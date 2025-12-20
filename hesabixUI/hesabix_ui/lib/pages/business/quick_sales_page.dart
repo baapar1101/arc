@@ -2,10 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
 import '../../services/invoice_service.dart';
 import '../../services/product_service.dart';
@@ -20,12 +18,11 @@ import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_line_item.dart';
 import '../../models/invoice_transaction.dart';
-import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
+import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../models/customer_model.dart';
-import '../../models/cash_register.dart';
 import 'package:go_router/go_router.dart';
 
 class QuickSalesPage extends StatefulWidget {
@@ -45,6 +42,7 @@ class QuickSalesPage extends StatefulWidget {
 }
 
 class _QuickSalesPageState extends State<QuickSalesPage> {
+  static const double _mobileBreakpoint = 700.0;
   final QuickSalesService _quickSalesService = QuickSalesService();
   final InvoiceService _invoiceService = InvoiceService();
   final ProductService _productService = ProductService();
@@ -82,7 +80,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   bool _autoPrint = false;
   bool _enableWarehouseDocument = true;
   String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
-  bool _autoPostWarehouse = true;
   bool _showInventory = true;
   bool _showPurchasePrice = false;
   int? _printTemplateId;
@@ -198,7 +195,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _autoPrint = settings['auto_print'] ?? false;
         _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
         _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
-        _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
         _showInventory = settings['show_inventory'] ?? true;
         _showPurchasePrice = settings['show_purchase_price'] ?? false;
         _printTemplateId = settings['print_template_id'];
@@ -252,7 +248,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
               productId: productId,
             );
             final instanceId = (selected['id'] as num?)?.toInt();
-            await _addToCart(product, instanceId: instanceId);
+            final instanceWarehouseId = (selected['warehouse_id'] as num?)?.toInt() ??
+                (selected['warehouseId'] as num?)?.toInt() ??
+                int.tryParse('${selected['warehouse_id'] ?? selected['warehouseId'] ?? ''}');
+            await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId);
             await _saveRecentProduct(product);
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
@@ -291,7 +290,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         
         // افزودن به سبد
         final instanceId = (instanceData['id'] as num?)?.toInt();
-        await _addToCart(product, instanceId: instanceId);
+        final instanceWarehouseId = (instanceData['warehouse_id'] as num?)?.toInt() ??
+            (instanceData['warehouseId'] as num?)?.toInt() ??
+            int.tryParse('${instanceData['warehouse_id'] ?? instanceData['warehouseId'] ?? ''}');
+        await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId);
         await _saveRecentProduct(product);
         _barcodeController.clear();
         _barcodeFocus.requestFocus();
@@ -538,7 +540,53 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     return 0;
   }
 
-  Future<void> _addToCart(Map<String, dynamic> product, {int? instanceId}) async {
+  bool get _hasUniqueItemsInCart => _cartItems.any((it) => it.extraInfo?['instance_id'] != null);
+
+  /// تغییر انبار انتخابی برای اقلام فاکتور
+  /// - مقدار اولیه از تنظیمات (`_defaultWarehouseId`) است
+  /// - با تغییر، اقلام سبد همگام می‌شوند و موجودی‌ها refresh می‌شوند
+  void _onWarehouseForInvoiceChanged(int? newWarehouseId) {
+    // اگر کالای یونیک در سبد داریم، برای جلوگیری از چند-انباره شدن فاکتور، تغییر را محدود می‌کنیم
+    if (_hasUniqueItemsInCart && newWarehouseId != null) {
+      final conflictingUnique = _cartItems.firstWhere(
+        (it) => it.extraInfo?['instance_id'] != null && it.warehouseId != null && it.warehouseId != newWarehouseId,
+        orElse: () => InvoiceLineItem(),
+      );
+      if (conflictingUnique.productId != null) {
+        SnackBarHelper.show(
+          context,
+          message: 'در سبد کالاهای یونیک از انبار دیگری وجود دارد. ابتدا آن را حذف کنید یا انبار همان کالا را انتخاب کنید.',
+          isError: true,
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _defaultWarehouseId = newWarehouseId;
+
+      // همگام‌سازی انبار برای اقلام غیر یونیک
+      for (var i = 0; i < _cartItems.length; i++) {
+        final item = _cartItems[i];
+        if (item.extraInfo?['instance_id'] != null) continue; // کالاهای یونیک
+        _cartItems[i] = item.copyWith(warehouseId: newWarehouseId);
+      }
+
+      // کش موجودی وابسته به انبار است
+      _productStocks.clear();
+    });
+
+    // در صورت فعال بودن نمایش موجودی، موجودی‌ها را مجدداً بارگذاری کن
+    if (_showInventory) {
+      _refreshAllStocks();
+    }
+  }
+
+  Future<void> _addToCart(
+    Map<String, dynamic> product, {
+    int? instanceId,
+    int? instanceWarehouseId,
+  }) async {
     final productId = (product['id'] as num?)?.toInt();
     if (productId == null) return;
     
@@ -595,9 +643,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       discountValue: 0,
       taxRate: _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
       trackInventory: trackInventory,
-      warehouseId: _defaultWarehouseId,
+      warehouseId: instanceWarehouseId ?? _defaultWarehouseId,
       basePurchasePriceMainUnit: _toNum(product['base_purchase_price']),
-      extraInfo: instanceId != null ? {'instance_id': instanceId} : null,
+      extraInfo: instanceId != null
+          ? {
+              'instance_id': instanceId,
+              if (instanceWarehouseId != null) 'instance_warehouse_id': instanceWarehouseId,
+            }
+          : null,
     );
     
     setState(() {
@@ -827,6 +880,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     // اعتبارسنجی ارز
     if (_defaultCurrencyId == null) {
       SnackBarHelper.show(context, message: 'ارز پیش‌فرض تنظیم نشده است. لطفاً در تنظیمات فاکتور سریع تنظیم کنید.', isError: true);
+      return;
+    }
+
+    // اگر قرار است حواله انبار صادر شود، انبار الزامی است
+    if (_enableWarehouseDocument && _defaultWarehouseId == null) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای صدور حواله انبار، انتخاب انبار الزامی است',
+        isError: true,
+      );
       return;
     }
     
@@ -1165,8 +1228,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < _mobileBreakpoint;
     
     if (_loading) {
       return Scaffold(
@@ -1180,38 +1244,57 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       onKeyEvent: _handleKeyEvent,
       child: Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('فروش سریع'),
-            if (_cartItems.isNotEmpty) ...[
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_cartItems.length} قلم',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onPrimaryContainer,
-                  ),
-                ),
+        title: isMobile
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('فروش سریع'),
+                  if (_cartItems.isNotEmpty)
+                    Text(
+                      '${_cartItems.length} قلم • ${_formatNumber(_totalAmount)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              )
+            : Row(
+                children: [
+                  const Text('فروش سریع'),
+                  if (_cartItems.isNotEmpty) ...[
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_cartItems.length} قلم',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: cs.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatNumber(_totalAmount),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                _formatNumber(_totalAmount),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: cs.primary,
-                ),
-              ),
-            ],
-          ],
-        ),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
         actions: [
@@ -1230,93 +1313,89 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
           ),
         ],
       ),
-      body: Row(
-        children: [
-          // ستون چپ: سبد خرید
-          Expanded(
-            flex: 7,
-            child: Column(
-              children: [
-                // جستجوی بارکد
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: cs.surfaceContainerHighest,
-                  child: Row(
-                    children: [
-                      // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
-                      if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
-                        IconButton(
-                          icon: _loadingStocks 
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.refresh),
-                          onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
-                          tooltip: 'به‌روزرسانی موجودی',
-                        ),
-                      Expanded(
-                        child: TextField(
-                          controller: _barcodeController,
-                          focusNode: _barcodeFocus,
-                          decoration: InputDecoration(
-                            labelText: 'بارکد / کد / نام محصول',
-                            hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
-                            prefixIcon: const Icon(Icons.qr_code_scanner),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
-                                if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle, color: Colors.green),
-                                    tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                                    onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
-                                  ),
-                                // دکمه جستجو
+      bottomNavigationBar: isMobile ? _buildMobileBottomBar(cs) : null,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final cartColumn = Column(
+            children: [
+              // جستجوی بارکد
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: cs.surfaceContainerHighest,
+                child: isMobile
+                    ? Column(
+                        children: [
+                          Row(
+                            children: [
+                              // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
+                              if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
                                 IconButton(
-                                  icon: const Icon(Icons.search),
-                                  onPressed: () => _searchByBarcode(_barcodeController.text),
-                                  tooltip: 'جستجو',
+                                  icon: _loadingStocks
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.refresh),
+                                  onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                                  tooltip: 'به‌روزرسانی موجودی',
                                 ),
-                              ],
+                              Expanded(child: _buildBarcodeSearchField()),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          CustomerComboboxWidget(
+                            selectedCustomer: _selectedCustomer,
+                            onCustomerChanged: (customer) {
+                              setState(() {
+                                _selectedCustomer = customer ?? _anonymousCustomer;
+                              });
+                            },
+                            businessId: widget.businessId,
+                            authStore: widget.authStore,
+                            isRequired: false,
+                            label: 'مشتری',
+                            hintText: 'مشتری ناشناس',
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
+                          if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
+                            IconButton(
+                              icon: _loadingStocks
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.refresh),
+                              onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                              tooltip: 'به‌روزرسانی موجودی',
+                            ),
+                          Expanded(child: _buildBarcodeSearchField()),
+                          const SizedBox(width: 8),
+                          // جستجوی مشتری
+                          SizedBox(
+                            width: 200,
+                            child: CustomerComboboxWidget(
+                              selectedCustomer: _selectedCustomer,
+                              onCustomerChanged: (customer) {
+                                setState(() {
+                                  _selectedCustomer = customer ?? _anonymousCustomer;
+                                });
+                              },
+                              businessId: widget.businessId,
+                              authStore: widget.authStore,
+                              isRequired: false,
+                              label: 'مشتری',
+                              hintText: 'مشتری ناشناس',
                             ),
                           ),
-                          onSubmitted: _searchByBarcode,
-                          onChanged: (value) {
-                            // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
-                            if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
-                              setState(() {
-                                _lastFailedSearchQuery = null;
-                              });
-                            }
-                          },
-                          textInputAction: TextInputAction.search,
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      // جستجوی مشتری
-                      SizedBox(
-                        width: 200,
-                        child: CustomerComboboxWidget(
-                          selectedCustomer: _selectedCustomer,
-                          onCustomerChanged: (customer) {
-                            setState(() {
-                              _selectedCustomer = customer ?? _anonymousCustomer;
-                            });
-                          },
-                          businessId: widget.businessId,
-                          authStore: widget.authStore,
-                          isRequired: false,
-                          label: 'مشتری',
-                          hintText: 'مشتری ناشناس',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              ),
                 // تاریخچه محصولات اخیر
                 if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
                   Container(
@@ -1663,142 +1742,355 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                         ),
                 ),
               ],
+            );
+
+          if (isMobile) {
+            return Column(
+              children: [
+                Expanded(child: cartColumn),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              // ستون چپ: سبد خرید
+              Expanded(flex: 7, child: cartColumn),
+              // ستون راست: خلاصه و پرداخت
+              _buildDesktopCheckoutPanel(cs),
+            ],
+          );
+        },
+      ),
+      ),
+    );
+  }
+
+  Widget _buildBarcodeSearchField() {
+    return TextField(
+      controller: _barcodeController,
+      focusNode: _barcodeFocus,
+      decoration: InputDecoration(
+        labelText: 'بارکد / کد / نام محصول',
+        hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
+        prefixIcon: const Icon(Icons.qr_code_scanner),
+        border: const OutlineInputBorder(),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
+            if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Colors.green),
+                tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
+                onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+              ),
+            // دکمه جستجو
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => _searchByBarcode(_barcodeController.text),
+              tooltip: 'جستجو',
+            ),
+          ],
+        ),
+      ),
+      onSubmitted: _searchByBarcode,
+      onChanged: (value) {
+        // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
+        if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+          setState(() {
+            _lastFailedSearchQuery = null;
+          });
+        }
+      },
+      textInputAction: TextInputAction.search,
+    );
+  }
+
+  Widget _buildDesktopCheckoutPanel(ColorScheme cs) {
+    return Container(
+      width: 350,
+      color: cs.surfaceContainerHighest,
+      child: Column(
+        children: [
+          _buildInvoiceSummarySection(cs),
+          const Divider(),
+          _buildPaymentSection(cs),
+          const Spacer(),
+          _buildCheckoutButtons(cs),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceSummarySection(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'خلاصه فاکتور',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: cs.onSurface,
             ),
           ),
-          // ستون راست: خلاصه و پرداخت
-          Container(
-            width: 350,
-            color: cs.surfaceContainerHighest,
-            child: Column(
-              children: [
-                // خلاصه فاکتور
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'خلاصه فاکتور',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
-                      _buildSummaryRow('جمع کل', _formatNumber(_subtotalAmount)),
-                      if (_totalDiscount > 0)
-                        _buildSummaryRow('تخفیف', '-${_formatNumber(_totalDiscount)}'),
-                      if (_totalTax > 0)
-                        _buildSummaryRow('مالیات', _formatNumber(_totalTax)),
-                      const Divider(),
-                      _buildSummaryRow(
-                        'مبلغ نهایی',
-                        _formatNumber(_totalAmount),
-                        isTotal: true,
-                      ),
-                      if (_payment != null && _payment!.amount < _totalAmount) ...[
-                        const SizedBox(height: 8),
-                        _buildSummaryRow(
-                          'مبلغ پرداخت شده',
-                          _formatNumber(_payment!.amount),
-                          isWarning: true,
-                        ),
-                        _buildSummaryRow(
-                          'باقیمانده',
-                          _formatNumber(_totalAmount - _payment!.amount),
-                          isWarning: true,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // پرداخت
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'پرداخت',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      CashRegisterComboboxWidget(
-                        businessId: widget.businessId,
-                        selectedRegisterId: _selectedCashRegisterId,
-                        onChanged: (option) {
-                          setState(() {
-                            _selectedCashRegisterId = option?.id;
-                            if (option != null && _totalAmount > 0) {
-                              _payment = InvoiceTransaction(
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                type: TransactionType.cashRegister,
-                                cashRegisterId: option.id,
-                                cashRegisterName: option.name,
-                                transactionDate: DateTime.now(),
-                                amount: _totalAmount, // همیشه برابر با مبلغ کل فاکتور
-                              );
-                            } else {
-                              _payment = null;
-                            }
-                          });
-                        },
-                        label: 'صندوق',
-                        hintText: 'انتخاب صندوق',
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                // دکمه‌های ثبت
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: _saving ? null : () => _saveInvoice(print: true),
-                          icon: _saving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.print),
-                          label: const Text('ثبت و چاپ'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: cs.primary,
-                            foregroundColor: cs.onPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          onPressed: _saving ? null : () => _saveInvoice(print: false),
-                          icon: const Icon(Icons.save),
-                          label: const Text('ثبت'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          const SizedBox(height: 16),
+          _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
+          _buildSummaryRow('جمع کل', _formatNumber(_subtotalAmount)),
+          if (_totalDiscount > 0) _buildSummaryRow('تخفیف', '-${_formatNumber(_totalDiscount)}'),
+          if (_totalTax > 0) _buildSummaryRow('مالیات', _formatNumber(_totalTax)),
+          const Divider(),
+          _buildSummaryRow('مبلغ نهایی', _formatNumber(_totalAmount), isTotal: true),
+          if (_payment != null && _payment!.amount < _totalAmount) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow('مبلغ پرداخت شده', _formatNumber(_payment!.amount), isWarning: true),
+            _buildSummaryRow('باقیمانده', _formatNumber(_totalAmount - _payment!.amount), isWarning: true),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSection(ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'پرداخت',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          CashRegisterComboboxWidget(
+            businessId: widget.businessId,
+            selectedRegisterId: _selectedCashRegisterId,
+            onChanged: (option) {
+              setState(() {
+                _selectedCashRegisterId = option?.id;
+                if (option != null && _totalAmount > 0) {
+                  _payment = InvoiceTransaction(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    type: TransactionType.cashRegister,
+                    cashRegisterId: option.id,
+                    cashRegisterName: option.name,
+                    transactionDate: DateTime.now(),
+                    amount: _totalAmount, // همیشه برابر با مبلغ کل فاکتور
+                  );
+                } else {
+                  _payment = null;
+                }
+              });
+            },
+            label: 'صندوق',
+            hintText: 'انتخاب صندوق',
+          ),
+          const SizedBox(height: 16),
+          WarehouseComboboxWidget(
+            businessId: widget.businessId,
+            selectedWarehouseId: _defaultWarehouseId,
+            onChanged: _onWarehouseForInvoiceChanged,
+            label: 'انبار اقلام',
+            hintText: 'انتخاب انبار برای اقلام فاکتور',
+            isRequired: _enableWarehouseDocument, // اگر حواله فعال باشد، انبار لازم است
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckoutButtons(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : () => _saveInvoice(print: true),
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print),
+              label: const Text('ثبت و چاپ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: _saving ? null : () => _saveInvoice(print: false),
+              icon: const Icon(Icons.save),
+              label: const Text('ثبت'),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMobileBottomBar(ColorScheme cs) {
+    final canCheckout = _cartItems.isNotEmpty && !_saving;
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'مبلغ نهایی',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatNumber(_totalAmount),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: cs.primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton(
+              onPressed: canCheckout ? () => _openCheckoutSheet(cs) : null,
+              child: Text(_cartItems.isEmpty ? 'سبد خالی' : 'پرداخت / ثبت'),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              enabled: canCheckout,
+              tooltip: 'اقدامات سریع',
+              onSelected: (value) async {
+                switch (value) {
+                  case 'save':
+                    await _saveInvoice(print: false);
+                    break;
+                  case 'print':
+                    await _saveInvoice(print: true);
+                    break;
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<String>(
+                  value: 'save',
+                  child: Row(
+                    children: [
+                      Icon(Icons.save),
+                      SizedBox(width: 10),
+                      Text('ثبت'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'print',
+                  child: Row(
+                    children: [
+                      Icon(Icons.print),
+                      SizedBox(width: 10),
+                      Text('ثبت و چاپ'),
+                    ],
+                  ),
+                ),
+              ],
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.more_vert,
+                          color: canCheckout ? cs.onSurface : cs.onSurface.withOpacity(0.4),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _openCheckoutSheet(ColorScheme cs) async {
+    if (_cartItems.isEmpty) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: cs.surface,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    children: [
+                      _buildInvoiceSummarySection(cs),
+                      const Divider(),
+                      _buildPaymentSection(cs),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: _buildCheckoutButtons(cs),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

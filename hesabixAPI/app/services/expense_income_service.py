@@ -632,6 +632,15 @@ def list_expense_income(
     if doc_type in (DOCUMENT_TYPE_EXPENSE, DOCUMENT_TYPE_INCOME):
         q = q.filter(Document.document_type == doc_type)
 
+    # پروژه
+    project_id = query.get("project_id")
+    try:
+        project_id_int = int(project_id) if project_id is not None else None
+    except Exception:
+        project_id_int = None
+    if project_id_int is not None:
+        q = q.filter(Document.project_id == project_id_int)
+
     # فیلتر تاریخ
     from_date = query.get("from_date")
     to_date = query.get("to_date")

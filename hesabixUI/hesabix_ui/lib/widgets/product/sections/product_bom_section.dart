@@ -92,6 +92,51 @@ class _ProductBomSectionState extends State<ProductBomSection> {
           ],
         ),
         const SizedBox(height: 12),
+        // کارت راهنمای استفاده از فرمول در فاکتور تولید
+        if (_items.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'راهنمای استفاده از فرمول تولید',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'برای استفاده از این فرمول‌ها در تولید، به بخش "فاکتور تولید" بروید و از دکمه "انفجار فرمول" استفاده کنید. این روش از نظر حسابداری اصولی‌تر است.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: _items.isEmpty
               ? const Center(child: Text('هنوز فرمولی تعریف نشده است'))
@@ -284,10 +329,8 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     switch (status.toLowerCase()) {
       case 'draft':
         return 'پیش‌نویس';
-      case 'active':
-        return 'فعال';
-      case 'inactive':
-        return 'غیرفعال';
+      case 'approved':
+        return 'تایید شده';
       case 'archived':
         return 'بایگانی';
       default:
@@ -299,10 +342,8 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     switch (status.toLowerCase()) {
       case 'draft':
         return Colors.grey;
-      case 'active':
+      case 'approved':
         return Colors.green;
-      case 'inactive':
-        return Colors.orange;
       case 'archived':
         return Colors.blueGrey;
       default:

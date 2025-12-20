@@ -3,7 +3,7 @@ Schema models کامل برای محصولات (Products)
 
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from decimal import Decimal
@@ -267,6 +267,52 @@ class ProductUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
+class BulkDefaultWarehouseApplyScope(str, Enum):
+    """دامنه اعمال تغییر انبار پیش‌فرض به صورت گروهی"""
+    TRACK_INVENTORY_TRUE = "track_inventory_true"
+    TRACK_INVENTORY_FALSE = "track_inventory_false"
+    ALL = "all"
+
+
+class BulkDefaultWarehouseRequest(BaseModel):
+    """درخواست تغییر گروهی انبار پیش‌فرض کالاها"""
+    ids: List[int] = Field(..., description="لیست شناسه کالاها", min_length=1)
+    default_warehouse_id: Optional[int] = Field(
+        None,
+        description="شناسه انبار پیش‌فرض جدید (اگر null باشد یعنی پاک‌سازی)",
+        gt=0
+    )
+    apply_scope: BulkDefaultWarehouseApplyScope = Field(
+        default=BulkDefaultWarehouseApplyScope.ALL,
+        description="اعمال روی کالاهای انبارداری/غیرانبارداری/همه"
+    )
+
+
+class BulkDefaultWarehouseSkippedItem(BaseModel):
+    id: int
+    reason: str
+    code: Optional[str] = None
+    name: Optional[str] = None
+
+
+class BulkDefaultWarehousePreviewResponse(BaseModel):
+    total_requested: int
+    found_count: int
+    will_update_count: int
+    forced_service_null_count: int = 0
+    skipped: List[BulkDefaultWarehouseSkippedItem] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
+class BulkDefaultWarehouseApplyResponse(BaseModel):
+    total_requested: int
+    found_count: int
+    updated_count: int
+    forced_service_null_count: int = 0
+    skipped: List[BulkDefaultWarehouseSkippedItem] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
 class ProductInventoryInfo(BaseModel):
     """اطلاعات موجودی محصول"""
     warehouse_id: Optional[int]
@@ -371,69 +417,6 @@ class ProductListResponse(BaseModel):
     has_more: bool = Field(..., description="آیا رکورد بیشتری وجود دارد")
 
 
-class BulkPriceUpdateRequest(BaseModel):
-    """درخواست تغییر گروهی قیمت"""
-    product_ids: List[int] = Field(
-        ...,
-        description="لیست شناسه‌های محصولات",
-        min_items=1
-    )
-    price_type: Literal["sales", "purchase"] = Field(
-        ...,
-        description="نوع قیمت: sales (فروش) یا purchase (خرید)"
-    )
-    change_type: Literal["percent", "amount", "set"] = Field(
-        ...,
-        description="نوع تغییر: percent (درصد), amount (مبلغ ثابت), set (تنظیم مقدار)"
-    )
-    value: Decimal = Field(
-        ...,
-        description="مقدار تغییر (بسته به change_type)"
-    )
-    
-    @validator('value')
-    def validate_value(cls, v, values):
-        change_type = values.get('change_type')
-        if change_type == 'percent' and (v < -100 or v > 1000):
-            raise ValueError('درصد باید بین -100 تا 1000 باشد')
-        if change_type == 'set' and v < 0:
-            raise ValueError('قیمت نمی‌تواند منفی باشد')
-        return v
-    
-    class Config:
-        json_schema_extra = {
-            "examples": [
-                {
-                    "summary": "افزایش 10 درصدی قیمت",
-                    "value": {
-                        "product_ids": [1, 2, 3],
-                        "price_type": "sales",
-                        "change_type": "percent",
-                        "value": 10
-                    }
-                },
-                {
-                    "summary": "کاهش 50000 تومانی قیمت",
-                    "value": {
-                        "product_ids": [4, 5],
-                        "price_type": "purchase",
-                        "change_type": "amount",
-                        "value": -50000
-                    }
-                },
-                {
-                    "summary": "تنظیم قیمت به 100000",
-                    "value": {
-                        "product_ids": [5],
-                        "price_type": "purchase",
-                        "change_type": "set",
-                        "value": 100000
-                    }
-                }
-            ]
-        }
-
-
 class BulkPriceUpdateType(str, Enum):
     """نوع تغییر قیمت گروهی"""
     PERCENTAGE = "percentage"
@@ -453,6 +436,84 @@ class BulkPriceUpdateTarget(str, Enum):
     BOTH = "both"
 
 
+class BulkPriceUpdateRequest(BaseModel):
+    """
+    درخواست تغییر گروهی قیمت (نسخه جدید)
+
+    نکته: این مدل باید با فرانت (`BulkPriceUpdateRequest.toJson`) و سرویس
+    `app/services/bulk_price_update_service.py` هم‌خوان باشد.
+    """
+    update_type: BulkPriceUpdateType = Field(
+        ...,
+        description="نوع تغییر: percentage (درصدی) یا amount (مبلغی)"
+    )
+    direction: BulkPriceUpdateDirection = Field(
+        default=BulkPriceUpdateDirection.INCREASE,
+        description="جهت تغییر: increase (افزایش) یا decrease (کاهش)"
+    )
+    target: BulkPriceUpdateTarget = Field(
+        ...,
+        description="هدف تغییر: sales_price / purchase_price / both"
+    )
+    value: Decimal = Field(
+        ...,
+        description="مقدار تغییر (همیشه غیرمنفی؛ جهت از طریق direction تعیین می‌شود)",
+        ge=0
+    )
+
+    # فیلترهای انتخاب کالاها (اختیاری)
+    category_ids: Optional[List[int]] = Field(None, description="فیلتر بر اساس دسته‌بندی", min_items=1)
+    currency_ids: Optional[List[int]] = Field(None, description="فیلتر بر اساس ارز", min_items=1)
+    price_list_ids: Optional[List[int]] = Field(None, description="فیلتر بر اساس لیست قیمت", min_items=1)
+    item_types: Optional[List[ProductItemType]] = Field(None, description="فیلتر بر اساس نوع آیتم", min_items=1)
+    product_ids: Optional[List[int]] = Field(None, description="شناسه‌های کالاهای خاص", min_items=1)
+
+    # گزینه‌های اضافی
+    only_products_with_inventory: Optional[bool] = Field(
+        default=None,
+        description="اگر true باشد فقط کالاهای دارای کنترل موجودی؛ اگر false باشد فقط کالاهای بدون کنترل موجودی؛ اگر null باشد بدون فیلتر"
+    )
+    only_products_with_base_price: bool = Field(
+        default=True,
+        description="فقط کالاهایی که قیمت پایه (متناسب با target) دارند"
+    )
+
+    @validator("value")
+    def validate_value(cls, v: Decimal, values: dict):
+        update_type = values.get("update_type")
+        # محدودیت منطقی برای درصد
+        if update_type == BulkPriceUpdateType.PERCENTAGE and v > Decimal("1000"):
+            raise ValueError("درصد نمی‌تواند بیشتر از 1000 باشد")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "summary": "افزایش 10 درصدی قیمت فروش (با فیلتر دسته)",
+                    "value": {
+                        "update_type": "percentage",
+                        "direction": "increase",
+                        "target": "sales_price",
+                        "value": 10,
+                        "category_ids": [1],
+                        "only_products_with_base_price": True
+                    }
+                },
+                {
+                    "summary": "کاهش 50000 تومانی قیمت خرید (برای محصولات انتخاب‌شده)",
+                    "value": {
+                        "update_type": "amount",
+                        "direction": "decrease",
+                        "target": "purchase_price",
+                        "value": 50000,
+                        "product_ids": [4, 5]
+                    }
+                }
+            ]
+        }
+
+
 class BulkPriceUpdatePreview(BaseModel):
     """پیش‌نمایش تغییرات قیمت"""
     product_id: int
@@ -468,24 +529,43 @@ class BulkPriceUpdatePreview(BaseModel):
 
 
 class BulkPriceUpdatePreviewResponse(BaseModel):
-    """پیش‌نمایش تغییر قیمت گروهی"""
-    affected_count: int = Field(..., description="تعداد محصولات تحت تأثیر")
-    preview: List[dict] = Field(
+    """پیش‌نمایش تغییر قیمت گروهی (مطابق خروجی سرویس bulk_price_update_service و فرانت)"""
+    total_products: int = Field(..., description="تعداد کل محصولات مطابق فیلترها")
+    affected_products: List[BulkPriceUpdatePreview] = Field(
         ...,
-        description="پیش‌نمایش تغییرات - شامل: product_id, name, old_price, new_price"
+        description="لیست محصولات و پیش‌نمایش تغییرات قیمت"
     )
-    
+    summary: Dict[str, Any] = Field(..., description="خلاصه آماری تغییرات")
+
     class Config:
         json_schema_extra = {
             "example": {
-                "affected_count": 3,
-                "preview": [
+                "total_products": 3,
+                "affected_products": [
                     {
                         "product_id": 1,
-                        "name": "محصول A",
-                        "old_price": 100000,
-                        "new_price": 110000
+                        "product_name": "محصول A",
+                        "product_code": "P-001",
+                        "category_name": "دسته ۱",
+                        "current_sales_price": 100000,
+                        "current_purchase_price": 80000,
+                        "new_sales_price": 110000,
+                        "new_purchase_price": 88000,
+                        "sales_price_change": 10000,
+                        "purchase_price_change": 8000,
                     }
-                ]
+                ],
+                "summary": {
+                    "total_products": 3,
+                    "affected_products": 3,
+                    "products_with_sales_change": 3,
+                    "products_with_purchase_change": 3,
+                    "total_sales_change": 30000,
+                    "total_purchase_change": 24000,
+                    "update_type": "amount",
+                    "direction": "increase",
+                    "target": "both",
+                    "value": 1000,
+                },
             }
         }

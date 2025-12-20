@@ -29,12 +29,14 @@ class PersonDetailsDialog extends StatefulWidget {
   final int businessId;
   final Person person;
   final AuthStore authStore;
+  final bool isWarrantyPluginActive;
 
   const PersonDetailsDialog({
     super.key,
     required this.businessId,
     required this.person,
     required this.authStore,
+    required this.isWarrantyPluginActive,
   });
 
   @override
@@ -81,7 +83,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     _personService = PersonService();
     _storageService = BusinessStorageService(ApiClient());
     _warrantyService = WarrantyService();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: widget.isWarrantyPluginActive ? 5 : 4, vsync: this);
     _loadPersonDetails();
     _ensureCalendarController();
     _initFinancialContext();
@@ -404,7 +406,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 tabs: [
                   const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات شخص'),
                   const Tab(icon: Icon(Icons.assignment), text: 'کارت حساب'),
-                  Tab(icon: Icon(Icons.verified_user), text: t.warranty ?? 'گارانتی'),
+                  if (widget.isWarrantyPluginActive)
+                    Tab(icon: const Icon(Icons.verified_user), text: t.warranty ?? 'گارانتی'),
                   const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
                   const Tab(icon: Icon(Icons.share), text: 'اشتراک‌گذاری'),
                 ],
@@ -416,7 +419,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 children: [
                   _buildInfoTab(theme),
                   _buildAccountCardTab(t, theme),
-                  _buildWarrantyTab(t, theme),
+                  if (widget.isWarrantyPluginActive) _buildWarrantyTab(t, theme),
                   _buildAttachmentsTab(theme),
                   _buildShareTab(theme),
                 ],
@@ -800,6 +803,9 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<List<WarrantyCode>> _loadPersonWarranties() async {
+    if (!widget.isWarrantyPluginActive) {
+      return [];
+    }
     if (widget.person.id == null) {
       return [];
     }

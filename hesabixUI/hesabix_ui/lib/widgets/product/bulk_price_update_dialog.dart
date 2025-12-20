@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:dio/dio.dart';
 
 import '../../core/api_client.dart';
 import '../../models/bulk_price_update_data.dart';
@@ -12,6 +13,8 @@ import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/category/category_picker_field.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/errors/api_error.dart';
+import '../../utils/responsive_helper.dart';
 
 class BulkPriceUpdateDialog extends StatefulWidget {
   final int businessId;
@@ -33,6 +36,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   final _formKey = GlobalKey<FormState>();
   final _apiClient = ApiClient();
   final _valueController = TextEditingController();
+  final _scrollController = ScrollController();
   
   late final BulkPriceUpdateService _bulkPriceService;
   late final CategoryService _categoryService;
@@ -50,7 +54,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   List<int> _selectedCurrencyIds = [];
   List<int> _selectedPriceListIds = [];
   List<String> _selectedItemTypes = [];
-  bool? _onlyProductsWithInventory;
+  bool _onlyProductsWithInventory = false;
   bool _onlyProductsWithBasePrice = true;
 
   // داده‌های مرجع
@@ -74,6 +78,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   @override
   void dispose() {
     _valueController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -133,7 +138,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         priceListIds: _selectedPriceListIds.isNotEmpty ? _selectedPriceListIds : null,
         itemTypes: _selectedItemTypes.isNotEmpty ? _selectedItemTypes : null,
         productIds: widget.selectedProductIds,
-        onlyProductsWithInventory: _onlyProductsWithInventory,
+        onlyProductsWithInventory: _onlyProductsWithInventory ? true : null,
         onlyProductsWithBasePrice: _onlyProductsWithBasePrice,
       );
 
@@ -150,7 +155,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       setState(() => _isPreviewLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
+        SnackBarHelper.showError(context, message: _formatBulkPriceUpdateError(e, t));
       }
     }
   }
@@ -221,7 +226,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         priceListIds: _selectedPriceListIds.isNotEmpty ? _selectedPriceListIds : null,
         itemTypes: _selectedItemTypes.isNotEmpty ? _selectedItemTypes : null,
         productIds: widget.selectedProductIds,
-        onlyProductsWithInventory: _onlyProductsWithInventory,
+        onlyProductsWithInventory: _onlyProductsWithInventory ? true : null,
         onlyProductsWithBasePrice: _onlyProductsWithBasePrice,
       );
 
@@ -233,14 +238,17 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       if (mounted) {
         Navigator.of(context).pop(true);
         widget.onSuccess?.call();
-        SnackBarHelper.show(context, message: result['message'] ?? AppLocalizations.of(context),
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showSuccess(
+          context,
+          message: result['message']?.toString() ?? t.operationSuccessful,
         );
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
+        SnackBarHelper.showError(context, message: _formatBulkPriceUpdateError(e, t));
       }
     }
   }
@@ -252,147 +260,192 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
     final surface = theme.colorScheme.surface;
     final primary = theme.colorScheme.primary;
     final onPrimary = theme.colorScheme.onPrimary;
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: 900,
-          height: 640,
-          color: surface,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primary.withValues(alpha: 0.90), primary.withValues(alpha: 0.75)],
-                    begin: Alignment.centerRight,
-                    end: Alignment.centerLeft,
-                  ),
-                ),
-                child: Row(
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
+      shape: isMobile ? const RoundedRectangleBorder() : RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: ResponsiveHelper.getDialogConstraints(context),
+        child: ClipRRect(
+          borderRadius: isMobile ? BorderRadius.zero : BorderRadius.circular(16),
+          child: Container(
+            color: surface,
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final maxW = constraints.maxWidth;
+                final isCompact = maxW < 720; // چینش تک‌ستونه برای عرض کم
+                final bodyPadding = EdgeInsets.all(isMobile ? 12 : 20);
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Header
                     Container(
-                      width: 40,
-                      height: 40,
+                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 14),
                       decoration: BoxDecoration(
-                        color: onPrimary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [primary.withValues(alpha: 0.90), primary.withValues(alpha: 0.75)],
+                          begin: Alignment.centerRight,
+                          end: Alignment.centerLeft,
+                        ),
                       ),
-                      child: Icon(Icons.price_change, color: onPrimary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            t.bulkPriceUpdateTitle,
-                            style: theme.textTheme.titleLarge?.copyWith(color: onPrimary, fontWeight: FontWeight.w700),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: onPrimary.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.price_change, color: onPrimary),
                           ),
-                          Text(
-                            t.bulkPriceUpdateSubtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(color: onPrimary.withValues(alpha: 0.9)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  t.bulkPriceUpdateTitle,
+                                  style: theme.textTheme.titleLarge?.copyWith(color: onPrimary, fontWeight: FontWeight.w700),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  t.bulkPriceUpdateSubtitle,
+                                  style: theme.textTheme.bodySmall?.copyWith(color: onPrimary.withValues(alpha: 0.9)),
+                                  maxLines: isMobile ? 2 : 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: t.close,
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: IconButton.styleFrom(foregroundColor: onPrimary),
+                            icon: const Icon(Icons.close),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: IconButton.styleFrom(foregroundColor: onPrimary),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
 
-              // Body
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildSectionCard(
-                                title: t.changeTypeAndDirection,
-                                icon: Icons.tune,
-                                child: _buildUpdateTypeSection(),
+                    // Body
+                    Expanded(
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : Scrollbar(
+                              controller: _scrollController,
+                              thumbVisibility: !isMobile,
+                              child: SingleChildScrollView(
+                                controller: _scrollController,
+                                padding: bodyPadding,
+                                child: Form(
+                                  key: _formKey,
+                                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildSectionCard(
+                                        title: t.changeTypeAndDirection,
+                                        icon: Icons.tune,
+                                        child: _buildUpdateTypeSection(isCompact: isCompact),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildSectionCard(
+                                        title: t.changeTarget,
+                                        icon: Icons.track_changes,
+                                        child: _buildTargetSection(),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildSectionCard(
+                                        title: t.changeAmount,
+                                        icon: Icons.calculate,
+                                        child: _buildValueSection(),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildSectionCard(
+                                        title: t.filters,
+                                        icon: Icons.filter_list,
+                                        child: _buildFiltersSection(isCompact: isCompact),
+                                      ),
+                                      if (_previewResponse != null) ...[
+                                        const SizedBox(height: 14),
+                                        _buildSectionCard(
+                                          title: t.previewChanges,
+                                          icon: Icons.preview,
+                                          child: _buildPreviewSection(isCompact: isCompact),
+                                        ),
+                                      ],
+                                      if (isMobile) const SizedBox(height: 8), // فضای نفس برای موبایل
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 14),
-                              _buildSectionCard(
-                                title: t.changeTarget,
-                                icon: Icons.track_changes,
-                                child: _buildTargetSection(),
-                              ),
-                              const SizedBox(height: 14),
-                              _buildSectionCard(
-                                title: t.changeAmount,
-                                icon: Icons.calculate,
-                                child: _buildValueSection(),
-                              ),
-                              const SizedBox(height: 14),
-                              _buildSectionCard(
-                                title: t.filters,
-                                icon: Icons.filter_list,
-                                child: _buildFiltersSection(),
-                              ),
-                              if (_previewResponse != null) ...[
-                                const SizedBox(height: 14),
-                                _buildSectionCard(
-                                  title: t.previewChanges,
-                                  icon: Icons.preview,
-                                  child: _buildPreviewSection(),
+                            ),
+                    ),
+
+                    // Footer actions
+                    Container(
+                      padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 10, isMobile ? 12 : 16, isMobile ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.4))),
+                      ),
+                      child: isMobile
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _isPreviewLoading ? null : _previewChanges,
+                                  icon: _isPreviewLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.visibility),
+                                  label: Text(t.preview),
+                                ),
+                                const SizedBox(height: 8),
+                                FilledButton.icon(
+                                  onPressed: _isLoading || _previewResponse == null ? null : _applyChanges,
+                                  icon: _isLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.check_circle),
+                                  label: Text(t.applyChanges),
                                 ),
                               ],
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
-
-              // Footer actions
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.4))),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _isPreviewLoading ? null : _previewChanges,
-                      icon: _isPreviewLoading
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.visibility),
-                      label: Text(t.preview),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _isLoading || _previewResponse == null ? null : _applyChanges,
-                      icon: _isLoading
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.check_circle),
-                      label: Text(t.applyChanges),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _isPreviewLoading ? null : _previewChanges,
+                                  icon: _isPreviewLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.visibility),
+                                  label: Text(t.preview),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton.icon(
+                                  onPressed: _isLoading || _previewResponse == null ? null : _applyChanges,
+                                  icon: _isLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.check_circle),
+                                  label: Text(t.applyChanges),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUpdateTypeSection() {
+  Widget _buildUpdateTypeSection({required bool isCompact}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -508,6 +561,9 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
               if (parsed < 0) {
                 return 'مقدار نمیتواند منفی باشد';
               }
+              if (parsed == 0) {
+                return 'مقدار تغییر باید بزرگتر از صفر باشد';
+              }
               return null;
             }
             
@@ -519,6 +575,9 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
             }
             if (parsed < 0) {
               return 'مقدار نمیتواند منفی باشد';
+            }
+            if (parsed == 0) {
+              return 'مقدار تغییر باید بزرگتر از صفر باشد';
             }
             return null;
           },
@@ -542,34 +601,44 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
     );
   }
 
-  Widget _buildFiltersSection() {
+  Widget _buildFiltersSection({required bool isCompact}) {
+    final gap = isCompact ? 12.0 : 16.0;
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCategoryFilter(),
+          SizedBox(height: gap),
+          _buildCurrencyFilter(),
+          SizedBox(height: gap),
+          _buildPriceListFilter(),
+          SizedBox(height: gap),
+          _buildItemTypeFilter(),
+          SizedBox(height: gap),
+          _buildOptionsFilter(),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(
-              child: _buildCategoryFilter(),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildCurrencyFilter(),
-            ),
+            Expanded(child: _buildCategoryFilter()),
+            SizedBox(width: gap),
+            Expanded(child: _buildCurrencyFilter()),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         Row(
           children: [
-            Expanded(
-              child: _buildPriceListFilter(),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildItemTypeFilter(),
-            ),
+            Expanded(child: _buildPriceListFilter()),
+            SizedBox(width: gap),
+            Expanded(child: _buildItemTypeFilter()),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         _buildOptionsFilter(),
       ],
     );
@@ -702,9 +771,9 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         CheckboxListTile(
           title: const Text('فقط کالاهای با موجودی'),
           subtitle: const Text('فقط کالاهایی که موجودی آن‌ها کنترل می‌شود'),
-          value: _onlyProductsWithInventory ?? false,
+          value: _onlyProductsWithInventory,
           onChanged: (value) {
-            setState(() => _onlyProductsWithInventory = value);
+            setState(() => _onlyProductsWithInventory = value ?? false);
           },
           controlAffinity: ListTileControlAffinity.leading,
         ),
@@ -721,8 +790,9 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
     );
   }
 
-  Widget _buildPreviewSection() {
+  Widget _buildPreviewSection({required bool isCompact}) {
     if (_previewResponse == null) return const SizedBox.shrink();
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -750,49 +820,81 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSummaryItem(
-                      'کل کالاها',
-                      _previewResponse!.totalProducts.toString(),
-                      Icons.inventory_2,
+              isCompact
+                  ? Column(
+                      children: [
+                        _buildSummaryItem(
+                          'کل کالاها',
+                          _previewResponse!.totalProducts.toString(),
+                          Icons.inventory_2,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildSummaryItem(
+                          'کالاهای تأثیرپذیر',
+                          _previewResponse!.affectedProducts.length.toString(),
+                          Icons.touch_app,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'کل کالاها',
+                            _previewResponse!.totalProducts.toString(),
+                            Icons.inventory_2,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'کالاهای تأثیرپذیر',
+                            _previewResponse!.affectedProducts.length.toString(),
+                            Icons.touch_app,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Expanded(
-                    child: _buildSummaryItem(
-                      'کالاهای تأثیرپذیر',
-                      _previewResponse!.affectedProducts.length.toString(),
-                      Icons.touch_app,
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSummaryItem(
-                      'تغییرات قیمت فروش',
-                      _previewResponse!.summary['products_with_sales_change']?.toString() ?? '0',
-                      Icons.sell,
+              isCompact
+                  ? Column(
+                      children: [
+                        _buildSummaryItem(
+                          'تغییرات قیمت فروش',
+                          _previewResponse!.summary['products_with_sales_change']?.toString() ?? '0',
+                          Icons.sell,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildSummaryItem(
+                          'تغییرات قیمت خرید',
+                          _previewResponse!.summary['products_with_purchase_change']?.toString() ?? '0',
+                          Icons.shopping_cart,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'تغییرات قیمت فروش',
+                            _previewResponse!.summary['products_with_sales_change']?.toString() ?? '0',
+                            Icons.sell,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'تغییرات قیمت خرید',
+                            _previewResponse!.summary['products_with_purchase_change']?.toString() ?? '0',
+                            Icons.shopping_cart,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Expanded(
-                    child: _buildSummaryItem(
-                      'تغییرات قیمت خرید',
-                      _previewResponse!.summary['products_with_purchase_change']?.toString() ?? '0',
-                      Icons.shopping_cart,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 200,
+          height: isMobile ? 260 : 240,
           child: ListView.builder(
             itemCount: _previewResponse!.affectedProducts.length,
             itemBuilder: (context, index) {
@@ -810,11 +912,15 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                         Text(
                           'فروش: ${formatWithThousands(product.currentSalesPrice ?? 0)} → ${formatWithThousands(product.newSalesPrice ?? 0)}',
                           style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       if (product.purchasePriceChange != null)
                         Text(
                           'خرید: ${formatWithThousands(product.currentPurchasePrice ?? 0)} → ${formatWithThousands(product.newPurchasePrice ?? 0)}',
                           style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
@@ -891,5 +997,79 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         ),
       ),
     );
+  }
+
+  String _formatBulkPriceUpdateError(Object e, AppLocalizations t) {
+    ApiErrorDetails? apiError;
+    if (e is DioException && e.error is ApiErrorDetails) {
+      apiError = e.error as ApiErrorDetails;
+    } else if (e is ApiErrorDetails) {
+      apiError = e;
+    }
+
+    if (apiError?.code == 'VALIDATION_ERROR') {
+      final details = apiError?.details?['details'];
+      if (details is List) {
+        final messages = <String>[];
+        for (final item in details) {
+          if (item is Map) {
+            final loc = item['loc'];
+            final msg = item['msg']?.toString();
+            final field = _extractFieldName(loc);
+            final label = _bulkPriceFieldLabel(field);
+            if (msg != null && msg.isNotEmpty) {
+              messages.add(label != null ? '$label: $msg' : msg);
+            }
+          }
+        }
+        if (messages.isNotEmpty) {
+          return 'لطفاً موارد زیر را اصلاح کنید:\n- ${messages.join('\n- ')}';
+        }
+      }
+      return apiError?.message ?? t.operationFailed;
+    }
+
+    return '${t.operationFailed}: ${apiError?.message ?? e.toString()}';
+  }
+
+  String? _extractFieldName(dynamic loc) {
+    if (loc is List) {
+      // ساختار معمول: ["body", "field_name", ...]
+      for (final part in loc) {
+        final s = part?.toString();
+        if (s != null && s.isNotEmpty && s != 'body' && s != 'query' && s != 'path') {
+          return s;
+        }
+      }
+    }
+    return null;
+  }
+
+  String? _bulkPriceFieldLabel(String? field) {
+    switch (field) {
+      case 'update_type':
+        return 'نوع تغییر';
+      case 'direction':
+        return 'جهت تغییر';
+      case 'target':
+        return 'هدف تغییر';
+      case 'value':
+        return 'مقدار تغییر';
+      case 'product_ids':
+        return 'کالاهای انتخاب‌شده';
+      case 'category_ids':
+        return 'دسته‌بندی';
+      case 'currency_ids':
+        return 'ارز';
+      case 'price_list_ids':
+        return 'لیست قیمت';
+      case 'item_types':
+        return 'نوع آیتم';
+      case 'only_products_with_inventory':
+        return 'فقط کالاهای با موجودی';
+      case 'only_products_with_base_price':
+        return 'فقط کالاهای با قیمت پایه';
+    }
+    return null;
   }
 }

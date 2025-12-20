@@ -953,18 +953,40 @@ class _KardexPageState extends State<KardexPage> {
           SizedBox(
             width: 220,
             child: DropdownButtonFormField<int>(
+              isExpanded: true,
               value: _selectedFiscalYearId,
               decoration: InputDecoration(
                 labelText: t.fiscalYear,
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
+              selectedItemBuilder: (ctx) {
+                return _fiscalYears.map<Widget>((fy) {
+                  final id = fy['id'] as int?;
+                  final title = (fy['title'] ?? '').toString();
+                  final label = title.isNotEmpty ? title : 'FY ${id ?? ''}';
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  );
+                }).toList();
+              },
               items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
                 final id = fy['id'] as int?;
                 final title = (fy['title'] ?? '').toString();
                 return DropdownMenuItem<int>(
                   value: id,
-                  child: Text(title.isNotEmpty ? title : 'FY ${id ?? ''}'),
+                  child: Text(
+                    title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
                 );
               }).toList(),
               onChanged: (val) {

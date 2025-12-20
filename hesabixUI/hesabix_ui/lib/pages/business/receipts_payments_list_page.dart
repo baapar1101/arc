@@ -1333,12 +1333,12 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       
       // تبدیل personLines به فرمت مورد نیاز API
       final personLinesData = _personLines.map((line) {
+        final trimmedDesc = line.description?.trim();
         final personLine = <String, dynamic>{
           'person_id': int.parse(line.personId!),
           'person_name': line.personName,
           'amount': line.amount,
-          if (line.description != null && line.description!.isNotEmpty)
-            'description': line.description,
+          if (trimmedDesc != null && trimmedDesc.isNotEmpty) 'description': trimmedDesc,
         };
         
         // اضافه کردن اطلاعات فاکتور در extra_info
@@ -1883,6 +1883,7 @@ class _PersonLineTile extends StatefulWidget {
 class _PersonLineTileState extends State<_PersonLineTile> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
+  final FocusNode _descFocusNode = FocusNode();
   bool _showInstallmentSchedule = false; // برای نمایش/مخفی کردن لیست اقساط
   List<Map<String, dynamic>> _invoices = [];
   bool _loadingInvoices = false;
@@ -1933,7 +1934,13 @@ class _PersonLineTileState extends State<_PersonLineTile> {
       }
     }
     if (oldWidget.line.description != widget.line.description) {
-      _descController.text = widget.line.description ?? '';
+      final desired = widget.line.description ?? '';
+      // هنگام تایپ کاربر، controller.text عملاً همین مقدار است.
+      // فقط وقتی برنامه‌وار/از بیرون تغییر کند sync می‌کنیم تا کرسر/متن وسط تایپ reset نشود.
+      if (_descController.text != desired) {
+        final selection = TextSelection.collapsed(offset: desired.length);
+        _descController.value = TextEditingValue(text: desired, selection: selection);
+      }
     }
     // اگر قسط جاری انتخاب شده باشد، لیست را مخفی کن
     if (widget.line.installmentCurrentSeq != null && oldWidget.line.installmentCurrentSeq == null) {
@@ -2177,6 +2184,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
   void dispose() {
     _amountController.dispose();
     _descController.dispose();
+    _descFocusNode.dispose();
     super.dispose();
   }
 
@@ -2261,10 +2269,13 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _descController,
+              focusNode: _descFocusNode,
               decoration: InputDecoration(
                 labelText: t.description,
               ),
-              onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v.trim())),
+              // IMPORTANT: اینجا trim نکن تا هر keypress باعث sync مجدد controller و reset شدن کرسر نشود.
+              // trim را موقع ذخیره‌سازی/ارسال به API انجام می‌دهیم.
+              onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v)),
             ),
             const SizedBox(height: 8),
             // سوئیچ لینک به فاکتور (فقط برای اسناد غیراقساطی)

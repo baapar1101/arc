@@ -8,13 +8,65 @@ class WarehouseFormDialog extends StatefulWidget {
   final int businessId;
   final Warehouse? warehouse; // null برای افزودن، مقدار برای ویرایش
   final VoidCallback? onSuccess;
+  final bool _useDialogChrome;
 
   const WarehouseFormDialog({
     super.key,
     required this.businessId,
     this.warehouse,
     this.onSuccess,
-  });
+    bool useDialogChrome = true,
+  }) : _useDialogChrome = useDialogChrome;
+
+  /// باز کردن فرم به‌صورت ریسپانسیو:
+  /// - موبایل: bottom sheet اسکرول‌پذیر
+  /// - دسکتاپ/تبلت: دیالوگ وسط با اندازه محدود
+  static Future<bool?> show(
+    BuildContext context, {
+    required int businessId,
+    Warehouse? warehouse,
+    VoidCallback? onSuccess,
+  }) async {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 700;
+
+    if (isMobile) {
+      return showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (bottomSheetContext) {
+          final bottomInset = MediaQuery.of(bottomSheetContext).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: FractionallySizedBox(
+              heightFactor: 0.95,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Material(
+                  child: WarehouseFormDialog(
+                    businessId: businessId,
+                    warehouse: warehouse,
+                    onSuccess: onSuccess,
+                    useDialogChrome: false,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    return showDialog<bool>(
+      context: context,
+      builder: (_) => WarehouseFormDialog(
+        businessId: businessId,
+        warehouse: warehouse,
+        onSuccess: onSuccess,
+      ),
+    );
+  }
 
   @override
   State<WarehouseFormDialog> createState() => _WarehouseFormDialogState();
@@ -109,11 +161,11 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
       }
 
       if (mounted) {
+        final msg = widget.warehouse == null ? 'انبار با موفقیت ایجاد شد' : 'انبار با موفقیت به‌روزرسانی شد';
+        // SnackBarHelper با navigatorKey/overlay کار می‌کند و روی دیالوگ/باتم‌شیت هم نمایش داده می‌شود.
+        SnackBarHelper.showSuccess(context, message: msg);
         Navigator.of(context).pop(true);
         widget.onSuccess?.call();
-        SnackBarHelper.showSuccess(context, message: widget.warehouse == null 
-              ? 'انبار با موفقیت ایجاد شد'
-              : 'انبار با موفقیت به‌روزرسانی شد');
       }
     } catch (e) {
       if (mounted) {
@@ -142,149 +194,166 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isEditing = widget.warehouse != null;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final screenHeight = media.size.height;
     final isDesktop = screenWidth > 900;
-
-    final screenHeight = MediaQuery.of(context).size.height;
+    final isCompact = screenWidth < 700;
     
     return PopScope(
-      canPop: false,
-      child: Dialog(
-        insetPadding: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.zero,
-        ),
-        child: Container(
-        width: screenWidth,
-        height: screenHeight,
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.zero,
+      canPop: !_isLoading,
+      child: widget._useDialogChrome
+          ? Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isDesktop ? 16 : 12),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    isEditing ? Icons.edit : Icons.add,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  // در دسکتاپ/تبلت: دیالوگ وسط با اندازه محدود
+                  maxWidth: isDesktop ? 760 : 680,
+                  maxHeight: isCompact ? screenHeight * 0.92 : screenHeight * 0.9,
+                ),
+                child: _buildContent(theme: theme, isEditing: isEditing, isDesktop: isDesktop),
+              ),
+            )
+          : SafeArea(
+              child: _buildContent(theme: theme, isEditing: isEditing, isDesktop: isDesktop),
+            ),
+    );
+  }
+
+  Widget _buildContent({
+    required ThemeData theme,
+    required bool isEditing,
+    required bool isDesktop,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                theme.colorScheme.primary,
+                theme.colorScheme.primary.withValues(alpha: 0.8),
+              ],
+            ),
+            borderRadius: widget._useDialogChrome
+                ? BorderRadius.vertical(top: Radius.circular(isDesktop ? 16 : 12))
+                : BorderRadius.zero,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isEditing ? Icons.edit : Icons.add,
+                color: theme.colorScheme.onPrimary,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isEditing ? 'ویرایش انبار' : 'افزودن انبار',
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: theme.colorScheme.onPrimary,
-                    size: 28,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      isEditing ? 'ویرایش انبار' : 'افزودن انبار',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+                color: theme.colorScheme.onPrimary,
+              ),
+            ],
+          ),
+        ),
+
+        // Form
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // کد انبار با سویچ تولید خودکار/دستی
+                  _buildCodeSection(theme, isDesktop),
+                  const SizedBox(height: 20),
+
+                  // اطلاعات پایه
+                  _buildBasicInfoSection(theme, isDesktop),
+                  const SizedBox(height: 20),
+
+                  // اطلاعات تماس
+                  _buildContactInfoSection(theme, isDesktop),
+                  const SizedBox(height: 20),
+
+                  // تنظیمات
+                  _buildSettingsSection(theme, isDesktop),
+
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.red.shade700),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                    color: theme.colorScheme.onPrimary,
-                  ),
+                  ],
                 ],
               ),
             ),
-
-            // Form
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // کد انبار با سویچ تولید خودکار/دستی
-                      _buildCodeSection(theme, isDesktop),
-                      const SizedBox(height: 20),
-
-                      // اطلاعات پایه
-                      _buildBasicInfoSection(theme, isDesktop),
-                      const SizedBox(height: 20),
-
-                      // اطلاعات تماس
-                      _buildContactInfoSection(theme, isDesktop),
-                      const SizedBox(height: 20),
-
-                      // تنظیمات
-                      _buildSettingsSection(theme, isDesktop),
-
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: TextStyle(color: Colors.red.shade700),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Footer (دکمه‌ها)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.zero,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    child: const Text('انصراف'),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _saveWarehouse,
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('ذخیره'),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
+
+        // Footer (دکمه‌ها)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                child: const Text('انصراف'),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: _isLoading ? null : _saveWarehouse,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('ذخیره'),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 

@@ -293,6 +293,10 @@ class DataTableConfig<T> {
   // Alignment configuration
   final TextAlign? cellTextAlign;       // If set, overrides all cell text alignment
   final TextAlign? headerTextAlign;     // If set, overrides all header text alignment
+
+  // Row height configuration (useful for mobile/card-like rows)
+  final double? headingRowHeight;
+  final double? dataRowHeight;
   
   // Refresh callback
   final VoidCallback? onRefresh;
@@ -386,6 +390,8 @@ class DataTableConfig<T> {
     this.showFiltersButton = false,
     this.cellTextAlign,
     this.headerTextAlign,
+    this.headingRowHeight,
+    this.dataRowHeight,
     this.onRefresh,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,
@@ -445,6 +451,7 @@ class DataTableConfig<T> {
 /// Data table response model
 class DataTableResponse<T> {
   final List<T> items;
+  final List<Map<String, dynamic>> rawItems;
   final int total;
   final int page;
   final int limit;
@@ -452,6 +459,7 @@ class DataTableResponse<T> {
 
   const DataTableResponse({
     required this.items,
+    required this.rawItems,
     required this.total,
     required this.page,
     required this.limit,
@@ -494,9 +502,11 @@ class DataTableResponse<T> {
     
     // Parse items safely
     final parsedItems = <T>[];
+    final rawItems = <Map<String, dynamic>>[];
     for (final item in items) {
       try {
         if (item is Map<String, dynamic>) {
+          rawItems.add(item);
           parsedItems.add(fromJsonT(item));
         }
       } catch (e) {
@@ -507,6 +517,7 @@ class DataTableResponse<T> {
     
     return DataTableResponse<T>(
       items: parsedItems,
+      rawItems: rawItems,
       total: total,
       page: page,
       limit: limit,

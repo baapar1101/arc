@@ -13,6 +13,7 @@ import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/marketplace_service.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -31,6 +32,45 @@ class PersonsPage extends StatefulWidget {
 class _PersonsPageState extends State<PersonsPage> {
   final _personService = PersonService();
   final GlobalKey _personsTableKey = GlobalKey();
+  final MarketplaceService _marketplaceService = MarketplaceService();
+  List<Map<String, dynamic>> _businessPlugins = [];
+  bool _pluginsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBusinessPlugins();
+  }
+
+  Future<void> _loadBusinessPlugins() async {
+    if (_pluginsLoaded) return;
+    try {
+      final plugins = await _marketplaceService.listBusinessPlugins(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _businessPlugins = plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _pluginsLoaded = true;
+      });
+    } catch (_) {
+      // اگر خطا خورد، پیش‌فرض: پلاگین‌ها را غیرفعال فرض می‌کنیم تا درخواست‌های حساس ارسال نشود.
+      if (!mounted) return;
+      setState(() {
+        _pluginsLoaded = true;
+      });
+    }
+  }
+
+  bool _isWarrantyPluginActive() {
+    try {
+      final warrantyPlugin = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'product_warranty',
+        orElse: () => <String, dynamic>{},
+      );
+      return warrantyPlugin['is_active'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -602,13 +642,20 @@ class _PersonsPageState extends State<PersonsPage> {
 
   void _showPersonDetails(Person person) {
     if (person.id == null) return;
-    showDialog(
-      context: context,
-      builder: (context) => PersonDetailsDialog(
-        businessId: widget.businessId,
-        person: person,
-        authStore: widget.authStore,
-      ),
-    );
+    () async {
+      if (!_pluginsLoaded) {
+        await _loadBusinessPlugins();
+      }
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => PersonDetailsDialog(
+          businessId: widget.businessId,
+          person: person,
+          authStore: widget.authStore,
+          isWarrantyPluginActive: _isWarrantyPluginActive(),
+        ),
+      );
+    }();
   }
 }

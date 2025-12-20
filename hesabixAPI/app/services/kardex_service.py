@@ -228,6 +228,25 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         take = 20
 
     total = q.count()
+
+    # Aggregated totals across all matching rows (before pagination)
+    totals = {
+        "debit": 0.0,
+        "credit": 0.0,
+        "quantity": None,
+    }
+    try:
+        from sqlalchemy import func
+        sum_q = q.order_by(None).with_entities(
+            func.coalesce(func.sum(DocumentLine.debit), 0),
+            func.coalesce(func.sum(DocumentLine.credit), 0),
+            func.sum(DocumentLine.quantity),
+        ).one()
+        totals["debit"] = float(sum_q[0] or 0)
+        totals["credit"] = float(sum_q[1] or 0)
+        totals["quantity"] = float(sum_q[2]) if sum_q[2] is not None else None
+    except Exception:
+        pass
     try:
         logger.debug("KARDEX query total=%s (after filters)", total)
     except Exception:
@@ -354,6 +373,7 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
 
     return {
         "items": items,
+        "totals": totals,
         "pagination": {
             "total": total,
             "page": (skip // take) + 1,

@@ -1101,12 +1101,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             const SizedBox(height: 8),
                             Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall),
                             const SizedBox(height: 12),
-                            TabBar(tabs: [
-                              Tab(text: t.login),
-                              Tab(text: t.register),
-                              Tab(text: t.forgotPassword),
-                              Tab(text: t.otpLogin),
-                            ]),
+                            TabBar(
+                              isScrollable: true,
+                              tabs: [
+                                Tab(text: t.login),
+                                Tab(text: t.register),
+                                Tab(text: t.forgotPassword),
+                                Tab(text: t.otpLogin),
+                              ],
+                            ),
                             const SizedBox(height: 16),
                             Builder(builder: (innerContext) {
                               final tabController = DefaultTabController.maybeOf(innerContext);

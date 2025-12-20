@@ -248,6 +248,99 @@ class AppLocalizationsFa extends AppLocalizations {
   String get error => 'خطا';
 
   @override
+  String get bulkDefaultWarehouseTitle => 'تغییر گروهی انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseAction => 'تغییر انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseNewWarehouseLabel => 'انبار جدید';
+
+  @override
+  String get bulkDefaultWarehouseClearOption => 'پاک کردن انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseScopeLabel => 'دامنه اعمال:';
+
+  @override
+  String get bulkDefaultWarehouseScopeAll => 'همه موارد انتخاب‌شده';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue =>
+      'فقط کالاهای انبارداری';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse =>
+      'فقط کالاهای غیرانبارداری';
+
+  @override
+  String get bulkDefaultWarehouseConfirmTitle => 'اعمال تغییر';
+
+  @override
+  String get bulkDefaultWarehouseConfirmMessage =>
+      'آیا از اعمال تغییر انبار پیش‌فرض برای کالاهای انتخاب‌شده مطمئن هستید؟';
+
+  @override
+  String bulkDefaultWarehouseApplySuccess(String count) {
+    return 'انجام شد. تعداد تغییر: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseSelectedCount(int count) {
+    return 'تعداد کالاهای انتخاب‌شده: $count';
+  }
+
+  @override
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  ) {
+    return 'تعداد انتخاب: $total | پیدا شده: $found | قابل تغییر: $willUpdate';
+  }
+
+  @override
+  String bulkDefaultWarehouseSkippedCount(int count) {
+    return 'نادیده گرفته‌شده: $count';
+  }
+
+  @override
+  String get bulkDefaultWarehouseNotesLabel => 'یادداشت‌ها:';
+
+  @override
+  String bulkDefaultWarehouseForcedServiceNull(int count) {
+    return 'خدماتی که انبار پیش‌فرض ندارند (به‌صورت خودکار): $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  ) {
+    return 'تعداد انتخاب: $total | پیدا شده: $found | تغییر کرده: $updated | نادیده: $skipped';
+  }
+
+  @override
+  String get bulkDefaultWarehouseReasonAlreadySet =>
+      'از قبل همین‌طور تنظیم شده';
+
+  @override
+  String get bulkDefaultWarehouseReasonScopeMismatch =>
+      'با دامنه انتخابی شما هم‌خوانی ندارد';
+
+  @override
+  String get bulkDefaultWarehouseReasonNotFound => 'پیدا نشد';
+
+  @override
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull =>
+      'خدمت است و انبار پیش‌فرض ندارد';
+
+  @override
+  String get bulkDefaultWarehouseReasonUnknown => 'نامشخص';
+
+  @override
   String get newBusiness => 'کسب‌وکار جدید';
 
   @override
@@ -3868,6 +3961,144 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get reportsComingSoonMessage =>
       'این گزارش به‌زودی در دسترس خواهد بود.';
+
+  @override
+  String get reportsSearchHint => 'جستجو در گزارش‌ها…';
+
+  @override
+  String reportsSearchResults(Object count) {
+    return 'نتایج ($count)';
+  }
+
+  @override
+  String get reportsSearchNoResults => 'گزارشی با این عبارت پیدا نشد.';
+
+  @override
+  String get reportsFavoritesTitle => 'علاقه‌مندی‌ها';
+
+  @override
+  String get reportsFavoritesEmptyMessage =>
+      'برای دسترسی سریع، روی ستاره کنار هر گزارش بزنید.';
+
+  @override
+  String get reportsRecentTitle => 'اخیراً استفاده‌شده';
+
+  @override
+  String get reportsRecentEmptyMessage =>
+      'گزارش‌هایی که باز می‌کنید اینجا نمایش داده می‌شوند.';
+
+  @override
+  String get reportsWarehouseSection => 'گزارشات انبار';
+
+  @override
+  String get reportsSystemSection => 'گزارشات سیستم';
+
+  @override
+  String get reportsActivityLogsTitle => 'گزارش فعالیت‌های کاربران';
+
+  @override
+  String get reportsActivityLogsSubtitle =>
+      'مشاهده تاریخچه فعالیت‌های کاربران در سیستم';
+
+  @override
+  String reportsSectionCount(Object count) {
+    return '$count گزارش';
+  }
+
+  @override
+  String get reportsAddToFavorites => 'افزودن به علاقه‌مندی‌ها';
+
+  @override
+  String get reportsRemoveFromFavorites => 'حذف از علاقه‌مندی‌ها';
+
+  @override
+  String get reportsInstallmentsSubtitle => 'وضعیت اقساط، سررسیدها و مانده';
+
+  @override
+  String get reportsStockCountTitle => 'گزارش انبارگردانی';
+
+  @override
+  String get reportsStockCountSubtitle =>
+      'تاریخچه انبارگردانی‌ها و حواله‌های تعدیل';
+
+  @override
+  String get reportsWarehouseDocumentsSummaryTitle =>
+      'گزارش خلاصه حواله‌های انبار';
+
+  @override
+  String get reportsWarehouseDocumentsSummarySubtitle =>
+      'خلاصه حواله‌ها به تفکیک نوع با آمار ورود و خروج';
+
+  @override
+  String get reportsSlowMovingItemsTitle => 'گزارش کالاهای کم‌گردش';
+
+  @override
+  String get reportsSlowMovingItemsSubtitle =>
+      'کالاهایی که در بازه زمانی مشخص‌شده هیچ حرکتی نداشته‌اند';
+
+  @override
+  String get reportsCriticalStockTitle => 'گزارش کالاهای با موجودی بحرانی';
+
+  @override
+  String get reportsCriticalStockSubtitle =>
+      'کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است';
+
+  @override
+  String get reportsInterWarehouseTransfersTitle =>
+      'گزارش انتقالات بین انبارها';
+
+  @override
+  String get reportsInterWarehouseTransfersSubtitle =>
+      'جزئیات انتقالات بین انبارها';
+
+  @override
+  String get reportsAdjustmentDocumentsTitle => 'گزارش حواله‌های تعدیل';
+
+  @override
+  String get reportsAdjustmentDocumentsSubtitle =>
+      'تحلیل حواله‌های تعدیل و تفاوت‌های موجودی';
+
+  @override
+  String get reportsWarehousePerformanceTitle => 'گزارش عملکرد انبارها';
+
+  @override
+  String get reportsWarehousePerformanceSubtitle => 'مقایسه عملکرد انبارها';
+
+  @override
+  String get reportsProductMovementHistoryTitle =>
+      'گزارش تاریخچه حرکات یک کالا';
+
+  @override
+  String get reportsProductMovementHistorySubtitle =>
+      'تاریخچه کامل حرکات یک کالا در تمام انبارها';
+
+  @override
+  String get reportsInventoryValuationTitle => 'گزارش ارزش موجودی انبار';
+
+  @override
+  String get reportsInventoryValuationSubtitle => 'ارزش ریالی موجودی انبارها';
+
+  @override
+  String get reportsPendingDocumentsTitle => 'گزارش حواله‌های در انتظار تأیید';
+
+  @override
+  String get reportsPendingDocumentsSubtitle =>
+      'حواله‌های پیش‌نویس یا در انتظار تأیید';
+
+  @override
+  String get reportsInventoryTurnoverTitle => 'گزارش گردش موجودی';
+
+  @override
+  String get reportsInventoryTurnoverSubtitle => 'نرخ گردش موجودی کالاها';
+
+  @override
+  String get reportsSortTooltip => 'مرتب‌سازی';
+
+  @override
+  String get reportsSortDefault => 'پیش‌فرض';
+
+  @override
+  String get reportsSortAlphabetical => 'الفبایی';
 
   @override
   String get operationSuccessful => 'عملیات با موفقیت انجام شد';

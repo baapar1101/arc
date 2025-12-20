@@ -42,6 +42,7 @@ class DataTableWidget<T> extends StatefulWidget {
 class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Data state
   List<T> _items = [];
+  List<Map<String, dynamic>> _rawItems = [];
   bool _loadingList = false;
   String? _error;
   Map<String, dynamic>? _summary;  // Summary from API response
@@ -96,6 +97,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Density (row height)
   // Default: non-dense (normal) rows
   bool _dense = false;
+
+  // Calendar type for export header when no CalendarController is provided
+  // (loaded from SharedPreferences: app_calendar_type)
+  String? _exportCalendarType;
   
   // Keyboard focus and navigation
   final FocusNode _tableFocusNode = FocusNode(debugLabel: 'DataTableFocus');
@@ -116,9 +121,23 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _setupSearchListener();
     _loadColumnSettings();
     _loadDensityPreference();
+    _loadExportCalendarPreference();
     _fetchData();
   }
 
+  Future<void> _loadExportCalendarPreference() async {
+    // If caller provided a controller, we always use it.
+    if (widget.calendarController != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString('app_calendar_type');
+      if (v == null || v.isEmpty) return;
+      if (!mounted) return;
+      setState(() {
+        _exportCalendarType = v.toLowerCase();
+      });
+    } catch (_) {}
+  }
   /// Public method to refresh the data table
   void refresh() {
     _fetchData();
@@ -329,6 +348,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (mounted) {
         setState(() {
           _items = response.items;
+          _rawItems = response.rawItems;
           _page = response.page;
           _limit = response.limit;
           _total = response.total;
@@ -826,6 +846,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       // Add selected row indices if exporting selected only
       if (selectedOnly && _selectedRows.isNotEmpty) {
         params['selected_indices'] = _selectedRows.toList();
+        // Prefer stable keys for selected rows (avoids index mismatch when backend exports with different paging/sort)
+        try {
+          final keys = <Map<String, dynamic>>[];
+          for (final i in _selectedRows) {
+            if (i >= 0 && i < _rawItems.length) {
+              final row = _rawItems[i];
+              final keyMap = _extractSelectedRowKey(row);
+              if (keyMap.isNotEmpty) keys.add(keyMap);
+            }
+          }
+          if (keys.isNotEmpty) {
+            params['selected_row_keys'] = keys;
+          }
+        } catch (_) {}
       }
       // Optional report template for PDF
       if (format == 'pdf' && _templateIdForExport != null) {
@@ -858,6 +892,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           headers: {
             // Calendar type based on current locale
             'X-Calendar-Type': (() {
+              // Prefer user-selected calendar if calendarController is provided
+              final cc = widget.calendarController;
+              if (cc != null) {
+                return cc.isJalali ? 'jalali' : 'gregorian';
+              }
+              // Fallback: use persisted app_calendar_type (loaded earlier)
+              final pref = _exportCalendarType;
+              if (pref == 'jalali' || pref == 'gregorian') return pref;
               final loc = Localizations.localeOf(context);
               final lang = (loc.languageCode).toLowerCase();
               return (lang == 'fa') ? 'jalali' : 'gregorian';
@@ -923,6 +965,29 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         });
       }
     }
+  }
+
+  /// Build a stable identifier payload for a selected row to allow backend-side filtering.
+  /// This is intentionally conservative: only includes known-id fields if present.
+  Map<String, dynamic> _extractSelectedRowKey(Map<String, dynamic> row) {
+    final out = <String, dynamic>{};
+    // Best-case: a single stable ID exists
+    if (row['line_id'] != null) return {'line_id': row['line_id']};
+    if (row['id'] != null) return {'id': row['id']};
+
+    // Composite keys for report rows (inventory kardex / documents)
+    for (final k in <String>[
+      'document_id',
+      'document_code',
+      'product_id',
+      'warehouse_id',
+      'movement',
+      'document_date',
+    ]) {
+      final v = row[k];
+      if (v != null && '$v'.isNotEmpty) out[k] = v;
+    }
+    return out;
   }
 
   // Cross-platform save using conditional FileSaver
@@ -1053,55 +1118,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       shape: RoundedRectangleBorder(
         borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
       ),
-      child: Shortcuts(
-        shortcuts: <LogicalKeySet, Intent>{
-          LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
-          LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),
-          LogicalKeySet(LogicalKeyboardKey.arrowDown): const MoveRowIntent(1),
-          LogicalKeySet(LogicalKeyboardKey.arrowUp): const MoveRowIntent(-1),
-          LogicalKeySet(LogicalKeyboardKey.enter): const ActivateRowIntent(),
-          LogicalKeySet(LogicalKeyboardKey.space): const ToggleSelectionIntent(),
-          LogicalKeySet(LogicalKeyboardKey.escape): const ClearSelectionIntent(),
-          LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control): const SelectAllIntent(),
-        },
-        child: Actions(
-          actions: <Type, Action<Intent>>{
-            MoveRowIntent: CallbackAction<MoveRowIntent>(onInvoke: (intent) {
-              // اگر فیلد جست‌وجو focus دارد، کلیدها را به عنوان متن وارد کن
-              if (_searchFocusNode.hasFocus) {
-                return null; // اجازه می‌دهد کلید به صورت عادی پردازش شود
-              }
-              if (_items.isEmpty) return null;
-              setState(() {
-                final next = (_activeRowIndex == -1 ? 0 : _activeRowIndex) + intent.delta;
-                _activeRowIndex = next.clamp(0, _items.length - 1);
-              });
-              return null;
-            }),
-            ActivateRowIntent: CallbackAction<ActivateRowIntent>(onInvoke: (intent) {
-              if (_activeRowIndex >= 0 && _activeRowIndex < _items.length && widget.config.onRowTap != null) {
-                widget.config.onRowTap!(_items[_activeRowIndex]);
-              }
-              return null;
-            }),
-            ToggleSelectionIntent: CallbackAction<ToggleSelectionIntent>(onInvoke: (intent) {
-              if (widget.config.enableRowSelection && _activeRowIndex >= 0 && _activeRowIndex < _items.length) {
-                _toggleRowSelection(_activeRowIndex);
-              }
-              return null;
-            }),
-            ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(onInvoke: (intent) {
-              _clearRowSelection();
-              return null;
-            }),
-            SelectAllIntent: CallbackAction<SelectAllIntent>(onInvoke: (intent) {
-              _selectAllRows();
-              return null;
-            }),
-          },
-          child: Focus(
-            focusNode: _tableFocusNode,
-            child: Container(
+      child: Container(
         padding: widget.config.padding ?? const EdgeInsets.all(16),
         margin: widget.config.margin,
         decoration: BoxDecoration(
@@ -1117,7 +1134,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         child: Column(
           children: [
             // Header
-            if (widget.config.title != null) ...[
+            if (_shouldShowHeader()) ...[
               _buildHeader(t, theme),
               const SizedBox(height: 16),
             ],
@@ -1192,7 +1209,62 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             
             // Data Table
             Expanded(
-              child: _buildDataTable(t, theme),
+              child: Shortcuts(
+                shortcuts: <LogicalKeySet, Intent>{
+                  LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
+                  LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),
+                  LogicalKeySet(LogicalKeyboardKey.arrowDown): const MoveRowIntent(1),
+                  LogicalKeySet(LogicalKeyboardKey.arrowUp): const MoveRowIntent(-1),
+                  LogicalKeySet(LogicalKeyboardKey.enter): const ActivateRowIntent(),
+                  LogicalKeySet(LogicalKeyboardKey.space): const ToggleSelectionIntent(),
+                  LogicalKeySet(LogicalKeyboardKey.escape): const ClearSelectionIntent(),
+                  LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control): const SelectAllIntent(),
+                },
+                child: Actions(
+                  actions: <Type, Action<Intent>>{
+                    MoveRowIntent: CallbackAction<MoveRowIntent>(onInvoke: (intent) {
+                      // اگر فیلد جست‌وجو focus دارد، کلیدها را به عنوان متن وارد کن
+                      if (_searchFocusNode.hasFocus) {
+                        return null; // اجازه می‌دهد کلید به صورت عادی پردازش شود
+                      }
+                      if (_items.isEmpty) return null;
+                      setState(() {
+                        final next = (_activeRowIndex == -1 ? 0 : _activeRowIndex) + intent.delta;
+                        _activeRowIndex = next.clamp(0, _items.length - 1);
+                      });
+                      return null;
+                    }),
+                    ActivateRowIntent: CallbackAction<ActivateRowIntent>(onInvoke: (intent) {
+                      if (_activeRowIndex >= 0 && _activeRowIndex < _items.length && widget.config.onRowTap != null) {
+                        widget.config.onRowTap!(_items[_activeRowIndex]);
+                      }
+                      return null;
+                    }),
+                    ToggleSelectionIntent: CallbackAction<ToggleSelectionIntent>(onInvoke: (intent) {
+                      if (widget.config.enableRowSelection && _activeRowIndex >= 0 && _activeRowIndex < _items.length) {
+                        _toggleRowSelection(_activeRowIndex);
+                      }
+                      return null;
+                    }),
+                    ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(onInvoke: (intent) {
+                      _clearRowSelection();
+                      return null;
+                    }),
+                    SelectAllIntent: CallbackAction<SelectAllIntent>(onInvoke: (intent) {
+                      _selectAllRows();
+                      return null;
+                    }),
+                  },
+                  child: Focus(
+                    focusNode: _tableFocusNode,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (_) => _tableFocusNode.requestFocus(),
+                      child: _buildDataTable(t, theme),
+                    ),
+                  ),
+                ),
+              ),
             ),
             
             // Footer with Pagination
@@ -1201,9 +1273,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _buildFooter(t, theme),
             ],
           ],
-        ),
-            ),
-          ),
         ),
       ),
     );
@@ -1227,7 +1296,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ),
           const SizedBox(width: 8),
         ],
-        if (widget.config.showTableIcon) ...[
+        if (widget.config.showTableIcon && widget.config.title != null) ...[
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
@@ -1242,14 +1311,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ),
           const SizedBox(width: 12),
         ],
-        Text(
-          widget.config.title!,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface,
+        if (widget.config.title != null)
+          Text(
+            widget.config.title!,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
-        ),
-        if (widget.config.subtitle != null) ...[
+        if (widget.config.title != null && widget.config.subtitle != null) ...[
           const SizedBox(width: 8),
           Text(
             widget.config.subtitle!,
@@ -1662,8 +1732,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           }
                         } catch (_) {
                           // در صورت خطا، مانده آخرین ردیف را استفاده می‌کنیم
-                          if (_items.isNotEmpty) {
-                            final lastItem = _items.last;
+                          if (_rawItems.isNotEmpty) {
+                            final lastItem = _rawItems.last;
                             try {
                               final v = DataTableUtils.getCellValue(lastItem, colKey);
                               if (v is num) {
@@ -1677,30 +1747,33 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         }
                       } else if (_items.isNotEmpty) {
                         // اگر summary موجود نباشد، مانده آخرین ردیف را استفاده می‌کنیم
-                        final lastItem = _items.last;
+                        final lastItem = _rawItems.isNotEmpty ? _rawItems.last : null;
                         try {
-                          final v = DataTableUtils.getCellValue(lastItem, colKey);
-                          if (v is num) {
-                            value = v.toDouble();
-                          } else if (v != null) {
-                            final parsed = double.tryParse('$v');
-                            if (parsed != null) value = parsed;
+                          if (lastItem != null) {
+                            final v = DataTableUtils.getCellValue(lastItem, colKey);
+                            if (v is num) {
+                              value = v.toDouble();
+                            } else if (v != null) {
+                              final parsed = double.tryParse('$v');
+                              if (parsed != null) value = parsed;
+                            }
                           }
                         } catch (_) {}
                       }
                     } else {
                       // برای سایر فیلدها، مجموع را محاسبه می‌کنیم
-                    for (final it in _items) {
-                      try {
-                        final v = DataTableUtils.getCellValue(it, colKey);
-                        if (v is num) {
+                      final source = _rawItems.isNotEmpty ? _rawItems : const <Map<String, dynamic>>[];
+                      for (final it in source) {
+                        try {
+                          final v = DataTableUtils.getCellValue(it, colKey);
+                          if (v is num) {
                             value += v.toDouble();
-                        } else if (v != null) {
-                          final parsed = double.tryParse('$v');
+                          } else if (v != null) {
+                            final parsed = double.tryParse('$v');
                             if (parsed != null) value += parsed;
-                        }
-                      } catch (_) {}
-                    }
+                          }
+                        } catch (_) {}
+                      }
                     }
                     
                     // Format number with thousand separators and remove unnecessary decimals
@@ -1745,121 +1818,143 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             ),
           
           // Results info and pagination on second row
-          Row(
-            children: [
-          // Results info
-          Text(
-            '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const Spacer(),
-          
-          // Page size selector
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                t.recordsPerPage,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 900;
+
+              final resultsInfo = Text(
+                '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ),
-              const SizedBox(width: 8),
-              DropdownButton<int>(
-                value: _limit,
-                items: widget.config.pageSizeOptions.map((size) {
-                  return DropdownMenuItem(
-                    value: size,
-                    child: Text(size.toString()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _limit = value;
-                      _page = 1;
-                    });
-                    _fetchData();
-                  }
-                },
-                style: theme.textTheme.bodySmall,
-                underline: const SizedBox.shrink(),
-                isDense: true,
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          
-          // Pagination controls (only show if more than 1 page)
-          if (_totalPages > 1)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // First page
-                IconButton(
-                  onPressed: _page > 1 ? () {
-                    setState(() => _page = 1);
-                    _fetchData();
-                  } : null,
-                  icon: const Icon(Icons.first_page),
-                  iconSize: 20,
-                  tooltip: t.firstPage,
-                ),
-                
-                // Previous page
-                IconButton(
-                  onPressed: _page > 1 ? () {
-                    setState(() => _page--);
-                    _fetchData();
-                  } : null,
-                  icon: const Icon(Icons.chevron_left),
-                  iconSize: 20,
-                  tooltip: t.previousPage,
-                ),
-                
-                // Page numbers
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '$_page / $_totalPages',
+              );
+
+              final pageSizeSelector = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    t.recordsPerPage,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
-                
-                // Next page
-                IconButton(
-                  onPressed: _page < _totalPages ? () {
-                    setState(() => _page++);
-                    _fetchData();
-                  } : null,
-                  icon: const Icon(Icons.chevron_right),
-                  iconSize: 20,
-                  tooltip: t.nextPage,
-                ),
-                
-                // Last page
-                IconButton(
-                  onPressed: _page < _totalPages ? () {
-                    setState(() => _page = _totalPages);
-                    _fetchData();
-                  } : null,
-                  icon: const Icon(Icons.last_page),
-                  iconSize: 20,
-                  tooltip: t.lastPage,
-                    ),
+                  const SizedBox(width: 8),
+                  DropdownButton<int>(
+                    value: _limit,
+                    items: widget.config.pageSizeOptions.map((size) {
+                      return DropdownMenuItem(
+                        value: size,
+                        child: Text(size.toString()),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _limit = value;
+                          _page = 1;
+                        });
+                        _fetchData();
+                      }
+                    },
+                    style: theme.textTheme.bodySmall,
+                    underline: const SizedBox.shrink(),
+                    isDense: true,
+                  ),
+                ],
+              );
+
+              final paginationControls = _totalPages > 1
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: _page > 1
+                              ? () {
+                                  setState(() => _page = 1);
+                                  _fetchData();
+                                }
+                              : null,
+                          icon: const Icon(Icons.first_page),
+                          iconSize: 20,
+                          tooltip: t.firstPage,
+                        ),
+                        IconButton(
+                          onPressed: _page > 1
+                              ? () {
+                                  setState(() => _page--);
+                                  _fetchData();
+                                }
+                              : null,
+                          icon: const Icon(Icons.chevron_left),
+                          iconSize: 20,
+                          tooltip: t.previousPage,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$_page / $_totalPages',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _page < _totalPages
+                              ? () {
+                                  setState(() => _page++);
+                                  _fetchData();
+                                }
+                              : null,
+                          icon: const Icon(Icons.chevron_right),
+                          iconSize: 20,
+                          tooltip: t.nextPage,
+                        ),
+                        IconButton(
+                          onPressed: _page < _totalPages
+                              ? () {
+                                  setState(() => _page = _totalPages);
+                                  _fetchData();
+                                }
+                              : null,
+                          icon: const Icon(Icons.last_page),
+                          iconSize: 20,
+                          tooltip: t.lastPage,
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink();
+
+              if (isWide) {
+                return Row(
+                  children: [
+                    resultsInfo,
+                    const Spacer(),
+                    pageSizeSelector,
+                    const SizedBox(width: 16),
+                    paginationControls,
+                  ],
+                );
+              }
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    resultsInfo,
+                    const SizedBox(width: 16),
+                    pageSizeSelector,
+                    const SizedBox(width: 16),
+                    paginationControls,
                   ],
                 ),
-              ],
-            ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -2254,8 +2349,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           // در غیر این صورت از config استفاده می‌کنیم
           minWidth: _calculateMinTableWidth(columns, availableWidth),
           horizontalScrollController: _horizontalScrollController,
-          headingRowHeight: _dense ? 40 : 44,
-          dataRowHeight: _dense ? 38 : 48,
+          headingRowHeight: widget.config.headingRowHeight ?? (_dense ? 40 : 44),
+          dataRowHeight: widget.config.dataRowHeight ?? (_dense ? 38 : 48),
           columns: columns,
       rows: _items.asMap().entries.map((entry) {
         final index = entry.key;
@@ -2537,6 +2632,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (column is NumberColumn) return column.textAlign;
     if (column is DateColumn) return column.textAlign;
     return TextAlign.center;
+  }
+
+  bool _shouldShowHeader() {
+    // Show header if there is a title OR any header controls/actions are enabled.
+    if (widget.config.title != null) return true;
+    if (widget.config.showBackButton) return true;
+    if (widget.config.showClearFiltersButton && _hasActiveFilters()) return true;
+    if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) return true;
+    if (widget.config.customHeaderActions != null && widget.config.customHeaderActions!.isNotEmpty) return true;
+    if (widget.config.showRefreshButton) return true;
+    if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings) return true;
+    // Keep header for density toggle / overflow menu consistency
+    return true;
   }
 
   int? _getMaxLines(DataTableColumn column) {

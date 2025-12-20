@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../services/bom_service.dart';
-import '../../services/product_service.dart';
 import '../../models/bom_models.dart';
 import '../../models/invoice_line_item.dart';
+import '../../services/bom_service.dart';
+import '../../services/product_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
-import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
 
-/// ویجت انفجار فرمول تولید برای فاکتور تولید
+/// ویجت انفجار فرمول تولید برای استفاده در فاکتور تولید
+/// این ویجت فقط در فاکتور تولید نمایش داده می‌شود
 class BomExplosionWidget extends StatefulWidget {
   final int businessId;
   final Function(List<InvoiceLineItem>, int bomId) onExploded;
+  final double? productionOperationsTotal; // هزینه عملیات/سربار تولید
 
   const BomExplosionWidget({
     super.key,
     required this.businessId,
     required this.onExploded,
+    this.productionOperationsTotal,
   });
 
   @override
@@ -28,286 +29,53 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
   final ProductService _productService = ProductService();
   
   Map<String, dynamic>? _selectedProduct;
-  List<ProductBOM> _boms = [];
   ProductBOM? _selectedBom;
-  final TextEditingController _quantityController = TextEditingController(text: '1');
-  bool _loadingBoms = false;
-  bool _exploding = false;
-
-  @override
-  void dispose() {
-    _quantityController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadBomsForProduct(int productId) async {
-    setState(() {
-      _loadingBoms = true;
-      _selectedBom = null;
-    });
-    try {
-      final boms = await _bomService.list(
-        businessId: widget.businessId,
-        productId: productId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _boms = boms;
-        // انتخاب فرمول پیش‌فرض اگر وجود دارد
-        _selectedBom = boms.firstWhere(
-          (b) => b.isDefault,
-          orElse: () => boms.isNotEmpty ? boms.first : boms.first,
-        );
-        _loadingBoms = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _boms = [];
-        _selectedBom = null;
-        _loadingBoms = false;
-      });
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری فرمول‌ها: $e');
-      }
-    }
-  }
-
-  Future<void> _explodeAndAdd() async {
-    if (_selectedProduct == null) {
-      SnackBarHelper.show(context, message: 'لطفاً کالای تولیدی را انتخاب کنید');
-      return;
-    }
-
-    if (_boms.isEmpty) {
-      SnackBarHelper.show(context, message: 'برای این کالا فرمول تولیدی تعریف نشده است');
-      return;
-    }
-
-    final quantity = double.tryParse(_quantityController.text.replaceAll(',', '.')) ?? 0;
-    if (quantity <= 0) {
-      SnackBarHelper.show(context, message: 'مقدار تولید باید بزرگ‌تر از صفر باشد');
-      return;
-    }
-
-    setState(() {
-      _exploding = true;
-    });
-
-    try {
-      final bomId = _selectedBom?.id;
-      if (bomId == null) {
-        SnackBarHelper.show(context, message: 'لطفاً یک فرمول تولید را انتخاب کنید');
-        return;
-      }
-
-      // انفجار فرمول
-      final explosionResult = await _bomService.explode(
-        businessId: widget.businessId,
-        productId: null, // از bom_id استفاده می‌کنیم
-        bomId: bomId,
-        quantity: quantity,
-      );
-
-      // دریافت اطلاعات کامل محصولات برای ساخت InvoiceLineItem
-      final lineItems = <InvoiceLineItem>[];
-
-      // افزودن مواد اولیه (inputs) - movement: out
-      for (final item in explosionResult.items) {
-        try {
-          final productData = await _productService.getProduct(
-            businessId: widget.businessId,
-            productId: item.componentProductId,
-          );
-          
-          final mainUnit = productData['main_unit']?.toString();
-          final secondaryUnit = productData['secondary_unit']?.toString();
-          final unitFactor = _toNum(productData['unit_conversion_factor'], fallback: 1);
-          
-          // تعیین واحد انتخابی بر اساس uom در BOM
-          String? selectedUnit = mainUnit;
-          num finalQuantity = item.requiredQty;
-          
-          if (item.uom != null) {
-            if (item.uom == secondaryUnit && secondaryUnit != null) {
-              selectedUnit = secondaryUnit;
-              // اگر uom در BOM واحد فرعی است، quantity را تبدیل نکنیم (از API آمده)
-            } else if (item.uom == mainUnit) {
-              selectedUnit = mainUnit;
-            }
-          }
-
-          lineItems.add(
-            InvoiceLineItem(
-              productId: item.componentProductId,
-              productCode: item.componentProductCode ?? productData['code']?.toString(),
-              productName: item.componentProductName ?? productData['name']?.toString(),
-              mainUnit: mainUnit,
-              secondaryUnit: secondaryUnit,
-              unitConversionFactor: unitFactor,
-              selectedUnit: selectedUnit,
-              quantity: finalQuantity,
-              description: 'مصرف مواد برای تولید',
-              unitPriceSource: 'base',
-              unitPrice: _toNum(productData['base_purchase_price'], fallback: 0),
-              basePurchasePriceMainUnit: _toNum(productData['base_purchase_price']),
-              baseSalesPriceMainUnit: _toNum(productData['base_sales_price']),
-              taxRate: _toNum(productData['sales_tax_rate'], fallback: 0),
-              trackInventory: productData['track_inventory'] == true,
-              warehouseId: item.suggestedWarehouseId,
-              extraInfo: {
-                'movement': 'out',
-                'bom_id': bomId,
-              },
-            ),
-          );
-        } catch (e) {
-          // اگر محصول یافت نشد، با اطلاعات محدود اضافه می‌کنیم
-          lineItems.add(
-            InvoiceLineItem(
-              productId: item.componentProductId,
-              productCode: item.componentProductCode,
-              productName: item.componentProductName ?? 'کالا #${item.componentProductId}',
-              quantity: item.requiredQty,
-              description: 'مصرف مواد برای تولید',
-              unitPriceSource: 'base',
-              unitPrice: 0,
-              warehouseId: item.suggestedWarehouseId,
-              extraInfo: {
-                'movement': 'out',
-                'bom_id': bomId,
-              },
-            ),
-          );
-        }
-      }
-
-      // افزودن خروجی‌ها (outputs) - movement: in
-      for (final output in explosionResult.outputs) {
-        try {
-          final productData = await _productService.getProduct(
-            businessId: widget.businessId,
-            productId: output.outputProductId,
-          );
-          
-          final mainUnit = productData['main_unit']?.toString();
-          final secondaryUnit = productData['secondary_unit']?.toString();
-          final unitFactor = _toNum(productData['unit_conversion_factor'], fallback: 1);
-          
-          // تعیین واحد انتخابی
-          String? selectedUnit = mainUnit;
-          num finalQuantity = output.ratio;
-          
-          if (output.uom != null) {
-            if (output.uom == secondaryUnit && secondaryUnit != null) {
-              selectedUnit = secondaryUnit;
-            } else if (output.uom == mainUnit) {
-              selectedUnit = mainUnit;
-            }
-          }
-
-          lineItems.add(
-            InvoiceLineItem(
-              productId: output.outputProductId,
-              productCode: output.outputProductCode ?? productData['code']?.toString(),
-              productName: output.outputProductName ?? productData['name']?.toString(),
-              mainUnit: mainUnit,
-              secondaryUnit: secondaryUnit,
-              unitConversionFactor: unitFactor,
-              selectedUnit: selectedUnit,
-              quantity: finalQuantity,
-              description: 'خروجی تولید',
-              unitPriceSource: 'base',
-              unitPrice: _toNum(productData['base_sales_price'], fallback: 0),
-              baseSalesPriceMainUnit: _toNum(productData['base_sales_price']),
-              basePurchasePriceMainUnit: _toNum(productData['base_purchase_price']),
-              taxRate: _toNum(productData['sales_tax_rate'], fallback: 0),
-              trackInventory: productData['track_inventory'] == true,
-              extraInfo: {
-                'movement': 'in',
-                'bom_id': bomId,
-              },
-            ),
-          );
-        } catch (e) {
-          // اگر محصول یافت نشد، با اطلاعات محدود اضافه می‌کنیم
-          lineItems.add(
-            InvoiceLineItem(
-              productId: output.outputProductId,
-              productCode: output.outputProductCode,
-              productName: output.outputProductName ?? 'کالا #${output.outputProductId}',
-              quantity: output.ratio,
-              description: 'خروجی تولید',
-              unitPriceSource: 'base',
-              unitPrice: 0,
-              extraInfo: {
-                'movement': 'in',
-                'bom_id': bomId,
-              },
-            ),
-          );
-        }
-      }
-
-      if (!mounted) return;
-
-      // افزودن ردیف‌ها به فاکتور (bomId همیشه وجود دارد چون در ابتدای تابع بررسی شده)
-      widget.onExploded(lineItems, bomId);
-
-      // نمایش پیام موفقیت
-      SnackBarHelper.showSuccess(context, message: '${lineItems.length} ردیف به فاکتور اضافه شد');
-
-      // پاک کردن فرم
-      setState(() {
-        _selectedProduct = null;
-        _boms = [];
-        _selectedBom = null;
-        _quantityController.text = '1';
-      });
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در انفجار فرمول: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _exploding = false;
-        });
-      }
-    }
-  }
-
-  num _toNum(dynamic value, {num fallback = 0}) {
-    if (value == null) return fallback;
-    if (value is num) return value;
-    return num.tryParse(value.toString()) ?? fallback;
-  }
+  List<ProductBOM> _availableBoms = [];
+  double? _productionQuantity;
+  bool _isLoadingBoms = false;
+  bool _isExploding = false;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     return Card(
       elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'انفجار فرمول تولید',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Icon(
+                  Icons.build_circle_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'انفجار فرمول تولید',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'برای افزودن مواد اولیه و محصولات نهایی به فاکتور، فرمول تولید را منفجر کنید',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            
             // انتخاب کالا
             ProductComboboxWidget(
               businessId: widget.businessId,
@@ -315,103 +83,330 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               onChanged: (product) {
                 setState(() {
                   _selectedProduct = product;
-                  _boms = [];
                   _selectedBom = null;
+                  _availableBoms = [];
+                  if (product != null && product['id'] != null) {
+                    _loadBomsForProduct();
+                  }
                 });
-                if (product != null) {
-                  _loadBomsForProduct(product['id'] as int);
-                }
               },
-              label: 'کالای تولیدی',
-              hintText: 'انتخاب کالای تولیدی',
+              hintText: 'کالای تولیدی را انتخاب کنید',
             ),
-            
             const SizedBox(height: 16),
-            
-            // نمایش فرمول‌ها
-            if (_loadingBoms)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_selectedProduct != null && _boms.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'برای این کالا فرمول تولیدی تعریف نشده است',
-                  style: TextStyle(fontSize: 13),
-                ),
-              )
-            else if (_boms.isNotEmpty) ...[
-              // انتخاب فرمول
-              DropdownButtonFormField<ProductBOM>(
-                initialValue: _selectedBom,
-                decoration: const InputDecoration(
-                  labelText: 'فرمول تولید',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.list_alt),
-                ),
-                items: _boms.map((bom) {
-                  return DropdownMenuItem<ProductBOM>(
-                    value: bom,
-                    child: Row(
-                      children: [
-                        if (bom.isDefault)
-                          Icon(Icons.star, size: 16, color: Colors.orange),
-                        if (bom.isDefault) const SizedBox(width: 4),
-                        Text('${bom.name} (${bom.version})'),
-                      ],
+            // انتخاب فرمول (اگر کالا انتخاب شده باشد)
+            if (_selectedProduct != null && _selectedProduct!['id'] != null) ...[
+              if (_isLoadingBoms)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ))
+              else if (_availableBoms.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
                     ),
-                  );
-                }).toList(),
-                onChanged: (bom) {
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'برای این کالا فرمول تولیدی تعریف نشده است',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                DropdownButtonFormField<ProductBOM>(
+                  value: _selectedBom,
+                  decoration: InputDecoration(
+                    labelText: 'فرمول تولید',
+                    hintText: 'فرمول را انتخاب کنید',
+                    prefixIcon: const Icon(Icons.assignment_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                  ),
+                  items: _availableBoms.map((bom) {
+                    return DropdownMenuItem<ProductBOM>(
+                      value: bom,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  bom.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  'v${bom.version}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (bom.isDefault)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'پیش‌فرض',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (bom) {
+                    setState(() {
+                      _selectedBom = bom;
+                    });
+                  },
+                ),
+              const SizedBox(height: 16),
+              // ورود مقدار تولید
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'مقدار تولید',
+                  hintText: 'مثال: 100',
+                  prefixIcon: const Icon(Icons.numbers_outlined),
+                  suffixText: 'واحد',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (value) {
                   setState(() {
-                    _selectedBom = bom;
+                    _productionQuantity = double.tryParse(value);
                   });
                 },
               ),
-              
               const SizedBox(height: 16),
-              
-              // ورود مقدار تولید
-              TextField(
-                controller: _quantityController,
-                decoration: const InputDecoration(
-                  labelText: 'مقدار تولید',
-                  hintText: 'مثلاً 10',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.numbers),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  EnglishDigitsFormatter(),
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
               // دکمه انفجار
               FilledButton.icon(
-                onPressed: _exploding ? null : _explodeAndAdd,
-                icon: _exploding
+                onPressed: (_selectedBom != null && 
+                            _productionQuantity != null && 
+                            _productionQuantity! > 0 && 
+                            !_isExploding)
+                    ? _explodeAndAdd
+                    : null,
+                icon: _isExploding
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.auto_awesome),
-                label: Text(_exploding ? 'در حال انفجار...' : 'انفجار و افزودن به فاکتور'),
+                label: Text(_isExploding ? 'در حال انفجار...' : 'انفجار و افزودن به فاکتور'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
               ),
             ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _loadBomsForProduct() async {
+    final productId = _selectedProduct?['id'] as int?;
+    if (productId == null) return;
+
+    setState(() {
+      _isLoadingBoms = true;
+      _selectedBom = null;
+    });
+
+    try {
+      final boms = await _bomService.list(
+        businessId: widget.businessId,
+        productId: productId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _availableBoms = boms;
+        // انتخاب فرمول پیش‌فرض به صورت خودکار
+        _selectedBom = boms.firstWhere(
+          (bom) => bom.isDefault,
+          orElse: () => boms.isNotEmpty ? boms.first : null!,
+        );
+        _isLoadingBoms = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _availableBoms = [];
+        _selectedBom = null;
+        _isLoadingBoms = false;
+      });
+      SnackBarHelper.showError(context, message: 'خطا در بارگذاری فرمول‌ها: $e');
+    }
+  }
+
+  Future<void> _explodeAndAdd() async {
+    if (_selectedBom == null || 
+        _productionQuantity == null || 
+        _productionQuantity! <= 0) {
+      return;
+    }
+
+    setState(() {
+      _isExploding = true;
+    });
+
+    try {
+      // فراخوانی API انفجار
+      final result = await _bomService.explode(
+        businessId: widget.businessId,
+        bomId: _selectedBom!.id,
+        quantity: _productionQuantity!,
+      );
+
+      if (!mounted) return;
+
+      // تبدیل نتایج به InvoiceLineItem
+      final lineItems = await _convertToLineItems(result, _selectedBom!.id!);
+
+      // فراخوانی callback
+      widget.onExploded(lineItems, _selectedBom!.id!);
+
+      // نمایش پیام موفقیت
+      SnackBarHelper.showSuccess(
+        context,
+        message: 'فرمول با موفقیت منفجر شد و ${lineItems.length} ردیف به فاکتور اضافه شد',
+      );
+
+      // پاک کردن فیلدها
+      setState(() {
+        _productionQuantity = null;
+        _isExploding = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isExploding = false;
+      });
+      SnackBarHelper.showError(context, message: 'خطا در انفجار فرمول: $e');
+    }
+  }
+
+  /// تبدیل نتایج انفجار به ردیف‌های فاکتور
+  Future<List<InvoiceLineItem>> _convertToLineItems(
+    BomExplosionResult result,
+    int bomId,
+  ) async {
+    final lineItems = <InvoiceLineItem>[];
+
+    // محاسبه مجموع هزینه مواد اولیه
+    double totalMaterialsCost = 0;
+    final productCosts = <int, double>{};
+
+    for (final item in result.items) {
+      try {
+        // دریافت اطلاعات کالا برای COGS
+        final product = await _productService.getProduct(
+          businessId: widget.businessId,
+          productId: item.componentProductId,
+        );
+
+        // استفاده از base_purchase_price به عنوان COGS
+        // اگر موجود نباشد، از 0 استفاده می‌کنیم
+        final costPrice = (product['base_purchase_price'] as num?)?.toDouble() ?? 0.0;
+        final itemCost = item.requiredQty * costPrice;
+        totalMaterialsCost += itemCost;
+        productCosts[item.componentProductId] = costPrice;
+      } catch (e) {
+        // در صورت خطا، از 0 استفاده می‌کنیم
+        productCosts[item.componentProductId] = 0.0;
+      }
+    }
+
+    // محاسبه تعداد کل محصولات نهایی
+    double totalOutputQty = 0;
+    for (final output in result.outputs) {
+      totalOutputQty += output.ratio;
+    }
+
+    // تبدیل items به ردیف‌ها (movement: "out" - مواد اولیه)
+    for (final item in result.items) {
+      final costPrice = productCosts[item.componentProductId] ?? 0.0;
+      
+      lineItems.add(InvoiceLineItem(
+        productId: item.componentProductId,
+        productName: item.componentProductName,
+        productCode: item.componentProductCode,
+        quantity: item.requiredQty,
+        unitPrice: costPrice,
+        unitPriceSource: 'manual',
+        mainUnit: item.mainUnit ?? item.componentProductMainUnit,
+        selectedUnit: item.uom ?? item.mainUnit ?? item.componentProductMainUnit,
+        warehouseId: item.suggestedWarehouseId,
+        trackInventory: true,
+        extraInfo: {
+          'movement': 'out',
+          'bom_id': bomId,
+          'cost_price': costPrice,
+          if (item.suggestedWarehouseId != null) 'warehouse_id': item.suggestedWarehouseId,
+        },
+      ));
+    }
+
+    // تبدیل outputs به ردیف‌ها (movement: "in" - محصولات نهایی)
+    // استفاده از هزینه عملیات از UI
+    final operationsTotal = widget.productionOperationsTotal ?? 0.0;
+    final totalCost = totalMaterialsCost + operationsTotal;
+    final costPricePerUnit = totalOutputQty > 0 ? totalCost / totalOutputQty : 0.0;
+
+    for (final output in result.outputs) {
+      lineItems.add(InvoiceLineItem(
+        productId: output.outputProductId,
+        productName: output.outputProductName,
+        productCode: output.outputProductCode,
+        quantity: output.ratio,
+        unitPrice: costPricePerUnit,
+        unitPriceSource: 'manual',
+        mainUnit: output.mainUnit,
+        selectedUnit: output.uom ?? output.mainUnit,
+        trackInventory: true,
+        extraInfo: {
+          'movement': 'in',
+          'bom_id': bomId,
+          'cost_price': costPricePerUnit,
+        },
+      ));
+    }
+
+    return lineItems;
   }
 }
 

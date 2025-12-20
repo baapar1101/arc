@@ -4,9 +4,11 @@ from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from datetime import datetime, date
 import logging
+import secrets
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,11 @@ def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
 
 def _build_wh_code(prefix_base: str) -> str:
 	today = datetime.now().date()
-	return f"{prefix_base}-{today.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}"
+	# IMPORTANT:
+	# کد قبلی بر اساس timestamp ثانیه‌ای تولید می‌شد و در بار همزمان (۸ worker)
+	# باعث برخورد (Duplicate) روی unique index `warehouse_documents.code` می‌شد.
+	# این suffix را تصادفی و ثابت‌طول (۵ رقم) می‌سازیم تا احتمال برخورد بسیار کم شود.
+	return f"{prefix_base}-{today.strftime('%Y%m%d')}-{secrets.randbelow(100000):05d}"
 
 
 def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
@@ -77,7 +83,6 @@ def create_from_invoice(
 ) -> WarehouseDocument:
 	"""ساخت حواله انبار draft از روی فاکتور (بدون پست)."""
 	fy = _get_current_fiscal_year(db, business_id)
-	code = _build_wh_code("WH")
 	
 	# خواندن انبار کلی از سطح سند فاکتور (extra_info.warehouse_id)
 	# این انبار به سطح سند حواله منتقل می‌شود
@@ -113,22 +118,40 @@ def create_from_invoice(
 	delivery_fields = {k: v for k, v in delivery_fields.items() if v is not None}
 	extra_info = delivery_fields if delivery_fields else None
 	
-	wh = WarehouseDocument(
-		business_id=business_id,
-		fiscal_year_id=fy.id,
-		code=code,
-		document_date=invoice.document_date,
-		status="draft",
-		doc_type=wh_doc_type,
-		warehouse_id_from=warehouse_id_from,
-		warehouse_id_to=warehouse_id_to,
-		source_type="invoice",
-		source_document_id=invoice.id,
-		created_by_user_id=created_by_user_id,
-		extra_info=extra_info,
-	)
-	db.add(wh)
-	db.flush()
+	# تولید code و INSERT اولیه حواله باید در برابر برخورد unique مقاوم باشد.
+	# از SAVEPOINT استفاده می‌کنیم تا در صورت IntegrityError فقط همین INSERT برگشت بخورد
+	# و تراکنش اصلی ساخت فاکتور از بین نرود.
+	wh: Optional[WarehouseDocument] = None
+	for attempt in range(10):
+		code = _build_wh_code("WH")
+		try:
+			with db.begin_nested():
+				wh = WarehouseDocument(
+					business_id=business_id,
+					fiscal_year_id=fy.id,
+					code=code,
+					document_date=invoice.document_date,
+					status="draft",
+					doc_type=wh_doc_type,
+					warehouse_id_from=warehouse_id_from,
+					warehouse_id_to=warehouse_id_to,
+					source_type="invoice",
+					source_document_id=invoice.id,
+					created_by_user_id=created_by_user_id,
+					extra_info=extra_info,
+				)
+				db.add(wh)
+				db.flush()
+			break
+		except IntegrityError as e:
+			# برخورد روی code: دوباره تولید می‌کنیم و تلاش می‌کنیم
+			err_msg = str(getattr(e, "orig", e))
+			if ("Duplicate entry" in err_msg) and ("warehouse_documents.code" in err_msg) and (attempt < 9):
+				continue
+			raise
+
+	if wh is None:
+		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
 	for ln in lines:
 		pid = ln.get("product_id")
 		qty = Decimal(str(ln.get("quantity") or 0))
@@ -139,6 +162,11 @@ def create_from_invoice(
 		product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
 		if not product:
 			continue  # اگر محصول یافت نشد، خط را رد می‌کنیم
+		
+		# اقلام غیرانبارداری (مثل خدمات) نباید وارد حواله انبار شوند
+		# در غیر این صورت ممکن است حواله‌ای با warehouse_id=None یا حرکت‌های اشتباه ساخته شود.
+		if not getattr(product, "track_inventory", False):
+			continue
 
 		extra = ln.get("extra_info") or {}
 		movement_override = ln.get("movement")
@@ -159,6 +187,10 @@ def create_from_invoice(
 				warehouse_id = warehouse_id_from
 			elif mv == "in":
 				warehouse_id = warehouse_id_to
+		
+		# برای اقلام انبارداری، warehouse_id الزامی است
+		if not warehouse_id:
+			raise ApiError("WAREHOUSE_REQUIRED", "warehouse_id برای خطوط انبارداری الزامی است", http_status=400)
 
 		# بررسی و ایجاد instance های کالای یونیک (فقط برای حواله ورود)
 		instance_data = ln.get("instance_data")
@@ -383,7 +415,6 @@ def create_manual_warehouse_document(
 	extra_info = {**existing_extra_info, **delivery_fields}
 	
 	# ایجاد حواله
-	code = _build_wh_code("WH")
 	wh = WarehouseDocument(
 		business_id=business_id,
 		fiscal_year_id=fy.id,

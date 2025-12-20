@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/tax_product_code_service.dart';
+import '../../utils/number_normalizer.dart';
 
 class TaxCodeSearchSheet extends StatefulWidget {
   final TaxProductCodeService service;
@@ -27,6 +30,113 @@ class _TaxCodeSearchSheetState extends State<TaxCodeSearchSheet> {
   String _currentQuery = '';
   String? _errorMessage;
   static const int _pageSize = 40;
+  static const String _stuffIdUrl = 'https://stuffid.tax.gov.ir/';
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openStuffIdSite() async {
+    final uri = Uri.parse(_stuffIdUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showSnack('امکان باز کردن لینک وجود ندارد. می‌توانید لینک را کپی کنید.');
+      }
+    } catch (_) {
+      _showSnack('خطا در باز کردن لینک. می‌توانید لینک را کپی کنید.');
+    }
+  }
+
+  Future<void> _copyStuffIdLink() async {
+    await Clipboard.setData(const ClipboardData(text: _stuffIdUrl));
+    _showSnack('لینک کپی شد');
+  }
+
+  String _normalizeTaxCodeInput(String input) {
+    final clean = toEnglishDigits(input).trim();
+    return clean.replaceAll(RegExp(r'[\s\-]'), '');
+  }
+
+  Future<void> _promptManualTaxCode() async {
+    final controller = TextEditingController();
+    String? errorText;
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('ورود دستی کد مالیاتی'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('کد مالیاتی باید دقیقاً ۱۳ رقم باشد.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(13),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'کد ۱۳ رقمی',
+                    hintText: 'مثلاً 1234567890123',
+                    errorText: errorText,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onChanged: (_) {
+                    if (errorText != null) {
+                      setState(() => errorText = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    await _openStuffIdSite();
+                  },
+                  child: const Text('باز کردن سایت stuffid.tax.gov.ir'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final normalized = _normalizeTaxCodeInput(controller.text);
+                  if (!RegExp(r'^\d{13}$').hasMatch(normalized)) {
+                    setState(() => errorText = 'کد باید دقیقاً ۱۳ رقم و فقط عدد باشد');
+                    return;
+                  }
+                  Navigator.of(ctx).pop(normalized);
+                },
+                child: const Text('ثبت'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+    final code = (result ?? '').trim();
+    if (code.isEmpty) return;
+    Navigator.of(context).pop(<String, dynamic>{
+      'code': code,
+      'description': null,
+      'manual': true,
+    });
+  }
 
   @override
   void initState() {
@@ -142,6 +252,30 @@ class _TaxCodeSearchSheetState extends State<TaxCodeSearchSheet> {
                 ),
               ),
               Padding(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _openStuffIdSite,
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('stuffid.tax.gov.ir'),
+                    ),
+                    TextButton.icon(
+                      onPressed: _promptManualTaxCode,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('ورود دستی کد ۱۳ رقمی'),
+                    ),
+                    TextButton.icon(
+                      onPressed: _copyStuffIdLink,
+                      icon: const Icon(Icons.copy),
+                      label: const Text('کپی لینک'),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: TextField(
                   controller: _searchController,
@@ -184,9 +318,42 @@ class _TaxCodeSearchSheetState extends State<TaxCodeSearchSheet> {
   Widget _buildResultsList(ThemeData theme) {
     if (_currentQuery.length >= 2 && _items.isEmpty && !_isLoading && _errorMessage == null) {
       return Center(
-        child: Text(
-          'موردی یافت نشد. عبارت دیگری جستجو کنید.',
-          style: theme.textTheme.bodyMedium,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'موردی یافت نشد.',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'اگر کد را در لیست پیدا نمی‌کنید، می‌توانید از سایت stuffid.tax.gov.ir کد مالیاتی را پیدا کنید و همین‌جا کد ۱۳ رقمی را دستی وارد کنید.',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _promptManualTaxCode,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('ورود دستی کد ۱۳ رقمی'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _openStuffIdSite,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('باز کردن سایت stuffid.tax.gov.ir'),
+              ),
+              TextButton.icon(
+                onPressed: _copyStuffIdLink,
+                icon: const Icon(Icons.copy),
+                label: const Text('کپی لینک'),
+              ),
+            ],
+          ),
         ),
       );
     }

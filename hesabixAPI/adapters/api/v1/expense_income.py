@@ -74,7 +74,7 @@ async def list_expense_income_endpoint(
     try:
         body_json = await request.json()
         if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date"]:
+            for key in ["document_type", "from_date", "to_date", "project_id"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
     except Exception:
@@ -290,7 +290,7 @@ async def export_expense_income_excel_endpoint(
     try:
         body_json = await request.json()
         if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date"]:
+            for key in ["document_type", "from_date", "to_date", "project_id"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
     except Exception:
@@ -349,6 +349,7 @@ async def export_expense_income_pdf_endpoint(
         "document_type": body.get("document_type"),
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
+        "project_id": body.get("project_id"),
     }
     # سال مالی از هدر
     try:

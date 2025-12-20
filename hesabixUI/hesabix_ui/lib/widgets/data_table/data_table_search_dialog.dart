@@ -619,10 +619,10 @@ class ActiveFiltersWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 3,
-            children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
               // Text search filters
               ...columnSearchValues.entries.map((entry) {
                 final columnName = entry.key;
@@ -631,7 +631,9 @@ class ActiveFiltersWidget extends StatelessWidget {
                 final columnLabel = DataTableUtils.getColumnLabel(columnName, columns);
                 final typeLabel = DataTableUtils.getSearchOperatorLabel(searchType);
                 
-                return Chip(
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: Chip(
                   label: Text('$columnLabel: $searchValue ($typeLabel)'),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   onDeleted: () => onRemoveColumnFilter(columnName),
@@ -640,6 +642,7 @@ class ActiveFiltersWidget extends StatelessWidget {
                   labelStyle: TextStyle(
                     color: theme.primaryColor,
                     fontSize: 12,
+                  ),
                   ),
                 );
               }),
@@ -674,7 +677,9 @@ class ActiveFiltersWidget extends StatelessWidget {
                   displayText += selectedValues.join(', ');
                 }
                 
-                return Chip(
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: Chip(
                   label: Text(displayText),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   onDeleted: () {
@@ -690,6 +695,7 @@ class ActiveFiltersWidget extends StatelessWidget {
                     color: theme.primaryColor,
                     fontSize: 12,
                   ),
+                  ),
                 );
               }),
               
@@ -701,7 +707,9 @@ class ActiveFiltersWidget extends StatelessWidget {
                 final columnLabel = DataTableUtils.getColumnLabel(columnName, columns);
                 
                 if (fromDate != null && toDate != null) {
-                  return Chip(
+                  return Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Chip(
                     label: Text('$columnLabel: ${HesabixDateUtils.formatForDisplay(fromDate, calendarController?.isJalali ?? false)} - ${HesabixDateUtils.formatForDisplay(toDate, calendarController?.isJalali ?? false)}'),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () => onRemoveColumnFilter(columnName),
@@ -711,6 +719,7 @@ class ActiveFiltersWidget extends StatelessWidget {
                       color: theme.primaryColor,
                       fontSize: 12,
                     ),
+                    ),
                   );
                 }
                 return const SizedBox.shrink();
@@ -718,18 +727,22 @@ class ActiveFiltersWidget extends StatelessWidget {
               
               // Legacy date range filter
               if (fromDate != null && toDate != null)
-                Chip(
-                  label: Text('${t.dateFrom}: ${HesabixDateUtils.formatForDisplay(fromDate!, calendarController?.isJalali ?? false)} - ${t.dateTo}: ${HesabixDateUtils.formatForDisplay(toDate!, calendarController?.isJalali ?? false)}'),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  onDeleted: () => onClearAll(),
-                  backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
-                  deleteIconColor: theme.primaryColor,
-                  labelStyle: TextStyle(
-                    color: theme.primaryColor,
-                    fontSize: 12,
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: Chip(
+                    label: Text('${t.dateFrom}: ${HesabixDateUtils.formatForDisplay(fromDate!, calendarController?.isJalali ?? false)} - ${t.dateTo}: ${HesabixDateUtils.formatForDisplay(toDate!, calendarController?.isJalali ?? false)}'),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    onDeleted: () => onClearAll(),
+                    backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
+                    deleteIconColor: theme.primaryColor,
+                    labelStyle: TextStyle(
+                      color: theme.primaryColor,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

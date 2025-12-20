@@ -8,6 +8,7 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
+import '../../widgets/product/bulk_default_warehouse_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
 import '../../widgets/attached_files/attached_files_widget.dart';
 import '../../services/business_storage_service.dart';
@@ -1379,6 +1380,48 @@ class _ProductsPageState extends State<ProductsPage> {
                     }
                   },
                   icon: const Icon(Icons.delete_sweep_outlined),
+                ),
+              ),
+            if (widget.authStore.hasBusinessPermission('products', 'edit'))
+              Tooltip(
+                message: t.bulkDefaultWarehouseAction,
+                child: IconButton(
+                  onPressed: () async {
+                    final t = AppLocalizations.of(context);
+                    try {
+                      final state = _tableKey.currentState as dynamic;
+                      final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+                      if (items.isEmpty) {
+                        SnackBarHelper.showError(context, message: t.noRowsSelectedError);
+                        return;
+                      }
+                      final ids = <int>[];
+                      for (final row in items) {
+                        if (row is Map<String, dynamic>) {
+                          final id = row['id'];
+                          if (id is int) ids.add(id);
+                        }
+                      }
+                      if (ids.isEmpty) return;
+
+                      await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => BulkDefaultWarehouseDialog(
+                          businessId: widget.businessId,
+                          selectedProductIds: ids,
+                          onSuccess: () {
+                            try {
+                              (_tableKey.currentState as dynamic)?.refresh();
+                            } catch (_) {}
+                          },
+                        ),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      SnackBarHelper.showError(context, message: '${t.error}: $e');
+                    }
+                  },
+                  icon: const Icon(Icons.warehouse_outlined),
                 ),
               ),
             Tooltip(

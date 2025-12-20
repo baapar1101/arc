@@ -14,6 +14,9 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/expense_income/expense_income_form_dialog.dart';
 import 'package:hesabix_ui/widgets/expense_income/expense_income_details_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
+import '../../widgets/project/project_selector_widget.dart';
+import '../../services/project_service.dart';
 
 /// صفحه لیست اسناد هزینه و درآمد با ویجت جدول
 class ExpenseIncomeListPage extends StatefulWidget {
@@ -39,50 +42,30 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   String? _selectedDocumentType;
   DateTime? _fromDate;
   DateTime? _toDate;
+  int? _selectedProjectId;
+  String? _selectedProjectName;
   // کلید کنترل جدول برای دسترسی به selection و refresh
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
-  List<FilterOption> _projectFilterOptions = [];
-  bool _loadingProjects = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _service = ExpenseIncomeListService(widget.apiClient);
-    _loadProjects();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _isInitialized = true);
+    });
   }
 
-  /// بارگذاری لیست پروژه‌ها برای فیلتر
-  Future<void> _loadProjects() async {
-    if (!mounted) return;
-    setState(() => _loadingProjects = true);
-    
-    try {
-      final response = await widget.apiClient.post(
-        '/businesses/${widget.businessId}/projects/search',
-        data: {
-          'take': 1000,
-          'skip': 0,
-          'is_active': true,
-        },
-      );
-      
-      if (response.data['success'] == true) {
-        final List<dynamic> projects = response.data['data']['items'] ?? [];
-        if (mounted) {
-          setState(() {
-            _projectFilterOptions = projects.map((p) => FilterOption(
-              value: p['id'].toString(),
-              label: p['name'] ?? 'پروژه ${p['id']}',
-              description: p['code'],
-            )).toList();
-            _loadingProjects = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('خطا در بارگذاری پروژه‌ها: $e');
-      if (mounted) setState(() => _loadingProjects = false);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // اگر صفحه قبلاً initialize شده بود، داده‌ها را refresh کن (مثل برگشت از دیالوگ ثبت/ویرایش)
+    if (_isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _refreshData();
+      });
     }
   }
 
@@ -104,6 +87,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final contentPadding = ResponsiveHelper.getPadding(context);
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -112,18 +97,24 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // هدر صفحه
-            _buildHeader(t),
+            _buildHeader(t, isMobile),
             
             // فیلترها
-            _buildFilters(t),
+            _buildFilters(t, isMobile),
             
             // جدول داده‌ها
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  8,
+                  contentPadding,
+                  // avoid FAB overlapping footer/pagination on mobile
+                  isMobile ? 88 : 8,
+                ),
                 child: DataTableWidget<ExpenseIncomeDocument>(
                   key: _tableKey,
-                  config: _buildTableConfig(t, context),
+                  config: _buildTableConfig(t, context, isMobile: isMobile),
                   fromJson: (json) => ExpenseIncomeDocument.fromJson(json),
                   calendarController: widget.calendarController,
                 ),
@@ -132,13 +123,25 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           ],
         ),
       ),
+      floatingActionButton: (isMobile && widget.authStore.canWriteSection('expenses_income'))
+          ? FloatingActionButton.extended(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            )
+          : null,
     );
   }
 
   /// ساخت هدر صفحه
-  Widget _buildHeader(AppLocalizations t) {
+  Widget _buildHeader(AppLocalizations t, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -159,109 +162,499 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               ],
             ),
           ),
-          FilledButton.icon(
-            onPressed: _onAddNew,
-            icon: const Icon(Icons.add),
-            label: Text(t.add),
-          ),
+          if (!isMobile && widget.authStore.canWriteSection('expenses_income'))
+            FilledButton.icon(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            ),
         ],
       ),
     );
   }
 
   /// ساخت بخش فیلترها
-  Widget _buildFilters(AppLocalizations t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // فیلتر نوع سند
-          Expanded(
-            flex: 2,
-            child: SegmentedButton<String?>(
-              segments: [
-                ButtonSegment<String?>(
-                  value: null,
-                  label: Text('همه'),
-                  icon: const Icon(Icons.all_inclusive),
+  Widget _buildFilters(AppLocalizations t, bool isMobile) {
+    final padding = ResponsiveHelper.getPadding(context);
+    if (isMobile) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _buildExternalFilterChips(),
                 ),
-                ButtonSegment<String?>(
-                  value: 'expense',
-                  label: Text('هزینه‌ها'),
-                  icon: const Icon(Icons.trending_down),
-                ),
-                ButtonSegment<String?>(
-                  value: 'income',
-                  label: Text('درآمدها'),
-                  icon: const Icon(Icons.trending_up),
-                ),
-              ],
-              selected: _selectedDocumentType != null ? {_selectedDocumentType} : <String?>{},
-              onSelectionChanged: (set) {
-                setState(() {
-                  _selectedDocumentType = set.first;
-                });
-                // refresh data when filter changes
-                _refreshData();
-              },
+              ),
             ),
-          ),
-          
-          const SizedBox(width: 16),
-          
-          // فیلتر تاریخ
-          Expanded(
-            flex: 3,
-            child: Row(
-              children: [
-                Expanded(
-                  child: DateInputField(
-                    value: _fromDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _fromDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'از تاریخ',
-                    hintText: 'انتخاب تاریخ شروع',
-                  ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: _openMobileFiltersSheet,
+              icon: const Icon(Icons.tune),
+              tooltip: 'فیلترها',
+            ),
+            if (_hasExternalFiltersActive()) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  _clearExternalFilters();
+                  _refreshData();
+                },
+                icon: const Icon(Icons.clear_all),
+                tooltip: t.clear,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // Desktop/tablet: show full inline filter controls
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              // فیلتر نوع سند
+              Expanded(
+                flex: 2,
+                child: SegmentedButton<String?>(
+                  segments: const [
+                    ButtonSegment<String?>(value: null, label: Text('همه'), icon: Icon(Icons.all_inclusive)),
+                    ButtonSegment<String?>(value: 'expense', label: Text('هزینه‌ها'), icon: Icon(Icons.trending_down)),
+                    ButtonSegment<String?>(value: 'income', label: Text('درآمدها'), icon: Icon(Icons.trending_up)),
+                  ],
+                  // نکته: Set می‌تواند null را نگه دارد و باعث می‌شود «همه» واقعاً selected شود
+                  selected: {_selectedDocumentType},
+                  onSelectionChanged: (set) {
+                    setState(() => _selectedDocumentType = set.first);
+                    _refreshData();
+                  },
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DateInputField(
-                    value: _toDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _toDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'تا تاریخ',
-                    hintText: 'انتخاب تاریخ پایان',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
+              ),
+              const SizedBox(width: 16),
+              // فیلتر پروژه
+              Expanded(
+                flex: 2,
+                child: ProjectSelectorWidget(
+                  businessId: widget.businessId,
+                  apiClient: widget.apiClient,
+                  selectedProjectId: _selectedProjectId,
+                  onChanged: (v) async {
                     setState(() {
-                      _fromDate = null;
-                      _toDate = null;
+                      _selectedProjectId = v;
+                      _selectedProjectName = null;
+                    });
+                    await _hydrateSelectedProjectName();
+                    _refreshData();
+                  },
+                  authStore: widget.authStore,
+                  calendarController: widget.calendarController,
+                  allowNull: true,
+                  labelText: 'پروژه',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: DateInputField(
+                  value: _fromDate,
+                  calendarController: widget.calendarController,
+                  onChanged: (date) {
+                    setState(() {
+                      _fromDate = date;
+                      if (_fromDate != null && _toDate != null && _fromDate!.isAfter(_toDate!)) {
+                        final swap = _fromDate;
+                        _fromDate = _toDate;
+                        _toDate = swap;
+                      }
                     });
                     _refreshData();
                   },
-                  icon: const Icon(Icons.clear),
-                  tooltip: 'پاک کردن فیلتر تاریخ',
+                  labelText: 'از تاریخ',
+                  hintText: 'انتخاب تاریخ شروع',
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DateInputField(
+                  value: _toDate,
+                  calendarController: widget.calendarController,
+                  onChanged: (date) {
+                    setState(() {
+                      _toDate = date;
+                      if (_fromDate != null && _toDate != null && _fromDate!.isAfter(_toDate!)) {
+                        final swap = _fromDate;
+                        _fromDate = _toDate;
+                        _toDate = swap;
+                      }
+                    });
+                    _refreshData();
+                  },
+                  labelText: 'تا تاریخ',
+                  hintText: 'انتخاب تاریخ پایان',
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _fromDate = null;
+                    _toDate = null;
+                  });
+                  _refreshData();
+                },
+                icon: const Icon(Icons.clear),
+                tooltip: 'پاک کردن فیلتر تاریخ',
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// ساخت تنظیمات جدول
-  DataTableConfig<ExpenseIncomeDocument> _buildTableConfig(AppLocalizations t, BuildContext context) {
+  List<Widget> _buildExternalFilterChips() {
     final theme = Theme.of(context);
+    final chips = <Widget>[];
+
+    // نوع سند
+    final docLabel = switch (_selectedDocumentType) {
+      'income' => 'درآمدها',
+      'expense' => 'هزینه‌ها',
+      _ => 'همه',
+    };
+    chips.add(
+      InputChip(
+        label: Text('نوع: $docLabel'),
+        backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        onPressed: _openMobileFiltersSheet,
+        onDeleted: _selectedDocumentType == null
+            ? null
+            : () {
+                setState(() => _selectedDocumentType = null);
+                _refreshData();
+              },
+        deleteIcon: const Icon(Icons.close, size: 18),
+        deleteButtonTooltipMessage: 'پاک کردن نوع',
+      ),
+    );
+
+    // بازه تاریخ
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null ? _formatDateShort(_fromDate!) : '...';
+      final to = _toDate != null ? _formatDateShort(_toDate!) : '...';
+      chips.add(
+        InputChip(
+          label: Text('تاریخ: $from تا $to'),
+          backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          onPressed: _openMobileFiltersSheet,
+          onDeleted: () {
+            setState(() {
+              _fromDate = null;
+              _toDate = null;
+            });
+            _refreshData();
+          },
+          deleteIcon: const Icon(Icons.close, size: 18),
+          deleteButtonTooltipMessage: 'پاک کردن بازه تاریخ',
+        ),
+      );
+    }
+
+    if (_selectedProjectId != null) {
+      chips.add(
+        InputChip(
+          label: Text('پروژه: ${_selectedProjectName ?? '#${_selectedProjectId!}'}'),
+          backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          onPressed: _openMobileFiltersSheet,
+          onDeleted: () {
+            setState(() {
+              _selectedProjectId = null;
+              _selectedProjectName = null;
+            });
+            _refreshData();
+          },
+          deleteIcon: const Icon(Icons.close, size: 18),
+          deleteButtonTooltipMessage: 'پاک کردن پروژه',
+        ),
+      );
+    }
+
+    return chips;
+  }
+
+  bool _hasExternalFiltersActive() {
+    return _selectedDocumentType != null || _fromDate != null || _toDate != null || _selectedProjectId != null;
+  }
+
+  void _clearExternalFilters() {
+    setState(() {
+      _selectedDocumentType = null;
+      _fromDate = null;
+      _toDate = null;
+      _selectedProjectId = null;
+      _selectedProjectName = null;
+    });
+  }
+
+  String _formatDateShort(DateTime d) {
+    return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali);
+  }
+
+  Future<void> _openMobileFiltersSheet() async {
+    final theme = Theme.of(context);
+
+    String? tmpType = _selectedDocumentType;
+    DateTime? tmpFrom = _fromDate;
+    DateTime? tmpTo = _toDate;
+    int? tmpProjectId = _selectedProjectId;
+    String? tmpProjectName = _selectedProjectName;
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 12,
+                    bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // handle
+                      Align(
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.tune),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'فیلترها',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tmpType = null;
+                                tmpFrom = null;
+                                tmpTo = null;
+                                tmpProjectId = null;
+                              });
+                            },
+                            child: const Text('پاک کردن'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<String?>(
+                        segments: const [
+                          ButtonSegment<String?>(value: null, label: Text('همه')),
+                          ButtonSegment<String?>(value: 'expense', label: Text('هزینه')),
+                          ButtonSegment<String?>(value: 'income', label: Text('درآمد')),
+                        ],
+                        selected: {tmpType},
+                        onSelectionChanged: (set) => setModalState(() => tmpType = set.first),
+                      ),
+                      const SizedBox(height: 12),
+                      DateInputField(
+                        value: tmpFrom,
+                        calendarController: widget.calendarController,
+                        onChanged: (d) => setModalState(() => tmpFrom = d),
+                        labelText: 'از تاریخ',
+                        hintText: 'انتخاب تاریخ شروع',
+                      ),
+                      const SizedBox(height: 12),
+                      DateInputField(
+                        value: tmpTo,
+                        calendarController: widget.calendarController,
+                        onChanged: (d) => setModalState(() => tmpTo = d),
+                        labelText: 'تا تاریخ',
+                        hintText: 'انتخاب تاریخ پایان',
+                      ),
+                      const SizedBox(height: 12),
+                      ProjectSelectorWidget(
+                        businessId: widget.businessId,
+                        apiClient: widget.apiClient,
+                        selectedProjectId: tmpProjectId,
+                        onChanged: (v) => setModalState(() {
+                          tmpProjectId = v;
+                          tmpProjectName = null;
+                        }),
+                        authStore: widget.authStore,
+                        calendarController: widget.calendarController,
+                        allowNull: true,
+                        labelText: 'پروژه',
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('بستن'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('اعمال'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result == true) {
+      // normalize date range
+      if (tmpFrom != null && tmpTo != null && tmpFrom!.isAfter(tmpTo!)) {
+        final swap = tmpFrom;
+        tmpFrom = tmpTo;
+        tmpTo = swap;
+      }
+      setState(() {
+        _selectedDocumentType = tmpType;
+        _fromDate = tmpFrom;
+        _toDate = tmpTo;
+        _selectedProjectId = tmpProjectId;
+        _selectedProjectName = tmpProjectName;
+      });
+      await _hydrateSelectedProjectName();
+      _refreshData();
+    }
+  }
+
+  Future<void> _hydrateSelectedProjectName() async {
+    final projectId = _selectedProjectId;
+    if (projectId == null) {
+      if (mounted) setState(() => _selectedProjectName = null);
+      return;
+    }
+    try {
+      final svc = ProjectService(widget.apiClient);
+      final data = await svc.getProject(projectId);
+      if (!mounted) return;
+      final name = (data['name'] ?? data['project_name'] ?? '').toString().trim();
+      setState(() => _selectedProjectName = name.isEmpty ? null : name);
+    } catch (_) {
+      if (mounted) setState(() => _selectedProjectName = null);
+    }
+  }
+
+  /// ساخت تنظیمات جدول
+  DataTableConfig<ExpenseIncomeDocument> _buildTableConfig(
+    AppLocalizations t,
+    BuildContext context, {
+    required bool isMobile,
+  }) {
+    final theme = Theme.of(context);
+
+    if (isMobile) {
+      return DataTableConfig<ExpenseIncomeDocument>(
+        endpoint: '/businesses/${widget.businessId}/expense-income',
+        // avoid duplicate titles (page already has its own header)
+        title: null,
+        excelEndpoint: '/businesses/${widget.businessId}/expense-income/export/excel',
+        pdfEndpoint: '/businesses/${widget.businessId}/expense-income/export/pdf',
+        businessId: widget.businessId,
+        reportModuleKey: 'expense_income',
+        reportSubtype: 'list',
+        enableColumnSettings: false,
+        showColumnSettingsButton: false,
+        defaultSortBy: 'document_date',
+        defaultSortDesc: true,
+        dataRowHeight: 168,
+        padding: const EdgeInsets.all(8),
+        columns: [
+          CustomColumn(
+            'summary',
+            'سند',
+            sortable: false,
+            searchable: false,
+            width: ColumnWidth.extraLarge,
+            builder: (dynamic item, int index) => _buildMobileSummaryCard(item as ExpenseIncomeDocument),
+          ),
+        ],
+        searchFields: const ['code'],
+        filterFields: const ['document_type'],
+        dateRangeField: 'document_date',
+        showSearch: true,
+        showFilters: false,
+        showPagination: true,
+        showColumnSearch: false,
+        showRefreshButton: true,
+        showClearFiltersButton: false,
+        enableRowSelection: false,
+        enableMultiRowSelection: false,
+        showExportButtons: true,
+        showExcelExport: true,
+        showPdfExport: true,
+        defaultPageSize: 20,
+        pageSizeOptions: const [10, 20, 50, 100],
+        additionalParams: {
+          'document_type': _selectedDocumentType,
+          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        },
+        getExportParams: () => {
+          'business_id': widget.businessId,
+          'document_type': _selectedDocumentType,
+          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        },
+        onRowTap: (item) => _onView(item as ExpenseIncomeDocument),
+        emptyStateMessage: 'هیچ سند هزینه یا درآمدی یافت نشد',
+        loadingMessage: 'در حال بارگذاری اسناد...',
+        errorMessage: 'خطا در بارگذاری اسناد',
+      );
+    }
+
     return DataTableConfig<ExpenseIncomeDocument>(
       endpoint: '/businesses/${widget.businessId}/expense-income',
       title: 'هزینه و درآمد',
@@ -272,18 +665,19 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       reportSubtype: 'list',
       // دکمه حذف گروهی در هدر جدول
       customHeaderActions: [
-        Tooltip(
-          message: 'حذف انتخاب‌شده‌ها',
-          child: FilledButton.icon(
-            onPressed: _selectedCount > 0 ? _onBulkDelete : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.errorContainer,
-              foregroundColor: theme.colorScheme.onErrorContainer,
+        if (widget.authStore.canDeleteSection('expenses_income'))
+          Tooltip(
+            message: 'حذف انتخاب‌شده‌ها',
+            child: FilledButton.icon(
+              onPressed: _selectedCount > 0 ? _onBulkDelete : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.errorContainer,
+                foregroundColor: theme.colorScheme.onErrorContainer,
+              ),
+              icon: const Icon(Icons.delete_forever),
+              label: Text('حذف ($_selectedCount)'),
             ),
-            icon: const Icon(Icons.delete_forever),
-            label: Text('حذف ($_selectedCount)'),
           ),
-        ),
       ],
       getExportParams: () => {
         'business_id': widget.businessId,
@@ -291,6 +685,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
         if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       },
       columns: [
         // کد سند
@@ -379,9 +774,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           'پروژه',
           width: ColumnWidth.medium,
           formatter: (item) => item.projectName ?? '-',
-          searchable: true,
-          filterType: ColumnFilterType.multiSelect,
-          filterOptions: _projectFilterOptions,
+          searchable: false,
         ),
         
         // عملیات
@@ -395,17 +788,19 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               label: 'مشاهده',
               onTap: (item) => _onView(item),
             ),
-            DataTableAction(
-              icon: Icons.edit,
-              label: 'ویرایش',
-              onTap: (item) => _onEdit(item),
-            ),
-            DataTableAction(
-              icon: Icons.delete,
-              label: 'حذف',
-              onTap: (item) => _onDelete(item),
-              isDestructive: true,
-            ),
+            if (widget.authStore.canWriteSection('expenses_income'))
+              DataTableAction(
+                icon: Icons.edit,
+                label: 'ویرایش',
+                onTap: (item) => _onEdit(item),
+              ),
+            if (widget.authStore.canDeleteSection('expenses_income'))
+              DataTableAction(
+                icon: Icons.delete,
+                label: 'حذف',
+                onTap: (item) => _onDelete(item),
+                isDestructive: true,
+              ),
           ],
         ),
       ],
@@ -437,6 +832,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
         if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       },
       onRowTap: (item) => _onView(item),
       onRowDoubleTap: (item) => _onEdit(item),
@@ -446,23 +842,328 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     );
   }
 
+  Widget _buildMobileSummaryCard(ExpenseIncomeDocument doc) {
+    final theme = Theme.of(context);
+    final isIncome = doc.isIncome;
+    final typeColor = isIncome ? Colors.green : Colors.orange;
+    final amountText = '${formatWithThousands(doc.totalAmount)} ${doc.currencyCode ?? 'ریال'}';
+    final dateText = HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali);
+    final counterparty = (doc.counterpartyInfo ?? '').trim();
+    final accounts = (doc.itemAccountNames ?? '').trim();
+    final description = (doc.description ?? '').trim();
+    final linesCount = doc.itemLinesCount + doc.counterpartyLinesCount;
+
+    final canEdit = widget.authStore.canWriteSection('expenses_income');
+    final canDelete = widget.authStore.canDeleteSection('expenses_income');
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.6)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _onView(doc),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          doc.code,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: typeColor.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            doc.documentTypeName,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: typeColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'عملیات',
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'view':
+                          _onView(doc);
+                          break;
+                        case 'edit':
+                          _onEdit(doc);
+                          break;
+                        case 'delete':
+                          _onDelete(doc);
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'view', child: _PopupRow(icon: Icons.visibility, label: 'مشاهده')),
+                      if (canEdit) const PopupMenuItem(value: 'edit', child: _PopupRow(icon: Icons.edit, label: 'ویرایش')),
+                      if (canDelete)
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: _PopupRow(
+                            icon: Icons.delete,
+                            label: 'حذف',
+                            isDestructive: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      dateText,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    amountText,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                    textDirection: TextDirection.ltr,
+                  ),
+                ],
+              ),
+              if (counterparty.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.person_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        counterparty,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (accounts.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.account_balance_wallet_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        accounts,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.format_list_numbered, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text(
+                    'تعداد خطوط: $linesCount',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              if ((doc.projectName ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.work_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        doc.projectName!.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// افزودن سند جدید
   void _onAddNew() async {
+    if (!widget.authStore.canWriteSection('expenses_income')) {
+      SnackBarHelper.showError(context, message: 'دسترسی لازم برای افزودن را ندارید');
+      return;
+    }
+
+    // اگر نوع سند مشخص نیست، از کاربر بپرس
+    bool? isIncome;
+    if (_selectedDocumentType == 'income') {
+      isIncome = true;
+    } else if (_selectedDocumentType == 'expense') {
+      isIncome = false;
+    } else {
+      isIncome = await _askAddType();
+      if (!mounted) return;
+      if (isIncome == null) return; // cancelled
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => ExpenseIncomeFormDialog(
         businessId: widget.businessId,
         calendarController: widget.calendarController,
-        isIncome: false, // پیش‌فرض هزینه
+        isIncome: isIncome!,
         businessInfo: widget.authStore.currentBusiness,
         apiClient: widget.apiClient,
       ),
     );
+    if (!mounted) return;
     
     // اگر سند با موفقیت ثبت شد، جدول را تازه‌سازی کن
     if (result == true) {
       _refreshData();
     }
+  }
+
+  Future<bool?> _askAddType() async {
+    if (!mounted) return null;
+    final theme = Theme.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+
+    if (isMobile) {
+      return showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Text(
+                      'افزودن سند',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      icon: const Icon(Icons.trending_down),
+                      label: const Text('هزینه'),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      icon: const Icon(Icons.trending_up),
+                      label: const Text('درآمد'),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, null),
+                      child: const Text('انصراف'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('افزودن سند'),
+          content: const Text('نوع سند را انتخاب کنید:'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, false),
+              icon: const Icon(Icons.trending_down),
+              label: const Text('هزینه'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.trending_up),
+              label: const Text('درآمد'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// مشاهده جزئیات سند
@@ -498,6 +1199,10 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   /// ویرایش سند
   void _onEdit(ExpenseIncomeDocument document) async {
     if (!context.mounted) return;
+    if (!widget.authStore.canWriteSection('expenses_income')) {
+      SnackBarHelper.showError(context, message: 'دسترسی لازم برای ویرایش را ندارید');
+      return;
+    }
     final ctx = context;
     try {
       // دریافت جزئیات کامل سند
@@ -531,6 +1236,10 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
   /// حذف سند
   void _onDelete(ExpenseIncomeDocument document) {
+    if (!widget.authStore.canDeleteSection('expenses_income')) {
+      SnackBarHelper.showError(context, message: 'دسترسی لازم برای حذف را ندارید');
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -624,6 +1333,12 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
   /// حذف گروهی اسناد انتخاب‌شده
   Future<void> _onBulkDelete() async {
+    if (!widget.authStore.canDeleteSection('expenses_income')) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'دسترسی لازم برای حذف را ندارید');
+      }
+      return;
+    }
     // استخراج آیتم‌های انتخاب‌شده از جدول
     final state = _tableKey.currentState;
     if (state == null) return;
@@ -699,5 +1414,32 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       }
       SnackBarHelper.showError(context, message: message);
     }
+  }
+}
+
+class _PopupRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isDestructive;
+  const _PopupRow({
+    required this.icon,
+    required this.label,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = isDestructive ? theme.colorScheme.error : theme.iconTheme.color;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: isDestructive ? TextStyle(color: theme.colorScheme.error) : null,
+        ),
+      ],
+    );
   }
 }

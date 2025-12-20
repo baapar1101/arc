@@ -10,23 +10,31 @@ import '../../models/person_model.dart';
 class _CustomerPickerState {
   final List<Customer> customers;
   final bool isLoading;
+  final bool isLoadingMore;
   final bool hasSearched;
+  final bool hasMore;
 
   _CustomerPickerState({
     required this.customers,
     required this.isLoading,
+    required this.isLoadingMore,
     required this.hasSearched,
+    required this.hasMore,
   });
 
   _CustomerPickerState copyWith({
     List<Customer>? customers,
     bool? isLoading,
+    bool? isLoadingMore,
     bool? hasSearched,
+    bool? hasMore,
   }) {
     return _CustomerPickerState(
       customers: customers ?? this.customers,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasSearched: hasSearched ?? this.hasSearched,
+      hasMore: hasMore ?? this.hasMore,
     );
   }
 }
@@ -64,11 +72,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   bool _hasLoadedRecent = false;
   bool _isSearchMode = false;
   bool _hasSearched = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = false;
+  int _currentPage = 1;
+  String _currentQuery = '';
   final ValueNotifier<_CustomerPickerState> _pickerStateNotifier = ValueNotifier<_CustomerPickerState>(
     _CustomerPickerState(
       customers: [],
       isLoading: false,
+      isLoadingMore: false,
       hasSearched: false,
+      hasMore: false,
     ),
   );
 
@@ -106,18 +120,28 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         _hasLoadedRecent = true;
         _isSearchMode = false;
         _hasSearched = false;
+        _isLoadingMore = false;
+        _hasMore = false; // در حالت "اخیرها" صفحه‌بندی نداریم
+        _currentPage = 1;
+        _currentQuery = '';
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
         customers: _customers,
         isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
         hasSearched: _hasSearched,
+        hasMore: _hasMore,
       );
     } catch (e) {
       setState(() {
         _isLoading = false;
         _hasLoadedRecent = true;
         _isSearchMode = false;
+        _isLoadingMore = false;
+        _hasMore = false;
+        _currentPage = 1;
+        _currentQuery = '';
       });
     }
   }
@@ -142,11 +166,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       _isLoading = true;
       _isSearchMode = true;
       _hasSearched = true;
+      _isLoadingMore = false;
+      _hasMore = false;
+      _currentPage = 1;
+      _currentQuery = query;
     });
     // به‌روزرسانی ValueNotifier
     _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(
       isLoading: _isLoading,
       hasSearched: _hasSearched,
+      isLoadingMore: _isLoadingMore,
+      hasMore: _hasMore,
     );
 
     try {
@@ -154,6 +184,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       final result = await _customerService.searchCustomers(
         businessId: widget.businessId,
         searchQuery: query,
+        page: 1,
         limit: 20,
       );
 
@@ -163,12 +194,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       setState(() {
         _customers = customers;
         _isLoading = false;
+        _hasMore = (result['hasMore'] as bool?) ?? false;
+        _currentPage = 1;
+        _isLoadingMore = false;
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
         customers: _customers,
         isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
         hasSearched: _hasSearched,
+        hasMore: _hasMore,
       );
       print('[CustomerCombobox] ValueNotifier updated - customers count: ${_pickerStateNotifier.value.customers.length}');
     } catch (e) {
@@ -176,12 +212,69 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       setState(() {
         _customers.clear();
         _isLoading = false;
+        _isLoadingMore = false;
+        _hasMore = false;
+        _currentPage = 1;
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
         customers: [],
         isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
         hasSearched: _hasSearched,
+        hasMore: _hasMore,
+      );
+    }
+  }
+
+  Future<void> _loadMoreCustomers() async {
+    // فقط برای حالت جست‌وجو و وقتی صفحه بعدی داریم
+    if (!_isSearchMode) return;
+    if (_isLoading) return;
+    if (_isLoadingMore) return;
+    if (!_hasMore) return;
+    if (_currentQuery.trim().isEmpty) return;
+
+    final nextPage = _currentPage + 1;
+    setState(() {
+      _isLoadingMore = true;
+    });
+    _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(
+      isLoadingMore: true,
+    );
+
+    try {
+      final result = await _customerService.searchCustomers(
+        businessId: widget.businessId,
+        searchQuery: _currentQuery,
+        page: nextPage,
+        limit: 20,
+      );
+
+      final newCustomers = result['customers'] as List<Customer>;
+      final existingIds = _customers.map((c) => c.id).toSet();
+      final uniqueNewCustomers = newCustomers.where((c) => !existingIds.contains(c.id)).toList();
+
+      setState(() {
+        _customers = [..._customers, ...uniqueNewCustomers];
+        _currentPage = nextPage;
+        _hasMore = (result['hasMore'] as bool?) ?? false;
+        _isLoadingMore = false;
+      });
+
+      _pickerStateNotifier.value = _CustomerPickerState(
+        customers: _customers,
+        isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
+        hasSearched: _hasSearched,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
+      _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(
+        isLoadingMore: false,
       );
     }
   }
@@ -257,7 +350,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     _pickerStateNotifier.value = _CustomerPickerState(
       customers: _customers,
       isLoading: _isLoading,
+      isLoadingMore: _isLoadingMore,
       hasSearched: _hasSearched,
+      hasMore: _hasMore,
     );
     showModalBottomSheet(
       context: context,
@@ -276,6 +371,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             print('[CustomerCombobox] onSearchChanged callback called with: "$query"');
             _onSearchChanged(query);
           },
+          onLoadMore: _loadMoreCustomers,
           onAddNew: () => _addNewPerson(bottomSheetContext),
         );
       },
@@ -343,6 +439,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
   final Function(Customer) onCustomerSelected;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
+  final VoidCallback onLoadMore;
   final VoidCallback? onAddNew;
 
   const _CustomerPickerBottomSheet({
@@ -351,6 +448,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
     required this.onCustomerSelected,
     required this.searchController,
     required this.onSearchChanged,
+    required this.onLoadMore,
     this.onAddNew,
   });
 
@@ -359,6 +457,30 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
 }
 
 class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    // کمی قبل از رسیدن به انتها، صفحه بعدی را بگیر
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      widget.onLoadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     print('[CustomerPickerBottomSheet] build called');
@@ -444,7 +566,8 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (pickerState.isLoading) {
+    // لودینگ اولیه (وقتی هنوز دیتایی نداریم)
+    if (pickerState.isLoading && pickerState.customers.isEmpty) {
       print('[CustomerPickerBottomSheet] Showing loading indicator');
       return const Center(child: CircularProgressIndicator());
     }
@@ -473,39 +596,62 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
     }
 
     print('[CustomerPickerBottomSheet] Building ListView with ${pickerState.customers.length} items');
-    return ListView.builder(
-      itemCount: pickerState.customers.length,
-      itemBuilder: (context, index) {
-        final customer = pickerState.customers[index];
-        final isSelected = widget.selectedCustomer?.id == customer.id;
-        
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: colorScheme.primaryContainer,
-            child: Icon(
-              Icons.person,
-              color: colorScheme.onPrimaryContainer,
-            ),
+    return Column(
+      children: [
+        // وقتی کاربر عبارت جست‌وجو را عوض می‌کند، یک لودینگ سبک نشان بده بدون اینکه لیست محو شود
+        if (pickerState.isLoading) const LinearProgressIndicator(minHeight: 2),
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            itemCount: pickerState.customers.length +
+                ((pickerState.isLoadingMore || (pickerState.isLoading && pickerState.customers.isNotEmpty)) ? 1 : 0),
+            itemBuilder: (context, index) {
+              // فوتر برای بارگذاری صفحه بعد
+              if ((pickerState.isLoadingMore || (pickerState.isLoading && pickerState.customers.isNotEmpty)) &&
+                  index == pickerState.customers.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+
+              final customer = pickerState.customers[index];
+              final isSelected = widget.selectedCustomer?.id == customer.id;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.person,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                title: Text(customer.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (customer.code != null) Text('کد: ${customer.code}'),
+                    if (customer.phone != null) Text('تلفن: ${customer.phone}'),
+                  ],
+                ),
+                trailing: isSelected
+                    ? Icon(
+                        Icons.check_circle,
+                        color: colorScheme.primary,
+                      )
+                    : null,
+                onTap: () => widget.onCustomerSelected(customer),
+              );
+            },
           ),
-          title: Text(customer.name),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (customer.code != null)
-                Text('کد: ${customer.code}'),
-              if (customer.phone != null)
-                Text('تلفن: ${customer.phone}'),
-            ],
-          ),
-          trailing: isSelected
-              ? Icon(
-                  Icons.check_circle,
-                  color: colorScheme.primary,
-                )
-              : null,
-          onTap: () => widget.onCustomerSelected(customer),
-        );
-      },
+        ),
+      ],
     );
   }
 }

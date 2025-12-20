@@ -82,7 +82,8 @@ class CalendarConverter:
 def get_calendar_type_from_header(calendar_header: Optional[str]) -> CalendarType:
     """Extract calendar type from X-Calendar-Type header"""
     if not calendar_header:
-        return "gregorian"
+        # Default calendar for the product (and API docs): Jalali
+        return "jalali"
     
     calendar_type = calendar_header.lower().strip()
     if calendar_type in ["jalali", "persian", "shamsi"]:

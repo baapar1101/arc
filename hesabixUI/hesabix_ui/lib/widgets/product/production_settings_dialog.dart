@@ -14,6 +14,7 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
   final _formKey = GlobalKey<FormState>();
   final _invCtrl = TextEditingController();
   final _wipCtrl = TextEditingController();
+  final _overheadCtrl = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   String? _errorMessage;
@@ -25,11 +26,12 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
   }
 
   Future<void> _load() async {
-    final (inv, wip) = await _service.getDefaultAccounts(widget.businessId);
+    final (inv, wip, overhead) = await _service.getDefaultAccounts(widget.businessId);
     if (!mounted) return;
     setState(() {
       _invCtrl.text = inv ?? '10102';
       _wipCtrl.text = wip ?? '10106';
+      _overheadCtrl.text = overhead ?? '70408';
       _loading = false;
     });
   }
@@ -38,6 +40,7 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
   void dispose() {
     _invCtrl.dispose();
     _wipCtrl.dispose();
+    _overheadCtrl.dispose();
     super.dispose();
   }
 
@@ -54,6 +57,7 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
         businessId: widget.businessId,
         inventoryCode: _invCtrl.text.trim(),
         wipCode: _wipCtrl.text.trim(),
+        overheadCode: _overheadCtrl.text.trim(),
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -112,6 +116,25 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
                           border: OutlineInputBorder(),
                           labelText: 'کد حساب کالای در جریان ساخت/محصول تولیدی',
                           helperText: 'کد حساب برای محصول در حال تولید',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'لطفاً کد حساب را وارد کنید';
+                          }
+                          if (value.trim().length < 3) {
+                            return 'کد حساب باید حداقل 3 کاراکتر باشد';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _overheadCtrl,
+                        enabled: !_saving,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'کد حساب هزینه عملیات/سربار تولید',
+                          helperText: 'برای ثبت هزینه عملیات تولید: بدهکار WIP / بستانکار این حساب',
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {

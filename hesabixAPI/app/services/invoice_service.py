@@ -677,6 +677,8 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         "direct_consumption": _get_fixed_account_by_code(db, code("direct_consumption", "70406")),
         "wip": _get_fixed_account_by_code(db, code("wip", "10106")),
         "waste_expense": _get_fixed_account_by_code(db, code("waste_expense", "70407")),
+        # هزینه عملیات/سربار تولید (برای انتقال به WIP در فاکتور تولید)
+        "production_overhead": _get_fixed_account_by_code(db, code("production_overhead", "70408")),
         # حساب‌های فروش اقساطی
         "unearned_installment_profit": _get_fixed_account_by_code(db, code("unearned_installment_profit", "10405")),
         "installment_profit": _get_fixed_account_by_code(db, code("installment_profit", "60205")),
@@ -1686,6 +1688,12 @@ def create_invoice(
                 
                 # محاسبه COGS برای مواد اولیه (خروج)
                 total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
+
+                # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
+                try:
+                    operations_total = Decimal(str((header_extra or {}).get("production_operations_total", 0) or 0))
+                except Exception:
+                    operations_total = Decimal(0)
                 
                 # محاسبه هزینه محصول نهایی (ورود)
                 # برای محصول نهایی، از cost_price استفاده می‌کنیم
@@ -1725,6 +1733,25 @@ def create_invoice(
                         debit=Decimal(0),
                         credit=total_materials_cost,
                         description="خروج مواد اولیه از موجودی",
+                    ))
+
+                # ثبت حسابداری هزینه عملیات/سربار تولید: بدهکار WIP / بستانکار حساب سربار
+                if operations_total > 0:
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["wip"].id,
+                        debit=operations_total,
+                        credit=Decimal(0),
+                        description="هزینه عملیات تولید (انتقال به WIP)",
+                        extra_info={"source": "production_operations"},
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["production_overhead"].id,
+                        debit=Decimal(0),
+                        credit=operations_total,
+                        description="هزینه عملیات/سربار تولید",
+                        extra_info={"source": "production_operations"},
                     ))
                 
                 # ثبت حسابداری برای محصول نهایی (ورود)
@@ -2460,6 +2487,13 @@ def update_invoice(
             
             # محاسبه COGS برای مواد اولیه (خروج)
             total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
+
+            # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
+            operations_total_raw = (header_extra or {}).get("production_operations_total", 0)
+            try:
+                operations_total = Decimal(str(operations_total_raw or 0))
+            except Exception:
+                operations_total = Decimal(0)
             
             # محاسبه هزینه محصول نهایی (ورود)
             total_finished_cost = Decimal(0)
@@ -2498,6 +2532,25 @@ def update_invoice(
                     debit=Decimal(0),
                     credit=total_materials_cost,
                     description="خروج مواد اولیه از موجودی",
+                ))
+
+            # ثبت حسابداری هزینه عملیات/سربار تولید: بدهکار WIP / بستانکار حساب سربار
+            if operations_total > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["wip"].id,
+                    debit=operations_total,
+                    credit=Decimal(0),
+                    description="هزینه عملیات تولید (انتقال به WIP)",
+                    extra_info={"source": "production_operations"},
+                ))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["production_overhead"].id,
+                    debit=Decimal(0),
+                    credit=operations_total,
+                    description="هزینه عملیات/سربار تولید",
+                    extra_info={"source": "production_operations"},
                 ))
             
             # ثبت حسابداری برای محصول نهایی (ورود)
@@ -2715,7 +2768,7 @@ def update_invoice(
     # همچنین اسناد عمومی را هم invalidate کن (چون فاکتورها از Document ارث‌بری دارند)
     from app.services.document_service import invalidate_documents_cache
     invalidate_documents_cache(
-        business_id=business_id,
+        business_id=document.business_id,
         fiscal_year_id=document.fiscal_year_id,
         document_type=document.document_type
     )
@@ -2724,7 +2777,7 @@ def update_invoice(
     if document.document_type in ['expense', 'income']:
         from app.services.expense_income_service import invalidate_expense_income_cache
         invalidate_expense_income_cache(
-            business_id=business_id,
+            business_id=document.business_id,
             fiscal_year_id=document.fiscal_year_id,
             document_id=document.id
         )

@@ -560,6 +560,216 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     return {"message": "PRODUCT_UPDATED", "data": data}
 
 
+def preview_bulk_default_warehouse_update(
+    db: Session,
+    business_id: int,
+    payload: Any,
+) -> Dict[str, Any]:
+    """
+    پیش‌نمایش تغییر گروهی انبار پیش‌فرض کالاها.
+    payload: BulkDefaultWarehouseRequest (به دلیل جلوگیری از import cycle به صورت Any)
+    """
+    from sqlalchemy import and_
+    from adapters.db.models.product import Product
+    from adapters.db.models.warehouse import Warehouse
+    from adapters.api.v1.schema_models.product import ProductItemType
+
+    ids = list({int(x) for x in (payload.ids or []) if x})
+    if not ids:
+        return {
+            "total_requested": 0,
+            "found_count": 0,
+            "will_update_count": 0,
+            "skipped": [],
+            "notes": [],
+        }
+
+    # Validate warehouse id (if provided)
+    if payload.default_warehouse_id is not None:
+        wh = db.query(Warehouse).filter(
+            and_(Warehouse.business_id == business_id, Warehouse.id == int(payload.default_warehouse_id))
+        ).first()
+        if not wh:
+            raise ApiError("WAREHOUSE_NOT_FOUND", "انبار انتخاب‌شده یافت نشد", http_status=404)
+
+    # Load products
+    rows = (
+        db.query(Product)
+        .filter(and_(Product.business_id == business_id, Product.id.in_(ids)))
+        .all()
+    )
+    by_id = {int(p.id): p for p in rows}
+
+    apply_scope = str(getattr(payload, "apply_scope", "all"))
+    skipped = []
+    will_update = 0
+    notes = []
+
+    def _scope_ok(p: Product) -> bool:
+        if apply_scope == "track_inventory_true":
+            return bool(getattr(p, "track_inventory", False)) is True
+        if apply_scope == "track_inventory_false":
+            return bool(getattr(p, "track_inventory", False)) is False
+        return True
+
+    # Missing ids
+    missing = [pid for pid in ids if pid not in by_id]
+    for pid in missing:
+        skipped.append({"id": pid, "reason": "NOT_FOUND"})
+
+    forced_service_to_null = 0
+
+    for pid in ids:
+        p = by_id.get(pid)
+        if not p:
+            continue
+        if not _scope_ok(p):
+            skipped.append({"id": pid, "reason": "SCOPE_MISMATCH", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+            continue
+
+        # خدمات: انبار پیش‌فرض باید null باشد
+        item_type_val = getattr(p, "item_type", None)
+        item_type_str = item_type_val.value if hasattr(item_type_val, "value") else str(item_type_val or "")
+        if item_type_str == ProductItemType.SERVICE.value:
+            target = None
+            if getattr(p, "default_warehouse_id", None) is None:
+                skipped.append({"id": pid, "reason": "SERVICE_ALREADY_NULL", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+            else:
+                forced_service_to_null += 1
+                will_update += 1
+            continue
+
+        target = payload.default_warehouse_id
+        if getattr(p, "default_warehouse_id", None) == target:
+            skipped.append({"id": pid, "reason": "ALREADY_SET", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+            continue
+        will_update += 1
+
+    if forced_service_to_null:
+        notes.append(f"{forced_service_to_null} خدمت به‌صورت خودکار بدون انبار پیش‌فرض ذخیره می‌شود.")
+
+    return {
+        "total_requested": len(ids),
+        "found_count": len(rows),
+        "will_update_count": will_update,
+        "forced_service_null_count": forced_service_to_null,
+        "skipped": skipped,
+        "notes": notes,
+    }
+
+
+def apply_bulk_default_warehouse_update(
+    db: Session,
+    business_id: int,
+    user_id: int | None,
+    payload: Any,
+) -> Dict[str, Any]:
+    """
+    اعمال تغییر گروهی انبار پیش‌فرض کالاها.
+    payload: BulkDefaultWarehouseRequest (به دلیل جلوگیری از import cycle به صورت Any)
+    """
+    from sqlalchemy import and_
+    from adapters.db.models.product import Product
+    from adapters.db.models.warehouse import Warehouse
+    from adapters.api.v1.schema_models.product import ProductItemType
+
+    ids = list({int(x) for x in (payload.ids or []) if x})
+    if not ids:
+        return {
+            "total_requested": 0,
+            "found_count": 0,
+            "updated_count": 0,
+            "skipped": [],
+            "notes": [],
+        }
+
+    # Validate warehouse id (if provided)
+    if payload.default_warehouse_id is not None:
+        wh = db.query(Warehouse).filter(
+            and_(Warehouse.business_id == business_id, Warehouse.id == int(payload.default_warehouse_id))
+        ).first()
+        if not wh:
+            raise ApiError("WAREHOUSE_NOT_FOUND", "انبار انتخاب‌شده یافت نشد", http_status=404)
+
+    rows = (
+        db.query(Product)
+        .filter(and_(Product.business_id == business_id, Product.id.in_(ids)))
+        .all()
+    )
+    by_id = {int(p.id): p for p in rows}
+
+    apply_scope = str(getattr(payload, "apply_scope", "all"))
+    skipped = []
+    updated_count = 0
+    notes = []
+
+    def _scope_ok(p: Product) -> bool:
+        if apply_scope == "track_inventory_true":
+            return bool(getattr(p, "track_inventory", False)) is True
+        if apply_scope == "track_inventory_false":
+            return bool(getattr(p, "track_inventory", False)) is False
+        return True
+
+    # Missing ids
+    missing = [pid for pid in ids if pid not in by_id]
+    for pid in missing:
+        skipped.append({"id": pid, "reason": "NOT_FOUND"})
+
+    forced_service_to_null = 0
+
+    for pid in ids:
+        p = by_id.get(pid)
+        if not p:
+            continue
+        if not _scope_ok(p):
+            skipped.append({"id": pid, "reason": "SCOPE_MISMATCH", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+            continue
+
+        # خدمات: انبار پیش‌فرض باید null باشد
+        item_type_val = getattr(p, "item_type", None)
+        item_type_str = item_type_val.value if hasattr(item_type_val, "value") else str(item_type_val or "")
+        if item_type_str == ProductItemType.SERVICE.value:
+            target = None
+            if getattr(p, "default_warehouse_id", None) is None:
+                skipped.append({"id": pid, "reason": "SERVICE_ALREADY_NULL", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+                continue
+            p.default_warehouse_id = None
+            forced_service_to_null += 1
+            updated_count += 1
+            # Cache invalidation
+            invalidate_products_cache(
+                business_id=business_id,
+                product_id=pid,
+                category_id=getattr(p, "category_id", None),
+            )
+            continue
+
+        target = payload.default_warehouse_id
+        if getattr(p, "default_warehouse_id", None) == target:
+            skipped.append({"id": pid, "reason": "ALREADY_SET", "code": getattr(p, "code", None), "name": getattr(p, "name", None)})
+            continue
+        p.default_warehouse_id = target
+        updated_count += 1
+        invalidate_products_cache(
+            business_id=business_id,
+            product_id=pid,
+            category_id=getattr(p, "category_id", None),
+        )
+
+    if forced_service_to_null:
+        notes.append(f"{forced_service_to_null} خدمت به‌صورت خودکار بدون انبار پیش‌فرض ذخیره شد.")
+
+    db.flush()
+    return {
+        "total_requested": len(ids),
+        "found_count": len(rows),
+        "updated_count": updated_count,
+        "forced_service_null_count": forced_service_to_null,
+        "skipped": skipped,
+        "notes": notes,
+    }
+
+
 def check_product_has_related_documents(db: Session, product_id: int) -> tuple[bool, list[str]]:
     """
     بررسی وجود اسناد حسابداری، حواله‌های انبار و خطوط فاکتور مرتبط با کالا
@@ -1606,7 +1816,8 @@ def get_inventory_kardex_report(
             'product_id': product_id,
             'product_code': product.code or '',
             'product_name': product.name or '',
-            'document_date': mv_date.isoformat() if mv_date else None,
+            # keep as date object so format_datetime_fields can apply jalali/gregorian consistently
+            'document_date': mv_date,
             'document_type': document.document_type if document else None,
             'document_type_name': document_type_name,
             'document_code': document_code,

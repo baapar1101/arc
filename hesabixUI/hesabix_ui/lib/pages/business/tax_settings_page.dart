@@ -116,9 +116,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     if (!(_connectionFormKey.currentState?.validate() ?? false)) {
       return;
     }
-    final memoryId = _convertDigitsToEnglish(
-      _taxMemoryIdController.text.trim(),
-    );
+    final memoryId = _normalizeTaxMemoryId(_taxMemoryIdController.text);
     final economicCode = _convertDigitsToEnglish(
       _economicCodeController.text.trim(),
     );
@@ -440,11 +438,11 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 label: t.taxMemoryIdLabel,
                 controller: _taxMemoryIdController,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
+                  if (value == null || _normalizeTaxMemoryId(value).isEmpty) {
                     return t.taxMemoryIdRequired;
                   }
-                  final normalized = _convertDigitsToEnglish(value.trim());
-                  if (!_isDigitsOnly(normalized)) {
+                  final normalized = _normalizeTaxMemoryId(value);
+                  if (!_isAlphaNumericOnly(normalized)) {
                     return '${t.taxMemoryIdLabel} ${t.invalid}';
                   }
                   return null;
@@ -720,9 +718,23 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     return buffer.toString();
   }
 
+  String _normalizeTaxMemoryId(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '';
+    final englishDigits = _convertDigitsToEnglish(trimmed);
+    // Allow users to paste with spaces/dashes; store a clean ID.
+    final compact = englishDigits.replaceAll(RegExp(r'[\s\-]'), '');
+    return compact;
+  }
+
   bool _isDigitsOnly(String input) {
     if (input.isEmpty) return false;
     return RegExp(r'^[0-9]+$').hasMatch(input);
+  }
+
+  bool _isAlphaNumericOnly(String input) {
+    if (input.isEmpty) return false;
+    return RegExp(r'^[a-zA-Z0-9]+$').hasMatch(input);
   }
 
   Widget _buildDataQualitySection(AppLocalizations t, ColorScheme cs) {

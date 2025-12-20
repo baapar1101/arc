@@ -965,15 +965,13 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddWarehouseDialog() async {
-      final result = await showDialog<bool>(
-        context: context,
-        builder: (context) => WarehouseFormDialog(
-          businessId: widget.businessId,
-          onSuccess: () {
-            // Refresh the warehouses page if it's currently open
-            _refreshCurrentPage();
-          },
-        ),
+      final result = await WarehouseFormDialog.show(
+        context,
+        businessId: widget.businessId,
+        onSuccess: () {
+          // Refresh the warehouses page if it's currently open
+          _refreshCurrentPage();
+        },
       );
       if (result == true) {
         // Warehouse was successfully added, refresh the current page

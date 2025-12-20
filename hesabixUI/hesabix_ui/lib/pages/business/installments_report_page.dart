@@ -85,6 +85,72 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   int _currentPage = 1;
   static const List<int> _pageSizeOptions = <int>[25, 50, 100, 200];
 
+  String? _extractFilenameFromContentDisposition(String? contentDisposition) {
+    if (contentDisposition == null || contentDisposition.trim().isEmpty) return null;
+    // Try RFC5987 filename*=
+    final starMatch = RegExp(r"filename\*\s*=\s*utf-8''([^;]+)", caseSensitive: false).firstMatch(contentDisposition);
+    if (starMatch != null) {
+      final raw = starMatch.group(1);
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          return Uri.decodeFull(raw);
+        } catch (_) {
+          return raw;
+        }
+      }
+    }
+    // Fallback: filename="..."
+    final quoted = RegExp(r'filename\s*=\s*"([^"]+)"', caseSensitive: false).firstMatch(contentDisposition);
+    if (quoted != null) return quoted.group(1);
+    // Fallback: filename=...
+    final plain = RegExp(r'filename\s*=\s*([^;]+)', caseSensitive: false).firstMatch(contentDisposition);
+    if (plain != null) return plain.group(1)?.trim();
+    return null;
+  }
+
+  bool _looksLikeXlsx(List<int> bytes) {
+    // XLSX is a ZIP container; signature: PK\x03\x04
+    if (bytes.length < 4) return false;
+    return bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+  }
+
+  ({String filename, String mimeType}) _resolveDownloadMeta({
+    required Response<List<int>> response,
+    required List<int> data,
+    required String fallbackBaseName,
+    required String fallbackExt,
+    required String fallbackMime,
+  }) {
+    final contentType = response.headers.value('content-type')?.toLowerCase();
+    final cd = response.headers.value('content-disposition');
+    final headerFilename = _extractFilenameFromContentDisposition(cd);
+
+    // If backend fell back to CSV, use .csv and correct mime.
+    if (contentType != null && contentType.contains('text/csv')) {
+      final name = headerFilename ?? '$fallbackBaseName.csv';
+      return (filename: name, mimeType: 'text/csv');
+    }
+
+    // If content-type indicates PDF
+    if (contentType != null && contentType.contains('application/pdf')) {
+      final name = headerFilename ?? '$fallbackBaseName.pdf';
+      return (filename: name, mimeType: 'application/pdf');
+    }
+
+    // If bytes look like XLSX, prefer XLSX regardless of content-type.
+    if (_looksLikeXlsx(data)) {
+      final name = headerFilename ?? '$fallbackBaseName.xlsx';
+      return (
+        filename: name,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+    }
+
+    // Default: keep fallback.
+    final name = headerFilename ?? '$fallbackBaseName.$fallbackExt';
+    return (filename: name, mimeType: fallbackMime);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -573,20 +639,27 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
       };
 
-      final bytes = await widget.apiClient.post<List<int>>(
+      final resp = await widget.apiClient.post<List<int>>(
         '/api/v1/invoices/business/${widget.businessId}/installments/export/excel',
         data: body,
         responseType: ResponseType.bytes,
         options: Options(
-          headers: {'Accept': 'application/octet-stream'},
+          headers: {'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv'},
         ),
       );
-      final data = bytes.data ?? <int>[];
+      final data = resp.data ?? <int>[];
       if (kIsWeb) {
+        final meta = _resolveDownloadMeta(
+          response: resp,
+          data: data,
+          fallbackBaseName: 'installments_${widget.businessId}',
+          fallbackExt: 'xlsx',
+          fallbackMime: 'application/octet-stream',
+        );
         await web_utils.saveBytesAsFileWeb(
           data,
-          'installments_${widget.businessId}.xlsx',
-          mimeType: 'application/octet-stream',
+          meta.filename,
+          mimeType: meta.mimeType,
         );
       } else {
         if (mounted) {
@@ -615,7 +688,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
       };
 
-      final bytes = await widget.apiClient.post<List<int>>(
+      final resp = await widget.apiClient.post<List<int>>(
         '/api/v1/invoices/business/${widget.businessId}/installments/export/pdf',
         data: body,
         responseType: ResponseType.bytes,
@@ -623,12 +696,19 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           headers: {'Accept': 'application/pdf'},
         ),
       );
-      final data = bytes.data ?? <int>[];
+      final data = resp.data ?? <int>[];
       if (kIsWeb) {
+        final meta = _resolveDownloadMeta(
+          response: resp,
+          data: data,
+          fallbackBaseName: 'installments_${widget.businessId}',
+          fallbackExt: 'pdf',
+          fallbackMime: 'application/pdf',
+        );
         await web_utils.saveBytesAsFileWeb(
           data,
-          'installments_${widget.businessId}.pdf',
-          mimeType: 'application/pdf',
+          meta.filename,
+          mimeType: meta.mimeType,
         );
       } else {
         if (mounted) {

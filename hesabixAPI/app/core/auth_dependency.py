@@ -557,6 +557,14 @@ def get_current_user(
 	
 	# تشخیص نوع تقویم از هدر X-Calendar-Type
 	calendar_type = _detect_calendar_type(request)
+
+	# Ensure request.state has consistent values even if middleware isn't applied (or order differs)
+	try:
+		request.state.locale = language
+		request.state.calendar_type = calendar_type
+		request.state.translator = Translator(language)
+	except Exception:
+		pass
 	
 	# تشخیص منطقه زمانی از هدر X-Timezone (اختیاری)
 	timezone = _detect_timezone(request)

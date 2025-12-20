@@ -9,6 +9,34 @@ import '../../widgets/product/product_form_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 
 
+class _ProductPickerState {
+  final List<Map<String, dynamic>> items;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
+
+  const _ProductPickerState({
+    required this.items,
+    required this.isLoading,
+    required this.isLoadingMore,
+    required this.hasMore,
+  });
+
+  _ProductPickerState copyWith({
+    List<Map<String, dynamic>>? items,
+    bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
+  }) {
+    return _ProductPickerState(
+      items: items ?? this.items,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+    );
+  }
+}
+
 class ProductComboboxWidget extends StatefulWidget {
   final int businessId;
   final Map<String, dynamic>? selectedProduct;
@@ -47,10 +75,19 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   int _currentSkip = 0;
   String? _currentSearchQuery;
   static const int _pageSize = 20;
+  late final ValueNotifier<_ProductPickerState> _pickerStateNotifier;
 
   @override
   void initState() {
     super.initState();
+    _pickerStateNotifier = ValueNotifier<_ProductPickerState>(
+      const _ProductPickerState(
+        items: <Map<String, dynamic>>[],
+        isLoading: false,
+        isLoadingMore: false,
+        hasMore: false,
+      ),
+    );
     _initializeSelectedProduct();
     _loadRecent();
     _scrollController.addListener(_onScroll);
@@ -100,6 +137,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               setState(() {
                 _items = [product, ..._items];
               });
+              _syncPickerState();
             }
           }
         }
@@ -121,7 +159,17 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     _searchCtrl.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _pickerStateNotifier.dispose();
     super.dispose();
+  }
+
+  void _syncPickerState() {
+    _pickerStateNotifier.value = _ProductPickerState(
+      items: _items,
+      isLoading: _loading,
+      isLoadingMore: _loadingMore,
+      hasMore: _hasMore,
+    );
   }
 
   void _onScroll() {
@@ -144,6 +192,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       _currentSearchQuery = null;
       _hasMore = false;
     });
+    _syncPickerState();
     try {
       final items = await _service.searchProducts(
         businessId: widget.businessId,
@@ -158,6 +207,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         _hasMore = items.length >= _pageSize;
         _currentSkip = items.length;
       });
+      _syncPickerState();
       // فراخوانی callback فقط در بار اول
       if (_isFirstLoad && widget.onProductsLoaded != null) {
         _isFirstLoad = false;
@@ -170,13 +220,17 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         _hasMore = false;
         _currentSkip = 0;
       });
+      _syncPickerState();
       // فراخوانی callback با لیست خالی در صورت خطا (فقط در بار اول)
       if (_isFirstLoad && widget.onProductsLoaded != null) {
         _isFirstLoad = false;
         widget.onProductsLoaded?.call(const <Map<String, dynamic>>[]);
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _syncPickerState();
+      }
     }
   }
 
@@ -200,6 +254,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       _currentSearchQuery = q;
       _hasMore = false;
     });
+    _syncPickerState();
     try {
       final items = await _service.searchProducts(
         businessId: widget.businessId,
@@ -214,6 +269,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         _hasMore = items.length >= _pageSize;
         _currentSkip = items.length;
       });
+      _syncPickerState();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -221,8 +277,12 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         _hasMore = false;
         _currentSkip = 0;
       });
+      _syncPickerState();
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _syncPickerState();
+      }
     }
   }
 
@@ -230,6 +290,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     if (_loadingMore || !_hasMore) return;
     
     setState(() => _loadingMore = true);
+    _syncPickerState();
     try {
       final items = await _service.searchProducts(
         businessId: widget.businessId,
@@ -244,11 +305,16 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         _hasMore = items.length >= _pageSize;
         _currentSkip = _items.length;
       });
+      _syncPickerState();
     } catch (_) {
       if (!mounted) return;
       setState(() => _hasMore = false);
+      _syncPickerState();
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      if (mounted) {
+        setState(() => _loadingMore = false);
+        _syncPickerState();
+      }
     }
   }
 
@@ -324,7 +390,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     }
   }
 
-  Future<void> _searchByBarcode(BuildContext bottomSheetContext, VoidCallback refreshBottomSheet) async {
+  Future<void> _searchByBarcode(BuildContext bottomSheetContext) async {
     final barcodeController = TextEditingController();
     
     await showDialog<Map<String, dynamic>?>(
@@ -344,7 +410,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               autofocus: true,
               onSubmitted: (value) async {
                 if (value.trim().isNotEmpty) {
-                  await _performBarcodeSearch(value.trim(), context, refreshBottomSheet);
+                  await _performBarcodeSearch(value.trim(), context, bottomSheetContext);
                 }
               },
             ),
@@ -358,7 +424,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           FilledButton(
             onPressed: () async {
               if (barcodeController.text.trim().isNotEmpty) {
-                await _performBarcodeSearch(barcodeController.text.trim(), context, refreshBottomSheet);
+                await _performBarcodeSearch(barcodeController.text.trim(), context, bottomSheetContext);
               }
             },
             child: const Text('جستجو'),
@@ -368,7 +434,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     );
   }
 
-  Future<void> _performBarcodeSearch(String code, BuildContext dialogContext, VoidCallback refreshBottomSheet) async {
+  Future<void> _performBarcodeSearch(String code, BuildContext dialogContext, BuildContext bottomSheetContext) async {
     try {
       final instanceData = await _warehouseService.searchInstanceByCode(
         businessId: widget.businessId,
@@ -426,6 +492,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             setState(() {
               _items = [product, ..._items];
             });
+            _syncPickerState();
           } else {
             // اگر در لیست است، لیست را refresh کن تا محصول در ابتدا قرار بگیرد
             await _loadRecent();
@@ -434,13 +501,10 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         
         // انتخاب محصول
         _select(product);
-        
-        // به‌روزرسانی لیست در bottom sheet
-        refreshBottomSheet();
-        
-        // بستن bottom sheet اگر باز است
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
+
+        // بستن bottom sheet (بعد از انتخاب موفق)
+        if (bottomSheetContext.mounted && Navigator.canPop(bottomSheetContext)) {
+          Navigator.pop(bottomSheetContext);
         }
       }
     } on dio.DioException catch (e) {
@@ -475,97 +539,20 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return StatefulBuilder(
-          builder: (bottomSheetContext, setBottomSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(widget.label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        // دکمه جستجو با بارکد
-                        IconButton(
-                          onPressed: () async {
-                            await _searchByBarcode(bottomSheetContext, () {
-                              if (mounted) {
-                                setBottomSheetState(() {});
-                              }
-                            });
-                          },
-                          icon: const Icon(Icons.qr_code_scanner),
-                          tooltip: 'جستجو با بارکد/سریال',
-                          color: theme.colorScheme.primary,
-                        ),
-                        if (widget.authStore != null)
-                          IconButton(
-                            onPressed: () => _addNewProduct(bottomSheetContext),
-                            icon: const Icon(Icons.add),
-                            tooltip: 'افزودن کالا/خدمت جدید',
-                            color: theme.colorScheme.primary,
-                          ),
-                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _searchCtrl,
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onChanged: (value) {
-                        _onQueryChanged(value);
-                        // به‌روزرسانی لیست در bottom sheet
-                        setBottomSheetState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: _loading
-                          ? const Center(child: CircularProgressIndicator())
-                          : ListView.separated(
-                              controller: _scrollController,
-                              itemCount: _items.length + (_loadingMore ? 1 : 0),
-                              separatorBuilder: (separatorContext, separatorIndex) {
-                                // نمایش separator فقط بین آیتم‌های واقعی
-                                if (separatorIndex >= _items.length - 1) {
-                                  return const SizedBox.shrink();
-                                }
-                                return const Divider(height: 1);
-                              },
-                              itemBuilder: (context, index) {
-                                if (index == _items.length && _loadingMore) {
-                                  return const Padding(
-                                    padding: EdgeInsets.all(16.0),
-                                    child: Center(child: CircularProgressIndicator()),
-                                  );
-                                }
-                                final it = _items[index];
-                                final code = it['code']?.toString() ?? '';
-                                final name = it['name']?.toString() ?? '';
-                                final itemType = it['item_type']?.toString() ?? '';
-                                return ListTile(
-                                  leading: const Icon(Icons.inventory_2_outlined),
-                                  title: Text(code.isNotEmpty ? '$code - $name' : name),
-                                  subtitle: itemType.isNotEmpty ? Text(itemType) : null,
-                                  onTap: () {
-                                    _select(it);
-                                    Navigator.pop(ctx);
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+        return _ProductPickerBottomSheet(
+          label: widget.label,
+          hintText: widget.hintText,
+          pickerStateNotifier: _pickerStateNotifier,
+          scrollController: _scrollController,
+          searchController: _searchCtrl,
+          canAddNewProduct: widget.authStore != null,
+          onClose: () => Navigator.pop(ctx),
+          onAddNewProduct: widget.authStore != null ? (bottomSheetContext) => _addNewProduct(bottomSheetContext) : null,
+          onSearchByBarcode: (bottomSheetContext) => _searchByBarcode(bottomSheetContext),
+          onQueryChanged: _onQueryChanged,
+          onProductSelected: (product) {
+            _select(product);
+            Navigator.pop(ctx);
           },
         );
       },
@@ -612,6 +599,183 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         ),
         ),
       ),
+    );
+  }
+}
+
+class _ProductPickerBottomSheet extends StatefulWidget {
+  final String label;
+  final String hintText;
+  final ValueNotifier<_ProductPickerState> pickerStateNotifier;
+  final ScrollController scrollController;
+  final TextEditingController searchController;
+  final bool canAddNewProduct;
+  final VoidCallback onClose;
+  final void Function(BuildContext bottomSheetContext)? onAddNewProduct;
+  final Future<void> Function(BuildContext bottomSheetContext) onSearchByBarcode;
+  final void Function(String query) onQueryChanged;
+  final void Function(Map<String, dynamic> product) onProductSelected;
+
+  const _ProductPickerBottomSheet({
+    required this.label,
+    required this.hintText,
+    required this.pickerStateNotifier,
+    required this.scrollController,
+    required this.searchController,
+    required this.canAddNewProduct,
+    required this.onClose,
+    required this.onAddNewProduct,
+    required this.onSearchByBarcode,
+    required this.onQueryChanged,
+    required this.onProductSelected,
+  });
+
+  @override
+  State<_ProductPickerBottomSheet> createState() => _ProductPickerBottomSheetState();
+}
+
+class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ValueListenableBuilder<_ProductPickerState>(
+          valueListenable: widget.pickerStateNotifier,
+          builder: (context, state, _) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      widget.label,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () async => widget.onSearchByBarcode(context),
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: 'جستجو با بارکد/سریال',
+                      color: colorScheme.primary,
+                    ),
+                    if (widget.canAddNewProduct && widget.onAddNewProduct != null)
+                      IconButton(
+                        onPressed: () => widget.onAddNewProduct!(context),
+                        icon: const Icon(Icons.add),
+                        tooltip: 'افزودن کالا/خدمت جدید',
+                        color: colorScheme.primary,
+                      ),
+                    IconButton(onPressed: widget.onClose, icon: const Icon(Icons.close)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: widget.searchController,
+                  decoration: InputDecoration(
+                    hintText: widget.hintText,
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    suffixIcon: state.isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
+                  ),
+                  onChanged: widget.onQueryChanged,
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: _buildList(theme, state),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(ThemeData theme, _ProductPickerState state) {
+    final colorScheme = theme.colorScheme;
+
+    if (state.isLoading && state.items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (!state.isLoading && state.items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'کالایی یافت نشد',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
+        Expanded(
+          child: ListView.separated(
+            controller: widget.scrollController,
+            itemCount: state.items.length + ((state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0),
+            separatorBuilder: (separatorContext, separatorIndex) {
+              if (separatorIndex >= state.items.length - 1) return const SizedBox.shrink();
+              return const Divider(height: 1);
+            },
+            itemBuilder: (context, index) {
+              // فوتر لودینگ: هم برای صفحه بعد (load more) و هم برای واکشی نتیجه جدید (refresh search)
+              if (index == state.items.length && (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))) {
+                return const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              // گارد ایمن: در صورت تغییر همزمان طول لیست هنگام rebuild، از RangeError جلوگیری کن
+              if (index >= state.items.length) {
+                return const SizedBox.shrink();
+              }
+              final it = state.items[index];
+              final code = it['code']?.toString() ?? '';
+              final name = it['name']?.toString() ?? '';
+              final itemType = it['item_type']?.toString() ?? '';
+              return ListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: Text(code.isNotEmpty ? '$code - $name' : name),
+                subtitle: itemType.isNotEmpty ? Text(itemType) : null,
+                onTap: () => widget.onProductSelected(it),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

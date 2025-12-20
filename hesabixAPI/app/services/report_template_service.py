@@ -235,6 +235,26 @@ class ReportTemplateService:
 		env.filters["default"] = lambda v, d="": v if v not in (None, "") else d
 		env.filters["upper"] = lambda v: str(v).upper()
 		env.filters["lower"] = lambda v: str(v).lower()
+		def _smart_number(v, max_decimals: int = 2):
+			"""عدد با جداکننده هزارگان و حذف .0 های اضافی؛ None => رشته خالی"""
+			if v is None:
+				return ""
+			try:
+				n = float(v)
+				if abs(n - round(n)) < 1e-9:
+					return f"{int(round(n)):,}"
+				s = f"{n:,.{int(max_decimals)}f}"
+				if "." in s:
+					s = s.rstrip("0").rstrip(".")
+				return s
+			except Exception:
+				return "" if v is None else str(v)
+		env.filters["smart_number"] = _smart_number
+		def _ltr(v):
+			"""Wrap text in a span forcing LTR direction (useful for numbers in RTL PDFs)."""
+			s = "" if v is None else str(v)
+			return f'<span style="direction:ltr; unicode-bidi:plaintext; font-variant-numeric: tabular-nums">{s}</span>'
+		env.filters["ltr"] = _ltr
 		def _money(v, decimals: int = 0, sep: str = ","):
 			try:
 				n = float(v)

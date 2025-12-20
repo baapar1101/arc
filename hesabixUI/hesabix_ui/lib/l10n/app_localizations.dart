@@ -566,6 +566,147 @@ abstract class AppLocalizations {
   /// **'Error'**
   String get error;
 
+  /// No description provided for @bulkDefaultWarehouseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk default warehouse'**
+  String get bulkDefaultWarehouseTitle;
+
+  /// No description provided for @bulkDefaultWarehouseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change default warehouse'**
+  String get bulkDefaultWarehouseAction;
+
+  /// No description provided for @bulkDefaultWarehouseNewWarehouseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New warehouse'**
+  String get bulkDefaultWarehouseNewWarehouseLabel;
+
+  /// No description provided for @bulkDefaultWarehouseClearOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear default warehouse (empty)'**
+  String get bulkDefaultWarehouseClearOption;
+
+  /// No description provided for @bulkDefaultWarehouseScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply scope (Policy):'**
+  String get bulkDefaultWarehouseScopeLabel;
+
+  /// No description provided for @bulkDefaultWarehouseScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected'**
+  String get bulkDefaultWarehouseScopeAll;
+
+  /// No description provided for @bulkDefaultWarehouseScopeTrackInventoryTrue.
+  ///
+  /// In en, this message translates to:
+  /// **'Only inventory-tracked items (track_inventory=true)'**
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue;
+
+  /// No description provided for @bulkDefaultWarehouseScopeTrackInventoryFalse.
+  ///
+  /// In en, this message translates to:
+  /// **'Only non-inventory items (track_inventory=false)'**
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse;
+
+  /// No description provided for @bulkDefaultWarehouseConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes'**
+  String get bulkDefaultWarehouseConfirmTitle;
+
+  /// No description provided for @bulkDefaultWarehouseConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to apply this default warehouse change to the selected items?'**
+  String get bulkDefaultWarehouseConfirmMessage;
+
+  /// No description provided for @bulkDefaultWarehouseApplySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Done. Updated: {count}'**
+  String bulkDefaultWarehouseApplySuccess(String count);
+
+  /// No description provided for @bulkDefaultWarehouseSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected items: {count}'**
+  String bulkDefaultWarehouseSelectedCount(int count);
+
+  /// No description provided for @bulkDefaultWarehousePreviewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested: {total} | Found: {found} | Will update: {willUpdate}'**
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  );
+
+  /// No description provided for @bulkDefaultWarehouseSkippedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: {count}'**
+  String bulkDefaultWarehouseSkippedCount(int count);
+
+  /// No description provided for @bulkDefaultWarehouseNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes:'**
+  String get bulkDefaultWarehouseNotesLabel;
+
+  /// No description provided for @bulkDefaultWarehouseForcedServiceNull.
+  ///
+  /// In en, this message translates to:
+  /// **'Service items forced to null default warehouse: {count}'**
+  String bulkDefaultWarehouseForcedServiceNull(int count);
+
+  /// No description provided for @bulkDefaultWarehouseApplySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested: {total} | Found: {found} | Updated: {updated} | Skipped: {skipped}'**
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  );
+
+  /// No description provided for @bulkDefaultWarehouseReasonAlreadySet.
+  ///
+  /// In en, this message translates to:
+  /// **'Already set'**
+  String get bulkDefaultWarehouseReasonAlreadySet;
+
+  /// No description provided for @bulkDefaultWarehouseReasonScopeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of selected scope'**
+  String get bulkDefaultWarehouseReasonScopeMismatch;
+
+  /// No description provided for @bulkDefaultWarehouseReasonNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get bulkDefaultWarehouseReasonNotFound;
+
+  /// No description provided for @bulkDefaultWarehouseReasonServiceAlreadyNull.
+  ///
+  /// In en, this message translates to:
+  /// **'Service item must have no default warehouse'**
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull;
+
+  /// No description provided for @bulkDefaultWarehouseReasonUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get bulkDefaultWarehouseReasonUnknown;
+
   /// No description provided for @newBusiness.
   ///
   /// In en, this message translates to:
@@ -7603,6 +7744,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This report will be available soon.'**
   String get reportsComingSoonMessage;
+
+  /// No description provided for @reportsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search reports…'**
+  String get reportsSearchHint;
+
+  /// No description provided for @reportsSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Results ({count})'**
+  String reportsSearchResults(Object count);
+
+  /// No description provided for @reportsSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No reports matched your search.'**
+  String get reportsSearchNoResults;
+
+  /// No description provided for @reportsFavoritesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get reportsFavoritesTitle;
+
+  /// No description provided for @reportsFavoritesEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'For quick access, tap the star next to a report.'**
+  String get reportsFavoritesEmptyMessage;
+
+  /// No description provided for @reportsRecentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get reportsRecentTitle;
+
+  /// No description provided for @reportsRecentEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports you open will show up here.'**
+  String get reportsRecentEmptyMessage;
+
+  /// No description provided for @reportsWarehouseSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse reports'**
+  String get reportsWarehouseSection;
+
+  /// No description provided for @reportsSystemSection.
+  ///
+  /// In en, this message translates to:
+  /// **'System reports'**
+  String get reportsSystemSection;
+
+  /// No description provided for @reportsActivityLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User activity logs'**
+  String get reportsActivityLogsTitle;
+
+  /// No description provided for @reportsActivityLogsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View the history of user activity in the system'**
+  String get reportsActivityLogsSubtitle;
+
+  /// No description provided for @reportsSectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} reports'**
+  String reportsSectionCount(Object count);
+
+  /// No description provided for @reportsAddToFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favorites'**
+  String get reportsAddToFavorites;
+
+  /// No description provided for @reportsRemoveFromFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get reportsRemoveFromFavorites;
+
+  /// No description provided for @reportsInstallmentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment status, due dates, and remaining balance'**
+  String get reportsInstallmentsSubtitle;
+
+  /// No description provided for @reportsStockCountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock count report'**
+  String get reportsStockCountTitle;
+
+  /// No description provided for @reportsStockCountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock count history and adjustment documents'**
+  String get reportsStockCountSubtitle;
+
+  /// No description provided for @reportsWarehouseDocumentsSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse documents summary'**
+  String get reportsWarehouseDocumentsSummaryTitle;
+
+  /// No description provided for @reportsWarehouseDocumentsSummarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary by document type with inbound/outbound stats'**
+  String get reportsWarehouseDocumentsSummarySubtitle;
+
+  /// No description provided for @reportsSlowMovingItemsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow-moving items'**
+  String get reportsSlowMovingItemsTitle;
+
+  /// No description provided for @reportsSlowMovingItemsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items with no movement during the selected time range'**
+  String get reportsSlowMovingItemsSubtitle;
+
+  /// No description provided for @reportsCriticalStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical stock items'**
+  String get reportsCriticalStockTitle;
+
+  /// No description provided for @reportsCriticalStockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items with stock below the defined threshold'**
+  String get reportsCriticalStockSubtitle;
+
+  /// No description provided for @reportsInterWarehouseTransfersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inter-warehouse transfers'**
+  String get reportsInterWarehouseTransfersTitle;
+
+  /// No description provided for @reportsInterWarehouseTransfersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details of transfers between warehouses'**
+  String get reportsInterWarehouseTransfersSubtitle;
+
+  /// No description provided for @reportsAdjustmentDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment documents'**
+  String get reportsAdjustmentDocumentsTitle;
+
+  /// No description provided for @reportsAdjustmentDocumentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis of adjustment documents and inventory differences'**
+  String get reportsAdjustmentDocumentsSubtitle;
+
+  /// No description provided for @reportsWarehousePerformanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse performance'**
+  String get reportsWarehousePerformanceTitle;
+
+  /// No description provided for @reportsWarehousePerformanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare warehouse performance'**
+  String get reportsWarehousePerformanceSubtitle;
+
+  /// No description provided for @reportsProductMovementHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product movement history'**
+  String get reportsProductMovementHistoryTitle;
+
+  /// No description provided for @reportsProductMovementHistorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full movement history of a product across all warehouses'**
+  String get reportsProductMovementHistorySubtitle;
+
+  /// No description provided for @reportsInventoryValuationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory valuation'**
+  String get reportsInventoryValuationTitle;
+
+  /// No description provided for @reportsInventoryValuationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetary valuation of warehouse inventories'**
+  String get reportsInventoryValuationSubtitle;
+
+  /// No description provided for @reportsPendingDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending documents'**
+  String get reportsPendingDocumentsTitle;
+
+  /// No description provided for @reportsPendingDocumentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft or pending-approval documents'**
+  String get reportsPendingDocumentsSubtitle;
+
+  /// No description provided for @reportsInventoryTurnoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory turnover'**
+  String get reportsInventoryTurnoverTitle;
+
+  /// No description provided for @reportsInventoryTurnoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory turnover rate for products'**
+  String get reportsInventoryTurnoverSubtitle;
+
+  /// No description provided for @reportsSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get reportsSortTooltip;
+
+  /// No description provided for @reportsSortDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get reportsSortDefault;
+
+  /// No description provided for @reportsSortAlphabetical.
+  ///
+  /// In en, this message translates to:
+  /// **'Alphabetical'**
+  String get reportsSortAlphabetical;
 
   /// No description provided for @operationSuccessful.
   ///

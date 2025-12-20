@@ -1,0 +1,50 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <div class="header">
+    <div>
+      <div class="title">{{ title_text }}</div>
+      <div class="meta">{{ 'کسب و کار' if is_fa else 'Business' }}: {{ business_name }}</div>
+      {% if fiscal_year_name %}
+      <div class="meta">{{ 'سال مالی' if is_fa else 'Fiscal Year' }}: {{ fiscal_year_name }}</div>
+      {% endif %}
+      {% if date_from or date_to %}
+      <div class="meta">
+        {{ 'بازه' if is_fa else 'Range' }}:
+        {{ (date_from or '...') }} — {{ (date_to or '...') }}
+      </div>
+      {% endif %}
+    </div>
+    <div class="meta">{{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}</div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          {% for h in headers %}
+            <th>{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            {% for key in keys %}
+              {% set v = item.get(key, '') %}
+              {% if key == 'date' %}
+                {% set v = item.get('date_text', v) %}
+              {% endif %}
+              {% if key in numeric_keys %}
+                <td class="amount">{{ v | smart_number }}</td>
+              {% else %}
+                <td>{{ v }}</td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+

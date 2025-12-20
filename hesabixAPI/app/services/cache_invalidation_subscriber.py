@@ -34,22 +34,69 @@ def handle_invalidation_message(message_data: dict):
 			fiscal_year_id = message_data.get("fiscal_year_id")
 			
 			if business_id:
-				# فراخوانی تابع invalidate_persons_cache
-				# اما بدون publish کردن دوباره (برای جلوگیری از loop)
-				from app.services.person_service import invalidate_persons_cache
-				
 				# استفاده از invalidate_by_business مستقیم برای جلوگیری از publish مجدد
 				cache = get_cache()
 				if cache.enabled:
 					deleted_count = cache.invalidate_by_business(business_id, fiscal_year_id)
 					if deleted_count > 0:
-						logger.info(f"Received invalidation message: Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}")
+						logger.info(
+							f"Received invalidation message: Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}"
+						)
 					
 					# همچنین pattern-based invalidation را هم انجام می‌دهیم
 					pattern = "persons_list:*"
 					deleted_pattern = cache.delete_pattern(pattern)
 					if deleted_pattern > 0:
-						logger.info(f"Received invalidation message: Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+						logger.info(
+							f"Received invalidation message: Invalidated {deleted_pattern} cache keys using pattern: {pattern}"
+						)
+		
+		elif message_type == "documents_cache_invalidation":
+			cache = get_cache()
+			if cache.enabled:
+				deleted_count = cache.invalidate_documents_by_business(
+					business_id=message_data.get("business_id"),
+					fiscal_year_id=message_data.get("fiscal_year_id"),
+					document_id=message_data.get("document_id"),
+					document_type=message_data.get("document_type"),
+				)
+				logger.info(f"Received documents invalidation: deleted={deleted_count}, payload={message_data}")
+		
+		elif message_type == "invoices_cache_invalidation":
+			cache = get_cache()
+			if cache.enabled:
+				deleted_count = cache.invalidate_invoices_by_business(
+					business_id=message_data.get("business_id"),
+					fiscal_year_id=message_data.get("fiscal_year_id"),
+					invoice_id=message_data.get("invoice_id"),
+					document_type=message_data.get("document_type"),
+					project_id=message_data.get("project_id"),
+				)
+				logger.info(f"Received invoices invalidation: deleted={deleted_count}, payload={message_data}")
+		
+		elif message_type == "products_cache_invalidation":
+			cache = get_cache()
+			if cache.enabled:
+				deleted_count = cache.invalidate_products_by_business(
+					business_id=message_data.get("business_id"),
+					category_id=message_data.get("category_id"),
+					product_id=message_data.get("product_id"),
+				)
+				logger.info(f"Received products invalidation: deleted={deleted_count}, payload={message_data}")
+		
+		elif message_type == "warehouse_docs_cache_invalidation":
+			cache = get_cache()
+			if cache.enabled:
+				deleted_count = cache.invalidate_warehouse_docs_by_business(
+					business_id=message_data.get("business_id"),
+					fiscal_year_id=message_data.get("fiscal_year_id"),
+					doc_type=message_data.get("doc_type"),
+					warehouse_id=message_data.get("warehouse_id"),
+					status=message_data.get("status"),
+					document_id=message_data.get("document_id"),
+				)
+				logger.info(f"Received warehouse docs invalidation: deleted={deleted_count}, payload={message_data}")
+		
 		else:
 			logger.warning(f"Unknown invalidation message type: {message_type}")
 			

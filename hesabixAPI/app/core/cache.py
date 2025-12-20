@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional, Any
+import time
+from datetime import date, datetime
+from decimal import Decimal
 from functools import wraps
+from typing import Any, Optional
+
 import redis
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
+from pydantic import BaseModel
 
 from app.core.settings import get_settings
 
@@ -13,6 +18,24 @@ logger = logging.getLogger(__name__)
 
 # Global Redis client instance
 _redis_client: Optional[redis.Redis] = None
+
+
+def _json_serializer(obj: Any) -> Any:
+	"""Serializer برای مقادیر غیرقابل JSON مثل Decimal/Datetime/BaseModel"""
+	if isinstance(obj, Decimal):
+		return float(obj)
+	if isinstance(obj, (datetime, date)):
+		return obj.isoformat()
+	if isinstance(obj, BaseModel):
+		return obj.model_dump()
+	if hasattr(obj, "dict"):
+		try:
+			return obj.dict()
+		except Exception:
+			pass
+	if hasattr(obj, "__dict__"):
+		return obj.__dict__
+	return str(obj)
 
 
 def get_redis_client(force_reconnect: bool = False) -> Optional[redis.Redis]:
@@ -202,12 +225,8 @@ class CacheService:
 			return False
 		
 		try:
-			# ذخیره مقدار
-			if isinstance(value, (dict, list, bool, int, float)):
-				serialized = json.dumps(value, ensure_ascii=False)
-			else:
-				serialized = str(value)
-			
+			# ذخیره مقدار با serializer ایمن برای Decimal/Datetime/BaseModel
+			serialized = json.dumps(value, ensure_ascii=False, default=_json_serializer)
 			self.client.setex(key, ttl, serialized)
 			
 			# اضافه کردن کلید به set مربوط به tag
@@ -270,12 +289,8 @@ class CacheService:
 			return False
 		
 		try:
-			# ذخیره مقدار
-			if isinstance(value, (dict, list, bool, int, float)):
-				serialized = json.dumps(value, ensure_ascii=False)
-			else:
-				serialized = str(value)
-			
+			# ذخیره مقدار با serializer ایمن برای Decimal/Datetime/BaseModel
+			serialized = json.dumps(value, ensure_ascii=False, default=_json_serializer)
 			self.client.setex(key, ttl, serialized)
 			
 			# اضافه کردن کلید به set مربوط به business_id
@@ -439,12 +454,8 @@ class CacheService:
 			return False
 		
 		try:
-			# ذخیره مقدار
-			if isinstance(value, (dict, list, bool, int, float)):
-				serialized = json.dumps(value, ensure_ascii=False)
-			else:
-				serialized = str(value)
-			
+			# ذخیره مقدار با serializer ایمن برای Decimal/Datetime/BaseModel
+			serialized = json.dumps(value, ensure_ascii=False, default=_json_serializer)
 			self.client.setex(key, ttl, serialized)
 			
 			# اضافه کردن کلید به set مربوط به business_id

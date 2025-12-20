@@ -542,11 +542,47 @@ async def export_bank_accounts_pdf(
     except Exception:
         resolved_html = None
 
+    # Inject Persian fonts (same as invoice) for better rendering in reports
+    fa_font_url_regular = ""
+    fa_font_url_bold = ""
+    try:
+        if is_fa:
+            from app.services.pdf.template_renderer import load_farsi_font_data_uris
+            fa_reg, fa_bold = load_farsi_font_data_uris()
+            fa_font_url_regular = fa_reg or ""
+            fa_font_url_bold = fa_bold or ""
+    except Exception:
+        fa_font_url_regular = ""
+        fa_font_url_bold = ""
+    
+    font_face_css = ""
+    if is_fa and fa_font_url_regular:
+        font_face_css += f"""
+          @font-face {{
+            font-family: 'YekanBakhFaNum';
+            src: url('{fa_font_url_regular}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+          }}
+        """
+    if is_fa and fa_font_url_bold:
+        font_face_css += f"""
+          @font-face {{
+            font-family: 'YekanBakhFaNum';
+            src: url('{fa_font_url_bold}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+          }}
+        """
+    
+    body_font_family = "YekanBakhFaNum, Vazirmatn, Tahoma, Arial, sans-serif" if is_fa else "Arial, sans-serif"
+    
     table_html = f"""
     <html lang=\"{html_lang}\" dir=\"{html_dir}\"> 
       <head>
         <meta charset='utf-8'>
         <style>
+          {font_face_css}
           @page {{
             size: A4 landscape;
             margin: 12mm;
@@ -554,10 +590,11 @@ async def export_bank_accounts_pdf(
               content: "{page_label_left}" counter(page) "{page_label_of}" counter(pages);
               font-size: 10px;
               color: #666;
+              font-family: {body_font_family};
             }}
           }}
           body {{
-            font-family: sans-serif;
+            font-family: {body_font_family};
             font-size: 11px;
             color: #222;
           }}

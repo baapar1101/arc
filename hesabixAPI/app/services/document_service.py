@@ -539,11 +539,12 @@ def create_manual_document(
         # فراخوانی workflow triggers
         try:
             from app.services.workflow.workflow_trigger_service import trigger_document_created
+            manual_document_type = document_data.get("document_type", "manual")
             trigger_document_created(
                 db=db,
                 business_id=business_id,
                 document_id=document.id,
-                document_type=document_type,
+                document_type=manual_document_type,
                 user_id=user_id
             )
         except Exception as e:

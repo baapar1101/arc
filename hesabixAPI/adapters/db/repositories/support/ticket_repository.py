@@ -83,18 +83,39 @@ class TicketRepository(BaseRepository[Ticket]):
                         query = query.filter(Category.name.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.category.has(name=filter_item.value))
+                elif filter_item.property == "category_id":
+                    if filter_item.operator == "in":
+                        query = query.filter(Ticket.category_id.in_(filter_item.value))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.category_id == filter_item.value)
+                    else:
+                        query = query.filter(Ticket.category_id == filter_item.value)
                 elif filter_item.property == "priority.name":
                     query = query.join(Ticket.priority)
                     if filter_item.operator == "in":
                         query = query.filter(Priority.name.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.priority.has(name=filter_item.value))
+                elif filter_item.property == "priority_id":
+                    if filter_item.operator == "in":
+                        query = query.filter(Ticket.priority_id.in_(filter_item.value))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.priority_id == filter_item.value)
+                    else:
+                        query = query.filter(Ticket.priority_id == filter_item.value)
                 elif filter_item.property == "status.name":
                     query = query.join(Ticket.status)
                     if filter_item.operator == "in":
                         query = query.filter(Status.name.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.status.has(name=filter_item.value))
+                elif filter_item.property == "status_id":
+                    if filter_item.operator == "in":
+                        query = query.filter(Ticket.status_id.in_(filter_item.value))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.status_id == filter_item.value)
+                    else:
+                        query = query.filter(Ticket.status_id == filter_item.value)
                 elif filter_item.property == "description" and hasattr(Ticket, "description"):
                     if filter_item.operator == "*":
                         query = query.filter(Ticket.description.ilike(f"%{filter_item.value}%"))
@@ -170,12 +191,26 @@ class TicketRepository(BaseRepository[Ticket]):
                         query = query.filter(Priority.name.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.priority.has(name=filter_item.value))
+                elif filter_item.property == "priority_id":
+                    if filter_item.operator == "in":
+                        query = query.filter(Ticket.priority_id.in_(filter_item.value))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.priority_id == filter_item.value)
+                    else:
+                        query = query.filter(Ticket.priority_id == filter_item.value)
                 elif filter_item.property == "status.name":
                     query = query.join(Ticket.status)
                     if filter_item.operator == "in":
                         query = query.filter(Status.name.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.status.has(name=filter_item.value))
+                elif filter_item.property == "status_id":
+                    if filter_item.operator == "in":
+                        query = query.filter(Ticket.status_id.in_(filter_item.value))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.status_id == filter_item.value)
+                    else:
+                        query = query.filter(Ticket.status_id == filter_item.value)
                 elif filter_item.property == "description" and hasattr(Ticket, "description"):
                     if filter_item.operator == "*":
                         query = query.filter(Ticket.description.ilike(f"%{filter_item.value}%"))

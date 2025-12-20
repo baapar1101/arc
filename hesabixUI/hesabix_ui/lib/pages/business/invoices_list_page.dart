@@ -42,6 +42,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   final InvoiceService _invoiceService = InvoiceService();
   late final BusinessDashboardService _dashboardService = BusinessDashboardService(widget.apiClient);
 
+  static const double _mobileInvoiceRowHeight = 164;
+  static const double _mobileInvoiceCardVPadding = 6; // inside row height budget
+
   String? _selectedInvoiceType;
   bool _isInitialized = false;
   DateTime? _fromDate;
@@ -53,6 +56,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   int? _selectedProjectId; // فیلتر پروژه
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
+  bool _showDesktopFilters = false;
   
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
@@ -156,6 +160,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
+    final contentPadding = ResponsiveHelper.getPadding(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -167,10 +172,16 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             _buildFilters(t, isMobile),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  8,
+                  contentPadding,
+                  // avoid FAB overlapping footer/pagination on mobile
+                  isMobile ? 88 : 8,
+                ),
                 child: DataTableWidget<InvoiceListItem>(
                   key: _tableKey,
-                  config: _buildTableConfig(t),
+                  config: _buildTableConfig(t, isMobile: isMobile),
                   fromJson: (json) => InvoiceListItem.fromJson(json),
                   calendarController: widget.calendarController,
                 ),
@@ -223,47 +234,378 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Widget _buildFilters(AppLocalizations t, bool isMobile) {
     final padding = ResponsiveHelper.getPadding(context);
-    
+
+    if (isMobile) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _buildExternalFilterChips(t),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => _openMobileFiltersSheet(t),
+              icon: const Icon(Icons.tune),
+              tooltip: 'فیلترها',
+            ),
+            if (_hasExternalFiltersActive()) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _clearExternalFilters,
+                icon: const Icon(Icons.clear_all),
+                tooltip: t.clear,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // Desktop/tablet: show full filter controls inline
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // نوع فاکتور - همیشه scrollable افقی
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<String?>(
-              style: SegmentedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _buildExternalFilterChips(t),
+                  ),
+                ),
               ),
-              segments: [
-                ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
-                ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
-                ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
-                ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
-                ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
-                ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
-                ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
-                ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () => setState(() => _showDesktopFilters = !_showDesktopFilters),
+                icon: Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
+                label: Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+              ),
+              if (_hasExternalFiltersActive()) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _clearExternalFilters,
+                  icon: const Icon(Icons.clear_all),
+                  tooltip: t.clear,
+                ),
               ],
-              selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
-              onSelectionChanged: (set) {
-                setState(() => _selectedInvoiceType = set.first);
+            ],
+          ),
+          if (_showDesktopFilters) ...[
+            const SizedBox(height: 10),
+            _buildFiltersForm(
+              t: t,
+              isMobileLayout: false,
+              invoiceType: _selectedInvoiceType,
+              fiscalYearId: _selectedFiscalYearId,
+              projectId: _selectedProjectId,
+              fromDate: _fromDate,
+              toDate: _toDate,
+              isProforma: _isProforma,
+              onInvoiceTypeChanged: (v) {
+                setState(() => _selectedInvoiceType = v);
+                _refreshData();
+              },
+              onFiscalYearChanged: (v) {
+                setState(() => _selectedFiscalYearId = v);
+                _refreshData();
+              },
+              onProjectChanged: (v) {
+                setState(() => _selectedProjectId = v);
+                _refreshData();
+              },
+              onFromDateChanged: (v) {
+                setState(() => _fromDate = v);
+                _refreshData();
+              },
+              onToDateChanged: (v) {
+                setState(() => _toDate = v);
+                _refreshData();
+              },
+              onClearDateRange: () {
+                setState(() {
+                  _fromDate = null;
+                  _toDate = null;
+                });
+                _refreshData();
+              },
+              onIsProformaChanged: (v) {
+                setState(() => _isProforma = v);
                 _refreshData();
               },
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  bool _hasExternalFiltersActive() {
+    return _selectedInvoiceType != null ||
+        _fromDate != null ||
+        _toDate != null ||
+        _isProforma != null ||
+        _selectedFiscalYearId != null ||
+        _selectedProjectId != null;
+  }
+
+  void _clearExternalFilters() {
+    setState(() {
+      _selectedInvoiceType = null;
+      _fromDate = null;
+      _toDate = null;
+      _isProforma = null;
+      _selectedProjectId = null;
+      // Fiscal year is typically important; keep it unless explicitly cleared by user.
+    });
+    _refreshData();
+  }
+
+  List<Widget> _buildExternalFilterChips(AppLocalizations t) {
+    final chips = <Widget>[];
+    if (_selectedInvoiceType != null) {
+      chips.add(Chip(
+        label: Text(_invoiceTypeLabel(t, _selectedInvoiceType)),
+        avatar: const Icon(Icons.receipt_long, size: 16),
+      ));
+    } else {
+      chips.add(Chip(
+        label: Text(t.all),
+        avatar: const Icon(Icons.all_inclusive, size: 16),
+      ));
+    }
+
+    if (_selectedFiscalYearId != null && _fiscalYears.isNotEmpty) {
+      final fy = _fiscalYears.where((e) => (e['id'] as int?) == _selectedFiscalYearId).toList();
+      final title = fy.isNotEmpty ? (fy.first['title'] ?? '').toString() : '';
+      chips.add(Chip(
+        label: Text(title.isNotEmpty ? title : '${t.fiscalYear}: $_selectedFiscalYearId'),
+        avatar: const Icon(Icons.event_note, size: 16),
+      ));
+    }
+
+    if (_selectedProjectId != null) {
+      final label = _projectFilterOptions
+          .where((o) => o.value == _selectedProjectId.toString())
+          .map((o) => o.label)
+          .cast<String?>()
+          .firstWhere((e) => e != null && e!.isNotEmpty, orElse: () => null);
+      chips.add(Chip(
+        label: Text(label ?? 'پروژه: $_selectedProjectId'),
+        avatar: const Icon(Icons.folder_open, size: 16),
+      ));
+    }
+
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null
+          ? HesabixDateUtils.formatForDisplay(_fromDate!, widget.calendarController.isJalali)
+          : '—';
+      final to = _toDate != null
+          ? HesabixDateUtils.formatForDisplay(_toDate!, widget.calendarController.isJalali)
+          : '—';
+      chips.add(Chip(
+        label: Text('${t.documentDate}: $from → $to'),
+        avatar: const Icon(Icons.date_range, size: 16),
+      ));
+    }
+
+    if (_isProforma != null) {
+      chips.add(Chip(
+        label: Text(_isProforma == true ? t.proforma : t.finalized),
+        avatar: Icon(_isProforma == true ? Icons.description_outlined : Icons.verified, size: 16),
+      ));
+    }
+
+    if (chips.isEmpty) {
+      chips.add(Chip(label: Text(t.all)));
+    }
+    return chips;
+  }
+
+  String _invoiceTypeLabel(AppLocalizations t, String? type) {
+    switch (type) {
+      case 'invoice_sales':
+        return t.invoiceTypeSales;
+      case 'invoice_purchase':
+        return t.invoiceTypePurchase;
+      case 'invoice_sales_return':
+        return t.invoiceTypeSalesReturn;
+      case 'invoice_purchase_return':
+        return t.invoiceTypePurchaseReturn;
+      case 'invoice_production':
+        return t.invoiceTypeProduction;
+      case 'invoice_direct_consumption':
+        return t.invoiceTypeDirectConsumption;
+      case 'invoice_waste':
+        return t.invoiceTypeWaste;
+      default:
+        return t.all;
+    }
+  }
+
+  Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
+    String? invoiceType = _selectedInvoiceType;
+    int? fiscalYearId = _selectedFiscalYearId;
+    int? projectId = _selectedProjectId;
+    DateTime? fromDate = _fromDate;
+    DateTime? toDate = _toDate;
+    bool? isProforma = _isProforma;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 8,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text('فیلترها', style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            invoiceType = null;
+                            projectId = null;
+                            fromDate = null;
+                            toDate = null;
+                            isProforma = null;
+                            // fiscalYearId intentionally kept
+                          });
+                        },
+                        child: Text(t.clear),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: _buildFiltersForm(
+                        t: t,
+                        isMobileLayout: true,
+                        invoiceType: invoiceType,
+                        fiscalYearId: fiscalYearId,
+                        projectId: projectId,
+                        fromDate: fromDate,
+                        toDate: toDate,
+                        isProforma: isProforma,
+                        onInvoiceTypeChanged: (v) => setModalState(() => invoiceType = v),
+                        onFiscalYearChanged: (v) => setModalState(() => fiscalYearId = v),
+                        onProjectChanged: (v) => setModalState(() => projectId = v),
+                        onFromDateChanged: (v) => setModalState(() => fromDate = v),
+                        onToDateChanged: (v) => setModalState(() => toDate = v),
+                        onClearDateRange: () => setModalState(() {
+                          fromDate = null;
+                          toDate = null;
+                        }),
+                        onIsProformaChanged: (v) => setModalState(() => isProforma = v),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.check),
+                      label: Text(t.confirm),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true && mounted) {
+      setState(() {
+        _selectedInvoiceType = invoiceType;
+        _selectedFiscalYearId = fiscalYearId;
+        _selectedProjectId = projectId;
+        _fromDate = fromDate;
+        _toDate = toDate;
+        _isProforma = isProforma;
+      });
+      _refreshData();
+    }
+  }
+
+  Widget _buildFiltersForm({
+    required AppLocalizations t,
+    required bool isMobileLayout,
+    required String? invoiceType,
+    required int? fiscalYearId,
+    required int? projectId,
+    required DateTime? fromDate,
+    required DateTime? toDate,
+    required bool? isProforma,
+    required ValueChanged<String?> onInvoiceTypeChanged,
+    required ValueChanged<int?> onFiscalYearChanged,
+    required ValueChanged<int?> onProjectChanged,
+    required ValueChanged<DateTime?> onFromDateChanged,
+    required ValueChanged<DateTime?> onToDateChanged,
+    required VoidCallback onClearDateRange,
+    required ValueChanged<bool?> onIsProformaChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<String?>(
+            style: SegmentedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            segments: [
+              ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
+              ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
+              ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
+              ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
+              ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
+              ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
+              ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
+              ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
+            ],
+            selected: invoiceType != null ? {invoiceType} : <String?>{},
+            onSelectionChanged: (set) => onInvoiceTypeChanged(set.isEmpty ? null : set.first),
           ),
-          const SizedBox(height: 8),
-          // فیلتر سال مالی و پروژه
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-          if (_fiscalYears.isNotEmpty)
-                SizedBox(
-                width: isMobile ? double.infinity : 280,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (_fiscalYears.isNotEmpty)
+              SizedBox(
+                width: isMobileLayout ? double.infinity : 280,
                 child: DropdownButtonFormField<int>(
-                  value: _selectedFiscalYearId,
+                  value: fiscalYearId,
                   decoration: InputDecoration(
                     labelText: t.fiscalYear,
                     border: const OutlineInputBorder(),
@@ -282,38 +624,82 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                       ),
                     );
                   }).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedFiscalYearId = val;
-                    });
-                    _refreshData();
-                  },
+                  onChanged: onFiscalYearChanged,
                 ),
               ),
-              // فیلتر پروژه
-              SizedBox(
-                width: isMobile ? double.infinity : 280,
-                child: _buildProjectFilter(),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: ProjectSelectorWidget(
+                businessId: widget.businessId,
+                apiClient: widget.apiClient,
+                selectedProjectId: projectId,
+                onChanged: onProjectChanged,
+                authStore: widget.authStore,
+                calendarController: widget.calendarController,
+                allowNull: true,
+                labelText: 'پروژه',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (isMobileLayout)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: DateInputField(
+                      value: fromDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onFromDateChanged,
+                      labelText: t.dateFrom,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DateInputField(
+                      value: toDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onToDateChanged,
+                      labelText: t.dateTo,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: onClearDateRange,
+                    icon: const Icon(Icons.clear),
+                    tooltip: t.clearDateFilter,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool?>(
+                segments: [
+                  ButtonSegment<bool?>(value: null, label: Text(t.all)),
+                  ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
+                  ButtonSegment<bool?>(value: false, label: Text(t.finalized)),
+                ],
+                selected: {isProforma},
+                onSelectionChanged: (set) => onIsProformaChanged(set.first),
               ),
             ],
-            ),
-          const SizedBox(height: 8),
-          // فیلترهای تاریخ و وضعیت
-          if (isMobile)
-            // موبایل: Column layout
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Row(
                   children: [
                     Expanded(
                       child: DateInputField(
-                        value: _fromDate,
+                        value: fromDate,
                         calendarController: widget.calendarController,
-                        onChanged: (date) {
-                          setState(() => _fromDate = date);
-                          _refreshData();
-                        },
+                        onChanged: onFromDateChanged,
                         labelText: t.dateFrom,
                         hintText: t.selectDate,
                       ),
@@ -321,113 +707,38 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: DateInputField(
-                        value: _toDate,
+                        value: toDate,
                         calendarController: widget.calendarController,
-                        onChanged: (date) {
-                          setState(() => _toDate = date);
-                          _refreshData();
-                        },
+                        onChanged: onToDateChanged,
                         labelText: t.dateTo,
                         hintText: t.selectDate,
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _fromDate = null;
-                          _toDate = null;
-                        });
-                        _refreshData();
-                      },
+                      onPressed: onClearDateRange,
                       icon: const Icon(Icons.clear),
                       tooltip: t.clearDateFilter,
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                SegmentedButton<bool?>(
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: SegmentedButton<bool?>(
                   segments: [
                     ButtonSegment<bool?>(value: null, label: Text(t.all)),
                     ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
                     ButtonSegment<bool?>(value: false, label: Text(t.finalized)),
                   ],
-                  selected: {_isProforma},
-                  onSelectionChanged: (set) {
-                    setState(() => _isProforma = set.first);
-                    _refreshData();
-                  },
+                  selected: {isProforma},
+                  onSelectionChanged: (set) => onIsProformaChanged(set.first),
                 ),
-              ],
-            )
-          else
-            // دسکتاپ/تبلت: Row layout
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: DateInputField(
-                          value: _fromDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() => _fromDate = date);
-                            _refreshData();
-                          },
-                          labelText: t.dateFrom,
-                          hintText: t.selectDate,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DateInputField(
-                          value: _toDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() => _toDate = date);
-                            _refreshData();
-                          },
-                          labelText: t.dateTo,
-                          hintText: t.selectDate,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _fromDate = null;
-                            _toDate = null;
-                          });
-                          _refreshData();
-                        },
-                        icon: const Icon(Icons.clear),
-                        tooltip: t.clearDateFilter,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: SegmentedButton<bool?>(
-                    segments: [
-                      ButtonSegment<bool?>(value: null, label: Text(t.all)),
-                      ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
-                      ButtonSegment<bool?>(value: false, label: Text(t.finalized)),
-                    ],
-                    selected: {_isProforma},
-                    onSelectionChanged: (set) {
-                      setState(() => _isProforma = set.first);
-                      _refreshData();
-                    },
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -449,15 +760,86 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     );
   }
 
-  DataTableConfig<InvoiceListItem> _buildTableConfig(AppLocalizations t) {
+  DataTableConfig<InvoiceListItem> _buildTableConfig(AppLocalizations t, {required bool isMobile}) {
+    if (isMobile) {
+      return DataTableConfig<InvoiceListItem>(
+        endpoint: '/invoices/business/${widget.businessId}/search',
+        // avoid duplicate titles (page already has its own header)
+        title: null,
+        excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
+        pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
+        businessId: widget.businessId,
+        reportModuleKey: 'invoices',
+        reportSubtype: 'list',
+        enableColumnSettings: false,
+        showColumnSettingsButton: false,
+        defaultSortBy: 'document_date',
+        defaultSortDesc: true,
+        dataRowHeight: _mobileInvoiceRowHeight,
+        padding: const EdgeInsets.all(8),
+        columns: [
+          CustomColumn(
+            'summary',
+            'فاکتور',
+            sortable: false,
+            searchable: false,
+            width: ColumnWidth.extraLarge,
+            builder: (dynamic item, int index) => _buildMobileInvoiceSummaryCard(item as InvoiceListItem),
+          ),
+        ],
+        searchFields: const ['code', 'description'],
+        filterFields: const ['document_type'],
+        dateRangeField: 'document_date',
+        showSearch: true,
+        showFilters: true,
+        showPagination: true,
+        showColumnSearch: false,
+        showRefreshButton: true,
+        showClearFiltersButton: true,
+        showExportButtons: true,
+        // Selection/Actions are moved inside card for mobile to avoid UI clutter and layout glitches
+        enableRowSelection: false,
+        enableMultiRowSelection: false,
+        defaultPageSize: 20,
+        pageSizeOptions: const [10, 20, 50, 100],
+        additionalParams: {
+          'document_type': _selectedInvoiceType,
+          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_isProforma != null) 'is_proforma': _isProforma,
+          if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+          if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        },
+        onRowTap: (item) => _onView(item as InvoiceListItem),
+        emptyStateMessage: t.noInvoicesFound,
+        loadingMessage: t.loadingInvoices,
+        errorMessage: t.errorLoadingInvoices,
+        customHeaderActions: [
+          Tooltip(
+            message: 'ایمپورت فاکتورها از فایل Excel',
+            child: IconButton(
+              onPressed: _onImport,
+              icon: const Icon(Icons.upload_file),
+              tooltip: 'ایمپورت از اکسل',
+            ),
+          ),
+        ],
+        footerTotals: { 'total_amount': 'جمع مبلغ این صفحه' },
+      );
+    }
+
     return DataTableConfig<InvoiceListItem>(
       endpoint: '/invoices/business/${widget.businessId}/search',
-      title: t.invoices,
+      // avoid duplicate titles (page already has its own header)
+      title: null,
       excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
       pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
       businessId: widget.businessId,
       reportModuleKey: 'invoices',
       reportSubtype: 'list',
+      defaultSortBy: 'document_date',
+      defaultSortDesc: true,
+      padding: const EdgeInsets.all(12),
       columns: [
         // عملیات
         ActionColumn(
@@ -635,6 +1017,193 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           ),
         ),
       ],
+      footerTotals: { 'total_amount': 'جمع مبلغ این صفحه' },
+    );
+  }
+
+  Widget _buildMobileInvoiceSummaryCard(InvoiceListItem invoice) {
+    final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
+
+    final amount = invoice.totalAmount != null
+        ? '${formatWithThousands(invoice.totalAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
+        : '-';
+    final dateText = HesabixDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
+    final typeText = (invoice.documentTypeName).trim().isNotEmpty ? invoice.documentTypeName : _invoiceTypeLabel(t, invoice.documentType);
+    final counterparty = (invoice.counterparty == null || invoice.counterparty!.trim().isEmpty) ? t.unknown : invoice.counterparty!;
+    final project = invoice.projectName ?? '-';
+    final createdBy = invoice.createdByName ?? t.unknown;
+    final desc = (invoice.description ?? '').trim();
+    final tax = (invoice.taxStatus ?? '').trim();
+
+    List<_InvoiceActionItem> buildActions() {
+      final actions = <_InvoiceActionItem>[
+        _InvoiceActionItem(
+          icon: Icons.visibility,
+          label: t.view,
+          onTap: () => _onView(invoice),
+        ),
+      ];
+      if (widget.authStore.canWriteSection('invoices')) {
+        actions.addAll([
+          _InvoiceActionItem(
+            icon: Icons.edit,
+            label: t.edit,
+            onTap: () => _onEdit(invoice),
+          ),
+          _InvoiceActionItem(
+            icon: Icons.delete,
+            label: t.delete,
+            isDestructive: true,
+            onTap: () => _onDelete(invoice),
+          ),
+          _InvoiceActionItem(
+            icon: Icons.drive_folder_upload,
+            label: t.taxAddToWorkspaceSingle,
+            onTap: () => _onAddToTaxWorkspace(invoice),
+          ),
+          _InvoiceActionItem(
+            icon: Icons.folder_off,
+            label: t.taxRemoveFromWorkspaceSingle,
+            onTap: () => _onRemoveFromTaxWorkspace(invoice),
+          ),
+        ]);
+      }
+      return actions;
+    }
+
+    Widget badge({required IconData icon, required String text}) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(
+              text,
+              style: theme.textTheme.labelMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Constrain the card to stay within the row height so badges never spill into next row.
+    final cardHeight = _mobileInvoiceRowHeight - (_mobileInvoiceCardVPadding * 2);
+
+    final badges = <Widget>[
+      badge(icon: Icons.event, text: dateText),
+      badge(icon: Icons.folder_open, text: project),
+      badge(icon: Icons.person, text: createdBy),
+      if (invoice.isProforma) badge(icon: Icons.description_outlined, text: t.proforma),
+      if (invoice.isInstallmentSale) badge(icon: Icons.calendar_month, text: t.installmentColumn),
+      if (tax.isNotEmpty) badge(icon: Icons.verified_outlined, text: tax),
+      if (desc.isNotEmpty) badge(icon: Icons.notes, text: desc),
+    ];
+
+    return SizedBox(
+      height: cardHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: _mobileInvoiceCardVPadding),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        invoice.code,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      amount,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(width: 6),
+                    PopupMenuButton<int>(
+                      tooltip: t.actions,
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      onSelected: (idx) {
+                        final actions = buildActions();
+                        if (idx >= 0 && idx < actions.length) actions[idx].onTap();
+                      },
+                      itemBuilder: (context) {
+                        final actions = buildActions();
+                        return List.generate(actions.length, (i) {
+                          final a = actions[i];
+                          return PopupMenuItem<int>(
+                            value: i,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  a.icon,
+                                  size: 18,
+                                  color: a.isDestructive ? theme.colorScheme.error : null,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(a.label, overflow: TextOverflow.ellipsis)),
+                              ],
+                            ),
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  typeText,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  counterparty,
+                  style: theme.textTheme.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Spacer(),
+                // Badges: single-line with horizontal scroll to avoid wrapping/overflow.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (int i = 0; i < badges.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 6),
+                        badges[i],
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1040,6 +1609,19 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(e.toString()));
     }
   }
+}
+
+class _InvoiceActionItem {
+  final IconData icon;
+  final String label;
+  final bool isDestructive;
+  final VoidCallback onTap;
+  const _InvoiceActionItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
 }
 
 

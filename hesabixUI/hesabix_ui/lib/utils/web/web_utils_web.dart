@@ -1,4 +1,5 @@
-import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
 Future<void> saveBytesAsFileWeb(
@@ -7,7 +8,12 @@ Future<void> saveBytesAsFileWeb(
   String mimeType = 'application/octet-stream',
 }) async {
   final safeName = filename.isEmpty ? 'download.bin' : filename;
-  final dataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+  // Use Blob + ObjectURL to avoid data: URL limits and large base64 payloads.
+  final u8 = Uint8List.fromList(bytes);
+  final jsU8 = u8.toJS; // JSUint8Array
+  final parts = <JSAny>[jsU8 as JSAny].toJS;
+  final blob = web.Blob(parts, web.BlobPropertyBag(type: mimeType));
+  final dataUrl = web.URL.createObjectURL(blob);
   final anchor = web.HTMLAnchorElement()
     ..href = dataUrl
     ..download = safeName
@@ -15,6 +21,7 @@ Future<void> saveBytesAsFileWeb(
   web.document.body?.append(anchor);
   anchor.click();
   anchor.remove();
+  web.URL.revokeObjectURL(dataUrl);
 }
 
 void openUrlInNewTabWeb(String url) {

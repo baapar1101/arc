@@ -304,7 +304,7 @@ class ProductRepository(BaseRepository[Product]):
         if not obj:
             return None
         # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
-        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor", "default_warehouse_id"}
+        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor", "default_warehouse_id", "base_sales_price", "base_purchase_price"}
         for k, v in data.items():
             if hasattr(obj, k):
                 if k in nullable_overrides:

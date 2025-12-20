@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -32,13 +33,13 @@ class _SupportPageState extends State<SupportPage> {
   // Refresh counter to force data table refresh
   int _refreshCounter = 0;
 
-  // Mobile / card-view state
-  bool _mobileCardView = true;
+  // Mobile state
   bool _showMobileFilters = false;
   bool _ticketsLoading = false;
   String? _ticketsError;
   bool _ticketsEverLoaded = false;
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   List<SupportTicket> _tickets = <SupportTicket>[];
   int _ticketPage = 1;
   final int _ticketPageSize = 20;
@@ -89,6 +90,12 @@ class _SupportPageState extends State<SupportPage> {
       // Refresh the data table after successful ticket creation
       setState(() {
         _refreshCounter++;
+        // Also refresh mobile list if loaded
+        if (_ticketsEverLoaded) {
+          _ticketPage = 1;
+          _hasMoreTickets = true;
+          _loadTickets(showSpinner: false);
+        }
       });
     }
   }
@@ -225,49 +232,19 @@ class _SupportPageState extends State<SupportPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                t.supportTickets,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (isMobile)
-              SegmentedButton<bool>(
-                segments: <ButtonSegment<bool>>[
-                  ButtonSegment<bool>(
-                    value: true,
-                    icon: const Icon(Icons.view_list_rounded),
-                    label: const Text('لیست'),
-                  ),
-                  ButtonSegment<bool>(
-                    value: false,
-                    icon: const Icon(Icons.table_chart),
-                    label: const Text('جدول'),
-                  ),
-                ],
-                selected: <bool>{_mobileCardView},
-                onSelectionChanged: (values) {
-                  setState(() {
-                    _mobileCardView = values.first;
-                    if (_mobileCardView && !_ticketsEverLoaded && !_ticketsLoading) {
-                      _ticketsEverLoaded = true;
-                      _loadTickets();
-                    }
-                  });
-                },
-              ),
-          ],
+        Text(
+          t.supportTickets,
+          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 4),
-        if (!isMobile)
-          Text(
-            'در این بخش می‌توانید همه تیکت‌های پشتیبانی خود را ببینید، جست‌وجو و بر اساس وضعیت و اولویت فیلتر کنید.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        const SizedBox(height: 8),
+        Text(
+          isMobile
+              ? 'مدیریت و پیگیری درخواست‌های پشتیبانی خود'
+              : 'در این بخش می‌توانید همه تیکت‌های پشتیبانی خود را مشاهده کنید، جست‌وجو و بر اساس وضعیت و اولویت فیلتر کنید.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
       ],
     );
   }
@@ -291,12 +268,15 @@ class _SupportPageState extends State<SupportPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'اگر سوال یا مشکلی دارید، اولین تیکت خود را ثبت کنید تا تیم پشتیبانی کنار شما باشد.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'هنوز هیچ تیکتی ثبت نکرده‌اید. برای دریافت کمک از تیم پشتیبانی، اولین تیکت خود را ایجاد کنید.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -309,23 +289,103 @@ class _SupportPageState extends State<SupportPage> {
     );
   }
 
-  Widget _buildMobileFilters(AppLocalizations t, ThemeData theme) {
+  void _showMobileFiltersBottomSheet(AppLocalizations t, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => _buildMobileFiltersBottomSheet(
+          t, theme, scrollController,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileFiltersBottomSheet(
+    AppLocalizations t,
+    ThemeData theme,
+    ScrollController scrollController,
+  ) {
     if (_statuses.isEmpty && _priorities.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Card(
-      margin: const EdgeInsets.only(top: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      return Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              Icons.filter_alt_off,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+            ),
+            const SizedBox(height: 16),
             Text(
-              'فیلترهای سریع',
-              style: theme.textTheme.titleSmall,
+              'فیلتر در دسترس نیست',
+              style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
+            Text(
+              'در حال حاضر امکان فیلتر کردن وجود ندارد.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Handle bar
+        Container(
+          margin: const EdgeInsets.only(top: 12, bottom: 8),
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        // Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.filter_list,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'فیلتر تیکت‌ها',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        // Filters content
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(24),
+            children: [
             if (_statuses.isNotEmpty) ...[
               Text(
                 t.status,
@@ -443,9 +503,100 @@ class _SupportPageState extends State<SupportPage> {
                 ),
               ),
             ],
-          ],
+            ],
+          ),
         ),
-      ),
+        // Apply button
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _selectedStatusId = null;
+                        _selectedPriorityId = null;
+                        _ticketPage = 1;
+                        _hasMoreTickets = true;
+                      });
+                      Navigator.of(context).pop();
+                      _loadTickets(showSpinner: true);
+                    },
+                    icon: const Icon(Icons.clear_all),
+                    label: const Text('پاک کردن همه'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _ticketPage = 1;
+                        _hasMoreTickets = true;
+                      });
+                      _loadTickets(showSpinner: true);
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('اعمال فیلتر'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      setState(() {
+        _ticketPage = 1;
+        _hasMoreTickets = true;
+      });
+      _loadTickets(showSpinner: false);
+    });
+  }
+
+  Widget _buildMobileFilters(AppLocalizations t, ThemeData theme) {
+    if (_statuses.isEmpty && _priorities.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Quick filter chips (always visible)
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (_selectedStatusId != null || _selectedPriorityId != null)
+          ActionChip(
+            avatar: const Icon(Icons.filter_alt, size: 18),
+            label: Text(
+              '${(_selectedStatusId != null ? 1 : 0) + (_selectedPriorityId != null ? 1 : 0)} فیلتر فعال',
+            ),
+            onPressed: () {
+              setState(() {
+                _selectedStatusId = null;
+                _selectedPriorityId = null;
+                _ticketPage = 1;
+                _hasMoreTickets = true;
+              });
+              _loadTickets(showSpinner: true);
+            },
+          ),
+        ActionChip(
+          avatar: const Icon(Icons.tune, size: 18),
+          label: const Text('فیلترهای بیشتر'),
+          onPressed: () => _showMobileFiltersBottomSheet(t, theme),
+        ),
+      ],
     );
   }
 
@@ -456,6 +607,7 @@ class _SupportPageState extends State<SupportPage> {
         controller: _searchController,
         decoration: InputDecoration(
           labelText: t.search,
+          hintText: 'جست‌وجو در عنوان و توضیحات تیکت‌ها...',
           prefixIcon: const Icon(Icons.search),
           suffixIcon: _searchController.text.isEmpty
               ? null
@@ -464,13 +616,18 @@ class _SupportPageState extends State<SupportPage> {
                   onPressed: () {
                     setState(() {
                       _searchController.clear();
+                      _searchDebounce?.cancel();
+                      _ticketPage = 1;
+                      _hasMoreTickets = true;
                     });
                     _loadTickets(showSpinner: false);
                   },
                 ),
         ),
         textInputAction: TextInputAction.search,
+        onChanged: _onSearchChanged,
         onSubmitted: (_) {
+          _searchDebounce?.cancel();
           setState(() {
             _ticketPage = 1;
             _hasMoreTickets = true;
@@ -481,31 +638,6 @@ class _SupportPageState extends State<SupportPage> {
     );
   }
 
-  Widget _buildMobileFiltersToggle(AppLocalizations t, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            visualDensity: VisualDensity.compact,
-            shape: const StadiumBorder(),
-          ),
-          onPressed: () {
-            setState(() {
-              _showMobileFilters = !_showMobileFilters;
-            });
-          },
-          icon: Icon(
-            _showMobileFilters ? Icons.filter_alt_off : Icons.filter_list,
-            size: 18,
-          ),
-          label: Text(_showMobileFilters ? 'مخفی کردن فیلترها' : 'نمایش فیلترها'),
-        ),
-      ),
-    );
-  }
 
   Widget _buildMobileTicketsList(AppLocalizations t, ThemeData theme) {
     if (_ticketsLoading) {
@@ -618,10 +750,11 @@ class _SupportPageState extends State<SupportPage> {
                           const SizedBox(width: 8),
                           Chip(
                             label: Text(
-                              statusLabel.isEmpty ? t.status : statusLabel,
+                              statusLabel.isEmpty ? 'نامشخص' : statusLabel,
                               style: TextStyle(
                                 color: statusColor,
                                 fontWeight: FontWeight.w500,
+                                fontSize: 12,
                               ),
                             ),
                             backgroundColor: _chipBackground(statusColor),
@@ -650,7 +783,7 @@ class _SupportPageState extends State<SupportPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            priorityLabel.isEmpty ? t.priority : priorityLabel,
+                            priorityLabel.isEmpty ? 'نامشخص' : priorityLabel,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: priorityColor,
                             ),
@@ -683,6 +816,7 @@ class _SupportPageState extends State<SupportPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -692,10 +826,10 @@ class _SupportPageState extends State<SupportPage> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final width = MediaQuery.of(context).size.width;
-    final bool isMobile = width < 700;
+    final bool isMobile = width < 768;
 
-    // در موبایل و نمای کارت، لود تیکت‌ها را به‌صورت تنبل انجام بده
-    if (isMobile && _mobileCardView && !_ticketsEverLoaded && !_ticketsLoading) {
+    // در موبایل، لود تیکت‌ها را به‌صورت تنبل انجام بده
+    if (isMobile && !_ticketsEverLoaded && !_ticketsLoading) {
       _ticketsEverLoaded = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -706,8 +840,8 @@ class _SupportPageState extends State<SupportPage> {
     }
 
     return Scaffold(
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: isMobile && _mobileCardView
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: isMobile
           ? FloatingActionButton.extended(
               onPressed: _navigateToCreateTicket,
               icon: const Icon(Icons.add),
@@ -720,42 +854,45 @@ class _SupportPageState extends State<SupportPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildMobileHeader(t, theme, isMobile),
-            if (isMobile) _buildMobileSearch(t),
-            if (isMobile) _buildMobileFiltersToggle(t, theme),
-            if (isMobile)
-              AnimatedCrossFade(
-                firstChild: const SizedBox.shrink(),
-                secondChild: _buildMobileFilters(t, theme),
-                crossFadeState: _showMobileFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
-              ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            if (isMobile) ...[
+              _buildMobileSearch(t),
+              const SizedBox(height: 12),
+              _buildMobileFilters(t, theme),
+              const SizedBox(height: 12),
+            ],
+            if (!isMobile) const SizedBox(height: 8),
             if (_metadataError != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 18, color: theme.colorScheme.error),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'خطا در بارگذاری فهرست وضعیت‌ها و اولویت‌ها. فیلترهای پیشرفته ممکن است کامل نباشند.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
+                child: Card(
+                  color: theme.colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 20, color: theme.colorScheme.onErrorContainer),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'امکان بارگذاری لیست فیلترها وجود ندارد. لطفاً صفحه را رفرش کنید.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 4),
             Expanded(
-              child: (!isMobile || !_mobileCardView)
+              child: !isMobile
                   ? DataTableWidget<Map<String, dynamic>>(
                       key: ValueKey('data_table_$_refreshCounter'),
                       config: DataTableConfig<Map<String, dynamic>>(
-                        title: t.supportTickets,
-                        subtitle: 'جدول پیشرفته برای جست‌وجو، فیلتر و مرتب‌سازی همه تیکت‌ها',
+                        title: null,
+                        subtitle: null,
                         endpoint: '/api/v1/support/search',
                         columns: [
                           TextColumn(

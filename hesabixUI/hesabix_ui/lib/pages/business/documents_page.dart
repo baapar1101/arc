@@ -10,7 +10,9 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
-import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';
+import 'package:hesabix_ui/pages/business/documents_mobile_view.dart';
+import '../../utils/snackbar_helper.dart';
 
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
@@ -110,36 +112,58 @@ class _DocumentsPageState extends State<DocumentsPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        if (isMobile) {
+          return DocumentsMobileView(
+            businessId: widget.businessId,
+            calendarController: widget.calendarController,
+            service: _service,
+            onCreateNew: _createNewDocument,
+            onShowDetails: _showDocumentDetails,
+            onEdit: _editDocument,
+            onDelete: _deleteDocument,
+            onBulkDelete: _bulkDeleteDocumentsByIds,
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // فیلترها
-            _buildFilters(t),
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // فیلترها
+                _buildFiltersResponsive(t, constraints.maxWidth),
 
-            // جدول داده‌ها
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: DataTableWidget<DocumentModel>(
-                  key: _tableKey,
-                  config: _buildTableConfig(t),
-                  fromJson: (json) => DocumentModel.fromJson(json),
-                  calendarController: widget.calendarController,
+                // جدول داده‌ها
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: DataTableWidget<DocumentModel>(
+                      key: _tableKey,
+                      config: _buildTableConfig(t),
+                      fromJson: (json) => DocumentModel.fromJson(json),
+                      calendarController: widget.calendarController,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   /// ساخت فیلترها
-  Widget _buildFilters(AppLocalizations t) {
+  Widget _buildFiltersResponsive(AppLocalizations t, double maxWidth) {
+    final isCompact = maxWidth < 900;
+    return isCompact ? _buildFiltersWrap(t) : _buildFiltersRow(t);
+  }
+
+  Widget _buildFiltersRow(AppLocalizations t) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -156,7 +180,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           // فیلتر نوع سند
           SizedBox(
             width: 200,
-            child: DropdownButtonFormField<String>(
+            child: DropdownButtonFormField<String?>(
               initialValue: _selectedDocumentType,
               decoration: const InputDecoration(
                 labelText: 'نوع سند',
@@ -168,7 +192,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 isDense: true,
               ),
               items: _documentTypes.entries.map((entry) {
-                return DropdownMenuItem<String>(
+                return DropdownMenuItem<String?>(
                   value: entry.key == 'all' ? null : entry.key,
                   child: Text(entry.value),
                 );
@@ -187,6 +211,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           Expanded(
             child: DateInputField(
               calendarController: widget.calendarController,
+              value: _fromDate,
               onChanged: (date) {
                 setState(() => _fromDate = date);
                 _refreshData();
@@ -201,6 +226,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           Expanded(
             child: DateInputField(
               calendarController: widget.calendarController,
+              value: _toDate,
               onChanged: (date) {
                 setState(() => _toDate = date);
                 _refreshData();
@@ -240,6 +266,114 @@ class _DocumentsPageState extends State<DocumentsPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildFiltersWrap(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: 240,
+            child: DropdownButtonFormField<String?>(
+              initialValue: _selectedDocumentType,
+              decoration: const InputDecoration(
+                labelText: 'نوع سند',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: _documentTypes.entries.map((entry) {
+                return DropdownMenuItem<String?>(
+                  value: entry.key == 'all' ? null : entry.key,
+                  child: Text(entry.value),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => _selectedDocumentType = value);
+                _refreshData();
+              },
+            ),
+          ),
+          SizedBox(
+            width: 240,
+            child: DateInputField(
+              calendarController: widget.calendarController,
+              value: _fromDate,
+              onChanged: (date) {
+                setState(() => _fromDate = date);
+                _refreshData();
+              },
+              labelText: 'از تاریخ',
+              hintText: 'انتخاب تاریخ شروع',
+            ),
+          ),
+          SizedBox(
+            width: 240,
+            child: DateInputField(
+              calendarController: widget.calendarController,
+              value: _toDate,
+              onChanged: (date) {
+                setState(() => _toDate = date);
+                _refreshData();
+              },
+              labelText: 'تا تاریخ',
+              hintText: 'انتخاب تاریخ پایان',
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _selectedDocumentType = null;
+                _fromDate = null;
+                _toDate = null;
+              });
+              _refreshData();
+            },
+            icon: const Icon(Icons.clear),
+            tooltip: 'پاک کردن فیلتر',
+          ),
+          ElevatedButton.icon(
+            onPressed: _createNewDocument,
+            icon: const Icon(Icons.add),
+            label: const Text('سند جدید'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _bulkDeleteDocumentsByIds(List<int> documentIds) async {
+    try {
+      final result = await _service.bulkDeleteDocuments(documentIds);
+      if (!mounted) return;
+      final deletedCount = (result['deleted_count'] as int?) ?? 0;
+      final skipped = (result['skipped_auto_documents'] as List?) ?? const [];
+      String message = '$deletedCount سند با موفقیت حذف شد';
+      if (skipped.isNotEmpty) {
+        message += '\n${skipped.length} سند اتوماتیک نادیده گرفته شد';
+      }
+      SnackBarHelper.show(context, message: message);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
+    }
   }
 
   /// ایجاد سند جدید
@@ -614,9 +748,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // دریافت آیتم‌های انتخاب شده از جدول
         final state = _tableKey.currentState;
         if (state != null) {
-          final selectedRows =
-              (state as dynamic).getSelectedRows() as List<DocumentModel>;
-          final documentIds = selectedRows.map((doc) => doc.id).toList();
+          // DataTableWidget exposes `getSelectedItems()` (not `getSelectedRows()`).
+          final selectedItems =
+              List<DocumentModel>.from((state as dynamic).getSelectedItems());
+          final documentIds = selectedItems.map((doc) => doc.id).toList();
 
           if (documentIds.isNotEmpty) {
             final result = await _service.bulkDeleteDocuments(documentIds);

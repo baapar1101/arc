@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
+import logging
+import os
+from typing import Optional, IO
 
 from app.core.settings import get_settings
 from app.core.logging import configure_logging
@@ -98,6 +101,49 @@ from app.core.calendar_middleware import add_calendar_type
 
 # Import activity log hooks برای ثبت event handlers
 import adapters.db.activity_log_hooks  # noqa: F401
+
+
+_BACKGROUND_JOBS_LOCK_FH: Optional[IO[str]] = None
+
+
+def _try_acquire_background_jobs_lock() -> bool:
+    """
+    جلوگیری از اجرای چندباره background jobs در حالت multi-worker.
+    با uvicorn --workers هر worker جداگانه startup event را اجرا می‌کند؛
+    این lock باعث می‌شود فقط یکی از process ها leader شود و jobها را اجرا کند.
+    """
+    global _BACKGROUND_JOBS_LOCK_FH
+
+    # امکان خاموش کردن کامل background jobs از طریق env
+    enabled = os.getenv("HESABIX_BACKGROUND_JOBS_ENABLED", "true").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return False
+
+    lock_path = os.getenv("HESABIX_BACKGROUND_JOBS_LOCKFILE", "/tmp/hesabix-background-jobs.lock")
+
+    try:
+        import fcntl  # Linux-only
+    except Exception:
+        # در محیط‌هایی که fcntl ندارند (مثلاً Windows) همان رفتار قبلی را نگه می‌داریم
+        return True
+
+    try:
+        fh = open(lock_path, "a+", encoding="utf-8")
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fh.seek(0)
+        fh.truncate()
+        fh.write(f"pid={os.getpid()}\n")
+        fh.flush()
+        _BACKGROUND_JOBS_LOCK_FH = fh  # نگه داشتن handle برای حفظ lock
+        return True
+    except Exception:
+        try:
+            if _BACKGROUND_JOBS_LOCK_FH:
+                _BACKGROUND_JOBS_LOCK_FH.close()
+        except Exception:
+            pass
+        _BACKGROUND_JOBS_LOCK_FH = None
+        return False
 
 
 def create_app() -> FastAPI:
@@ -1073,6 +1119,16 @@ def create_app() -> FastAPI:
     import asyncio
     @application.on_event("startup")
     async def _start_background_jobs():
+        # Cache invalidation subscriber: بهتر است در همه worker ها فعال باشد
+        from app.services.cache_invalidation_subscriber import start_cache_invalidation_subscriber
+        start_cache_invalidation_subscriber()
+
+        # سایر background jobs باید فقط در یک process اجرا شوند (leader-only)
+        if not _try_acquire_background_jobs_lock():
+            logger = logging.getLogger(__name__)
+            logger.info("Background jobs skipped (not leader / disabled).")
+            return
+
         asyncio.create_task(notifications_background_loop(30))
         # Storage cleanup: هر 24 ساعت یکبار
         asyncio.create_task(storage_cleanup_loop(24))
@@ -1082,6 +1138,7 @@ def create_app() -> FastAPI:
         asyncio.create_task(document_monetization_loop(10))
         # Document monetization period finalization: هر 24 ساعت یکبار
         asyncio.create_task(document_monetization_finalize_periods_loop(24))
+
         # AI background jobs
         from app.services.ai_background_jobs import (
             ai_quota_reset_loop,
@@ -1094,18 +1151,20 @@ def create_app() -> FastAPI:
         asyncio.create_task(ai_chat_cleanup_loop(24))
         # AI subscription check: هر 6 ساعت یکبار
         asyncio.create_task(ai_subscription_check_loop(6))
-        # Notification moderation: هر 60 ثانیه یکبار
-        from app.workers.notification_moderation_worker import run_worker_loop
-        asyncio.create_task(run_worker_loop(60))
-        # Monitoring metrics collection: هر 60 ثانیه (افزایش برای کاهش فشار روی connection pool)
+
+        # Notification moderation worker بهتر است جداگانه با systemd اجرا شود.
+        # اگر نیاز بود داخل API هم اجرا شود، می‌توان با env فعالش کرد.
+        run_inline_moderation = os.getenv("HESABIX_RUN_NOTIFICATION_MODERATION_IN_API", "false").strip().lower()
+        if run_inline_moderation in {"1", "true", "yes", "on"}:
+            from app.workers.notification_moderation_worker import run_worker_loop
+            asyncio.create_task(run_worker_loop(60))
+
+        # Monitoring metrics collection: هر 60 ثانیه
         asyncio.create_task(monitoring_metrics_collection_loop(60))
-        # Service status check: هر 120 ثانیه (افزایش برای کاهش فشار روی connection pool)
+        # Service status check: هر 120 ثانیه
         asyncio.create_task(monitoring_service_status_check_loop(120))
         # Business deletion check: هر 24 ساعت یکبار (فقط لاگ - حذف نمی‌کند)
         asyncio.create_task(check_expired_deleted_businesses_loop(24))
-        # Cache invalidation subscriber: برای دریافت پیام‌های invalidation از Redis Pub/Sub
-        from app.services.cache_invalidation_subscriber import start_cache_invalidation_subscriber
-        start_cache_invalidation_subscriber()
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

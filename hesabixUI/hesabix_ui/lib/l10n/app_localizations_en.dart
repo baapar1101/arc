@@ -248,6 +248,98 @@ class AppLocalizationsEn extends AppLocalizations {
   String get error => 'Error';
 
   @override
+  String get bulkDefaultWarehouseTitle => 'Bulk default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseAction => 'Change default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseNewWarehouseLabel => 'New warehouse';
+
+  @override
+  String get bulkDefaultWarehouseClearOption =>
+      'Clear default warehouse (empty)';
+
+  @override
+  String get bulkDefaultWarehouseScopeLabel => 'Apply scope (Policy):';
+
+  @override
+  String get bulkDefaultWarehouseScopeAll => 'All selected';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue =>
+      'Only inventory-tracked items (track_inventory=true)';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse =>
+      'Only non-inventory items (track_inventory=false)';
+
+  @override
+  String get bulkDefaultWarehouseConfirmTitle => 'Apply changes';
+
+  @override
+  String get bulkDefaultWarehouseConfirmMessage =>
+      'Are you sure you want to apply this default warehouse change to the selected items?';
+
+  @override
+  String bulkDefaultWarehouseApplySuccess(String count) {
+    return 'Done. Updated: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseSelectedCount(int count) {
+    return 'Selected items: $count';
+  }
+
+  @override
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  ) {
+    return 'Requested: $total | Found: $found | Will update: $willUpdate';
+  }
+
+  @override
+  String bulkDefaultWarehouseSkippedCount(int count) {
+    return 'Skipped: $count';
+  }
+
+  @override
+  String get bulkDefaultWarehouseNotesLabel => 'Notes:';
+
+  @override
+  String bulkDefaultWarehouseForcedServiceNull(int count) {
+    return 'Service items forced to null default warehouse: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  ) {
+    return 'Requested: $total | Found: $found | Updated: $updated | Skipped: $skipped';
+  }
+
+  @override
+  String get bulkDefaultWarehouseReasonAlreadySet => 'Already set';
+
+  @override
+  String get bulkDefaultWarehouseReasonScopeMismatch => 'Out of selected scope';
+
+  @override
+  String get bulkDefaultWarehouseReasonNotFound => 'Not found';
+
+  @override
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull =>
+      'Service item must have no default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseReasonUnknown => 'Unknown';
+
+  @override
   String get newBusiness => 'New business';
 
   @override
@@ -3892,6 +3984,145 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsComingSoonMessage => 'This report will be available soon.';
+
+  @override
+  String get reportsSearchHint => 'Search reports…';
+
+  @override
+  String reportsSearchResults(Object count) {
+    return 'Results ($count)';
+  }
+
+  @override
+  String get reportsSearchNoResults => 'No reports matched your search.';
+
+  @override
+  String get reportsFavoritesTitle => 'Favorites';
+
+  @override
+  String get reportsFavoritesEmptyMessage =>
+      'For quick access, tap the star next to a report.';
+
+  @override
+  String get reportsRecentTitle => 'Recently used';
+
+  @override
+  String get reportsRecentEmptyMessage => 'Reports you open will show up here.';
+
+  @override
+  String get reportsWarehouseSection => 'Warehouse reports';
+
+  @override
+  String get reportsSystemSection => 'System reports';
+
+  @override
+  String get reportsActivityLogsTitle => 'User activity logs';
+
+  @override
+  String get reportsActivityLogsSubtitle =>
+      'View the history of user activity in the system';
+
+  @override
+  String reportsSectionCount(Object count) {
+    return '$count reports';
+  }
+
+  @override
+  String get reportsAddToFavorites => 'Add to favorites';
+
+  @override
+  String get reportsRemoveFromFavorites => 'Remove from favorites';
+
+  @override
+  String get reportsInstallmentsSubtitle =>
+      'Installment status, due dates, and remaining balance';
+
+  @override
+  String get reportsStockCountTitle => 'Stock count report';
+
+  @override
+  String get reportsStockCountSubtitle =>
+      'Stock count history and adjustment documents';
+
+  @override
+  String get reportsWarehouseDocumentsSummaryTitle =>
+      'Warehouse documents summary';
+
+  @override
+  String get reportsWarehouseDocumentsSummarySubtitle =>
+      'Summary by document type with inbound/outbound stats';
+
+  @override
+  String get reportsSlowMovingItemsTitle => 'Slow-moving items';
+
+  @override
+  String get reportsSlowMovingItemsSubtitle =>
+      'Items with no movement during the selected time range';
+
+  @override
+  String get reportsCriticalStockTitle => 'Critical stock items';
+
+  @override
+  String get reportsCriticalStockSubtitle =>
+      'Items with stock below the defined threshold';
+
+  @override
+  String get reportsInterWarehouseTransfersTitle => 'Inter-warehouse transfers';
+
+  @override
+  String get reportsInterWarehouseTransfersSubtitle =>
+      'Details of transfers between warehouses';
+
+  @override
+  String get reportsAdjustmentDocumentsTitle => 'Adjustment documents';
+
+  @override
+  String get reportsAdjustmentDocumentsSubtitle =>
+      'Analysis of adjustment documents and inventory differences';
+
+  @override
+  String get reportsWarehousePerformanceTitle => 'Warehouse performance';
+
+  @override
+  String get reportsWarehousePerformanceSubtitle =>
+      'Compare warehouse performance';
+
+  @override
+  String get reportsProductMovementHistoryTitle => 'Product movement history';
+
+  @override
+  String get reportsProductMovementHistorySubtitle =>
+      'Full movement history of a product across all warehouses';
+
+  @override
+  String get reportsInventoryValuationTitle => 'Inventory valuation';
+
+  @override
+  String get reportsInventoryValuationSubtitle =>
+      'Monetary valuation of warehouse inventories';
+
+  @override
+  String get reportsPendingDocumentsTitle => 'Pending documents';
+
+  @override
+  String get reportsPendingDocumentsSubtitle =>
+      'Draft or pending-approval documents';
+
+  @override
+  String get reportsInventoryTurnoverTitle => 'Inventory turnover';
+
+  @override
+  String get reportsInventoryTurnoverSubtitle =>
+      'Inventory turnover rate for products';
+
+  @override
+  String get reportsSortTooltip => 'Sort';
+
+  @override
+  String get reportsSortDefault => 'Default';
+
+  @override
+  String get reportsSortAlphabetical => 'Alphabetical';
 
   @override
   String get operationSuccessful => 'Operation successful';

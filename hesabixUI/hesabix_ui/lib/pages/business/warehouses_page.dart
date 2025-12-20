@@ -113,16 +113,12 @@ class _WarehousesPageState extends State<WarehousesPage> {
   }
 
   Future<void> _showCreateDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => WarehouseFormDialog(
-        businessId: widget.businessId,
-        onSuccess: () {
-          if (mounted) {
-            _refreshTable();
-          }
-        },
-      ),
+    final result = await WarehouseFormDialog.show(
+      context,
+      businessId: widget.businessId,
+      onSuccess: () {
+        if (mounted) _refreshTable();
+      },
     );
     if (result == true && mounted) {
       _refreshTable();
@@ -130,17 +126,13 @@ class _WarehousesPageState extends State<WarehousesPage> {
   }
 
   Future<void> _showEditDialog(Warehouse w) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => WarehouseFormDialog(
-        businessId: widget.businessId,
-        warehouse: w,
-        onSuccess: () {
-          if (mounted) {
-            _refreshTable();
-          }
-        },
-      ),
+    final result = await WarehouseFormDialog.show(
+      context,
+      businessId: widget.businessId,
+      warehouse: w,
+      onSuccess: () {
+        if (mounted) _refreshTable();
+      },
     );
     if (result == true && mounted) {
       _refreshTable();

@@ -110,6 +110,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
   // لیست شناسه فرمول‌های تولید استفاده شده در این فاکتور
   Set<int> _bomIds = <int>{};
+  // هزینه عملیات/سربار تولید
+  double? _productionOperationsTotal;
   
   // فروش اقساطی (MVP)
   bool _useInstallments = false;
@@ -2323,6 +2325,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       extraInfo['bom_ids'] = _bomIds.toList();
     }
     
+    // افزودن هزینه عملیات/سربار تولید
+    if (_selectedInvoiceType == InvoiceType.production && 
+        _productionOperationsTotal != null && 
+        _productionOperationsTotal! > 0) {
+      extraInfo['production_operations_total'] = _productionOperationsTotal;
+    }
+    
     // ساخت payload
     final payload = <String, dynamic>{
       'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!),
@@ -2439,6 +2448,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               if (_selectedInvoiceType == InvoiceType.production) ...[
                 BomExplosionWidget(
                   businessId: widget.businessId,
+                  productionOperationsTotal: _productionOperationsTotal,
                   onExploded: (newItems, bomId) {
                     setState(() {
                       // افزودن ردیف‌های جدید به لیست موجود
@@ -2497,6 +2507,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 calendarController: widget.calendarController,
                 onChanged: (rows) {
                   setState(() {
+                    // بررسی bom_id های موجود در ردیف‌های جدید
+                    final bomIdsInRows = <int>{};
+                    for (final row in rows) {
+                      final bomId = row.extraInfo?['bom_id'];
+                      if (bomId is int) {
+                        bomIdsInRows.add(bomId);
+                      }
+                    }
+                    
+                    // حذف bom_id هایی که دیگر در ردیف‌ها نیستند
+                    _bomIds.removeWhere((bomId) => !bomIdsInRows.contains(bomId));
+                    
                     _lineItems = rows;
                     _sumSubtotal = rows.fold<num>(0, (acc, e) => acc + e.subtotal);
                     _sumDiscount = rows.fold<num>(0, (acc, e) => acc + e.discountAmount);
@@ -2695,6 +2717,44 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   ),
                 ),
               ),
+
+              // هزینه عملیات/سربار تولید (فقط برای فاکتور تولید)
+              if (_selectedInvoiceType == InvoiceType.production) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'هزینه عملیات/سربار تولید',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: _productionOperationsTotal?.toString(),
+                          decoration: InputDecoration(
+                            labelText: 'مبلغ هزینه عملیات (ریال)',
+                            hintText: 'مثال: 50000',
+                            prefixIcon: const Icon(Icons.attach_money),
+                            border: const OutlineInputBorder(),
+                            helperText: 'هزینه عملیات و سربار تولید که به هزینه تمام‌شده محصول اضافه می‌شود',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (value) {
+                            setState(() {
+                              _productionOperationsTotal = double.tryParse(value);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
               const SizedBox(height: 24),
               

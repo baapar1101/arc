@@ -1,41 +1,311 @@
 {% extends "pdf/base.html" %}
 {% block content %}
-  <div class="document-header">
-    <div class="header-left">
-      <div class="document-type-badge">
-        {{ document.document_type_name or ('سند' if is_fa else 'Document') }}
+  <style>
+    /* ====== B/W print-first overrides (WeasyPrint) ====== */
+    :root {
+      --primary: #000;
+      --primary-dark: #000;
+      --border: #000;
+      --text: #000;
+      --muted: #000;
+      --zebra: #fff;
+      --background: #fff;
+    }
+
+    /* Base template applies gradients/shadows to all tables; neutralize for this report */
+    .doc-layout table { 
+      box-shadow: none !important;
+      border-collapse: collapse !important;
+      border-spacing: 0 !important;
+      width: 100%;
+      font-size: 10px;
+    }
+    .doc-layout thead {
+      background: #f2f2f2 !important;
+      color: #000 !important;
+    }
+    .doc-layout th,
+    .doc-layout td {
+      border: 1px solid #000 !important;
+      padding: 6px 6px !important;
+      vertical-align: top;
+      text-align: {{ 'right' if is_fa else 'left' }};
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .doc-layout tbody tr:nth-child(even) { background: #fff !important; }
+    .doc-layout tbody tr:hover { background: #fff !important; }
+
+    .doc-layout .amount {
+      font-weight: 700;
+      text-align: center !important;
+      white-space: nowrap;
+    }
+
+    /* ====== Layout ====== */
+    .doc-layout {
+      position: relative;
+      font-size: 10.5px;
+      color: #000;
+    }
+    .doc-layout, .doc-layout * {
+      box-sizing: border-box;
+    }
+    .doc-layout > * { position: relative; z-index: 1; }
+
+    .doc-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 120px;
+      font-weight: 700;
+      color: rgba(0, 0, 0, 0.10);
+      z-index: 0;
+      white-space: nowrap;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .doc-card {
+      border: 1px solid #000;
+      border-radius: 0;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #fff;
+      page-break-inside: avoid;
+      overflow: hidden;
+    }
+    .doc-card--no-border {
+      border: none;
+    }
+    .doc-card--tight {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .doc-header .left { flex: 1 1 auto; min-width: 260px; }
+    .doc-header .right { flex: 0 0 auto; text-align: {{ 'left' if is_fa else 'right' }}; }
+
+    .doc-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #000;
+      margin: 0 0 2px 0;
+    }
+    .doc-meta {
+      color: #000;
+      font-size: 10.5px;
+      line-height: 1.5;
+    }
+
+    .doc-info-table {
+      width: 100%;
+      border-collapse: collapse !important;
+      table-layout: fixed;
+      margin-top: 8px;
+      font-size: 10.5px;
+    }
+    .doc-info-table td {
+      border: 1px solid #000 !important;
+      padding: 6px 8px !important;
+      vertical-align: top;
+      background: #fff;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .doc-info-table .k {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .doc-info-table .v {
+      margin-inline-start: 6px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .doc-note {
+      border: 1px solid #000;
+      padding: 8px 10px;
+      margin-top: 8px;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+    .doc-note .k { font-weight: 700; }
+    .doc-note .v { display: block; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+    .doc-logo img { max-height: 50px; max-width: 130px; object-fit: contain; display: block; }
+
+    .totals-row { background: #f2f2f2 !important; font-weight: 700; }
+
+    .doc-summary {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 10px;
+      page-break-inside: avoid;
+      max-width: 92%;
+      margin: 0 auto; /* وسط‌چین شدن کل بلوک */
+    }
+    .doc-summary .box {
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+      text-align: center;
+    }
+    .doc-summary .box.summary-box {
+      border: 1px dotted #000;
+      padding: 10px 12px;
+    }
+    .doc-summary .box h4 {
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .doc-mini-table {
+      width: 90%;
+      margin: 0 auto;
+      border-collapse: collapse !important;
+      table-layout: fixed;
+      font-size: 10.5px;
+    }
+    .doc-mini-table td {
+      border: none !important;
+      padding: 2px 4px !important;
+    }
+    .doc-mini-table .k {
+      width: 55%;
+      font-weight: 700;
+      text-align: {{ 'right' if is_fa else 'left' }};
+      white-space: nowrap;
+    }
+    .doc-mini-table .v {
+      width: 45%;
+      text-align: {{ 'left' if is_fa else 'right' }};
+      white-space: nowrap;
+    }
+
+    .doc-warning { color: #000; font-weight: 700; }
+
+    .signatures {
+      display: flex;
+      gap: 10px;
+      justify-content: center; /* وسط‌چین */
+      align-items: flex-end;
+      margin-top: 6px;
+    }
+    .signature-box { flex: 1; text-align: center; }
+    .signature-frame {
+      height: 60px;
+      margin: 0 12px 4px 12px;
+      border: 1px solid #000;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .signature-frame img {
+      max-height: 56px;
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .signature-label { font-size: 10px; }
+  </style>
+
+  <div class="doc-layout">
+    {% if document.is_proforma %}
+      <div class="doc-watermark">{{ 'غیرقطعی' if is_fa else 'DRAFT' }}</div>
+    {% endif %}
+
+    <div class="doc-card">
+      <div class="doc-header">
+        <div class="left">
+          <div class="doc-title">
+            {{ document.document_type_name or ('سند حسابداری' if is_fa else 'Accounting Document') }}
+          </div>
+          <div class="doc-meta">
+            <strong>{{ 'کد سند' if is_fa else 'Code' }}:</strong> {{ code or '-' }}
+            {% if fiscal_year_title %}
+              <span style="margin-inline-start: 8px;"> • </span>
+              <strong>{{ 'سال مالی' if is_fa else 'Fiscal year' }}:</strong> {{ fiscal_year_title }}
+            {% endif %}
+            {% if currency_code %}
+              <span style="margin-inline-start: 8px;"> • </span>
+              <strong>{{ 'ارز' if is_fa else 'Currency' }}:</strong> {{ currency_code }}
+            {% endif %}
+          </div>
+          <div class="doc-meta">
+            <strong>{{ 'تاریخ سند' if is_fa else 'Date' }}:</strong>
+            {{ document_date_display or document_date_jalali or document_date or '-' }}
+            <span style="margin-inline-start: 8px;"> • </span>
+            <strong>{{ 'تاریخ چاپ' if is_fa else 'Generated' }}:</strong> {{ generated_at }}
+          </div>
+        </div>
+
+        <div class="right">
+          <div class="doc-logo">
+            {% if assets and assets.images and assets.images.logo %}
+              <img src="{{ assets.images.logo }}" alt="Logo">
+            {% endif %}
+          </div>
+          <div class="doc-meta">
+            <strong>{{ 'کسب‌وکار' if is_fa else 'Business' }}:</strong> {{ business_name or '-' }}
+          </div>
+        </div>
       </div>
-      <div class="document-info">
-        <div class="info-row">
-          <span class="info-label">{{ 'کد سند' if is_fa else 'Code' }}:</span>
-          <span class="info-value">{{ code or '-' }}</span>
+
+      <table class="doc-info-table">
+        <tbody>
+          <tr>
+            <td style="width: 50%;">
+              <span class="k">{{ 'تهیه‌کننده' if is_fa else 'Prepared by' }}:</span>
+              <span class="v">{{ created_by_name or '-' }}</span>
+            </td>
+            <td style="width: 50%;">
+              <span class="k">{{ 'زمان ثبت' if is_fa else 'Registered at' }}:</span>
+              <span class="v">
+                {{ registered_at_display or (registered_at|string)|replace('T',' ')|replace('Z','') if registered_at else '-' }}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="k">{{ 'پروژه' if is_fa else 'Project' }}:</span>
+              <span class="v">{{ project_name or '-' }}</span>
+            </td>
+            <td>
+              <span class="k">{{ 'وضعیت' if is_fa else 'Status' }}:</span>
+              <span class="v">
+                {% if document.is_proforma %}
+                  {{ 'غیرقطعی' if is_fa else 'Draft' }}
+                {% else %}
+                  {{ 'قطعی' if is_fa else 'Final' }}
+                {% endif %}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if description %}
+        <div class="doc-note">
+          <span class="k">{{ 'توضیحات' if is_fa else 'Description' }}:</span>
+          <span class="v">{{ description }}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">{{ 'تاریخ' if is_fa else 'Date' }}:</span>
-          <span class="info-value">{{ document_date_jalali or document_date or '-' }}</span>
-        </div>
-        {% if description %}
-        <div class="info-row">
-          <span class="info-label">{{ 'توضیحات' if is_fa else 'Description' }}:</span>
-          <span class="info-value">{{ description | truncate(100) }}</span>
-        </div>
-        {% endif %}
-      </div>
+      {% endif %}
     </div>
-    <div class="header-right">
-      <div class="business-info">
-        <div class="business-name">{{ business_name or '-' }}</div>
-        <div class="generated-at">
-          {{ 'تولید شده در' if is_fa else 'Generated at' }}: {{ generated_at }}
-        </div>
-      </div>
-    </div>
-  </div>
 
   {# Installment plan summary if available #}
   {% set plan = (document.extra_info or {}).get('installment_plan') %}
   {% if plan and plan.get('schedule') %}
-  <div class="table-container">
+  <div class="doc-card doc-card--no-border">
     <h4 style="margin: 8px 0;">{{ 'خلاصه اقساط' if is_fa else 'Installment Summary' }}</h4>
     <table class="document-lines">
       <thead>
@@ -73,99 +343,138 @@
   </div>
   {% endif %}
 
-  <div class="table-container">
+  <div class="doc-card doc-card--no-border doc-card--tight">
     <table class="document-lines">
       <thead>
         <tr>
-          <th style="width: 50%;">{{ 'شرح' if is_fa else 'Description' }}</th>
-          <th style="width: 25%;">{{ 'بدهکار' if is_fa else 'Debit' }}</th>
-          <th style="width: 25%;">{{ 'بستانکار' if is_fa else 'Credit' }}</th>
+          <th style="width: 4%;">#</th>
+          <th style="width: 20%;">{{ 'حساب' if is_fa else 'Account' }}</th>
+          <th style="width: 24%;">{{ 'تفصیلی' if is_fa else 'Counterparty' }}</th>
+          <th style="width: 30%;">{{ 'شرح' if is_fa else 'Description' }}</th>
+          <th style="width: 11%;">{{ 'بدهکار' if is_fa else 'Debit' }}</th>
+          <th style="width: 11%;">{{ 'بستانکار' if is_fa else 'Credit' }}</th>
         </tr>
       </thead>
       <tbody>
         {% for line in lines or [] %}
           <tr>
-            <td>{{ line.description or '-' }}</td>
-            <td class="amount">{{ line.debit | money(0) | ltr | safe if line.debit else '-' }}</td>
-            <td class="amount">{{ line.credit | money(0) | ltr | safe if line.credit else '-' }}</td>
+            <td>{{ loop.index }}</td>
+            <td>
+              {% if line.account_tree_ancestors %}
+                <div style="font-size: 9px; color: #444; margin-bottom: 2px;">
+                  {{ line.account_tree_ancestors }}
+                </div>
+              {% endif %}
+              <div><strong>{{ line.account_code or '-' }}</strong></div>
+              <div style="font-size: 10px;">{{ line.account_name or '-' }}</div>
+            </td>
+            <td>
+              <div><strong>{{ line.person_name or '—' }}</strong></div>
+              {% if line.bank_account_name or line.cash_register_name or line.petty_cash_name or line.check_number %}
+                <div style="font-size: 9px; color: #444; margin-top: 2px;">
+                  {% if line.bank_account_name %}
+                    <div>{{ 'بانک' if is_fa else 'Bank' }}: {{ line.bank_account_name }}</div>
+                  {% endif %}
+                  {% if line.cash_register_name %}
+                    <div>{{ 'صندوق' if is_fa else 'Cash' }}: {{ line.cash_register_name }}</div>
+                  {% endif %}
+                  {% if line.petty_cash_name %}
+                    <div>{{ 'تنخواه' if is_fa else 'Petty cash' }}: {{ line.petty_cash_name }}</div>
+                  {% endif %}
+                  {% if line.check_number %}
+                    <div>{{ 'چک' if is_fa else 'Check' }}: {{ line.check_number }}</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              <div>{{ line.description or '-' }}</div>
+              {% if line.product_name or line.quantity %}
+                <div style="font-size: 10px; color: #444;">
+                  {% if line.product_name %}<span><strong>{{ 'کالا' if is_fa else 'Product' }}:</strong> {{ line.product_name }}</span>{% endif %}
+                  {% if line.quantity %}
+                    <span style="margin-inline-start: 8px;"> • </span>
+                    <span><strong>{{ 'تعداد' if is_fa else 'Qty' }}:</strong> {{ line.quantity | smart_number }}</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </td>
+            <td class="amount">{{ line.debit | money(0) | ltr | safe if (line.debit or 0) else '-' }}</td>
+            <td class="amount">{{ line.credit | money(0) | ltr | safe if (line.credit or 0) else '-' }}</td>
           </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr class="totals-row">
-          <td><strong>{{ 'جمع' if is_fa else 'Total' }}</strong></td>
-          <td class="amount">
-            <strong>
-              {% set total_debit = lines | sum(attribute='debit') if lines else 0 %}
-              {{ total_debit | money(0) | ltr | safe }}
-            </strong>
-          </td>
-          <td class="amount">
-            <strong>
-              {% set total_credit = lines | sum(attribute='credit') if lines else 0 %}
-              {{ total_credit | money(0) | ltr | safe }}
-            </strong>
-          </td>
+          <td colspan="4"><strong>{{ 'جمع' if is_fa else 'Total' }}</strong></td>
+          <td class="amount"><strong>{{ (total_debit if total_debit is not none else (lines | sum(attribute='debit') if lines else 0)) | money(0) | ltr | safe }}</strong></td>
+          <td class="amount"><strong>{{ (total_credit if total_credit is not none else (lines | sum(attribute='credit') if lines else 0)) | money(0) | ltr | safe }}</strong></td>
         </tr>
       </tfoot>
     </table>
   </div>
 
-  {% if document.notes %}
-  <div class="notes-section">
-    <h4>{{ 'یادداشت‌ها' if is_fa else 'Notes' }}</h4>
-    <p>{{ document.notes }}</p>
-  </div>
-  {% endif %}
+  {# بعضی مسیرها ممکن است total_debit/total_credit را اصلاً به context ندهند؛ اینجا امن‌سازی می‌کنیم #}
+  {% set d_raw = total_debit if (total_debit is defined and total_debit is not none) else (lines | sum(attribute='debit') if lines else 0) %}
+  {% set c_raw = total_credit if (total_credit is defined and total_credit is not none) else (lines | sum(attribute='credit') if lines else 0) %}
+  {% set d = d_raw | float %}
+  {% set c = c_raw | float %}
+  {% set diff = (d - c) | float %}
 
-  <style>
-    .document-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 24px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 8px;
-    }
-    .document-type-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      background: var(--primary);
-      color: white;
-      border-radius: 4px;
-      font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 12px;
-    }
-    .info-row {
-      margin: 6px 0;
-    }
-    .info-label {
-      font-weight: 600;
-      color: var(--muted);
-      margin-inline-end: 8px;
-    }
-    .info-value {
-      color: var(--text);
-    }
-    .table-container {
-      margin: 20px 0;
-      overflow-x: auto;
-    }
-    .totals-row {
-      background: #e9ecef;
-      font-weight: 600;
-      border-top: 2px solid var(--primary);
-    }
-    .notes-section {
-      margin-top: 24px;
-      padding: 16px;
-      background: #fff3cd;
-      border-right: 4px solid #ffc107;
-      border-radius: 4px;
-    }
-  </style>
+  <div class="doc-card doc-card--no-border">
+    <div class="doc-summary">
+      <div class="box summary-box">
+        <h4>{{ 'خلاصه سند' if is_fa else 'Summary' }}</h4>
+        <table class="doc-mini-table">
+          <tbody>
+            <tr>
+              <td class="k">{{ 'تعداد سطر' if is_fa else 'Lines' }}</td>
+              <td class="v">{{ lines_count or (lines|length if lines else 0) }}</td>
+            </tr>
+            <tr>
+              <td class="k">{{ 'جمع بدهکار' if is_fa else 'Total debit' }}</td>
+              <td class="v amount">{{ d | money(0) | ltr | safe }}</td>
+            </tr>
+            <tr>
+              <td class="k">{{ 'جمع بستانکار' if is_fa else 'Total credit' }}</td>
+              <td class="v amount">{{ c | money(0) | ltr | safe }}</td>
+            </tr>
+            <tr>
+              <td class="k">{{ 'اختلاف' if is_fa else 'Difference' }}</td>
+              <td class="v {% if diff != 0 %}doc-warning{% endif %}">{{ diff | money(0) | ltr | safe }}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% if diff != 0 %}
+          <div class="doc-warning" style="margin-top: 6px;">
+            {{ 'هشدار: سند متوازن نیست.' if is_fa else 'Warning: document is not balanced.' }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="box">
+        <h4>{{ 'امضاها' if is_fa else 'Signatures' }}</h4>
+        <div class="signatures">
+          <div class="signature-box">
+            <div class="signature-frame">
+              {% if prepared_by_signature_data_uri %}
+                <img src="{{ prepared_by_signature_data_uri }}" alt="Signature">
+              {% endif %}
+            </div>
+            <div class="signature-label">{{ 'تهیه‌کننده' if is_fa else 'Prepared by' }}</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-frame"></div>
+            <div class="signature-label">{{ 'تأییدکننده' if is_fa else 'Approved by' }}</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-frame"></div>
+            <div class="signature-label">{{ 'مدیر مالی' if is_fa else 'Finance manager' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}
 
 

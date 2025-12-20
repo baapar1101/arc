@@ -142,8 +142,188 @@ def export_installments_excel_endpoint(
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Content-Type": mime,
+        # Flutter Web needs this to read filename/content-type headers
+        "Access-Control-Expose-Headers": "Content-Disposition, Content-Type",
     }
     return Response(content=content, media_type=mime, headers=headers)
+
+
+@router.post("/business/{business_id}/installments/export/pdf")
+@require_business_access("business_id")
+def export_installments_pdf_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "export")),
+) -> Response:
+    """
+    خروجی PDF گزارش اقساط بر اساس همان فیلترهای search_installments.
+    """
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from app.services.pdf.template_renderer import load_farsi_font_data_uris
+
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    calendar_type = ctx.get_calendar_type()
+
+    body = payload or {}
+    data = search_installments(db=db, business_id=business_id, query=body, disable_pagination=True)
+    items = (data.get("items") or [])
+
+    # Resolve business name
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b and getattr(b, "name", None):
+            business_name = b.name
+    except Exception:
+        business_name = ""
+
+    # Format dates based on calendar
+    def _fmt_date(v: Any) -> str:
+        if v is None:
+            return ""
+        try:
+            if calendar_type == "jalali":
+                fd = CalendarConverter.format_datetime(v, "jalali")
+            else:
+                fd = CalendarConverter.format_datetime(v, "gregorian")
+            return fd.get("date_only") or fd.get("formatted") or str(v)
+        except Exception:
+            try:
+                # Already string
+                return str(v)
+            except Exception:
+                return ""
+
+    for it in items:
+        try:
+            it["document_date"] = _fmt_date(it.get("document_date"))
+            it["due_date"] = _fmt_date(it.get("due_date"))
+        except Exception:
+            pass
+
+    # Filters summary (human readable)
+    filters_summary: List[Dict[str, str]] = []
+    try:
+        fy_id = body.get("fiscal_year_id")
+        if fy_id:
+            filters_summary.append({"label": "سال مالی" if is_fa else "Fiscal year", "value": str(fy_id)})
+    except Exception:
+        pass
+    try:
+        due_from = body.get("due_from")
+        if isinstance(due_from, str) and due_from:
+            filters_summary.append({"label": "از سررسید" if is_fa else "Due from", "value": due_from[:10]})
+    except Exception:
+        pass
+    try:
+        due_to = body.get("due_to")
+        if isinstance(due_to, str) and due_to:
+            filters_summary.append({"label": "تا سررسید" if is_fa else "Due to", "value": due_to[:10]})
+    except Exception:
+        pass
+    try:
+        status = body.get("status")
+        if isinstance(status, str) and status:
+            filters_summary.append({"label": "وضعیت" if is_fa else "Status", "value": status})
+    except Exception:
+        pass
+    try:
+        person_id = body.get("person_id")
+        if person_id:
+            person_name = None
+            try:
+                p = db.query(Person).filter(Person.id == int(person_id), Person.business_id == business_id).first()
+                person_name = getattr(p, "name", None) if p else None
+            except Exception:
+                person_name = None
+            filters_summary.append({
+                "label": "شخص" if is_fa else "Person",
+                "value": (person_name or str(person_id)),
+            })
+    except Exception:
+        pass
+    try:
+        invoice_id = body.get("invoice_id")
+        if invoice_id:
+            inv_code = None
+            try:
+                doc = db.query(Document).filter(Document.id == int(invoice_id), Document.business_id == business_id).first()
+                inv_code = getattr(doc, "code", None) if doc else None
+            except Exception:
+                inv_code = None
+            filters_summary.append({
+                "label": "فاکتور" if is_fa else "Invoice",
+                "value": (inv_code or str(invoice_id)),
+            })
+    except Exception:
+        pass
+
+    # Summary totals (reuse service stats when available)
+    stats = data.get("stats") or {}
+
+    now = datetime.datetime.now()
+    footer_text = ""
+    try:
+        footer_label = "زمان چاپ" if is_fa else "Printed at"
+        issuer_label = "صادرکننده" if is_fa else "Issued by"
+        issuer_name = ""
+        try:
+            issuer_name = ctx.get_user_name() or ""
+        except Exception:
+            issuer_name = ""
+        try:
+            fd = CalendarConverter.format_datetime(now, "jalali" if calendar_type == "jalali" else "gregorian")
+            printed_at_str = fd.get("formatted") or fd.get("date_only", "")
+        except Exception:
+            printed_at_str = now.strftime("%Y/%m/%d %H:%M")
+        footer_text = f"{footer_label}: {printed_at_str}"
+        if issuer_name:
+            footer_text += f" | {issuer_label}: {issuer_name}"
+    except Exception:
+        footer_text = ""
+
+    fa_font_url_regular = None
+    fa_font_url_bold = None
+    if is_fa:
+        fa_font_url_regular, fa_font_url_bold = load_farsi_font_data_uris()
+
+    html_content = render_template(
+        "pdf/installments/list.html",
+        {
+            "title_text": "گزارش اقساط" if is_fa else "Installments report",
+            "business_name": business_name,
+            "generated_at": now,
+            "is_fa": is_fa,
+            "footer_text": footer_text,
+            "paper_size": body.get("paper_size"),
+            "orientation": body.get("orientation"),
+            "fa_font_url_regular": fa_font_url_regular,
+            "fa_font_url_bold": fa_font_url_bold,
+            "filters_summary": filters_summary,
+            "items": items,
+            "stats": stats,
+        },
+    )
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
+
+    filename = f"installments_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type",
+        },
+    )
 
 
 @router.put("/business/{business_id}/{invoice_id}")
