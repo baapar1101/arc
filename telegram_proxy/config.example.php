@@ -13,6 +13,12 @@ const TG_PROXY_CONFIG = [
 	'proxy_api_key'        => 'change-me', // در صورت عدم نیاز، خالی بگذارید.
 	'proxy_base_url'       => 'https://your-proxy-domain.com', // آدرس domain پروکسی (اختیاری - برای تست)
 	'internal_webhook_url' => 'https://your-api.example.com/api/v1/integrations/telegram/webhook/YOUR_WEBHOOK_SECRET', // ⚠️ باید telegram_webhook_secret باشد (نه bot token!)
+
+	// Logging controls (optional):
+	// enable_logging: اگر false باشد، هیچ لاگی نوشته نمی‌شود
+	// log_level: سطح لاگ. یکی از 'ERROR', 'WARNING', 'INFO', 'DEBUG'
+	'enable_logging'      => true,
+	'log_level'           => 'DEBUG',
 ];
 
 /**

@@ -1,0 +1,81 @@
+========================================
+راهنمای نصب Flutter برای ویندوز
+========================================
+
+برای نصب Flutter و ساخت خروجی ویندوز، یکی از روش‌های زیر را انتخاب کنید:
+
+روش 1: استفاده از فایل Batch (ساده‌ترین روش)
+------------------------------------------------
+1. فایل install_flutter.bat را با دوبار کلیک اجرا کنید
+   یا در Command Prompt اجرا کنید:
+   
+   install_flutter.bat
+
+2. اسکریپت به صورت خودکار:
+   - Git را بررسی می‌کند
+   - Flutter را از GitHub کلون می‌کند
+   - Flutter را به PATH اضافه می‌کند
+   - flutter doctor را اجرا می‌کند
+
+روش 2: استفاده از PowerShell
+------------------------------------------------
+1. PowerShell را به عنوان Administrator اجرا کنید
+   (کلیک راست روی PowerShell > Run as Administrator)
+
+2. دستور زیر را اجرا کنید:
+   
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   
+3. سپس اسکریپت را اجرا کنید:
+   
+   .\install_flutter_simple.ps1
+
+پیش‌نیازها
+------------------------------------------------
+1. Git باید نصب باشد
+   دانلود: https://git-scm.com/download/win
+
+2. Visual Studio 2022 (برای ساخت خروجی ویندوز)
+   دانلود: https://visualstudio.microsoft.com/downloads/
+   در حین نصب، "Desktop development with C++" را انتخاب کنید
+
+بعد از نصب
+------------------------------------------------
+1. یک Command Prompt یا PowerShell جدید باز کنید
+
+2. به پوشه پروژه بروید:
+   
+   cd hesabixUI\hesabix_ui
+
+3. Dependencies را نصب کنید:
+   
+   flutter pub get
+
+4. برای ساخت خروجی ویندوز:
+   
+   flutter build windows --release
+
+5. فایل اجرایی در مسیر زیر قرار می‌گیرد:
+   
+   build\windows\x64\runner\Release\hesabix_ui.exe
+
+بررسی نصب
+------------------------------------------------
+برای بررسی وضعیت نصب، دستور زیر را اجرا کنید:
+
+flutter doctor
+
+اگر مشکلی دیدید، دستور زیر را برای اطلاعات بیشتر اجرا کنید:
+
+flutter doctor -v
+
+راهنمای کامل
+------------------------------------------------
+برای راهنمای کامل‌تر، فایل FLUTTER_WINDOWS_INSTALL_GUIDE.md را مطالعه کنید.
+
+========================================
+
+
+
+
+

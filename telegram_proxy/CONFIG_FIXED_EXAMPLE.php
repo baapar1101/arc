@@ -28,7 +28,12 @@ const TG_PROXY_CONFIG = [
 	// 3. مقدار telegram_webhook_secret را پیدا کنید
 	// 4. آن را در اینجا قرار دهید
 	'internal_webhook_url' => 'https://hsxn.hesabix.ir/api/v1/integrations/telegram/webhook/YOUR_WEBHOOK_SECRET_HERE',
-];
+
+		// کنترل‌های لاگینگ (اختیاری):
+		// enable_logging: اگر false باشد، هیچ لاگی نوشته نمی‌شود
+		// log_level: یکی از 'ERROR'|'WARNING'|'INFO'|'DEBUG'
+		'enable_logging'      => true,
+		'log_level'           => 'INFO',
 
 /**
  * تفاوت بین telegram_webhook_secret و telegram_bot_token:
