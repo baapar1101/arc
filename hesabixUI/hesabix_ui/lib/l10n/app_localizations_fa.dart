@@ -1902,7 +1902,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get alreadyAddedWarningTitle => 'کاربر موجود';
 
   @override
-  String get version => 'نسخه 1.0.0';
+  String get version => 'نسخه 1.0.23';
 
   @override
   String get motto => 'جهان با تعاون زیبا می‌شود';

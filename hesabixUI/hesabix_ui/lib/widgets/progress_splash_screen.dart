@@ -279,7 +279,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                     
                     // Version Info
                     Text(
-                      'Version 1.0.0',
+                      AppLocalizations.of(context).version,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),

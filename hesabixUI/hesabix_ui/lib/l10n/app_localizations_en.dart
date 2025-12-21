@@ -1911,7 +1911,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get alreadyAddedWarningTitle => 'Existing User';
 
   @override
-  String get version => 'Version 1.0.0';
+  String get version => 'Version 1.0.23';
 
   @override
   String get motto => 'The world becomes beautiful through cooperation';
