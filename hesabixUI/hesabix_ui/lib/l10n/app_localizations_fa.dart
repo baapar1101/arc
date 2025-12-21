@@ -72,7 +72,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get light => 'روشن';
 
   @override
-  String get dark => 'تیره';
+  String get dark => 'تاریک';
 
   @override
   String get welcomeTitle => 'حسابداری ابری حسابیکس';
@@ -92,6 +92,25 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get captchaRequired => 'کد امنیتی الزامی است.';
+
+  @override
+  String get acceptTermsPrefix => 'من با ';
+
+  @override
+  String get acceptTermsSuffix => ' موافقم';
+
+  @override
+  String get privacyPolicy => 'سیاست حفظ حریم خصوصی';
+
+  @override
+  String get termsOfService => 'قوانین ارائه خدمات';
+
+  @override
+  String get and => 'و';
+
+  @override
+  String get acceptTermsRequired =>
+      'برای عضویت باید با سیاست حفظ حریم خصوصی و قوانین ارائه خدمات موافق باشید.';
 
   @override
   String get sendReset => 'ارسال کد بازیابی';
@@ -248,10 +267,106 @@ class AppLocalizationsFa extends AppLocalizations {
   String get error => 'خطا';
 
   @override
+  String get bulkDefaultWarehouseTitle => 'تغییر گروهی انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseAction => 'تغییر انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseNewWarehouseLabel => 'انبار جدید';
+
+  @override
+  String get bulkDefaultWarehouseClearOption => 'پاک کردن انبار پیش‌فرض';
+
+  @override
+  String get bulkDefaultWarehouseScopeLabel => 'دامنه اعمال:';
+
+  @override
+  String get bulkDefaultWarehouseScopeAll => 'همه موارد انتخاب‌شده';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue =>
+      'فقط کالاهای انبارداری';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse =>
+      'فقط کالاهای غیرانبارداری';
+
+  @override
+  String get bulkDefaultWarehouseConfirmTitle => 'اعمال تغییر';
+
+  @override
+  String get bulkDefaultWarehouseConfirmMessage =>
+      'آیا از اعمال تغییر انبار پیش‌فرض برای کالاهای انتخاب‌شده مطمئن هستید؟';
+
+  @override
+  String bulkDefaultWarehouseApplySuccess(String count) {
+    return 'انجام شد. تعداد تغییر: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseSelectedCount(int count) {
+    return 'تعداد کالاهای انتخاب‌شده: $count';
+  }
+
+  @override
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  ) {
+    return 'تعداد انتخاب: $total | پیدا شده: $found | قابل تغییر: $willUpdate';
+  }
+
+  @override
+  String bulkDefaultWarehouseSkippedCount(int count) {
+    return 'نادیده گرفته‌شده: $count';
+  }
+
+  @override
+  String get bulkDefaultWarehouseNotesLabel => 'یادداشت‌ها:';
+
+  @override
+  String bulkDefaultWarehouseForcedServiceNull(int count) {
+    return 'خدماتی که انبار پیش‌فرض ندارند (به‌صورت خودکار): $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  ) {
+    return 'تعداد انتخاب: $total | پیدا شده: $found | تغییر کرده: $updated | نادیده: $skipped';
+  }
+
+  @override
+  String get bulkDefaultWarehouseReasonAlreadySet =>
+      'از قبل همین‌طور تنظیم شده';
+
+  @override
+  String get bulkDefaultWarehouseReasonScopeMismatch =>
+      'با دامنه انتخابی شما هم‌خوانی ندارد';
+
+  @override
+  String get bulkDefaultWarehouseReasonNotFound => 'پیدا نشد';
+
+  @override
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull =>
+      'خدمت است و انبار پیش‌فرض ندارد';
+
+  @override
+  String get bulkDefaultWarehouseReasonUnknown => 'نامشخص';
+
+  @override
   String get newBusiness => 'کسب‌وکار جدید';
 
   @override
   String get businesses => 'کسب‌وکارها';
+
+  @override
+  String get deleteBusiness => 'حذف کسب و کار';
 
   @override
   String get support => 'پشتیبانی';
@@ -1950,7 +2065,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get cash => 'صندوق';
 
   @override
-  String get invoices => 'صورتحساب‌ها';
+  String get invoices => 'فاکتورها';
 
   @override
   String get expensesIncome => 'هزینه و درآمد';
@@ -2543,6 +2658,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personTypeSeller => 'فروشنده';
 
   @override
+  String get personTypeShareholder => 'سهامدار';
+
+  @override
   String get personCreatedSuccessfully => 'شخص با موفقیت ایجاد شد';
 
   @override
@@ -3020,6 +3138,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxUnitId => 'شناسه واحد مالیاتی';
 
   @override
+  String get vatColumn => 'مالیات بر ارزش افزوده';
+
+  @override
+  String taxVatPercent(Object value) {
+    return '$value٪';
+  }
+
+  @override
+  String get taxVatUnknown => 'نامشخص';
+
+  @override
   String get bulkPriceUpdateTitle => 'تغییر قیمت‌های گروهی';
 
   @override
@@ -3389,6 +3518,22 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get deleteInvoiceTaxWorkspaceError =>
+      'این فاکتور در کارپوشه سامانه مودیان قرار دارد و قابل حذف نمی‌باشد';
+
+  @override
+  String get deleteInvoiceReceiptPaymentsWarning =>
+      'اسناد دریافت/پرداخت مرتبط:';
+
+  @override
+  String get deleteInvoiceWarehouseWarning => 'حواله‌های انبار قطعی شده مرتبط:';
+
+  @override
+  String deleteInvoiceInstallmentsWarning(String count) {
+    return 'این فاکتور دارای $count قسط است که حذف خواهند شد';
+  }
+
+  @override
   String get saveInvoice => 'ذخیره فاکتور';
 
   @override
@@ -3712,6 +3857,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'ریز گردش هر کالا (FIFO/LIFO/میانگین)';
 
   @override
+  String get reportsInventoryStockTitle => 'گزارش موجودی انبار';
+
+  @override
+  String get reportsInventoryStockSubtitle =>
+      'موجودی محصولات به تفکیک انبار و تاریخ';
+
+  @override
   String get reportsSalesByProductTitle => 'فروش به تفکیک کالا';
 
   @override
@@ -3828,6 +3980,144 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get reportsComingSoonMessage =>
       'این گزارش به‌زودی در دسترس خواهد بود.';
+
+  @override
+  String get reportsSearchHint => 'جستجو در گزارش‌ها…';
+
+  @override
+  String reportsSearchResults(Object count) {
+    return 'نتایج ($count)';
+  }
+
+  @override
+  String get reportsSearchNoResults => 'گزارشی با این عبارت پیدا نشد.';
+
+  @override
+  String get reportsFavoritesTitle => 'علاقه‌مندی‌ها';
+
+  @override
+  String get reportsFavoritesEmptyMessage =>
+      'برای دسترسی سریع، روی ستاره کنار هر گزارش بزنید.';
+
+  @override
+  String get reportsRecentTitle => 'اخیراً استفاده‌شده';
+
+  @override
+  String get reportsRecentEmptyMessage =>
+      'گزارش‌هایی که باز می‌کنید اینجا نمایش داده می‌شوند.';
+
+  @override
+  String get reportsWarehouseSection => 'گزارشات انبار';
+
+  @override
+  String get reportsSystemSection => 'گزارشات سیستم';
+
+  @override
+  String get reportsActivityLogsTitle => 'گزارش فعالیت‌های کاربران';
+
+  @override
+  String get reportsActivityLogsSubtitle =>
+      'مشاهده تاریخچه فعالیت‌های کاربران در سیستم';
+
+  @override
+  String reportsSectionCount(Object count) {
+    return '$count گزارش';
+  }
+
+  @override
+  String get reportsAddToFavorites => 'افزودن به علاقه‌مندی‌ها';
+
+  @override
+  String get reportsRemoveFromFavorites => 'حذف از علاقه‌مندی‌ها';
+
+  @override
+  String get reportsInstallmentsSubtitle => 'وضعیت اقساط، سررسیدها و مانده';
+
+  @override
+  String get reportsStockCountTitle => 'گزارش انبارگردانی';
+
+  @override
+  String get reportsStockCountSubtitle =>
+      'تاریخچه انبارگردانی‌ها و حواله‌های تعدیل';
+
+  @override
+  String get reportsWarehouseDocumentsSummaryTitle =>
+      'گزارش خلاصه حواله‌های انبار';
+
+  @override
+  String get reportsWarehouseDocumentsSummarySubtitle =>
+      'خلاصه حواله‌ها به تفکیک نوع با آمار ورود و خروج';
+
+  @override
+  String get reportsSlowMovingItemsTitle => 'گزارش کالاهای کم‌گردش';
+
+  @override
+  String get reportsSlowMovingItemsSubtitle =>
+      'کالاهایی که در بازه زمانی مشخص‌شده هیچ حرکتی نداشته‌اند';
+
+  @override
+  String get reportsCriticalStockTitle => 'گزارش کالاهای با موجودی بحرانی';
+
+  @override
+  String get reportsCriticalStockSubtitle =>
+      'کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است';
+
+  @override
+  String get reportsInterWarehouseTransfersTitle =>
+      'گزارش انتقالات بین انبارها';
+
+  @override
+  String get reportsInterWarehouseTransfersSubtitle =>
+      'جزئیات انتقالات بین انبارها';
+
+  @override
+  String get reportsAdjustmentDocumentsTitle => 'گزارش حواله‌های تعدیل';
+
+  @override
+  String get reportsAdjustmentDocumentsSubtitle =>
+      'تحلیل حواله‌های تعدیل و تفاوت‌های موجودی';
+
+  @override
+  String get reportsWarehousePerformanceTitle => 'گزارش عملکرد انبارها';
+
+  @override
+  String get reportsWarehousePerformanceSubtitle => 'مقایسه عملکرد انبارها';
+
+  @override
+  String get reportsProductMovementHistoryTitle =>
+      'گزارش تاریخچه حرکات یک کالا';
+
+  @override
+  String get reportsProductMovementHistorySubtitle =>
+      'تاریخچه کامل حرکات یک کالا در تمام انبارها';
+
+  @override
+  String get reportsInventoryValuationTitle => 'گزارش ارزش موجودی انبار';
+
+  @override
+  String get reportsInventoryValuationSubtitle => 'ارزش ریالی موجودی انبارها';
+
+  @override
+  String get reportsPendingDocumentsTitle => 'گزارش حواله‌های در انتظار تأیید';
+
+  @override
+  String get reportsPendingDocumentsSubtitle =>
+      'حواله‌های پیش‌نویس یا در انتظار تأیید';
+
+  @override
+  String get reportsInventoryTurnoverTitle => 'گزارش گردش موجودی';
+
+  @override
+  String get reportsInventoryTurnoverSubtitle => 'نرخ گردش موجودی کالاها';
+
+  @override
+  String get reportsSortTooltip => 'مرتب‌سازی';
+
+  @override
+  String get reportsSortDefault => 'پیش‌فرض';
+
+  @override
+  String get reportsSortAlphabetical => 'الفبایی';
 
   @override
   String get operationSuccessful => 'عملیات با موفقیت انجام شد';
@@ -3960,6 +4250,22 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get notificationsFieldSmsSenderHint =>
       'دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.';
+
+  @override
+  String get notificationsProxySectionTitle => 'پروکسی تلگرام';
+
+  @override
+  String get notificationsProxySectionSubtitle =>
+      'در صورت قرار داشتن سرورها در ایران، با فعال کردن پروکسی درخواست‌های تلگرام از مسیر امن بیرونی عبور می‌کند.';
+
+  @override
+  String get notificationsProxyEnableLabel => 'فعال‌سازی پروکسی تلگرام';
+
+  @override
+  String get notificationsFieldTelegramProxyBaseUrl => 'آدرس پایه پروکسی';
+
+  @override
+  String get notificationsFieldTelegramProxyApiKey => 'کلید دسترسی پروکسی';
 
   @override
   String get notificationsAdvancedRestartHint =>
@@ -4270,6 +4576,46 @@ class AppLocalizationsFa extends AppLocalizations {
   String get walletPayoutRequested => 'درخواست تسویه ثبت شد';
 
   @override
+  String get settingsWalletPayoutsAdmin => 'مدیریت تسویه کیف‌پول';
+
+  @override
+  String get settingsWalletPayoutsAdminDescription =>
+      'مشاهده، پیگیری و ثبت تسویه‌های کیف‌پول کسب‌وکارها';
+
+  @override
+  String get walletPayoutsAdminTitle => 'درخواست‌های تسویه کیف‌پول';
+
+  @override
+  String get walletPayoutsAdminSubtitle =>
+      'در این بخش می‌توانید درخواست‌های تسویه کیف‌پول را مشاهده و وضعیت واریز بانکی آن‌ها را ثبت کنید.';
+
+  @override
+  String get walletPayoutsAdminEmpty =>
+      'در حال حاضر درخواستی برای نمایش وجود ندارد.';
+
+  @override
+  String get walletPayoutsAdminSettleDialogTitle => 'ثبت اطلاعات واریز بانکی';
+
+  @override
+  String get walletPayoutsAdminSettleAction => 'ثبت و تسویه';
+
+  @override
+  String get walletPayoutsAdminSuccess => 'اطلاعات تسویه با موفقیت ثبت شد.';
+
+  @override
+  String get walletPayoutsAdminFormRequired => 'این فیلد الزامی است';
+
+  @override
+  String get walletPayoutsAdminSettlementDate => 'تاریخ واریز';
+
+  @override
+  String get walletPayoutsAdminFeeHint =>
+      'در صورت وجود کارمزد انتقال، آن را وارد کنید';
+
+  @override
+  String get bankTrackingCode => 'کد پیگیری بانک';
+
+  @override
   String get walletTopUpTitle => 'افزایش اعتبار';
 
   @override
@@ -4484,6 +4830,332 @@ class AppLocalizationsFa extends AppLocalizations {
       'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
 
   @override
+  String get taxIntegrationTitle => 'سامانه مودیان مالیاتی';
+
+  @override
+  String get taxIntegrationSubtitle =>
+      'اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.';
+
+  @override
+  String get taxSettingsTabConnection => 'اتصال و اطلاعات پایه';
+
+  @override
+  String get taxSettingsTabKeys => 'کلیدها و گواهی‌ها';
+
+  @override
+  String get taxSettingsTabDataQuality => 'کیفیت داده';
+
+  @override
+  String get taxSettingsTabGuide => 'راهنما';
+
+  @override
+  String get taxGuideIntroTitle => 'چگونه تنظیمات سامانه مودیان را تکمیل کنیم؟';
+
+  @override
+  String get taxGuideIntroDescription =>
+      'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید حسابیکس را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
+
+  @override
+  String get taxGuidePrereqTitle => 'پیش‌نیازهای قبل از شروع';
+
+  @override
+  String get taxGuidePrereqItem1 =>
+      'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در حسابیکس';
+
+  @override
+  String get taxGuidePrereqItem2 =>
+      'اطلاعات ثبتی صحیح (شناسه ملی، کد اقتصادی و ایمیل سازمانی معتبر)';
+
+  @override
+  String get taxGuidePrereqItem3 =>
+      'دسترسی به کارپوشه مالیاتی در سامانه my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep1Title => '۱) ساخت کلیدها در حسابیکس';
+
+  @override
+  String get taxGuideStep1Description =>
+      'از کارت «تولید کلید جدید» استفاده کنید تا کلید خصوصی، عمومی و در صورت نیاز CSR را ایجاد کنید.';
+
+  @override
+  String get taxGuideStep1Bullet1 =>
+      'از برگه «کلیدها و گواهی‌ها» روی دکمه تولید کلید بزنید.';
+
+  @override
+  String get taxGuideStep1Bullet2 =>
+      'نوع شخص (حقیقی/حقوقی) و شناسه ملی را دقیق وارد کنید.';
+
+  @override
+  String get taxGuideStep1Bullet3 =>
+      'نام فارسی، نام انگلیسی و ایمیل باید با پرونده مالیاتی یکسان باشند.';
+
+  @override
+  String get taxGuideStep2Title => '۲) دانلود و نگهداری امن';
+
+  @override
+  String get taxGuideStep2Description =>
+      'پس از تولید، کلیدها فقط یک‌بار نمایش داده می‌شوند؛ آن‌ها را در جای امن نگهداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet1 =>
+      'فایل‌های کلید را دانلود و در فضای آفلاین (USB یا رمزدار) نگهداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet2 =>
+      'از اشتراک‌گذاری کلید خصوصی با افراد غیرمسئول خودداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet3 =>
+      'در صورت مفقودی کلید خصوصی باید فرآیند تولید کلید را از ابتدا طی کنید.';
+
+  @override
+  String get taxGuideStep3Title => '۳) ثبت کلید عمومی در سامانه مودیان';
+
+  @override
+  String get taxGuideStep3Description =>
+      'برای دریافت شناسه یکتای حافظه باید Public Key را در کارپوشه مالیاتی ثبت کنید.';
+
+  @override
+  String get taxGuideStep3Bullet1 =>
+      'به my.tax.gov.ir وارد شوید و مسیر «ورود به پرونده > عضویت > شناسه یکتا حافظه مالیاتی» را دنبال کنید.';
+
+  @override
+  String get taxGuideStep3Bullet2 =>
+      'گزینه «توسط مودی» را انتخاب و فایل Public Key را بارگذاری کنید.';
+
+  @override
+  String get taxGuideStep3Bullet3 =>
+      'شناسه یکتای نمایش داده شده را ذخیره و در حسابیکس وارد کنید.';
+
+  @override
+  String get taxGuideStep4Title => '۴) تکمیل فرم اتصال در حسابیکس';
+
+  @override
+  String get taxGuideStep4Description =>
+      'شناسه حافظه، کد اقتصادی و کلید خصوصی باید در تب «اتصال و اطلاعات پایه» ثبت شوند.';
+
+  @override
+  String get taxGuideStep4Bullet1 =>
+      'شناسه یکتا و کد اقتصادی را بدون فاصله اضافی وارد کنید.';
+
+  @override
+  String get taxGuideStep4Bullet2 =>
+      'کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.';
+
+  @override
+  String get taxGuideStep4Bullet3 =>
+      'در صورت استفاده از محیط تست، گزینه حالت سندباکس را فعال کنید.';
+
+  @override
+  String get taxGuideStep5Title => '۵) دریافت گواهی میانی با CSR';
+
+  @override
+  String get taxGuideStep5Description =>
+      'برای اشخاص حقوقی لازم است CSR تولید شده را در مرکز صدور گواهی میانی ثبت کنید.';
+
+  @override
+  String get taxGuideStep5Bullet1 =>
+      'به سایت gica.ir مراجعه و گزینه «درخواست گواهی از طریق CSR» را انتخاب کنید.';
+
+  @override
+  String get taxGuideStep5Bullet2 =>
+      'فرم‌ها را با اطلاعات شرکت تکمیل و هزینه صدور را پرداخت کنید.';
+
+  @override
+  String get taxGuideStep5Bullet3 =>
+      'پس از مراجعه حضوری، فایل گواهی صادره را در حسابیکس بارگذاری کنید.';
+
+  @override
+  String get taxGuideStep6Title => '۶) ثبت کد کالا و خدمت';
+
+  @override
+  String get taxGuideStep6Description =>
+      'بدون درج کد و واحد مالیاتی برای کالا/خدمت ارسال صورتحساب رد می‌شود.';
+
+  @override
+  String get taxGuideStep6Bullet1 =>
+      'از مسیر «کالا و خدمات > ویرایش» کد ۱۳ رقمی را در بخش مالیات ثبت کنید.';
+
+  @override
+  String get taxGuideStep6Bullet2 =>
+      'در صورت نیاز از فایل کدهای عمومی stuffid.tax.gov.ir استفاده کنید یا کد اختصاصی بسازید.';
+
+  @override
+  String get taxGuideStep6Bullet3 =>
+      'برای خدمات خاص، کد مربوطه را از portal.gs1-ir.org دریافت کنید.';
+
+  @override
+  String get taxGuideStep7Title => '۷) کنترل کیفیت داده و ارسال امن';
+
+  @override
+  String get taxGuideStep7Description =>
+      'پس از تکمیل تنظیمات، گزارش کیفیت داده و کارپوشه مودیان را بررسی کنید.';
+
+  @override
+  String get taxGuideStep7Bullet1 =>
+      'در تب «کیفیت داده» موارد ناقص برای کالا، مشتری و فاکتور نشان داده می‌شود.';
+
+  @override
+  String get taxGuideStep7Bullet2 =>
+      'فاکتورها را ابتدا به کارپوشه مودیان اضافه و وضعیت خطاها را در همان صفحه پیگیری کنید.';
+
+  @override
+  String get taxGuideStep7Bullet3 =>
+      'ارسال تکی یا گروهی را فقط بعد از رفع خطاهای اعتبارسنجی انجام دهید.';
+
+  @override
+  String get taxGuideResourcesTitle => 'یادآوری مسیرها و منابع';
+
+  @override
+  String get taxGuideResourcesWorkspace =>
+      'کارپوشه مودیان: از منوی فروش > کارپوشه مالیاتی قابل دسترسی است.';
+
+  @override
+  String get taxGuideResourcesProducts =>
+      'کالا و خدمات: در همین منو می‌توانید کد مالیاتی و واحد را ویرایش یا از اکسل وارد کنید.';
+
+  @override
+  String get taxGuideResourcesSupport =>
+      'در صورت بروز خطای اتصال، لاگ کامل در ماژول «تنظیمات سامانه مودیان» و بخش تیکتینگ در دسترس است.';
+
+  @override
+  String get taxMemoryIdLabel => 'شناسه حافظه مالیاتی';
+
+  @override
+  String get taxEconomicCodeLabel => 'کد اقتصادی';
+
+  @override
+  String get taxSandboxModeLabel => 'حالت سندباکس';
+
+  @override
+  String get taxSandboxModeSubtitle =>
+      'با فعال بودن این گزینه، درخواست‌ها به محیط آزمایشی سامانه ارسال می‌شوند.';
+
+  @override
+  String get taxPrivateKeyLabel => 'کلید خصوصی (PEM)';
+
+  @override
+  String get taxPublicKeyLabel => 'کلید عمومی (اختیاری)';
+
+  @override
+  String get taxCertificateLabel => 'گواهی دیجیتال (اختیاری)';
+
+  @override
+  String get taxCertificateRequestLabel => 'درخواست گواهی (CSR)';
+
+  @override
+  String get taxGenerateKeys => 'تولید کلید جدید';
+
+  @override
+  String get taxMemoryIdRequired => 'شناسه حافظه مالیاتی الزامی است';
+
+  @override
+  String get taxEconomicCodeRequired => 'کد اقتصادی الزامی است';
+
+  @override
+  String get taxPrivateKeyRequired => 'کلید خصوصی الزامی است';
+
+  @override
+  String get taxKeysGenerated => 'کلید جدید تولید شد';
+
+  @override
+  String get taxSettingsSaved => 'تنظیمات سامانه مودیان ذخیره شد';
+
+  @override
+  String taxLastUpdated(String date) {
+    return 'آخرین بروزرسانی: $date';
+  }
+
+  @override
+  String get taxPersonTypeLabel => 'نوع مودی';
+
+  @override
+  String get taxPersonTypeNatural => 'شخص حقیقی';
+
+  @override
+  String get taxPersonTypeLegal => 'شخص حقوقی';
+
+  @override
+  String get taxNationalIdLabel => 'شناسه ملی مودی';
+
+  @override
+  String get taxLegalNameFaLabel => 'نام فارسی شرکت';
+
+  @override
+  String get taxLegalNameEnLabel => 'نام انگلیسی شرکت';
+
+  @override
+  String get taxLegalEmailLabel => 'ایمیل سازمانی';
+
+  @override
+  String get taxDataQualityTitle => 'کنترل کیفیت داده';
+
+  @override
+  String get taxDataQualitySubtitle =>
+      'اقلام فاقد اطلاعات مالیاتی را پیش از ارسال بررسی کنید.';
+
+  @override
+  String get taxDataQualityReload => 'به‌روزرسانی گزارش';
+
+  @override
+  String get taxDataQualityProductsHeader => 'کالا و خدمات';
+
+  @override
+  String get taxDataQualityPersonsHeader => 'اشخاص و مشتریان';
+
+  @override
+  String get taxDataQualityMissingTaxCode => 'کالاهای فاقد کد مالیاتی';
+
+  @override
+  String get taxDataQualityMissingTaxUnit => 'کالاهای فاقد واحد مالیاتی';
+
+  @override
+  String get taxDataQualityMissingNationalId => 'اشخاص فاقد کد ملی';
+
+  @override
+  String get taxDataQualityMissingEconomicId => 'اشخاص فاقد شناسه اقتصادی';
+
+  @override
+  String get taxDataQualitySamples => 'نمونه‌ها';
+
+  @override
+  String get taxDataQualityNoSamples => 'نمونه‌ای یافت نشد.';
+
+  @override
+  String get taxDataQualityNoIssues =>
+      'همه چیز آماده است! موردی برای تکمیل وجود ندارد.';
+
+  @override
+  String get taxDataQualityNoData => 'گزارشی برای نمایش وجود ندارد.';
+
+  @override
+  String taxDataQualityFetchError(String error) {
+    return 'خطا در دریافت گزارش: $error';
+  }
+
+  @override
+  String get taxDataQualityTaxCodeLabel => 'کد مالیاتی';
+
+  @override
+  String get taxDataQualityTaxUnitLabel => 'واحد مالیاتی';
+
+  @override
+  String get taxDataQualityNationalIdLabel => 'کد ملی';
+
+  @override
+  String get taxDataQualityEconomicIdLabel => 'شناسه اقتصادی';
+
+  @override
+  String get taxValidationIssuesTitle => 'مشکلات اعتبارسنجی مالیاتی';
+
+  @override
+  String get taxValidationIssuesDescription =>
+      'برای ارسال موفق به سامانه مودیان، ابتدا موارد زیر را برطرف کنید.';
+
+  @override
+  String get taxValidationIssuesEmpty => 'جزئیاتی برای نمایش وجود ندارد.';
+
+  @override
   String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';
 
   @override
@@ -4630,6 +5302,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String taxSendSelectedErrorWithMessage(String error) {
     return 'خطا در ارسال فاکتورهای انتخاب‌شده: $error';
   }
+
+  @override
+  String taxSendSelectedPartialTitle(int success, int failed) {
+    return '$success فاکتور ارسال شد و $failed فاکتور ناموفق بود';
+  }
+
+  @override
+  String taxBatchFailedRow(String id) {
+    return 'فاکتور $id';
+  }
+
+  @override
+  String get taxInquireSelectedTooltip => 'استعلام وضعیت فاکتورهای انتخاب‌شده';
+
+  @override
+  String taxInquireSelectedButton(int count) {
+    return 'استعلام وضعیت ($count)';
+  }
+
+  @override
+  String get taxInquireSelectedDialogTitle =>
+      'استعلام وضعیت فاکتورهای انتخاب‌شده';
+
+  @override
+  String taxInquireSelectedDialogMessage(int count) {
+    return 'وضعیت $count فاکتور انتخاب‌شده استعلام شود؟';
+  }
+
+  @override
+  String taxInquireSelectedErrorWithMessage(String error) {
+    return 'خطا در استعلام وضعیت: $error';
+  }
+
+  @override
+  String get taxInquiryResultTitle => 'نتیجه استعلام وضعیت';
+
+  @override
+  String get taxInquiryResultEmpty => 'نتیجه‌ای برای نمایش وجود ندارد.';
+
+  @override
+  String get taxInquiryStatusUnknown => 'وضعیت نامشخص';
 
   @override
   String get taxRemoveSelectedDialogTitle => 'حذف انتخاب‌شده‌ها از کارپوشه';
@@ -4865,4 +5578,1095 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'چاپ PDF';
+
+  @override
+  String get applicationName => 'نام برنامه';
+
+  @override
+  String get applicationVersion => 'نسخه برنامه';
+
+  @override
+  String get defaultLanguage => 'زبان پیش‌فرض';
+
+  @override
+  String get defaultTheme => 'تم پیش‌فرض';
+
+  @override
+  String get enableUserRegistration => 'فعال‌سازی ثبت‌نام کاربر';
+
+  @override
+  String get enableEmailVerification => 'فعال‌سازی تایید ایمیل';
+
+  @override
+  String get sessionTimeout => 'زمان انقضای نشست';
+
+  @override
+  String get sessionTimeoutMinutes => 'زمان انقضای نشست (دقیقه)';
+
+  @override
+  String get maxFileSize => 'حداکثر حجم فایل';
+
+  @override
+  String get maxFileSizeMB => 'حداکثر حجم فایل (مگابایت)';
+
+  @override
+  String get maxUsers => 'حداکثر تعداد کاربران';
+
+  @override
+  String get maintenanceMode => 'حالت تعمیرات';
+
+  @override
+  String get unlimited => 'نامحدود';
+
+  @override
+  String get errorLoadingSettings => 'خطا در بارگذاری تنظیمات';
+
+  @override
+  String get errorSavingSettings => 'خطا در ذخیره تنظیمات';
+
+  @override
+  String get settingsSavedSuccessfully => 'تنظیمات با موفقیت ذخیره شد';
+
+  @override
+  String get persian => 'فارسی';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get zeroMeansUnlimited => '0 = نامحدود';
+
+  @override
+  String get otpLogin => 'ورود با OTP';
+
+  @override
+  String get otpLoginTitle => 'ورود با کد یکبار مصرف';
+
+  @override
+  String get otpLoginSubtitle =>
+      'کد ورود به ایمیل، شماره موبایل یا تلگرام شما ارسال می‌شود';
+
+  @override
+  String get otpLoginIdentifierHint => 'ایمیل یا شماره موبایل خود را وارد کنید';
+
+  @override
+  String get otpLoginIdentifierRequired => 'ایمیل یا شماره موبایل الزامی است';
+
+  @override
+  String get otpCodeSent => 'کد ارسال شد';
+
+  @override
+  String get otpChannelSelectionTitle => 'روش دریافت کد:';
+
+  @override
+  String get otpChannelSms => 'پیامک';
+
+  @override
+  String get otpChannelEmail => 'ایمیل';
+
+  @override
+  String get otpChannelTelegram => 'تلگرام';
+
+  @override
+  String get otpSendCodeButton => 'ارسال کد ورود';
+
+  @override
+  String get otpChangeChannelTitle => 'تغییر روش دریافت:';
+
+  @override
+  String get otpChangeIdentifier => 'تغییر شناسه';
+
+  @override
+  String get otpSelectChannelError => 'لطفاً کانال ارسال را انتخاب کنید';
+
+  @override
+  String get otpCaptchaError => 'خطا در دریافت کپتچا';
+
+  @override
+  String otpCodeSentMessage(String channel) {
+    return 'کد ورود به $channel شما ارسال شد';
+  }
+
+  @override
+  String get otpCodeResentMessage => 'کد ورود مجدداً ارسال شد';
+
+  @override
+  String get otpSendError => 'خطا در ارسال کد ورود';
+
+  @override
+  String get otpEnterCaptchaError => 'لطفاً کد کپتچا را وارد کنید';
+
+  @override
+  String get workflows => 'اتوماسیون‌ها';
+
+  @override
+  String get workflow => 'اتوماسیون';
+
+  @override
+  String get newWorkflow => 'Workflow جدید';
+
+  @override
+  String get editWorkflow => 'ویرایش Workflow';
+
+  @override
+  String get workflowSaved => 'Workflow ذخیره شد';
+
+  @override
+  String get workflowDeleted => 'Node حذف شد';
+
+  @override
+  String get workflowDuplicated => 'Node کپی شد';
+
+  @override
+  String get workflowCopy => 'کپی';
+
+  @override
+  String get workflowUndo => 'بازگردانی';
+
+  @override
+  String get workflowSave => 'ذخیره';
+
+  @override
+  String get workflowCancel => 'انصراف';
+
+  @override
+  String get workflowClose => 'بستن';
+
+  @override
+  String get workflowValidationError => 'خطا در اعتبارسنجی';
+
+  @override
+  String get workflowErrorLoading => 'خطا در بارگذاری داده‌ها';
+
+  @override
+  String get workflowErrorSaving => 'خطا در ذخیره‌سازی';
+
+  @override
+  String get workflowStatusUpdated => 'وضعیت Workflow بروزرسانی شد';
+
+  @override
+  String get workflowExecuted => 'Workflow اجرا شد';
+
+  @override
+  String get workflowErrorExecuting => 'خطا در اجرای Workflow';
+
+  @override
+  String get workflowNoAccess => 'دسترسی به اتوماسیون‌ها برای شما فراهم نیست';
+
+  @override
+  String get workflowNoAccessEditor =>
+      'دسترسی به ویرایش اتوماسیون برای شما فراهم نیست';
+
+  @override
+  String get workflowNoWorkflows => 'هنوز workflow‌ای ایجاد نشده است.';
+
+  @override
+  String get workflowCreateFirst =>
+      'با دکمه پایین صفحه نخستین اتوماسیون را بسازید.';
+
+  @override
+  String get workflowCreate => 'افزودن Workflow';
+
+  @override
+  String get workflowRefresh => 'بازخوانی';
+
+  @override
+  String get workflowRunNow => 'اجرای فوری';
+
+  @override
+  String get workflowExecutionHistory => 'تاریخچه اجرا';
+
+  @override
+  String get workflowEdit => 'ویرایش';
+
+  @override
+  String get workflowLastUpdate => 'آخرین بروزرسانی';
+
+  @override
+  String get workflowAvailableTriggers => 'Trigger های در دسترس';
+
+  @override
+  String get workflowAvailableActions => 'Action های در دسترس';
+
+  @override
+  String get workflowFilters => 'فیلترها';
+
+  @override
+  String get workflowStatus => 'وضعیت';
+
+  @override
+  String get workflowSearch => 'جستجو';
+
+  @override
+  String get workflowAllStatuses => 'همه وضعیت‌ها';
+
+  @override
+  String get workflowOnlyActive => 'فقط فعال';
+
+  @override
+  String get workflowInactive => 'غیرفعال';
+
+  @override
+  String get workflowDraft => 'پیش‌نویس';
+
+  @override
+  String get workflowActive => 'فعال';
+
+  @override
+  String get workflowNodeDeleted => 'Node حذف شد';
+
+  @override
+  String get workflowNodeDuplicated => 'Node کپی شد';
+
+  @override
+  String get workflowNodeSettings => 'تنظیمات';
+
+  @override
+  String get workflowNodeNoSettings => 'این node نیاز به تنظیمات خاصی ندارد.';
+
+  @override
+  String get workflowNodeFieldRequired => 'این فیلد الزامی است';
+
+  @override
+  String get workflowNodeArrayType => 'Array (نیاز به UI پیچیده‌تر)';
+
+  @override
+  String get workflowNodeObjectType => 'Object (نیاز به UI پیچیده‌تر)';
+
+  @override
+  String get workflowExecutionLogs => 'لاگ اجرا';
+
+  @override
+  String get workflowNoLogs => 'لاگی یافت نشد';
+
+  @override
+  String get workflowNoExecutions => 'هنوز اجرایی وجود ندارد';
+
+  @override
+  String get workflowStarted => 'شروع';
+
+  @override
+  String get workflowCompleted => 'پایان';
+
+  @override
+  String get workflowLogs => 'لاگ';
+
+  @override
+  String get workflowErrorLoadingLogs => 'خطا در دریافت لاگ‌ها';
+
+  @override
+  String get workflowErrorUpdatingStatus => 'خطا در تغییر وضعیت';
+
+  @override
+  String get workflowHierarchicalLayoutApplied =>
+      'چیدمان Hierarchical اعمال شد';
+
+  @override
+  String get workflowForceDirectedLayoutApplied =>
+      'چیدمان Force-directed اعمال شد';
+
+  @override
+  String get settingsCategoriesCount => 'دسته‌بندی';
+
+  @override
+  String get settingsCount => 'تنظیمات';
+
+  @override
+  String get expandAllCategories => 'باز کردن همه';
+
+  @override
+  String get collapseAllCategories => 'بستن همه';
+
+  @override
+  String get noSettingsFound => 'هیچ تنظیماتی یافت نشد';
+
+  @override
+  String get searchResults => 'نتایج جستجو';
+
+  @override
+  String searchResultCount(int count) {
+    return '$count نتیجه';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'نتیجه‌ای برای \"$query\" یافت نشد';
+  }
+
+  @override
+  String get searchSettingsPlaceholder => 'جستجو در تنظیمات...';
+
+  @override
+  String get noSettingsInCategory => 'هیچ تنظیماتی در این دسته یافت نشد';
+
+  @override
+  String get settingsCategoryCoreConfiguration => 'پایه و پیکربندی';
+
+  @override
+  String get settingsCategoryCoreConfigurationDescription =>
+      'تنظیمات پایه و پیکربندی سیستم';
+
+  @override
+  String get settingsCategoryStorageFiles => 'ذخیره‌سازی و فایل‌ها';
+
+  @override
+  String get settingsCategoryStorageFilesDescription =>
+      'مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی';
+
+  @override
+  String get settingsCategoryFinancialPayment => 'مالی و پرداخت';
+
+  @override
+  String get settingsCategoryFinancialPaymentDescription =>
+      'تنظیمات کیف‌پول و درگاه‌های پرداخت';
+
+  @override
+  String get settingsCategoryUsersBusinesses => 'کاربران و کسب و کارها';
+
+  @override
+  String get settingsCategoryUsersBusinessesDescription =>
+      'مدیریت کاربران و کسب و کارها';
+
+  @override
+  String get settingsCategoryCommunications => 'ارتباطات';
+
+  @override
+  String get settingsCategoryCommunicationsDescription =>
+      'ایمیل، اعلان‌ها و اعلان‌های سیستمی';
+
+  @override
+  String get settingsCategoryAI => 'هوش مصنوعی';
+
+  @override
+  String get settingsCategoryAIDescription => 'تنظیمات، پلن‌ها و Prompt های AI';
+
+  @override
+  String get settingsCategoryExternalServices => 'سرویس‌های خارجی';
+
+  @override
+  String get settingsCategoryExternalServicesDescription =>
+      'ادغام‌های سرویس‌های خارجی';
+
+  @override
+  String get settingsCategoryMonitoringLogs => 'مانیتورینگ و لاگ‌ها';
+
+  @override
+  String get settingsCategoryMonitoringLogsDescription =>
+      'مانیتورینگ سیستم و ثبت لاگ';
+
+  @override
+  String get settingsShareLinks => 'لینک‌های اشتراک';
+
+  @override
+  String get settingsShareLinksDescription =>
+      'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی';
+
+  @override
+  String get settingsRedisCache => 'تنظیمات Redis Cache';
+
+  @override
+  String get settingsRedisCacheDescription =>
+      'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس';
+
+  @override
+  String get settingsStoragePlans => 'پلن‌های ذخیره‌سازی';
+
+  @override
+  String get settingsStoragePlansDescription =>
+      'مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها';
+
+  @override
+  String get settingsDocumentMonetization => 'تنظیمات پکیج‌ها';
+
+  @override
+  String get settingsDocumentMonetizationDescription =>
+      'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها';
+
+  @override
+  String get settingsMarketplacePlugins => 'مدیریت افزونه‌های بازار';
+
+  @override
+  String get settingsMarketplacePluginsDescription =>
+      'مدیریت افزونه‌ها و پلن‌های بازار افزونه‌ها';
+
+  @override
+  String get settingsWalletSettings => 'تنظیمات کیف‌پول';
+
+  @override
+  String get settingsWalletSettingsDescription => 'تعیین ارز پایه و سیاست‌ها';
+
+  @override
+  String get settingsPaymentGateways => 'درگاه‌های پرداخت';
+
+  @override
+  String get settingsPaymentGatewaysDescription => 'مدیریت و پیکربندی درگاه‌ها';
+
+  @override
+  String get settingsBusinessesManagement => 'مدیریت کسب و کارها';
+
+  @override
+  String get settingsBusinessesManagementDescription =>
+      'مشاهده و مدیریت لیست همه کسب و کارهای سیستم';
+
+  @override
+  String get settingsAnnouncements => 'مدیریت اعلان‌ها';
+
+  @override
+  String get settingsAnnouncementsDescription =>
+      'ایجاد/ویرایش/انتشار اعلان‌های سیستمی';
+
+  @override
+  String get settingsNotifications => 'تنظیمات نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationsDescription =>
+      'فعال/غیرفعال‌سازی کانال‌ها و ارسال تست';
+
+  @override
+  String get settingsNotificationTemplates => 'قالب‌های نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationTemplatesDescription =>
+      'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها';
+
+  @override
+  String get settingsAISettings => 'تنظیمات AI';
+
+  @override
+  String get settingsAISettingsDescription =>
+      'پیکربندی Provider، مدل و API Key';
+
+  @override
+  String get settingsAIPlans => 'پلن‌های AI';
+
+  @override
+  String get settingsAIPlansDescription =>
+      'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها';
+
+  @override
+  String get settingsAIPrompts => 'Prompt های AI';
+
+  @override
+  String get settingsAIPromptsDescription =>
+      'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف';
+
+  @override
+  String get settingsZohalServices => 'سرویس‌های زحل';
+
+  @override
+  String get settingsZohalServicesDescription =>
+      'مدیریت سرویس‌های استعلامات زحل و تنظیمات API';
+
+  @override
+  String get settingsZohalSettings => 'تنظیمات زحل';
+
+  @override
+  String get settingsZohalSettingsDescription =>
+      'تنظیم API Key و پیکربندی سرویس زحل';
+
+  @override
+  String get settingsTaxProductCodes => 'کدهای مالیاتی کالا';
+
+  @override
+  String get settingsTaxProductCodesDescription =>
+      'جستجو و ایمپورت لیست جدید از فایل XML';
+
+  @override
+  String get settingsSystemMonitoring => 'مانیتورینگ سیستم';
+
+  @override
+  String get settingsSystemMonitoringDescription =>
+      'بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها';
+
+  @override
+  String get settingsServiceLogs => 'لاگ‌های سرویس‌ها';
+
+  @override
+  String get settingsServiceLogsDescription =>
+      'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها';
+
+  @override
+  String get warranty => 'گارانتی';
+
+  @override
+  String get warrantyManagement => 'مدیریت گارانتی';
+
+  @override
+  String get warrantySettings => 'تنظیمات گارانتی';
+
+  @override
+  String get warrantyCodes => 'کدهای گارانتی';
+
+  @override
+  String get warrantyCode => 'کد گارانتی';
+
+  @override
+  String get warrantySerial => 'سریال گارانتی';
+
+  @override
+  String get generateWarrantyCodes => 'تولید کدهای گارانتی';
+
+  @override
+  String get warrantyActivation => 'فعال‌سازی گارانتی';
+
+  @override
+  String get warrantyTracking => 'رهگیری گارانتی';
+
+  @override
+  String get warrantyStatus => 'وضعیت گارانتی';
+
+  @override
+  String get warrantyGenerated => 'تولید شده';
+
+  @override
+  String get warrantyActivated => 'فعال شده';
+
+  @override
+  String get warrantyExpired => 'این گارانتی منقضی شده است';
+
+  @override
+  String get warrantyUsed => 'استفاده شده';
+
+  @override
+  String get warrantyRevoked => 'این گارانتی لغو شده است';
+
+  @override
+  String get warrantyDuration => 'مدت گارانتی';
+
+  @override
+  String get warrantyDurationDays => 'مدت گارانتی (روز)';
+
+  @override
+  String get warrantyExpiresAt => 'تاریخ انقضا';
+
+  @override
+  String get warrantyGeneratedAt => 'تاریخ تولید';
+
+  @override
+  String get warrantyActivatedAt => 'تاریخ فعال‌سازی';
+
+  @override
+  String get warrantyProduct => 'کالای گارانتی';
+
+  @override
+  String get warrantyCustomer => 'مشتری';
+
+  @override
+  String get warrantyCustomerName => 'نام مشتری';
+
+  @override
+  String get warrantyCustomerPhone => 'شماره تماس مشتری';
+
+  @override
+  String get warrantyCustomerEmail => 'ایمیل مشتری';
+
+  @override
+  String get warrantyProductSerial => 'سریال کالا';
+
+  @override
+  String get activateWarranty => 'فعال‌سازی گارانتی';
+
+  @override
+  String get trackWarranty => 'رهگیری گارانتی';
+
+  @override
+  String get warrantyTrackingLink => 'لینک رهگیری گارانتی';
+
+  @override
+  String get warrantyCodeFormat => 'فرمت کد';
+
+  @override
+  String get warrantyCodePrefix => 'پیشوند کد';
+
+  @override
+  String get warrantySerialFormat => 'فرمت سریال';
+
+  @override
+  String get warrantySerialLength => 'طول سریال';
+
+  @override
+  String get warrantyRandom => 'رندوم';
+
+  @override
+  String get warrantySequential => 'ترتیبی';
+
+  @override
+  String get warrantyCustom => 'دلخواه';
+
+  @override
+  String get warrantySecuritySettings => 'تنظیمات امنیتی';
+
+  @override
+  String get warrantyRequireSerialVerification => 'نیاز به تأیید سریال کالا';
+
+  @override
+  String get warrantyRequireProductInstanceMatch =>
+      'نیاز به تطابق با instance کالا';
+
+  @override
+  String get warrantyMaxActivationAttempts => 'حداکثر تلاش برای فعال‌سازی';
+
+  @override
+  String get warrantyActivationLockoutDuration => 'مدت قفل شدن (دقیقه)';
+
+  @override
+  String get warrantyAutoLinkToPerson => 'اتصال خودکار به Person';
+
+  @override
+  String get warrantyEnableTrackingLink => 'فعال‌سازی لینک رهگیری';
+
+  @override
+  String get warrantyTrackingLinkExpiresDays => 'مدت اعتبار لینک رهگیری (روز)';
+
+  @override
+  String get warrantyEnableSmsNotification => 'ارسال SMS هنگام فعال‌سازی';
+
+  @override
+  String get warrantyEnableEmailNotification => 'ارسال ایمیل هنگام فعال‌سازی';
+
+  @override
+  String get warrantyCodeNotFound => 'کد گارانتی یافت نشد';
+
+  @override
+  String get warrantyInvalidSerial => 'سریال گارانتی معتبر نیست';
+
+  @override
+  String get warrantyAlreadyActivated => 'این گارانتی قبلاً فعال شده است';
+
+  @override
+  String get warrantyActivationSuccess => 'گارانتی با موفقیت فعال شد';
+
+  @override
+  String get warrantyActivationFailed => 'فعال‌سازی گارانتی ناموفق بود';
+
+  @override
+  String get warrantyTooManyAttempts => 'تعداد تلاش‌های شما بیش از حد مجاز است';
+
+  @override
+  String get warrantyProductSerialRequired => 'وارد کردن سریال کالا الزامی است';
+
+  @override
+  String get warrantyProductSerialNotFound => 'سریال کالا یافت نشد';
+
+  @override
+  String get warrantyLinkNotFound => 'لینک رهگیری یافت نشد';
+
+  @override
+  String get warrantyLinkExpired => 'لینک رهگیری منقضی شده است';
+
+  @override
+  String get warrantyLinkInactive => 'لینک رهگیری غیرفعال است';
+
+  @override
+  String get warrantyPluginNotActive =>
+      'پلاگین گارانتی برای این کسب و کار فعال نیست';
+
+  @override
+  String get warrantyGenerateCodes => 'تولید کدهای گارانتی';
+
+  @override
+  String get warrantyQuantity => 'تعداد';
+
+  @override
+  String get warrantyCustomSerials => 'سریال‌های دلخواه';
+
+  @override
+  String get warrantyCustomCodes => 'کدهای دلخواه';
+
+  @override
+  String get warrantyListCodes => 'لیست کدهای گارانتی';
+
+  @override
+  String get warrantyFilterByStatus => 'فیلتر بر اساس وضعیت';
+
+  @override
+  String get warrantyFilterByProduct => 'فیلتر بر اساس کالا';
+
+  @override
+  String get warrantyEvents => 'رویدادهای گارانتی';
+
+  @override
+  String get warrantyEventActivation => 'فعال‌سازی';
+
+  @override
+  String get warrantyEventRepairRequest => 'درخواست تعمیر';
+
+  @override
+  String get warrantyEventRepairCompleted => 'تعمیر انجام شد';
+
+  @override
+  String get warrantyEventReplacement => 'تعویض';
+
+  @override
+  String get warrantyEventExpired => 'منقضی شد';
+
+  @override
+  String get warrantyEventRevoked => 'لغو شد';
+
+  @override
+  String get warrantyManage => 'مدیریت گارانتی';
+
+  @override
+  String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
+
+  @override
+  String get identityInquirySubtitle =>
+      'لطفاً کد ملی و تاریخ تولد را وارد کنید';
+
+  @override
+  String get nationalIdHint => 'کد ملی 10 رقمی';
+
+  @override
+  String get nationalIdRequired => 'کد ملی الزامی است';
+
+  @override
+  String get nationalIdInvalidLength => 'کد ملی باید 10 رقم باشد';
+
+  @override
+  String get nationalIdInvalid => 'کد ملی نامعتبر است';
+
+  @override
+  String get birthDate => 'تاریخ تولد';
+
+  @override
+  String get birthDateHint => 'تاریخ شمسی (YYYY-MM-DD یا YYYY/MM/DD)';
+
+  @override
+  String get birthDateRequired => 'تاریخ تولد الزامی است';
+
+  @override
+  String get birthDateInvalid => 'فرمت تاریخ نامعتبر است';
+
+  @override
+  String get selectBirthDate => 'انتخاب تاریخ';
+
+  @override
+  String get inquire => 'استعلام';
+
+  @override
+  String get inquiring => 'در حال استعلام...';
+
+  @override
+  String get inquiryError => 'خطا در استعلام';
+
+  @override
+  String get inquiryErrorPrefix => 'خطا در استعلام:';
+
+  @override
+  String get unknownError => 'خطای نامشخص';
+
+  @override
+  String get noMatch => 'عدم تطابق';
+
+  @override
+  String get noMatchDescription =>
+      'کد ملی و تاریخ تولد با یکدیگر مطابقت ندارند';
+
+  @override
+  String get personalInformation => 'اطلاعات شخصی';
+
+  @override
+  String get fatherName => 'نام پدر';
+
+  @override
+  String get alive => 'زنده';
+
+  @override
+  String get deceased => 'فوت شده';
+
+  @override
+  String get newInquiry => 'استعلام جدید';
+
+  @override
+  String get identityInquiryDescription =>
+      'با وارد کردن کد ملی و تاریخ تولد می‌توانید اطلاعات هویتی فرد را استعلام کنید';
+
+  @override
+  String get noResultAvailable => 'خطا: نتیجه‌ای وجود ندارد';
+
+  @override
+  String get accountSettingsTitle => 'تنظیمات حساب کاربری';
+
+  @override
+  String get accountSettingsSubtitle =>
+      'مدیریت و تنظیم تمام بخش‌های حساب کاربری شما';
+
+  @override
+  String get accountSettingsMarketingDescription =>
+      'مدیریت لینک معرفی و گزارش‌های بازاریابی';
+
+  @override
+  String get accountSettingsNotificationsTitle => 'اعلان‌ها و نوتیفیکیشن';
+
+  @override
+  String get accountSettingsNotificationsDescription =>
+      'تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن';
+
+  @override
+  String get accountSettingsSignatureTitle => 'امضا و تصویر کاربر';
+
+  @override
+  String get accountSettingsSignatureDescription =>
+      'بارگذاری و مدیریت امضای شخصی و تصویر پروفایل';
+
+  @override
+  String get accountSettingsApiKeysTitle => 'کلیدهای API';
+
+  @override
+  String get accountSettingsApiKeysDescription =>
+      'مدیریت کلیدهای API برای دسترسی به سیستم';
+
+  @override
+  String get accountSettingsLoginSessionsTitle => 'سشن‌های ورود';
+
+  @override
+  String get accountSettingsLoginSessionsDescription =>
+      'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری';
+
+  @override
+  String get accountSettingsChangePasswordDescription =>
+      'تغییر کلمه عبور حساب کاربری';
+
+  @override
+  String get accountSettingsVerificationTitle => 'تایید شماره موبایل و ایمیل';
+
+  @override
+  String get accountSettingsVerificationDescription =>
+      'تایید شماره موبایل و ایمیل برای امنیت بیشتر';
+
+  @override
+  String get accountSettingsNotificationHistoryTitle => 'تاریخچه ناتیفیکیشن‌ها';
+
+  @override
+  String get accountSettingsNotificationHistoryDescription =>
+      'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
+
+  @override
+  String get apiKeysPageTitle => 'مدیریت کلیدهای API';
+
+  @override
+  String get apiKeyErrorLoadingKeys => 'خطا در بارگذاری کلیدها';
+
+  @override
+  String get apiKeyErrorCreatingKey => 'خطا در ایجاد کلید';
+
+  @override
+  String get apiKeyCreatedSuccessfully => 'کلید API ایجاد شد';
+
+  @override
+  String get apiKeySaveWarning =>
+      'لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.';
+
+  @override
+  String get apiKeyClose => 'بستن';
+
+  @override
+  String get apiKeyCopy => 'کپی';
+
+  @override
+  String get apiKeyCopied => 'کلید کپی شد';
+
+  @override
+  String get apiKeyUpdatedSuccessfully => 'کلید با موفقیت به‌روزرسانی شد';
+
+  @override
+  String get apiKeyErrorUpdating => 'خطا در به‌روزرسانی کلید';
+
+  @override
+  String get apiKeyDeleteTitle => 'حذف کلید API';
+
+  @override
+  String apiKeyDeleteConfirmation(String name) {
+    return 'آیا از حذف کلید \"$name\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.';
+  }
+
+  @override
+  String get apiKeyDeletedSuccessfully => 'کلید با موفقیت حذف شد';
+
+  @override
+  String get apiKeyErrorDeleting => 'خطا در حذف کلید';
+
+  @override
+  String get apiKeyFilterActive => 'فعال';
+
+  @override
+  String get apiKeyFilterRevoked => 'لغو شده';
+
+  @override
+  String get apiKeyFilterAll => 'همه';
+
+  @override
+  String get apiKeyNoActiveKeys => 'هیچ کلید فعالی وجود ندارد';
+
+  @override
+  String get apiKeyNoRevokedKeys => 'هیچ کلید لغو شده‌ای وجود ندارد';
+
+  @override
+  String get apiKeyNoKeysCreated => 'هیچ کلید API ایجاد نشده است';
+
+  @override
+  String get apiKeyCreateNewButton => 'ایجاد کلید جدید';
+
+  @override
+  String get apiKeyCreateHint =>
+      'برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید';
+
+  @override
+  String get apiKeyNoRevokedHint => 'هیچ کلید لغو شده‌ای برای نمایش وجود ندارد';
+
+  @override
+  String get apiKeyUsageHint =>
+      'برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید';
+
+  @override
+  String get apiKeyEdit => 'ویرایش';
+
+  @override
+  String get apiKeyDelete => 'حذف';
+
+  @override
+  String get apiKeyCreatedAt => 'ایجاد شده';
+
+  @override
+  String get apiKeyLastUsed => 'آخرین استفاده';
+
+  @override
+  String get apiKeyExpiresAt => 'انقضا';
+
+  @override
+  String get apiKeyRevokedAt => 'لغو شده';
+
+  @override
+  String get apiKeyAllowedIPs => 'IP های مجاز';
+
+  @override
+  String get apiKeyCreateNewTitle => 'ایجاد کلید API جدید';
+
+  @override
+  String get apiKeyNameLabel => 'نام کلید';
+
+  @override
+  String get apiKeyNameHint => 'مثال: Production API Key';
+
+  @override
+  String get apiKeyScopeLabel => 'محدوده دسترسی (JSON)';
+
+  @override
+  String get apiKeyScopeHint =>
+      'اختیاری - مثال: {\"read\": true, \"write\": false}';
+
+  @override
+  String get apiKeyIPsLabel => 'لیست IP های مجاز';
+
+  @override
+  String get apiKeyIPsHint => 'جدا شده با کاما - مثال: 192.168.1.1, 10.0.0.1';
+
+  @override
+  String get apiKeyExpiryLabel => 'تاریخ و زمان انقضا (اختیاری)';
+
+  @override
+  String get apiKeyExpiryHint => 'انتخاب کنید';
+
+  @override
+  String get apiKeyNoExpiry => 'بدون انقضا';
+
+  @override
+  String get apiKeyEditTitle => 'ویرایش کلید API';
+
+  @override
+  String get apiKeyWithoutName => 'بدون نام';
+
+  @override
+  String get datePickerSelectDate => 'انتخاب تاریخ';
+
+  @override
+  String get timePickerSelectTime => 'انتخاب زمان';
+
+  @override
+  String get dateTimeLabel => 'تاریخ و زمان';
+
+  @override
+  String get dateLabel => 'تاریخ';
+
+  @override
+  String get timeLabel => 'زمان';
+
+  @override
+  String get clearButton => 'پاک کردن';
+
+  @override
+  String get sessionsPageTitle => 'مدیریت سشن‌های ورود';
+
+  @override
+  String get sessionsErrorLoading => 'خطا در بارگذاری سشن‌ها';
+
+  @override
+  String get sessionsCannotDeleteCurrent =>
+      'نمی‌توانید session فعلی را حذف کنید';
+
+  @override
+  String get sessionsDeleteTitle => 'حذف سشن';
+
+  @override
+  String sessionsDeleteConfirmation(String device) {
+    return 'آیا از حذف session \"$device\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.';
+  }
+
+  @override
+  String get sessionsDeletedSuccessfully => 'Session با موفقیت حذف شد';
+
+  @override
+  String get sessionsErrorDeleting => 'خطا در حذف session';
+
+  @override
+  String get sessionsNoOtherSessions => 'هیچ session دیگری وجود ندارد';
+
+  @override
+  String get sessionsRevokeAllTitle => 'خروج از همه دستگاه‌ها';
+
+  @override
+  String sessionsRevokeAllConfirmation(int count) {
+    return 'آیا از حذف $count session دیگر اطمینان دارید؟\nاین عمل باعث خروج از تمام دستگاه‌های دیگر می‌شود.\nSession فعلی شما حفظ خواهد شد.';
+  }
+
+  @override
+  String get sessionsDeleteAll => 'حذف همه';
+
+  @override
+  String sessionsDeleted(int count) {
+    return '$count session حذف شد';
+  }
+
+  @override
+  String get sessionsNoActive => 'هیچ session فعالی وجود ندارد';
+
+  @override
+  String get sessionsThisDevice => 'این دستگاه';
+
+  @override
+  String get sessionsLastUsed => 'آخرین استفاده';
+
+  @override
+  String get sessionsCreatedAt => 'ایجاد شده';
+
+  @override
+  String get sessionsToday => 'امروز';
+
+  @override
+  String get sessionsYesterday => 'دیروز';
+
+  @override
+  String sessionsDaysAgo(int days) {
+    return '$days روز پیش';
+  }
+
+  @override
+  String sessionsWeeksAgo(int weeks) {
+    return '$weeks هفته پیش';
+  }
+
+  @override
+  String sessionsMonthsAgo(int months) {
+    return '$months ماه پیش';
+  }
 }

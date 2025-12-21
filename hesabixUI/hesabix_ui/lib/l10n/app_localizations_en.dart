@@ -95,6 +95,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captchaRequired => 'Captcha is required.';
 
   @override
+  String get acceptTermsPrefix => 'I accept ';
+
+  @override
+  String get acceptTermsSuffix => '';
+
+  @override
+  String get privacyPolicy => 'Privacy Policy';
+
+  @override
+  String get termsOfService => 'Terms of Service';
+
+  @override
+  String get and => 'and';
+
+  @override
+  String get acceptTermsRequired =>
+      'You must accept the Privacy Policy and Terms of Service to register.';
+
+  @override
   String get sendReset => 'Send reset code';
 
   @override
@@ -248,10 +267,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String get error => 'Error';
 
   @override
+  String get bulkDefaultWarehouseTitle => 'Bulk default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseAction => 'Change default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseNewWarehouseLabel => 'New warehouse';
+
+  @override
+  String get bulkDefaultWarehouseClearOption =>
+      'Clear default warehouse (empty)';
+
+  @override
+  String get bulkDefaultWarehouseScopeLabel => 'Apply scope (Policy):';
+
+  @override
+  String get bulkDefaultWarehouseScopeAll => 'All selected';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue =>
+      'Only inventory-tracked items (track_inventory=true)';
+
+  @override
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse =>
+      'Only non-inventory items (track_inventory=false)';
+
+  @override
+  String get bulkDefaultWarehouseConfirmTitle => 'Apply changes';
+
+  @override
+  String get bulkDefaultWarehouseConfirmMessage =>
+      'Are you sure you want to apply this default warehouse change to the selected items?';
+
+  @override
+  String bulkDefaultWarehouseApplySuccess(String count) {
+    return 'Done. Updated: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseSelectedCount(int count) {
+    return 'Selected items: $count';
+  }
+
+  @override
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  ) {
+    return 'Requested: $total | Found: $found | Will update: $willUpdate';
+  }
+
+  @override
+  String bulkDefaultWarehouseSkippedCount(int count) {
+    return 'Skipped: $count';
+  }
+
+  @override
+  String get bulkDefaultWarehouseNotesLabel => 'Notes:';
+
+  @override
+  String bulkDefaultWarehouseForcedServiceNull(int count) {
+    return 'Service items forced to null default warehouse: $count';
+  }
+
+  @override
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  ) {
+    return 'Requested: $total | Found: $found | Updated: $updated | Skipped: $skipped';
+  }
+
+  @override
+  String get bulkDefaultWarehouseReasonAlreadySet => 'Already set';
+
+  @override
+  String get bulkDefaultWarehouseReasonScopeMismatch => 'Out of selected scope';
+
+  @override
+  String get bulkDefaultWarehouseReasonNotFound => 'Not found';
+
+  @override
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull =>
+      'Service item must have no default warehouse';
+
+  @override
+  String get bulkDefaultWarehouseReasonUnknown => 'Unknown';
+
+  @override
   String get newBusiness => 'New business';
 
   @override
   String get businesses => 'Businesses';
+
+  @override
+  String get deleteBusiness => 'Delete Business';
 
   @override
   String get support => 'Support';
@@ -2555,6 +2669,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personTypeSeller => 'Seller';
 
   @override
+  String get personTypeShareholder => 'Shareholder';
+
+  @override
   String get personCreatedSuccessfully => 'Person created successfully';
 
   @override
@@ -3037,6 +3154,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxUnitId => 'Tax unit id';
 
   @override
+  String get vatColumn => 'VAT';
+
+  @override
+  String taxVatPercent(Object value) {
+    return '$value%';
+  }
+
+  @override
+  String get taxVatUnknown => 'Not specified';
+
+  @override
   String get bulkPriceUpdateTitle => 'Bulk price update';
 
   @override
@@ -3408,6 +3536,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get deleteInvoiceTaxWorkspaceError =>
+      'This invoice is in the tax workspace and cannot be deleted';
+
+  @override
+  String get deleteInvoiceReceiptPaymentsWarning =>
+      'Related receipt/payment documents:';
+
+  @override
+  String get deleteInvoiceWarehouseWarning =>
+      'Related finalized warehouse documents:';
+
+  @override
+  String deleteInvoiceInstallmentsWarning(String count) {
+    return 'This invoice has $count installments that will be deleted';
+  }
+
+  @override
   String get saveInvoice => 'Save invoice';
 
   @override
@@ -3732,6 +3877,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Per-item movement details (FIFO/LIFO/average)';
 
   @override
+  String get reportsInventoryStockTitle => 'Inventory stock report';
+
+  @override
+  String get reportsInventoryStockSubtitle =>
+      'Product inventory by warehouse and date';
+
+  @override
   String get reportsSalesByProductTitle => 'Sales by product';
 
   @override
@@ -3851,6 +4003,145 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsComingSoonMessage => 'This report will be available soon.';
+
+  @override
+  String get reportsSearchHint => 'Search reports…';
+
+  @override
+  String reportsSearchResults(Object count) {
+    return 'Results ($count)';
+  }
+
+  @override
+  String get reportsSearchNoResults => 'No reports matched your search.';
+
+  @override
+  String get reportsFavoritesTitle => 'Favorites';
+
+  @override
+  String get reportsFavoritesEmptyMessage =>
+      'For quick access, tap the star next to a report.';
+
+  @override
+  String get reportsRecentTitle => 'Recently used';
+
+  @override
+  String get reportsRecentEmptyMessage => 'Reports you open will show up here.';
+
+  @override
+  String get reportsWarehouseSection => 'Warehouse reports';
+
+  @override
+  String get reportsSystemSection => 'System reports';
+
+  @override
+  String get reportsActivityLogsTitle => 'User activity logs';
+
+  @override
+  String get reportsActivityLogsSubtitle =>
+      'View the history of user activity in the system';
+
+  @override
+  String reportsSectionCount(Object count) {
+    return '$count reports';
+  }
+
+  @override
+  String get reportsAddToFavorites => 'Add to favorites';
+
+  @override
+  String get reportsRemoveFromFavorites => 'Remove from favorites';
+
+  @override
+  String get reportsInstallmentsSubtitle =>
+      'Installment status, due dates, and remaining balance';
+
+  @override
+  String get reportsStockCountTitle => 'Stock count report';
+
+  @override
+  String get reportsStockCountSubtitle =>
+      'Stock count history and adjustment documents';
+
+  @override
+  String get reportsWarehouseDocumentsSummaryTitle =>
+      'Warehouse documents summary';
+
+  @override
+  String get reportsWarehouseDocumentsSummarySubtitle =>
+      'Summary by document type with inbound/outbound stats';
+
+  @override
+  String get reportsSlowMovingItemsTitle => 'Slow-moving items';
+
+  @override
+  String get reportsSlowMovingItemsSubtitle =>
+      'Items with no movement during the selected time range';
+
+  @override
+  String get reportsCriticalStockTitle => 'Critical stock items';
+
+  @override
+  String get reportsCriticalStockSubtitle =>
+      'Items with stock below the defined threshold';
+
+  @override
+  String get reportsInterWarehouseTransfersTitle => 'Inter-warehouse transfers';
+
+  @override
+  String get reportsInterWarehouseTransfersSubtitle =>
+      'Details of transfers between warehouses';
+
+  @override
+  String get reportsAdjustmentDocumentsTitle => 'Adjustment documents';
+
+  @override
+  String get reportsAdjustmentDocumentsSubtitle =>
+      'Analysis of adjustment documents and inventory differences';
+
+  @override
+  String get reportsWarehousePerformanceTitle => 'Warehouse performance';
+
+  @override
+  String get reportsWarehousePerformanceSubtitle =>
+      'Compare warehouse performance';
+
+  @override
+  String get reportsProductMovementHistoryTitle => 'Product movement history';
+
+  @override
+  String get reportsProductMovementHistorySubtitle =>
+      'Full movement history of a product across all warehouses';
+
+  @override
+  String get reportsInventoryValuationTitle => 'Inventory valuation';
+
+  @override
+  String get reportsInventoryValuationSubtitle =>
+      'Monetary valuation of warehouse inventories';
+
+  @override
+  String get reportsPendingDocumentsTitle => 'Pending documents';
+
+  @override
+  String get reportsPendingDocumentsSubtitle =>
+      'Draft or pending-approval documents';
+
+  @override
+  String get reportsInventoryTurnoverTitle => 'Inventory turnover';
+
+  @override
+  String get reportsInventoryTurnoverSubtitle =>
+      'Inventory turnover rate for products';
+
+  @override
+  String get reportsSortTooltip => 'Sort';
+
+  @override
+  String get reportsSortDefault => 'Default';
+
+  @override
+  String get reportsSortAlphabetical => 'Alphabetical';
 
   @override
   String get operationSuccessful => 'Operation successful';
@@ -3983,6 +4274,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationsFieldSmsSenderHint =>
       'Exactly as registered in your vendor panel.';
+
+  @override
+  String get notificationsProxySectionTitle => 'Telegram proxy';
+
+  @override
+  String get notificationsProxySectionSubtitle =>
+      'When servers are hosted inside Iran, enable the proxy to route Telegram traffic through an external relay.';
+
+  @override
+  String get notificationsProxyEnableLabel => 'Enable Telegram proxy';
+
+  @override
+  String get notificationsFieldTelegramProxyBaseUrl => 'Proxy base URL';
+
+  @override
+  String get notificationsFieldTelegramProxyApiKey => 'Proxy access key';
 
   @override
   String get notificationsAdvancedRestartHint =>
@@ -4296,6 +4603,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletPayoutRequested => 'Payout request submitted';
 
   @override
+  String get settingsWalletPayoutsAdmin => 'Wallet payout management';
+
+  @override
+  String get settingsWalletPayoutsAdminDescription =>
+      'Review wallet payout requests and record bank settlement details';
+
+  @override
+  String get walletPayoutsAdminTitle => 'Wallet payout requests';
+
+  @override
+  String get walletPayoutsAdminSubtitle =>
+      'Monitor pending payout requests, review bank account details, and register settlement information after transfers are completed.';
+
+  @override
+  String get walletPayoutsAdminEmpty => 'No payout requests to show.';
+
+  @override
+  String get walletPayoutsAdminSettleDialogTitle =>
+      'Record settlement information';
+
+  @override
+  String get walletPayoutsAdminSettleAction => 'Record & settle';
+
+  @override
+  String get walletPayoutsAdminSuccess =>
+      'Settlement information saved successfully.';
+
+  @override
+  String get walletPayoutsAdminFormRequired => 'This field is required';
+
+  @override
+  String get walletPayoutsAdminSettlementDate => 'Settlement date';
+
+  @override
+  String get walletPayoutsAdminFeeHint =>
+      'If the bank charged a fee, enter the amount here';
+
+  @override
+  String get bankTrackingCode => 'Bank tracking code';
+
+  @override
   String get walletTopUpTitle => 'Top up';
 
   @override
@@ -4511,6 +4859,334 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review invoices before sending them to the tax system.';
 
   @override
+  String get taxIntegrationTitle => 'Tax system integration';
+
+  @override
+  String get taxIntegrationSubtitle =>
+      'Manage credentials and keys required to connect to the national tax platform.';
+
+  @override
+  String get taxSettingsTabConnection => 'Connection & basics';
+
+  @override
+  String get taxSettingsTabKeys => 'Keys & certificates';
+
+  @override
+  String get taxSettingsTabDataQuality => 'Data quality';
+
+  @override
+  String get taxSettingsTabGuide => 'Guide';
+
+  @override
+  String get taxGuideIntroTitle => 'How to complete the Tax System setup?';
+
+  @override
+  String get taxGuideIntroDescription =>
+      'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.';
+
+  @override
+  String get taxGuidePrereqTitle => 'Prerequisites before you begin';
+
+  @override
+  String get taxGuidePrereqItem1 =>
+      'Access to the “Tax System” menu as a business admin';
+
+  @override
+  String get taxGuidePrereqItem2 =>
+      'Accurate registration data (national ID, economic code, corporate email)';
+
+  @override
+  String get taxGuidePrereqItem3 =>
+      'Active access to your taxpayer workspace on my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep1Title => '1) Generate keys inside Hesabix';
+
+  @override
+  String get taxGuideStep1Description =>
+      'Use the “Generate new keys” card to create the private/public key pair and CSR.';
+
+  @override
+  String get taxGuideStep1Bullet1 =>
+      'Open the Keys & Certificates tab and tap the generate button.';
+
+  @override
+  String get taxGuideStep1Bullet2 =>
+      'Provide the exact taxpayer type and national ID.';
+
+  @override
+  String get taxGuideStep1Bullet3 =>
+      'Persian/English names and email must match the tax records.';
+
+  @override
+  String get taxGuideStep2Title => '2) Download and store securely';
+
+  @override
+  String get taxGuideStep2Description =>
+      'Keys are shown only once; store them safely.';
+
+  @override
+  String get taxGuideStep2Bullet1 =>
+      'Download the key files and keep them in offline, encrypted storage.';
+
+  @override
+  String get taxGuideStep2Bullet2 =>
+      'Never share the private key outside the tax integration team.';
+
+  @override
+  String get taxGuideStep2Bullet3 =>
+      'If the private key is lost you must regenerate the entire pair.';
+
+  @override
+  String get taxGuideStep3Title =>
+      '3) Register the public key on my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep3Description =>
+      'You must upload the Public Key to obtain the tax memory ID.';
+
+  @override
+  String get taxGuideStep3Bullet1 =>
+      'Log into my.tax.gov.ir and navigate to Case Access > Enrollment > Tax Memory ID.';
+
+  @override
+  String get taxGuideStep3Bullet2 =>
+      'Select “By taxpayer” and upload the generated Public Key file.';
+
+  @override
+  String get taxGuideStep3Bullet3 =>
+      'Copy the issued memory ID and paste it back into Hesabix.';
+
+  @override
+  String get taxGuideStep4Title => '4) Complete the connection form in Hesabix';
+
+  @override
+  String get taxGuideStep4Description =>
+      'Tax memory ID, economic code and private key are mandatory under the Connection tab.';
+
+  @override
+  String get taxGuideStep4Bullet1 =>
+      'Enter the ID and economic code without extra spaces.';
+
+  @override
+  String get taxGuideStep4Bullet2 =>
+      'Paste the PEM private key and optionally store the Public Key and CSR.';
+
+  @override
+  String get taxGuideStep4Bullet3 =>
+      'Enable sandbox mode only for staging/testing environments.';
+
+  @override
+  String get taxGuideStep5Title =>
+      '5) Request the intermediate certificate via CSR';
+
+  @override
+  String get taxGuideStep5Description =>
+      'Legal entities must submit the CSR to the national certificate authority.';
+
+  @override
+  String get taxGuideStep5Bullet1 =>
+      'Visit gica.ir and choose the CSR-based request option.';
+
+  @override
+  String get taxGuideStep5Bullet2 =>
+      'Fill in the company details and pay the issuance fee.';
+
+  @override
+  String get taxGuideStep5Bullet3 =>
+      'After in-person verification upload the issued certificate into Hesabix.';
+
+  @override
+  String get taxGuideStep6Title => '6) Assign product/service tax codes';
+
+  @override
+  String get taxGuideStep6Description =>
+      'Invoices will be rejected if items lack tax code and unit.';
+
+  @override
+  String get taxGuideStep6Bullet1 =>
+      'Edit each item under Products & Services and add the 13-digit tax code.';
+
+  @override
+  String get taxGuideStep6Bullet2 =>
+      'Use the public code list from stuffid.tax.gov.ir or request dedicated codes.';
+
+  @override
+  String get taxGuideStep6Bullet3 =>
+      'Service codes can be obtained from portal.gs1-ir.org.';
+
+  @override
+  String get taxGuideStep7Title =>
+      '7) Run data quality checks before submission';
+
+  @override
+  String get taxGuideStep7Description =>
+      'Review the Data Quality tab and the tax workspace before sending invoices.';
+
+  @override
+  String get taxGuideStep7Bullet1 =>
+      'The Data Quality tab highlights missing fields for products, customers and invoices.';
+
+  @override
+  String get taxGuideStep7Bullet2 =>
+      'Add invoices to the tax workspace first and fix validation errors inline.';
+
+  @override
+  String get taxGuideStep7Bullet3 =>
+      'Send single or bulk invoices only after the checklist is green.';
+
+  @override
+  String get taxGuideResourcesTitle => 'Shortcuts and resources';
+
+  @override
+  String get taxGuideResourcesWorkspace =>
+      'Tax workspace: available under Sales > Tax Workspace.';
+
+  @override
+  String get taxGuideResourcesProducts =>
+      'Products & Services: update tax codes via the same menu or Excel import.';
+
+  @override
+  String get taxGuideResourcesSupport =>
+      'For integration issues review the Tax Settings logs or open a support ticket.';
+
+  @override
+  String get taxMemoryIdLabel => 'Tax memory ID';
+
+  @override
+  String get taxEconomicCodeLabel => 'Economic code';
+
+  @override
+  String get taxSandboxModeLabel => 'Sandbox mode';
+
+  @override
+  String get taxSandboxModeSubtitle =>
+      'When enabled, requests are sent to the sandbox environment.';
+
+  @override
+  String get taxPrivateKeyLabel => 'Private key (PEM)';
+
+  @override
+  String get taxPublicKeyLabel => 'Public key (optional)';
+
+  @override
+  String get taxCertificateLabel => 'Digital certificate (optional)';
+
+  @override
+  String get taxCertificateRequestLabel => 'Certificate request (CSR)';
+
+  @override
+  String get taxGenerateKeys => 'Generate new keys';
+
+  @override
+  String get taxMemoryIdRequired => 'Tax memory ID is required';
+
+  @override
+  String get taxEconomicCodeRequired => 'Economic code is required';
+
+  @override
+  String get taxPrivateKeyRequired => 'Private key is required';
+
+  @override
+  String get taxKeysGenerated => 'Keys generated successfully';
+
+  @override
+  String get taxSettingsSaved => 'Tax integration settings saved';
+
+  @override
+  String taxLastUpdated(String date) {
+    return 'Last updated: $date';
+  }
+
+  @override
+  String get taxPersonTypeLabel => 'Taxpayer type';
+
+  @override
+  String get taxPersonTypeNatural => 'Individual';
+
+  @override
+  String get taxPersonTypeLegal => 'Legal entity';
+
+  @override
+  String get taxNationalIdLabel => 'Taxpayer national ID';
+
+  @override
+  String get taxLegalNameFaLabel => 'Persian company name';
+
+  @override
+  String get taxLegalNameEnLabel => 'English company name';
+
+  @override
+  String get taxLegalEmailLabel => 'Corporate email';
+
+  @override
+  String get taxDataQualityTitle => 'Data quality check';
+
+  @override
+  String get taxDataQualitySubtitle =>
+      'Review missing tax data before submitting invoices.';
+
+  @override
+  String get taxDataQualityReload => 'Refresh report';
+
+  @override
+  String get taxDataQualityProductsHeader => 'Products & services';
+
+  @override
+  String get taxDataQualityPersonsHeader => 'Persons & customers';
+
+  @override
+  String get taxDataQualityMissingTaxCode => 'Items missing tax code';
+
+  @override
+  String get taxDataQualityMissingTaxUnit => 'Items missing tax unit';
+
+  @override
+  String get taxDataQualityMissingNationalId => 'Persons missing national ID';
+
+  @override
+  String get taxDataQualityMissingEconomicId => 'Persons missing economic ID';
+
+  @override
+  String get taxDataQualitySamples => 'Samples';
+
+  @override
+  String get taxDataQualityNoSamples => 'No samples available.';
+
+  @override
+  String get taxDataQualityNoIssues => 'All good! No pending data issues.';
+
+  @override
+  String get taxDataQualityNoData => 'No report to display.';
+
+  @override
+  String taxDataQualityFetchError(String error) {
+    return 'Failed to fetch quality report: $error';
+  }
+
+  @override
+  String get taxDataQualityTaxCodeLabel => 'Tax code';
+
+  @override
+  String get taxDataQualityTaxUnitLabel => 'Tax unit';
+
+  @override
+  String get taxDataQualityNationalIdLabel => 'National ID';
+
+  @override
+  String get taxDataQualityEconomicIdLabel => 'Economic ID';
+
+  @override
+  String get taxValidationIssuesTitle => 'Tax validation issues';
+
+  @override
+  String get taxValidationIssuesDescription =>
+      'Resolve the following items before sending invoices to the tax platform.';
+
+  @override
+  String get taxValidationIssuesEmpty => 'No issue details provided.';
+
+  @override
   String get taxAddToWorkspaceSingle => 'Add to tax workspace';
 
   @override
@@ -4655,6 +5331,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String taxSendSelectedErrorWithMessage(String error) {
     return 'Failed to send selected invoices: $error';
   }
+
+  @override
+  String taxSendSelectedPartialTitle(int success, int failed) {
+    return '$success sent, $failed failed';
+  }
+
+  @override
+  String taxBatchFailedRow(String id) {
+    return 'Invoice $id';
+  }
+
+  @override
+  String get taxInquireSelectedTooltip =>
+      'Inquire status for selected invoices';
+
+  @override
+  String taxInquireSelectedButton(int count) {
+    return 'Inquire status ($count)';
+  }
+
+  @override
+  String get taxInquireSelectedDialogTitle => 'Inquire status';
+
+  @override
+  String taxInquireSelectedDialogMessage(int count) {
+    return 'Inquire status for $count selected invoices?';
+  }
+
+  @override
+  String taxInquireSelectedErrorWithMessage(String error) {
+    return 'Failed to inquire status: $error';
+  }
+
+  @override
+  String get taxInquiryResultTitle => 'Status inquiry result';
+
+  @override
+  String get taxInquiryResultEmpty => 'No results to display.';
+
+  @override
+  String get taxInquiryStatusUnknown => 'Unknown status';
 
   @override
   String get taxRemoveSelectedDialogTitle =>
@@ -4891,4 +5608,1096 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'Print PDF';
+
+  @override
+  String get applicationName => 'Application Name';
+
+  @override
+  String get applicationVersion => 'Application Version';
+
+  @override
+  String get defaultLanguage => 'Default Language';
+
+  @override
+  String get defaultTheme => 'Default Theme';
+
+  @override
+  String get enableUserRegistration => 'Enable User Registration';
+
+  @override
+  String get enableEmailVerification => 'Enable Email Verification';
+
+  @override
+  String get sessionTimeout => 'Session Timeout';
+
+  @override
+  String get sessionTimeoutMinutes => 'Session Timeout (minutes)';
+
+  @override
+  String get maxFileSize => 'Max File Size';
+
+  @override
+  String get maxFileSizeMB => 'Max File Size (MB)';
+
+  @override
+  String get maxUsers => 'Max Users';
+
+  @override
+  String get maintenanceMode => 'Maintenance Mode';
+
+  @override
+  String get unlimited => 'Unlimited';
+
+  @override
+  String get errorLoadingSettings => 'Error loading settings';
+
+  @override
+  String get errorSavingSettings => 'Error saving settings';
+
+  @override
+  String get settingsSavedSuccessfully => 'Settings saved successfully';
+
+  @override
+  String get persian => 'Persian';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get zeroMeansUnlimited => '0 = Unlimited';
+
+  @override
+  String get otpLogin => 'OTP Login';
+
+  @override
+  String get otpLoginTitle => 'Login with OTP';
+
+  @override
+  String get otpLoginSubtitle =>
+      'Login code will be sent to your email, mobile number or Telegram';
+
+  @override
+  String get otpLoginIdentifierHint => 'Enter your email or mobile number';
+
+  @override
+  String get otpLoginIdentifierRequired => 'Email or mobile number is required';
+
+  @override
+  String get otpCodeSent => 'Code sent';
+
+  @override
+  String get otpChannelSelectionTitle => 'Receive code via:';
+
+  @override
+  String get otpChannelSms => 'SMS';
+
+  @override
+  String get otpChannelEmail => 'Email';
+
+  @override
+  String get otpChannelTelegram => 'Telegram';
+
+  @override
+  String get otpSendCodeButton => 'Send login code';
+
+  @override
+  String get otpChangeChannelTitle => 'Change delivery method:';
+
+  @override
+  String get otpChangeIdentifier => 'Change identifier';
+
+  @override
+  String get otpSelectChannelError => 'Please select a delivery channel';
+
+  @override
+  String get otpCaptchaError => 'Error loading captcha';
+
+  @override
+  String otpCodeSentMessage(String channel) {
+    return 'Login code sent to your $channel';
+  }
+
+  @override
+  String get otpCodeResentMessage => 'Login code resent';
+
+  @override
+  String get otpSendError => 'Error sending login code';
+
+  @override
+  String get otpEnterCaptchaError => 'Please enter captcha code';
+
+  @override
+  String get workflows => 'Automations';
+
+  @override
+  String get workflow => 'Automation';
+
+  @override
+  String get newWorkflow => 'New Workflow';
+
+  @override
+  String get editWorkflow => 'Edit Workflow';
+
+  @override
+  String get workflowSaved => 'Workflow saved';
+
+  @override
+  String get workflowDeleted => 'Node deleted';
+
+  @override
+  String get workflowDuplicated => 'Node duplicated';
+
+  @override
+  String get workflowCopy => 'Copy';
+
+  @override
+  String get workflowUndo => 'Undo';
+
+  @override
+  String get workflowSave => 'Save';
+
+  @override
+  String get workflowCancel => 'Cancel';
+
+  @override
+  String get workflowClose => 'Close';
+
+  @override
+  String get workflowValidationError => 'Validation Error';
+
+  @override
+  String get workflowErrorLoading => 'Error loading data';
+
+  @override
+  String get workflowErrorSaving => 'Error saving';
+
+  @override
+  String get workflowStatusUpdated => 'Workflow status updated';
+
+  @override
+  String get workflowExecuted => 'Workflow executed';
+
+  @override
+  String get workflowErrorExecuting => 'Error executing workflow';
+
+  @override
+  String get workflowNoAccess => 'You do not have access to workflows.';
+
+  @override
+  String get workflowNoAccessEditor =>
+      'You do not have access to workflow editor.';
+
+  @override
+  String get workflowNoWorkflows => 'No workflows yet.';
+
+  @override
+  String get workflowCreateFirst =>
+      'Use the button below to create your first automation.';
+
+  @override
+  String get workflowCreate => 'Create Workflow';
+
+  @override
+  String get workflowRefresh => 'Refresh';
+
+  @override
+  String get workflowRunNow => 'Run now';
+
+  @override
+  String get workflowExecutionHistory => 'Execution history';
+
+  @override
+  String get workflowEdit => 'Edit';
+
+  @override
+  String get workflowLastUpdate => 'Last update';
+
+  @override
+  String get workflowAvailableTriggers => 'Available triggers';
+
+  @override
+  String get workflowAvailableActions => 'Available actions';
+
+  @override
+  String get workflowFilters => 'Filters';
+
+  @override
+  String get workflowStatus => 'Status';
+
+  @override
+  String get workflowSearch => 'Search';
+
+  @override
+  String get workflowAllStatuses => 'All statuses';
+
+  @override
+  String get workflowOnlyActive => 'Only active';
+
+  @override
+  String get workflowInactive => 'Inactive';
+
+  @override
+  String get workflowDraft => 'Draft';
+
+  @override
+  String get workflowActive => 'Active';
+
+  @override
+  String get workflowNodeDeleted => 'Node deleted';
+
+  @override
+  String get workflowNodeDuplicated => 'Node duplicated';
+
+  @override
+  String get workflowNodeSettings => 'Settings';
+
+  @override
+  String get workflowNodeNoSettings =>
+      'This node does not require any special settings.';
+
+  @override
+  String get workflowNodeFieldRequired => 'This field is required';
+
+  @override
+  String get workflowNodeArrayType => 'Array (needs more complex UI)';
+
+  @override
+  String get workflowNodeObjectType => 'Object (needs more complex UI)';
+
+  @override
+  String get workflowExecutionLogs => 'Execution logs';
+
+  @override
+  String get workflowNoLogs => 'No logs found';
+
+  @override
+  String get workflowNoExecutions => 'No executions yet';
+
+  @override
+  String get workflowStarted => 'Started';
+
+  @override
+  String get workflowCompleted => 'Completed';
+
+  @override
+  String get workflowLogs => 'Logs';
+
+  @override
+  String get workflowErrorLoadingLogs => 'Error loading logs';
+
+  @override
+  String get workflowErrorUpdatingStatus => 'Error updating status';
+
+  @override
+  String get workflowHierarchicalLayoutApplied => 'Hierarchical layout applied';
+
+  @override
+  String get workflowForceDirectedLayoutApplied =>
+      'Force-directed layout applied';
+
+  @override
+  String get settingsCategoriesCount => 'Categories';
+
+  @override
+  String get settingsCount => 'Settings';
+
+  @override
+  String get expandAllCategories => 'Expand All';
+
+  @override
+  String get collapseAllCategories => 'Collapse All';
+
+  @override
+  String get noSettingsFound => 'No settings found';
+
+  @override
+  String get searchResults => 'Search Results';
+
+  @override
+  String searchResultCount(int count) {
+    return '$count result';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'No results found for \"$query\"';
+  }
+
+  @override
+  String get searchSettingsPlaceholder => 'Search settings...';
+
+  @override
+  String get noSettingsInCategory => 'No settings found in this category';
+
+  @override
+  String get settingsCategoryCoreConfiguration => 'Core & Configuration';
+
+  @override
+  String get settingsCategoryCoreConfigurationDescription =>
+      'Basic system settings and configuration';
+
+  @override
+  String get settingsCategoryStorageFiles => 'Storage & Files';
+
+  @override
+  String get settingsCategoryStorageFilesDescription =>
+      'File storage and storage plan management';
+
+  @override
+  String get settingsCategoryFinancialPayment => 'Financial & Payment';
+
+  @override
+  String get settingsCategoryFinancialPaymentDescription =>
+      'Wallet and payment gateway settings';
+
+  @override
+  String get settingsCategoryUsersBusinesses => 'Users & Businesses';
+
+  @override
+  String get settingsCategoryUsersBusinessesDescription =>
+      'User and business management';
+
+  @override
+  String get settingsCategoryCommunications => 'Communications';
+
+  @override
+  String get settingsCategoryCommunicationsDescription =>
+      'Email, notifications and announcements';
+
+  @override
+  String get settingsCategoryAI => 'Artificial Intelligence';
+
+  @override
+  String get settingsCategoryAIDescription => 'AI settings, plans and prompts';
+
+  @override
+  String get settingsCategoryExternalServices => 'External Services';
+
+  @override
+  String get settingsCategoryExternalServicesDescription =>
+      'External service integrations';
+
+  @override
+  String get settingsCategoryMonitoringLogs => 'Monitoring & Logs';
+
+  @override
+  String get settingsCategoryMonitoringLogsDescription =>
+      'System monitoring and logging';
+
+  @override
+  String get settingsShareLinks => 'Share Links';
+
+  @override
+  String get settingsShareLinksDescription =>
+      'Configure public share link destinations';
+
+  @override
+  String get settingsRedisCache => 'Redis Cache';
+
+  @override
+  String get settingsRedisCacheDescription =>
+      'Configure Redis cache for improved performance';
+
+  @override
+  String get settingsStoragePlans => 'Storage Plans';
+
+  @override
+  String get settingsStoragePlansDescription =>
+      'Manage storage plans and pricing';
+
+  @override
+  String get settingsDocumentMonetization => 'Document Monetization';
+
+  @override
+  String get settingsDocumentMonetizationDescription =>
+      'Manage document revenue scenarios and packages';
+
+  @override
+  String get settingsMarketplacePlugins => 'Marketplace Plugins Management';
+
+  @override
+  String get settingsMarketplacePluginsDescription =>
+      'Manage plugins and plans for the marketplace';
+
+  @override
+  String get settingsWalletSettings => 'Wallet Settings';
+
+  @override
+  String get settingsWalletSettingsDescription =>
+      'Set base currency and policies';
+
+  @override
+  String get settingsPaymentGateways => 'Payment Gateways';
+
+  @override
+  String get settingsPaymentGatewaysDescription =>
+      'Manage and configure payment gateways';
+
+  @override
+  String get settingsBusinessesManagement => 'Businesses Management';
+
+  @override
+  String get settingsBusinessesManagementDescription =>
+      'View and manage all system businesses';
+
+  @override
+  String get settingsAnnouncements => 'Announcements';
+
+  @override
+  String get settingsAnnouncementsDescription =>
+      'Create/edit/publish system announcements';
+
+  @override
+  String get settingsNotifications => 'Notifications';
+
+  @override
+  String get settingsNotificationsDescription =>
+      'Enable/disable channels and send test messages';
+
+  @override
+  String get settingsNotificationTemplates => 'Notification Templates';
+
+  @override
+  String get settingsNotificationTemplatesDescription =>
+      'Manage templates for channels and languages';
+
+  @override
+  String get settingsAISettings => 'AI Settings';
+
+  @override
+  String get settingsAISettingsDescription =>
+      'Configure Provider, model and API Key';
+
+  @override
+  String get settingsAIPlans => 'AI Plans';
+
+  @override
+  String get settingsAIPlansDescription => 'Manage AI usage plans and pricing';
+
+  @override
+  String get settingsAIPrompts => 'AI Prompts';
+
+  @override
+  String get settingsAIPromptsDescription =>
+      'Manage default prompts for different roles';
+
+  @override
+  String get settingsZohalServices => 'Zohal Services';
+
+  @override
+  String get settingsZohalServicesDescription =>
+      'Manage Zohal inquiry services and API settings';
+
+  @override
+  String get settingsZohalSettings => 'Zohal Settings';
+
+  @override
+  String get settingsZohalSettingsDescription =>
+      'Set API Key and configure Zohal service';
+
+  @override
+  String get settingsTaxProductCodes => 'Tax Product Codes';
+
+  @override
+  String get settingsTaxProductCodesDescription =>
+      'Search and import new list from XML file';
+
+  @override
+  String get settingsSystemMonitoring => 'System Monitoring';
+
+  @override
+  String get settingsSystemMonitoringDescription =>
+      'Check system status, hardware resources and services';
+
+  @override
+  String get settingsServiceLogs => 'Service Logs';
+
+  @override
+  String get settingsServiceLogsDescription =>
+      'View logs of hesabix-api and hesabix-rq-worker and manage services';
+
+  @override
+  String get warranty => 'Warranty';
+
+  @override
+  String get warrantyManagement => 'Warranty Management';
+
+  @override
+  String get warrantySettings => 'Warranty Settings';
+
+  @override
+  String get warrantyCodes => 'Warranty Codes';
+
+  @override
+  String get warrantyCode => 'Warranty Code';
+
+  @override
+  String get warrantySerial => 'Warranty Serial';
+
+  @override
+  String get generateWarrantyCodes => 'Generate Warranty Codes';
+
+  @override
+  String get warrantyActivation => 'Warranty Activation';
+
+  @override
+  String get warrantyTracking => 'Warranty Tracking';
+
+  @override
+  String get warrantyStatus => 'Warranty Status';
+
+  @override
+  String get warrantyGenerated => 'Generated';
+
+  @override
+  String get warrantyActivated => 'Activated';
+
+  @override
+  String get warrantyExpired => 'This warranty has expired';
+
+  @override
+  String get warrantyUsed => 'Used';
+
+  @override
+  String get warrantyRevoked => 'This warranty has been revoked';
+
+  @override
+  String get warrantyDuration => 'Warranty Duration';
+
+  @override
+  String get warrantyDurationDays => 'Warranty Duration (Days)';
+
+  @override
+  String get warrantyExpiresAt => 'Expires At';
+
+  @override
+  String get warrantyGeneratedAt => 'Generated At';
+
+  @override
+  String get warrantyActivatedAt => 'Activated At';
+
+  @override
+  String get warrantyProduct => 'Warranty Product';
+
+  @override
+  String get warrantyCustomer => 'Customer';
+
+  @override
+  String get warrantyCustomerName => 'Customer Name';
+
+  @override
+  String get warrantyCustomerPhone => 'Customer Phone';
+
+  @override
+  String get warrantyCustomerEmail => 'Customer Email';
+
+  @override
+  String get warrantyProductSerial => 'Product Serial';
+
+  @override
+  String get activateWarranty => 'Activate Warranty';
+
+  @override
+  String get trackWarranty => 'Track Warranty';
+
+  @override
+  String get warrantyTrackingLink => 'Warranty Tracking Link';
+
+  @override
+  String get warrantyCodeFormat => 'Code Format';
+
+  @override
+  String get warrantyCodePrefix => 'Code Prefix';
+
+  @override
+  String get warrantySerialFormat => 'Serial Format';
+
+  @override
+  String get warrantySerialLength => 'Serial Length';
+
+  @override
+  String get warrantyRandom => 'Random';
+
+  @override
+  String get warrantySequential => 'Sequential';
+
+  @override
+  String get warrantyCustom => 'Custom';
+
+  @override
+  String get warrantySecuritySettings => 'Security Settings';
+
+  @override
+  String get warrantyRequireSerialVerification =>
+      'Require Product Serial Verification';
+
+  @override
+  String get warrantyRequireProductInstanceMatch =>
+      'Require Product Instance Match';
+
+  @override
+  String get warrantyMaxActivationAttempts => 'Max Activation Attempts';
+
+  @override
+  String get warrantyActivationLockoutDuration => 'Lockout Duration (Minutes)';
+
+  @override
+  String get warrantyAutoLinkToPerson => 'Auto Link to Person';
+
+  @override
+  String get warrantyEnableTrackingLink => 'Enable Tracking Link';
+
+  @override
+  String get warrantyTrackingLinkExpiresDays => 'Tracking Link Expires (Days)';
+
+  @override
+  String get warrantyEnableSmsNotification => 'Send SMS on Activation';
+
+  @override
+  String get warrantyEnableEmailNotification => 'Send Email on Activation';
+
+  @override
+  String get warrantyCodeNotFound => 'Warranty code not found';
+
+  @override
+  String get warrantyInvalidSerial => 'Invalid warranty serial';
+
+  @override
+  String get warrantyAlreadyActivated =>
+      'This warranty has already been activated';
+
+  @override
+  String get warrantyActivationSuccess => 'Warranty activated successfully';
+
+  @override
+  String get warrantyActivationFailed => 'Warranty activation failed';
+
+  @override
+  String get warrantyTooManyAttempts => 'Too many activation attempts';
+
+  @override
+  String get warrantyProductSerialRequired => 'Product serial is required';
+
+  @override
+  String get warrantyProductSerialNotFound => 'Product serial not found';
+
+  @override
+  String get warrantyLinkNotFound => 'Tracking link not found';
+
+  @override
+  String get warrantyLinkExpired => 'Tracking link has expired';
+
+  @override
+  String get warrantyLinkInactive => 'Tracking link is inactive';
+
+  @override
+  String get warrantyPluginNotActive =>
+      'Warranty plugin is not active for this business';
+
+  @override
+  String get warrantyGenerateCodes => 'Generate Warranty Codes';
+
+  @override
+  String get warrantyQuantity => 'Quantity';
+
+  @override
+  String get warrantyCustomSerials => 'Custom Serials';
+
+  @override
+  String get warrantyCustomCodes => 'Custom Codes';
+
+  @override
+  String get warrantyListCodes => 'List Warranty Codes';
+
+  @override
+  String get warrantyFilterByStatus => 'Filter by Status';
+
+  @override
+  String get warrantyFilterByProduct => 'Filter by Product';
+
+  @override
+  String get warrantyEvents => 'Warranty Events';
+
+  @override
+  String get warrantyEventActivation => 'Activation';
+
+  @override
+  String get warrantyEventRepairRequest => 'Repair Request';
+
+  @override
+  String get warrantyEventRepairCompleted => 'Repair Completed';
+
+  @override
+  String get warrantyEventReplacement => 'Replacement';
+
+  @override
+  String get warrantyEventExpired => 'Expired';
+
+  @override
+  String get warrantyEventRevoked => 'Revoked';
+
+  @override
+  String get warrantyManage => 'Manage Warranty';
+
+  @override
+  String get identityInquiryTitle => 'Identity Inquiry';
+
+  @override
+  String get identityInquirySubtitle =>
+      'Please enter national ID and birth date';
+
+  @override
+  String get nationalIdHint => '10-digit national ID';
+
+  @override
+  String get nationalIdRequired => 'National ID is required';
+
+  @override
+  String get nationalIdInvalidLength => 'National ID must be 10 digits';
+
+  @override
+  String get nationalIdInvalid => 'Invalid national ID';
+
+  @override
+  String get birthDate => 'Birth Date';
+
+  @override
+  String get birthDateHint => 'Jalali date (YYYY-MM-DD or YYYY/MM/DD)';
+
+  @override
+  String get birthDateRequired => 'Birth date is required';
+
+  @override
+  String get birthDateInvalid => 'Invalid date format';
+
+  @override
+  String get selectBirthDate => 'Select Date';
+
+  @override
+  String get inquire => 'Inquire';
+
+  @override
+  String get inquiring => 'Inquiring...';
+
+  @override
+  String get inquiryError => 'Inquiry Error';
+
+  @override
+  String get inquiryErrorPrefix => 'Inquiry error:';
+
+  @override
+  String get unknownError => 'Unknown error';
+
+  @override
+  String get noMatch => 'No Match';
+
+  @override
+  String get noMatchDescription => 'National ID and birth date do not match';
+
+  @override
+  String get personalInformation => 'Personal Information';
+
+  @override
+  String get fatherName => 'Father Name';
+
+  @override
+  String get alive => 'Alive';
+
+  @override
+  String get deceased => 'Deceased';
+
+  @override
+  String get newInquiry => 'New Inquiry';
+
+  @override
+  String get identityInquiryDescription =>
+      'You can inquiry personal identity information by entering national ID and birth date';
+
+  @override
+  String get noResultAvailable => 'Error: No result available';
+
+  @override
+  String get accountSettingsTitle => 'Account Settings';
+
+  @override
+  String get accountSettingsSubtitle =>
+      'Manage and configure all aspects of your account';
+
+  @override
+  String get accountSettingsMarketingDescription =>
+      'Manage referral links and marketing reports';
+
+  @override
+  String get accountSettingsNotificationsTitle => 'Notifications';
+
+  @override
+  String get accountSettingsNotificationsDescription =>
+      'Notification channel settings and configuration';
+
+  @override
+  String get accountSettingsSignatureTitle => 'Signature & Profile Picture';
+
+  @override
+  String get accountSettingsSignatureDescription =>
+      'Upload and manage personal signature and profile picture';
+
+  @override
+  String get accountSettingsApiKeysTitle => 'API Keys';
+
+  @override
+  String get accountSettingsApiKeysDescription =>
+      'Manage API keys for system access';
+
+  @override
+  String get accountSettingsLoginSessionsTitle => 'Login Sessions';
+
+  @override
+  String get accountSettingsLoginSessionsDescription =>
+      'View and manage connected devices to your account';
+
+  @override
+  String get accountSettingsChangePasswordDescription =>
+      'Change account password';
+
+  @override
+  String get accountSettingsVerificationTitle => 'Mobile & Email Verification';
+
+  @override
+  String get accountSettingsVerificationDescription =>
+      'Verify mobile number and email for enhanced security';
+
+  @override
+  String get accountSettingsNotificationHistoryTitle => 'Notification History';
+
+  @override
+  String get accountSettingsNotificationHistoryDescription =>
+      'View all sent notifications (OTP, password reset, tickets, etc.)';
+
+  @override
+  String get apiKeysPageTitle => 'Manage API Keys';
+
+  @override
+  String get apiKeyErrorLoadingKeys => 'Error loading keys';
+
+  @override
+  String get apiKeyErrorCreatingKey => 'Error creating key';
+
+  @override
+  String get apiKeyCreatedSuccessfully => 'API Key created';
+
+  @override
+  String get apiKeySaveWarning =>
+      'Please save this key. This is the only time it will be displayed.';
+
+  @override
+  String get apiKeyClose => 'Close';
+
+  @override
+  String get apiKeyCopy => 'Copy';
+
+  @override
+  String get apiKeyCopied => 'Key copied';
+
+  @override
+  String get apiKeyUpdatedSuccessfully => 'Key updated successfully';
+
+  @override
+  String get apiKeyErrorUpdating => 'Error updating key';
+
+  @override
+  String get apiKeyDeleteTitle => 'Delete API Key';
+
+  @override
+  String apiKeyDeleteConfirmation(String name) {
+    return 'Are you sure you want to delete the key \"$name\"?\nThis action is irreversible.';
+  }
+
+  @override
+  String get apiKeyDeletedSuccessfully => 'Key deleted successfully';
+
+  @override
+  String get apiKeyErrorDeleting => 'Error deleting key';
+
+  @override
+  String get apiKeyFilterActive => 'Active';
+
+  @override
+  String get apiKeyFilterRevoked => 'Revoked';
+
+  @override
+  String get apiKeyFilterAll => 'All';
+
+  @override
+  String get apiKeyNoActiveKeys => 'No active keys';
+
+  @override
+  String get apiKeyNoRevokedKeys => 'No revoked keys';
+
+  @override
+  String get apiKeyNoKeysCreated => 'No API keys created';
+
+  @override
+  String get apiKeyCreateNewButton => 'Create New Key';
+
+  @override
+  String get apiKeyCreateHint => 'Click the create button to create a new key';
+
+  @override
+  String get apiKeyNoRevokedHint => 'No revoked keys to display';
+
+  @override
+  String get apiKeyUsageHint =>
+      'Create a key to use the API in other applications';
+
+  @override
+  String get apiKeyEdit => 'Edit';
+
+  @override
+  String get apiKeyDelete => 'Delete';
+
+  @override
+  String get apiKeyCreatedAt => 'Created';
+
+  @override
+  String get apiKeyLastUsed => 'Last Used';
+
+  @override
+  String get apiKeyExpiresAt => 'Expires';
+
+  @override
+  String get apiKeyRevokedAt => 'Revoked';
+
+  @override
+  String get apiKeyAllowedIPs => 'Allowed IPs';
+
+  @override
+  String get apiKeyCreateNewTitle => 'Create New API Key';
+
+  @override
+  String get apiKeyNameLabel => 'Key Name';
+
+  @override
+  String get apiKeyNameHint => 'Example: Production API Key';
+
+  @override
+  String get apiKeyScopeLabel => 'Access Scope (JSON)';
+
+  @override
+  String get apiKeyScopeHint =>
+      'Optional - Example: {\"read\": true, \"write\": false}';
+
+  @override
+  String get apiKeyIPsLabel => 'Allowed IP List';
+
+  @override
+  String get apiKeyIPsHint =>
+      'Comma separated - Example: 192.168.1.1, 10.0.0.1';
+
+  @override
+  String get apiKeyExpiryLabel => 'Expiry Date and Time (Optional)';
+
+  @override
+  String get apiKeyExpiryHint => 'Select';
+
+  @override
+  String get apiKeyNoExpiry => 'No expiry';
+
+  @override
+  String get apiKeyEditTitle => 'Edit API Key';
+
+  @override
+  String get apiKeyWithoutName => 'Unnamed';
+
+  @override
+  String get datePickerSelectDate => 'Select Date';
+
+  @override
+  String get timePickerSelectTime => 'Select Time';
+
+  @override
+  String get dateTimeLabel => 'Date and Time';
+
+  @override
+  String get dateLabel => 'Date';
+
+  @override
+  String get timeLabel => 'Time';
+
+  @override
+  String get clearButton => 'Clear';
+
+  @override
+  String get sessionsPageTitle => 'Manage Login Sessions';
+
+  @override
+  String get sessionsErrorLoading => 'Error loading sessions';
+
+  @override
+  String get sessionsCannotDeleteCurrent => 'Cannot delete current session';
+
+  @override
+  String get sessionsDeleteTitle => 'Delete Session';
+
+  @override
+  String sessionsDeleteConfirmation(String device) {
+    return 'Are you sure you want to delete session \"$device\"?\nThis action is irreversible.';
+  }
+
+  @override
+  String get sessionsDeletedSuccessfully => 'Session deleted successfully';
+
+  @override
+  String get sessionsErrorDeleting => 'Error deleting session';
+
+  @override
+  String get sessionsNoOtherSessions => 'No other sessions';
+
+  @override
+  String get sessionsRevokeAllTitle => 'Logout from all devices';
+
+  @override
+  String sessionsRevokeAllConfirmation(int count) {
+    return 'Are you sure you want to delete $count other sessions?\nThis will logout all other devices.\nYour current session will be preserved.';
+  }
+
+  @override
+  String get sessionsDeleteAll => 'Delete All';
+
+  @override
+  String sessionsDeleted(int count) {
+    return '$count sessions deleted';
+  }
+
+  @override
+  String get sessionsNoActive => 'No active sessions';
+
+  @override
+  String get sessionsThisDevice => 'This Device';
+
+  @override
+  String get sessionsLastUsed => 'Last Used';
+
+  @override
+  String get sessionsCreatedAt => 'Created';
+
+  @override
+  String get sessionsToday => 'Today';
+
+  @override
+  String get sessionsYesterday => 'Yesterday';
+
+  @override
+  String sessionsDaysAgo(int days) {
+    return '$days days ago';
+  }
+
+  @override
+  String sessionsWeeksAgo(int weeks) {
+    return '$weeks weeks ago';
+  }
+
+  @override
+  String sessionsMonthsAgo(int months) {
+    return '$months months ago';
+  }
 }

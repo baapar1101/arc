@@ -266,6 +266,42 @@ abstract class AppLocalizations {
   /// **'Captcha is required.'**
   String get captchaRequired;
 
+  /// No description provided for @acceptTermsPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'I accept '**
+  String get acceptTermsPrefix;
+
+  /// No description provided for @acceptTermsSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **''**
+  String get acceptTermsSuffix;
+
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
+  /// No description provided for @termsOfService.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get termsOfService;
+
+  /// No description provided for @and.
+  ///
+  /// In en, this message translates to:
+  /// **'and'**
+  String get and;
+
+  /// No description provided for @acceptTermsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'You must accept the Privacy Policy and Terms of Service to register.'**
+  String get acceptTermsRequired;
+
   /// No description provided for @sendReset.
   ///
   /// In en, this message translates to:
@@ -566,6 +602,147 @@ abstract class AppLocalizations {
   /// **'Error'**
   String get error;
 
+  /// No description provided for @bulkDefaultWarehouseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk default warehouse'**
+  String get bulkDefaultWarehouseTitle;
+
+  /// No description provided for @bulkDefaultWarehouseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change default warehouse'**
+  String get bulkDefaultWarehouseAction;
+
+  /// No description provided for @bulkDefaultWarehouseNewWarehouseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New warehouse'**
+  String get bulkDefaultWarehouseNewWarehouseLabel;
+
+  /// No description provided for @bulkDefaultWarehouseClearOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear default warehouse (empty)'**
+  String get bulkDefaultWarehouseClearOption;
+
+  /// No description provided for @bulkDefaultWarehouseScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply scope (Policy):'**
+  String get bulkDefaultWarehouseScopeLabel;
+
+  /// No description provided for @bulkDefaultWarehouseScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected'**
+  String get bulkDefaultWarehouseScopeAll;
+
+  /// No description provided for @bulkDefaultWarehouseScopeTrackInventoryTrue.
+  ///
+  /// In en, this message translates to:
+  /// **'Only inventory-tracked items (track_inventory=true)'**
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue;
+
+  /// No description provided for @bulkDefaultWarehouseScopeTrackInventoryFalse.
+  ///
+  /// In en, this message translates to:
+  /// **'Only non-inventory items (track_inventory=false)'**
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse;
+
+  /// No description provided for @bulkDefaultWarehouseConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes'**
+  String get bulkDefaultWarehouseConfirmTitle;
+
+  /// No description provided for @bulkDefaultWarehouseConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to apply this default warehouse change to the selected items?'**
+  String get bulkDefaultWarehouseConfirmMessage;
+
+  /// No description provided for @bulkDefaultWarehouseApplySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Done. Updated: {count}'**
+  String bulkDefaultWarehouseApplySuccess(String count);
+
+  /// No description provided for @bulkDefaultWarehouseSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected items: {count}'**
+  String bulkDefaultWarehouseSelectedCount(int count);
+
+  /// No description provided for @bulkDefaultWarehousePreviewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested: {total} | Found: {found} | Will update: {willUpdate}'**
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  );
+
+  /// No description provided for @bulkDefaultWarehouseSkippedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: {count}'**
+  String bulkDefaultWarehouseSkippedCount(int count);
+
+  /// No description provided for @bulkDefaultWarehouseNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes:'**
+  String get bulkDefaultWarehouseNotesLabel;
+
+  /// No description provided for @bulkDefaultWarehouseForcedServiceNull.
+  ///
+  /// In en, this message translates to:
+  /// **'Service items forced to null default warehouse: {count}'**
+  String bulkDefaultWarehouseForcedServiceNull(int count);
+
+  /// No description provided for @bulkDefaultWarehouseApplySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested: {total} | Found: {found} | Updated: {updated} | Skipped: {skipped}'**
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  );
+
+  /// No description provided for @bulkDefaultWarehouseReasonAlreadySet.
+  ///
+  /// In en, this message translates to:
+  /// **'Already set'**
+  String get bulkDefaultWarehouseReasonAlreadySet;
+
+  /// No description provided for @bulkDefaultWarehouseReasonScopeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of selected scope'**
+  String get bulkDefaultWarehouseReasonScopeMismatch;
+
+  /// No description provided for @bulkDefaultWarehouseReasonNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get bulkDefaultWarehouseReasonNotFound;
+
+  /// No description provided for @bulkDefaultWarehouseReasonServiceAlreadyNull.
+  ///
+  /// In en, this message translates to:
+  /// **'Service item must have no default warehouse'**
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull;
+
+  /// No description provided for @bulkDefaultWarehouseReasonUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get bulkDefaultWarehouseReasonUnknown;
+
   /// No description provided for @newBusiness.
   ///
   /// In en, this message translates to:
@@ -577,6 +754,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Businesses'**
   String get businesses;
+
+  /// No description provided for @deleteBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Business'**
+  String get deleteBusiness;
 
   /// No description provided for @support.
   ///
@@ -5042,6 +5225,12 @@ abstract class AppLocalizations {
   /// **'Seller'**
   String get personTypeSeller;
 
+  /// No description provided for @personTypeShareholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Shareholder'**
+  String get personTypeShareholder;
+
   /// No description provided for @personCreatedSuccessfully.
   ///
   /// In en, this message translates to:
@@ -5984,6 +6173,24 @@ abstract class AppLocalizations {
   /// **'Tax unit id'**
   String get taxUnitId;
 
+  /// No description provided for @vatColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT'**
+  String get vatColumn;
+
+  /// Formatted VAT percent value
+  ///
+  /// In en, this message translates to:
+  /// **'{value}%'**
+  String taxVatPercent(Object value);
+
+  /// No description provided for @taxVatUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not specified'**
+  String get taxVatUnknown;
+
   /// No description provided for @bulkPriceUpdateTitle.
   ///
   /// In en, this message translates to:
@@ -6698,6 +6905,30 @@ abstract class AppLocalizations {
   /// **'Failed to delete invoice: {error}'**
   String deleteInvoiceErrorWithMessage(String error);
 
+  /// No description provided for @deleteInvoiceTaxWorkspaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'This invoice is in the tax workspace and cannot be deleted'**
+  String get deleteInvoiceTaxWorkspaceError;
+
+  /// No description provided for @deleteInvoiceReceiptPaymentsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Related receipt/payment documents:'**
+  String get deleteInvoiceReceiptPaymentsWarning;
+
+  /// No description provided for @deleteInvoiceWarehouseWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Related finalized warehouse documents:'**
+  String get deleteInvoiceWarehouseWarning;
+
+  /// No description provided for @deleteInvoiceInstallmentsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This invoice has {count} installments that will be deleted'**
+  String deleteInvoiceInstallmentsWarning(String count);
+
   /// No description provided for @saveInvoice.
   ///
   /// In en, this message translates to:
@@ -7316,6 +7547,18 @@ abstract class AppLocalizations {
   /// **'Per-item movement details (FIFO/LIFO/average)'**
   String get reportsInventoryKardexSubtitle;
 
+  /// No description provided for @reportsInventoryStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory stock report'**
+  String get reportsInventoryStockTitle;
+
+  /// No description provided for @reportsInventoryStockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product inventory by warehouse and date'**
+  String get reportsInventoryStockSubtitle;
+
   /// No description provided for @reportsSalesByProductTitle.
   ///
   /// In en, this message translates to:
@@ -7538,6 +7781,246 @@ abstract class AppLocalizations {
   /// **'This report will be available soon.'**
   String get reportsComingSoonMessage;
 
+  /// No description provided for @reportsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search reports…'**
+  String get reportsSearchHint;
+
+  /// No description provided for @reportsSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Results ({count})'**
+  String reportsSearchResults(Object count);
+
+  /// No description provided for @reportsSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No reports matched your search.'**
+  String get reportsSearchNoResults;
+
+  /// No description provided for @reportsFavoritesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get reportsFavoritesTitle;
+
+  /// No description provided for @reportsFavoritesEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'For quick access, tap the star next to a report.'**
+  String get reportsFavoritesEmptyMessage;
+
+  /// No description provided for @reportsRecentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get reportsRecentTitle;
+
+  /// No description provided for @reportsRecentEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports you open will show up here.'**
+  String get reportsRecentEmptyMessage;
+
+  /// No description provided for @reportsWarehouseSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse reports'**
+  String get reportsWarehouseSection;
+
+  /// No description provided for @reportsSystemSection.
+  ///
+  /// In en, this message translates to:
+  /// **'System reports'**
+  String get reportsSystemSection;
+
+  /// No description provided for @reportsActivityLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User activity logs'**
+  String get reportsActivityLogsTitle;
+
+  /// No description provided for @reportsActivityLogsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View the history of user activity in the system'**
+  String get reportsActivityLogsSubtitle;
+
+  /// No description provided for @reportsSectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} reports'**
+  String reportsSectionCount(Object count);
+
+  /// No description provided for @reportsAddToFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favorites'**
+  String get reportsAddToFavorites;
+
+  /// No description provided for @reportsRemoveFromFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get reportsRemoveFromFavorites;
+
+  /// No description provided for @reportsInstallmentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment status, due dates, and remaining balance'**
+  String get reportsInstallmentsSubtitle;
+
+  /// No description provided for @reportsStockCountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock count report'**
+  String get reportsStockCountTitle;
+
+  /// No description provided for @reportsStockCountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock count history and adjustment documents'**
+  String get reportsStockCountSubtitle;
+
+  /// No description provided for @reportsWarehouseDocumentsSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse documents summary'**
+  String get reportsWarehouseDocumentsSummaryTitle;
+
+  /// No description provided for @reportsWarehouseDocumentsSummarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary by document type with inbound/outbound stats'**
+  String get reportsWarehouseDocumentsSummarySubtitle;
+
+  /// No description provided for @reportsSlowMovingItemsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow-moving items'**
+  String get reportsSlowMovingItemsTitle;
+
+  /// No description provided for @reportsSlowMovingItemsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items with no movement during the selected time range'**
+  String get reportsSlowMovingItemsSubtitle;
+
+  /// No description provided for @reportsCriticalStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical stock items'**
+  String get reportsCriticalStockTitle;
+
+  /// No description provided for @reportsCriticalStockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items with stock below the defined threshold'**
+  String get reportsCriticalStockSubtitle;
+
+  /// No description provided for @reportsInterWarehouseTransfersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inter-warehouse transfers'**
+  String get reportsInterWarehouseTransfersTitle;
+
+  /// No description provided for @reportsInterWarehouseTransfersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details of transfers between warehouses'**
+  String get reportsInterWarehouseTransfersSubtitle;
+
+  /// No description provided for @reportsAdjustmentDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment documents'**
+  String get reportsAdjustmentDocumentsTitle;
+
+  /// No description provided for @reportsAdjustmentDocumentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis of adjustment documents and inventory differences'**
+  String get reportsAdjustmentDocumentsSubtitle;
+
+  /// No description provided for @reportsWarehousePerformanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse performance'**
+  String get reportsWarehousePerformanceTitle;
+
+  /// No description provided for @reportsWarehousePerformanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare warehouse performance'**
+  String get reportsWarehousePerformanceSubtitle;
+
+  /// No description provided for @reportsProductMovementHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product movement history'**
+  String get reportsProductMovementHistoryTitle;
+
+  /// No description provided for @reportsProductMovementHistorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full movement history of a product across all warehouses'**
+  String get reportsProductMovementHistorySubtitle;
+
+  /// No description provided for @reportsInventoryValuationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory valuation'**
+  String get reportsInventoryValuationTitle;
+
+  /// No description provided for @reportsInventoryValuationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetary valuation of warehouse inventories'**
+  String get reportsInventoryValuationSubtitle;
+
+  /// No description provided for @reportsPendingDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending documents'**
+  String get reportsPendingDocumentsTitle;
+
+  /// No description provided for @reportsPendingDocumentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft or pending-approval documents'**
+  String get reportsPendingDocumentsSubtitle;
+
+  /// No description provided for @reportsInventoryTurnoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory turnover'**
+  String get reportsInventoryTurnoverTitle;
+
+  /// No description provided for @reportsInventoryTurnoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory turnover rate for products'**
+  String get reportsInventoryTurnoverSubtitle;
+
+  /// No description provided for @reportsSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get reportsSortTooltip;
+
+  /// No description provided for @reportsSortDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get reportsSortDefault;
+
+  /// No description provided for @reportsSortAlphabetical.
+  ///
+  /// In en, this message translates to:
+  /// **'Alphabetical'**
+  String get reportsSortAlphabetical;
+
   /// No description provided for @operationSuccessful.
   ///
   /// In en, this message translates to:
@@ -7759,6 +8242,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exactly as registered in your vendor panel.'**
   String get notificationsFieldSmsSenderHint;
+
+  /// No description provided for @notificationsProxySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram proxy'**
+  String get notificationsProxySectionTitle;
+
+  /// No description provided for @notificationsProxySectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When servers are hosted inside Iran, enable the proxy to route Telegram traffic through an external relay.'**
+  String get notificationsProxySectionSubtitle;
+
+  /// No description provided for @notificationsProxyEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Telegram proxy'**
+  String get notificationsProxyEnableLabel;
+
+  /// No description provided for @notificationsFieldTelegramProxyBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy base URL'**
+  String get notificationsFieldTelegramProxyBaseUrl;
+
+  /// No description provided for @notificationsFieldTelegramProxyApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy access key'**
+  String get notificationsFieldTelegramProxyApiKey;
 
   /// No description provided for @notificationsAdvancedRestartHint.
   ///
@@ -8324,6 +8837,78 @@ abstract class AppLocalizations {
   /// **'Payout request submitted'**
   String get walletPayoutRequested;
 
+  /// No description provided for @settingsWalletPayoutsAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet payout management'**
+  String get settingsWalletPayoutsAdmin;
+
+  /// No description provided for @settingsWalletPayoutsAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Review wallet payout requests and record bank settlement details'**
+  String get settingsWalletPayoutsAdminDescription;
+
+  /// No description provided for @walletPayoutsAdminTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet payout requests'**
+  String get walletPayoutsAdminTitle;
+
+  /// No description provided for @walletPayoutsAdminSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor pending payout requests, review bank account details, and register settlement information after transfers are completed.'**
+  String get walletPayoutsAdminSubtitle;
+
+  /// No description provided for @walletPayoutsAdminEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No payout requests to show.'**
+  String get walletPayoutsAdminEmpty;
+
+  /// No description provided for @walletPayoutsAdminSettleDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record settlement information'**
+  String get walletPayoutsAdminSettleDialogTitle;
+
+  /// No description provided for @walletPayoutsAdminSettleAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Record & settle'**
+  String get walletPayoutsAdminSettleAction;
+
+  /// No description provided for @walletPayoutsAdminSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement information saved successfully.'**
+  String get walletPayoutsAdminSuccess;
+
+  /// No description provided for @walletPayoutsAdminFormRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required'**
+  String get walletPayoutsAdminFormRequired;
+
+  /// No description provided for @walletPayoutsAdminSettlementDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement date'**
+  String get walletPayoutsAdminSettlementDate;
+
+  /// No description provided for @walletPayoutsAdminFeeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the bank charged a fee, enter the amount here'**
+  String get walletPayoutsAdminFeeHint;
+
+  /// No description provided for @bankTrackingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank tracking code'**
+  String get bankTrackingCode;
+
   /// No description provided for @walletTopUpTitle.
   ///
   /// In en, this message translates to:
@@ -8732,6 +9317,570 @@ abstract class AppLocalizations {
   /// **'Review invoices before sending them to the tax system.'**
   String get taxWorkspaceSubtitle;
 
+  /// No description provided for @taxIntegrationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax system integration'**
+  String get taxIntegrationTitle;
+
+  /// No description provided for @taxIntegrationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage credentials and keys required to connect to the national tax platform.'**
+  String get taxIntegrationSubtitle;
+
+  /// No description provided for @taxSettingsTabConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection & basics'**
+  String get taxSettingsTabConnection;
+
+  /// No description provided for @taxSettingsTabKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys & certificates'**
+  String get taxSettingsTabKeys;
+
+  /// No description provided for @taxSettingsTabDataQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Data quality'**
+  String get taxSettingsTabDataQuality;
+
+  /// No description provided for @taxSettingsTabGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide'**
+  String get taxSettingsTabGuide;
+
+  /// No description provided for @taxGuideIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to complete the Tax System setup?'**
+  String get taxGuideIntroTitle;
+
+  /// No description provided for @taxGuideIntroDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.'**
+  String get taxGuideIntroDescription;
+
+  /// No description provided for @taxGuidePrereqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prerequisites before you begin'**
+  String get taxGuidePrereqTitle;
+
+  /// No description provided for @taxGuidePrereqItem1.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to the “Tax System” menu as a business admin'**
+  String get taxGuidePrereqItem1;
+
+  /// No description provided for @taxGuidePrereqItem2.
+  ///
+  /// In en, this message translates to:
+  /// **'Accurate registration data (national ID, economic code, corporate email)'**
+  String get taxGuidePrereqItem2;
+
+  /// No description provided for @taxGuidePrereqItem3.
+  ///
+  /// In en, this message translates to:
+  /// **'Active access to your taxpayer workspace on my.tax.gov.ir'**
+  String get taxGuidePrereqItem3;
+
+  /// No description provided for @taxGuideStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'1) Generate keys inside Hesabix'**
+  String get taxGuideStep1Title;
+
+  /// No description provided for @taxGuideStep1Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the “Generate new keys” card to create the private/public key pair and CSR.'**
+  String get taxGuideStep1Description;
+
+  /// No description provided for @taxGuideStep1Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Keys & Certificates tab and tap the generate button.'**
+  String get taxGuideStep1Bullet1;
+
+  /// No description provided for @taxGuideStep1Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Provide the exact taxpayer type and national ID.'**
+  String get taxGuideStep1Bullet2;
+
+  /// No description provided for @taxGuideStep1Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian/English names and email must match the tax records.'**
+  String get taxGuideStep1Bullet3;
+
+  /// No description provided for @taxGuideStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'2) Download and store securely'**
+  String get taxGuideStep2Title;
+
+  /// No description provided for @taxGuideStep2Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys are shown only once; store them safely.'**
+  String get taxGuideStep2Description;
+
+  /// No description provided for @taxGuideStep2Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the key files and keep them in offline, encrypted storage.'**
+  String get taxGuideStep2Bullet1;
+
+  /// No description provided for @taxGuideStep2Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Never share the private key outside the tax integration team.'**
+  String get taxGuideStep2Bullet2;
+
+  /// No description provided for @taxGuideStep2Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'If the private key is lost you must regenerate the entire pair.'**
+  String get taxGuideStep2Bullet3;
+
+  /// No description provided for @taxGuideStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'3) Register the public key on my.tax.gov.ir'**
+  String get taxGuideStep3Title;
+
+  /// No description provided for @taxGuideStep3Description.
+  ///
+  /// In en, this message translates to:
+  /// **'You must upload the Public Key to obtain the tax memory ID.'**
+  String get taxGuideStep3Description;
+
+  /// No description provided for @taxGuideStep3Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Log into my.tax.gov.ir and navigate to Case Access > Enrollment > Tax Memory ID.'**
+  String get taxGuideStep3Bullet1;
+
+  /// No description provided for @taxGuideStep3Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Select “By taxpayer” and upload the generated Public Key file.'**
+  String get taxGuideStep3Bullet2;
+
+  /// No description provided for @taxGuideStep3Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the issued memory ID and paste it back into Hesabix.'**
+  String get taxGuideStep3Bullet3;
+
+  /// No description provided for @taxGuideStep4Title.
+  ///
+  /// In en, this message translates to:
+  /// **'4) Complete the connection form in Hesabix'**
+  String get taxGuideStep4Title;
+
+  /// No description provided for @taxGuideStep4Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID, economic code and private key are mandatory under the Connection tab.'**
+  String get taxGuideStep4Description;
+
+  /// No description provided for @taxGuideStep4Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the ID and economic code without extra spaces.'**
+  String get taxGuideStep4Bullet1;
+
+  /// No description provided for @taxGuideStep4Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the PEM private key and optionally store the Public Key and CSR.'**
+  String get taxGuideStep4Bullet2;
+
+  /// No description provided for @taxGuideStep4Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable sandbox mode only for staging/testing environments.'**
+  String get taxGuideStep4Bullet3;
+
+  /// No description provided for @taxGuideStep5Title.
+  ///
+  /// In en, this message translates to:
+  /// **'5) Request the intermediate certificate via CSR'**
+  String get taxGuideStep5Title;
+
+  /// No description provided for @taxGuideStep5Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entities must submit the CSR to the national certificate authority.'**
+  String get taxGuideStep5Description;
+
+  /// No description provided for @taxGuideStep5Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit gica.ir and choose the CSR-based request option.'**
+  String get taxGuideStep5Bullet1;
+
+  /// No description provided for @taxGuideStep5Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in the company details and pay the issuance fee.'**
+  String get taxGuideStep5Bullet2;
+
+  /// No description provided for @taxGuideStep5Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'After in-person verification upload the issued certificate into Hesabix.'**
+  String get taxGuideStep5Bullet3;
+
+  /// No description provided for @taxGuideStep6Title.
+  ///
+  /// In en, this message translates to:
+  /// **'6) Assign product/service tax codes'**
+  String get taxGuideStep6Title;
+
+  /// No description provided for @taxGuideStep6Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices will be rejected if items lack tax code and unit.'**
+  String get taxGuideStep6Description;
+
+  /// No description provided for @taxGuideStep6Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit each item under Products & Services and add the 13-digit tax code.'**
+  String get taxGuideStep6Bullet1;
+
+  /// No description provided for @taxGuideStep6Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the public code list from stuffid.tax.gov.ir or request dedicated codes.'**
+  String get taxGuideStep6Bullet2;
+
+  /// No description provided for @taxGuideStep6Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Service codes can be obtained from portal.gs1-ir.org.'**
+  String get taxGuideStep6Bullet3;
+
+  /// No description provided for @taxGuideStep7Title.
+  ///
+  /// In en, this message translates to:
+  /// **'7) Run data quality checks before submission'**
+  String get taxGuideStep7Title;
+
+  /// No description provided for @taxGuideStep7Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the Data Quality tab and the tax workspace before sending invoices.'**
+  String get taxGuideStep7Description;
+
+  /// No description provided for @taxGuideStep7Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'The Data Quality tab highlights missing fields for products, customers and invoices.'**
+  String get taxGuideStep7Bullet1;
+
+  /// No description provided for @taxGuideStep7Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Add invoices to the tax workspace first and fix validation errors inline.'**
+  String get taxGuideStep7Bullet2;
+
+  /// No description provided for @taxGuideStep7Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Send single or bulk invoices only after the checklist is green.'**
+  String get taxGuideStep7Bullet3;
+
+  /// No description provided for @taxGuideResourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts and resources'**
+  String get taxGuideResourcesTitle;
+
+  /// No description provided for @taxGuideResourcesWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace: available under Sales > Tax Workspace.'**
+  String get taxGuideResourcesWorkspace;
+
+  /// No description provided for @taxGuideResourcesProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & Services: update tax codes via the same menu or Excel import.'**
+  String get taxGuideResourcesProducts;
+
+  /// No description provided for @taxGuideResourcesSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'For integration issues review the Tax Settings logs or open a support ticket.'**
+  String get taxGuideResourcesSupport;
+
+  /// No description provided for @taxMemoryIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID'**
+  String get taxMemoryIdLabel;
+
+  /// No description provided for @taxEconomicCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic code'**
+  String get taxEconomicCodeLabel;
+
+  /// No description provided for @taxSandboxModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox mode'**
+  String get taxSandboxModeLabel;
+
+  /// No description provided for @taxSandboxModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, requests are sent to the sandbox environment.'**
+  String get taxSandboxModeSubtitle;
+
+  /// No description provided for @taxPrivateKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key (PEM)'**
+  String get taxPrivateKeyLabel;
+
+  /// No description provided for @taxPublicKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key (optional)'**
+  String get taxPublicKeyLabel;
+
+  /// No description provided for @taxCertificateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Digital certificate (optional)'**
+  String get taxCertificateLabel;
+
+  /// No description provided for @taxCertificateRequestLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate request (CSR)'**
+  String get taxCertificateRequestLabel;
+
+  /// No description provided for @taxGenerateKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate new keys'**
+  String get taxGenerateKeys;
+
+  /// No description provided for @taxMemoryIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID is required'**
+  String get taxMemoryIdRequired;
+
+  /// No description provided for @taxEconomicCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic code is required'**
+  String get taxEconomicCodeRequired;
+
+  /// No description provided for @taxPrivateKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key is required'**
+  String get taxPrivateKeyRequired;
+
+  /// No description provided for @taxKeysGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys generated successfully'**
+  String get taxKeysGenerated;
+
+  /// No description provided for @taxSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax integration settings saved'**
+  String get taxSettingsSaved;
+
+  /// No description provided for @taxLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated: {date}'**
+  String taxLastUpdated(String date);
+
+  /// No description provided for @taxPersonTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer type'**
+  String get taxPersonTypeLabel;
+
+  /// No description provided for @taxPersonTypeNatural.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual'**
+  String get taxPersonTypeNatural;
+
+  /// No description provided for @taxPersonTypeLegal.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entity'**
+  String get taxPersonTypeLegal;
+
+  /// No description provided for @taxNationalIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer national ID'**
+  String get taxNationalIdLabel;
+
+  /// No description provided for @taxLegalNameFaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian company name'**
+  String get taxLegalNameFaLabel;
+
+  /// No description provided for @taxLegalNameEnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'English company name'**
+  String get taxLegalNameEnLabel;
+
+  /// No description provided for @taxLegalEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Corporate email'**
+  String get taxLegalEmailLabel;
+
+  /// No description provided for @taxDataQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data quality check'**
+  String get taxDataQualityTitle;
+
+  /// No description provided for @taxDataQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review missing tax data before submitting invoices.'**
+  String get taxDataQualitySubtitle;
+
+  /// No description provided for @taxDataQualityReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh report'**
+  String get taxDataQualityReload;
+
+  /// No description provided for @taxDataQualityProductsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & services'**
+  String get taxDataQualityProductsHeader;
+
+  /// No description provided for @taxDataQualityPersonsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons & customers'**
+  String get taxDataQualityPersonsHeader;
+
+  /// No description provided for @taxDataQualityMissingTaxCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Items missing tax code'**
+  String get taxDataQualityMissingTaxCode;
+
+  /// No description provided for @taxDataQualityMissingTaxUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Items missing tax unit'**
+  String get taxDataQualityMissingTaxUnit;
+
+  /// No description provided for @taxDataQualityMissingNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons missing national ID'**
+  String get taxDataQualityMissingNationalId;
+
+  /// No description provided for @taxDataQualityMissingEconomicId.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons missing economic ID'**
+  String get taxDataQualityMissingEconomicId;
+
+  /// No description provided for @taxDataQualitySamples.
+  ///
+  /// In en, this message translates to:
+  /// **'Samples'**
+  String get taxDataQualitySamples;
+
+  /// No description provided for @taxDataQualityNoSamples.
+  ///
+  /// In en, this message translates to:
+  /// **'No samples available.'**
+  String get taxDataQualityNoSamples;
+
+  /// No description provided for @taxDataQualityNoIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'All good! No pending data issues.'**
+  String get taxDataQualityNoIssues;
+
+  /// No description provided for @taxDataQualityNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No report to display.'**
+  String get taxDataQualityNoData;
+
+  /// No description provided for @taxDataQualityFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to fetch quality report: {error}'**
+  String taxDataQualityFetchError(String error);
+
+  /// No description provided for @taxDataQualityTaxCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax code'**
+  String get taxDataQualityTaxCodeLabel;
+
+  /// No description provided for @taxDataQualityTaxUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax unit'**
+  String get taxDataQualityTaxUnitLabel;
+
+  /// No description provided for @taxDataQualityNationalIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get taxDataQualityNationalIdLabel;
+
+  /// No description provided for @taxDataQualityEconomicIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic ID'**
+  String get taxDataQualityEconomicIdLabel;
+
+  /// No description provided for @taxValidationIssuesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax validation issues'**
+  String get taxValidationIssuesTitle;
+
+  /// No description provided for @taxValidationIssuesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve the following items before sending invoices to the tax platform.'**
+  String get taxValidationIssuesDescription;
+
+  /// No description provided for @taxValidationIssuesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No issue details provided.'**
+  String get taxValidationIssuesEmpty;
+
   /// No description provided for @taxAddToWorkspaceSingle.
   ///
   /// In en, this message translates to:
@@ -8971,6 +10120,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to send selected invoices: {error}'**
   String taxSendSelectedErrorWithMessage(String error);
+
+  /// No description provided for @taxSendSelectedPartialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{success} sent, {failed} failed'**
+  String taxSendSelectedPartialTitle(int success, int failed);
+
+  /// No description provided for @taxBatchFailedRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice {id}'**
+  String taxBatchFailedRow(String id);
+
+  /// No description provided for @taxInquireSelectedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status for selected invoices'**
+  String get taxInquireSelectedTooltip;
+
+  /// No description provided for @taxInquireSelectedButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status ({count})'**
+  String taxInquireSelectedButton(int count);
+
+  /// No description provided for @taxInquireSelectedDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status'**
+  String get taxInquireSelectedDialogTitle;
+
+  /// No description provided for @taxInquireSelectedDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status for {count} selected invoices?'**
+  String taxInquireSelectedDialogMessage(int count);
+
+  /// No description provided for @taxInquireSelectedErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to inquire status: {error}'**
+  String taxInquireSelectedErrorWithMessage(String error);
+
+  /// No description provided for @taxInquiryResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Status inquiry result'**
+  String get taxInquiryResultTitle;
+
+  /// No description provided for @taxInquiryResultEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No results to display.'**
+  String get taxInquiryResultEmpty;
+
+  /// No description provided for @taxInquiryStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown status'**
+  String get taxInquiryStatusUnknown;
 
   /// No description provided for @taxRemoveSelectedDialogTitle.
   ///
@@ -9421,6 +10630,2052 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Print PDF'**
   String get printWarehouseDocument;
+
+  /// No description provided for @applicationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Name'**
+  String get applicationName;
+
+  /// No description provided for @applicationVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Version'**
+  String get applicationVersion;
+
+  /// No description provided for @defaultLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Language'**
+  String get defaultLanguage;
+
+  /// No description provided for @defaultTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Theme'**
+  String get defaultTheme;
+
+  /// No description provided for @enableUserRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable User Registration'**
+  String get enableUserRegistration;
+
+  /// No description provided for @enableEmailVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Email Verification'**
+  String get enableEmailVerification;
+
+  /// No description provided for @sessionTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Timeout'**
+  String get sessionTimeout;
+
+  /// No description provided for @sessionTimeoutMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Timeout (minutes)'**
+  String get sessionTimeoutMinutes;
+
+  /// No description provided for @maxFileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Max File Size'**
+  String get maxFileSize;
+
+  /// No description provided for @maxFileSizeMB.
+  ///
+  /// In en, this message translates to:
+  /// **'Max File Size (MB)'**
+  String get maxFileSizeMB;
+
+  /// No description provided for @maxUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Users'**
+  String get maxUsers;
+
+  /// No description provided for @maintenanceMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance Mode'**
+  String get maintenanceMode;
+
+  /// No description provided for @unlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get unlimited;
+
+  /// No description provided for @errorLoadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading settings'**
+  String get errorLoadingSettings;
+
+  /// No description provided for @errorSavingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving settings'**
+  String get errorSavingSettings;
+
+  /// No description provided for @settingsSavedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved successfully'**
+  String get settingsSavedSuccessfully;
+
+  /// No description provided for @persian.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian'**
+  String get persian;
+
+  /// No description provided for @english.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get english;
+
+  /// No description provided for @zeroMeansUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'0 = Unlimited'**
+  String get zeroMeansUnlimited;
+
+  /// No description provided for @otpLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP Login'**
+  String get otpLogin;
+
+  /// No description provided for @otpLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login with OTP'**
+  String get otpLoginTitle;
+
+  /// No description provided for @otpLoginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code will be sent to your email, mobile number or Telegram'**
+  String get otpLoginSubtitle;
+
+  /// No description provided for @otpLoginIdentifierHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email or mobile number'**
+  String get otpLoginIdentifierHint;
+
+  /// No description provided for @otpLoginIdentifierRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or mobile number is required'**
+  String get otpLoginIdentifierRequired;
+
+  /// No description provided for @otpCodeSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent'**
+  String get otpCodeSent;
+
+  /// No description provided for @otpChannelSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive code via:'**
+  String get otpChannelSelectionTitle;
+
+  /// No description provided for @otpChannelSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get otpChannelSms;
+
+  /// No description provided for @otpChannelEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get otpChannelEmail;
+
+  /// No description provided for @otpChannelTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get otpChannelTelegram;
+
+  /// No description provided for @otpSendCodeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send login code'**
+  String get otpSendCodeButton;
+
+  /// No description provided for @otpChangeChannelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change delivery method:'**
+  String get otpChangeChannelTitle;
+
+  /// No description provided for @otpChangeIdentifier.
+  ///
+  /// In en, this message translates to:
+  /// **'Change identifier'**
+  String get otpChangeIdentifier;
+
+  /// No description provided for @otpSelectChannelError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a delivery channel'**
+  String get otpSelectChannelError;
+
+  /// No description provided for @otpCaptchaError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading captcha'**
+  String get otpCaptchaError;
+
+  /// No description provided for @otpCodeSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code sent to your {channel}'**
+  String otpCodeSentMessage(String channel);
+
+  /// No description provided for @otpCodeResentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code resent'**
+  String get otpCodeResentMessage;
+
+  /// No description provided for @otpSendError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sending login code'**
+  String get otpSendError;
+
+  /// No description provided for @otpEnterCaptchaError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter captcha code'**
+  String get otpEnterCaptchaError;
+
+  /// No description provided for @workflows.
+  ///
+  /// In en, this message translates to:
+  /// **'Automations'**
+  String get workflows;
+
+  /// No description provided for @workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get workflow;
+
+  /// No description provided for @newWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'New Workflow'**
+  String get newWorkflow;
+
+  /// No description provided for @editWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workflow'**
+  String get editWorkflow;
+
+  /// No description provided for @workflowSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow saved'**
+  String get workflowSaved;
+
+  /// No description provided for @workflowDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Node deleted'**
+  String get workflowDeleted;
+
+  /// No description provided for @workflowDuplicated.
+  ///
+  /// In en, this message translates to:
+  /// **'Node duplicated'**
+  String get workflowDuplicated;
+
+  /// No description provided for @workflowCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get workflowCopy;
+
+  /// No description provided for @workflowUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workflowUndo;
+
+  /// No description provided for @workflowSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workflowSave;
+
+  /// No description provided for @workflowCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workflowCancel;
+
+  /// No description provided for @workflowClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get workflowClose;
+
+  /// No description provided for @workflowValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation Error'**
+  String get workflowValidationError;
+
+  /// No description provided for @workflowErrorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading data'**
+  String get workflowErrorLoading;
+
+  /// No description provided for @workflowErrorSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving'**
+  String get workflowErrorSaving;
+
+  /// No description provided for @workflowStatusUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow status updated'**
+  String get workflowStatusUpdated;
+
+  /// No description provided for @workflowExecuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow executed'**
+  String get workflowExecuted;
+
+  /// No description provided for @workflowErrorExecuting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error executing workflow'**
+  String get workflowErrorExecuting;
+
+  /// No description provided for @workflowNoAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to workflows.'**
+  String get workflowNoAccess;
+
+  /// No description provided for @workflowNoAccessEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to workflow editor.'**
+  String get workflowNoAccessEditor;
+
+  /// No description provided for @workflowNoWorkflows.
+  ///
+  /// In en, this message translates to:
+  /// **'No workflows yet.'**
+  String get workflowNoWorkflows;
+
+  /// No description provided for @workflowCreateFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the button below to create your first automation.'**
+  String get workflowCreateFirst;
+
+  /// No description provided for @workflowCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Workflow'**
+  String get workflowCreate;
+
+  /// No description provided for @workflowRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get workflowRefresh;
+
+  /// No description provided for @workflowRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get workflowRunNow;
+
+  /// No description provided for @workflowExecutionHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution history'**
+  String get workflowExecutionHistory;
+
+  /// No description provided for @workflowEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get workflowEdit;
+
+  /// No description provided for @workflowLastUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Last update'**
+  String get workflowLastUpdate;
+
+  /// No description provided for @workflowAvailableTriggers.
+  ///
+  /// In en, this message translates to:
+  /// **'Available triggers'**
+  String get workflowAvailableTriggers;
+
+  /// No description provided for @workflowAvailableActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Available actions'**
+  String get workflowAvailableActions;
+
+  /// No description provided for @workflowFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get workflowFilters;
+
+  /// No description provided for @workflowStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowStatus;
+
+  /// No description provided for @workflowSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get workflowSearch;
+
+  /// No description provided for @workflowAllStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'All statuses'**
+  String get workflowAllStatuses;
+
+  /// No description provided for @workflowOnlyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Only active'**
+  String get workflowOnlyActive;
+
+  /// No description provided for @workflowInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get workflowInactive;
+
+  /// No description provided for @workflowDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get workflowDraft;
+
+  /// No description provided for @workflowActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get workflowActive;
+
+  /// No description provided for @workflowNodeDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Node deleted'**
+  String get workflowNodeDeleted;
+
+  /// No description provided for @workflowNodeDuplicated.
+  ///
+  /// In en, this message translates to:
+  /// **'Node duplicated'**
+  String get workflowNodeDuplicated;
+
+  /// No description provided for @workflowNodeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get workflowNodeSettings;
+
+  /// No description provided for @workflowNodeNoSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'This node does not require any special settings.'**
+  String get workflowNodeNoSettings;
+
+  /// No description provided for @workflowNodeFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required'**
+  String get workflowNodeFieldRequired;
+
+  /// No description provided for @workflowNodeArrayType.
+  ///
+  /// In en, this message translates to:
+  /// **'Array (needs more complex UI)'**
+  String get workflowNodeArrayType;
+
+  /// No description provided for @workflowNodeObjectType.
+  ///
+  /// In en, this message translates to:
+  /// **'Object (needs more complex UI)'**
+  String get workflowNodeObjectType;
+
+  /// No description provided for @workflowExecutionLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution logs'**
+  String get workflowExecutionLogs;
+
+  /// No description provided for @workflowNoLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'No logs found'**
+  String get workflowNoLogs;
+
+  /// No description provided for @workflowNoExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'No executions yet'**
+  String get workflowNoExecutions;
+
+  /// No description provided for @workflowStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get workflowStarted;
+
+  /// No description provided for @workflowCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get workflowCompleted;
+
+  /// No description provided for @workflowLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get workflowLogs;
+
+  /// No description provided for @workflowErrorLoadingLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading logs'**
+  String get workflowErrorLoadingLogs;
+
+  /// No description provided for @workflowErrorUpdatingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating status'**
+  String get workflowErrorUpdatingStatus;
+
+  /// No description provided for @workflowHierarchicalLayoutApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Hierarchical layout applied'**
+  String get workflowHierarchicalLayoutApplied;
+
+  /// No description provided for @workflowForceDirectedLayoutApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Force-directed layout applied'**
+  String get workflowForceDirectedLayoutApplied;
+
+  /// No description provided for @settingsCategoriesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get settingsCategoriesCount;
+
+  /// No description provided for @settingsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsCount;
+
+  /// No description provided for @expandAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand All'**
+  String get expandAllCategories;
+
+  /// No description provided for @collapseAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse All'**
+  String get collapseAllCategories;
+
+  /// No description provided for @noSettingsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found'**
+  String get noSettingsFound;
+
+  /// No description provided for @searchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Results'**
+  String get searchResults;
+
+  /// No description provided for @searchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} result'**
+  String searchResultCount(int count);
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found for \"{query}\"'**
+  String noSearchResults(String query);
+
+  /// No description provided for @searchSettingsPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings...'**
+  String get searchSettingsPlaceholder;
+
+  /// No description provided for @noSettingsInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found in this category'**
+  String get noSettingsInCategory;
+
+  /// No description provided for @settingsCategoryCoreConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Core & Configuration'**
+  String get settingsCategoryCoreConfiguration;
+
+  /// No description provided for @settingsCategoryCoreConfigurationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic system settings and configuration'**
+  String get settingsCategoryCoreConfigurationDescription;
+
+  /// No description provided for @settingsCategoryStorageFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & Files'**
+  String get settingsCategoryStorageFiles;
+
+  /// No description provided for @settingsCategoryStorageFilesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'File storage and storage plan management'**
+  String get settingsCategoryStorageFilesDescription;
+
+  /// No description provided for @settingsCategoryFinancialPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial & Payment'**
+  String get settingsCategoryFinancialPayment;
+
+  /// No description provided for @settingsCategoryFinancialPaymentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet and payment gateway settings'**
+  String get settingsCategoryFinancialPaymentDescription;
+
+  /// No description provided for @settingsCategoryUsersBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Users & Businesses'**
+  String get settingsCategoryUsersBusinesses;
+
+  /// No description provided for @settingsCategoryUsersBusinessesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'User and business management'**
+  String get settingsCategoryUsersBusinessesDescription;
+
+  /// No description provided for @settingsCategoryCommunications.
+  ///
+  /// In en, this message translates to:
+  /// **'Communications'**
+  String get settingsCategoryCommunications;
+
+  /// No description provided for @settingsCategoryCommunicationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Email, notifications and announcements'**
+  String get settingsCategoryCommunicationsDescription;
+
+  /// No description provided for @settingsCategoryAI.
+  ///
+  /// In en, this message translates to:
+  /// **'Artificial Intelligence'**
+  String get settingsCategoryAI;
+
+  /// No description provided for @settingsCategoryAIDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'AI settings, plans and prompts'**
+  String get settingsCategoryAIDescription;
+
+  /// No description provided for @settingsCategoryExternalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'External Services'**
+  String get settingsCategoryExternalServices;
+
+  /// No description provided for @settingsCategoryExternalServicesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'External service integrations'**
+  String get settingsCategoryExternalServicesDescription;
+
+  /// No description provided for @settingsCategoryMonitoringLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitoring & Logs'**
+  String get settingsCategoryMonitoringLogs;
+
+  /// No description provided for @settingsCategoryMonitoringLogsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'System monitoring and logging'**
+  String get settingsCategoryMonitoringLogsDescription;
+
+  /// No description provided for @settingsShareLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Links'**
+  String get settingsShareLinks;
+
+  /// No description provided for @settingsShareLinksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure public share link destinations'**
+  String get settingsShareLinksDescription;
+
+  /// No description provided for @settingsRedisCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Redis Cache'**
+  String get settingsRedisCache;
+
+  /// No description provided for @settingsRedisCacheDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Redis cache for improved performance'**
+  String get settingsRedisCacheDescription;
+
+  /// No description provided for @settingsStoragePlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Plans'**
+  String get settingsStoragePlans;
+
+  /// No description provided for @settingsStoragePlansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage storage plans and pricing'**
+  String get settingsStoragePlansDescription;
+
+  /// No description provided for @settingsDocumentMonetization.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Monetization'**
+  String get settingsDocumentMonetization;
+
+  /// No description provided for @settingsDocumentMonetizationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage document revenue scenarios and packages'**
+  String get settingsDocumentMonetizationDescription;
+
+  /// No description provided for @settingsMarketplacePlugins.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace Plugins Management'**
+  String get settingsMarketplacePlugins;
+
+  /// No description provided for @settingsMarketplacePluginsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage plugins and plans for the marketplace'**
+  String get settingsMarketplacePluginsDescription;
+
+  /// No description provided for @settingsWalletSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet Settings'**
+  String get settingsWalletSettings;
+
+  /// No description provided for @settingsWalletSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set base currency and policies'**
+  String get settingsWalletSettingsDescription;
+
+  /// No description provided for @settingsPaymentGateways.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Gateways'**
+  String get settingsPaymentGateways;
+
+  /// No description provided for @settingsPaymentGatewaysDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage and configure payment gateways'**
+  String get settingsPaymentGatewaysDescription;
+
+  /// No description provided for @settingsBusinessesManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses Management'**
+  String get settingsBusinessesManagement;
+
+  /// No description provided for @settingsBusinessesManagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage all system businesses'**
+  String get settingsBusinessesManagementDescription;
+
+  /// No description provided for @settingsAnnouncements.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get settingsAnnouncements;
+
+  /// No description provided for @settingsAnnouncementsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create/edit/publish system announcements'**
+  String get settingsAnnouncementsDescription;
+
+  /// No description provided for @settingsNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsNotifications;
+
+  /// No description provided for @settingsNotificationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable/disable channels and send test messages'**
+  String get settingsNotificationsDescription;
+
+  /// No description provided for @settingsNotificationTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Templates'**
+  String get settingsNotificationTemplates;
+
+  /// No description provided for @settingsNotificationTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage templates for channels and languages'**
+  String get settingsNotificationTemplatesDescription;
+
+  /// No description provided for @settingsAISettings.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Settings'**
+  String get settingsAISettings;
+
+  /// No description provided for @settingsAISettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Provider, model and API Key'**
+  String get settingsAISettingsDescription;
+
+  /// No description provided for @settingsAIPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Plans'**
+  String get settingsAIPlans;
+
+  /// No description provided for @settingsAIPlansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage AI usage plans and pricing'**
+  String get settingsAIPlansDescription;
+
+  /// No description provided for @settingsAIPrompts.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Prompts'**
+  String get settingsAIPrompts;
+
+  /// No description provided for @settingsAIPromptsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage default prompts for different roles'**
+  String get settingsAIPromptsDescription;
+
+  /// No description provided for @settingsZohalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Zohal Services'**
+  String get settingsZohalServices;
+
+  /// No description provided for @settingsZohalServicesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Zohal inquiry services and API settings'**
+  String get settingsZohalServicesDescription;
+
+  /// No description provided for @settingsZohalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Zohal Settings'**
+  String get settingsZohalSettings;
+
+  /// No description provided for @settingsZohalSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set API Key and configure Zohal service'**
+  String get settingsZohalSettingsDescription;
+
+  /// No description provided for @settingsTaxProductCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax Product Codes'**
+  String get settingsTaxProductCodes;
+
+  /// No description provided for @settingsTaxProductCodesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and import new list from XML file'**
+  String get settingsTaxProductCodesDescription;
+
+  /// No description provided for @settingsSystemMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'System Monitoring'**
+  String get settingsSystemMonitoring;
+
+  /// No description provided for @settingsSystemMonitoringDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check system status, hardware resources and services'**
+  String get settingsSystemMonitoringDescription;
+
+  /// No description provided for @settingsServiceLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Service Logs'**
+  String get settingsServiceLogs;
+
+  /// No description provided for @settingsServiceLogsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View logs of hesabix-api and hesabix-rq-worker and manage services'**
+  String get settingsServiceLogsDescription;
+
+  /// No description provided for @warranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty'**
+  String get warranty;
+
+  /// No description provided for @warrantyManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Management'**
+  String get warrantyManagement;
+
+  /// No description provided for @warrantySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Settings'**
+  String get warrantySettings;
+
+  /// No description provided for @warrantyCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Codes'**
+  String get warrantyCodes;
+
+  /// No description provided for @warrantyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Code'**
+  String get warrantyCode;
+
+  /// No description provided for @warrantySerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Serial'**
+  String get warrantySerial;
+
+  /// No description provided for @generateWarrantyCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Warranty Codes'**
+  String get generateWarrantyCodes;
+
+  /// No description provided for @warrantyActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Activation'**
+  String get warrantyActivation;
+
+  /// No description provided for @warrantyTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Tracking'**
+  String get warrantyTracking;
+
+  /// No description provided for @warrantyStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Status'**
+  String get warrantyStatus;
+
+  /// No description provided for @warrantyGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated'**
+  String get warrantyGenerated;
+
+  /// No description provided for @warrantyActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Activated'**
+  String get warrantyActivated;
+
+  /// No description provided for @warrantyExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has expired'**
+  String get warrantyExpired;
+
+  /// No description provided for @warrantyUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get warrantyUsed;
+
+  /// No description provided for @warrantyRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has been revoked'**
+  String get warrantyRevoked;
+
+  /// No description provided for @warrantyDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Duration'**
+  String get warrantyDuration;
+
+  /// No description provided for @warrantyDurationDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Duration (Days)'**
+  String get warrantyDurationDays;
+
+  /// No description provided for @warrantyExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires At'**
+  String get warrantyExpiresAt;
+
+  /// No description provided for @warrantyGeneratedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated At'**
+  String get warrantyGeneratedAt;
+
+  /// No description provided for @warrantyActivatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Activated At'**
+  String get warrantyActivatedAt;
+
+  /// No description provided for @warrantyProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Product'**
+  String get warrantyProduct;
+
+  /// No description provided for @warrantyCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get warrantyCustomer;
+
+  /// No description provided for @warrantyCustomerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Name'**
+  String get warrantyCustomerName;
+
+  /// No description provided for @warrantyCustomerPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Phone'**
+  String get warrantyCustomerPhone;
+
+  /// No description provided for @warrantyCustomerEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Email'**
+  String get warrantyCustomerEmail;
+
+  /// No description provided for @warrantyProductSerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Serial'**
+  String get warrantyProductSerial;
+
+  /// No description provided for @activateWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate Warranty'**
+  String get activateWarranty;
+
+  /// No description provided for @trackWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Warranty'**
+  String get trackWarranty;
+
+  /// No description provided for @warrantyTrackingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Tracking Link'**
+  String get warrantyTrackingLink;
+
+  /// No description provided for @warrantyCodeFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Code Format'**
+  String get warrantyCodeFormat;
+
+  /// No description provided for @warrantyCodePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Code Prefix'**
+  String get warrantyCodePrefix;
+
+  /// No description provided for @warrantySerialFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial Format'**
+  String get warrantySerialFormat;
+
+  /// No description provided for @warrantySerialLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial Length'**
+  String get warrantySerialLength;
+
+  /// No description provided for @warrantyRandom.
+  ///
+  /// In en, this message translates to:
+  /// **'Random'**
+  String get warrantyRandom;
+
+  /// No description provided for @warrantySequential.
+  ///
+  /// In en, this message translates to:
+  /// **'Sequential'**
+  String get warrantySequential;
+
+  /// No description provided for @warrantyCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get warrantyCustom;
+
+  /// No description provided for @warrantySecuritySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Settings'**
+  String get warrantySecuritySettings;
+
+  /// No description provided for @warrantyRequireSerialVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Require Product Serial Verification'**
+  String get warrantyRequireSerialVerification;
+
+  /// No description provided for @warrantyRequireProductInstanceMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Require Product Instance Match'**
+  String get warrantyRequireProductInstanceMatch;
+
+  /// No description provided for @warrantyMaxActivationAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Activation Attempts'**
+  String get warrantyMaxActivationAttempts;
+
+  /// No description provided for @warrantyActivationLockoutDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Lockout Duration (Minutes)'**
+  String get warrantyActivationLockoutDuration;
+
+  /// No description provided for @warrantyAutoLinkToPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Link to Person'**
+  String get warrantyAutoLinkToPerson;
+
+  /// No description provided for @warrantyEnableTrackingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Tracking Link'**
+  String get warrantyEnableTrackingLink;
+
+  /// No description provided for @warrantyTrackingLinkExpiresDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking Link Expires (Days)'**
+  String get warrantyTrackingLinkExpiresDays;
+
+  /// No description provided for @warrantyEnableSmsNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send SMS on Activation'**
+  String get warrantyEnableSmsNotification;
+
+  /// No description provided for @warrantyEnableEmailNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Email on Activation'**
+  String get warrantyEnableEmailNotification;
+
+  /// No description provided for @warrantyCodeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty code not found'**
+  String get warrantyCodeNotFound;
+
+  /// No description provided for @warrantyInvalidSerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid warranty serial'**
+  String get warrantyInvalidSerial;
+
+  /// No description provided for @warrantyAlreadyActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has already been activated'**
+  String get warrantyAlreadyActivated;
+
+  /// No description provided for @warrantyActivationSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty activated successfully'**
+  String get warrantyActivationSuccess;
+
+  /// No description provided for @warrantyActivationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty activation failed'**
+  String get warrantyActivationFailed;
+
+  /// No description provided for @warrantyTooManyAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many activation attempts'**
+  String get warrantyTooManyAttempts;
+
+  /// No description provided for @warrantyProductSerialRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Product serial is required'**
+  String get warrantyProductSerialRequired;
+
+  /// No description provided for @warrantyProductSerialNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Product serial not found'**
+  String get warrantyProductSerialNotFound;
+
+  /// No description provided for @warrantyLinkNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link not found'**
+  String get warrantyLinkNotFound;
+
+  /// No description provided for @warrantyLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link has expired'**
+  String get warrantyLinkExpired;
+
+  /// No description provided for @warrantyLinkInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link is inactive'**
+  String get warrantyLinkInactive;
+
+  /// No description provided for @warrantyPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty plugin is not active for this business'**
+  String get warrantyPluginNotActive;
+
+  /// No description provided for @warrantyGenerateCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Warranty Codes'**
+  String get warrantyGenerateCodes;
+
+  /// No description provided for @warrantyQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get warrantyQuantity;
+
+  /// No description provided for @warrantyCustomSerials.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Serials'**
+  String get warrantyCustomSerials;
+
+  /// No description provided for @warrantyCustomCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Codes'**
+  String get warrantyCustomCodes;
+
+  /// No description provided for @warrantyListCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'List Warranty Codes'**
+  String get warrantyListCodes;
+
+  /// No description provided for @warrantyFilterByStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Status'**
+  String get warrantyFilterByStatus;
+
+  /// No description provided for @warrantyFilterByProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Product'**
+  String get warrantyFilterByProduct;
+
+  /// No description provided for @warrantyEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Events'**
+  String get warrantyEvents;
+
+  /// No description provided for @warrantyEventActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Activation'**
+  String get warrantyEventActivation;
+
+  /// No description provided for @warrantyEventRepairRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair Request'**
+  String get warrantyEventRepairRequest;
+
+  /// No description provided for @warrantyEventRepairCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair Completed'**
+  String get warrantyEventRepairCompleted;
+
+  /// No description provided for @warrantyEventReplacement.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement'**
+  String get warrantyEventReplacement;
+
+  /// No description provided for @warrantyEventExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get warrantyEventExpired;
+
+  /// No description provided for @warrantyEventRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get warrantyEventRevoked;
+
+  /// No description provided for @warrantyManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Warranty'**
+  String get warrantyManage;
+
+  /// No description provided for @identityInquiryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity Inquiry'**
+  String get identityInquiryTitle;
+
+  /// No description provided for @identityInquirySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter national ID and birth date'**
+  String get identityInquirySubtitle;
+
+  /// No description provided for @nationalIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'10-digit national ID'**
+  String get nationalIdHint;
+
+  /// No description provided for @nationalIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID is required'**
+  String get nationalIdRequired;
+
+  /// No description provided for @nationalIdInvalidLength.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID must be 10 digits'**
+  String get nationalIdInvalidLength;
+
+  /// No description provided for @nationalIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid national ID'**
+  String get nationalIdInvalid;
+
+  /// No description provided for @birthDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Birth Date'**
+  String get birthDate;
+
+  /// No description provided for @birthDateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Jalali date (YYYY-MM-DD or YYYY/MM/DD)'**
+  String get birthDateHint;
+
+  /// No description provided for @birthDateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Birth date is required'**
+  String get birthDateRequired;
+
+  /// No description provided for @birthDateInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid date format'**
+  String get birthDateInvalid;
+
+  /// No description provided for @selectBirthDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Date'**
+  String get selectBirthDate;
+
+  /// No description provided for @inquire.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire'**
+  String get inquire;
+
+  /// No description provided for @inquiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiring...'**
+  String get inquiring;
+
+  /// No description provided for @inquiryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiry Error'**
+  String get inquiryError;
+
+  /// No description provided for @inquiryErrorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiry error:'**
+  String get inquiryErrorPrefix;
+
+  /// No description provided for @unknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get unknownError;
+
+  /// No description provided for @noMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No Match'**
+  String get noMatch;
+
+  /// No description provided for @noMatchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID and birth date do not match'**
+  String get noMatchDescription;
+
+  /// No description provided for @personalInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal Information'**
+  String get personalInformation;
+
+  /// No description provided for @fatherName.
+  ///
+  /// In en, this message translates to:
+  /// **'Father Name'**
+  String get fatherName;
+
+  /// No description provided for @alive.
+  ///
+  /// In en, this message translates to:
+  /// **'Alive'**
+  String get alive;
+
+  /// No description provided for @deceased.
+  ///
+  /// In en, this message translates to:
+  /// **'Deceased'**
+  String get deceased;
+
+  /// No description provided for @newInquiry.
+  ///
+  /// In en, this message translates to:
+  /// **'New Inquiry'**
+  String get newInquiry;
+
+  /// No description provided for @identityInquiryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You can inquiry personal identity information by entering national ID and birth date'**
+  String get identityInquiryDescription;
+
+  /// No description provided for @noResultAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: No result available'**
+  String get noResultAvailable;
+
+  /// No description provided for @accountSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get accountSettingsTitle;
+
+  /// No description provided for @accountSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage and configure all aspects of your account'**
+  String get accountSettingsSubtitle;
+
+  /// No description provided for @accountSettingsMarketingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage referral links and marketing reports'**
+  String get accountSettingsMarketingDescription;
+
+  /// No description provided for @accountSettingsNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get accountSettingsNotificationsTitle;
+
+  /// No description provided for @accountSettingsNotificationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification channel settings and configuration'**
+  String get accountSettingsNotificationsDescription;
+
+  /// No description provided for @accountSettingsSignatureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature & Profile Picture'**
+  String get accountSettingsSignatureTitle;
+
+  /// No description provided for @accountSettingsSignatureDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and manage personal signature and profile picture'**
+  String get accountSettingsSignatureDescription;
+
+  /// No description provided for @accountSettingsApiKeysTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'API Keys'**
+  String get accountSettingsApiKeysTitle;
+
+  /// No description provided for @accountSettingsApiKeysDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage API keys for system access'**
+  String get accountSettingsApiKeysDescription;
+
+  /// No description provided for @accountSettingsLoginSessionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login Sessions'**
+  String get accountSettingsLoginSessionsTitle;
+
+  /// No description provided for @accountSettingsLoginSessionsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage connected devices to your account'**
+  String get accountSettingsLoginSessionsDescription;
+
+  /// No description provided for @accountSettingsChangePasswordDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Change account password'**
+  String get accountSettingsChangePasswordDescription;
+
+  /// No description provided for @accountSettingsVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile & Email Verification'**
+  String get accountSettingsVerificationTitle;
+
+  /// No description provided for @accountSettingsVerificationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify mobile number and email for enhanced security'**
+  String get accountSettingsVerificationDescription;
+
+  /// No description provided for @accountSettingsNotificationHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification History'**
+  String get accountSettingsNotificationHistoryTitle;
+
+  /// No description provided for @accountSettingsNotificationHistoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View all sent notifications (OTP, password reset, tickets, etc.)'**
+  String get accountSettingsNotificationHistoryDescription;
+
+  /// No description provided for @apiKeysPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage API Keys'**
+  String get apiKeysPageTitle;
+
+  /// No description provided for @apiKeyErrorLoadingKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading keys'**
+  String get apiKeyErrorLoadingKeys;
+
+  /// No description provided for @apiKeyErrorCreatingKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Error creating key'**
+  String get apiKeyErrorCreatingKey;
+
+  /// No description provided for @apiKeyCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key created'**
+  String get apiKeyCreatedSuccessfully;
+
+  /// No description provided for @apiKeySaveWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please save this key. This is the only time it will be displayed.'**
+  String get apiKeySaveWarning;
+
+  /// No description provided for @apiKeyClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get apiKeyClose;
+
+  /// No description provided for @apiKeyCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get apiKeyCopy;
+
+  /// No description provided for @apiKeyCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Key copied'**
+  String get apiKeyCopied;
+
+  /// No description provided for @apiKeyUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Key updated successfully'**
+  String get apiKeyUpdatedSuccessfully;
+
+  /// No description provided for @apiKeyErrorUpdating.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating key'**
+  String get apiKeyErrorUpdating;
+
+  /// No description provided for @apiKeyDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete API Key'**
+  String get apiKeyDeleteTitle;
+
+  /// No description provided for @apiKeyDeleteConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete the key \"{name}\"?\nThis action is irreversible.'**
+  String apiKeyDeleteConfirmation(String name);
+
+  /// No description provided for @apiKeyDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Key deleted successfully'**
+  String get apiKeyDeletedSuccessfully;
+
+  /// No description provided for @apiKeyErrorDeleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting key'**
+  String get apiKeyErrorDeleting;
+
+  /// No description provided for @apiKeyFilterActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get apiKeyFilterActive;
+
+  /// No description provided for @apiKeyFilterRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get apiKeyFilterRevoked;
+
+  /// No description provided for @apiKeyFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get apiKeyFilterAll;
+
+  /// No description provided for @apiKeyNoActiveKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No active keys'**
+  String get apiKeyNoActiveKeys;
+
+  /// No description provided for @apiKeyNoRevokedKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No revoked keys'**
+  String get apiKeyNoRevokedKeys;
+
+  /// No description provided for @apiKeyNoKeysCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'No API keys created'**
+  String get apiKeyNoKeysCreated;
+
+  /// No description provided for @apiKeyCreateNewButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Key'**
+  String get apiKeyCreateNewButton;
+
+  /// No description provided for @apiKeyCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the create button to create a new key'**
+  String get apiKeyCreateHint;
+
+  /// No description provided for @apiKeyNoRevokedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No revoked keys to display'**
+  String get apiKeyNoRevokedHint;
+
+  /// No description provided for @apiKeyUsageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a key to use the API in other applications'**
+  String get apiKeyUsageHint;
+
+  /// No description provided for @apiKeyEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get apiKeyEdit;
+
+  /// No description provided for @apiKeyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get apiKeyDelete;
+
+  /// No description provided for @apiKeyCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get apiKeyCreatedAt;
+
+  /// No description provided for @apiKeyLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Used'**
+  String get apiKeyLastUsed;
+
+  /// No description provided for @apiKeyExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires'**
+  String get apiKeyExpiresAt;
+
+  /// No description provided for @apiKeyRevokedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get apiKeyRevokedAt;
+
+  /// No description provided for @apiKeyAllowedIPs.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed IPs'**
+  String get apiKeyAllowedIPs;
+
+  /// No description provided for @apiKeyCreateNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New API Key'**
+  String get apiKeyCreateNewTitle;
+
+  /// No description provided for @apiKeyNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Key Name'**
+  String get apiKeyNameLabel;
+
+  /// No description provided for @apiKeyNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: Production API Key'**
+  String get apiKeyNameHint;
+
+  /// No description provided for @apiKeyScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Access Scope (JSON)'**
+  String get apiKeyScopeLabel;
+
+  /// No description provided for @apiKeyScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional - Example: \'{\'\"read\": true, \"write\": false\'}\''**
+  String get apiKeyScopeHint;
+
+  /// No description provided for @apiKeyIPsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed IP List'**
+  String get apiKeyIPsLabel;
+
+  /// No description provided for @apiKeyIPsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Comma separated - Example: 192.168.1.1, 10.0.0.1'**
+  String get apiKeyIPsHint;
+
+  /// No description provided for @apiKeyExpiryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date and Time (Optional)'**
+  String get apiKeyExpiryLabel;
+
+  /// No description provided for @apiKeyExpiryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get apiKeyExpiryHint;
+
+  /// No description provided for @apiKeyNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get apiKeyNoExpiry;
+
+  /// No description provided for @apiKeyEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit API Key'**
+  String get apiKeyEditTitle;
+
+  /// No description provided for @apiKeyWithoutName.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed'**
+  String get apiKeyWithoutName;
+
+  /// No description provided for @datePickerSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Date'**
+  String get datePickerSelectDate;
+
+  /// No description provided for @timePickerSelectTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Time'**
+  String get timePickerSelectTime;
+
+  /// No description provided for @dateTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date and Time'**
+  String get dateTimeLabel;
+
+  /// No description provided for @dateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dateLabel;
+
+  /// No description provided for @timeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get timeLabel;
+
+  /// No description provided for @clearButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearButton;
+
+  /// No description provided for @sessionsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Login Sessions'**
+  String get sessionsPageTitle;
+
+  /// No description provided for @sessionsErrorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading sessions'**
+  String get sessionsErrorLoading;
+
+  /// No description provided for @sessionsCannotDeleteCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot delete current session'**
+  String get sessionsCannotDeleteCurrent;
+
+  /// No description provided for @sessionsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Session'**
+  String get sessionsDeleteTitle;
+
+  /// No description provided for @sessionsDeleteConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete session \"{device}\"?\nThis action is irreversible.'**
+  String sessionsDeleteConfirmation(String device);
+
+  /// No description provided for @sessionsDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Session deleted successfully'**
+  String get sessionsDeletedSuccessfully;
+
+  /// No description provided for @sessionsErrorDeleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting session'**
+  String get sessionsErrorDeleting;
+
+  /// No description provided for @sessionsNoOtherSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No other sessions'**
+  String get sessionsNoOtherSessions;
+
+  /// No description provided for @sessionsRevokeAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout from all devices'**
+  String get sessionsRevokeAllTitle;
+
+  /// No description provided for @sessionsRevokeAllConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete {count} other sessions?\nThis will logout all other devices.\nYour current session will be preserved.'**
+  String sessionsRevokeAllConfirmation(int count);
+
+  /// No description provided for @sessionsDeleteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All'**
+  String get sessionsDeleteAll;
+
+  /// No description provided for @sessionsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sessions deleted'**
+  String sessionsDeleted(int count);
+
+  /// No description provided for @sessionsNoActive.
+  ///
+  /// In en, this message translates to:
+  /// **'No active sessions'**
+  String get sessionsNoActive;
+
+  /// No description provided for @sessionsThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device'**
+  String get sessionsThisDevice;
+
+  /// No description provided for @sessionsLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Used'**
+  String get sessionsLastUsed;
+
+  /// No description provided for @sessionsCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get sessionsCreatedAt;
+
+  /// No description provided for @sessionsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get sessionsToday;
+
+  /// No description provided for @sessionsYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get sessionsYesterday;
+
+  /// No description provided for @sessionsDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days ago'**
+  String sessionsDaysAgo(int days);
+
+  /// No description provided for @sessionsWeeksAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks} weeks ago'**
+  String sessionsWeeksAgo(int weeks);
+
+  /// No description provided for @sessionsMonthsAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{months} months ago'**
+  String sessionsMonthsAgo(int months);
 }
 
 class _AppLocalizationsDelegate
