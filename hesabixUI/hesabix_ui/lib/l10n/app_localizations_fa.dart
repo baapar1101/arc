@@ -94,6 +94,25 @@ class AppLocalizationsFa extends AppLocalizations {
   String get captchaRequired => 'کد امنیتی الزامی است.';
 
   @override
+  String get acceptTermsPrefix => 'من با ';
+
+  @override
+  String get acceptTermsSuffix => ' موافقم';
+
+  @override
+  String get privacyPolicy => 'سیاست حفظ حریم خصوصی';
+
+  @override
+  String get termsOfService => 'قوانین ارائه خدمات';
+
+  @override
+  String get and => 'و';
+
+  @override
+  String get acceptTermsRequired =>
+      'برای عضویت باید با سیاست حفظ حریم خصوصی و قوانین ارائه خدمات موافق باشید.';
+
+  @override
   String get sendReset => 'ارسال کد بازیابی';
 
   @override

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import '../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -55,6 +57,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Uint8List? _registerCaptchaImage;
   bool _loadingRegister = false;
   Timer? _registerCaptchaTimer;
+  // Terms acceptance
+  bool _acceptedTerms = false;
+  final TapGestureRecognizer _privacyTapRecognizer = TapGestureRecognizer();
+  final TapGestureRecognizer _termsTapRecognizer = TapGestureRecognizer();
 
   // Forgot password
   final _forgotKey = GlobalKey<FormState>();
@@ -97,6 +103,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginIdentifierCtrl.dispose();
     _otpLoginCaptchaCtrl.dispose();
     _otpLoginCaptchaTimer?.cancel();
+    _privacyTapRecognizer.dispose();
+    _termsTapRecognizer.dispose();
     super.dispose();
   }
 
@@ -622,6 +630,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
     if (_registerCaptchaId == null || _registerCaptchaCtrl.text.trim().isEmpty) {
       _showSnack(t.captchaRequired);
+      return;
+    }
+    if (!_acceptedTerms) {
+      _showSnack(t.acceptTermsRequired);
       return;
     }
 
@@ -1292,7 +1304,38 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 16),
+                                                const SizedBox(height: 12),
+                                                CheckboxListTile(
+                                                  value: _acceptedTerms,
+                                                  onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+                                                  controlAffinity: ListTileControlAffinity.leading,
+                                                  contentPadding: EdgeInsets.zero,
+                                                  dense: true,
+                                                  visualDensity: const VisualDensity(vertical: -2),
+                                                  title: RichText(
+                                                    text: TextSpan(
+                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                                                      ),
+                                                      children: [
+                                                        TextSpan(text: t.acceptTermsPrefix),
+                                                        TextSpan(
+                                                          text: t.privacyPolicy,
+                                                          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                                                          recognizer: _privacyTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/privacy/'),
+                                                        ),
+                                                        TextSpan(text: ' ${t.and} '),
+                                                        TextSpan(
+                                                          text: t.termsOfService,
+                                                          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                                                          recognizer: _termsTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/terms/'),
+                                                        ),
+                                                        TextSpan(text: t.acceptTermsSuffix),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
                                                 FilledButton(
                                                   onPressed: _loadingRegister ? null : _onRegister,
                                                   child: _loadingRegister

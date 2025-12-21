@@ -95,6 +95,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captchaRequired => 'Captcha is required.';
 
   @override
+  String get acceptTermsPrefix => 'I accept ';
+
+  @override
+  String get acceptTermsSuffix => '';
+
+  @override
+  String get privacyPolicy => 'Privacy Policy';
+
+  @override
+  String get termsOfService => 'Terms of Service';
+
+  @override
+  String get and => 'and';
+
+  @override
+  String get acceptTermsRequired =>
+      'You must accept the Privacy Policy and Terms of Service to register.';
+
+  @override
   String get sendReset => 'Send reset code';
 
   @override

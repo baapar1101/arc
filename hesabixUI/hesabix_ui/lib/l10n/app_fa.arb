@@ -160,6 +160,12 @@
   ,
   "captchaRequired": "کد امنیتی الزامی است."
   ,
+  "acceptTermsPrefix": "من با ",
+  "acceptTermsSuffix": " موافقم",
+  "privacyPolicy": "سیاست حفظ حریم خصوصی",
+  "termsOfService": "قوانین ارائه خدمات",
+  "and": "و",
+  "acceptTermsRequired": "برای عضویت باید با سیاست حفظ حریم خصوصی و قوانین ارائه خدمات موافق باشید.",
   "sendReset": "ارسال کد بازیابی"
   ,
   "registerFailed": "عضویت ناموفق بود. لطفاً دوباره تلاش کنید.",

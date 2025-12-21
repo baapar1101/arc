@@ -266,6 +266,42 @@ abstract class AppLocalizations {
   /// **'Captcha is required.'**
   String get captchaRequired;
 
+  /// No description provided for @acceptTermsPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'I accept '**
+  String get acceptTermsPrefix;
+
+  /// No description provided for @acceptTermsSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **''**
+  String get acceptTermsSuffix;
+
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
+  /// No description provided for @termsOfService.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get termsOfService;
+
+  /// No description provided for @and.
+  ///
+  /// In en, this message translates to:
+  /// **'and'**
+  String get and;
+
+  /// No description provided for @acceptTermsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'You must accept the Privacy Policy and Terms of Service to register.'**
+  String get acceptTermsRequired;
+
   /// No description provided for @sendReset.
   ///
   /// In en, this message translates to:
