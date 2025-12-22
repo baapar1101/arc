@@ -111,10 +111,10 @@ if ($PubHostedUrl) { $env:PUB_HOSTED_URL = $PubHostedUrl }
 if ($FlutterStorageBaseUrl) { $env:FLUTTER_STORAGE_BASE_URL = $FlutterStorageBaseUrl }
 
 if (-not $env:PUB_HOSTED_URL) {
-    $env:PUB_HOSTED_URL = "https://pub.flutter-io.cn"
+    $env:PUB_HOSTED_URL = "https://mirrors.tuna.tsinghua.edu.cn/dart-pub"
 }
 if (-not $env:FLUTTER_STORAGE_BASE_URL) {
-    $env:FLUTTER_STORAGE_BASE_URL = "https://storage.flutter-io.cn"
+    $env:FLUTTER_STORAGE_BASE_URL = "https://mirrors.tuna.tsinghua.edu.cn/flutter"
 }
 
 Write-Host "PUB_HOSTED_URL: $($env:PUB_HOSTED_URL)"
@@ -204,16 +204,13 @@ $RUNNER_DIR = Join-Path $APP_DIR "build\windows\x64\runner"
 $EXECUTABLE = $null
 
 if (Test-Path $RUNNER_DIR) {
-    $exeFile = Get-ChildItem -Path $RUNNER_DIR -Recurse -File -Filter "hesabix_ui.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($exeFile) {
-        $EXECUTABLE = $exeFile.FullName
-    }
+    $EXECUTABLE = (Get-ChildItem -Path $RUNNER_DIR -Recurse -File -Filter "hesabix_ui.exe" -ErrorAction SilentlyContinue | Select-Object -First 1)?.FullName
 }
 
 if ($EXECUTABLE -and (Test-Path $EXECUTABLE)) {
     Write-Host ""
     Write-Host "=========================================="
-    Write-Host "[SUCCESS] Build completed successfully!" -ForegroundColor Green
+    Write-Host "✓ Build completed successfully!" -ForegroundColor Green
     Write-Host "=========================================="
     Write-Host ""
     Write-Host "Build Configuration:"
