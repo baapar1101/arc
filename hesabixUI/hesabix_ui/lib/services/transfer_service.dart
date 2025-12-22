@@ -27,13 +27,27 @@ class TransferService {
       amount: amount.abs(),
     );
 
+    // تبدیل نوع حساب از "bank" به "bank_account" برای سازگاری با API
+    String sourceType = source['type'] as String? ?? '';
+    if (sourceType == 'bank') {
+      sourceType = 'bank_account';
+    }
+    
+    String destinationType = destination['type'] as String? ?? '';
+    if (destinationType == 'bank') {
+      destinationType = 'bank_account';
+    }
+
+    // total_amount همان amount است (بدون commission)
     final body = <String, dynamic>{
       'document_date': documentDate.toIso8601String(),
       'currency_id': currencyId,
-      'source': source,
-      'destination': destination,
-      'amount': amount,
-      if (commission != null) 'commission': commission,
+      'source_type': sourceType,
+      'source_id': source['id'],
+      'destination_type': destinationType,
+      'destination_id': destination['id'],
+      'total_amount': amount,
+      if (commission != null && commission > 0) 'commission': commission,
       if (description != null && description.isNotEmpty) 'description': description,
       if (extraInfo != null) 'extra_info': extraInfo,
     };
@@ -134,13 +148,26 @@ class TransferService {
     String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
+    // تبدیل نوع حساب از "bank" به "bank_account" برای سازگاری با API
+    String sourceType = source['type'] as String? ?? '';
+    if (sourceType == 'bank') {
+      sourceType = 'bank_account';
+    }
+    
+    String destinationType = destination['type'] as String? ?? '';
+    if (destinationType == 'bank') {
+      destinationType = 'bank_account';
+    }
+
     final body = <String, dynamic>{
       'document_date': documentDate.toIso8601String(),
       'currency_id': currencyId,
-      'source': source,
-      'destination': destination,
-      'amount': amount,
-      if (commission != null) 'commission': commission,
+      'source_type': sourceType,
+      'source_id': source['id'],
+      'destination_type': destinationType,
+      'destination_id': destination['id'],
+      'total_amount': amount,
+      if (commission != null && commission > 0) 'commission': commission,
       if (description != null && description.isNotEmpty) 'description': description,
       if (extraInfo != null) 'extra_info': extraInfo,
     };

@@ -48,6 +48,12 @@ class TransferCreateRequest(BaseModel):
         description="تاریخ سند (فرمت ISO: YYYY-MM-DD یا جلالی: YYYY/MM/DD)",
         example="2024-01-15"
     )
+    currency_id: int = Field(
+        ..., 
+        description="شناسه ارز",
+        example=1,
+        gt=0
+    )
     description: Optional[str] = Field(
         None, 
         description="توضیحات سند (حداکثر 1000 کاراکتر)",
@@ -78,6 +84,7 @@ class TransferCreateRequest(BaseModel):
                 "total_amount": 1000000,
                 "commission": 5000,
                 "document_date": "2024-01-15",
+                "currency_id": 1,
                 "description": "انتقال وجه بابت خرید مواد اولیه"
             }
         }

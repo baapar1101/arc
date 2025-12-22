@@ -391,6 +391,7 @@ async def create_transfer_endpoint(
             "total_amount": 1000000,
             "commission": 5000,
             "document_date": "2024-01-15",
+            "currency_id": 1,
             "description": "انتقال وجه بابت خرید مواد اولیه"
         }
     ),
@@ -404,9 +405,48 @@ async def create_transfer_endpoint(
     این endpoint برای ثبت انتقال وجه بین حساب‌های مختلف استفاده می‌شود.
     سند به صورت خودکار در دفتر کل ثبت شده و موجودی حساب‌ها به‌روزرسانی می‌شود.
     """
-    # تبدیل Pydantic model به dict برای سرویس
-    body_dict = body.dict(exclude_none=True)
-    created = create_transfer(db, business_id, ctx.get_user_id(), body_dict)
+    # تبدیل داده‌های flat به nested برای سازگاری با سرویس
+    # تبدیل bank_account به bank (سرویس انتظار دارد bank باشد)
+    source_type = body.source_type
+    if source_type == "bank_account":
+        source_type = "bank"
+    
+    destination_type = body.destination_type
+    if destination_type == "bank_account":
+        destination_type = "bank"
+    
+    # ساخت ساختار nested برای سرویس
+    # استفاده از dict برای اطمینان از اینکه همه فیلدها به درستی منتقل می‌شوند
+    body_dict = body.dict(exclude_none=False)
+    
+    # اطمینان از اینکه currency_id وجود دارد
+    currency_id_value = body_dict.get("currency_id")
+    if not currency_id_value:
+        raise ApiError("CURRENCY_REQUIRED", "currency_id is required", http_status=400)
+    
+    service_data = {
+        "document_date": body_dict.get("document_date"),
+        "currency_id": int(currency_id_value),
+        "source": {
+            "type": source_type,
+            "id": body_dict.get("source_id")
+        },
+        "destination": {
+            "type": destination_type,
+            "id": body_dict.get("destination_id")
+        },
+        "amount": body_dict.get("total_amount"),  # مبلغ انتقال (بدون commission)
+    }
+    
+    # اضافه کردن فیلدهای اختیاری
+    if body_dict.get("commission") is not None:
+        service_data["commission"] = body_dict.get("commission")
+    if body_dict.get("description") is not None:
+        service_data["description"] = body_dict.get("description")
+    if body_dict.get("fiscal_year_id") is not None:
+        service_data["fiscal_year_id"] = body_dict.get("fiscal_year_id")
+    
+    created = create_transfer(db, business_id, ctx.get_user_id(), service_data)
     return success_response(data=format_datetime_fields(created, request), request=request, message="TRANSFER_CREATED")
 
 
@@ -1044,7 +1084,49 @@ async def update_transfer_endpoint(
     
     # تبدیل Pydantic model به dict (فقط فیلدهای set شده)
     body_dict = body.dict(exclude_unset=True)
-    updated = update_transfer(db, document_id, ctx.get_user_id(), body_dict)
+    
+    # تبدیل داده‌های flat به nested برای سازگاری با سرویس
+    service_data = {}
+    
+    # کپی فیلدهای مستقیم
+    if "document_date" in body_dict:
+        service_data["document_date"] = body_dict["document_date"]
+    if "currency_id" in body_dict:
+        service_data["currency_id"] = body_dict["currency_id"]
+    if "description" in body_dict:
+        service_data["description"] = body_dict["description"]
+    if "fiscal_year_id" in body_dict:
+        service_data["fiscal_year_id"] = body_dict["fiscal_year_id"]
+    if "extra_info" in body_dict:
+        service_data["extra_info"] = body_dict["extra_info"]
+    
+    # تبدیل source و destination
+    if "source_type" in body_dict or "source_id" in body_dict:
+        source_type = body_dict.get("source_type", "")
+        if source_type == "bank_account":
+            source_type = "bank"
+        service_data["source"] = {
+            "type": source_type,
+            "id": body_dict.get("source_id")
+        }
+    
+    if "destination_type" in body_dict or "destination_id" in body_dict:
+        destination_type = body_dict.get("destination_type", "")
+        if destination_type == "bank_account":
+            destination_type = "bank"
+        service_data["destination"] = {
+            "type": destination_type,
+            "id": body_dict.get("destination_id")
+        }
+    
+    # تبدیل total_amount به amount
+    if "total_amount" in body_dict:
+        service_data["amount"] = body_dict["total_amount"]
+    
+    if "commission" in body_dict:
+        service_data["commission"] = body_dict["commission"]
+    
+    updated = update_transfer(db, document_id, ctx.get_user_id(), service_data)
     return success_response(data=format_datetime_fields(updated, request), request=request, message="TRANSFER_UPDATED")
 
 
