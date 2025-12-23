@@ -1101,22 +1101,53 @@ async def update_transfer_endpoint(
         service_data["extra_info"] = body_dict["extra_info"]
     
     # تبدیل source و destination
+    # اعتبارسنجی: هر دو type و id باید ارائه شوند
     if "source_type" in body_dict or "source_id" in body_dict:
-        source_type = body_dict.get("source_type", "")
+        source_type = body_dict.get("source_type")
+        source_id = body_dict.get("source_id")
+        
+        if source_type is None:
+            raise ApiError(
+                "VALIDATION_ERROR",
+                "برای تغییر source، هر دو فیلد source_type و source_id باید ارائه شوند",
+                http_status=400
+            )
+        if source_id is None:
+            raise ApiError(
+                "VALIDATION_ERROR",
+                "برای تغییر source، هر دو فیلد source_type و source_id باید ارائه شوند",
+                http_status=400
+            )
+        
         if source_type == "bank_account":
             source_type = "bank"
         service_data["source"] = {
             "type": source_type,
-            "id": body_dict.get("source_id")
+            "id": source_id
         }
     
     if "destination_type" in body_dict or "destination_id" in body_dict:
-        destination_type = body_dict.get("destination_type", "")
+        destination_type = body_dict.get("destination_type")
+        destination_id = body_dict.get("destination_id")
+        
+        if destination_type is None:
+            raise ApiError(
+                "VALIDATION_ERROR",
+                "برای تغییر destination، هر دو فیلد destination_type و destination_id باید ارائه شوند",
+                http_status=400
+            )
+        if destination_id is None:
+            raise ApiError(
+                "VALIDATION_ERROR",
+                "برای تغییر destination، هر دو فیلد destination_type و destination_id باید ارائه شوند",
+                http_status=400
+            )
+        
         if destination_type == "bank_account":
             destination_type = "bank"
         service_data["destination"] = {
             "type": destination_type,
-            "id": body_dict.get("destination_id")
+            "id": destination_id
         }
     
     # تبدیل total_amount به amount
