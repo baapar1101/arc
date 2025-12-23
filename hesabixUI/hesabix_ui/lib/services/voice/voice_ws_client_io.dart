@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,12 @@ export 'voice_ws_client_stub.dart';
 class VoiceWsClientIO implements VoiceWsClient {
   WebSocket? _socket;
   bool _connecting = false;
+  bool _shouldReconnect = false;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+  static const Duration _reconnectDelay = Duration(seconds: 2);
+  Timer? _reconnectTimer;
+  String? _storedApiKey;
 
   void Function(Map<String, dynamic>)? _onEvent;
   void Function(List<int>)? _onAudioFrame;
@@ -27,10 +34,12 @@ class VoiceWsClientIO implements VoiceWsClient {
   }) async {
     if (_connecting || isConnected) return;
     _connecting = true;
+    _storedApiKey = apiKey;
     _onEvent = onEvent;
     _onAudioFrame = onAudioFrame;
     _onError = onError;
     _onDone = onDone;
+    _reconnectAttempts = 0;
 
     try {
       final apiBase = AppConfig.apiBaseUrl;
@@ -40,6 +49,7 @@ class VoiceWsClientIO implements VoiceWsClient {
       final url = '$wsBase/ws/ai/voice?api_key=$apiKey';
 
       _socket = await WebSocket.connect(url);
+      _reconnectAttempts = 0; // Reset on successful connection
       _socket!.listen(
         (dynamic data) {
           try {
@@ -59,19 +69,43 @@ class VoiceWsClientIO implements VoiceWsClient {
         },
         onError: (Object e) {
           _onError?.call(e);
-          disconnect();
+          _handleDisconnection();
         },
         onDone: () {
           _onDone?.call();
-          disconnect();
+          _handleDisconnection();
         },
         cancelOnError: true,
       );
     } catch (e) {
       _onError?.call(e);
-      disconnect();
+      _handleDisconnection();
     } finally {
       _connecting = false;
+    }
+  }
+
+  void _handleDisconnection() {
+    final wasConnected = _socket != null;
+    _socket = null;
+    _connecting = false;
+    
+    if (_shouldReconnect && wasConnected && _reconnectAttempts < _maxReconnectAttempts) {
+      _reconnectAttempts++;
+      _reconnectTimer = Timer(_reconnectDelay * _reconnectAttempts, () {
+        if (_shouldReconnect && !isConnected && !_connecting && _storedApiKey != null) {
+          // Retry connection with stored callbacks
+          if (_onEvent != null && _onAudioFrame != null) {
+            connect(
+              apiKey: _storedApiKey!,
+              onEvent: _onEvent!,
+              onAudioFrame: _onAudioFrame!,
+              onError: _onError,
+              onDone: _onDone,
+            );
+          }
+        }
+      });
     }
   }
 
@@ -93,11 +127,26 @@ class VoiceWsClientIO implements VoiceWsClient {
 
   @override
   void disconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _storedApiKey = null;
     try {
       _socket?.close();
     } catch (_) {}
     _socket = null;
     _connecting = false;
+  }
+
+  void enableReconnect() {
+    _shouldReconnect = true;
+    _reconnectAttempts = 0;
+  }
+
+  void disableReconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 }
 

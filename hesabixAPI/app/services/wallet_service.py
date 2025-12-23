@@ -17,7 +17,8 @@ from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from app.services.system_settings_service import get_wallet_settings
-from app.services.business_service import ensure_wallet_currency_in_business
+# Lazy import to avoid circular dependency
+# from app.services.business_service import ensure_wallet_currency_in_business
 from datetime import datetime, date
 
 logger = structlog.get_logger()
@@ -1005,6 +1006,8 @@ def _create_simple_document(
 def _post_topup_document(db: Session, business_id: int, user_id: int, amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
 	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
 	try:
+		# Lazy import to avoid circular dependency
+		from app.services.business_service import ensure_wallet_currency_in_business
 		ensure_wallet_currency_in_business(db, business_id)
 	except Exception as e:
 		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
@@ -1039,6 +1042,8 @@ def _post_topup_document(db: Session, business_id: int, user_id: int, amount: De
 def _post_payout_document(db: Session, business_id: int, user_id: int, net_amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
 	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
 	try:
+		# Lazy import to avoid circular dependency
+		from app.services.business_service import ensure_wallet_currency_in_business
 		ensure_wallet_currency_in_business(db, business_id)
 	except Exception as e:
 		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
@@ -1077,6 +1082,8 @@ def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amou
 	"""
 	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
 	try:
+		# Lazy import to avoid circular dependency
+		from app.services.business_service import ensure_wallet_currency_in_business
 		ensure_wallet_currency_in_business(db, business_id)
 	except Exception as e:
 		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
@@ -1176,6 +1183,8 @@ def charge_wallet_for_zohal_service(
 	
 	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
 	try:
+		# Lazy import to avoid circular dependency
+		from app.services.business_service import ensure_wallet_currency_in_business
 		ensure_wallet_currency_in_business(db, business_id)
 	except Exception as e:
 		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))

@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "ir.hsxn.hesabix_ui"
     compileSdk = 36
-    ndkVersion = "26.1.10909125"
+    // ndkVersion = "26.1.10909125" // Commented out to use default NDK
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

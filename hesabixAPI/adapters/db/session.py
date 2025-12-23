@@ -74,14 +74,16 @@ def set_mysql_session_params(dbapi_conn, connection_record):
 # Event Listeners برای Monitoring Pool Statistics
 @event.listens_for(engine.pool, "connect")
 def receive_connect(dbapi_conn, connection_record):
-	"""Log ایجاد اتصال جدید"""
-	pool = engine.pool
-	logger.debug(
-		f"New database connection created. "
-		f"Pool size: {pool.size()}, "
-		f"Checked out: {pool.checkedout()}, "
-		f"Overflow: {pool.overflow()}"
-	)
+	"""Log ایجاد اتصال جدید (فقط در صورت نیاز)"""
+	# فقط در حالت debug لاگ می‌کنیم
+	if logger.isEnabledFor(logging.DEBUG):
+		pool = engine.pool
+		logger.debug(
+			f"New database connection created. "
+			f"Pool size: {pool.size()}, "
+			f"Checked out: {pool.checkedout()}, "
+			f"Overflow: {pool.overflow()}"
+		)
 
 
 # Rate limiting برای لاگ‌های pool usage
@@ -167,12 +169,14 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 				f"Overflow: {pool.overflow()}, "
 				f"Total capacity: {total_capacity}"
 			)
-	else:
-		logger.debug(
-			f"Connection checked out. "
-			f"Pool usage: {usage_percent:.1f}%, "
-			f"Checked out: {checked_out}/{total_capacity}"
-		)
+	# لاگ debug فقط در صورت فعال بودن
+	# else:
+	# 	if logger.isEnabledFor(logging.DEBUG):
+	# 		logger.debug(
+	# 			f"Connection checked out. "
+	# 			f"Pool usage: {usage_percent:.1f}%, "
+	# 			f"Checked out: {checked_out}/{total_capacity}"
+	# 		)
 
 
 # Monitoring برای connection leak detection
@@ -272,11 +276,13 @@ def receive_checkin(dbapi_conn, connection_record):
 	# بررسی leak های موجود
 	_check_connection_leaks()
 	
-	logger.debug(
-		f"Connection checked in. "
-		f"Pool size: {pool.size()}, "
-		f"Checked out: {pool.checkedout()}"
-	)
+	# لاگ debug فقط در صورت فعال بودن
+	# if logger.isEnabledFor(logging.DEBUG):
+	# 	logger.debug(
+	# 		f"Connection checked in. "
+	# 		f"Pool size: {pool.size()}, "
+	# 		f"Checked out: {pool.checkedout()}"
+	# 	)
 
 
 def get_db() -> Generator[Session, None, None]:

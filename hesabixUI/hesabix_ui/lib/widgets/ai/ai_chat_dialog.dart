@@ -421,6 +421,36 @@ class _AIChatDialogState extends State<AIChatDialog> {
       collectDataOptIn: _voiceCollectData,
       onEvent: (event) {
         final type = event['type'] as String?;
+        if (type == 'ready') {
+          setState(() {
+            // Connection ready
+          });
+          return;
+        }
+        if (type == 'started') {
+          setState(() {
+            // Session started
+          });
+          return;
+        }
+        if (type == 'stt_started') {
+          setState(() {
+            // STT processing started
+          });
+          return;
+        }
+        if (type == 'speech_start') {
+          setState(() {
+            // User started speaking
+          });
+          return;
+        }
+        if (type == 'speech_end') {
+          setState(() {
+            // User finished speaking
+          });
+          return;
+        }
         if (type == 'transcript_final') {
           final text = (event['text'] as String?)?.trim() ?? '';
           if (text.isEmpty) return;
@@ -469,6 +499,32 @@ class _AIChatDialogState extends State<AIChatDialog> {
           _scrollToBottom();
           if (interactionId != null) {
             _promptVoiceFeedback(interactionId);
+          }
+          return;
+        }
+        if (type == 'error') {
+          final errorCode = event['error'] as String?;
+          final errorMessage = event['message'] as String? ?? 'خطای نامشخص';
+          
+          // Handle specific error codes
+          if (errorCode == 'SESSION_TIMEOUT' || errorCode == 'INACTIVITY_TIMEOUT') {
+            _showError('جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.');
+            _stopVoiceSession();
+          } else if (errorCode == 'STT_FAILED') {
+            _showError('خطا در تشخیص گفتار: $errorMessage');
+          } else if (errorCode == 'EMPTY_TRANSCRIPT') {
+            _showError('متن قابل تشخیص نیست. لطفاً دوباره تلاش کنید.');
+          } else if (errorCode == 'NO_ACTIVE_SUBSCRIPTION' || 
+                     errorCode == 'QUOTA_EXCEEDED' || 
+                     errorCode == 'INSUFFICIENT_FUNDS' ||
+                     errorCode == 'AVAILABILITY_CHECK_FAILED') {
+            _showError(errorMessage);
+            _stopVoiceSession();
+          } else if (errorCode == 'FORBIDDEN') {
+            _showError('شما به این کسب‌وکار دسترسی ندارید.');
+            _stopVoiceSession();
+          } else {
+            _showError('خطا: $errorMessage');
           }
           return;
         }

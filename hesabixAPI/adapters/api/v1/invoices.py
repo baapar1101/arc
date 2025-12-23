@@ -29,6 +29,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.user import User
 from app.core.responses import ApiError
+from app.services import invoice_service
 from app.services.invoice_service import (
     create_invoice,
     update_invoice,
@@ -660,14 +661,18 @@ def recalculate_invoice_profits_endpoint(
     # اجرای sync برای تعداد کم فاکتورها
     from decimal import Decimal
     
-    invoices = query.limit(batch_size).all()
+    # پردازش همه فاکتورها (نه فقط batch_size)
+    invoices = query.all()
     processed = 0
     skipped = 0
     errors = []
     
+    logger.info(f"Starting profit recalculation for {len(invoices)} invoices (business_id={business_id})")
+    
     for doc in invoices:
         try:
             # محاسبه سود (فقط برای بررسی - نتیجه ذخیره نمی‌شود چون on-demand است)
+            from app.services.invoice_service import _calculate_invoice_profit
             profit_data = _calculate_invoice_profit(
                 db,
                 business_id,
@@ -680,17 +685,29 @@ def recalculate_invoice_profits_endpoint(
                 business.invoice_profit_calculation_type or "gross"
             )
             
-            # سود در invoice_document_to_dict به صورت on-demand محاسبه می‌شود
-            # این endpoint فقط برای تست و بررسی است
-            processed += 1
+            # بررسی اینکه آیا سود محاسبه شده است
+            if profit_data and (profit_data.get("gross_profit") is not None or profit_data.get("net_profit") is not None):
+                processed += 1
+                logger.debug(f"Successfully calculated profit for invoice {doc.id} (code: {doc.code})")
+            else:
+                skipped += 1
+                errors.append({
+                    "invoice_id": doc.id,
+                    "invoice_code": doc.code,
+                    "error": "سود محاسبه نشد (نتیجه خالی)"
+                })
+                logger.warning(f"Empty profit result for invoice {doc.id} (code: {doc.code})")
         except Exception as e:
             skipped += 1
+            error_msg = str(e)
             errors.append({
                 "invoice_id": doc.id,
                 "invoice_code": doc.code,
-                "error": str(e)
+                "error": error_msg
             })
-            logger.warning(f"Error calculating profit for invoice {doc.id}: {e}")
+            logger.error(f"Error calculating profit for invoice {doc.id} (code: {doc.code}): {e}", exc_info=True)
+    
+    logger.info(f"Profit recalculation completed: processed={processed}, skipped={skipped}, total={total_invoices}")
     
     return success_response(
         data={
@@ -698,7 +715,7 @@ def recalculate_invoice_profits_endpoint(
             "processed": processed,
             "skipped": skipped,
             "total": total_invoices,
-            "errors": errors[:10] if errors else []  # فقط 10 خطای اول
+            "errors": errors[:20] if errors else []  # 20 خطای اول برای بررسی بهتر
         },
         request=request,
         message="PROFIT_RECALCULATED"

@@ -1417,13 +1417,19 @@ def _calculate_invoice_profit(
             line_discount = Decimal(str(extra_info.get("line_discount", 0) or 0))
             warehouse_id = extra_info.get("warehouse_id")
             
-            # محاسبه مبلغ فروش (بعد از تخفیف)
+            # محاسبه مبلغ فروش (بعد از تخفیف، بدون مالیات)
+            # توجه: برای محاسبه سود، از مبلغ بدون مالیات استفاده می‌کنیم
+            # چون مالیات جزء درآمد نیست و باید جداگانه محاسبه شود
             sales_amount = (qty * unit_price) - line_discount
             
             # محاسبه هزینه هر واحد - استفاده مستقیم از extra_info
             cost_per_unit = Decimal(0)
             if calculation_basis == "purchase_price":
-                cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+                # اگر قیمت خرید صفر یا None باشد، باید از cost_price در extra_info استفاده کنیم
+                base_cost = product.base_purchase_price or 0
+                if base_cost == 0 and extra_info.get("cost_price") is not None:
+                    base_cost = extra_info.get("cost_price")
+                cost_per_unit = Decimal(str(base_cost))
             elif calculation_basis == "cost_price":
                 if extra_info.get("cost_price") is not None:
                     cost_per_unit = Decimal(str(extra_info.get("cost_price")))

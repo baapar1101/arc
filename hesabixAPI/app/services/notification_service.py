@@ -133,16 +133,16 @@ class NotificationService:
 		# Render templates با جایگزینی پارامترها (fallback به متن ساده)
 		def render_for(channel: str) -> tuple[str, str]:
 			tpl = self.templates.get(event_key=event_key, channel=channel, locale=locale or None)
-		if tpl:
-			# استفاده از قالب با رندر پارامترها
-			subj_raw = tpl.subject or (context.get("subject") or "پیام سیستم")
-			body_raw = tpl.body or context.get("message", "")
-			# رندر کردن subject و body با پارامترهای context
-			subj = self._render_template(subj_raw, context)
-			body = self._render_template(body_raw, context)
-			# اگر بعد از رندر body خالی شد، از context استفاده می‌کنیم
-			if not body or not body.strip():
-				body = context.get("message", "")
+			if tpl:
+				# استفاده از قالب با رندر پارامترها
+				subj_raw = tpl.subject or (context.get("subject") or "پیام سیستم")
+				body_raw = tpl.body or context.get("message", "")
+				# رندر کردن subject و body با پارامترهای context
+				subj = self._render_template(subj_raw, context)
+				body = self._render_template(body_raw, context)
+				# اگر بعد از رندر body خالی شد، از context استفاده می‌کنیم
+				if not body or not body.strip():
+					body = context.get("message", "")
 			else:
 				# اگر قالب پیدا نشد، از context استفاده می‌کنیم
 				subj_raw = context.get("subject", "پیام سیستم")

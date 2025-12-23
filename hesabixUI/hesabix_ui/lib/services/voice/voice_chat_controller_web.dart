@@ -39,8 +39,9 @@ class VoiceChatController {
   web.MediaStreamAudioSourceNode? _micSource;
   web.ScriptProcessorNode? _processor;
 
-  // playback queue
+  // playback queue with max size limit
   final List<Int16List> _playQueue = <Int16List>[];
+  static const int _maxQueueSize = 50; // Maximum number of chunks in queue
   bool _playPumpActive = false;
   double _playHeadTime = 0.0;
 
@@ -75,6 +76,11 @@ class VoiceChatController {
       onError: (e) => onError(e.toString()),
       onDone: () => onError('اتصال صوت قطع شد.'),
     );
+    
+    // Enable reconnection for web client
+    if (_ws is VoiceWsClientWeb) {
+      (_ws as dynamic).enableReconnect();
+    }
 
     // request base64 transport for web
     _ws.sendJson({
@@ -191,6 +197,13 @@ class VoiceChatController {
     if (pcmBytes.isEmpty) return;
     final bytes = Uint8List.fromList(pcmBytes);
     final pcm16 = bytes.buffer.asInt16List(bytes.offsetInBytes, bytes.lengthInBytes ~/ 2);
+    
+    // Limit queue size to prevent memory issues
+    if (_playQueue.length >= _maxQueueSize) {
+      // Remove oldest items if queue is full
+      _playQueue.removeRange(0, _playQueue.length - _maxQueueSize + 1);
+    }
+    
     _playQueue.add(Int16List.fromList(pcm16));
     _pumpPlayback();
   }

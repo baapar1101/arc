@@ -67,7 +67,10 @@ def recalculate_invoice_profits_job(
             )
             
             total_invoices = query.count()
-            invoices = query.limit(batch_size).all()
+            # پردازش همه فاکتورها (نه فقط batch_size)
+            invoices = query.all()
+            
+            logger.info(f"Starting profit recalculation job for {len(invoices)} invoices (business_id={business_id})")
             
             processed = 0
             skipped = 0
@@ -88,20 +91,33 @@ def recalculate_invoice_profits_job(
                         business.invoice_profit_calculation_type or "gross"
                     )
                     
-                    processed += 1
+                    # بررسی اینکه آیا سود محاسبه شده است
+                    if profit_data and (profit_data.get("gross_profit") is not None or profit_data.get("net_profit") is not None):
+                        processed += 1
+                    else:
+                        skipped += 1
+                        errors.append({
+                            "invoice_id": doc.id,
+                            "invoice_code": doc.code,
+                            "error": "سود محاسبه نشد (نتیجه خالی)"
+                        })
+                        logger.warning(f"Empty profit result for invoice {doc.id} (code: {doc.code})")
                     
                     # Log هر 100 فاکتور
-                    if processed % 100 == 0:
-                        logger.info(f"Recalculated profit for {processed}/{len(invoices)} invoices")
+                    if (processed + skipped) % 100 == 0:
+                        logger.info(f"Progress: processed={processed}, skipped={skipped}, total={processed + skipped}/{len(invoices)}")
                         
                 except Exception as e:
                     skipped += 1
+                    error_msg = str(e)
                     errors.append({
                         "invoice_id": doc.id,
                         "invoice_code": doc.code,
-                        "error": str(e)
+                        "error": error_msg
                     })
-                    logger.warning(f"Error calculating profit for invoice {doc.id}: {e}")
+                    logger.error(f"Error calculating profit for invoice {doc.id} (code: {doc.code}): {e}", exc_info=True)
+            
+            logger.info(f"Profit recalculation job completed: processed={processed}, skipped={skipped}, total={total_invoices}")
             
             return {
                 "success": True,

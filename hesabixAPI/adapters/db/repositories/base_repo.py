@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Type, TypeVar, Generic, Any
+from typing import Type, TypeVar, Generic, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
-from app.services.query_service import QueryService
-from adapters.api.v1.schemas import QueryInfo
+if TYPE_CHECKING:
+	from adapters.api.v1.schemas import QueryInfo
 
 T = TypeVar('T')
 
@@ -27,6 +27,7 @@ class BaseRepository(Generic[T]):
 		Returns:
 			tuple: (لیست نتایج, تعداد کل رکوردها)
 		"""
+		from app.services.query_service import QueryService
 		return QueryService.query_with_filters(self.model_class, self.db, query_info)
 	
 	def get_by_id(self, id: int) -> T | None:

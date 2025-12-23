@@ -22,6 +22,7 @@ from app.services.ai.ai_service import AIService
 from app.core.auth_dependency import AuthContext
 from app.core.responses import ApiError
 from app.core.settings import get_settings
+import time
 
 from app.services.voice.vad import VadEndpointing, VadConfig
 from app.services.voice.stt import WhisperSTT, STTConfig
@@ -73,12 +74,16 @@ async def ai_voice_ws(websocket: WebSocket):
 		return
 
 	# State
-	session_id: Optional[int] = None
-	business_id: Optional[int] = None
+	session_id = None  # type: Optional[int]
+	business_id = None  # type: Optional[int]
 	collect_data_opt_in: bool = False
 	cancel_event = asyncio.Event()
 	currently_speaking = False
 	audio_transport: str = "binary"  # binary | base64
+	connection_start_time = time.time()
+	last_activity_time = time.time()
+	SESSION_TIMEOUT_SECONDS = 3600  # 1 hour timeout
+	ACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes inactivity timeout
 
 	# Configs
 	audio_sample_rate = int(settings.voice_sample_rate_hz)
@@ -126,35 +131,77 @@ async def ai_voice_ws(websocket: WebSocket):
 			await websocket.send_bytes(pcm_frame)
 
 	async def _handle_utterance(utterance_pcm: bytes) -> None:
-		nonlocal currently_speaking
+		nonlocal currently_speaking, last_activity_time
+		last_activity_time = time.time()
 
 		await send_event({"type": "speech_end"})
 
-		# STT
-		try:
-			await send_event({"type": "stt_started"})
-			text = await stt.transcribe_pcm16(utterance_pcm, sample_rate_hz=audio_sample_rate)
-			text = (text or "").strip()
-			await send_event({"type": "transcript_final", "text": text})
-		except Exception as exc:
-			logger.exception("STT failed")
-			await send_event({"type": "error", "error": "STT_FAILED", "message": str(exc)})
-			return
+		# STT with retry
+		max_retries = 3
+		retry_delay = 0.5
+		text = None
+		for attempt in range(max_retries):
+			try:
+				await send_event({"type": "stt_started"})
+				text = await stt.transcribe_pcm16(utterance_pcm, sample_rate_hz=audio_sample_rate)
+				text = (text or "").strip()
+				await send_event({"type": "transcript_final", "text": text})
+				break
+			except Exception as exc:
+				if attempt < max_retries - 1:
+					logger.warning(f"STT attempt {attempt + 1} failed, retrying: {exc}")
+					await asyncio.sleep(retry_delay * (attempt + 1))
+				else:
+					logger.exception("STT failed after all retries")
+					await send_event({"type": "error", "error": "STT_FAILED", "message": str(exc)})
+					return
 
 		if not text:
 			await send_event({"type": "error", "error": "EMPTY_TRANSCRIPT", "message": "متن قابل تشخیص نیست"})
 			return
 
-		# save user message + build history
-		with get_db_session() as db3:
-			msg_repo = AIChatMessageRepository(db3)
+		# Use a single DB session for the entire utterance processing
+		with get_db_session() as db_utterance:
+			# save user message + build history
+			msg_repo = AIChatMessageRepository(db_utterance)
 			prev = msg_repo.get_session_messages(session_id, limit=50)
 			messages = [{"role": m.role, "content": m.content} for m in prev]
 			messages.append({"role": "user", "content": text})
 
 			user_message = AIChatMessage(session_id=session_id, role=MessageRole.USER.value, content=text, tokens_used=0)
-			db3.add(user_message)
-			db3.commit()
+			db_utterance.add(user_message)
+			db_utterance.commit()
+
+			# Check availability before processing
+			ctx = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=db_utterance)
+			ai_service = AIService(db_utterance, ctx, business_id)
+			
+			# Estimate tokens (rough estimate: 1 token per 4 characters)
+			estimated_tokens = len(text) * 2  # conservative estimate
+			availability = ai_service.check_availability(estimated_tokens=estimated_tokens)
+			
+			if not availability["can_use"]:
+				reason = availability.get("reason")
+				details = availability.get("details", {})
+				message = details.get("message", "خطای نامشخص")
+				
+				if reason == "NO_ACTIVE_SUBSCRIPTION":
+					error_msg = "❌ اشتراک فعالی ندارید\n\nبرای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید."
+				elif reason == "QUOTA_EXCEEDED":
+					subscription = details.get("subscription", {})
+					tokens_used = subscription.get("tokens_used", 0)
+					tokens_limit = subscription.get("tokens_limit", 0)
+					error_msg = f"⚠️ سهمیه شما تمام شده است\n\nاستفاده شده: {tokens_used:,}\nسقف: {tokens_limit:,}"
+				elif reason == "INSUFFICIENT_FUNDS":
+					wallet = details.get("wallet", {})
+					balance = wallet.get("balance", 0)
+					estimated_cost = wallet.get("estimated_cost", 0)
+					error_msg = f"💰 موجودی کیف پول ناکافی\n\nموجودی فعلی: {balance:,.0f} ریال\nهزینه تخمینی: {estimated_cost:,.0f} ریال"
+				else:
+					error_msg = f"❌ {message}"
+				
+				await send_event({"type": "error", "error": reason or "AVAILABILITY_CHECK_FAILED", "message": error_msg})
+				return
 
 		# LLM streaming + TTS streaming
 		cancel_event.clear()
@@ -168,7 +215,7 @@ async def ai_voice_ws(websocket: WebSocket):
 
 		try:
 			with get_db_session() as db4:
-				ctx = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=None)
+				ctx = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=db4)
 				ai_service = AIService(db4, ctx, business_id)
 
 				async for chunk in ai_service.chat_completion_stream(
@@ -334,8 +381,24 @@ async def ai_voice_ws(websocket: WebSocket):
 
 	try:
 		while True:
-			message = await websocket.receive()
+			# Check for timeout
+			current_time = time.time()
+			if session_id is not None and current_time - connection_start_time > SESSION_TIMEOUT_SECONDS:
+				await send_event({"type": "error", "error": "SESSION_TIMEOUT", "message": "جلسه به دلیل timeout بسته شد"})
+				break
+			if session_id is not None and current_time - last_activity_time > ACTIVITY_TIMEOUT_SECONDS:
+				await send_event({"type": "error", "error": "INACTIVITY_TIMEOUT", "message": "جلسه به دلیل عدم فعالیت بسته شد"})
+				break
+			
+			# Use asyncio.wait_for for message receive timeout
+			try:
+				message = await asyncio.wait_for(websocket.receive(), timeout=1.0)
+			except asyncio.TimeoutError:
+				# Continue loop to check timeouts
+				continue
+			
 			msg_type = message.get("type")
+			last_activity_time = time.time()
 
 			# control
 			if msg_type == "websocket.receive" and message.get("text") is not None:
@@ -394,8 +457,44 @@ async def ai_voice_ws(websocket: WebSocket):
 						if not ai_session or ai_session.user_id != user.id:
 							await send_event({"type": "error", "error": "SESSION_NOT_FOUND", "message": "گفت‌وگو یافت نشد"})
 							continue
+						
+						# Check business access
+						ctx_check = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=db2)
+						if not ctx_check.can_access_business(ai_session.business_id):
+							await send_event({"type": "error", "error": "FORBIDDEN", "message": "شما به این کسب‌وکار دسترسی ندارید"})
+							continue
+						
+						# Check availability before starting session
+						ai_service_check = AIService(db2, ctx_check, ai_session.business_id)
+						availability = ai_service_check.check_availability(estimated_tokens=1000)
+						
+						if not availability["can_use"]:
+							reason = availability.get("reason")
+							details = availability.get("details", {})
+							message = details.get("message", "خطای نامشخص")
+							
+							if reason == "NO_ACTIVE_SUBSCRIPTION":
+								error_msg = "❌ اشتراک فعالی ندارید\n\nبرای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید."
+							elif reason == "QUOTA_EXCEEDED":
+								subscription = details.get("subscription", {})
+								tokens_used = subscription.get("tokens_used", 0)
+								tokens_limit = subscription.get("tokens_limit", 0)
+								error_msg = f"⚠️ سهمیه شما تمام شده است\n\nاستفاده شده: {tokens_used:,}\nسقف: {tokens_limit:,}"
+							elif reason == "INSUFFICIENT_FUNDS":
+								wallet = details.get("wallet", {})
+								balance = wallet.get("balance", 0)
+								estimated_cost = wallet.get("estimated_cost", 0)
+								error_msg = f"💰 موجودی کیف پول ناکافی\n\nموجودی فعلی: {balance:,.0f} ریال\nهزینه تخمینی: {estimated_cost:,.0f} ریال"
+							else:
+								error_msg = f"❌ {message}"
+							
+							await send_event({"type": "error", "error": reason or "AVAILABILITY_CHECK_FAILED", "message": error_msg})
+							continue
+						
 						session_id = requested_session_id
 						business_id = ai_session.business_id
+						connection_start_time = time.time()
+						last_activity_time = time.time()
 
 					cancel_event.clear()
 					vad.reset()
@@ -429,6 +528,7 @@ async def ai_voice_ws(websocket: WebSocket):
 					continue
 
 				frame = message["bytes"]
+				last_activity_time = time.time()
 				vad_event = vad.process_bytes(frame)
 
 				if vad_event.speech_started:

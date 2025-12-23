@@ -910,12 +910,8 @@ class CacheService:
 			return False
 		
 		try:
-			# ذخیره مقدار
-			if isinstance(value, (dict, list, bool, int, float)):
-				serialized = json.dumps(value, ensure_ascii=False)
-			else:
-				serialized = str(value)
-			
+			# ذخیره مقدار با serializer ایمن برای Decimal/Datetime/BaseModel
+			serialized = json.dumps(value, ensure_ascii=False, default=_json_serializer)
 			self.client.setex(key, ttl, serialized)
 			
 			# اضافه کردن کلید به set مربوط به business_id

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 
@@ -10,6 +11,12 @@ export 'voice_ws_client_stub.dart';
 class VoiceWsClientWeb implements VoiceWsClient {
   web.WebSocket? _ws;
   bool _connected = false;
+  bool _shouldReconnect = false;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+  static const Duration _reconnectDelay = Duration(seconds: 2);
+  Timer? _reconnectTimer;
+  String? _storedApiKey;
 
   void Function(Map<String, dynamic>)? _onEvent;
   void Function(List<int>)? _onAudioFrame;
@@ -28,10 +35,12 @@ class VoiceWsClientWeb implements VoiceWsClient {
     void Function()? onDone,
   }) async {
     disconnect();
+    _storedApiKey = apiKey;
     _onEvent = onEvent;
     _onAudioFrame = onAudioFrame;
     _onError = onError;
     _onDone = onDone;
+    _reconnectAttempts = 0;
 
     try {
       final apiBase = AppConfig.apiBaseUrl;
@@ -43,16 +52,21 @@ class VoiceWsClientWeb implements VoiceWsClient {
       _ws = web.WebSocket(url);
       _ws!.binaryType = 'arraybuffer';
 
-      _ws!.onOpen.listen((_) => _connected = true);
+      _ws!.onOpen.listen((_) {
+        _connected = true;
+        _reconnectAttempts = 0; // Reset on successful connection
+      });
       _ws!.onClose.listen((_) {
+        final wasConnected = _connected;
         _connected = false;
         _onDone?.call();
-        disconnect();
+        _handleDisconnection(wasConnected);
       });
       _ws!.onError.listen((_) {
+        final wasConnected = _connected;
         _connected = false;
         _onError?.call('WebSocket error');
-        disconnect();
+        _handleDisconnection(wasConnected);
       });
       _ws!.onMessage.listen((web.MessageEvent e) {
         final data = e.data;
@@ -99,13 +113,51 @@ class VoiceWsClientWeb implements VoiceWsClient {
     } catch (_) {}
   }
 
+  void _handleDisconnection(bool wasConnected) {
+    _ws = null;
+    _connected = false;
+    
+    if (_shouldReconnect && wasConnected && _reconnectAttempts < _maxReconnectAttempts) {
+      _reconnectAttempts++;
+      _reconnectTimer = Timer(_reconnectDelay * _reconnectAttempts, () {
+        if (_shouldReconnect && !isConnected && _storedApiKey != null) {
+          // Retry connection with stored callbacks
+          if (_onEvent != null && _onAudioFrame != null) {
+            connect(
+              apiKey: _storedApiKey!,
+              onEvent: _onEvent!,
+              onAudioFrame: _onAudioFrame!,
+              onError: _onError,
+              onDone: _onDone,
+            );
+          }
+        }
+      });
+    }
+  }
+
   @override
   void disconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _storedApiKey = null;
     try {
       _ws?.close();
     } catch (_) {}
     _ws = null;
     _connected = false;
+  }
+
+  void enableReconnect() {
+    _shouldReconnect = true;
+    _reconnectAttempts = 0;
+  }
+
+  void disableReconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 }
 

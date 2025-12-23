@@ -705,7 +705,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 Flexible(
                   flex: 2,
                   child: SizedBox(
-                    height: 36,
+                    height: 56,
                     child: WarehouseComboboxWidget(
                       businessId: widget.businessId,
                       selectedWarehouseId: item.warehouseId,

@@ -15,10 +15,11 @@ from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
-from adapters.api.v1.schemas import (
-    BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
-    BusinessListResponse, BusinessSummaryResponse, PaginationInfo
-)
+# Lazy import to avoid circular dependency
+# from adapters.api.v1.schemas import (
+#     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
+#     BusinessListResponse, BusinessSummaryResponse, PaginationInfo
+# )
 from app.core.responses import format_datetime_fields, ApiError
 from app.services.system_settings_service import get_wallet_settings
 
@@ -165,8 +166,10 @@ def check_business_creation_permission(db: Session, user_id: int) -> tuple[bool,
     return True, None
 
 
-def create_business(db: Session, business_data: BusinessCreateRequest, owner_id: int) -> Dict[str, Any]:
+def create_business(db: Session, business_data, owner_id: int) -> Dict[str, Any]:
     """ایجاد کسب و کار جدید"""
+    # Lazy import to avoid circular dependency
+    from adapters.api.v1.schemas import BusinessCreateRequest
     from app.core.responses import ApiError
     
     # بررسی دسترسی ایجاد کسب و کار
@@ -315,6 +318,8 @@ def get_businesses_by_owner(db: Session, owner_id: int, query_info: Dict[str, An
     total_pages = (total + take - 1) // take
     current_page = (skip // take) + 1
     
+    # Lazy import to avoid circular dependency
+    from adapters.api.v1.schemas import PaginationInfo
     pagination = PaginationInfo(
         total=total,
         page=current_page,
@@ -439,6 +444,8 @@ def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any], i
     total_pages = (total + take - 1) // take
     current_page = (skip // take) + 1
     
+    # Lazy import to avoid circular dependency
+    from adapters.api.v1.schemas import PaginationInfo
     pagination = PaginationInfo(
         total=total,
         page=current_page,
@@ -455,8 +462,10 @@ def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any], i
     }
 
 
-def update_business(db: Session, business_id: int, business_data: BusinessUpdateRequest, owner_id: int) -> Optional[Dict[str, Any]]:
+def update_business(db: Session, business_id: int, business_data, owner_id: int) -> Optional[Dict[str, Any]]:
     """ویرایش کسب و کار"""
+    # Lazy import to avoid circular dependency
+    from adapters.api.v1.schemas import BusinessUpdateRequest
     from app.core.responses import ApiError
     from adapters.db.models.currency import Currency, BusinessCurrency
     
@@ -1286,6 +1295,13 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         # تنظیمات اعتبار
         "default_credit_limit": float(business.default_credit_limit) if getattr(business, "default_credit_limit", None) is not None else None,
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
+        # تنظیمات محاسبه سود فاکتور
+        "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
+        "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),
+        "invoice_profit_include_overhead": bool(getattr(business, "invoice_profit_include_overhead", False)),
+        "invoice_profit_overhead_type": getattr(business, "invoice_profit_overhead_type", None),
+        "invoice_profit_overhead_percent": float(business.invoice_profit_overhead_percent) if getattr(business, "invoice_profit_overhead_percent", None) is not None else None,
+        "invoice_profit_calculation_type": getattr(business, "invoice_profit_calculation_type", None),
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at,   # datetime object بماند
         # Soft Delete fields
