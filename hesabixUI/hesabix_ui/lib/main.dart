@@ -36,6 +36,7 @@ import 'pages/admin/announcements_admin_page.dart';
 import 'pages/admin/businesses_list_page.dart';
 import 'pages/admin/support_operators_page.dart';
 import 'pages/admin/notification_moderation_queue_page.dart';
+import 'pages/admin/notification_sms_pricing_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
@@ -56,6 +57,7 @@ import 'pages/business/new_invoice_page.dart';
 import 'pages/business/edit_invoice_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
+import 'pages/business/business_currencies_settings_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/kardex_page.dart';
 import 'pages/business/debtors_report_page.dart';
@@ -1136,6 +1138,21 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const NotificationModerationQueuePage();
+                  },
+                ),
+                // Notification SMS Pricing
+                GoRoute(
+                  path: 'notification-sms-pricing',
+                  name: 'notification_sms_pricing',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationSmsPricingPage();
                   },
                 ),
                 GoRoute(
@@ -2382,6 +2399,21 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: BusinessInfoSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/currencies',
+              name: 'business_settings_currencies',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'business')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: BusinessCurrenciesSettingsPage(businessId: businessId),
                 );
               },
             ),

@@ -38,6 +38,7 @@ from adapters.api.v1.tax_product_codes import (
     admin_router as admin_tax_product_codes_router,
 )
 from adapters.api.v1.tax_settings import router as tax_settings_router
+from adapters.api.v1.tax_reports import router as tax_reports_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
@@ -80,6 +81,7 @@ from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
 from adapters.api.v1.admin.notification_moderation import router as admin_notification_moderation_router
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
+from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
 from adapters.api.v1.business_backups import router as business_backups_router
 from adapters.api.v1.business.document_monetization import router as business_document_monetization_router
@@ -815,6 +817,11 @@ def create_app() -> FastAPI:
     @application.middleware("http")
     async def smart_number_normalizer(request: Request, call_next):
         """Middleware هوشمند برای تبدیل اعداد فارسی/عربی به انگلیسی"""
+        # Streaming/SSE: برای جلوگیری از مشکلات Starlette/ASGI در listen_for_disconnect
+        # (و چون payload این endpoint کوچک و ثابت است) از normalize صرف‌نظر می‌کنیم.
+        if request.query_params.get("stream") == "true" and request.url.path.startswith("/api/v1/ai/chat/"):
+            return await call_next(request)
+
         # فقط برای درخواست‌های POST/PUT/PATCH با Content-Type JSON اعمال شود
         if not SmartNormalizerConfig.ENABLED or request.method not in ["POST", "PUT", "PATCH"]:
             return await call_next(request)
@@ -831,75 +838,48 @@ def create_app() -> FastAPI:
         if "/zohal/" in path:
             return await call_next(request)
         
-        # استفاده از receive wrapper برای خواندن و normalize کردن body
+        # نکته: برای سازگاری با StreamingResponse باید body را *کامل* قبل از شروع response بخوانیم.
+        # receive-wrapper قبلی می‌توانست باعث شود Starlette در زمان streaming همچنان پیام‌های http.request ببیند.
         original_receive = request._receive
-        body_chunks = []
-        normalized_body = None
-        body_processed = False
-        
-        async def receive():
-            nonlocal body_chunks, normalized_body, body_processed
-            
+        try:
+            raw_body: bytes = await request.body()
+        except Exception as e:
+            # اگر نتوانستیم body را بخوانیم، بدون تغییر ادامه بده
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error reading request body for normalization: {e}")
+            return await call_next(request)
+
+        # normalize کردن body
+        if raw_body:
             try:
-                # اگر body قبلاً پردازش شده، از cache استفاده کن
-                if body_processed:
-                    if normalized_body is not None:
-                        return {"type": "http.request", "body": normalized_body, "more_body": False}
-                    return {"type": "http.request", "body": b"", "more_body": False}
-                
-                # خواندن body از stream
-                message = await original_receive()
-                
-                if message["type"] == "http.request":
-                    body_chunk = message.get("body", b"")
-                    body_chunks.append(body_chunk)
-                    
-                    # اگر body کامل خوانده شد
-                    if not message.get("more_body", False):
-                        body_processed = True
-                        body = b"".join(body_chunks)
-                        
-                        if body:
-                            try:
-                                # تبدیل اعداد در JSON
-                                normalized_body = smart_normalize_json(body)
-                            except Exception as e:
-                                # در صورت خطا، body اصلی را استفاده کن
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.warning(f"Error normalizing JSON body: {e}")
-                                normalized_body = body
-                        else:
-                            normalized_body = b""
-                        
-                        return {"type": "http.request", "body": normalized_body, "more_body": False}
-                
-                return message
+                normalized_body = smart_normalize_json(raw_body)
             except Exception as e:
-                # در صورت خطا در receive، body اصلی را برگردان
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Error in receive wrapper: {e}")
-                # اگر body قبلاً خوانده شده، آن را برگردان
-                if body_processed and body_chunks:
-                    body = b"".join(body_chunks)
-                    return {"type": "http.request", "body": body, "more_body": False}
-                # در غیر این صورت، message خالی برگردان
-                return {"type": "http.request", "body": b"", "more_body": False}
-        
-        # جایگزینی receive فقط برای درخواست‌های JSON
+                logger.warning(f"Error normalizing JSON body: {e}")
+                normalized_body = raw_body
+        else:
+            normalized_body = b""
+
+        # body را برای downstream بازپخش می‌کنیم (فقط یک‌بار) و بعد receive اصلی را برای disconnect پاس می‌دهیم
+        sent = False
+
+        async def receive():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": normalized_body, "more_body": False}
+            return await original_receive()
+
         request._receive = receive
-        
+        # همچنین cache داخلی Request را هم به‌روز می‌کنیم تا handlerها body نرمال‌شده را ببینند
         try:
-            response = await call_next(request)
-            return response
-        except Exception as e:
-            # در صورت خطا، receive اصلی را برگردان و خطا را propagate کن
-            request._receive = original_receive
-            raise
-        finally:
-            # همیشه receive اصلی را برگردان
-            request._receive = original_receive
+            request._body = normalized_body  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        return await call_next(request)
 
     @application.middleware("http")
     async def maintenance_mode_middleware(request: Request, call_next):
@@ -1021,6 +1001,7 @@ def create_app() -> FastAPI:
     application.include_router(tax_product_codes_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_tax_product_codes_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(tax_reports_router, prefix=settings.api_v1_prefix)
     application.include_router(receipts_payments_router, prefix=settings.api_v1_prefix)
     application.include_router(transfers_router, prefix=settings.api_v1_prefix)
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
@@ -1049,6 +1030,8 @@ def create_app() -> FastAPI:
     # Notifications
     application.include_router(notifications_router, prefix=settings.api_v1_prefix)
     application.include_router(notifications_ws_router)
+    # AI Voice WS (no prefix)
+    application.include_router(ai_voice_ws_router)
     # Business backups
     application.include_router(business_backups_router, prefix=settings.api_v1_prefix)
     # Business storage
@@ -1108,10 +1091,12 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.subscription import router as ai_subscription_router
     from adapters.api.v1.ai.prompts import router as ai_prompts_router
     from adapters.api.v1.ai.usage import router as ai_usage_router
+    from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_subscription_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_usage_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_voice_feedback_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 
@@ -1138,6 +1123,11 @@ def create_app() -> FastAPI:
         asyncio.create_task(document_monetization_loop(10))
         # Document monetization period finalization: هر 24 ساعت یکبار
         asyncio.create_task(document_monetization_finalize_periods_loop(24))
+
+        # Tax system background jobs
+        from app.services.tax_background_jobs import tax_auto_inquiry_loop
+        # Auto-inquiry برای فاکتورهای pending: هر 30 دقیقه یکبار
+        asyncio.create_task(tax_auto_inquiry_loop(30))
 
         # AI background jobs
         from app.services.ai_background_jobs import (

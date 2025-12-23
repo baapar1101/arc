@@ -17,6 +17,13 @@ class InvoiceListItem {
   final String? counterparty;
   final int? projectId;
   final String? projectName;
+  // فیلدهای سود
+  final double? totalProfit;
+  final double? totalProfitPercent;
+  final double? grossProfit;
+  final double? grossProfitPercent;
+  final double? netProfit;
+  final double? netProfitPercent;
 
   const InvoiceListItem({
     required this.id,
@@ -35,6 +42,12 @@ class InvoiceListItem {
     this.counterparty,
     this.projectId,
     this.projectName,
+    this.totalProfit,
+    this.totalProfitPercent,
+    this.grossProfit,
+    this.grossProfitPercent,
+    this.netProfit,
+    this.netProfitPercent,
   });
 
   factory InvoiceListItem.fromJson(Map<String, dynamic> json) {
@@ -68,6 +81,12 @@ class InvoiceListItem {
       counterparty: json['counterparty']?.toString(),
       projectId: json['project_id'] as int?,
       projectName: json['project_name']?.toString(),
+      totalProfit: _toDouble(json['total_profit']),
+      totalProfitPercent: _toDouble(json['total_profit_percent']),
+      grossProfit: _toDouble(json['gross_profit']),
+      grossProfitPercent: _toDouble(json['gross_profit_percent']),
+      netProfit: _toDouble(json['net_profit']),
+      netProfitPercent: _toDouble(json['net_profit_percent']),
     );
   }
 }

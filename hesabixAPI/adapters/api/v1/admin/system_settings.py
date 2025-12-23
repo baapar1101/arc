@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from urllib.parse import urlsplit, urlunsplit
 import structlog
 
@@ -25,6 +25,8 @@ from app.services.system_settings_service import (
 	set_redis_configuration,
 	get_zohal_settings,
 	set_zohal_settings,
+	get_notification_sms_pricing,
+	set_notification_sms_pricing,
 )
 from app.services.providers.telegram_provider import TelegramProvider
 
@@ -495,3 +497,45 @@ def set_zohal_settings_endpoint(
 		low_balance_threshold=payload.low_balance_threshold,
 	)
 	return success_response(data, request, message="ZOHAL_SETTINGS_UPDATED")
+
+
+class NotificationSmsPricingPayload(BaseModel):
+	price_per_sms: float | None = Field(None, gt=0, description="قیمت پیش‌فرض هر پیامک")
+	event_type_prices: Dict[str, float] | None = Field(None, description="قیمت‌های خاص برای event_type ها")
+
+
+@router.get(
+	"/notification-sms-pricing",
+	summary="دریافت تنظیمات قیمت‌گذاری پیامک ناتیفیکیشن",
+	description="خواندن قیمت‌گذاری پیامک‌های ناتیفیکیشن کسب‌وکارها",
+)
+def get_notification_sms_pricing_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_notification_sms_pricing(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/notification-sms-pricing",
+	summary="تنظیم قیمت‌گذاری پیامک ناتیفیکیشن",
+	description="تنظیم قیمت هر پیامک برای ناتیفیکیشن‌های کسب‌وکارها. قیمت‌ها بر اساس ارز کیف پول هستند.",
+)
+def set_notification_sms_pricing_endpoint(
+	payload: NotificationSmsPricingPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_notification_sms_pricing(
+		db,
+		price_per_sms=payload.price_per_sms,
+		event_type_prices=payload.event_type_prices,
+	)
+	return success_response(data, request, message="NOTIFICATION_SMS_PRICING_UPDATED")

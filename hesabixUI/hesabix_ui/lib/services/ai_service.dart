@@ -330,6 +330,21 @@ class AIService {
     await _api.delete('/api/v1/ai/chat/sessions/$sessionId');
   }
 
+  // ========== Voice: Feedback ==========
+  Future<void> submitVoiceFeedback({
+    required int interactionId,
+    required int rating,
+    String? feedbackText,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/voice/interactions/$interactionId/feedback',
+      data: {
+        'rating': rating,
+        if (feedbackText != null && feedbackText.trim().isNotEmpty) 'feedback_text': feedbackText.trim(),
+      },
+    );
+  }
+
   // ========== User: Subscription ==========
   Future<UserAISubscription?> getCurrentSubscription({int? businessId}) async {
     try {

@@ -2154,6 +2154,81 @@
       }
     }
   },
+  "taxQuickActionSendAllPending": "ارسال همه در انتظار",
+  "taxQuickActionInquireAllSent": "استعلام همه ارسال شده",
+  "taxQuickActionRetryAllFailed": "تلاش مجدد همه ناموفق",
+  "taxHelpTooltip": "راهنما",
+  "taxHelpTitle": "راهنمای کارپوشه مالیاتی",
+  "taxHelpSectionStatuses": "وضعیت‌های فاکتور",
+  "taxHelpStatusNotSent": "ارسال نشده: فاکتور هنوز ارسال نشده",
+  "taxHelpStatusPending": "در انتظار: در حال ارسال",
+  "taxHelpStatusSent": "ارسال شده: ارسال شده و منتظر تایید",
+  "taxHelpStatusFinalized": "نهایی شده: نهایی شده توسط سامانه",
+  "taxHelpStatusFailed": "ناموفق: ارسال ناموفق",
+  "taxHelpSectionQuickActions": "عملیات سریع",
+  "taxHelpQuickActionSendPending": "ارسال همه در انتظار: ارسال تمام فاکتورهای در انتظار",
+  "taxHelpQuickActionInquireSent": "استعلام همه ارسال شده: بررسی وضعیت فاکتورهای ارسال شده",
+  "taxHelpQuickActionRetryFailed": "تلاش مجدد همه ناموفق: تلاش مجدد برای فاکتورهای ناموفق",
+  "taxHelpSectionImportantNotes": "نکات مهم",
+  "taxHelpNoteValidateBeforeSend": "قبل از ارسال، فاکتورها را اعتبارسنجی کنید",
+  "taxHelpNoteFailedInDLQ": "فاکتورهای ناموفق در صف خطا ذخیره می‌شوند",
+  "taxHelpNoteTimeline": "می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید",
+  "taxHelpNoteExport": "گزارش‌های ارسال را می‌توانید خروجی بگیرید",
+  "taxOperationSuccess": "عملیات با موفقیت انجام شد",
+  "taxOperationError": "خطا در انجام عملیات: {error}",
+  "@taxOperationError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "taxSendingInvoices": "در حال ارسال فاکتورها...",
+  "taxSendingWithError": "ارسال با خطا مواجه شد",
+  "taxSentCountFailedCount": "ارسال شده: {sentCount} | ناموفق: {failedCount}",
+  "@taxSentCountFailedCount": {
+    "placeholders": {
+      "sentCount": {
+        "type": "int"
+      },
+      "failedCount": {
+        "type": "int"
+      }
+    }
+  },
+  "taxProcessing": "در حال پردازش...",
+  "taxUnknownError": "خطای نامشخص",
+  "taxFailedInvoicesCount": "{count} فاکتور با خطا مواجه شد",
+  "@taxFailedInvoicesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRetryFailed": "تلاش مجدد",
+  "taxErrorCategoryValidation": "خطاهای اعتبارسنجی",
+  "taxErrorCategoryNetwork": "خطاهای شبکه",
+  "taxErrorCategoryAccess": "خطاهای دسترسی",
+  "taxErrorCategoryStatus": "خطاهای وضعیت",
+  "taxErrorCategoryOther": "سایر خطاها",
+  "taxErrorItemsCount": "{count} مورد",
+  "@taxErrorItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInvoiceNumber": "فاکتور #{invoiceId}",
+  "@taxInvoiceNumber": {
+    "placeholders": {
+      "invoiceId": {
+        "type": "int"
+      }
+    }
+  },
+  "taxCurrencyRial": "ریال",
 
   "documentMonetizationTitle": "پکیج‌ها و تعرفه‌ها",
   "documentMonetizationSubtitle": "پکیج‌ها، هزینه ثبت هر سند و تسویه حجمی",

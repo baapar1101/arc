@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
@@ -66,11 +67,19 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
     _searchCtrl.addListener(_onSearchChanged);
+    widget.calendarController.addListener(_onCalendarChanged);
     _fetch(reset: true);
+  }
+
+  void _onCalendarChanged() {
+    if (!mounted) return;
+    // رندر مجدد تاریخ‌ها و چیپ‌های وابسته به تقویم
+    setState(() {});
   }
 
   @override
   void dispose() {
+    widget.calendarController.removeListener(_onCalendarChanged);
     _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
@@ -501,7 +510,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                     ),
                   ),
                   Text(
-                    doc.documentDateDisplay ?? '-',
+                    HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali),
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     textDirection: TextDirection.ltr,
                   ),

@@ -5362,6 +5362,133 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get taxQuickActionSendAllPending => 'ارسال همه در انتظار';
+
+  @override
+  String get taxQuickActionInquireAllSent => 'استعلام همه ارسال شده';
+
+  @override
+  String get taxQuickActionRetryAllFailed => 'تلاش مجدد همه ناموفق';
+
+  @override
+  String get taxHelpTooltip => 'راهنما';
+
+  @override
+  String get taxHelpTitle => 'راهنمای کارپوشه مالیاتی';
+
+  @override
+  String get taxHelpSectionStatuses => 'وضعیت‌های فاکتور';
+
+  @override
+  String get taxHelpStatusNotSent => 'ارسال نشده: فاکتور هنوز ارسال نشده';
+
+  @override
+  String get taxHelpStatusPending => 'در انتظار: در حال ارسال';
+
+  @override
+  String get taxHelpStatusSent => 'ارسال شده: ارسال شده و منتظر تایید';
+
+  @override
+  String get taxHelpStatusFinalized => 'نهایی شده: نهایی شده توسط سامانه';
+
+  @override
+  String get taxHelpStatusFailed => 'ناموفق: ارسال ناموفق';
+
+  @override
+  String get taxHelpSectionQuickActions => 'عملیات سریع';
+
+  @override
+  String get taxHelpQuickActionSendPending =>
+      'ارسال همه در انتظار: ارسال تمام فاکتورهای در انتظار';
+
+  @override
+  String get taxHelpQuickActionInquireSent =>
+      'استعلام همه ارسال شده: بررسی وضعیت فاکتورهای ارسال شده';
+
+  @override
+  String get taxHelpQuickActionRetryFailed =>
+      'تلاش مجدد همه ناموفق: تلاش مجدد برای فاکتورهای ناموفق';
+
+  @override
+  String get taxHelpSectionImportantNotes => 'نکات مهم';
+
+  @override
+  String get taxHelpNoteValidateBeforeSend =>
+      'قبل از ارسال، فاکتورها را اعتبارسنجی کنید';
+
+  @override
+  String get taxHelpNoteFailedInDLQ =>
+      'فاکتورهای ناموفق در صف خطا ذخیره می‌شوند';
+
+  @override
+  String get taxHelpNoteTimeline =>
+      'می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید';
+
+  @override
+  String get taxHelpNoteExport => 'گزارش‌های ارسال را می‌توانید خروجی بگیرید';
+
+  @override
+  String get taxOperationSuccess => 'عملیات با موفقیت انجام شد';
+
+  @override
+  String taxOperationError(String error) {
+    return 'خطا در انجام عملیات: $error';
+  }
+
+  @override
+  String get taxSendingInvoices => 'در حال ارسال فاکتورها...';
+
+  @override
+  String get taxSendingWithError => 'ارسال با خطا مواجه شد';
+
+  @override
+  String taxSentCountFailedCount(int sentCount, int failedCount) {
+    return 'ارسال شده: $sentCount | ناموفق: $failedCount';
+  }
+
+  @override
+  String get taxProcessing => 'در حال پردازش...';
+
+  @override
+  String get taxUnknownError => 'خطای نامشخص';
+
+  @override
+  String taxFailedInvoicesCount(int count) {
+    return '$count فاکتور با خطا مواجه شد';
+  }
+
+  @override
+  String get taxRetryFailed => 'تلاش مجدد';
+
+  @override
+  String get taxErrorCategoryValidation => 'خطاهای اعتبارسنجی';
+
+  @override
+  String get taxErrorCategoryNetwork => 'خطاهای شبکه';
+
+  @override
+  String get taxErrorCategoryAccess => 'خطاهای دسترسی';
+
+  @override
+  String get taxErrorCategoryStatus => 'خطاهای وضعیت';
+
+  @override
+  String get taxErrorCategoryOther => 'سایر خطاها';
+
+  @override
+  String taxErrorItemsCount(int count) {
+    return '$count مورد';
+  }
+
+  @override
+  String taxInvoiceNumber(int invoiceId) {
+    return 'فاکتور #$invoiceId';
+  }
+
+  @override
+  String get taxCurrencyRial => 'ریال';
+
+  @override
   String get documentMonetizationTitle => 'پکیج‌ها و تعرفه‌ها';
 
   @override

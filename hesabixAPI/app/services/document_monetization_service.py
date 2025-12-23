@@ -37,6 +37,7 @@ from app.services.system_settings_service import (
 	DEFAULT_WALLET_CURRENCY_CODE,
 	get_default_document_policies,
 )
+from app.services.business_service import ensure_wallet_currency_in_business
 
 
 logger = structlog.get_logger()
@@ -144,6 +145,12 @@ def _create_document_monetization_accounting_document(
 	from datetime import date as date_type
 	
 	try:
+		# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
+		try:
+			ensure_wallet_currency_in_business(db, business_id)
+		except Exception as e:
+			logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
+		
 		# دریافت حساب‌ها
 		expense_account = _ensure_document_monetization_expense_account(db)
 		wallet_account = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول

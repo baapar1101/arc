@@ -37,6 +37,9 @@ ZOHAL_API_KEY = "zohal_api_key"
 ZOHAL_BASE_URL = "zohal_base_url"
 ZOHAL_LOW_BALANCE_THRESHOLD = "zohal_low_balance_threshold"
 
+# Notification SMS Pricing Configuration Key
+NOTIFICATION_SMS_PRICING_KEY = "notification_sms_pricing"
+
 # System Configuration Keys
 SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
 SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
@@ -767,3 +770,86 @@ def set_zohal_settings(
 		cache.invalidate("zohal:*")
 	
 	return get_zohal_settings(db)
+
+
+def get_notification_sms_pricing(db: Session) -> Dict[str, Any]:
+	"""
+	خواندن تنظیمات قیمت‌گذاری پیامک ناتیفیکیشن
+	
+	Returns:
+		دیکشنری شامل:
+		- price_per_sms: قیمت پیش‌فرض هر پیامک (حداقل 1)
+		- event_type_prices: قیمت‌های خاص برای هر event_type
+	"""
+	data = _get_setting_json(db, NOTIFICATION_SMS_PRICING_KEY)
+	if data and isinstance(data, dict):
+		price_per_sms = data.get("price_per_sms")
+		# اعتبارسنجی قیمت پیش‌فرض
+		if price_per_sms is not None:
+			try:
+				price_per_sms = float(price_per_sms)
+				if price_per_sms <= 0:
+					# اگر قیمت نامعتبر باشد، از مقدار پیش‌فرض استفاده می‌کنیم
+					price_per_sms = 500.0
+			except (ValueError, TypeError):
+				price_per_sms = 500.0
+		else:
+			price_per_sms = 500.0
+		
+		# اعتبارسنجی قیمت‌های event_type
+		event_type_prices = data.get("event_type_prices", {})
+		if isinstance(event_type_prices, dict):
+			validated_prices = {}
+			for event_type, price in event_type_prices.items():
+				try:
+					price_float = float(price)
+					if price_float > 0:
+						validated_prices[str(event_type)] = price_float
+				except (ValueError, TypeError):
+					# قیمت نامعتبر را نادیده می‌گیریم
+					continue
+			event_type_prices = validated_prices
+		else:
+			event_type_prices = {}
+		
+		return {
+			"price_per_sms": price_per_sms,
+			"event_type_prices": event_type_prices
+		}
+	# مقادیر پیش‌فرض
+	return {
+		"price_per_sms": 500.0,
+		"event_type_prices": {}
+	}
+
+
+def set_notification_sms_pricing(
+	db: Session,
+	*,
+	price_per_sms: float | None = None,
+	event_type_prices: Dict[str, float] | None = None,
+) -> Dict[str, Any]:
+	"""
+	تنظیم قیمت‌گذاری پیامک ناتیفیکیشن
+	
+	Args:
+		price_per_sms: قیمت پیش‌فرض هر پیامک (باید بزرگتر از صفر باشد)
+		event_type_prices: دیکشنری قیمت‌های خاص برای event_type ها
+	"""
+	current = get_notification_sms_pricing(db)
+	
+	if price_per_sms is not None:
+		if price_per_sms <= 0:
+			raise ApiError("INVALID_PRICE", "قیمت هر پیامک باید بزرگتر از صفر باشد", http_status=400)
+		current["price_per_sms"] = float(price_per_sms)
+	
+	if event_type_prices is not None:
+		# اعتبارسنجی قیمت‌ها
+		for event_type, price in event_type_prices.items():
+			if price <= 0:
+				raise ApiError("INVALID_PRICE", f"قیمت برای {event_type} باید بزرگتر از صفر باشد", http_status=400)
+		current["event_type_prices"] = event_type_prices
+	
+	_upsert_setting_json(db, NOTIFICATION_SMS_PRICING_KEY, current)
+	db.commit()
+	return current

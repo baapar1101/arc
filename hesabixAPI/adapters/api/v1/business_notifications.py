@@ -477,6 +477,7 @@ def list_send_logs(
             "sent_at": log.sent_at.isoformat() if log.sent_at else None,
             "failed_at": log.failed_at.isoformat() if log.failed_at else None,
             "failure_reason": log.failure_reason,
+            "cost": float(log.cost) if log.cost else None,
             "created_at": log.created_at.isoformat()
         })
     

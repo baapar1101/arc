@@ -92,7 +92,7 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
       isExpanded: true,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         labelText: widget.label,
         hintText: widget.hintText,
         border: const OutlineInputBorder(),

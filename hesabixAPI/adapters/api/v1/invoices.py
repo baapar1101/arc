@@ -504,6 +504,206 @@ def get_invoice_endpoint(
     result = invoice_document_to_dict(db, doc)
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
+
+@router.post("/business/{business_id}/recalculate-all-profits")
+@require_business_access("business_id")
+def recalculate_all_invoice_profits_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
+) -> Dict[str, Any]:
+    """
+    محاسبه مجدد سود تمام فاکتورهای یک کسب و کار
+    
+    این endpoint برای استفاده بعد از تغییر تنظیمات محاسبه سود طراحی شده است.
+    به صورت خودکار از background job استفاده می‌کند.
+    """
+    from adapters.db.models.business import Business
+    
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        from app.core.responses import ApiError
+        raise ApiError("BUSINESS_NOT_FOUND", "Business not found", http_status=404)
+    
+    # بررسی اینکه محاسبه سود فعال است
+    if business.invoice_profit_calculation_method == "disabled":
+        return success_response(
+            data={
+                "message": "محاسبه سود برای این کسب و کار غیرفعال است",
+                "processed": 0,
+                "skipped": 0
+            },
+            request=request,
+            message="PROFIT_CALCULATION_DISABLED"
+        )
+    
+    # استفاده از endpoint اصلی با پارامترهای پیش‌فرض
+    return recalculate_invoice_profits_endpoint(
+        request=request,
+        business_id=business_id,
+        payload={},  # بدون فیلتر - همه فاکتورها
+        ctx=ctx,
+        db=db,
+        _=_
+    )
+
+
+@router.post("/business/{business_id}/recalculate-profits")
+@require_business_access("business_id")
+def recalculate_invoice_profits_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
+) -> Dict[str, Any]:
+    """
+    محاسبه مجدد سود فاکتورهای قدیمی
+    
+    پارامترها:
+    - invoice_ids: لیست شناسه فاکتورها (اختیاری - اگر نباشد، تمام فاکتورهای کسب و کار)
+    - document_type: نوع فاکتور (اختیاری - برای فیلتر)
+    - fiscal_year_id: سال مالی (اختیاری - برای فیلتر)
+    - batch_size: تعداد فاکتورها در هر batch (پیش‌فرض: 100)
+    - use_background: استفاده از background job برای پردازش (پیش‌فرض: true)
+    """
+    from adapters.db.models.business import Business
+    from adapters.db.models.fiscal_year import FiscalYear
+    
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        from app.core.responses import ApiError
+        raise ApiError("BUSINESS_NOT_FOUND", "Business not found", http_status=404)
+    
+    # بررسی اینکه محاسبه سود فعال است
+    if business.invoice_profit_calculation_method == "disabled":
+        return success_response(
+            data={
+                "message": "محاسبه سود برای این کسب و کار غیرفعال است",
+                "processed": 0,
+                "skipped": 0
+            },
+            request=request,
+            message="PROFIT_CALCULATION_DISABLED"
+        )
+    
+    invoice_ids = payload.get("invoice_ids")
+    document_type = payload.get("document_type")
+    fiscal_year_id = payload.get("fiscal_year_id")
+    batch_size = payload.get("batch_size", 100)
+    use_background = payload.get("use_background", True)
+    
+    # ساخت query برای فاکتورها
+    query = db.query(Document).filter(Document.business_id == business_id)
+    query = query.filter(Document.document_type.in_(SUPPORTED_INVOICE_TYPES))
+    
+    if invoice_ids:
+        query = query.filter(Document.id.in_(invoice_ids))
+    if document_type:
+        query = query.filter(Document.document_type == document_type)
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # فقط فاکتورهای فروش و تولید
+    query = query.filter(
+        Document.document_type.in_(["invoice_sales", "invoice_sales_return", "invoice_production"])
+    )
+    
+    total_invoices = query.count()
+    
+    if total_invoices == 0:
+        return success_response(
+            data={
+                "message": "هیچ فاکتوری برای محاسبه سود یافت نشد",
+                "processed": 0,
+                "skipped": 0,
+                "total": 0
+            },
+            request=request,
+            message="NO_INVOICES_FOUND"
+        )
+    
+    # اگر تعداد فاکتورها زیاد است یا use_background فعال است، از background job استفاده کن
+    if use_background and total_invoices > batch_size:
+        from app.core.queue import get_queue_service, QUEUE_DEFAULT
+        from app.services.jobs.invoice_profit_job import recalculate_invoice_profits_job
+        
+        queue_service = get_queue_service()
+        if queue_service and queue_service.enabled:
+            # دریافت invoice_ids برای job
+            invoice_id_list = [d.id for d in query.limit(10000).all()] if not invoice_ids else invoice_ids
+            
+            job = queue_service.enqueue(
+                recalculate_invoice_profits_job,
+                business_id=business_id,
+                user_id=ctx.get_user_id(),
+                invoice_ids=invoice_id_list if invoice_ids else None,
+                document_type=document_type,
+                fiscal_year_id=fiscal_year_id,
+                batch_size=batch_size,
+                queue_name=QUEUE_DEFAULT,
+                timeout=3600,  # 1 ساعت timeout
+                result_ttl=7200,  # نتیجه را 2 ساعت نگه دار
+            )
+            
+            if job:
+                return success_response({
+                    "job_id": job.id,
+                    "status": "queued",
+                    "total_invoices": total_invoices,
+                    "message": f"محاسبه سود {total_invoices} فاکتور در پس‌زمینه شروع شد. از GET /api/v1/jobs/{job.id} برای بررسی وضعیت استفاده کنید."
+                }, request)
+    
+    # اجرای sync برای تعداد کم فاکتورها
+    from decimal import Decimal
+    
+    invoices = query.limit(batch_size).all()
+    processed = 0
+    skipped = 0
+    errors = []
+    
+    for doc in invoices:
+        try:
+            # محاسبه سود (فقط برای بررسی - نتیجه ذخیره نمی‌شود چون on-demand است)
+            profit_data = _calculate_invoice_profit(
+                db,
+                business_id,
+                doc.id,
+                business.invoice_profit_calculation_method or "automatic",
+                business.invoice_profit_calculation_basis or "purchase_price",
+                business.invoice_profit_include_overhead or False,
+                business.invoice_profit_overhead_type or "none",
+                Decimal(str(business.invoice_profit_overhead_percent or 0)) if business.invoice_profit_overhead_percent else None,
+                business.invoice_profit_calculation_type or "gross"
+            )
+            
+            # سود در invoice_document_to_dict به صورت on-demand محاسبه می‌شود
+            # این endpoint فقط برای تست و بررسی است
+            processed += 1
+        except Exception as e:
+            skipped += 1
+            errors.append({
+                "invoice_id": doc.id,
+                "invoice_code": doc.code,
+                "error": str(e)
+            })
+            logger.warning(f"Error calculating profit for invoice {doc.id}: {e}")
+    
+    return success_response(
+        data={
+            "message": f"محاسبه سود برای {processed} فاکتور انجام شد",
+            "processed": processed,
+            "skipped": skipped,
+            "total": total_invoices,
+            "errors": errors[:10] if errors else []  # فقط 10 خطای اول
+        },
+        request=request,
+        message="PROFIT_RECALCULATED"
+    )
+
 @router.get(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
@@ -2184,6 +2384,146 @@ def remove_invoices_from_tax_workspace_batch(
     )
 
 
+@router.get("/business/{business_id}/tax-workspace/health")
+@require_business_access("business_id")
+def get_tax_system_health(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """بررسی سلامت سامانه مالیاتی"""
+    from app.services.tax_health_check import check_tax_system_health
+    
+    health = check_tax_system_health(db, business_id)
+    
+    return success_response(
+        data=health,
+        request=request,
+        message="TAX_SYSTEM_HEALTH_CHECK",
+    )
+
+
+@router.get("/business/{business_id}/tax-workspace/failed-invoices")
+@require_business_access("business_id")
+def get_failed_invoices(
+    request: Request,
+    business_id: int,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """دریافت لیست فاکتورهای failed از Dead Letter Queue"""
+    from app.services.tax_dead_letter_queue import get_failed_invoices
+    
+    failed = get_failed_invoices(db, business_id, status, limit, offset)
+    
+    return success_response(
+        data={
+            "items": [
+                {
+                    "id": item.id,
+                    "invoice_id": item.invoice_id,
+                    "tracking_code": item.tracking_code,
+                    "error_code": item.error_code,
+                    "error_message": item.error_message,
+                    "attempt_count": item.attempt_count,
+                    "first_failed_at": item.first_failed_at.isoformat() if item.first_failed_at else None,
+                    "last_attempt_at": item.last_attempt_at.isoformat() if item.last_attempt_at else None,
+                    "status": item.status,
+                }
+                for item in failed
+            ],
+            "total": len(failed),
+        },
+        request=request,
+        message="TAX_FAILED_INVOICES_LIST",
+    )
+
+
+@router.post("/business/{business_id}/tax-workspace/failed-invoices/{failed_id}/retry")
+@require_business_access("business_id")
+def retry_failed_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    failed_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """تلاش مجدد برای ارسال فاکتور failed"""
+    from app.services.tax_dead_letter_queue import retry_failed_invoice
+    
+    result = retry_failed_invoice(db, failed_id)
+    db.commit()
+    
+    return success_response(
+        data=result,
+        request=request,
+        message="TAX_FAILED_INVOICE_RETRY_COMPLETED",
+    )
+
+
+@router.get("/business/{business_id}/{invoice_id}/tax-timeline")
+@require_business_access("business_id")
+def get_invoice_tax_timeline(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """دریافت Timeline تغییرات وضعیت مالیاتی فاکتور"""
+    doc = _get_invoice_for_business(db, business_id, invoice_id)
+    extra = dict(doc.extra_info or {})
+    
+    timeline = []
+    
+    # تاریخچه از extra_info
+    if extra.get("tax_last_send_at"):
+        timeline.append({
+            "event": "send_attempt",
+            "timestamp": extra.get("tax_last_send_at"),
+            "status": extra.get("tax_status"),
+            "tracking_code": extra.get("tax_tracking_code"),
+        })
+    
+    if extra.get("tax_last_inquiry_at"):
+        timeline.append({
+            "event": "status_inquiry",
+            "timestamp": extra.get("tax_last_inquiry_at"),
+            "status": extra.get("tax_status"),
+            "error_message": extra.get("tax_error_message"),
+        })
+    
+    # بررسی Dead Letter Queue
+    from app.services.tax_dead_letter_queue import get_failed_invoices
+    failed_items = get_failed_invoices(db, business_id, status=None, limit=1000, offset=0)
+    for failed in failed_items:
+        if failed.invoice_id == invoice_id:
+            timeline.append({
+                "event": "failed",
+                "timestamp": failed.first_failed_at.isoformat() if failed.first_failed_at else None,
+                "error_code": failed.error_code,
+                "error_message": failed.error_message,
+                "attempt_count": failed.attempt_count,
+            })
+    
+    # مرتب‌سازی بر اساس زمان
+    timeline.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+    
+    return success_response(
+        data={
+            "invoice_id": invoice_id,
+            "current_status": extra.get("tax_status"),
+            "timeline": timeline,
+        },
+        request=request,
+        message="TAX_TIMELINE_RETRIEVED",
+    )
+
+
 @router.post("/business/{business_id}/tax-workspace/inquire-status")
 @require_business_access("business_id")
 def inquire_tax_status_endpoint(
@@ -2219,6 +2559,166 @@ def inquire_tax_status_endpoint(
         request=request,
         message="TAX_STATUS_INQUIRY_COMPLETED",
     )
+
+
+@router.post("/business/{business_id}/tax-workspace/validate-batch")
+@require_business_access("business_id")
+def validate_invoices_for_tax_batch(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """اعتبارسنجی گروهی فاکتورها قبل از ارسال"""
+    ids = body.get("invoice_ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
+    
+    validated: List[int] = []
+    invalid: List[Dict[str, Any]] = []
+    
+    for raw_id in ids:
+        try:
+            invoice_id = int(raw_id)
+        except Exception:
+            invalid.append({"id": raw_id, "error": "INVALID_ID", "message": "شناسه نامعتبر"})
+            continue
+        
+        try:
+            doc = _get_invoice_for_business(db, business_id, invoice_id)
+            _ensure_sales_or_return(doc)
+            
+            # اعتبارسنجی
+            from app.services.tax_validation_service import validate_document_for_tax
+            validation = validate_document_for_tax(db, doc)
+            
+            if not validation["valid"]:
+                invalid.append({
+                    "id": invoice_id,
+                    "error": "VALIDATION_FAILED",
+                    "message": "فاکتور حداقل الزامات سامانه مودیان را ندارد.",
+                    "issues": validation["issues"],
+                })
+            else:
+                validated.append(invoice_id)
+                
+        except ApiError as e:
+            error_detail = getattr(e, "detail", {}) or {}
+            error_info = error_detail.get("error") if isinstance(error_detail, dict) else {}
+            invalid.append({
+                "id": invoice_id,
+                "error": (error_info or {}).get("code") or str(e),
+                "message": (error_info or {}).get("message") or str(e),
+            })
+        except Exception as e:
+            invalid.append({
+                "id": invoice_id,
+                "error": "UNKNOWN_ERROR",
+                "message": str(e),
+            })
+    
+    return success_response(
+        data={
+            "validated": validated,
+            "invalid": invalid,
+            "total": len(ids),
+            "valid_count": len(validated),
+            "invalid_count": len(invalid),
+        },
+        request=request,
+        message="TAX_VALIDATION_BATCH_COMPLETED",
+    )
+
+
+@router.post("/business/{business_id}/tax-workspace/quick-actions")
+@require_business_access("business_id")
+def tax_workspace_quick_actions(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+) -> Dict[str, Any]:
+    """عملیات سریع برای کارپوشه مالیاتی"""
+    action = body.get("action")
+    if not action or not isinstance(action, str):
+        raise ApiError("INVALID_REQUEST", "action is required", http_status=400)
+    
+    action = action.lower()
+    
+    # دریافت فاکتورها بر اساس وضعیت
+    from sqlalchemy import func
+    
+    base_query = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
+            func.json_extract(Document.extra_info, '$.tax_workspace') == True,
+        )
+    )
+    
+    invoice_ids: List[int] = []
+    
+    if action == "send_all_pending":
+        # ارسال همه pending
+        docs = base_query.filter(
+            func.json_extract(Document.extra_info, '$.tax_status') == 'pending'
+        ).all()
+        invoice_ids = [doc.id for doc in docs]
+        
+        if not invoice_ids:
+            return success_response(
+                data={"message": "هیچ فاکتور pending یافت نشد", "invoice_ids": []},
+                request=request,
+                message="NO_PENDING_INVOICES",
+            )
+        
+        # استفاده از endpoint ارسال گروهی
+        return send_invoices_to_tax_system_batch(request, business_id, {"invoice_ids": invoice_ids}, ctx, db)
+        
+    elif action == "inquire_all_sent":
+        # استعلام همه sent
+        docs = base_query.filter(
+            func.json_extract(Document.extra_info, '$.tax_status') == 'sent'
+        ).all()
+        
+        tracking_codes: List[str] = []
+        for doc in docs:
+            code = (doc.extra_info or {}).get("tax_tracking_code")
+            if code and isinstance(code, str) and code.strip():
+                tracking_codes.append(code.strip())
+        
+        if not tracking_codes:
+            return success_response(
+                data={"message": "هیچ فاکتور sent با کد رهگیری یافت نشد", "tracking_codes": []},
+                request=request,
+                message="NO_SENT_INVOICES",
+            )
+        
+        # استفاده از endpoint استعلام
+        return inquire_tax_status_endpoint(request, business_id, {"tracking_codes": tracking_codes}, ctx, db)
+        
+    elif action == "retry_all_failed":
+        # Retry همه failed
+        docs = base_query.filter(
+            func.json_extract(Document.extra_info, '$.tax_status') == 'failed'
+        ).all()
+        invoice_ids = [doc.id for doc in docs]
+        
+        if not invoice_ids:
+            return success_response(
+                data={"message": "هیچ فاکتور failed یافت نشد", "invoice_ids": []},
+                request=request,
+                message="NO_FAILED_INVOICES",
+            )
+        
+        # استفاده از endpoint ارسال گروهی
+        return send_invoices_to_tax_system_batch(request, business_id, {"invoice_ids": invoice_ids}, ctx, db)
+        
+    else:
+        raise ApiError("INVALID_ACTION", f"Unknown action: {action}", http_status=400)
 
 
 @router.post(

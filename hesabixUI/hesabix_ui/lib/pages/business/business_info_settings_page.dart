@@ -7,6 +7,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/models/business_models.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
+import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
@@ -47,6 +48,20 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _checkCreditEnabledByDefault = false;
   final _defaultCreditLimitController = TextEditingController();
 
+  // تنظیمات محاسبه سود فاکتور
+  String? _invoiceProfitCalculationMethod;
+  String? _invoiceProfitCalculationBasis;
+  bool _invoiceProfitIncludeOverhead = false;
+  String? _invoiceProfitOverheadType;
+  final _invoiceProfitOverheadPercentController = TextEditingController();
+  String? _invoiceProfitCalculationType;
+  bool _recalculatingProfits = false;
+
+  // ارز پیش‌فرض
+  int? _selectedDefaultCurrencyId;
+  List<Map<String, dynamic>> _currencies = [];
+  bool _loadingCurrencies = false;
+
   // فایل‌های گرافیکی
   Uint8List? _logoBytes;
   Uint8List? _stampBytes;
@@ -54,11 +69,13 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _uploadingStamp = false;
 
   late final ApiClient _apiClient;
+  late final CurrencyService _currencyService;
 
   @override
   void initState() {
     super.initState();
     _apiClient = ApiClient();
+    _currencyService = CurrencyService(_apiClient);
     _loadData();
   }
 
@@ -76,6 +93,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _provinceController.dispose();
     _cityController.dispose();
     _defaultCreditLimitController.dispose();
+    _invoiceProfitOverheadPercentController.dispose();
     super.dispose();
   }
 
@@ -102,6 +120,19 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _businessField = _resolveBusinessField(resp.businessField);
       _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
       _defaultCreditLimitController.text = (resp.defaultCreditLimit ?? 0).toStringAsFixed(0);
+      // تنظیمات محاسبه سود
+      _invoiceProfitCalculationMethod = resp.invoiceProfitCalculationMethod ?? 'automatic';
+      _invoiceProfitCalculationBasis = resp.invoiceProfitCalculationBasis ?? 'purchase_price';
+      _invoiceProfitIncludeOverhead = resp.invoiceProfitIncludeOverhead;
+      _invoiceProfitOverheadType = resp.invoiceProfitOverheadType ?? 'none';
+      _invoiceProfitOverheadPercentController.text = (resp.invoiceProfitOverheadPercent ?? 0).toStringAsFixed(2);
+      _invoiceProfitCalculationType = resp.invoiceProfitCalculationType ?? 'gross';
+
+      // بررسی اینکه آیا کسب‌وکار ارز پیش‌فرض دارد یا نه
+      if (resp.defaultCurrency == null) {
+        // اگر ارز پیش‌فرض ندارد، لیست ارزها را بارگذاری کن
+        await _loadCurrencies();
+      }
 
       // بارگذاری پیش‌نمایش لوگو و مهر در صورت وجود
       await _loadBrandingImages(resp);
@@ -128,6 +159,26 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       if (f.displayName == value) return f;
     }
     return null;
+  }
+
+  Future<void> _loadCurrencies() async {
+    setState(() {
+      _loadingCurrencies = true;
+    });
+    try {
+      final currencies = await _currencyService.listCurrencies();
+      setState(() {
+        _currencies = currencies;
+        _loadingCurrencies = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingCurrencies = false;
+      });
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری ارزها: $e');
+      }
+    }
   }
 
   Map<String, dynamic> _buildUpdatePayload() {
@@ -169,6 +220,32 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (orig.checkCreditEnabledByDefault != _checkCreditEnabledByDefault) {
       payload['check_credit_enabled_by_default'] = _checkCreditEnabledByDefault;
+    }
+    // تنظیمات محاسبه سود
+    if (_invoiceProfitCalculationMethod != null && _invoiceProfitCalculationMethod != orig.invoiceProfitCalculationMethod) {
+      payload['invoice_profit_calculation_method'] = _invoiceProfitCalculationMethod;
+    }
+    if (_invoiceProfitCalculationBasis != null && _invoiceProfitCalculationBasis != orig.invoiceProfitCalculationBasis) {
+      payload['invoice_profit_calculation_basis'] = _invoiceProfitCalculationBasis;
+    }
+    if (_invoiceProfitIncludeOverhead != orig.invoiceProfitIncludeOverhead) {
+      payload['invoice_profit_include_overhead'] = _invoiceProfitIncludeOverhead;
+    }
+    if (_invoiceProfitOverheadType != null && _invoiceProfitOverheadType != orig.invoiceProfitOverheadType) {
+      payload['invoice_profit_overhead_type'] = _invoiceProfitOverheadType;
+    }
+    final overheadPercentStr = _invoiceProfitOverheadPercentController.text.trim();
+    final parsedOverheadPercent = double.tryParse(overheadPercentStr.replaceAll(',', ''));
+    if (parsedOverheadPercent != null && parsedOverheadPercent != (orig.invoiceProfitOverheadPercent ?? 0)) {
+      payload['invoice_profit_overhead_percent'] = parsedOverheadPercent;
+    }
+    if (_invoiceProfitCalculationType != null && _invoiceProfitCalculationType != orig.invoiceProfitCalculationType) {
+      payload['invoice_profit_calculation_type'] = _invoiceProfitCalculationType;
+    }
+
+    // ارز پیش‌فرض (فقط اگر کسب‌وکار ارز پیش‌فرض ندارد)
+    if (orig.defaultCurrency == null && _selectedDefaultCurrencyId != null) {
+      payload['default_currency_id'] = _selectedDefaultCurrencyId;
     }
 
     return payload;
@@ -716,6 +793,73 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 12),
               _buildTextField(controller: _cityController, label: t.city),
               
+              // بخش ارز پیش‌فرض (فقط برای کسب‌وکارهایی که ارز پیش‌فرض ندارند)
+              if (_original?.defaultCurrency == null) ...[
+                const SizedBox(height: 24),
+                _buildSectionTitle('ارز پیش‌فرض', cs),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: cs.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'کسب‌وکار شما ارز پیش‌فرض تنظیم نکرده است. لطفاً یک ارز پیش‌فرض انتخاب کنید تا بتوانید سند حسابداری ثبت کنید.',
+                              style: TextStyle(
+                                color: cs.onSurface,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (_loadingCurrencies)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        DropdownButtonFormField<int>(
+                          value: _selectedDefaultCurrencyId,
+                          decoration: const InputDecoration(
+                            labelText: 'ارز پیش‌فرض *',
+                            border: OutlineInputBorder(),
+                            helperText: 'این ارز به صورت پیش‌فرض در تمام اسناد حسابداری استفاده می‌شود',
+                          ),
+                          items: _currencies.map((currency) {
+                            return DropdownMenuItem<int>(
+                              value: currency['id'] as int,
+                              child: Text('${currency['title']} (${currency['code']})'),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedDefaultCurrencyId = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null) {
+                              return 'لطفاً ارز پیش‌فرض را انتخاب کنید';
+                            }
+                            return null;
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              
               const SizedBox(height: 24),
               _buildSectionTitle('تنظیمات اعتبار مشتریان', cs),
               const SizedBox(height: 8),
@@ -734,11 +878,316 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
+
+              const SizedBox(height: 24),
+              _buildSectionTitle('تنظیمات محاسبه سود فاکتور', cs),
+              const SizedBox(height: 8),
+              _buildProfitCalculationSettings(cs),
+
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildProfitCalculationSettings(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // روش محاسبه
+            DropdownButtonFormField<String>(
+              value: _invoiceProfitCalculationMethod,
+              decoration: const InputDecoration(
+                labelText: 'روش محاسبه سود',
+                helperText: 'نحوه محاسبه سود فاکتورها را انتخاب کنید',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'automatic', child: Text('خودکار')),
+                DropdownMenuItem(value: 'manual', child: Text('دستی')),
+                DropdownMenuItem(value: 'disabled', child: Text('غیرفعال')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _invoiceProfitCalculationMethod = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            // مبنای محاسبه (فقط اگر روش automatic باشد)
+            if (_invoiceProfitCalculationMethod == 'automatic') ...[
+              DropdownButtonFormField<String>(
+                value: _invoiceProfitCalculationBasis,
+                decoration: const InputDecoration(
+                  labelText: 'مبنای محاسبه هزینه',
+                  helperText: 'مبنای محاسبه هزینه برای سود را انتخاب کنید',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'purchase_price',
+                    child: Text('قیمت خرید محصول'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'cost_price',
+                    child: Text('قیمت تمام شده (از انبار)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'actual_cost',
+                    child: Text('هزینه واقعی'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'average_cost',
+                    child: Text('میانگین قیمت خرید'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'fifo',
+                    child: Text('FIFO (اول ورود، اول خروج)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'lifo',
+                    child: Text('LIFO (آخر ورود، اول خروج)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'weighted_average',
+                    child: Text('میانگین وزنی'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'standard_cost',
+                    child: Text('هزینه استاندارد'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _invoiceProfitCalculationBasis = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              // نوع محاسبه سود
+              DropdownButtonFormField<String>(
+                value: _invoiceProfitCalculationType,
+                decoration: const InputDecoration(
+                  labelText: 'نوع محاسبه سود',
+                  helperText: 'نوع سود مورد نظر را انتخاب کنید',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'gross',
+                    child: Text('سود ناخالص (بدون هزینه‌ها)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'net',
+                    child: Text('سود خالص (با هزینه‌ها)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'both',
+                    child: Text('هر دو (ناخالص و خالص)'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _invoiceProfitCalculationType = value;
+                  });
+                },
+              ),
+              // شامل کردن هزینه‌های سربار
+              if (_invoiceProfitCalculationType != null && _invoiceProfitCalculationType != 'gross') ...[
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('شامل کردن هزینه‌های سربار'),
+                  subtitle: const Text('آیا هزینه‌های سربار در محاسبه سود خالص لحاظ شود؟'),
+                  value: _invoiceProfitIncludeOverhead,
+                  onChanged: (value) {
+                    setState(() {
+                      _invoiceProfitIncludeOverhead = value;
+                    });
+                  },
+                ),
+              ],
+              // نوع هزینه‌های سربار
+              if (_invoiceProfitCalculationType != null && 
+                  _invoiceProfitCalculationType != 'gross' && 
+                  _invoiceProfitIncludeOverhead) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _invoiceProfitOverheadType,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع هزینه‌های سربار',
+                    helperText: 'نوع هزینه‌های سربار را انتخاب کنید',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'none',
+                      child: Text('بدون سربار'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'production_overhead',
+                      child: Text('فقط سربار تولید'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'all_overhead',
+                      child: Text('تمام هزینه‌های سربار'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'custom_percent',
+                      child: Text('درصد سفارشی'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _invoiceProfitOverheadType = value;
+                    });
+                  },
+                ),
+                // درصد سفارشی
+                if (_invoiceProfitOverheadType == 'custom_percent') ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _invoiceProfitOverheadPercentController,
+                    decoration: const InputDecoration(
+                      labelText: 'درصد هزینه سربار',
+                      helperText: 'درصد هزینه سربار از هزینه کل (0-100)',
+                      suffixText: '%',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (_invoiceProfitOverheadType == 'custom_percent' && 
+                          (value == null || value.isEmpty)) {
+                        return 'لطفاً درصد را وارد کنید';
+                      }
+                      final percent = double.tryParse(value ?? '');
+                      if (percent != null && (percent < 0 || percent > 100)) {
+                        return 'درصد باید بین 0 تا 100 باشد';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ],
+              // دکمه به‌روزرسانی سود فاکتورها
+              if (_invoiceProfitCalculationMethod != null && _invoiceProfitCalculationMethod != 'disabled') ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: cs.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'به‌روزرسانی سود فاکتورها',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'بعد از تغییر تنظیمات محاسبه سود، می‌توانید سود تمام فاکتورهای موجود را با تنظیمات جدید به‌روزرسانی کنید.',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _recalculatingProfits ? null : _recalculateAllProfits,
+                        icon: _recalculatingProfits
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.refresh),
+                        label: Text(_recalculatingProfits ? 'در حال به‌روزرسانی...' : 'به‌روزرسانی سود تمام فاکتورها'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recalculateAllProfits() async {
+    if (_recalculatingProfits) return;
+    
+    setState(() {
+      _recalculatingProfits = true;
+    });
+
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/invoices/business/${widget.businessId}/recalculate-all-profits',
+      );
+
+      final data = response.data?['data'] as Map<String, dynamic>?;
+      
+      if (!mounted) return;
+
+      if (data != null && data['job_id'] != null) {
+        // Background job شروع شده
+        SnackBarHelper.show(
+          context,
+          message: 'به‌روزرسانی سود فاکتورها در پس‌زمینه شروع شد. این فرآیند ممکن است چند دقیقه طول بکشد.',
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        // به صورت sync انجام شد
+        final processed = data?['processed'] as int? ?? 0;
+        final skipped = data?['skipped'] as int? ?? 0;
+        final total = data?['total'] as int? ?? 0;
+        
+        SnackBarHelper.show(
+          context,
+          message: 'به‌روزرسانی سود انجام شد. $processed از $total فاکتور به‌روزرسانی شد${skipped > 0 ? ' ($skipped فاکتور رد شد)' : ''}.',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در به‌روزرسانی سود فاکتورها: $e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recalculatingProfits = false;
+        });
+      }
+    }
   }
 
   Widget _buildSectionTitle(String title, ColorScheme cs) {

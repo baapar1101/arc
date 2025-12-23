@@ -13,6 +13,7 @@ from adapters.api.v1.schemas import (
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.cache import get_cache
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.user import User
 from adapters.db.models.business import Business
@@ -507,6 +508,16 @@ def add_user(
     
     logger.info(f"Created permission object: {permission_obj.id}")
     
+    # Invalidate cache for added user's businesses list
+    cache = get_cache()
+    if cache.enabled:
+        try:
+            # حذف تمام کش‌های مربوط به لیست کسب و کارهای کاربر اضافه شده
+            deleted_count = cache.delete_pattern("user_businesses:*")
+            logger.info(f"Invalidated {deleted_count} cache keys for user {user.id} businesses list after adding to business")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache for user businesses: {e}")
+    
     # Format user data
     user_data = {
         "id": permission_obj.id,
@@ -657,6 +668,20 @@ def remove_user(
     if not success:
         raise HTTPException(status_code=404, detail="کاربر یافت نشد")
     
+    # Invalidate cache for removed user's businesses list
+    cache = get_cache()
+    if cache.enabled:
+        try:
+            # حذف تمام کش‌های مربوط به لیست کسب و کارهای کاربر حذف شده
+            deleted_count = cache.delete_pattern("user_businesses:*")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Invalidated {deleted_count} cache keys for user {user_id} businesses list after removal")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to invalidate cache for user businesses: {e}")
+    
     return success_response(
         data={},
         request=request,
@@ -743,6 +768,16 @@ def leave_business(
             status_code=500, 
             detail="خطا در خروج از کسب و کار"
         )
+    
+    # Invalidate cache for user businesses list
+    cache = get_cache()
+    if cache.enabled:
+        try:
+            # حذف تمام کش‌های مربوط به لیست کسب و کارهای کاربر
+            deleted_count = cache.delete_pattern("user_businesses:*")
+            logger.info(f"Invalidated {deleted_count} cache keys for user {current_user_id} businesses list")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache for user businesses: {e}")
     
     logger.info(f"User {current_user_id} successfully left business {business_id}")
     return success_response(

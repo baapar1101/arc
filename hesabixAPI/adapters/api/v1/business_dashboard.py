@@ -1,6 +1,7 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
 import structlog
+from datetime import datetime
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 
@@ -266,8 +267,12 @@ def get_business_info_with_permissions(
     from adapters.db.models.business import Business
     from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
     
-    # دریافت اطلاعات کسب و کار
-    business = db.get(Business, business_id)
+    # دریافت اطلاعات کسب و کار با eager loading برای default_currency و currencies
+    from sqlalchemy.orm import joinedload
+    business = db.query(Business).options(
+        joinedload(Business.default_currency),
+        joinedload(Business.currencies)
+    ).filter(Business.id == business_id).first()
     if not business:
         from app.core.responses import ApiError
         raise ApiError("NOT_FOUND", "Business not found", http_status=404)
@@ -322,16 +327,27 @@ def get_business_info_with_permissions(
         if business_permission:
             permissions = business_permission.business_permissions or {}
     
+    # استفاده از _business_to_dict برای دریافت اطلاعات کامل کسب و کار شامل default_currency و currencies
+    from app.services.business_service import _business_to_dict
+    business_dict = _business_to_dict(business)
+    
+    # استخراج فیلدهای مورد نیاز برای business_info
+    created_at_value = business_dict.get("created_at")
+    if isinstance(created_at_value, datetime):
+        created_at_str = created_at_value.isoformat()
+    else:
+        created_at_str = str(created_at_value) if created_at_value else ""
+    
     business_info = {
-        "id": business.id,
-        "name": business.name,
-        "business_type": business.business_type.value,
-        "business_field": business.business_field.value,
-        "owner_id": business.owner_id,
-        "address": business.address,
-        "phone": business.phone,
-        "mobile": business.mobile,
-        "created_at": business.created_at.isoformat(),
+        "id": business_dict["id"],
+        "name": business_dict["name"],
+        "business_type": business_dict["business_type"],
+        "business_field": business_dict["business_field"],
+        "owner_id": business_dict["owner_id"],
+        "address": business_dict["address"],
+        "phone": business_dict["phone"],
+        "mobile": business_dict["mobile"],
+        "created_at": created_at_str,
     }
     
     is_owner = ctx.is_business_owner(business_id)
@@ -342,7 +358,10 @@ def get_business_info_with_permissions(
         "user_permissions": permissions,
         "is_owner": is_owner,
         "role": "مالک" if is_owner else "عضو",
-        "has_access": has_access
+        "has_access": has_access,
+        # اضافه کردن default_currency و currencies به response
+        "default_currency": business_dict.get("default_currency"),
+        "currencies": business_dict.get("currencies", []),
     }
     
     logger.info(f"=== get_business_info_with_permissions END ===")

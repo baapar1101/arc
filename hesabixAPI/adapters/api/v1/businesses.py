@@ -29,6 +29,9 @@ from app.services.business_service import (
     get_business_summary,
     get_business_print_settings,
     update_business_print_settings,
+    add_business_currency,
+    remove_business_currency,
+    check_currency_usage_in_documents,
 )
 from app.services.file_storage_service import FileStorageService
 from adapters.db.models.business import Business
@@ -773,3 +776,77 @@ def get_business_stats(
     owner_id = ctx.get_user_id()
     stats = get_business_summary(db, owner_id)
     return success_response(stats, request)
+
+
+@router.post(
+    "/{business_id}/currencies",
+    summary="اضافه کردن ارز جانبی به کسب‌وکار",
+    description="اضافه کردن یک ارز به لیست ارزهای قابل استفاده در کسب‌وکار",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def add_business_currency_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
+) -> dict:
+    """اضافه کردن ارز جانبی به کسب‌وکار"""
+    currency_id = body.get("currency_id")
+    if not currency_id:
+        raise HTTPException(status_code=400, detail="currency_id الزامی است")
+    
+    try:
+        currency_id = int(currency_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="currency_id باید یک عدد صحیح باشد")
+    
+    owner_id = ctx.get_user_id()
+    currency_data = add_business_currency(db, business_id, currency_id, owner_id)
+    return success_response(currency_data, request, "ارز با موفقیت اضافه شد")
+
+
+@router.delete(
+    "/{business_id}/currencies/{currency_id}",
+    summary="حذف ارز جانبی از کسب‌وکار",
+    description="حذف یک ارز از لیست ارزهای قابل استفاده در کسب‌وکار (در صورت عدم استفاده در اسناد)",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def remove_business_currency_endpoint(
+    request: Request,
+    business_id: int,
+    currency_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
+) -> dict:
+    """حذف ارز جانبی از کسب‌وکار"""
+    owner_id = ctx.get_user_id()
+    remove_business_currency(db, business_id, currency_id, owner_id)
+    return success_response({"ok": True}, request, "ارز با موفقیت حذف شد")
+
+
+@router.get(
+    "/{business_id}/currencies/{currency_id}/usage-check",
+    summary="بررسی استفاده ارز در اسناد",
+    description="بررسی اینکه آیا یک ارز در اسناد حسابداری استفاده شده است یا نه",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def check_currency_usage_endpoint(
+    request: Request,
+    business_id: int,
+    currency_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """بررسی استفاده ارز در اسناد"""
+    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
+    return success_response({
+        "is_used": document_count > 0,
+        "document_count": document_count,
+        "can_delete": document_count == 0,
+    }, request)

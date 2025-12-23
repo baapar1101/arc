@@ -27,6 +27,7 @@ QUEUE_LOW_PRIORITY = "low"
 QUEUE_EMAIL = "email"
 QUEUE_REPORTS = "reports"
 QUEUE_EXPORTS = "exports"
+QUEUE_TAX = "tax"  # Queue مخصوص عملیات مالیاتی
 
 
 def get_redis_connection() -> Optional[Redis]:

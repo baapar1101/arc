@@ -935,6 +935,53 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           width: ColumnWidth.large,
           formatter: (item) => item.totalAmount != null ? '${formatWithThousands(item.totalAmount!, decimalPlaces: 2)} ${item.currencyCode ?? 'ریال'}' : '-',
         ),
+        // سود
+        CustomColumn(
+          'total_profit',
+          'سود',
+          sortable: true,
+          searchable: false,
+          width: ColumnWidth.medium,
+          builder: (dynamic item, int index) {
+            final invoice = item as InvoiceListItem;
+            // استفاده از total_profit (که می‌تواند gross یا net باشد) یا fallback به gross_profit
+            final profit = invoice.totalProfit ?? invoice.grossProfit;
+            final profitPercent = invoice.totalProfitPercent ?? invoice.grossProfitPercent;
+            
+            if (profit == null) {
+              return const Text('-');
+            }
+            
+            final profitValue = profit;
+            final profitPercentValue = profitPercent ?? 0;
+            
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatWithThousands(profitValue),
+                      style: TextStyle(
+                        color: profitValue >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (profitPercentValue != 0)
+                      Text(
+                        '${profitPercentValue.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
         // اقساطی؟
         CustomColumn(
           'is_installment_sale',

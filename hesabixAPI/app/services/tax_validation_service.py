@@ -157,19 +157,31 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
                 "meta": {"line_id": line.id, "line_number": idx},
             })
 
-    # 3. بررسی هزینه حمل
+    # 3. بررسی هزینه حمل (اختیاری - اگر وجود داشته باشد باید معتبر باشد)
     shipping_cost = (extra or {}).get("shipping_cost", 0)
     try:
         shipping_cost_val = float(shipping_cost or 0)
-    except Exception:
-        shipping_cost_val = 0
-    
-    if shipping_cost_val and abs(shipping_cost_val) > 0.5:
-        issues.append({
-            "code": "SHIPPING_COST_NOT_ALLOWED",
-            "message": "در نسخه فعلی، هزینه حمل باید صفر باشد.",
-            "meta": {"shipping_cost": shipping_cost},
-        })
+        # اگر هزینه حمل منفی باشد، خطا می‌دهیم
+        if shipping_cost_val < 0:
+            issues.append({
+                "code": "SHIPPING_COST_NEGATIVE",
+                "message": "هزینه حمل نمی‌تواند منفی باشد.",
+                "meta": {"shipping_cost": shipping_cost},
+            })
+        # اگر هزینه حمل اعشار داشته باشد، خطا می‌دهیم (سامانه اعشار قبول نمی‌کند)
+        elif shipping_cost_val > 0 and shipping_cost_val != int(shipping_cost_val):
+            issues.append({
+                "code": "SHIPPING_COST_HAS_DECIMAL",
+                "message": "هزینه حمل نباید اعشار داشته باشد.",
+                "meta": {"shipping_cost": shipping_cost},
+            })
+    except (ValueError, TypeError):
+        if shipping_cost:  # فقط اگر مقدار غیر صفر باشد خطا می‌دهیم
+            issues.append({
+                "code": "SHIPPING_COST_INVALID",
+                "message": "مبلغ هزینه حمل نامعتبر است.",
+                "meta": {"shipping_cost": shipping_cost},
+            })
 
     # 4. بررسی مبلغ کل فاکتور
     totals = extra.get("totals") or {}

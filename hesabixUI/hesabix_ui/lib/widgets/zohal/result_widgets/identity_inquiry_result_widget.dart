@@ -16,7 +16,8 @@ class IdentityInquiryResultWidget extends ZohalResultWidget {
   @override
   List<Widget> buildResultContent(BuildContext context) {
     final theme = Theme.of(context);
-    final responseBody = result['result']?['response_body'] as Map<String, dynamic>?;
+    // مسیر صحیح: result['data']['result']['response_body']
+    final responseBody = result['data']?['result']?['response_body'] as Map<String, dynamic>?;
     final data = responseBody?['data'] as Map<String, dynamic>?;
     final message = responseBody?['message']?.toString() ?? '';
     final errorCode = responseBody?['error_code'];

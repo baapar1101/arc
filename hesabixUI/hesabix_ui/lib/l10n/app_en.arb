@@ -2110,6 +2110,81 @@
       }
     }
   },
+  "taxQuickActionSendAllPending": "Send all pending",
+  "taxQuickActionInquireAllSent": "Inquire all sent",
+  "taxQuickActionRetryAllFailed": "Retry all failed",
+  "taxHelpTooltip": "Help",
+  "taxHelpTitle": "Tax workspace guide",
+  "taxHelpSectionStatuses": "Invoice statuses",
+  "taxHelpStatusNotSent": "Not sent: Invoice has not been sent yet",
+  "taxHelpStatusPending": "Pending: Currently being sent",
+  "taxHelpStatusSent": "Sent: Sent and awaiting confirmation",
+  "taxHelpStatusFinalized": "Finalized: Finalized by the tax system",
+  "taxHelpStatusFailed": "Failed: Sending failed",
+  "taxHelpSectionQuickActions": "Quick actions",
+  "taxHelpQuickActionSendPending": "Send all pending: Send all pending invoices",
+  "taxHelpQuickActionInquireSent": "Inquire all sent: Check status of sent invoices",
+  "taxHelpQuickActionRetryFailed": "Retry all failed: Retry failed invoices",
+  "taxHelpSectionImportantNotes": "Important notes",
+  "taxHelpNoteValidateBeforeSend": "Validate invoices before sending",
+  "taxHelpNoteFailedInDLQ": "Failed invoices are stored in the error queue",
+  "taxHelpNoteTimeline": "You can view the change history of each invoice",
+  "taxHelpNoteExport": "You can export sending reports",
+  "taxOperationSuccess": "Operation completed successfully",
+  "taxOperationError": "Error performing operation: {error}",
+  "@taxOperationError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "taxSendingInvoices": "Sending invoices...",
+  "taxSendingWithError": "Sending encountered an error",
+  "taxSentCountFailedCount": "Sent: {sentCount} | Failed: {failedCount}",
+  "@taxSentCountFailedCount": {
+    "placeholders": {
+      "sentCount": {
+        "type": "int"
+      },
+      "failedCount": {
+        "type": "int"
+      }
+    }
+  },
+  "taxProcessing": "Processing...",
+  "taxUnknownError": "Unknown error",
+  "taxFailedInvoicesCount": "{count} invoices encountered errors",
+  "@taxFailedInvoicesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRetryFailed": "Retry",
+  "taxErrorCategoryValidation": "Validation errors",
+  "taxErrorCategoryNetwork": "Network errors",
+  "taxErrorCategoryAccess": "Access errors",
+  "taxErrorCategoryStatus": "Status errors",
+  "taxErrorCategoryOther": "Other errors",
+  "taxErrorItemsCount": "{count} items",
+  "@taxErrorItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInvoiceNumber": "Invoice #{invoiceId}",
+  "@taxInvoiceNumber": {
+    "placeholders": {
+      "invoiceId": {
+        "type": "int"
+      }
+    }
+  },
+  "taxCurrencyRial": "Rial",
 
   "documentMonetizationTitle": "Packages and Tariffs",
   "documentMonetizationSubtitle": "Packages, per-document fees and volume settlement",

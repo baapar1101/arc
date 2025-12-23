@@ -25,6 +25,7 @@ from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.tax_unit import TaxUnit
 from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
+from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
@@ -1035,6 +1036,500 @@ def _validate_selected_instances(
             )
 
 
+# ==================== توابع محاسبه سود فاکتور ====================
+
+def _empty_profit_response() -> Dict[str, Any]:
+    """پاسخ خالی برای سود"""
+    return {
+        "gross_profit": 0.0,
+        "net_profit": 0.0,
+        "gross_profit_percent": 0.0,
+        "net_profit_percent": 0.0,
+        "total_profit": 0.0,
+        "total_profit_percent": 0.0,
+        "total_overhead": 0.0,
+        "line_profits": []
+    }
+
+
+def _calculate_average_purchase_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    as_of_date: date
+) -> Decimal:
+    """
+    محاسبه میانگین قیمت خرید محصول از تاریخچه
+    """
+    # دریافت تمام فاکتورهای خرید تا تاریخ مشخص
+    purchase_docs = db.query(Document).join(DocumentLine).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_PURCHASE,
+            Document.document_date <= as_of_date,
+            DocumentLine.product_id == product_id
+        )
+    ).all()
+    
+    total_cost = Decimal(0)
+    total_qty = Decimal(0)
+    
+    for doc in purchase_docs:
+        lines = db.query(DocumentLine).filter(
+            and_(
+                DocumentLine.document_id == doc.id,
+                DocumentLine.product_id == product_id
+            )
+        ).all()
+        
+        for line in lines:
+            qty = Decimal(str(line.quantity or 0))
+            if qty <= 0:
+                continue
+            
+            # استفاده از cost_price از extra_info یا unit_price
+            extra_info = line.extra_info or {}
+            cost_per_unit = Decimal(0)
+            if extra_info.get("cost_price") is not None:
+                cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+            elif line.unit_price is not None:
+                cost_per_unit = Decimal(str(line.unit_price))
+            
+            total_cost += qty * cost_per_unit
+            total_qty += qty
+    
+    if total_qty > 0:
+        return total_cost / total_qty
+    return Decimal(0)
+
+
+def _calculate_fifo_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    quantity: Decimal,
+    as_of_date: date,
+    warehouse_id: Optional[int] = None
+) -> Decimal:
+    """
+    محاسبه هزینه با روش FIFO (اول ورود، اول خروج)
+    """
+    movements = _iter_product_movements(
+        db, business_id, [product_id],
+        [warehouse_id] if warehouse_id else None,
+        as_of_date, None
+    )
+    
+    # مرتب‌سازی بر اساس تاریخ (قدیمی‌ترین اول)
+    movements.sort(key=lambda x: (x["document_date"], x["document_id"]))
+    
+    remaining_qty = quantity
+    total_cost = Decimal(0)
+    
+    for mv in movements:
+        if mv["movement"] == "in" and remaining_qty > 0:
+            qty_available = mv["quantity"]
+            cost_per_unit = mv.get("cost_price") or Decimal(0)
+            
+            if qty_available > remaining_qty:
+                total_cost += remaining_qty * cost_per_unit
+                remaining_qty = Decimal(0)
+                break
+            else:
+                total_cost += qty_available * cost_per_unit
+                remaining_qty -= qty_available
+    
+    if quantity > 0:
+        return total_cost / quantity
+    return Decimal(0)
+
+
+def _calculate_lifo_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    quantity: Decimal,
+    as_of_date: date,
+    warehouse_id: Optional[int] = None
+) -> Decimal:
+    """
+    محاسبه هزینه با روش LIFO (آخر ورود، اول خروج)
+    """
+    movements = _iter_product_movements(
+        db, business_id, [product_id],
+        [warehouse_id] if warehouse_id else None,
+        as_of_date, None
+    )
+    
+    # مرتب‌سازی بر اساس تاریخ (جدیدترین اول)
+    movements.sort(key=lambda x: (x["document_date"], x["document_id"]), reverse=True)
+    
+    remaining_qty = quantity
+    total_cost = Decimal(0)
+    
+    for mv in movements:
+        if mv["movement"] == "in" and remaining_qty > 0:
+            qty_available = mv["quantity"]
+            cost_per_unit = mv.get("cost_price") or Decimal(0)
+            
+            if qty_available > remaining_qty:
+                total_cost += remaining_qty * cost_per_unit
+                remaining_qty = Decimal(0)
+                break
+            else:
+                total_cost += qty_available * cost_per_unit
+                remaining_qty -= qty_available
+    
+    if quantity > 0:
+        return total_cost / quantity
+    return Decimal(0)
+
+
+def _calculate_weighted_average_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    as_of_date: date
+) -> Decimal:
+    """
+    محاسبه میانگین وزنی قیمت خرید
+    (همان _calculate_average_purchase_cost)
+    """
+    return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
+
+
+def _get_cost_per_unit_by_basis(
+    db: Session,
+    business_id: int,
+    product: Product,
+    line: DocumentLine,
+    calculation_basis: str,
+    document_date: date,
+    warehouse_id: Optional[int] = None
+) -> Decimal:
+    """
+    محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
+    """
+    extra_info = line.extra_info or {}
+    
+    if calculation_basis == "purchase_price":
+        return Decimal(str(product.base_purchase_price or 0))
+    
+    elif calculation_basis == "cost_price":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        return Decimal(str(product.base_purchase_price or 0))
+    
+    elif calculation_basis == "actual_cost":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        if extra_info.get("cogs_amount") is not None and line.quantity > 0:
+            return Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
+        return Decimal(str(product.base_purchase_price or 0))
+    
+    elif calculation_basis == "average_cost":
+        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+    
+    elif calculation_basis == "fifo":
+        return _calculate_fifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
+    
+    elif calculation_basis == "lifo":
+        return _calculate_lifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
+    
+    elif calculation_basis == "weighted_average":
+        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+    
+    elif calculation_basis == "standard_cost":
+        if extra_info.get("standard_cost") is not None:
+            return Decimal(str(extra_info.get("standard_cost")))
+        return Decimal(str(product.base_purchase_price or 0))
+    
+    else:
+        return Decimal(str(product.base_purchase_price or 0))
+
+
+def _calculate_overhead_cost(
+    db: Session,
+    business_id: int,
+    document_id: int,
+    total_cost: Decimal,
+    overhead_type: str,
+    overhead_percent: Optional[Decimal] = None
+) -> Decimal:
+    """
+    محاسبه هزینه‌های سربار
+    """
+    if overhead_type == "none":
+        return Decimal(0)
+    
+    elif overhead_type == "custom_percent":
+        if overhead_percent is None or overhead_percent <= 0:
+            return Decimal(0)
+        return total_cost * (overhead_percent / 100)
+    
+    elif overhead_type == "production_overhead":
+        document = db.query(Document).filter(Document.id == document_id).first()
+        if document and document.document_type == "invoice_production":
+            extra_info = document.extra_info or {}
+            operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
+            return operations_total
+        return Decimal(0)
+    
+    elif overhead_type == "all_overhead":
+        # TODO: پیاده‌سازی کامل بر اساس نیاز کسب و کار
+        return Decimal(0)
+    
+    return Decimal(0)
+
+
+def _calculate_invoice_profit(
+    db: Session,
+    business_id: int,
+    document_id: int,
+    calculation_method: str = "automatic",
+    calculation_basis: str = "purchase_price",
+    include_overhead: bool = False,
+    overhead_type: str = "none",
+    overhead_percent: Optional[Decimal] = None,
+    calculation_type: str = "gross"
+) -> Dict[str, Any]:
+    """
+    محاسبه سود فاکتور با پشتیبانی از روش‌های مختلف و هزینه‌های سربار
+    """
+    # اگر محاسبه سود غیرفعال است
+    if calculation_method == "disabled":
+        return _empty_profit_response()
+    
+    # دریافت فاکتور
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document or not document.document_type.startswith("invoice"):
+        return _empty_profit_response()
+    
+    # فقط برای فاکتورهای فروش و تولید محاسبه می‌شود
+    if document.document_type not in ["invoice_sales", "invoice_sales_return", "invoice_production"]:
+        return _empty_profit_response()
+    
+    total_gross_profit = Decimal(0)
+    total_net_profit = Decimal(0)
+    total_sales = Decimal(0)
+    total_cost = Decimal(0)
+    line_profits = []
+    
+    # برای فاکتور تولید
+    if document.document_type == "invoice_production":
+        # دریافت ردیف‌های فاکتور از DocumentLine (برای فاکتور تولید)
+        lines = db.query(DocumentLine).filter(DocumentLine.document_id == document_id).all()
+        # جداسازی خطوط ورودی و خروجی
+        out_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "out"]
+        in_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "in"]
+        
+        # محاسبه هزینه مواد اولیه
+        total_materials_cost = Decimal(0)
+        for line in out_lines:
+            if not line.product_id:
+                continue
+            product = db.query(Product).filter(Product.id == line.product_id).first()
+            if not product:
+                continue
+            
+            qty = Decimal(str(line.quantity or 0))
+            cost_per_unit = _get_cost_per_unit_by_basis(
+                db, business_id, product, line, calculation_basis,
+                document.document_date, line.warehouse_id
+            )
+            total_materials_cost += qty * cost_per_unit
+        
+        # دریافت هزینه عملیات
+        extra_info = document.extra_info or {}
+        operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
+        
+        # هزینه کل تولید
+        total_production_cost = total_materials_cost + operations_total
+        
+        # محاسبه سود برای محصولات نهایی
+        for line in in_lines:
+            if not line.product_id:
+                continue
+            
+            product = db.query(Product).filter(Product.id == line.product_id).first()
+            if not product:
+                continue
+            
+            qty = Decimal(str(line.quantity or 0))
+            unit_price = Decimal(str(product.base_sales_price or 0))
+            sales_amount = qty * unit_price
+            
+            # توزیع هزینه تولید
+            if len(in_lines) > 0:
+                line_cost = total_production_cost / len(in_lines)
+            else:
+                line_cost = Decimal(0)
+            
+            line_gross_profit = sales_amount - line_cost
+            line_gross_profit_percent = (line_gross_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
+            
+            total_gross_profit += line_gross_profit
+            total_sales += sales_amount
+            
+            line_profits.append({
+                "line_id": line.id,
+                "product_id": product.id,
+                "product_code": product.code,
+                "product_name": product.name,
+                "quantity": float(qty),
+                "unit_price": float(unit_price),
+                "cost_per_unit": float(line_cost / qty) if qty > 0 else 0,
+                "sales_amount": float(sales_amount),
+                "total_cost": float(line_cost),
+                "gross_profit": float(line_gross_profit),
+                "gross_profit_percent": float(line_gross_profit_percent),
+                "net_profit": float(line_gross_profit),
+                "net_profit_percent": float(line_gross_profit_percent),
+                "overhead": 0.0
+            })
+        
+        total_overhead = Decimal(0)
+        if include_overhead and overhead_type != "production_overhead":
+            total_overhead = _calculate_overhead_cost(
+                db, business_id, document.id, total_production_cost,
+                overhead_type, overhead_percent
+            )
+        
+        total_net_profit = total_gross_profit - total_overhead
+    
+    # برای فاکتورهای فروش
+    elif document.document_type in ["invoice_sales", "invoice_sales_return"]:
+        # دریافت ردیف‌های فاکتور از InvoiceItemLine (برای فاکتورهای فروش)
+        item_lines = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).all()
+        
+        for item_line in item_lines:
+            if not item_line.product_id:
+                continue
+            
+            product = db.query(Product).filter(Product.id == item_line.product_id).first()
+            if not product:
+                continue
+            
+            # خواندن اطلاعات از extra_info
+            extra_info = item_line.extra_info or {}
+            qty = Decimal(str(item_line.quantity or 0))
+            unit_price = Decimal(str(extra_info.get("unit_price", 0) or 0))
+            line_discount = Decimal(str(extra_info.get("line_discount", 0) or 0))
+            warehouse_id = extra_info.get("warehouse_id")
+            
+            # محاسبه مبلغ فروش (بعد از تخفیف)
+            sales_amount = (qty * unit_price) - line_discount
+            
+            # محاسبه هزینه هر واحد - استفاده مستقیم از extra_info
+            cost_per_unit = Decimal(0)
+            if calculation_basis == "purchase_price":
+                cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+            elif calculation_basis == "cost_price":
+                if extra_info.get("cost_price") is not None:
+                    cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+                else:
+                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+            elif calculation_basis == "actual_cost":
+                if extra_info.get("cost_price") is not None:
+                    cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+                elif extra_info.get("cogs_amount") is not None and qty > 0:
+                    cost_per_unit = Decimal(str(extra_info.get("cogs_amount"))) / qty
+                else:
+                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+            elif calculation_basis == "average_cost":
+                cost_per_unit = _calculate_average_purchase_cost(db, business_id, product.id, document.document_date)
+            elif calculation_basis == "fifo":
+                cost_per_unit = _calculate_fifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
+            elif calculation_basis == "lifo":
+                cost_per_unit = _calculate_lifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
+            elif calculation_basis == "weighted_average":
+                cost_per_unit = _calculate_weighted_average_cost(db, business_id, product.id, document.document_date)
+            elif calculation_basis == "standard_cost":
+                if extra_info.get("standard_cost") is not None:
+                    cost_per_unit = Decimal(str(extra_info.get("standard_cost")))
+                else:
+                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+            else:
+                cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+            
+            total_line_cost = qty * cost_per_unit
+            
+            # محاسبه سود ناخالص ردیف
+            line_gross_profit = sales_amount - total_line_cost
+            line_gross_profit_percent = (line_gross_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
+            
+            # محاسبه هزینه سربار برای این ردیف
+            line_overhead = Decimal(0)
+            if include_overhead:
+                line_overhead = _calculate_overhead_cost(
+                    db, business_id, document_id, total_line_cost,
+                    overhead_type, overhead_percent
+                ) / len(item_lines) if len(item_lines) > 0 else Decimal(0)
+            
+            # محاسبه سود خالص ردیف
+            line_net_profit = line_gross_profit - line_overhead
+            line_net_profit_percent = (line_net_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
+            
+            total_gross_profit += line_gross_profit
+            total_net_profit += line_net_profit
+            total_sales += sales_amount
+            total_cost += total_line_cost
+            
+            line_profits.append({
+                "line_id": item_line.id,
+                "product_id": product.id,
+                "product_code": product.code,
+                "product_name": product.name,
+                "quantity": float(qty),
+                "unit_price": float(unit_price),
+                "cost_per_unit": float(cost_per_unit),
+                "sales_amount": float(sales_amount),
+                "total_cost": float(total_line_cost),
+                "gross_profit": float(line_gross_profit),
+                "net_profit": float(line_net_profit),
+                "gross_profit_percent": float(line_gross_profit_percent),
+                "net_profit_percent": float(line_net_profit_percent),
+                "overhead": float(line_overhead)
+            })
+        
+        # محاسبه هزینه سربار کل
+        total_overhead = Decimal(0)
+        if include_overhead:
+            total_overhead = _calculate_overhead_cost(
+                db, business_id, document_id, total_cost,
+                overhead_type, overhead_percent
+            )
+            total_net_profit = total_gross_profit - total_overhead
+    
+    # محاسبه درصد سود
+    gross_profit_percent = (total_gross_profit / total_sales * 100) if total_sales > 0 else Decimal(0)
+    net_profit_percent = (total_net_profit / total_sales * 100) if total_sales > 0 else Decimal(0)
+    
+    # ساخت response
+    result = {
+        "total_overhead": float(total_overhead),
+        "line_profits": line_profits
+    }
+    
+    if calculation_type in ["gross", "both"]:
+        result["gross_profit"] = float(total_gross_profit)
+        result["gross_profit_percent"] = float(gross_profit_percent)
+    
+    if calculation_type in ["net", "both"]:
+        result["net_profit"] = float(total_net_profit)
+        result["net_profit_percent"] = float(net_profit_percent)
+    
+    # برای سازگاری با کد قدیم
+    if calculation_type == "gross":
+        result["total_profit"] = result["gross_profit"]
+        result["total_profit_percent"] = result["gross_profit_percent"]
+    elif calculation_type == "net":
+        result["total_profit"] = result["net_profit"]
+        result["total_profit_percent"] = result["net_profit_percent"]
+    
+    return result
+
+
 def create_invoice(
     db: Session,
     business_id: int,
@@ -1695,25 +2190,84 @@ def create_invoice(
                 except Exception:
                     operations_total = Decimal(0)
                 
+                # محاسبه مجموع هزینه تمام‌شده (مواد اولیه + هزینه عملیات)
+                total_production_cost = total_materials_cost + operations_total
+                
+                # محاسبه مجموع تعداد محصولات نهایی برای توزیع هزینه
+                total_output_quantity = Decimal(0)
+                for line in in_lines:
+                    qty = Decimal(str(line.get("quantity", 0) or 0))
+                    if qty > 0:
+                        total_output_quantity += qty
+                
                 # محاسبه هزینه محصول نهایی (ورود)
-                # برای محصول نهایی، از cost_price استفاده می‌کنیم
+                # ابتدا بررسی می‌کنیم که آیا cost_price دستی ارسال شده است یا نه
                 total_finished_cost = Decimal(0)
+                total_manual_cost = Decimal(0)  # مجموع هزینه‌های دستی
+                remaining_quantity = Decimal(0)  # مجموع تعداد محصولاتی که cost_price دستی ندارند
+                
+                # مرحله 1: محاسبه هزینه‌های دستی (cost_price از extra_info)
                 for line in in_lines:
                     extra_info = line.get("extra_info") or {}
                     qty = Decimal(str(line.get("quantity", 0) or 0))
                     if qty <= 0:
                         continue
                     
-                    # اولویت: cost_price > unit_price > مجموع هزینه مواد اولیه
                     if extra_info.get("cost_price") is not None:
+                        # استفاده از cost_price دستی
                         cost_line = qty * Decimal(str(extra_info.get("cost_price")))
-                    elif extra_info.get("unit_price") is not None:
-                        cost_line = qty * Decimal(str(extra_info.get("unit_price")))
+                        total_manual_cost += cost_line
+                        total_finished_cost += cost_line
                     else:
-                        # fallback: استفاده از مجموع هزینه مواد اولیه (اگر فقط یک خط ورودی باشد)
-                        cost_line = total_materials_cost if len(in_lines) == 1 else Decimal(0)
+                        # این خط نیاز به محاسبه خودکار دارد
+                        remaining_quantity += qty
+                
+                # مرحله 2: محاسبه خودکار برای خطوطی که cost_price ندارند
+                if remaining_quantity > 0:
+                    remaining_cost = total_production_cost - total_manual_cost
+                    if remaining_cost < 0:
+                        remaining_cost = Decimal(0)
+                    cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                     
-                    total_finished_cost += cost_line
+                    for line in in_lines:
+                        extra_info = line.get("extra_info") or {}
+                        qty = Decimal(str(line.get("quantity", 0) or 0))
+                        if qty > 0 and extra_info.get("cost_price") is None:
+                            cost_line = qty * cost_per_unit
+                            total_finished_cost += cost_line
+                
+                # مرحله 3: اعتبارسنجی توازن WIP
+                # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
+                if remaining_quantity == 0 and total_output_quantity > 0:
+                    # همه خطوط cost_price دستی دارند
+                    total_wip_debit = total_materials_cost + operations_total
+                    total_wip_credit = total_finished_cost
+                    balance_diff = abs(total_wip_debit - total_wip_credit)
+                    tolerance = Decimal("0.01")
+                    
+                    if balance_diff > tolerance:
+                        # توازن برقرار نیست، باید cost_price را اصلاح کنیم
+                        # محاسبه خودکار بر اساس کل هزینه و تعداد کل
+                        cost_per_unit = total_production_cost / total_output_quantity if total_output_quantity > 0 else Decimal(0)
+                        total_finished_cost = Decimal(0)
+                        for line in in_lines:
+                            qty = Decimal(str(line.get("quantity", 0) or 0))
+                            if qty > 0:
+                                total_finished_cost += qty * cost_per_unit
+                
+                # اعتبارسنجی نهایی توازن WIP
+                total_wip_debit = total_materials_cost + operations_total
+                total_wip_credit = total_finished_cost
+                balance_diff = abs(total_wip_debit - total_wip_credit)
+                tolerance = Decimal("0.01")
+                
+                if balance_diff > tolerance:
+                    # اگر هنوز توازن برقرار نیست، خطا می‌دهیم
+                    raise ApiError(
+                        "PRODUCTION_COST_MISMATCH",
+                        f"عدم توازن در حساب WIP. بدهکار: {total_wip_debit:,.0f}, بستانکار: {total_wip_credit:,.0f}, اختلاف: {balance_diff:,.0f}",
+                        http_status=400
+                    )
                 
                 # ثبت حسابداری برای مواد اولیه (خروج)
                 if total_materials_cost > 0:
@@ -2495,24 +3049,84 @@ def update_invoice(
             except Exception:
                 operations_total = Decimal(0)
             
+            # محاسبه مجموع هزینه تمام‌شده (مواد اولیه + هزینه عملیات)
+            total_production_cost = total_materials_cost + operations_total
+            
+            # محاسبه مجموع تعداد محصولات نهایی برای توزیع هزینه
+            total_output_quantity = Decimal(0)
+            for line in in_lines:
+                qty = Decimal(str(line.get("quantity", 0) or 0))
+                if qty > 0:
+                    total_output_quantity += qty
+            
             # محاسبه هزینه محصول نهایی (ورود)
+            # ابتدا بررسی می‌کنیم که آیا cost_price دستی ارسال شده است یا نه
             total_finished_cost = Decimal(0)
+            total_manual_cost = Decimal(0)  # مجموع هزینه‌های دستی
+            remaining_quantity = Decimal(0)  # مجموع تعداد محصولاتی که cost_price دستی ندارند
+            
+            # مرحله 1: محاسبه هزینه‌های دستی (cost_price از extra_info)
             for line in in_lines:
                 extra_info = line.get("extra_info") or {}
                 qty = Decimal(str(line.get("quantity", 0) or 0))
                 if qty <= 0:
                     continue
                 
-                # اولویت: cost_price > unit_price > مجموع هزینه مواد اولیه
                 if extra_info.get("cost_price") is not None:
+                    # استفاده از cost_price دستی
                     cost_line = qty * Decimal(str(extra_info.get("cost_price")))
-                elif extra_info.get("unit_price") is not None:
-                    cost_line = qty * Decimal(str(extra_info.get("unit_price")))
+                    total_manual_cost += cost_line
+                    total_finished_cost += cost_line
                 else:
-                    # fallback: استفاده از مجموع هزینه مواد اولیه (اگر فقط یک خط ورودی باشد)
-                    cost_line = total_materials_cost if len(in_lines) == 1 else Decimal(0)
+                    # این خط نیاز به محاسبه خودکار دارد
+                    remaining_quantity += qty
+            
+            # مرحله 2: محاسبه خودکار برای خطوطی که cost_price ندارند
+            if remaining_quantity > 0:
+                remaining_cost = total_production_cost - total_manual_cost
+                if remaining_cost < 0:
+                    remaining_cost = Decimal(0)
+                cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                 
-                total_finished_cost += cost_line
+                for line in in_lines:
+                    extra_info = line.get("extra_info") or {}
+                    qty = Decimal(str(line.get("quantity", 0) or 0))
+                    if qty > 0 and extra_info.get("cost_price") is None:
+                        cost_line = qty * cost_per_unit
+                        total_finished_cost += cost_line
+            
+            # مرحله 3: اعتبارسنجی توازن WIP
+            # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
+            if remaining_quantity == 0 and total_output_quantity > 0:
+                # همه خطوط cost_price دستی دارند
+                total_wip_debit = total_materials_cost + operations_total
+                total_wip_credit = total_finished_cost
+                balance_diff = abs(total_wip_debit - total_wip_credit)
+                tolerance = Decimal("0.01")
+                
+                if balance_diff > tolerance:
+                    # توازن برقرار نیست، باید cost_price را اصلاح کنیم
+                    # محاسبه خودکار بر اساس کل هزینه و تعداد کل
+                    cost_per_unit = total_production_cost / total_output_quantity if total_output_quantity > 0 else Decimal(0)
+                    total_finished_cost = Decimal(0)
+                    for line in in_lines:
+                        qty = Decimal(str(line.get("quantity", 0) or 0))
+                        if qty > 0:
+                            total_finished_cost += qty * cost_per_unit
+            
+            # اعتبارسنجی نهایی توازن WIP
+            total_wip_debit = total_materials_cost + operations_total
+            total_wip_credit = total_finished_cost
+            balance_diff = abs(total_wip_debit - total_wip_credit)
+            tolerance = Decimal("0.01")
+            
+            if balance_diff > tolerance:
+                # اگر هنوز توازن برقرار نیست، خطا می‌دهیم
+                raise ApiError(
+                    "PRODUCTION_COST_MISMATCH",
+                    f"عدم توازن در حساب WIP. بدهکار: {total_wip_debit:,.0f}, بستانکار: {total_wip_credit:,.0f}, اختلاف: {balance_diff:,.0f}",
+                    http_status=400
+                )
             
             # ثبت حسابداری برای مواد اولیه (خروج)
             if total_materials_cost > 0:
@@ -3114,7 +3728,27 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         if project:
             project_name = project.name
 
-    return {
+    # محاسبه سود فاکتور (در صورت فعال بودن)
+    profit_data = {}
+    business = db.query(Business).filter(Business.id == document.business_id).first()
+    if business and business.invoice_profit_calculation_method != "disabled":
+        try:
+            profit_data = _calculate_invoice_profit(
+                db,
+                document.business_id,
+                document.id,
+                business.invoice_profit_calculation_method or "automatic",
+                business.invoice_profit_calculation_basis or "purchase_price",
+                business.invoice_profit_include_overhead or False,
+                business.invoice_profit_overhead_type or "none",
+                Decimal(str(business.invoice_profit_overhead_percent or 0)) if business.invoice_profit_overhead_percent else None,
+                business.invoice_profit_calculation_type or "gross"
+            )
+        except Exception as e:
+            logger.warning(f"Error calculating invoice profit for document {document.id}: {e}")
+            profit_data = {}
+
+    result = {
         "id": document.id,
         "code": document.code,
         "business_id": document.business_id,
@@ -3135,6 +3769,22 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_at": document.created_at.isoformat(),
         "updated_at": document.updated_at.isoformat(),
     }
+    
+    # اضافه کردن اطلاعات سود به response
+    if profit_data:
+        if "gross_profit" in profit_data:
+            result["gross_profit"] = profit_data["gross_profit"]
+            result["gross_profit_percent"] = profit_data["gross_profit_percent"]
+        if "net_profit" in profit_data:
+            result["net_profit"] = profit_data["net_profit"]
+            result["net_profit_percent"] = profit_data["net_profit_percent"]
+        if "total_profit" in profit_data:
+            result["total_profit"] = profit_data["total_profit"]
+            result["total_profit_percent"] = profit_data["total_profit_percent"]
+        result["total_overhead"] = profit_data.get("total_overhead", 0.0)
+        result["line_profits"] = profit_data.get("line_profits", [])
+    
+    return result
 
 
 def get_invoice_installment_plan(

@@ -74,7 +74,7 @@ async def get_queue_stats(request: Request, ctx: AuthContext = Depends(get_curre
     
     from app.core.queue import (
         QUEUE_DEFAULT, QUEUE_HIGH_PRIORITY, QUEUE_LOW_PRIORITY,
-        QUEUE_EMAIL, QUEUE_REPORTS, QUEUE_EXPORTS
+        QUEUE_EMAIL, QUEUE_REPORTS, QUEUE_EXPORTS, QUEUE_TAX
     )
     
     queues = {
@@ -84,6 +84,7 @@ async def get_queue_stats(request: Request, ctx: AuthContext = Depends(get_curre
         "email": queue_service.get_queue_length(QUEUE_EMAIL),
         "reports": queue_service.get_queue_length(QUEUE_REPORTS),
         "exports": queue_service.get_queue_length(QUEUE_EXPORTS),
+        "tax": queue_service.get_queue_length(QUEUE_TAX),
     }
     
     return success_response({

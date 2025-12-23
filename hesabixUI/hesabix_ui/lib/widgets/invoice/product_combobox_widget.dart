@@ -576,7 +576,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         waitDuration: const Duration(milliseconds: 600),
         preferBelow: true,
         child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         decoration: BoxDecoration(
           border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
           borderRadius: BorderRadius.circular(8),

@@ -991,10 +991,9 @@ class _BusinessCardState extends State<_BusinessCard> {
           await widget.authStore.clearCurrentBusiness();
         }
         
-        // Navigate to businesses list and refresh
+        // Refresh businesses list immediately to remove the business from the list
         if (mounted) {
-          context.go('/user/profile/businesses');
-          // Trigger refresh in parent
+          // Trigger refresh in parent to reload the list
           widget.onLeave?.call();
         }
       } else if (mounted) {

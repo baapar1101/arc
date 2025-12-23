@@ -226,6 +226,13 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                                 _buildSettingItem(
                                   context,
+                                  title: 'مدیریت ارزهای جانبی',
+                                  subtitle: 'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار',
+                                  icon: Icons.currency_exchange,
+                                  onTap: () => context.go('/business/${widget.businessId}/settings/currencies'),
+                                ),
+                                _buildSettingItem(
+                                  context,
                                   title: 'ویرایش سال مالی جاری',
                                   subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
                                   icon: Icons.calendar_today,
@@ -472,6 +479,13 @@ class _SettingsPageState extends State<SettingsPage> {
                             subtitle: t.businessSettingsDescription,
                             icon: Icons.business,
                             onTap: () => context.go('/business/${widget.businessId}/settings/business'),
+                          ),
+                          _buildSettingItem(
+                            context,
+                            title: 'مدیریت ارزهای جانبی',
+                            subtitle: 'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار',
+                            icon: Icons.currency_exchange,
+                            onTap: () => context.go('/business/${widget.businessId}/settings/currencies'),
                           ),
                           _buildSettingItem(
                             context,

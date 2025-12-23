@@ -710,6 +710,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _buildFinancialSummaryCard(theme, totals),
             const SizedBox(height: 24),
           ],
+          // نمایش سود (فقط برای فاکتورهای فروش و تولید)
+          if (isInvoice && (document.documentType == 'invoice_sales' || 
+              document.documentType == 'invoice_sales_return' || 
+              document.documentType == 'invoice_production')) ...[
+            _buildProfitSection(theme),
+            const SizedBox(height: 24),
+          ],
           _buildSectionHeader('مشخصات پایه'),
           _buildInfoGrid([
             _InfoRow('شماره سند', document.code),
@@ -933,6 +940,199 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       spacing: 12,
       runSpacing: 12,
       children: visibleRows.map((row) => _InfoTile(row: row)).toList(),
+    );
+  }
+
+  Widget _buildProfitSection(ThemeData theme) {
+    if (_rawDocumentData == null) {
+      return const SizedBox.shrink();
+    }
+    
+    // استفاده از total_profit (که می‌تواند gross یا net باشد) یا fallback به gross_profit
+    final totalProfit = _rawDocumentData!['total_profit'] as num?;
+    final totalProfitPercent = _rawDocumentData!['gross_profit_percent'] as num?;
+    final grossProfit = _rawDocumentData!['gross_profit'] as num?;
+    final grossProfitPercent = _rawDocumentData!['gross_profit_percent'] as num?;
+    final netProfit = _rawDocumentData!['net_profit'] as num?;
+    final netProfitPercent = _rawDocumentData!['net_profit_percent'] as num?;
+    final totalOverhead = _rawDocumentData!['total_overhead'] as num?;
+    
+    // اگر سود محاسبه نشده باشد، چیزی نمایش نده
+    final profit = totalProfit ?? grossProfit;
+    if (profit == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final profitValue = profit.toDouble();
+    final profitPercentValue = (totalProfitPercent ?? grossProfitPercent)?.toDouble() ?? 0.0;
+    final isPositive = profitValue >= 0;
+    
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isPositive ? Icons.trending_up : Icons.trending_down,
+                  color: isPositive ? Colors.green : Colors.red,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'سود فاکتور',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isPositive ? Colors.green.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isPositive ? Colors.green.shade200 : Colors.red.shade200,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'سود ${totalProfit != null && netProfit != null ? 'کل' : grossProfit != null ? 'ناخالص' : 'خالص'}:',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (totalOverhead != null && totalOverhead.toDouble() > 0)
+                        Text(
+                          'هزینه سربار:',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatWithThousands(profitValue),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                      if (profitPercentValue != 0)
+                        Text(
+                          '${profitPercentValue.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
+                          ),
+                        ),
+                      if (totalOverhead != null && totalOverhead.toDouble() > 0)
+                        Text(
+                          formatWithThousands(totalOverhead.toDouble()),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // نمایش سود ناخالص و خالص (اگر هر دو موجود باشند)
+            if (grossProfit != null && netProfit != null && grossProfit != netProfit) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'سود ناخالص',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatWithThousands(grossProfit.toDouble()),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                          if (grossProfitPercent != null && grossProfitPercent.toDouble() != 0)
+                            Text(
+                              '${grossProfitPercent.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.purple.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'سود خالص',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatWithThousands(netProfit.toDouble()),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple.shade700,
+                            ),
+                          ),
+                          if (netProfitPercent != null && netProfitPercent.toDouble() != 0)
+                            Text(
+                              '${netProfitPercent.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.purple.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1194,16 +1394,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     headingRowColor: WidgetStateProperty.all(
                       theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                     ),
-                    columns: const [
-                      DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('نام کالا', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('فی', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('قیمت', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
+                    columns: [
+                      const DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('نام کالا', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('فی', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
+                      const DataColumn(label: Text('قیمت', style: TextStyle(fontWeight: FontWeight.bold))),
+                      // ستون سود (فقط اگر line_profits موجود باشد)
+                      if (_rawDocumentData?['line_profits'] != null)
+                        const DataColumn(
+                          label: Text('سود', style: TextStyle(fontWeight: FontWeight.bold)),
+                          numeric: true,
+                        ),
+                      const DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
                     ],
                     rows: productLines.asMap().entries.map((entry) {
                       final index = entry.key;
@@ -1215,6 +1421,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
                       final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
                       final unit = extraInfo?['unit'] as String? ?? '-';
+                      
+                      // دریافت سود این ردیف از line_profits
+                      Map<String, dynamic>? lineProfitData;
+                      if (_rawDocumentData?['line_profits'] != null) {
+                        final lineProfits = _rawDocumentData!['line_profits'] as List<dynamic>;
+                        final lineId = line['id'] as int?;
+                        if (lineId != null) {
+                          lineProfitData = lineProfits.firstWhere(
+                            (lp) => (lp as Map<String, dynamic>)['line_id'] == lineId,
+                            orElse: () => null,
+                          ) as Map<String, dynamic>?;
+                        }
+                      }
                       
                       // استایل پایه برای اعداد - استفاده از theme و tabular figures
                       final baseNumberStyle = theme.textTheme.bodyMedium?.copyWith(
@@ -1278,6 +1497,47 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             ),
                           ),
                         ),
+                        // سلول سود (فقط اگر line_profits موجود باشد)
+                        if (_rawDocumentData?['line_profits'] != null)
+                          DataCell(
+                            Builder(
+                              builder: (context) {
+                                if (lineProfitData == null) {
+                                  return const Text('-');
+                                }
+                                final profit = (lineProfitData['profit'] ?? lineProfitData['gross_profit']) as num?;
+                                final profitPercent = (lineProfitData['profit_percent'] ?? lineProfitData['gross_profit_percent']) as num?;
+                                if (profit == null) {
+                                  return const Text('-');
+                                }
+                                final profitValue = profit.toDouble();
+                                final profitPercentValue = profitPercent?.toDouble() ?? 0.0;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      formatWithThousands(profitValue),
+                                      textDirection: ui.TextDirection.ltr,
+                                      style: baseNumberStyle.copyWith(
+                                        color: profitValue >= 0 ? Colors.green : Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (profitPercentValue != 0)
+                                      Text(
+                                        '${profitPercentValue.toStringAsFixed(1)}%',
+                                        textDirection: ui.TextDirection.ltr,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
                           DataCell(
                             SizedBox(
                               width: 200,

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
@@ -35,11 +36,43 @@ from adapters.db.repositories.business_notification_repo import (
 from app.services.providers.sms_provider import SmsProvider
 from app.services.providers.email_provider import EmailProvider
 from app.services.email_service import EmailService
-from app.services.system_settings_service import get_effective_notifications_settings
+from app.services.system_settings_service import (
+    get_effective_notifications_settings,
+    get_notification_sms_pricing,
+    get_wallet_settings
+)
+from app.services.wallet_service import (
+    charge_wallet_for_notification,
+    _get_wallet_account_for_update
+)
+from app.services.notification_service import NotificationService
 from app.utils.phone_utils import normalize_phone_number
 from app.core.responses import ApiError
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_sms_count(text: str) -> int:
+    """
+    محاسبه تعداد پیامک بر اساس طول متن
+    
+    استاندارد SMS:
+    - 1-70 کاراکتر = 1 پیامک
+    - 71-134 کاراکتر = 2 پیامک
+    - 135-201 کاراکتر = 3 پیامک
+    - و الی آخر (هر 67 کاراکتر بعدی = 1 پیامک اضافی)
+    
+    Args:
+        text: متن پیامک
+        
+    Returns:
+        تعداد پیامک مورد نیاز
+    """
+    length = len(text)
+    if length <= 70:
+        return 1
+    # هر 67 کاراکتر بعدی = 1 پیامک اضافی
+    return 1 + ((length - 70 + 66) // 67)
 
 
 class TemplateRenderService:
@@ -204,6 +237,77 @@ class BusinessNotificationService:
         self.email_provider = EmailProvider(db)
         self.email_service = EmailService(db)  # برای ارسال مستقیم به Person
     
+    def _calculate_sms_cost(
+        self,
+        sms_count: int,
+        event_type: str
+    ) -> Decimal:
+        """
+        محاسبه هزینه ارسال پیامک
+        
+        Args:
+            sms_count: تعداد پیامک
+            event_type: نوع رویداد
+            
+        Returns:
+            هزینه کل (بر اساس ارز کیف پول)
+            
+        Raises:
+            ApiError: در صورت خطا در محاسبه هزینه
+        """
+        try:
+            if sms_count <= 0:
+                raise ApiError(
+                    "INVALID_SMS_COUNT",
+                    "تعداد پیامک باید بزرگتر از صفر باشد",
+                    http_status=400
+                )
+            
+            pricing = get_notification_sms_pricing(self.db)
+            
+            # بررسی قیمت خاص برای event_type
+            event_prices = pricing.get("event_type_prices", {})
+            price_per_sms = event_prices.get(event_type)
+            
+            # اگر قیمت خاصی تعریف نشده، از قیمت پیش‌فرض استفاده می‌کنیم
+            if price_per_sms is None:
+                price_per_sms = pricing.get("price_per_sms", 500.0)
+            
+            # اعتبارسنجی نهایی قیمت
+            try:
+                price_per_sms = float(price_per_sms)
+                if price_per_sms <= 0:
+                    logger.warning(
+                        f"قیمت پیامک نامعتبر است ({price_per_sms}). استفاده از مقدار پیش‌فرض 500"
+                    )
+                    price_per_sms = 500.0
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"خطا در تبدیل قیمت پیامک. استفاده از مقدار پیش‌فرض 500"
+                )
+                price_per_sms = 500.0
+            
+            total_cost = Decimal(str(price_per_sms)) * Decimal(str(sms_count))
+            
+            if total_cost <= 0:
+                raise ApiError(
+                    "INVALID_COST",
+                    "هزینه محاسبه شده نامعتبر است",
+                    http_status=500
+                )
+            
+            return total_cost
+            
+        except ApiError:
+            raise
+        except Exception as e:
+            logger.error(f"خطا در محاسبه هزینه پیامک: {e}", exc_info=True)
+            raise ApiError(
+                "COST_CALCULATION_ERROR",
+                f"خطا در محاسبه هزینه: {str(e)}",
+                http_status=500
+            )
+    
     def send_to_person(
         self,
         business_id: int,
@@ -285,6 +389,91 @@ class BusinessNotificationService:
                 if template.subject and ch == 'email':
                     rendered_subject = self.template_renderer.render(template.subject, context)
                 
+                # محاسبه هزینه و بررسی موجودی (فقط برای SMS)
+                wallet_charge_result = None
+                if ch == 'sms':
+                    try:
+                        # محاسبه تعداد پیامک
+                        sms_count = calculate_sms_count(rendered_body)
+                        
+                        if sms_count <= 0:
+                            results[ch] = {
+                                "success": False,
+                                "error": "تعداد پیامک محاسبه شده نامعتبر است"
+                            }
+                            continue
+                        
+                        # محاسبه هزینه
+                        total_cost = self._calculate_sms_cost(sms_count, event_type)
+                    except ApiError as cost_error:
+                        logger.error(f"خطا در محاسبه هزینه: {cost_error}")
+                        results[ch] = {
+                            "success": False,
+                            "error": cost_error.message or "خطا در محاسبه هزینه پیامک"
+                        }
+                        continue
+                    except Exception as cost_error:
+                        logger.error(f"خطای غیرمنتظره در محاسبه هزینه: {cost_error}", exc_info=True)
+                        results[ch] = {
+                            "success": False,
+                            "error": "خطای غیرمنتظره در محاسبه هزینه پیامک"
+                        }
+                        continue
+                    
+                    # بررسی موجودی کیف پول
+                    try:
+                        from app.services.wallet_service import _get_wallet_account_for_update
+                        account = _get_wallet_account_for_update(self.db, business_id)
+                        available_balance = Decimal(str(account.available_balance or 0))
+                        
+                        if available_balance < total_cost:
+                            # موجودی کافی نیست - ارسال نشود و هشدار بده
+                            results[ch] = self._handle_insufficient_funds(
+                                business_id=business_id,
+                                user_id=triggered_by_user_id,
+                                required_amount=total_cost,
+                                available_amount=available_balance,
+                                template_name=template.name,
+                                event_type=event_type,
+                                template_id=template.id,
+                                person_id=person_id,
+                                person=person,
+                                channel=ch,
+                                rendered_body=rendered_body,
+                                context=context
+                            )
+                            continue
+                        
+                        # کسر از کیف پول قبل از ارسال
+                        wallet_charge_result = charge_wallet_for_notification(
+                            db=self.db,
+                            business_id=business_id,
+                            user_id=triggered_by_user_id or 0,
+                            amount=total_cost,
+                            sms_count=sms_count,
+                            event_type=event_type,
+                            template_id=template.id,
+                            template_name=template.name
+                        )
+                    except ApiError as e:
+                        if e.code == "INSUFFICIENT_FUNDS":
+                            results[ch] = self._handle_insufficient_funds(
+                                business_id=business_id,
+                                user_id=triggered_by_user_id,
+                                required_amount=total_cost,
+                                available_amount=Decimal('0'),
+                                template_name=template.name,
+                                event_type=event_type,
+                                template_id=template.id,
+                                person_id=person_id,
+                                person=person,
+                                channel=ch,
+                                rendered_body=rendered_body,
+                                context=context
+                            )
+                            continue
+                        raise
+                
                 # ارسال
                 send_result = self._send_message(
                     channel=ch,
@@ -292,6 +481,57 @@ class BusinessNotificationService:
                     subject=rendered_subject,
                     body=rendered_body
                 )
+                
+                # اگر SMS بود و هزینه محاسبه شده، cost را تنظیم کن
+                if ch == 'sms' and wallet_charge_result:
+                    try:
+                        total_cost = self._calculate_sms_cost(
+                            calculate_sms_count(rendered_body),
+                            event_type
+                        )
+                        send_result['cost'] = total_cost
+                    except Exception as cost_error:
+                        # اگر خطا در محاسبه مجدد هزینه رخ داد، از مقدار قبلی استفاده می‌کنیم
+                        logger.warning(f"خطا در محاسبه مجدد هزینه: {cost_error}")
+                        # cost قبلاً در wallet_charge_result ذخیره شده است
+                
+                # در صورت خطای ارسال و کسر شده بودن، مبلغ را برگردان
+                if not send_result['success'] and wallet_charge_result and ch == 'sms':
+                    try:
+                        # بازگشت مبلغ به کیف پول
+                        account = _get_wallet_account_for_update(self.db, business_id)
+                        account.available_balance += total_cost
+                        self.db.flush()
+                        
+                        # ثبت تراکنش reversal
+                        from adapters.db.models.wallet import WalletTransaction
+                        reversal_tx = WalletTransaction(
+                            business_id=int(business_id),
+                            type="notification_sms_reversal",
+                            status="succeeded",
+                            amount=total_cost,
+                            fee_amount=Decimal("0"),
+                            description=f"بازگشت مبلغ - خطا در ارسال پیامک: {send_result.get('error', 'خطای نامشخص')}",
+                            document_id=wallet_charge_result.get('document_id'),
+                            extra_info=json.dumps({
+                                "source": "business_notification",
+                                "original_transaction_id": wallet_charge_result.get('wallet_transaction_id'),
+                                "reason": "send_failed",
+                                "error": send_result.get('error')
+                            }, ensure_ascii=False)
+                        )
+                        self.db.add(reversal_tx)
+                        self.db.flush()
+                        
+                        logger.warning(
+                            f"مبلغ {total_cost} به کیف پول کسب‌وکار {business_id} برگردانده شد "
+                            f"به دلیل خطا در ارسال پیامک"
+                        )
+                    except Exception as reversal_error:
+                        logger.error(
+                            f"خطا در بازگشت مبلغ به کیف پول: {reversal_error}",
+                            exc_info=True
+                        )
                 
                 # ثبت لاگ
                 log = self._create_log(
@@ -332,11 +572,20 @@ class BusinessNotificationService:
                     "message": "ارسال با موفقیت انجام شد" if send_result['success'] else send_result.get('error')
                 }
                 
+            except ApiError as api_error:
+                # خطاهای API را با پیام مناسب برمی‌گردانیم
+                logger.error(f"API Error sending notification via {ch}: {api_error}")
+                results[ch] = {
+                    "success": False,
+                    "error": api_error.message or str(api_error),
+                    "error_code": api_error.code
+                }
             except Exception as e:
+                # خطاهای غیرمنتظره را لاگ می‌کنیم و پیام عمومی نمایش می‌دهیم
                 logger.error(f"Error sending notification via {ch}: {e}", exc_info=True)
                 results[ch] = {
                     "success": False,
-                    "error": str(e)
+                    "error": "خطا در ارسال ناتیفیکیشن. لطفاً با پشتیبانی تماس بگیرید."
                 }
         
         self.db.commit()
@@ -519,5 +768,109 @@ class BusinessNotificationService:
                 f"خطا در پیش‌نمایش قالب: {str(e)}",
                 http_status=500
             )
+    
+    def _handle_insufficient_funds(
+        self,
+        business_id: int,
+        user_id: Optional[int],
+        required_amount: Decimal,
+        available_amount: Decimal,
+        template_name: str,
+        event_type: str,
+        template_id: int,
+        person_id: int,
+        person: Person,
+        channel: str,
+        rendered_body: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        مدیریت موجودی ناکافی:
+        1. ارسال هشدار به کاربر
+        2. ثبت لاگ
+        3. برگرداندن خطا
+        """
+        if not user_id:
+            user_id = 0
+        
+        # دریافت اطلاعات ارز کیف پول
+        wallet_settings = get_wallet_settings(self.db)
+        currency_code = wallet_settings.get("wallet_base_currency_code", "IRR")
+        currency_symbol = wallet_settings.get("wallet_base_currency_symbol", currency_code)
+        
+        # محاسبه کسری
+        shortfall = float(required_amount - available_amount)
+        
+        # آماده‌سازی پیام هشدار
+        warning_title = "موجودی کیف پول کافی نیست"
+        warning_message = (
+            f"برای ارسال ناتیفیکیشن '{template_name}' موجودی کیف پول کافی نیست.\n\n"
+            f"موجودی فعلی: {available_amount:,.0f} {currency_symbol}\n"
+            f"مبلغ مورد نیاز: {required_amount:,.0f} {currency_symbol}\n"
+            f"کسری: {shortfall:,.0f} {currency_symbol}\n\n"
+            f"لطفاً کیف پول خود را شارژ کنید."
+        )
+        
+        # ارسال هشدار به کاربر از طریق In-App Notification
+        if user_id and user_id > 0:
+            try:
+                notification_service = NotificationService(self.db)
+                notification_service.send(
+                    user_id=user_id,
+                    event_key="wallet.insufficient_funds_notification",
+                    context={
+                        "subject": warning_title,
+                        "message": warning_message,
+                        "required_amount": float(required_amount),
+                        "available_amount": float(available_amount),
+                        "shortfall": shortfall,
+                        "currency_code": currency_code,
+                        "currency_symbol": currency_symbol,
+                        "template_name": template_name,
+                        "event_type": event_type
+                    },
+                    preferred_channels=["inapp", "email"]  # اول In-App، سپس Email
+                )
+            except Exception as e:
+                logger.error(f"خطا در ارسال هشدار به کاربر {user_id}: {e}", exc_info=True)
+        
+        # ثبت لاگ در NotificationSendLog با وضعیت "rejected"
+        log = self._create_log(
+            business_id=business_id,
+            template_id=template_id,
+            recipient_type='person',
+            recipient_id=person_id,
+            recipient_identifier=person.mobile if channel == 'sms' else person.email,
+            channel=channel,
+            subject=None,
+            body=rendered_body,
+            context_data=context,
+            event_type=event_type,
+            triggered_by_user_id=user_id,
+            send_result={
+                "success": False,
+                "error": "INSUFFICIENT_FUNDS",
+                "cost": float(required_amount)
+            }
+        )
+        log.status = "rejected"
+        log.failure_reason = f"موجودی کافی نیست. مورد نیاز: {required_amount}, موجود: {available_amount}"
+        self.db.flush()
+        
+        # برگرداندن خطا
+        return {
+            "success": False,
+            "error": "INSUFFICIENT_FUNDS",
+            "error_message": "موجودی کیف پول کافی نیست",
+            "log_id": log.id,
+            "details": {
+                "required_amount": float(required_amount),
+                "available_amount": float(available_amount),
+                "shortfall": shortfall,
+                "currency_code": currency_code,
+                "currency_symbol": currency_symbol,
+                "warning_sent": user_id and user_id > 0
+            }
+        }
 
 

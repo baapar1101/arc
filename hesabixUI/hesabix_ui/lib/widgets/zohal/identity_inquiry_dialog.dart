@@ -439,7 +439,8 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
       );
     }
 
-    final responseBody = _result!['result']?['response_body'] as Map<String, dynamic>?;
+    // مسیر صحیح: _result['data']['result']['response_body']
+    final responseBody = _result!['data']?['result']?['response_body'] as Map<String, dynamic>?;
     final data = responseBody?['data'] as Map<String, dynamic>?;
     final message = responseBody?['message']?.toString() ?? '';
     final errorCode = responseBody?['error_code'];

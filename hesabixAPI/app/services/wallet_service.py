@@ -17,6 +17,7 @@ from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from app.services.system_settings_service import get_wallet_settings
+from app.services.business_service import ensure_wallet_currency_in_business
 from datetime import datetime, date
 
 logger = structlog.get_logger()
@@ -1002,6 +1003,12 @@ def _create_simple_document(
 
 
 def _post_topup_document(db: Session, business_id: int, user_id: int, amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
+	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
+	try:
+		ensure_wallet_currency_in_business(db, business_id)
+	except Exception as e:
+		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
+	
 	currency_id = _resolve_wallet_currency_id(db)
 	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	bank_acc = _get_fixed_account_by_code(db, "10203")
@@ -1030,6 +1037,12 @@ def _post_topup_document(db: Session, business_id: int, user_id: int, amount: De
 
 
 def _post_payout_document(db: Session, business_id: int, user_id: int, net_amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
+	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
+	try:
+		ensure_wallet_currency_in_business(db, business_id)
+	except Exception as e:
+		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
+	
 	currency_id = _resolve_wallet_currency_id(db)
 	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	bank_acc = _get_fixed_account_by_code(db, "10203")
@@ -1062,6 +1075,12 @@ def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amou
 	Dr 10205 (wallet) = amount
 	Cr 60205 (gift credit income) = amount
 	"""
+	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
+	try:
+		ensure_wallet_currency_in_business(db, business_id)
+	except Exception as e:
+		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
+	
 	currency_id = _resolve_wallet_currency_id(db)
 	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	gift_income_acc = _get_fixed_account_by_code(db, "60205")
@@ -1155,6 +1174,12 @@ def charge_wallet_for_zohal_service(
 	account.available_balance = available - amount
 	db.flush()
 	
+	# بررسی و اضافه کردن ارز کیف پول به کسب و کار در صورت نیاز
+	try:
+		ensure_wallet_currency_in_business(db, business_id)
+	except Exception as e:
+		logger.warning("failed_to_ensure_wallet_currency", business_id=business_id, error=str(e))
+	
 	# ایجاد سند حسابداری
 	currency_id = _resolve_wallet_currency_id(db)
 	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
@@ -1191,6 +1216,151 @@ def charge_wallet_for_zohal_service(
 		amount=amount,
 		fee_amount=Decimal("0"),
 		description=description or f"هزینه سرویس {service_name}",
+		document_id=document.id,
+		extra_info=extra_info_json,
+	)
+	db.add(tx)
+	db.flush()
+	
+	return {
+		"wallet_transaction_id": tx.id,
+		"document_id": document.id,
+		"available_balance": float(account.available_balance or 0),
+	}
+
+
+def _ensure_notification_expense_account(db: Session) -> Account:
+	"""
+	بررسی و ایجاد/به‌روزرسانی حساب هزینه ارسال پیامک ناتیفیکیشن (70510)
+	این تابع اطمینان می‌دهد که حساب 70510 با نام صحیح "هزینه ارسال پیامک ناتیفیکیشن" وجود دارد
+	حساب در گروه هزینه‌های عمومی (705) قرار دارد که مناسب هزینه‌های عملیاتی است
+	"""
+	account = db.query(Account).filter(
+		and_(
+			Account.code == "70510",
+			Account.business_id.is_(None)
+		)
+	).first()
+	
+	expected_name = "هزینه ارسال پیامک ناتیفیکیشن"
+	
+	if not account:
+		# دریافت حساب والد (705 - هزینه‌های عمومی)
+		parent_account = _get_fixed_account_by_code(db, "705")
+		
+		# ایجاد حساب هزینه ارسال پیامک ناتیفیکیشن
+		account = Account(
+			name=expected_name,
+			code="70510",
+			account_type="accounting_document",
+			business_id=None,  # حساب عمومی
+			parent_id=parent_account.id if parent_account else None
+		)
+		db.add(account)
+		db.flush()
+	else:
+		# بررسی و به‌روزرسانی نام حساب در صورت نیاز
+		if account.name != expected_name:
+			logger.info(f"به‌روزرسانی نام حساب 70510 از '{account.name}' به '{expected_name}'")
+			account.name = expected_name
+			# اطمینان از نوع حساب
+			if account.account_type != "accounting_document":
+				account.account_type = "accounting_document"
+				db.flush()
+	
+	return account
+
+
+def charge_wallet_for_notification(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	amount: Decimal,
+	sms_count: int,
+	event_type: str,
+	template_id: int | None = None,
+	template_name: str | None = None,
+	description: str | None = None,
+) -> Dict[str, Any]:
+	"""
+	کسر مبلغ از کیف‌پول برای ارسال پیامک ناتیفیکیشن و ایجاد سند حسابداری
+	
+	Args:
+		db: Database session
+		business_id: شناسه کسب‌وکار
+		user_id: شناسه کاربر
+		amount: مبلغ کسر (بر اساس ارز کیف پول)
+		sms_count: تعداد پیامک
+		event_type: نوع رویداد
+		template_id: شناسه قالب (اختیاری)
+		template_name: نام قالب (اختیاری)
+		description: توضیحات اضافی (اختیاری)
+		
+	Returns:
+		دیکشنری شامل:
+		- wallet_transaction_id: شناسه تراکنش کیف پول
+		- document_id: شناسه سند حسابداری
+		- available_balance: موجودی باقیمانده
+		
+	Raises:
+		ApiError: در صورت موجودی ناکافی یا خطای دیگر
+	"""
+	amount = Decimal(str(amount or 0))
+	if amount <= 0:
+		raise ApiError("INVALID_AMOUNT", "مبلغ باید بزرگتر از صفر باشد", http_status=400)
+	
+	# بررسی موجودی
+	account = _get_wallet_account_for_update(db, business_id)
+	available = Decimal(str(account.available_balance or 0))
+	
+	if available < amount:
+		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کیف پول کافی نیست", http_status=400)
+	
+	# کسر از موجودی
+	account.available_balance = available - amount
+	db.flush()
+	
+	# ایجاد سند حسابداری
+	currency_id = _resolve_wallet_currency_id(db)
+	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
+	expense_acc = _ensure_notification_expense_account(db)  # حساب هزینه ارسال پیامک ناتیفیکیشن
+	
+	template_desc = f" - قالب: {template_name}" if template_name else ""
+	desc = description or f"هزینه ارسال پیامک ناتیفیکیشن ({sms_count} پیامک){template_desc}"
+	
+	lines = [
+		{"account_id": expense_acc.id, "debit": amount, "credit": 0, "description": desc},
+		{"account_id": wallet_acc.id, "debit": 0, "credit": amount, "description": f"کسر از کیف پول برای ارسال پیامک ناتیفیکیشن"},
+	]
+	
+	document = _create_simple_document(
+		db=db,
+		business_id=business_id,
+		user_id=user_id,
+		document_type="payment",
+		currency_id=currency_id,
+		document_date=datetime.utcnow().date(),
+		description=desc,
+		accounting_lines=lines,
+	)
+	
+	# ثبت تراکنش کیف پول
+	extra_info = {
+		"source": "business_notification",
+		"sms_count": sms_count,
+		"event_type": event_type,
+		"template_id": template_id,
+		"template_name": template_name,
+	}
+	extra_info_json = json.dumps(extra_info, ensure_ascii=False)
+	
+	tx = WalletTransaction(
+		business_id=int(business_id),
+		type="notification_sms",
+		status="succeeded",
+		amount=amount,
+		fee_amount=Decimal("0"),
+		description=desc,
 		document_id=document.id,
 		extra_info=extra_info_json,
 	)

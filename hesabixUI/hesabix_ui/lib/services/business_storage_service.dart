@@ -58,6 +58,43 @@ class BusinessStorageService {
     return const <Map<String, dynamic>>[];
   }
 
+  /// دریافت لیست فایل‌های کسب‌وکار با اطلاعات pagination
+  Future<Map<String, dynamic>> listFilesWithPagination({
+    required int businessId,
+    int page = 1,
+    int limit = 50,
+    String? moduleContext,
+  }) async {
+    final query = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+      if (moduleContext != null) 'module_context': moduleContext,
+    };
+
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/files',
+      query: query,
+    );
+
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data != null) {
+      return {
+        'items': (data['items'] as List?)
+                ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+                .toList() ??
+            <Map<String, dynamic>>[],
+        'pagination': data['pagination'] is Map
+            ? Map<String, dynamic>.from(data['pagination'] as Map)
+            : <String, dynamic>{},
+      };
+    }
+    return {
+      'items': <Map<String, dynamic>>[],
+      'pagination': <String, dynamic>{},
+    };
+  }
+
   /// حذف فایل
   Future<void> deleteFile({
     required int businessId,

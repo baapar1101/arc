@@ -1197,9 +1197,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
           // تب اطلاعات فاکتور
           _buildInvoiceInfoTab(),
           // تب کالاها و خدمات
@@ -1210,6 +1213,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)) _buildInstallmentsTab(),
           // تب تنظیمات
           _buildSettingsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1238,34 +1244,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         InvoiceTypeCombobox(
                           selectedType: _selectedInvoiceType,
                           onTypeChanged: (type) {
-                                  setState(() {
-                                    _selectedInvoiceType = type;
-                                  _hasUserCustomizedSettings = false;
-                                    // پاک کردن bom_ids در صورت تغییر نوع فاکتور
-                                    if (type != InvoiceType.production) {
-                                      _bomIds.clear();
-                                    }
-                                    // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
-                                    if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
-                                      _selectedCustomer = null;
-                                      _selectedSeller = null;
-                                    } else if (type == InvoiceType.sales || type == InvoiceType.salesReturn) {
-                                      _selectedSupplier = null;
-                                    } else {
-                                      _selectedCustomer = null;
-                                      _selectedSupplier = null;
-                                      _selectedSeller = null;
-                                    }
-                                    // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
-                                    final newTabCount = _getTabCountForType(type);
-                                    if (newTabCount != _tabController.length) {
-                                      _tabController.dispose();
-                                      _tabController = TabController(length: newTabCount, vsync: this);
-                                      _attachTabListener();
-                                    }
-                                  });
-                                  _applyPrintSettingsForCurrentType();
-                                },
+                            _handleInvoiceTypeChange(type);
+                          },
                           isDraft: _isDraft,
                           onDraftChanged: (isDraft) {
                             setState(() {
@@ -1554,33 +1534,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               child: InvoiceTypeCombobox(
                                 selectedType: _selectedInvoiceType,
                                 onTypeChanged: (type) {
-                                  setState(() {
-                                    _selectedInvoiceType = type;
-                                    _hasUserCustomizedSettings = false;
-                                    // پاک کردن bom_ids در صورت تغییر نوع فاکتور
-                                    if (type != InvoiceType.production) {
-                                      _bomIds.clear();
-                                    }
-                                    // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
-                                    if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
-                                      _selectedCustomer = null;
-                                      _selectedSeller = null;
-                                    } else if (type == InvoiceType.sales || type == InvoiceType.salesReturn) {
-                                      _selectedSupplier = null;
-                                    } else {
-                                      _selectedCustomer = null;
-                                      _selectedSupplier = null;
-                                      _selectedSeller = null;
-                                    }
-                                    // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
-                                    final newTabCount = _getTabCountForType(type);
-                                    if (newTabCount != _tabController.length) {
-                                      _tabController.dispose();
-                                      _tabController = TabController(length: newTabCount, vsync: this);
-                                      _attachTabListener();
-                                    }
-                                  });
-                                  _applyPrintSettingsForCurrentType();
+                                  _handleInvoiceTypeChange(type);
                                 },
                                 isDraft: _isDraft,
                                 onDraftChanged: (isDraft) {
@@ -2433,6 +2387,102 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   void _showError(String message) {
     SnackBarHelper.showError(context, message: message);
+  }
+
+  /// مدیریت تغییر نوع فاکتور و پاک کردن ردیف‌های BOM
+  void _handleInvoiceTypeChange(InvoiceType? newType) {
+    // اگر نوع جدید null باشد، کاری نکن
+    if (newType == null) return;
+    
+    final oldType = _selectedInvoiceType;
+    final hasBomLines = _lineItems.any((item) => 
+      item.extraInfo?['bom_id'] != null || 
+      item.extraInfo?['movement'] == 'out' || 
+      item.extraInfo?['movement'] == 'in'
+    );
+    
+    setState(() {
+      _selectedInvoiceType = newType;
+      _hasUserCustomizedSettings = false;
+      
+      // اگر نوع فاکتور از تولید به نوع دیگری تغییر می‌کند
+      if (oldType == InvoiceType.production && newType != InvoiceType.production) {
+        // پاک کردن bom_ids
+        _bomIds.clear();
+        
+        // پاک کردن هزینه عملیات/سربار تولید
+        _productionOperationsTotal = null;
+        
+        // پاک کردن ردیف‌هایی که از BOM آمده‌اند یا movement دارند
+        _lineItems.removeWhere((item) {
+          final extraInfo = item.extraInfo;
+          if (extraInfo == null) return false;
+          
+          // حذف ردیف‌هایی که bom_id دارند
+          if (extraInfo['bom_id'] != null) return true;
+          
+          // حذف ردیف‌هایی که movement دارند (مخصوص فاکتور تولید)
+          final movement = extraInfo['movement'];
+          if (movement == 'out' || movement == 'in') return true;
+          
+          return false;
+        });
+        
+        // محاسبه مجدد جمع‌ها پس از حذف ردیف‌ها
+        _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
+        _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
+        _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
+        _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
+        
+        // اگر هیچ ردیفی باقی نماند، یک ردیف پیش‌فرض اضافه کن
+        if (_lineItems.isEmpty) {
+          _lineItems = [
+            InvoiceLineItem(
+              quantity: 1,
+              unitPrice: 0,
+              unitPriceSource: 'manual',
+              discountType: 'amount',
+              discountValue: 0,
+              taxRate: 0,
+            ),
+          ];
+        }
+      } else if (newType != InvoiceType.production) {
+        // اگر نوع جدید تولید نیست، bom_ids را پاک کن (برای اطمینان)
+        _bomIds.clear();
+        _productionOperationsTotal = null;
+      }
+      
+      // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
+      if (newType == InvoiceType.purchase || newType == InvoiceType.purchaseReturn) {
+        _selectedCustomer = null;
+        _selectedSeller = null;
+      } else if (newType == InvoiceType.sales || newType == InvoiceType.salesReturn) {
+        _selectedSupplier = null;
+      } else {
+        _selectedCustomer = null;
+        _selectedSupplier = null;
+        _selectedSeller = null;
+      }
+      
+      // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
+      final newTabCount = _getTabCountForType(newType);
+      if (newTabCount != _tabController.length) {
+        _tabController.dispose();
+        _tabController = TabController(length: newTabCount, vsync: this);
+        _attachTabListener();
+      }
+    });
+    
+    // نمایش هشدار به کاربر در صورت وجود ردیف‌های BOM
+    if (hasBomLines && newType != InvoiceType.production) {
+      SnackBarHelper.showInfo(
+        context,
+        message: 'ردیف‌های مربوط به فرمول تولید حذف شدند زیرا نوع فاکتور تغییر کرد.',
+      );
+    }
+    
+    _applyPrintSettingsForCurrentType();
   }
 
   Widget _buildProductsTab() {

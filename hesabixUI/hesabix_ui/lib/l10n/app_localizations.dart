@@ -10205,6 +10205,228 @@ abstract class AppLocalizations {
   /// **'Failed to remove selected invoices: {error}'**
   String taxRemoveSelectedErrorWithMessage(String error);
 
+  /// No description provided for @taxQuickActionSendAllPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Send all pending'**
+  String get taxQuickActionSendAllPending;
+
+  /// No description provided for @taxQuickActionInquireAllSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire all sent'**
+  String get taxQuickActionInquireAllSent;
+
+  /// No description provided for @taxQuickActionRetryAllFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry all failed'**
+  String get taxQuickActionRetryAllFailed;
+
+  /// No description provided for @taxHelpTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get taxHelpTooltip;
+
+  /// No description provided for @taxHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace guide'**
+  String get taxHelpTitle;
+
+  /// No description provided for @taxHelpSectionStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice statuses'**
+  String get taxHelpSectionStatuses;
+
+  /// No description provided for @taxHelpStatusNotSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent: Invoice has not been sent yet'**
+  String get taxHelpStatusNotSent;
+
+  /// No description provided for @taxHelpStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending: Currently being sent'**
+  String get taxHelpStatusPending;
+
+  /// No description provided for @taxHelpStatusSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent: Sent and awaiting confirmation'**
+  String get taxHelpStatusSent;
+
+  /// No description provided for @taxHelpStatusFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized: Finalized by the tax system'**
+  String get taxHelpStatusFinalized;
+
+  /// No description provided for @taxHelpStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: Sending failed'**
+  String get taxHelpStatusFailed;
+
+  /// No description provided for @taxHelpSectionQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions'**
+  String get taxHelpSectionQuickActions;
+
+  /// No description provided for @taxHelpQuickActionSendPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Send all pending: Send all pending invoices'**
+  String get taxHelpQuickActionSendPending;
+
+  /// No description provided for @taxHelpQuickActionInquireSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire all sent: Check status of sent invoices'**
+  String get taxHelpQuickActionInquireSent;
+
+  /// No description provided for @taxHelpQuickActionRetryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry all failed: Retry failed invoices'**
+  String get taxHelpQuickActionRetryFailed;
+
+  /// No description provided for @taxHelpSectionImportantNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Important notes'**
+  String get taxHelpSectionImportantNotes;
+
+  /// No description provided for @taxHelpNoteValidateBeforeSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Validate invoices before sending'**
+  String get taxHelpNoteValidateBeforeSend;
+
+  /// No description provided for @taxHelpNoteFailedInDLQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed invoices are stored in the error queue'**
+  String get taxHelpNoteFailedInDLQ;
+
+  /// No description provided for @taxHelpNoteTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'You can view the change history of each invoice'**
+  String get taxHelpNoteTimeline;
+
+  /// No description provided for @taxHelpNoteExport.
+  ///
+  /// In en, this message translates to:
+  /// **'You can export sending reports'**
+  String get taxHelpNoteExport;
+
+  /// No description provided for @taxOperationSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation completed successfully'**
+  String get taxOperationSuccess;
+
+  /// No description provided for @taxOperationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error performing operation: {error}'**
+  String taxOperationError(String error);
+
+  /// No description provided for @taxSendingInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending invoices...'**
+  String get taxSendingInvoices;
+
+  /// No description provided for @taxSendingWithError.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending encountered an error'**
+  String get taxSendingWithError;
+
+  /// No description provided for @taxSentCountFailedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent: {sentCount} | Failed: {failedCount}'**
+  String taxSentCountFailedCount(int sentCount, int failedCount);
+
+  /// No description provided for @taxProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing...'**
+  String get taxProcessing;
+
+  /// No description provided for @taxUnknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get taxUnknownError;
+
+  /// No description provided for @taxFailedInvoicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} invoices encountered errors'**
+  String taxFailedInvoicesCount(int count);
+
+  /// No description provided for @taxRetryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get taxRetryFailed;
+
+  /// No description provided for @taxErrorCategoryValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation errors'**
+  String get taxErrorCategoryValidation;
+
+  /// No description provided for @taxErrorCategoryNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network errors'**
+  String get taxErrorCategoryNetwork;
+
+  /// No description provided for @taxErrorCategoryAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Access errors'**
+  String get taxErrorCategoryAccess;
+
+  /// No description provided for @taxErrorCategoryStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status errors'**
+  String get taxErrorCategoryStatus;
+
+  /// No description provided for @taxErrorCategoryOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other errors'**
+  String get taxErrorCategoryOther;
+
+  /// No description provided for @taxErrorItemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items'**
+  String taxErrorItemsCount(int count);
+
+  /// No description provided for @taxInvoiceNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice #{invoiceId}'**
+  String taxInvoiceNumber(int invoiceId);
+
+  /// No description provided for @taxCurrencyRial.
+  ///
+  /// In en, this message translates to:
+  /// **'Rial'**
+  String get taxCurrencyRial;
+
   /// No description provided for @documentMonetizationTitle.
   ///
   /// In en, this message translates to:

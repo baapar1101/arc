@@ -5392,6 +5392,133 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get taxQuickActionSendAllPending => 'Send all pending';
+
+  @override
+  String get taxQuickActionInquireAllSent => 'Inquire all sent';
+
+  @override
+  String get taxQuickActionRetryAllFailed => 'Retry all failed';
+
+  @override
+  String get taxHelpTooltip => 'Help';
+
+  @override
+  String get taxHelpTitle => 'Tax workspace guide';
+
+  @override
+  String get taxHelpSectionStatuses => 'Invoice statuses';
+
+  @override
+  String get taxHelpStatusNotSent => 'Not sent: Invoice has not been sent yet';
+
+  @override
+  String get taxHelpStatusPending => 'Pending: Currently being sent';
+
+  @override
+  String get taxHelpStatusSent => 'Sent: Sent and awaiting confirmation';
+
+  @override
+  String get taxHelpStatusFinalized => 'Finalized: Finalized by the tax system';
+
+  @override
+  String get taxHelpStatusFailed => 'Failed: Sending failed';
+
+  @override
+  String get taxHelpSectionQuickActions => 'Quick actions';
+
+  @override
+  String get taxHelpQuickActionSendPending =>
+      'Send all pending: Send all pending invoices';
+
+  @override
+  String get taxHelpQuickActionInquireSent =>
+      'Inquire all sent: Check status of sent invoices';
+
+  @override
+  String get taxHelpQuickActionRetryFailed =>
+      'Retry all failed: Retry failed invoices';
+
+  @override
+  String get taxHelpSectionImportantNotes => 'Important notes';
+
+  @override
+  String get taxHelpNoteValidateBeforeSend =>
+      'Validate invoices before sending';
+
+  @override
+  String get taxHelpNoteFailedInDLQ =>
+      'Failed invoices are stored in the error queue';
+
+  @override
+  String get taxHelpNoteTimeline =>
+      'You can view the change history of each invoice';
+
+  @override
+  String get taxHelpNoteExport => 'You can export sending reports';
+
+  @override
+  String get taxOperationSuccess => 'Operation completed successfully';
+
+  @override
+  String taxOperationError(String error) {
+    return 'Error performing operation: $error';
+  }
+
+  @override
+  String get taxSendingInvoices => 'Sending invoices...';
+
+  @override
+  String get taxSendingWithError => 'Sending encountered an error';
+
+  @override
+  String taxSentCountFailedCount(int sentCount, int failedCount) {
+    return 'Sent: $sentCount | Failed: $failedCount';
+  }
+
+  @override
+  String get taxProcessing => 'Processing...';
+
+  @override
+  String get taxUnknownError => 'Unknown error';
+
+  @override
+  String taxFailedInvoicesCount(int count) {
+    return '$count invoices encountered errors';
+  }
+
+  @override
+  String get taxRetryFailed => 'Retry';
+
+  @override
+  String get taxErrorCategoryValidation => 'Validation errors';
+
+  @override
+  String get taxErrorCategoryNetwork => 'Network errors';
+
+  @override
+  String get taxErrorCategoryAccess => 'Access errors';
+
+  @override
+  String get taxErrorCategoryStatus => 'Status errors';
+
+  @override
+  String get taxErrorCategoryOther => 'Other errors';
+
+  @override
+  String taxErrorItemsCount(int count) {
+    return '$count items';
+  }
+
+  @override
+  String taxInvoiceNumber(int invoiceId) {
+    return 'Invoice #$invoiceId';
+  }
+
+  @override
+  String get taxCurrencyRial => 'Rial';
+
+  @override
   String get documentMonetizationTitle => 'Packages and Tariffs';
 
   @override

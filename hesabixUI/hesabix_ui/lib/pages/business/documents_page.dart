@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
@@ -44,6 +45,12 @@ class _DocumentsPageState extends State<DocumentsPage> {
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
 
+  void _onCalendarChanged() {
+    if (!mounted) return;
+    // فقط برای رندر مجدد تاریخ‌ها/فیلدهای وابسته به تقویم
+    setState(() {});
+  }
+
   // انواع اسناد
   final Map<String, String> _documentTypes = {
     'all': 'همه',
@@ -60,7 +67,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
   void initState() {
     super.initState();
     _service = DocumentService(widget.apiClient);
+    widget.calendarController.addListener(_onCalendarChanged);
     _loadProjects();
+  }
+
+  @override
+  void dispose() {
+    widget.calendarController.removeListener(_onCalendarChanged);
+    super.dispose();
   }
 
   /// بارگذاری لیست پروژه‌ها برای فیلتر
@@ -474,8 +488,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
           'document_date',
           'تاریخ',
           width: ColumnWidth.medium,
-          // نمایش تاریخ بر اساس خروجی سرور (متناسب با تقویم کاربر).
-          formatter: (item) => item.documentDateDisplay ?? '-',
+          // نمایش تاریخ بر اساس تقویم انتخاب‌شده‌ی کاربر در UI (نه متن برگشتی سرور).
+          formatter: (item) =>
+              HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
 
         // سال مالی

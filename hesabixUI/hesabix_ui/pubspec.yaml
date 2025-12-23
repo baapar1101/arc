@@ -57,6 +57,8 @@ dependencies:
   fl_chart: ^1.1.1
   web: ^1.1.1
   qr_flutter: ^4.1.0
+  flutter_sound: ^9.2.13
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

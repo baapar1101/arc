@@ -74,6 +74,7 @@ from .ai_usage_log import AIUsageLog, PaymentMethod  # noqa: F401
 from .ai_chat_session import AIChatSession  # noqa: F401
 from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
 from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401
+from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
 # Activity Log models
 from .activity_log import ActivityLog  # noqa: F401
 # Workflow models

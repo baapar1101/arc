@@ -67,7 +67,7 @@ class MoadianClient:
 
     def send_invoice(self, invoice_dto: InvoiceDto) -> Dict[str, Any]:
         """
-        ارسال فاکتور به سامانه مودیان
+        ارسال فاکتور به سامانه مودیان (با استفاده از packet-based approach مطابق SDK PHP)
         
         Args:
             invoice_dto: DTO فاکتور آماده شده
@@ -87,45 +87,60 @@ class MoadianClient:
         # تبدیل DTO به دیکشنری
         payload = invoice_dto.to_dict()
         
-        # امضای دیجیتال payload
-        signed_payload = self._sign_payload(payload)
-        
-        client = self._get_http_client()
-        
+        # استفاده از packet-based approach مطابق SDK PHP
         try:
-            response = client.post(
-                "/api/self-tsp/sync/SEND_INVOICE",
-                json={"body": [signed_payload]},
-                timeout=self.config.timeout_seconds,
-                headers=self._get_auth_headers(),
+            response_data = self._send_sync_packet(
+                packet_type="SEND_INVOICE",
+                packet_data={"body": [payload]},
+                fiscal_id=self.tax_memory_id or "",
+                authorization_required=True,
             )
-            response.raise_for_status()
-            data = response.json()
+            
+            # استخراج داده از پاسخ packet-based
+            result_data = self._extract_packet_result_data(response_data)
             
             # پردازش پاسخ
-            api_response = MoadianApiResponse.from_dict(data)
-            
-            if not api_response.success:
-                error_msg = extract_moadian_error_message(api_response.error or {})
-                raise ApiError(
-                    "TAX_SUBMISSION_FAILED",
-                    error_msg,
-                    http_status=400,
-                    details={"raw_response": data},
-                )
-            
-            # استخراج نتیجه
-            result = api_response.result or {}
-            first_result = result.get('result', [{}])[0] if isinstance(result.get('result'), list) else {}
+            if isinstance(result_data, dict):
+                # بررسی وجود errors در پاسخ
+                if result_data.get("errors"):
+                    error_msg = extract_moadian_error_message(result_data.get("errors", [{}])[0] if isinstance(result_data.get("errors"), list) else result_data.get("errors", {}))
+                    raise ApiError(
+                        "TAX_SUBMISSION_FAILED",
+                        error_msg,
+                        http_status=400,
+                        details={"raw_response": response_data},
+                    )
+                
+                # استخراج نتیجه موفق
+                result_list = result_data.get('result', [])
+                if isinstance(result_list, list) and result_list:
+                    first_result = result_list[0] if isinstance(result_list[0], dict) else {}
+                else:
+                    first_result = result_data.get('result', {}) if isinstance(result_data.get('result'), dict) else {}
+            else:
+                # اگر result_data dict نبود، از response_data مستقیماً استفاده می‌کنیم
+                api_response = MoadianApiResponse.from_dict(response_data)
+                if not api_response.success:
+                    error_msg = extract_moadian_error_message(api_response.error or {})
+                    raise ApiError(
+                        "TAX_SUBMISSION_FAILED",
+                        error_msg,
+                        http_status=400,
+                        details={"raw_response": response_data},
+                    )
+                result = api_response.result or {}
+                first_result = result.get('result', [{}])[0] if isinstance(result.get('result'), list) else {}
             
             return {
                 "mode": "live",
-                "tracking_code": first_result.get('referenceNumber') or first_result.get('uid'),
+                "tracking_code": first_result.get('referenceNumber') or first_result.get('uid') or first_result.get('reference_number'),
                 "uid": first_result.get('uid'),
                 "status": "sent",
-                "raw_response": data,
+                "raw_response": response_data,
                 "sent_at": datetime.utcnow().isoformat(),
             }
+        except ApiError:
+            raise
         except httpx.HTTPError as exc:
             raise ApiError(
                 "TAX_NETWORK_ERROR",
@@ -133,10 +148,17 @@ class MoadianClient:
                 http_status=502,
                 details={"message": str(exc)},
             ) from exc
+        except Exception as exc:
+            raise ApiError(
+                "TAX_SUBMISSION_FAILED",
+                f"خطا در ارسال فاکتور: {str(exc)}",
+                http_status=500,
+                details={"error": str(exc)},
+            ) from exc
 
     def inquire_status(self, tracking_codes: List[str]) -> Dict[str, Any]:
         """
-        استعلام وضعیت فاکتورها از سامانه
+        استعلام وضعیت فاکتورها از سامانه (با استفاده از packet-based approach و parallel requests)
         
         Args:
             tracking_codes: لیست کدهای رهگیری
@@ -170,56 +192,131 @@ class MoadianClient:
         # اطمینان از احراز هویت
         self._ensure_authenticated()
         
-        client = self._get_http_client()
-        aggregated: List[Dict[str, Any]] = []
+        # استفاده از parallel requests برای بهبود کارایی
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
         
-        for code in tracking_codes:
+        aggregated: List[Dict[str, Any]] = []
+        lock = threading.Lock()
+        
+        def inquire_single_code(code: str) -> Dict[str, Any]:
+            """استعلام وضعیت یک کد رهگیری"""
             try:
-                # ساخت payload استعلام
-                inquiry_payload = {
-                    "referenceNumber": [code]
-                }
-                
-                # امضای payload
-                signed_payload = self._sign_payload(inquiry_payload)
-                
-                response = client.post(
-                    "/api/self-tsp/sync/INQUIRY_BY_REFERENCE_NUMBER",
-                    json={"body": [signed_payload]},
-                    timeout=self.config.timeout_seconds,
-                    headers=self._get_auth_headers(),
+                # استفاده از packet-based approach
+                response_data = self._send_sync_packet(
+                    packet_type="INQUIRY_BY_REFERENCE_NUMBER",
+                    packet_data={"referenceNumber": [code]},
+                    fiscal_id=self.tax_memory_id or "",
+                    authorization_required=True,
                 )
-                response.raise_for_status()
-                data = response.json()
                 
-                api_response = MoadianApiResponse.from_dict(data)
+                # استخراج داده از پاسخ
+                result_data = self._extract_packet_result_data(response_data)
                 
-                if api_response.success and api_response.result:
-                    result_data = api_response.result.get('result', [{}])[0] if isinstance(api_response.result.get('result'), list) else {}
-                    aggregated.append({
-                        "reference_number": code,
-                        "status": result_data.get('status', 'unknown'),
-                        "uid": result_data.get('uid'),
-                        "confirmation_date": result_data.get('confirmationDate'),
-                        "inquiry_at": datetime.utcnow().isoformat(),
-                        "raw_data": result_data,
-                    })
+                if isinstance(result_data, dict):
+                    # بررسی وجود errors
+                    if result_data.get("errors"):
+                        error_msg = extract_moadian_error_message(result_data.get("errors", [{}])[0] if isinstance(result_data.get("errors"), list) else result_data.get("errors", {}))
+                        return {
+                            "reference_number": code,
+                            "status": "failed",
+                            "error_message": error_msg,
+                            "inquiry_at": datetime.utcnow().isoformat(),
+                        }
+                    else:
+                        # استخراج نتیجه موفق
+                        result_list = result_data.get('result', [])
+                        if isinstance(result_list, list) and result_list:
+                            first_result = result_list[0] if isinstance(result_list[0], dict) else {}
+                        else:
+                            first_result = result_data.get('result', {}) if isinstance(result_data.get('result'), dict) else {}
+                        
+                        return {
+                            "reference_number": code,
+                            "status": first_result.get('status', 'unknown'),
+                            "uid": first_result.get('uid'),
+                            "confirmation_date": first_result.get('confirmationDate') or first_result.get('confirmation_date'),
+                            "inquiry_at": datetime.utcnow().isoformat(),
+                            "raw_data": first_result,
+                        }
                 else:
-                    error_msg = extract_moadian_error_message(api_response.error or {})
-                    aggregated.append({
-                        "reference_number": code,
-                        "status": "failed",
-                        "error_message": error_msg,
-                        "inquiry_at": datetime.utcnow().isoformat(),
-                    })
+                    # Fallback به روش قدیمی
+                    api_response = MoadianApiResponse.from_dict(response_data)
+                    if api_response.success and api_response.result:
+                        result_data = api_response.result.get('result', [{}])[0] if isinstance(api_response.result.get('result'), list) else {}
+                        return {
+                            "reference_number": code,
+                            "status": result_data.get('status', 'unknown'),
+                            "uid": result_data.get('uid'),
+                            "confirmation_date": result_data.get('confirmationDate'),
+                            "inquiry_at": datetime.utcnow().isoformat(),
+                            "raw_data": result_data,
+                        }
+                    else:
+                        error_msg = extract_moadian_error_message(api_response.error or {})
+                        return {
+                            "reference_number": code,
+                            "status": "failed",
+                            "error_message": error_msg,
+                            "inquiry_at": datetime.utcnow().isoformat(),
+                        }
                     
+            except ApiError as e:
+                return {
+                    "reference_number": code,
+                    "status": "failed",
+                    "error_message": str(e),
+                    "inquiry_at": datetime.utcnow().isoformat(),
+                }
             except httpx.HTTPError as exc:
-                aggregated.append({
+                return {
                     "reference_number": code,
                     "status": "failed",
                     "error_message": f"خطا در ارتباط: {str(exc)}",
                     "inquiry_at": datetime.utcnow().isoformat(),
-                })
+                }
+            except Exception as exc:
+                return {
+                    "reference_number": code,
+                    "status": "failed",
+                    "error_message": f"خطای نامشخص: {str(exc)}",
+                    "inquiry_at": datetime.utcnow().isoformat(),
+                }
+        
+        # استفاده از ThreadPoolExecutor برای parallel requests
+        max_workers = min(len(tracking_codes), 5)  # حداکثر 5 thread همزمان
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # ارسال تمام درخواست‌ها
+            future_to_code = {
+                executor.submit(inquire_single_code, code): code 
+                for code in tracking_codes
+            }
+            
+            # جمع‌آوری نتایج
+            for future in as_completed(future_to_code):
+                code = future_to_code[future]
+                try:
+                    result = future.result()
+                    with lock:
+                        aggregated.append(result)
+                except Exception as exc:
+                    with lock:
+                        aggregated.append({
+                            "reference_number": code,
+                            "status": "failed",
+                            "error_message": f"خطا در پردازش: {str(exc)}",
+                            "inquiry_at": datetime.utcnow().isoformat(),
+                        })
+        
+        # مرتب‌سازی نتایج بر اساس ترتیب tracking_codes
+        code_to_result = {r["reference_number"]: r for r in aggregated}
+        aggregated = [code_to_result.get(code, {
+            "reference_number": code,
+            "status": "failed",
+            "error_message": "نتیجه یافت نشد",
+            "inquiry_at": datetime.utcnow().isoformat(),
+        }) for code in tracking_codes]
 
         return {
             "mode": "live",
@@ -334,6 +431,18 @@ class MoadianClient:
             if not expiry or expiry <= now:
                 expiry = now + timedelta(hours=24)
             self._token_expiry = expiry
+            
+            # ذخیره در cache
+            from app.core.cache import get_cache
+            cache = get_cache()
+            if cache.enabled:
+                cache_key = f"tax_token:{self.tax_memory_id}"
+                ttl_seconds = int((expiry - now).total_seconds())
+                if ttl_seconds > 0:
+                    cache.set(cache_key, {
+                        'token': self._auth_token,
+                        'expiry': expiry.isoformat(),
+                    }, ttl=ttl_seconds)
 
             return self._auth_token
         except ApiError:
@@ -347,14 +456,48 @@ class MoadianClient:
             ) from exc
 
     def _ensure_authenticated(self) -> None:
-        """اطمینان از وجود token معتبر"""
-        # بررسی انقضای token
+        """اطمینان از وجود token معتبر (با استفاده از cache)"""
+        # بررسی cache برای token
+        cache_key = f"tax_token:{self.tax_memory_id}"
+        from app.core.cache import get_cache
+        cache = get_cache()
+        
+        # تلاش برای دریافت از cache
+        cached_token_data = cache.get(cache_key) if cache.enabled else None
+        if cached_token_data and isinstance(cached_token_data, dict):
+            token = cached_token_data.get('token')
+            expiry_str = cached_token_data.get('expiry')
+            if token and expiry_str:
+                try:
+                    expiry = datetime.fromisoformat(expiry_str)
+                    # بررسی انقضا با buffer time (5 دقیقه)
+                    buffer_time = timedelta(minutes=5)
+                    if datetime.utcnow() < (expiry - buffer_time):
+                        self._auth_token = token
+                        self._token_expiry = expiry
+                        return  # token از cache معتبر است
+                except (ValueError, TypeError):
+                    pass  # اگر expiry نامعتبر بود، ادامه می‌دهیم
+        
+        # بررسی token در memory (fallback)
         if self._auth_token and self._token_expiry:
-            if datetime.utcnow() < self._token_expiry:
+            # بررسی انقضا با buffer time (5 دقیقه)
+            buffer_time = timedelta(minutes=5)
+            if datetime.utcnow() < (self._token_expiry - buffer_time):
                 return  # token هنوز معتبر است
         
         # لاگین مجدد
-        self.login()
+        token = self.login()
+        expiry = self._token_expiry
+        
+        # ذخیره در cache
+        if cache.enabled and expiry:
+            ttl_seconds = int((expiry - datetime.utcnow()).total_seconds())
+            if ttl_seconds > 0:
+                cache.set(cache_key, {
+                    'token': token,
+                    'expiry': expiry.isoformat(),
+                }, ttl=ttl_seconds)
 
     # -----------------------------
     # Packet-based (SDK-compatible) transfer helpers

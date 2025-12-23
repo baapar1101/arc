@@ -20,9 +20,89 @@ from adapters.api.v1.schemas import (
     BusinessListResponse, BusinessSummaryResponse, PaginationInfo
 )
 from app.core.responses import format_datetime_fields, ApiError
-from app.services.document_monetization_service import apply_default_policies_to_business
+from app.services.system_settings_service import get_wallet_settings
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_wallet_currency_in_business(db: Session, business_id: int) -> bool:
+    """
+    بررسی و اضافه کردن ارز کیف پول به لیست ارزهای کسب و کار در صورت عدم وجود
+    
+    Args:
+        db: Database session
+        business_id: شناسه کسب‌وکار
+        
+    Returns:
+        True اگر ارز اضافه شد، False اگر قبلاً وجود داشت
+    """
+    from app.core.responses import ApiError
+    
+    # دریافت کسب و کار
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    
+    # دریافت ارز کیف پول
+    wallet_settings = get_wallet_settings(db)
+    wallet_currency_id = wallet_settings.get("wallet_base_currency_id")
+    
+    if not wallet_currency_id:
+        # اگر ارز کیف پول تنظیم نشده باشد، کاری نمی‌کنیم
+        logger.warning("wallet_currency_not_set", business_id=business_id)
+        return False
+    
+    wallet_currency_id = int(wallet_currency_id)
+    
+    # بررسی اینکه آیا ارز کیف پول همان ارز پیشفرض کسب و کار است
+    if business.default_currency_id == wallet_currency_id:
+        # ارز پیشفرض به صورت خودکار در لیست ارزها قرار دارد
+        return False
+    
+    # بررسی اینکه آیا ارز کیف پول در لیست ارزهای جانبی وجود دارد
+    existing = (
+        db.query(BusinessCurrency)
+        .filter(
+            and_(
+                BusinessCurrency.business_id == business_id,
+                BusinessCurrency.currency_id == wallet_currency_id
+            )
+        )
+        .first()
+    )
+    
+    if existing:
+        # ارز قبلاً اضافه شده است
+        return False
+    
+    # بررسی وجود ارز در سیستم
+    currency = db.query(Currency).filter(Currency.id == wallet_currency_id).first()
+    if not currency:
+        logger.warning("wallet_currency_not_found", business_id=business_id, currency_id=wallet_currency_id)
+        return False
+    
+    # اضافه کردن ارز کیف پول به لیست ارزهای جانبی
+    business_currency = BusinessCurrency(
+        business_id=business_id,
+        currency_id=wallet_currency_id
+    )
+    db.add(business_currency)
+    db.flush()
+    
+    # Invalidate cache
+    from app.core.cache import get_cache
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"business_currencies:{business_id}")
+    
+    logger.info(
+        "wallet_currency_added_to_business",
+        business_id=business_id,
+        currency_id=wallet_currency_id,
+        currency_code=currency.code
+    )
+    
+    return True
 
 
 def check_business_creation_permission(db: Session, user_id: int) -> tuple[bool, str | None]:
@@ -163,10 +243,20 @@ def create_business(db: Session, business_data: BusinessCreateRequest, owner_id:
             db.add(bc)
         db.commit()
 
+    # بررسی و اضافه کردن ارز کیف پول در صورت نیاز
+    # اگر ارز پیشفرض کسب و کار با ارز کیف پول متفاوت باشد، ارز کیف پول را به ارزهای جانبی اضافه می‌کنیم
+    try:
+        ensure_wallet_currency_in_business(db, created_business.id)
+    except Exception as e:
+        # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
+        logger.warning("failed_to_add_wallet_currency", business_id=created_business.id, error=str(e))
+
     db.refresh(created_business)
 
     # اعمال خودکار سیاست‌های پیش‌فرض درآمدزایی اسناد
     try:
+        # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
+        from app.services.document_monetization_service import apply_default_policies_to_business
         apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
     except Exception as e:
         # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
@@ -367,6 +457,9 @@ def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any], i
 
 def update_business(db: Session, business_id: int, business_data: BusinessUpdateRequest, owner_id: int) -> Optional[Dict[str, Any]]:
     """ویرایش کسب و کار"""
+    from app.core.responses import ApiError
+    from adapters.db.models.currency import Currency, BusinessCurrency
+    
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
     
@@ -375,6 +468,46 @@ def update_business(db: Session, business_id: int, business_data: BusinessUpdate
     
     # به‌روزرسانی فیلدها
     update_data = business_data.dict(exclude_unset=True)
+    
+    # مدیریت ارز پیش‌فرض
+    if "default_currency_id" in update_data:
+        new_default_currency_id = update_data.pop("default_currency_id")
+        
+        # بررسی اینکه آیا کسب‌وکار قبلاً ارز پیش‌فرض تنظیم کرده است
+        if business.default_currency_id is not None:
+            raise ApiError(
+                "CANNOT_CHANGE_DEFAULT_CURRENCY",
+                "کسب‌وکار شما قبلاً ارز پیش‌فرض تنظیم کرده است و امکان تغییر آن وجود ندارد",
+                http_status=400
+            )
+        
+        # بررسی وجود ارز
+        if new_default_currency_id is not None:
+            currency = db.query(Currency).filter(Currency.id == int(new_default_currency_id)).first()
+            if not currency:
+                raise ApiError("CURRENCY_NOT_FOUND", "ارز یافت نشد", http_status=404)
+            
+            # تنظیم ارز پیش‌فرض
+            business.default_currency_id = int(new_default_currency_id)
+            
+            # اضافه کردن به business_currencies اگر وجود نداشته باشد
+            existing_bc = (
+                db.query(BusinessCurrency)
+                .filter(
+                    and_(
+                        BusinessCurrency.business_id == business_id,
+                        BusinessCurrency.currency_id == int(new_default_currency_id)
+                    )
+                )
+                .first()
+            )
+            
+            if not existing_bc:
+                bc = BusinessCurrency(business_id=business_id, currency_id=int(new_default_currency_id))
+                db.add(bc)
+                db.flush()
+    
+    # به‌روزرسانی سایر فیلدها
     for field, value in update_data.items():
         setattr(business, field, value)
     
@@ -382,6 +515,181 @@ def update_business(db: Session, business_id: int, business_data: BusinessUpdate
     updated_business = business_repo.update(business)
     
     return _business_to_dict(updated_business)
+
+
+def check_currency_usage_in_documents(db: Session, business_id: int, currency_id: int) -> int:
+    """
+    بررسی تعداد اسناد استفاده‌کننده از یک ارز در کسب‌وکار
+    
+    Args:
+        db: Database session
+        business_id: شناسه کسب‌وکار
+        currency_id: شناسه ارز
+        
+    Returns:
+        تعداد اسناد استفاده‌کننده از این ارز
+    """
+    from sqlalchemy import func
+    
+    count = (
+        db.query(func.count(Document.id))
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.currency_id == currency_id
+            )
+        )
+        .scalar()
+    )
+    return count or 0
+
+
+def add_business_currency(db: Session, business_id: int, currency_id: int, owner_id: int) -> Dict[str, Any]:
+    """
+    اضافه کردن ارز جانبی به کسب‌وکار
+    
+    Args:
+        db: Database session
+        business_id: شناسه کسب‌وکار
+        currency_id: شناسه ارز
+        owner_id: شناسه مالک کسب‌وکار
+        
+    Returns:
+        اطلاعات ارز اضافه شده
+        
+    Raises:
+        ApiError: در صورت خطا
+    """
+    from app.core.responses import ApiError
+    
+    # بررسی وجود کسب‌وکار و مالکیت
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise ApiError("NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    
+    if business.owner_id != owner_id:
+        raise ApiError("FORBIDDEN", "شما دسترسی به این کسب‌وکار را ندارید", http_status=403)
+    
+    # بررسی وجود ارز
+    currency = db.query(Currency).filter(Currency.id == currency_id).first()
+    if not currency:
+        raise ApiError("NOT_FOUND", "ارز یافت نشد", http_status=404)
+    
+    # بررسی اینکه ارز پیش‌فرض نیست
+    if business.default_currency_id == currency_id:
+        raise ApiError(
+            "CANNOT_ADD_DEFAULT_AS_SECONDARY",
+            "ارز پیش‌فرض به صورت خودکار در لیست ارزها قرار دارد",
+            http_status=400
+        )
+    
+    # بررسی تکراری نبودن
+    existing = (
+        db.query(BusinessCurrency)
+        .filter(
+            and_(
+                BusinessCurrency.business_id == business_id,
+                BusinessCurrency.currency_id == currency_id
+            )
+        )
+        .first()
+    )
+    
+    if existing:
+        raise ApiError(
+            "CURRENCY_ALREADY_ADDED",
+            "این ارز قبلاً به کسب‌وکار اضافه شده است",
+            http_status=400
+        )
+    
+    # اضافه کردن ارز
+    business_currency = BusinessCurrency(
+        business_id=business_id,
+        currency_id=currency_id
+    )
+    db.add(business_currency)
+    db.commit()
+    db.refresh(business_currency)
+    
+    # Invalidate cache
+    from app.core.cache import get_cache
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"business_currencies:{business_id}")
+    
+    return {
+        "id": currency.id,
+        "name": currency.name,
+        "title": currency.title,
+        "symbol": currency.symbol,
+        "code": currency.code,
+        "is_default": False,
+    }
+
+
+def remove_business_currency(db: Session, business_id: int, currency_id: int, owner_id: int) -> None:
+    """
+    حذف ارز جانبی از کسب‌وکار
+    
+    Args:
+        db: Database session
+        business_id: شناسه کسب‌وکار
+        currency_id: شناسه ارز
+        owner_id: شناسه مالک کسب‌وکار
+        
+    Raises:
+        ApiError: در صورت خطا
+    """
+    from app.core.responses import ApiError
+    
+    # بررسی وجود کسب‌وکار و مالکیت
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise ApiError("NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    
+    if business.owner_id != owner_id:
+        raise ApiError("FORBIDDEN", "شما دسترسی به این کسب‌وکار را ندارید", http_status=403)
+    
+    # بررسی اینکه ارز پیش‌فرض نیست
+    if business.default_currency_id == currency_id:
+        raise ApiError(
+            "CANNOT_DELETE_DEFAULT_CURRENCY",
+            "ارز پیش‌فرض قابل حذف نیست",
+            http_status=400
+        )
+    
+    # بررسی استفاده در اسناد
+    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
+    if document_count > 0:
+        raise ApiError(
+            "CURRENCY_IN_USE",
+            f"این ارز در {document_count} سند حسابداری استفاده شده و قابل حذف نیست",
+            http_status=400
+        )
+    
+    # حذف ارز
+    business_currency = (
+        db.query(BusinessCurrency)
+        .filter(
+            and_(
+                BusinessCurrency.business_id == business_id,
+                BusinessCurrency.currency_id == currency_id
+            )
+        )
+        .first()
+    )
+    
+    if not business_currency:
+        raise ApiError("NOT_FOUND", "این ارز در لیست ارزهای کسب‌وکار یافت نشد", http_status=404)
+    
+    db.delete(business_currency)
+    db.commit()
+    
+    # Invalidate cache
+    from app.core.cache import get_cache
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"business_currencies:{business_id}")
 
 
 def delete_business(db: Session, business_id: int, owner_id: int) -> bool:

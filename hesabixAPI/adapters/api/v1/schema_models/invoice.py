@@ -148,6 +148,16 @@ class InvoiceResponse(BaseModel):
     created_at: Optional[str]
     updated_at: Optional[str]
     
+    # فیلدهای سود (اختیاری - فقط در صورت فعال بودن محاسبه سود)
+    gross_profit: Optional[Decimal] = Field(None, description="سود ناخالص فاکتور")
+    gross_profit_percent: Optional[Decimal] = Field(None, description="درصد سود ناخالص")
+    net_profit: Optional[Decimal] = Field(None, description="سود خالص فاکتور")
+    net_profit_percent: Optional[Decimal] = Field(None, description="درصد سود خالص")
+    total_profit: Optional[Decimal] = Field(None, description="سود کل فاکتور (ناخالص یا خالص بر اساس تنظیمات)")
+    total_profit_percent: Optional[Decimal] = Field(None, description="درصد سود کل")
+    total_overhead: Optional[Decimal] = Field(None, description="هزینه‌های سربار")
+    line_profits: Optional[List[Dict[str, Any]]] = Field(None, description="سود هر ردیف")
+    
     class Config:
         json_schema_extra = {
             "example": {

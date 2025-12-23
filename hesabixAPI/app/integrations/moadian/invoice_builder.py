@@ -162,9 +162,20 @@ class InvoiceBuilder:
             # کد مالیاتی کالا (13 رقم)
             tax_code = tax_snapshot.get('tax_code', '').strip()
             if not tax_code:
-                # اگر کد مالیاتی نداشت، از یک کد پیش‌فرض استفاده می‌کنیم
-                # TODO: باید خطا بدهد یا از جدول استاندارد پیدا کند
-                tax_code = '0000000000000'
+                # اگر کد مالیاتی نداشت، خطا می‌دهیم
+                product_name = line.get('product_name', 'محصول')
+                line_number = product_lines.index(line) + 1
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "PRODUCT_TAX_CODE_MISSING",
+                    f"کالای '{product_name}' (ردیف {line_number}) فاقد کد مالیاتی است. لطفاً کد مالیاتی را در اطلاعات کالا وارد کنید.",
+                    http_status=400,
+                    details={
+                        "product_id": line.get('product_id'),
+                        "product_name": product_name,
+                        "line_number": line_number,
+                    }
+                )
             
             # شرح کالا
             product_name = line.get('product_name', 'محصول')

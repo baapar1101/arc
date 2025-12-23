@@ -407,7 +407,7 @@ class BusinessCreateRequest(BaseModel):
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
 	fiscal_years: Optional[List["FiscalYearCreate"]] = Field(default=None, description="آرایه سال‌های مالی برای ایجاد اولیه")
-	default_currency_id: Optional[int] = Field(default=None, description="شناسه ارز پیشفرض")
+	default_currency_id: int = Field(..., description="شناسه ارز پیشفرض (الزامی)")
 	currency_ids: Optional[List[int]] = Field(default=None, description="لیست شناسه ارزهای قابل استفاده")
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
@@ -428,9 +428,17 @@ class BusinessUpdateRequest(BaseModel):
 	province: Optional[str] = Field(default=None, max_length=100, description="استان")
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
+	default_currency_id: Optional[int] = Field(default=None, description="شناسه ارز پیشفرض (فقط برای کسب‌وکارهایی که ارز پیش‌فرض ندارند)")
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: Optional[bool] = Field(default=None, description="بررسی اعتبار مشتریان به صورت پیشفرض")
+	# تنظیمات محاسبه سود فاکتور
+	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور: automatic, manual, disabled")
+	invoice_profit_calculation_basis: Optional[str] = Field(default=None, description="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, standard_cost, actual_cost")
+	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
+	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
+	invoice_profit_overhead_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد هزینه‌های سربار (0-100) - فقط برای custom_percent")
+	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود: gross (ناخالص), net (خالص), both (هر دو)")
 
 
 class BusinessResponse(BaseModel):
@@ -454,6 +462,13 @@ class BusinessResponse(BaseModel):
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: bool = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض")
+	# تنظیمات محاسبه سود فاکتور
+	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور")
+	invoice_profit_calculation_basis: Optional[str] = Field(default=None, description="مبنای محاسبه سود")
+	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ می‌شود")
+	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار")
+	invoice_profit_overhead_percent: Optional[float] = Field(default=None, description="درصد هزینه‌های سربار")
+	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود")
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
 	default_currency: Optional[dict] = Field(default=None, description="ارز پیشفرض")

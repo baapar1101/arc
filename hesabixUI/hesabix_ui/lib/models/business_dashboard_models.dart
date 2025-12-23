@@ -201,8 +201,13 @@ class CurrencyLite {
   });
 
   factory CurrencyLite.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    // اگر id null یا 0 باشد، یک object معتبر نیست
+    if (id == null || (id is num && id <= 0)) {
+      throw ArgumentError('Invalid currency id: $id');
+    }
     return CurrencyLite(
-      id: json['id'] as int,
+      id: id is int ? id : (id as num).toInt(),
       code: json['code'] as String? ?? '',
       title: json['title'] as String? ?? '',
       symbol: json['symbol'] as String? ?? '',
@@ -276,9 +281,7 @@ class BusinessWithPermission {
       isOwner: json['is_owner'] ?? false,
       role: json['role'] ?? 'عضو',
       permissions: Map<String, dynamic>.from(json['permissions'] ?? {}),
-      defaultCurrency: json['default_currency'] != null
-          ? CurrencyLite.fromJson(Map<String, dynamic>.from(json['default_currency']))
-          : null,
+      defaultCurrency: _parseDefaultCurrency(json['default_currency']),
       currencies: (json['currencies'] as List<dynamic>? ?? const [])
           .map((c) => CurrencyLite.fromJson(Map<String, dynamic>.from(c)))
           .toList(),
@@ -287,6 +290,26 @@ class BusinessWithPermission {
       isDeleted: (json['is_deleted'] as bool?) ?? false,
       isDeletionPending: (json['is_deletion_pending'] as bool?) ?? false,
     );
+  }
+
+  /// Parse default currency with validation
+  static CurrencyLite? _parseDefaultCurrency(dynamic defaultCurrencyJson) {
+    if (defaultCurrencyJson == null) return null;
+    
+    try {
+      final currencyMap = Map<String, dynamic>.from(defaultCurrencyJson as Map);
+      final id = currencyMap['id'];
+      
+      // اگر id null یا 0 یا منفی باشد، ارز معتبر نیست
+      if (id == null || (id is num && id <= 0)) {
+        return null;
+      }
+      
+      return CurrencyLite.fromJson(currencyMap);
+    } catch (e) {
+      // در صورت خطا در parse کردن، null برگردان
+      return null;
+    }
   }
 }
 

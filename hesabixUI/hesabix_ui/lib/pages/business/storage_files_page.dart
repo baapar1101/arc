@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -26,18 +27,34 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   late final ApiClient _apiClient;
   late final BusinessStorageService _storageService;
   late final TabController _tabController;
+  late final ScrollController _scrollController;
+  late final TextEditingController _searchController;
+  
   bool _loading = true;
+  bool _loadingMore = false;
   String? _error;
   List<Map<String, dynamic>> _files = const <Map<String, dynamic>>[];
   Map<String, dynamic>? _usageInfo;
   String? _selectedModuleContext;
+  String? _searchQuery;
+  String _sortBy = 'created_at'; // created_at, file_size, original_name
+  bool _sortAscending = false;
   bool _uploading = false;
+  
+  // Pagination
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalCount = 0;
+  bool _hasMore = true;
   
   List<Map<String, dynamic>> _activeSubscriptions = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _availablePlans = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _invoices = const <Map<String, dynamic>>[];
   bool _loadingPlans = false;
   bool _loadingInvoices = false;
+  
+  // Selection for bulk operations
+  Set<String> _selectedFileIds = {};
 
   @override
   void initState() {
@@ -45,6 +62,9 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     _apiClient = ApiClient();
     _storageService = BusinessStorageService(_apiClient);
     _tabController = TabController(length: 3, vsync: this);
+    _scrollController = ScrollController();
+    _searchController = TextEditingController();
+    
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         if (_tabController.index == 1 && _availablePlans.isEmpty) {
@@ -54,31 +74,92 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         }
       }
     });
+    
+    _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
+    
     _load();
   }
   
   @override
   void dispose() {
     _tabController.dispose();
+    _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
+  
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    final delta = 200.0; // فاصله از انتها برای بارگذاری
+    
+    if (currentScroll >= (maxScroll - delta)) {
+      if (!_loadingMore && _hasMore && _tabController.index == 0) {
+        _loadMore();
+      }
+    }
+  }
+  
+  void _onSearchChanged() {
+    final query = _searchController.text.trim();
+    if (query != _searchQuery) {
+      _searchQuery = query.isEmpty ? null : query;
+      _load();
+    }
+  }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _currentPage = 1;
+        _files = [];
+        _selectedFileIds.clear();
+      });
+    }
+    
     try {
       final usageInfo = await _storageService.getUsageInfo(widget.businessId);
       final subscriptions = await _storageService.getActiveSubscriptions(widget.businessId);
-      final files = await _storageService.listFiles(
+      
+      final result = await _storageService.listFilesWithPagination(
         businessId: widget.businessId,
+        page: _currentPage,
+        limit: 50,
         moduleContext: _selectedModuleContext,
       );
+      
+      List<Map<String, dynamic>> files = (result['items'] as List?)
+              ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [];
+      
+      // Apply search filter
+      if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+        files = files.where((file) {
+          final name = (file['original_name'] ?? '').toString().toLowerCase();
+          return name.contains(_searchQuery!.toLowerCase());
+        }).toList();
+      }
+      
+      // Apply sorting
+      files = _sortFiles(files);
+      
+      final pagination = result['pagination'] as Map<String, dynamic>? ?? {};
+      final totalCount = (pagination['total_count'] as num?)?.toInt() ?? 0;
+      final totalPages = (pagination['total_pages'] as num?)?.toInt() ?? 1;
+      
       setState(() {
         _usageInfo = usageInfo;
         _activeSubscriptions = subscriptions;
         _files = files;
+        _totalCount = totalCount;
+        _totalPages = totalPages;
+        _hasMore = _currentPage < totalPages;
         _loading = false;
       });
     } catch (e) {
@@ -87,6 +168,85 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         _loading = false;
       });
     }
+  }
+  
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    
+    setState(() => _loadingMore = true);
+    
+    try {
+      _currentPage++;
+      final result = await _storageService.listFilesWithPagination(
+        businessId: widget.businessId,
+        page: _currentPage,
+        limit: 50,
+        moduleContext: _selectedModuleContext,
+      );
+      
+      List<Map<String, dynamic>> newFiles = (result['items'] as List?)
+              ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [];
+      
+      // Apply search filter
+      if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+        newFiles = newFiles.where((file) {
+          final name = (file['original_name'] ?? '').toString().toLowerCase();
+          return name.contains(_searchQuery!.toLowerCase());
+        }).toList();
+      }
+      
+      // Apply sorting
+      newFiles = _sortFiles(newFiles);
+      
+      final pagination = result['pagination'] as Map<String, dynamic>? ?? {};
+      final totalPages = (pagination['total_pages'] as num?)?.toInt() ?? 1;
+      
+      setState(() {
+        _files = [..._files, ...newFiles];
+        _totalPages = totalPages;
+        _hasMore = _currentPage < totalPages;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      setState(() {
+        _currentPage--;
+        _loadingMore = false;
+      });
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری بیشتر: $e');
+      }
+    }
+  }
+  
+  List<Map<String, dynamic>> _sortFiles(List<Map<String, dynamic>> files) {
+    files.sort((a, b) {
+      int comparison = 0;
+      
+      switch (_sortBy) {
+        case 'original_name':
+          final nameA = (a['original_name'] ?? '').toString().toLowerCase();
+          final nameB = (b['original_name'] ?? '').toString().toLowerCase();
+          comparison = nameA.compareTo(nameB);
+          break;
+        case 'file_size':
+          final sizeA = (a['file_size'] as num?)?.toInt() ?? 0;
+          final sizeB = (b['file_size'] as num?)?.toInt() ?? 0;
+          comparison = sizeA.compareTo(sizeB);
+          break;
+        case 'created_at':
+        default:
+          final dateA = a['created_at'] as String? ?? '';
+          final dateB = b['created_at'] as String? ?? '';
+          comparison = dateA.compareTo(dateB);
+          break;
+      }
+      
+      return _sortAscending ? comparison : -comparison;
+    });
+    
+    return files;
   }
   
   Future<void> _loadPlans() async {
@@ -515,6 +675,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
       appBar: AppBar(
@@ -527,6 +688,18 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
           onPressed: () => context.go('/business/${widget.businessId}/dashboard'),
         ),
         actions: [
+          if (isMobile && _tabController.index == 0)
+            IconButton(
+              onPressed: _uploading ? null : _uploadFile,
+              icon: _uploading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.cloud_upload_rounded),
+              tooltip: 'آپلود فایل',
+            ),
           IconButton(
             onPressed: _load,
             icon: const Icon(Icons.refresh),
@@ -543,7 +716,10 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                     children: [
                       Icon(Icons.error_outline, size: 64, color: Colors.red),
                       const SizedBox(height: 16),
-                      Text(_error!, textAlign: TextAlign.center),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(_error!, textAlign: TextAlign.center),
+                      ),
                       const SizedBox(height: 16),
                       FilledButton(
                         onPressed: _load,
@@ -552,36 +728,15 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                     ],
                   ),
                 )
-              : Column(
+              : TabBarView(
+                  controller: _tabController,
                   children: [
-                    // Header با اطلاعات استفاده
-                    _buildHeader(theme),
-                    // تب‌ها
-                    Container(
-                      color: theme.colorScheme.surface,
-                      child: TabBar(
-                        controller: _tabController,
-                        tabs: const [
-                          Tab(icon: Icon(Icons.folder), text: 'فایل‌ها'),
-                          Tab(icon: Icon(Icons.storage), text: 'پلن‌ها'),
-                          Tab(icon: Icon(Icons.receipt), text: 'صورتحساب‌ها'),
-                        ],
-                      ),
-                    ),
-                    // محتوای تب‌ها
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildFilesTab(theme),
-                          _buildPlansTab(theme),
-                          _buildInvoicesTab(theme),
-                        ],
-                      ),
-                    ),
+                    _buildFilesTab(theme),
+                    _buildPlansTab(theme),
+                    _buildInvoicesTab(theme),
                   ],
                 ),
-      floatingActionButton: _tabController.index == 0
+      floatingActionButton: !isMobile && _tabController.index == 0
           ? FloatingActionButton.extended(
               onPressed: _uploading ? null : _uploadFile,
               icon: _uploading
@@ -610,7 +765,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, {required bool isMobile}) {
     if (_usageInfo == null) return const SizedBox.shrink();
     
     final totalLimit = (_usageInfo!['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
@@ -620,20 +775,16 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     // رنگ‌های بهبود یافته بر اساس درصد استفاده
     Color progressColor;
-    Color progressBgColor;
     IconData statusIcon;
     
     if (usagePercent > 90) {
-      progressColor = const Color(0xFFEF5350); // Red 400
-      progressBgColor = const Color(0xFFFFCDD2); // Red 100
+      progressColor = const Color(0xFFEF5350);
       statusIcon = Icons.warning_rounded;
     } else if (usagePercent > 70) {
-      progressColor = const Color(0xFFFF9800); // Orange 500
-      progressBgColor = const Color(0xFFFFE0B2); // Orange 100
+      progressColor = const Color(0xFFFF9800);
       statusIcon = Icons.info_rounded;
     } else {
-      progressColor = const Color(0xFF66BB6A); // Green 400
-      progressBgColor = const Color(0xFFC8E6C9); // Green 100
+      progressColor = const Color(0xFF66BB6A);
       statusIcon = Icons.check_circle_rounded;
     }
 
@@ -650,102 +801,66 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 8 : 12),
         child: Column(
           children: [
             Row(
               children: [
-                // آیکون اصلی با container زیبا
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.cloud_circle_rounded,
-                    color: theme.colorScheme.onPrimary,
-                    size: 32,
-                  ),
+                Icon(
+                  Icons.cloud_circle_rounded,
+                  color: theme.colorScheme.onPrimary,
+                  size: isMobile ? 20 : 24,
                 ),
-                const SizedBox(width: 20),
-                // اطلاعات استفاده
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'فضای ذخیره‌سازی',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
+                        '${currentUsage.toStringAsFixed(1)} / ${totalLimit.toStringAsFixed(1)} GB',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            currentUsage.toStringAsFixed(2),
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              color: theme.colorScheme.onPrimary,
-                              fontWeight: FontWeight.w700,
-                              height: 1,
-                            ),
-                          ),
-                          Text(
-                            ' / ${totalLimit.toStringAsFixed(2)} GB',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '${usagePercent.toStringAsFixed(0)}% استفاده شده',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                // درصد استفاده با badge زیبا
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 10 : 12,
+                    vertical: isMobile ? 6 : 8,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.onPrimary,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        statusIcon,
-                        color: progressColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
+                      Icon(statusIcon, color: progressColor, size: isMobile ? 14 : 16),
+                      const SizedBox(width: 6),
                       Text(
                         '${usagePercent.toStringAsFixed(0)}%',
-                        style: theme.textTheme.titleLarge?.copyWith(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w700,
+                          fontSize: isMobile ? 12 : 14,
                         ),
                       ),
                     ],
@@ -753,73 +868,66 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            // Progress bar بهبود یافته
+            const SizedBox(height: 8),
             Stack(
               children: [
                 Container(
-                  height: 12,
+                  height: isMobile ? 6 : 8,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.onPrimary.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
                 FractionallySizedBox(
                   widthFactor: usagePercent / 100,
                   child: Container(
-                    height: 12,
+                    height: isMobile ? 6 : 8,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          progressColor,
-                          progressColor.withValues(alpha: 0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                      boxShadow: [
-                        BoxShadow(
-                          color: progressColor.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      color: progressColor,
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            // اطلاعات تکمیلی
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildHeaderInfoChip(
-                  theme,
-                  Icons.check_circle_outline_rounded,
-                  'موجود',
-                  '${available.toStringAsFixed(2)} GB',
-                ),
-                if (_activeSubscriptions.isNotEmpty)
+            if (!isMobile) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   _buildHeaderInfoChip(
                     theme,
-                    Icons.workspace_premium_rounded,
-                    'اشتراک فعال',
-                    '${_activeSubscriptions.length}',
+                    Icons.check_circle_outline_rounded,
+                    'موجود',
+                    '${available.toStringAsFixed(1)} GB',
+                    isMobile: false,
                   ),
-              ],
-            ),
+                  if (_activeSubscriptions.isNotEmpty)
+                    _buildHeaderInfoChip(
+                      theme,
+                      Icons.workspace_premium_rounded,
+                      'اشتراک',
+                      '${_activeSubscriptions.length}',
+                      isMobile: false,
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderInfoChip(ThemeData theme, IconData icon, String label, String value) {
+  Widget _buildHeaderInfoChip(ThemeData theme, IconData icon, String label, String value, {bool isMobile = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 10,
+        vertical: isMobile ? 6 : 6,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.onPrimary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
         ),
@@ -827,7 +935,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: theme.colorScheme.onPrimary, size: 18),
+          Icon(icon, color: theme.colorScheme.onPrimary, size: isMobile ? 14 : 16),
           const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -837,14 +945,15 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
-                  fontSize: 10,
+                  fontSize: isMobile ? 9 : 10,
                 ),
               ),
               Text(
                 value,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onPrimary,
                   fontWeight: FontWeight.bold,
+                  fontSize: isMobile ? 11 : 12,
                 ),
               ),
             ],
@@ -855,19 +964,46 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   }
 
   Widget _buildFilesTab(ThemeData theme) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      controller: _scrollController,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Header با اطلاعات استفاده (compact)
+          _buildHeader(theme, isMobile: isMobile),
+          // تب‌ها
+          Container(
+            color: theme.colorScheme.surface,
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: isMobile,
+              tabs: [
+                Tab(
+                  icon: const Icon(Icons.folder),
+                  text: isMobile ? null : 'فایل‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.storage),
+                  text: isMobile ? null : 'پلن‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.receipt),
+                  text: isMobile ? null : 'صورتحساب‌ها',
+                ),
+              ],
+            ),
+          ),
           // فیلترها و actions با طراحی بهبود یافته
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(isMobile ? 12 : 20),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                ),
               ),
               boxShadow: [
                 BoxShadow(
@@ -880,344 +1016,575 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.filter_list_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
+              // Bulk actions
+              if (_selectedFileIds.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'فیلتر و عملیات',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: theme.colorScheme.primary,
+                        size: 20,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    // Dropdown filter
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
-                      child: DropdownButtonFormField<String?>(
-                        value: _selectedModuleContext,
-                        decoration: InputDecoration(
-                          labelText: 'فیلتر بر اساس بخش',
-                          prefixIcon: Icon(
-                            Icons.category_rounded,
-                            color: theme.colorScheme.primary,
-                            size: 20,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          isDense: true,
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_selectedFileIds.length} فایل انتخاب شده',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
                         ),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('همه بخش‌ها')),
-                          DropdownMenuItem(value: 'accounting', child: Text('حسابداری')),
-                          DropdownMenuItem(value: 'tickets', child: Text('تیکت‌ها')),
-                          DropdownMenuItem(value: 'business_logo', child: Text('لوگو کسب‌وکار')),
-                        ],
-                        onChanged: (v) {
-                          setState(() => _selectedModuleContext = v);
-                          _load();
-                        },
                       ),
-                    ),
-                    // دکمه دانلود
-                    OutlinedButton.icon(
-                      onPressed: _downloadZip,
-                      icon: const Icon(Icons.download_rounded, size: 20),
-                      label: const Text('دانلود ZIP'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-                        shape: RoundedRectangleBorder(
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _downloadSelectedFiles,
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('دانلود'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: _deleteSelectedFiles,
+                        icon: const Icon(Icons.delete_rounded, size: 18),
+                        label: const Text('حذف'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _selectedFileIds.clear()),
+                        tooltip: 'لغو انتخاب',
+                      ),
+                    ],
+                  ),
+                ),
+              // Search bar
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'جستجو در فایل‌ها...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchQuery != null
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Filters and actions
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // Dropdown filter
+                  SizedBox(
+                    width: isMobile ? double.infinity : 200,
+                    child: DropdownButtonFormField<String?>(
+                      value: _selectedModuleContext,
+                      decoration: InputDecoration(
+                        labelText: 'بخش',
+                        prefixIcon: Icon(
+                          Icons.category_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('همه بخش‌ها')),
+                        DropdownMenuItem(value: 'accounting', child: Text('حسابداری')),
+                        DropdownMenuItem(value: 'tickets', child: Text('تیکت‌ها')),
+                        DropdownMenuItem(value: 'business_logo', child: Text('لوگو کسب‌وکار')),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _selectedModuleContext = v);
+                        _load();
+                      },
+                    ),
+                  ),
+                  // Sort dropdown
+                  SizedBox(
+                    width: isMobile ? double.infinity : 180,
+                    child: DropdownButtonFormField<String>(
+                      value: _sortBy,
+                      decoration: InputDecoration(
+                        labelText: 'مرتب‌سازی',
+                        prefixIcon: Icon(
+                          Icons.sort_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'created_at', child: Text('تاریخ ایجاد')),
+                        DropdownMenuItem(value: 'original_name', child: Text('نام فایل')),
+                        DropdownMenuItem(value: 'file_size', child: Text('حجم فایل')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() => _sortBy = v);
+                          _load();
+                        }
+                      },
+                    ),
+                  ),
+                  // Sort direction
+                  IconButton(
+                    icon: Icon(
+                      _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                    ),
+                    onPressed: () {
+                      setState(() => _sortAscending = !_sortAscending);
+                      _load();
+                    },
+                    tooltip: _sortAscending ? 'صعودی' : 'نزولی',
+                  ),
+                  // Select all
+                  IconButton(
+                    icon: Icon(
+                      _selectedFileIds.length == _files.length && _files.isNotEmpty
+                          ? Icons.deselect
+                          : Icons.select_all,
+                    ),
+                    onPressed: _selectAllFiles,
+                    tooltip: 'انتخاب همه',
+                  ),
+                  // دکمه دانلود ZIP
+                  if (!isMobile)
+                    OutlinedButton.icon(
+                      onPressed: _downloadZip,
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('دانلود ZIP'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
-                    // دکمه فایل منیجر
+                  // دکمه فایل منیجر
+                  if (!isMobile)
                     FilledButton.icon(
                       onPressed: () {
                         context.go('/business/${widget.businessId}/storage-files/file-manager');
                       },
-                      icon: const Icon(Icons.folder_open_rounded, size: 20),
+                      icon: const Icon(Icons.folder_open_rounded, size: 18),
                       label: const Text('فایل منیجر'),
                       style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
-                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        // لیست فایل‌ها
+        if (_files.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(64),
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.cloud_upload_rounded,
+                    size: 64,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'هیچ فایلی یافت نشد',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'برای شروع، اولین فایل خود را آپلود کنید',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: _uploadFile,
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: const Text('آپلود فایل'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    side: BorderSide(color: theme.colorScheme.primary, width: 2),
+                  ),
                 ),
               ],
             ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: isMobile
+                ? _buildMobileFileList(theme)
+                : _buildDesktopFileGrid(theme),
           ),
-          const SizedBox(height: 16),
-          // لیست فایل‌ها با طراحی card-based
-          if (_files.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(64),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                  width: 2,
-                  style: BorderStyle.solid,
-                ),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.cloud_upload_rounded,
-                        size: 64,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'هیچ فایلی یافت نشد',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'برای شروع، اولین فایل خود را آپلود کنید',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: _uploadFile,
-                      icon: const Icon(Icons.add_circle_outline_rounded),
-                      label: const Text('آپلود فایل'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        side: BorderSide(color: theme.colorScheme.primary, width: 2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 350,
-                childAspectRatio: 1.4,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: _files.length,
-              itemBuilder: (context, index) {
-                final file = _files[index];
-                final mimeType = file['mime_type'] ?? '';
-                final isImage = mimeType.startsWith('image/');
-                final fileName = file['original_name'] ?? '-';
-                final fileSize = file['file_size'] ?? 0;
-                final moduleContext = file['module_context'] ?? '-';
-                
-                // رنگ بر اساس نوع فایل
-                Color fileColor;
-                IconData fileIcon = _getFileIcon(mimeType);
-                
-                if (isImage) {
-                  fileColor = const Color(0xFF42A5F5); // Blue
-                } else if (mimeType.contains('pdf')) {
-                  fileColor = const Color(0xFFEF5350); // Red
-                } else if (mimeType.contains('word') || mimeType.contains('document')) {
-                  fileColor = const Color(0xFF42A5F5); // Blue
-                } else if (mimeType.contains('excel') || mimeType.contains('spreadsheet')) {
-                  fileColor = const Color(0xFF66BB6A); // Green
-                } else if (mimeType.startsWith('video/')) {
-                  fileColor = const Color(0xFF9C27B0); // Purple
-                } else {
-                  fileColor = const Color(0xFF78909C); // Blue Grey
-                }
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // هدر فایل با آیکون
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                fileColor.withValues(alpha: 0.15),
-                                fileColor.withValues(alpha: 0.05),
-                              ],
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: fileColor.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: fileColor.withValues(alpha: 0.3),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Icon(
-                                  fileIcon,
-                                  color: fileColor,
-                                  size: 32,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                fileName,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                        // اطلاعات فایل
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.data_usage_rounded,
-                                          size: 16,
-                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            _formatFileSize(fileSize),
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.category_rounded,
-                                          size: 16,
-                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            moduleContext,
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                // دکمه حذف
-                                OutlinedButton.icon(
-                                  onPressed: () => _deleteFile(file),
-                                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                                  label: const Text('حذف'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFEF5350),
-                                    side: BorderSide(
-                                      color: const Color(0xFFEF5350).withValues(alpha: 0.5),
-                                    ),
-                                    minimumSize: const Size(double.infinity, 36),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          // Loading indicator برای infinite scroll
+          if (_loadingMore)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
     );
   }
 
+  Widget _buildMobileFileList(ThemeData theme) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(12),
+      itemCount: _files.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildFileCard(theme, _files[index], isMobile: true),
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktopFileGrid(ThemeData theme) {
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 1200 ? 4 : width > 800 ? 3 : 2;
+    
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: _files.length,
+      itemBuilder: (context, index) {
+        return _buildFileCard(theme, _files[index], isMobile: false);
+      },
+    );
+  }
+
+  Widget _buildFileCard(ThemeData theme, Map<String, dynamic> file, {required bool isMobile}) {
+    final fileId = file['id'] as String;
+    final mimeType = (file['mime_type'] ?? '').toString();
+    final isImage = mimeType.startsWith('image/');
+    final fileName = file['original_name'] ?? '-';
+    final fileSize = file['file_size'] ?? 0;
+    final moduleContext = file['module_context'] ?? '-';
+    final createdAt = file['created_at'] as String?;
+    final isSelected = _selectedFileIds.contains(fileId);
+    
+    // رنگ بر اساس نوع فایل
+    Color fileColor;
+    IconData fileIcon = _getFileIcon(mimeType);
+    
+    if (isImage) {
+      fileColor = const Color(0xFF42A5F5);
+    } else if (mimeType.contains('pdf')) {
+      fileColor = const Color(0xFFEF5350);
+    } else if (mimeType.contains('word') || mimeType.contains('document')) {
+      fileColor = const Color(0xFF42A5F5);
+    } else if (mimeType.contains('excel') || mimeType.contains('spreadsheet')) {
+      fileColor = const Color(0xFF66BB6A);
+    } else if (mimeType.startsWith('video/')) {
+      fileColor = const Color(0xFF9C27B0);
+    } else {
+      fileColor = const Color(0xFF78909C);
+    }
+
+    return GestureDetector(
+      onLongPress: () => _toggleFileSelection(fileId),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withValues(alpha: 0.2),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // هدر فایل
+              Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          fileColor.withValues(alpha: 0.15),
+                          fileColor.withValues(alpha: 0.05),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        // Checkbox
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Checkbox(
+                              value: isSelected,
+                              onChanged: (v) => _toggleFileSelection(fileId),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: fileColor.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: fileColor.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            fileIcon,
+                            color: fileColor,
+                            size: isMobile ? 24 : 32,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          fileName,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          maxLines: isMobile ? 1 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // اطلاعات فایل
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildFileInfoRow(
+                            theme,
+                            Icons.data_usage_rounded,
+                            _formatFileSize(fileSize),
+                          ),
+                          const SizedBox(height: 6),
+                          _buildFileInfoRow(
+                            theme,
+                            Icons.category_rounded,
+                            moduleContext,
+                          ),
+                          if (createdAt != null) ...[
+                            const SizedBox(height: 6),
+                            _buildFileInfoRow(
+                              theme,
+                              Icons.calendar_today_rounded,
+                              _formatDate(createdAt),
+                            ),
+                          ],
+                        ],
+                      ),
+                      // دکمه‌های عملیات
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          if (isImage || mimeType.contains('pdf'))
+                            IconButton(
+                              icon: const Icon(Icons.preview_rounded, size: 18),
+                              onPressed: () => _previewFile(file),
+                              tooltip: 'پیش‌نمایش',
+                              color: theme.colorScheme.primary,
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.download_rounded, size: 18),
+                            onPressed: () => _downloadFile(file),
+                            tooltip: 'دانلود',
+                            color: theme.colorScheme.primary,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                            onPressed: () => _deleteFile(file),
+                            tooltip: 'حذف',
+                            color: const Color(0xFFEF5350),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileInfoRow(ThemeData theme, IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return '-';
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      if (difference.inDays == 0) {
+        if (difference.inHours == 0) {
+          if (difference.inMinutes == 0) {
+            return 'همین الان';
+          }
+          return '${difference.inMinutes} دقیقه پیش';
+        }
+        return '${difference.inHours} ساعت پیش';
+      } else if (difference.inDays == 1) {
+        return 'دیروز';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} روز پیش';
+      } else {
+        return '${date.year}/${date.month}/${date.day}';
+      }
+    } catch (e) {
+      return dateString;
+    }
+  }
+
   Widget _buildPlansTab(ThemeData theme) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    
     if (_loadingPlans) {
       return const Center(child: CircularProgressIndicator());
     }
     
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_availablePlans.isEmpty)
+          _buildHeader(theme, isMobile: isMobile),
+          Container(
+            color: theme.colorScheme.surface,
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: isMobile,
+              tabs: [
+                Tab(
+                  icon: const Icon(Icons.folder),
+                  text: isMobile ? null : 'فایل‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.storage),
+                  text: isMobile ? null : 'پلن‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.receipt),
+                  text: isMobile ? null : 'صورتحساب‌ها',
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_availablePlans.isEmpty)
             Container(
               padding: const EdgeInsets.all(64),
               decoration: BoxDecoration(
@@ -1649,21 +2016,52 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                 ),
               );
             }),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
   
   Widget _buildInvoicesTab(ThemeData theme) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    
     if (_loadingInvoices) {
       return const Center(child: CircularProgressIndicator());
     }
     
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildHeader(theme, isMobile: isMobile),
+          Container(
+            color: theme.colorScheme.surface,
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: isMobile,
+              tabs: [
+                Tab(
+                  icon: const Icon(Icons.folder),
+                  text: isMobile ? null : 'فایل‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.storage),
+                  text: isMobile ? null : 'پلن‌ها',
+                ),
+                Tab(
+                  icon: const Icon(Icons.receipt),
+                  text: isMobile ? null : 'صورتحساب‌ها',
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           if (_invoices.isEmpty)
             Container(
               padding: const EdgeInsets.all(64),
@@ -1994,6 +2392,9 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                 ),
               );
             }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -2126,5 +2527,272 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         ],
       ),
     );
+  }
+
+  Future<void> _downloadFile(Map<String, dynamic> file) async {
+    try {
+      if (mounted) {
+        SnackBarHelper.show(context, message: 'در حال دانلود فایل...');
+      }
+
+      final fileBytes = await _storageService.downloadFile(
+        businessId: widget.businessId,
+        fileId: file['id'] as String,
+      );
+
+      if (kIsWeb) {
+        final fileName = file['original_name'] ?? 'file';
+        await web_utils.saveBytesAsFileWeb(
+          fileBytes,
+          fileName,
+          mimeType: file['mime_type'] ?? 'application/octet-stream',
+        );
+      } else {
+        // برای موبایل باید از path_provider استفاده شود
+        if (mounted) {
+          SnackBarHelper.showError(context, message: 'دانلود در موبایل در حال توسعه است');
+        }
+      }
+
+      if (mounted) {
+        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت دانلود شد');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
+      }
+    }
+  }
+
+  Future<void> _previewFile(Map<String, dynamic> file) async {
+    final mimeType = (file['mime_type'] ?? '').toString();
+    final isImage = mimeType.startsWith('image/');
+    final isPdf = mimeType.contains('pdf');
+
+    if (!isImage && !isPdf) {
+      if (mounted) {
+        SnackBarHelper.show(context, message: 'پیش‌نمایش برای این نوع فایل در دسترس نیست');
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            file['original_name'] ?? 'پیش‌نمایش',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Content
+                  Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.7,
+                      ),
+                      child: isImage
+                          ? FutureBuilder<List<int>>(
+                              future: _storageService.downloadFile(
+                                businessId: widget.businessId,
+                                fileId: file['id'] as String,
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator());
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: Text('خطا: ${snapshot.error}'),
+                                  );
+                                }
+                                if (snapshot.hasData) {
+                                  return InteractiveViewer(
+                                    child: Image.memory(
+                                      Uint8List.fromList(snapshot.data!),
+                                      fit: BoxFit.contain,
+                                    ),
+                                  );
+                                }
+                                return const Center(child: Text('فایل یافت نشد'));
+                              },
+                            )
+                          : Center(
+                              child: Text(
+                                'پیش‌نمایش PDF در حال توسعه است',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteSelectedFiles() async {
+    if (_selectedFileIds.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف فایل‌های انتخاب شده'),
+        content: Text(
+          'آیا از حذف ${_selectedFileIds.length} فایل اطمینان دارید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    int successCount = 0;
+    int failCount = 0;
+
+    for (final fileId in _selectedFileIds) {
+      try {
+        await _storageService.deleteFile(
+          businessId: widget.businessId,
+          fileId: fileId,
+        );
+        successCount++;
+      } catch (e) {
+        failCount++;
+      }
+    }
+
+    if (mounted) {
+      _selectedFileIds.clear();
+      _load();
+      if (failCount == 0) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: '$successCount فایل با موفقیت حذف شد',
+        );
+      } else {
+        SnackBarHelper.showError(
+          context,
+          message: '$successCount فایل حذف شد، $failCount فایل خطا داشت',
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadSelectedFiles() async {
+    if (_selectedFileIds.isEmpty) return;
+
+    if (mounted) {
+      SnackBarHelper.show(context, message: 'در حال دانلود ${_selectedFileIds.length} فایل...');
+    }
+
+    int successCount = 0;
+    int failCount = 0;
+
+    for (final fileId in _selectedFileIds) {
+      try {
+        final file = _files.firstWhere((f) => f['id'] == fileId);
+        final fileBytes = await _storageService.downloadFile(
+          businessId: widget.businessId,
+          fileId: fileId,
+        );
+
+        if (kIsWeb) {
+          final fileName = file['original_name'] ?? 'file';
+          await web_utils.saveBytesAsFileWeb(
+            fileBytes,
+            fileName,
+            mimeType: file['mime_type'] ?? 'application/octet-stream',
+          );
+        }
+        successCount++;
+      } catch (e) {
+        failCount++;
+      }
+    }
+
+    if (mounted) {
+      if (failCount == 0) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: '$successCount فایل با موفقیت دانلود شد',
+        );
+      } else {
+        SnackBarHelper.showError(
+          context,
+          message: '$successCount فایل دانلود شد، $failCount فایل خطا داشت',
+        );
+      }
+    }
+  }
+
+  void _toggleFileSelection(String fileId) {
+    setState(() {
+      if (_selectedFileIds.contains(fileId)) {
+        _selectedFileIds.remove(fileId);
+      } else {
+        _selectedFileIds.add(fileId);
+      }
+    });
+  }
+
+  void _selectAllFiles() {
+    setState(() {
+      if (_selectedFileIds.length == _files.length) {
+        _selectedFileIds.clear();
+      } else {
+        _selectedFileIds = _files.map((f) => f['id'] as String).toSet();
+      }
+    });
   }
 }

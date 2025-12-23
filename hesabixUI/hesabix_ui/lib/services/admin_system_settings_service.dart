@@ -43,6 +43,29 @@ class AdminSystemSettingsService {
     final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/system-settings/redis/test');
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
+
+  Future<Map<String, dynamic>> getNotificationSmsPricing() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/system-settings/notification-sms-pricing');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> setNotificationSmsPricing({
+    double? pricePerSms,
+    Map<String, double>? eventTypePrices,
+  }) async {
+    final data = <String, dynamic>{};
+    if (pricePerSms != null) {
+      data['price_per_sms'] = pricePerSms;
+    }
+    if (eventTypePrices != null) {
+      data['event_type_prices'] = eventTypePrices;
+    }
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/notification-sms-pricing',
+      data: data,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
 }
 
 

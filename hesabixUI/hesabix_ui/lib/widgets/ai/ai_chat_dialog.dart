@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// دیالوگی برای دسترسی سریع به چت هوش مصنوعی از هر صفحه
@@ -55,6 +56,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _historyCollapsed = true;
   Map<String, dynamic>? _availabilityInfo;
   bool _showCreditWarning = false;
+  bool _voiceCollectData = false;
+  VoiceChatController? _voice;
+  bool _voiceStarting = false;
+  bool _voiceRecording = false;
+  int? _lastVoiceInteractionId;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
 
@@ -70,7 +76,103 @@ class _AIChatDialogState extends State<AIChatDialog> {
   void dispose() {
     _messageCtrl.dispose();
     _scrollController.dispose();
+    _voice?.dispose();
     super.dispose();
+  }
+
+  Future<void> _stopVoiceSession() async {
+    if (_voice == null) return;
+    setState(() {
+      _voiceStarting = true;
+      _voiceRecording = false;
+    });
+    try {
+      await _voice!.dispose();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _voice = null;
+      _voiceStarting = false;
+    });
+  }
+
+  Future<void> _promptVoiceFeedback(int interactionId) async {
+    if (_lastVoiceInteractionId == interactionId) return;
+    _lastVoiceInteractionId = interactionId;
+
+    int rating = 4;
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('کیفیت صدای AI'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.'),
+                  const SizedBox(height: 12),
+                  StatefulBuilder(
+                    builder: (context, setLocal) => Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (i) {
+                        final star = i + 1;
+                        final selected = star <= rating;
+                        return IconButton(
+                          tooltip: '$star',
+                          onPressed: () => setLocal(() => rating = star),
+                          icon: Icon(
+                            selected ? Icons.star : Icons.star_border,
+                            color: selected ? Colors.amber : null,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  TextField(
+                    controller: ctrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'نظر (اختیاری)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('بعداً'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('ثبت'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!ok) {
+      ctrl.dispose();
+      return;
+    }
+
+    try {
+      await _aiService.submitVoiceFeedback(
+        interactionId: interactionId,
+        rating: rating,
+        feedbackText: ctrl.text,
+      );
+      if (!mounted) return;
+      _showSnackbar('بازخورد ثبت شد');
+    } catch (e) {
+      if (!mounted) return;
+      _showError('خطا در ثبت بازخورد: $e');
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _loadSessions() async {
@@ -286,6 +388,112 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _streamingTimestamp = null;
       });
       _showError('ارسال پیام ناموفق بود: $e');
+    }
+  }
+
+  Future<void> _toggleVoice() async {
+    if (_currentSession == null) return;
+    if (_voiceStarting) return;
+
+    // اگر voice فعال است، فقط ضبط را toggle کن
+    if (_voice != null) {
+      try {
+        if (_voiceRecording) {
+          await _voice!.stopRecording();
+          if (!mounted) return;
+          setState(() => _voiceRecording = false);
+        } else {
+          await _voice!.startRecording();
+          if (!mounted) return;
+          setState(() => _voiceRecording = true);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        _showError('خطا در کنترل ضبط: $e');
+      }
+      return;
+    }
+
+    // Start voice
+    setState(() => _voiceStarting = true);
+    final controller = VoiceChatController(
+      sessionId: _currentSession!.id!,
+      collectDataOptIn: _voiceCollectData,
+      onEvent: (event) {
+        final type = event['type'] as String?;
+        if (type == 'transcript_final') {
+          final text = (event['text'] as String?)?.trim() ?? '';
+          if (text.isEmpty) return;
+          final userMsg = AIChatMessage(
+            sessionId: _currentSession!.id!,
+            role: MessageRole.user,
+            content: text,
+            createdAt: DateTime.now(),
+          );
+          setState(() {
+            _messages = List<AIChatMessage>.from(_messages)..add(userMsg);
+          });
+          _scrollToBottom();
+          return;
+        }
+        if (type == 'assistant_text_delta') {
+          final delta = event['text'] as String? ?? '';
+          if (delta.isEmpty) return;
+          setState(() {
+            _streamingContent = (_streamingContent ?? '') + delta;
+            _streamingTimestamp ??= DateTime.now();
+          });
+          _scrollToBottom();
+          return;
+        }
+        if (type == 'assistant_done') {
+          final text = (event['text'] as String?) ?? '';
+          final usage = event['usage'] as Map<String, dynamic>?;
+          final interactionId = event['interaction_id'] as int?;
+          setState(() {
+            if (text.trim().isNotEmpty) {
+              _messages = List<AIChatMessage>.from(_messages)
+                ..add(
+                  AIChatMessage(
+                    sessionId: _currentSession!.id!,
+                    role: MessageRole.assistant,
+                    content: text,
+                    tokensUsed: usage?['total_tokens'] as int? ?? 0,
+                    createdAt: _streamingTimestamp ?? DateTime.now(),
+                  ),
+                );
+            }
+            _streamingContent = null;
+            _streamingTimestamp = null;
+          });
+          _scrollToBottom();
+          if (interactionId != null) {
+            _promptVoiceFeedback(interactionId);
+          }
+          return;
+        }
+      },
+      onError: (msg) {
+        if (!mounted) return;
+        _showError(msg);
+      },
+    );
+
+    try {
+      await controller.start();
+      if (!mounted) return;
+      setState(() {
+        _voice = controller;
+        _voiceStarting = false;
+      });
+      // شروع ضبط بلافاصله
+      await _voice!.startRecording();
+      if (!mounted) return;
+      setState(() => _voiceRecording = true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _voiceStarting = false);
+      _showError('خطا در شروع مکالمه صوتی: $e');
     }
   }
 
@@ -620,6 +828,23 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 ),
                                 child: Row(
                                   children: [
+                                    Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Switch(
+                                              value: _voiceCollectData,
+                                              onChanged: (v) => setState(() => _voiceCollectData = v),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Text('بهبود کیفیت صدا'),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: TextField(
                                         controller: _messageCtrl,
@@ -638,6 +863,30 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
+                                    IconButton(
+                                      tooltip: _voice == null
+                                          ? 'شروع مکالمه صوتی'
+                                          : (_voiceRecording ? 'توقف ضبط' : 'شروع ضبط'),
+                                      onPressed: _voiceStarting ? null : _toggleVoice,
+                                      icon: _voiceStarting
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : Icon(
+                                              _voice == null
+                                                  ? Icons.mic
+                                                  : (_voiceRecording ? Icons.mic_off : Icons.mic_none),
+                                            ),
+                                    ),
+                                    if (_voice != null) ...[
+                                      IconButton(
+                                        tooltip: 'پایان مکالمه صوتی',
+                                        onPressed: _voiceStarting ? null : _stopVoiceSession,
+                                        icon: const Icon(Icons.call_end),
+                                      ),
+                                    ],
                                     FilledButton.icon(
                                       onPressed: _sending ? null : _sendMessage,
                                       icon: _sending

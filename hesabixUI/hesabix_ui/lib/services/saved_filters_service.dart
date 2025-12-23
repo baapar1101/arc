@@ -3,13 +3,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
 
 class SavedFiltersService {
-  static const String _keyPrefix = 'operator_tickets_saved_filters_';
+  static const String _operatorKeyPrefix = 'operator_tickets_saved_filters_';
+  static const String _userKeyPrefix = 'user_tickets_saved_filters_';
 
   /// Get all saved filters for operator tickets
-  static Future<List<SavedFilter>> getSavedFilters() async {
+  static Future<List<SavedFilter>> getSavedFilters({bool isOperator = true}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = '${_keyPrefix}list';
+      final keyPrefix = isOperator ? _operatorKeyPrefix : _userKeyPrefix;
+      final key = '${keyPrefix}list';
       final jsonString = prefs.getString(key);
 
       if (jsonString == null) return [];
@@ -22,9 +24,9 @@ class SavedFiltersService {
   }
 
   /// Save a filter
-  static Future<void> saveFilter(SavedFilter filter) async {
+  static Future<void> saveFilter(SavedFilter filter, {bool isOperator = true}) async {
     try {
-      final filters = await getSavedFilters();
+      final filters = await getSavedFilters(isOperator: isOperator);
       
       // Check if filter with same name exists, replace it
       final index = filters.indexWhere((f) => f.name == filter.name);
@@ -35,7 +37,8 @@ class SavedFiltersService {
       }
 
       final prefs = await SharedPreferences.getInstance();
-      final key = '${_keyPrefix}list';
+      final keyPrefix = isOperator ? _operatorKeyPrefix : _userKeyPrefix;
+      final key = '${keyPrefix}list';
       final jsonString = jsonEncode(filters.map((f) => f.toJson()).toList());
       await prefs.setString(key, jsonString);
     } catch (e) {
@@ -44,13 +47,14 @@ class SavedFiltersService {
   }
 
   /// Delete a saved filter
-  static Future<void> deleteFilter(String filterName) async {
+  static Future<void> deleteFilter(String filterName, {bool isOperator = true}) async {
     try {
-      final filters = await getSavedFilters();
+      final filters = await getSavedFilters(isOperator: isOperator);
       filters.removeWhere((f) => f.name == filterName);
 
       final prefs = await SharedPreferences.getInstance();
-      final key = '${_keyPrefix}list';
+      final keyPrefix = isOperator ? _operatorKeyPrefix : _userKeyPrefix;
+      final key = '${keyPrefix}list';
       if (filters.isEmpty) {
         await prefs.remove(key);
       } else {

@@ -97,6 +97,37 @@ class Settings(BaseSettings):
 	# Query Timeout
 	query_timeout_seconds: int = 60  # Timeout برای query های طولانی (60 ثانیه)
 
+	# =========================
+	# Voice AI (STT/TTS/VAD)
+	# =========================
+	voice_enabled: bool = True
+	voice_sample_rate_hz: int = 16000
+	voice_frame_ms: int = 20
+	voice_vad_mode: int = 2
+	voice_vad_silence_ms: int = 650
+	voice_vad_min_speech_ms: int = 250
+	voice_vad_pre_roll_ms: int = 200
+	voice_vad_max_utterance_ms: int = 30_000
+
+	# STT (Whisper)
+	voice_stt_language: str = "fa"
+	voice_stt_model_size_or_path: str = "small"
+	voice_stt_device: str = "auto"
+	voice_stt_compute_type: str = "int8"
+
+	# TTS (متن‌باز)
+	# engine: "coqui" | "dummy"
+	voice_tts_engine: str = "dummy"
+	voice_tts_language: str = "fa"
+	voice_tts_model_name: str | None = None
+	voice_tts_model_path: str | None = None
+	voice_tts_output_sample_rate_hz: int = 16000
+	voice_tts_frame_ms: int = 20
+
+	# Data collection (اختیاری، برای بهبود کیفیت در آینده)
+	voice_data_collection_enabled: bool = False
+	voice_data_collection_dir: str = "/var/lib/hesabix/voice-data"
+
 	@property
 	def mysql_dsn(self) -> str:
 		return (

@@ -485,57 +485,73 @@ def list_files_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	"""لیست فایل‌های کسب‌وکار"""
-	# بررسی دسترسی به کسب‌وکار
-	if not ctx.can_access_business(business_id):
-		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
-	
-	from sqlalchemy import and_
-	
-	# ساخت فیلترها
-	filters = [
-		FileStorage.business_id == business_id,
-		FileStorage.deleted_at.is_(None),
-	]
-	
-	if module_context:
-		filters.append(FileStorage.module_context == module_context)
-	
-	# فیلتر بر اساس context_id (برای دریافت فایل‌های یک سند خاص)
-	context_id_param = request.query_params.get("context_id")
-	if context_id_param:
-		filters.append(FileStorage.context_id == context_id_param)
-	
-	# محاسبه offset
-	offset = (page - 1) * limit
-	
-	# دریافت فایل‌ها
-	files_query = db.query(FileStorage).filter(and_(*filters))
-	total_count = files_query.count()
-	
-	files = files_query.order_by(FileStorage.created_at.desc()).offset(offset).limit(limit).all()
-	
-	# تبدیل به فرمت مناسب
-	files_data = []
-	for file in files:
-		files_data.append({
-			"id": str(file.id),
-			"original_name": file.original_name,
-			"file_size": file.file_size,
-			"mime_type": file.mime_type,
-			"module_context": file.module_context,
-			"context_id": file.context_id,
-			"created_at": file.created_at.isoformat() if file.created_at else None,
-		})
-	
-	return success_response({
-		"items": files_data,
-		"pagination": {
-			"page": page,
-			"limit": limit,
-			"total_count": total_count,
-			"total_pages": (total_count + limit - 1) // limit,
-		}
-	}, request)
+	try:
+		# بررسی دسترسی به کسب‌وکار
+		if not ctx.can_access_business(business_id):
+			raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+		
+		from sqlalchemy import and_
+		
+		# ساخت فیلترها
+		filters = [
+			FileStorage.business_id == business_id,
+			FileStorage.deleted_at.is_(None),
+		]
+		
+		if module_context:
+			filters.append(FileStorage.module_context == module_context)
+		
+		# فیلتر بر اساس context_id (برای دریافت فایل‌های یک سند خاص)
+		context_id_param = request.query_params.get("context_id")
+		if context_id_param:
+			filters.append(FileStorage.context_id == context_id_param)
+		
+		# محاسبه offset
+		offset = (page - 1) * limit
+		
+		# دریافت فایل‌ها
+		files_query = db.query(FileStorage).filter(and_(*filters))
+		total_count = files_query.count()
+		
+		files = files_query.order_by(FileStorage.created_at.desc()).offset(offset).limit(limit).all()
+		
+		# تبدیل به فرمت مناسب
+		files_data = []
+		for file in files:
+			try:
+				files_data.append({
+					"id": str(file.id) if file.id else None,
+					"original_name": file.original_name or "",
+					"file_size": file.file_size or 0,
+					"mime_type": file.mime_type or "application/octet-stream",
+					"module_context": file.module_context or "",
+					"context_id": str(file.context_id) if file.context_id else None,
+					"created_at": file.created_at.isoformat() if file.created_at else None,
+				})
+			except Exception as e:
+				# در صورت خطا در تبدیل یک فایل، آن را رد می‌کنیم و ادامه می‌دهیم
+				continue
+		
+		# محاسبه total_pages با محافظت در برابر تقسیم بر صفر
+		total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+		
+		return success_response({
+			"items": files_data,
+			"pagination": {
+				"page": page,
+				"limit": limit,
+				"total_count": total_count,
+				"total_pages": total_pages,
+			}
+		}, request)
+	except ApiError:
+		raise
+	except Exception as e:
+		raise ApiError(
+			"INTERNAL_ERROR",
+			f"خطا در دریافت لیست فایل‌ها: {str(e)}",
+			http_status=500
+		)
 
 
 @router.get(

@@ -245,6 +245,17 @@ class SettingsCategorizationService {
             order: 5,
             requiresSuperAdmin: true,
           ),
+          SettingsItem(
+            id: 'notification_sms_pricing',
+            title: 'قیمت‌گذاری پیامک ناتیفیکیشن',
+            description: 'تنظیم قیمت هر پیامک برای ناتیفیکیشن‌های کسب‌وکارها',
+            icon: Icons.price_check_outlined,
+            color: const Color(0xFF4CAF50),
+            route: '/user/profile/system-settings/notification-sms-pricing',
+            categoryId: 'communications',
+            order: 6,
+            requiresSuperAdmin: true,
+          ),
         ],
       ),
 

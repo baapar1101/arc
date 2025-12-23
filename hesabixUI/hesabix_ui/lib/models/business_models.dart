@@ -192,9 +192,14 @@ class BusinessData {
     return true;
   }
 
+  // بررسی اعتبار ارز پیش‌فرض (الزامی)
+  bool isCurrencyStepValid() {
+    return defaultCurrencyId != null;
+  }
+
   // بررسی اعتبار کل فرم
   bool isFormValid() {
-    return isStep1Valid() && isStep2Valid() && isStep3Valid() && isStep4Valid() && isFiscalStepValid();
+    return isStep1Valid() && isStep2Valid() && isStep3Valid() && isStep4Valid() && isFiscalStepValid() && isCurrencyStepValid();
   }
 
   // اعتبارسنجی شماره موبایل ایرانی
@@ -346,6 +351,14 @@ class BusinessResponse {
   final String? stampFileId;
   final double? defaultCreditLimit;
   final bool checkCreditEnabledByDefault;
+  // تنظیمات محاسبه سود فاکتور
+  final String? invoiceProfitCalculationMethod;
+  final String? invoiceProfitCalculationBasis;
+  final bool invoiceProfitIncludeOverhead;
+  final String? invoiceProfitOverheadType;
+  final double? invoiceProfitOverheadPercent;
+  final String? invoiceProfitCalculationType;
+  final Map<String, dynamic>? defaultCurrency;
   final DateTime createdAt;
   final DateTime updatedAt;
   // Soft Delete fields
@@ -375,6 +388,13 @@ class BusinessResponse {
     this.stampFileId,
     this.defaultCreditLimit,
     this.checkCreditEnabledByDefault = false,
+    this.invoiceProfitCalculationMethod,
+    this.invoiceProfitCalculationBasis,
+    this.invoiceProfitIncludeOverhead = false,
+    this.invoiceProfitOverheadType,
+    this.invoiceProfitOverheadPercent,
+    this.invoiceProfitCalculationType,
+    this.defaultCurrency,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -405,6 +425,13 @@ class BusinessResponse {
       stampFileId: json['stamp_file_id'],
       defaultCreditLimit: (json['default_credit_limit'] as num?)?.toDouble(),
       checkCreditEnabledByDefault: (json['check_credit_enabled_by_default'] as bool?) ?? false,
+      invoiceProfitCalculationMethod: json['invoice_profit_calculation_method'] as String?,
+      invoiceProfitCalculationBasis: json['invoice_profit_calculation_basis'] as String?,
+      invoiceProfitIncludeOverhead: (json['invoice_profit_include_overhead'] as bool?) ?? false,
+      invoiceProfitOverheadType: json['invoice_profit_overhead_type'] as String?,
+      invoiceProfitOverheadPercent: (json['invoice_profit_overhead_percent'] as num?)?.toDouble(),
+      invoiceProfitCalculationType: json['invoice_profit_calculation_type'] as String?,
+      defaultCurrency: json['default_currency'] != null ? Map<String, dynamic>.from(json['default_currency'] as Map) : null,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),
       deletedAt: json['deleted_at'] as String?,
