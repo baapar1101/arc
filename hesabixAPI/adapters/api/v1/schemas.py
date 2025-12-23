@@ -374,6 +374,165 @@ class UsersSummaryResponse(BaseModel):
 	active_percentage: float = Field(..., description="درصد کاربران فعال")
 
 
+# Bulk Operations Request Models
+class BulkActivateRequest(BaseModel):
+	"""درخواست فعال‌سازی دسته‌ای کاربران"""
+	user_ids: List[int] = Field(
+		..., 
+		min_items=1,
+		description="لیست شناسه‌های کاربران برای فعال‌سازی",
+		example=[1, 2, 3]
+	)
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"user_ids": [1, 2, 3, 4, 5]
+			}
+		}
+
+
+class BulkSuspendRequest(BaseModel):
+	"""درخواست تعلیق دسته‌ای کاربران"""
+	user_ids: List[int] = Field(
+		..., 
+		min_items=1,
+		description="لیست شناسه‌های کاربران برای تعلیق",
+		example=[1, 2, 3]
+	)
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"user_ids": [1, 2, 3, 4, 5]
+			}
+		}
+
+
+class BulkResetPasswordRequest(BaseModel):
+	"""درخواست بازنشانی رمز عبور دسته‌ای کاربران"""
+	user_ids: List[int] = Field(
+		..., 
+		min_items=1,
+		description="لیست شناسه‌های کاربران برای بازنشانی رمز عبور",
+		example=[1, 2, 3]
+	)
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"user_ids": [1, 2, 3, 4, 5]
+			}
+		}
+
+
+# User Detail Response Models
+class UserBusinessResponse(BaseModel):
+	"""اطلاعات کسب‌وکار کاربر"""
+	id: int = Field(..., description="شناسه کسب‌وکار")
+	name: str = Field(..., description="نام کسب‌وکار")
+	field: Optional[str] = Field(default=None, description="زمینه فعالیت")
+	role: str = Field(..., description="نقش کاربر در کسب‌وکار: owner, admin, operator, supervisor, user")
+	status: str = Field(..., description="وضعیت کسب‌وکار")
+	created_at: str = Field(..., description="تاریخ عضویت")
+
+
+class UserSessionResponse(BaseModel):
+	"""اطلاعات نشست کاربر"""
+	id: int = Field(..., description="شناسه نشست")
+	device: str = Field(..., description="نام دستگاه یا مرورگر")
+	ip: Optional[str] = Field(default=None, description="آدرس IP")
+	last_active_at: str = Field(..., description="آخرین زمان فعالیت")
+	created_at: str = Field(..., description="تاریخ ایجاد نشست")
+
+
+class UserAuditLogResponse(BaseModel):
+	"""اطلاعات لاگ فعالیت کاربر"""
+	id: int = Field(..., description="شناسه لاگ")
+	action: str = Field(..., description="نوع عملیات")
+	description: Optional[str] = Field(default=None, description="توضیحات")
+	category: Optional[str] = Field(default=None, description="دسته‌بندی")
+	entity_type: Optional[str] = Field(default=None, description="نوع موجودیت")
+	entity_id: Optional[int] = Field(default=None, description="شناسه موجودیت")
+	created_at: str = Field(..., description="تاریخ ایجاد")
+
+
+class UserDetailResponse(UserResponse):
+	"""اطلاعات کامل کاربر شامل کسب‌وکارها، نشست‌ها و لاگ‌ها"""
+	businesses: Optional[List[UserBusinessResponse]] = Field(
+		default=None, 
+		description="لیست کسب‌وکارهای کاربر"
+	)
+	sessions: Optional[List[UserSessionResponse]] = Field(
+		default=None, 
+		description="لیست نشست‌های فعال کاربر"
+	)
+	audit_logs: Optional[List[UserAuditLogResponse]] = Field(
+		default=None, 
+		description="آخرین فعالیت‌های کاربر (حداکثر 50 مورد)"
+	)
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"id": 1,
+				"email": "user@example.com",
+				"mobile": "09123456789",
+				"first_name": "احمد",
+				"last_name": "احمدی",
+				"is_active": True,
+				"referral_code": "ABC123",
+				"app_permissions": {"user_management": True},
+				"created_at": "2024-01-01T00:00:00Z",
+				"updated_at": "2024-01-01T00:00:00Z",
+				"signature_file_id": "550e8400-e29b-41d4-a716-446655440000",
+				"businesses": [
+					{
+						"id": 1,
+						"name": "شرکت نمونه",
+						"field": "بازرگانی",
+						"role": "owner",
+						"status": "active",
+						"created_at": "2024-01-01T00:00:00Z"
+					}
+				],
+				"sessions": [
+					{
+						"id": 1,
+						"device": "Chrome on Windows",
+						"ip": "192.168.1.1",
+						"last_active_at": "2024-01-15T10:30:00Z",
+						"created_at": "2024-01-01T00:00:00Z"
+					}
+				],
+				"audit_logs": [
+					{
+						"id": 1,
+						"action": "login",
+						"description": "ورود به سیستم",
+						"category": "authentication",
+						"entity_type": "user",
+						"entity_id": 1,
+						"created_at": "2024-01-15T10:30:00Z"
+					}
+				]
+			}
+		}
+
+
+# Bulk Operations Response Models
+class BulkOperationResponse(BaseModel):
+	"""پاسخ عملیات دسته‌ای"""
+	updated_count: int = Field(..., description="تعداد رکوردهای به‌روز شده")
+	total_requested: int = Field(..., description="تعداد کل درخواست‌ها")
+
+
+class BulkResetPasswordResponse(BaseModel):
+	"""پاسخ بازنشانی رمز عبور دسته‌ای"""
+	tokens_created: int = Field(..., description="تعداد توکن‌های ایجاد شده")
+	total_requested: int = Field(..., description="تعداد کل درخواست‌ها")
+
+
 # Business Schemas
 class BusinessType(str, Enum):
 	COMPANY = "شرکت"

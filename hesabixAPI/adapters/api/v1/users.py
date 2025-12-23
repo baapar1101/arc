@@ -7,7 +7,11 @@ import io
 from adapters.db.session import get_db
 from adapters.db.repositories.user_repo import UserRepository
 from adapters.db.repositories.password_reset_repo import PasswordResetRepository
-from adapters.api.v1.schemas import QueryInfo, SuccessResponse, UsersListResponse, UsersSummaryResponse, UserResponse
+from adapters.api.v1.schemas import (
+	QueryInfo, SuccessResponse, UsersListResponse, UsersSummaryResponse, UserResponse,
+	BulkActivateRequest, BulkSuspendRequest, BulkResetPasswordRequest,
+	UserDetailResponse, BulkOperationResponse, BulkResetPasswordResponse
+)
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_user_management
@@ -26,7 +30,14 @@ router = APIRouter(prefix="/users", tags=["کاربران", "مدیریت سیس
 
 @router.post("/search", 
 	summary="لیست کاربران با فیلتر پیشرفته", 
-	description="دریافت لیست کاربران با قابلیت فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	دریافت لیست کاربران با قابلیت فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی.
+	
+	### نکات:
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- نتایج به مدت 60 ثانیه cache می‌شوند
+	- برای جستجوی ساده از `GET /users` استفاده کنید
+	""",
 	response_model=SuccessResponse,
 	responses={
 		200: {
@@ -89,14 +100,15 @@ def list_users(
 	"""
 	دریافت لیست کاربران با قابلیت فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی
 	
-	پارامترهای QueryInfo:
-	- sort_by: فیلد مرتب‌سازی (مثال: created_at, first_name)
-	- sort_desc: ترتیب نزولی (true/false)
-	- take: تعداد رکورد در هر صفحه (پیش‌فرض: 10)
-	- skip: تعداد رکورد صرف‌نظر شده (پیش‌فرض: 0)
-	- search: عبارت جستجو
-	- search_fields: فیلدهای جستجو (مثال: ["first_name", "last_name", "email"])
-	- filters: آرایه فیلترها با ساختار:
+	### پارامترهای QueryInfo:
+	- **sort_by**: فیلد مرتب‌سازی (مثال: created_at, first_name, email)
+	- **sort_desc**: ترتیب نزولی (true/false)
+	- **take**: تعداد رکورد در هر صفحه (پیش‌فرض: 10، حداکثر: 100)
+	- **skip**: تعداد رکورد صرف‌نظر شده (پیش‌فرض: 0)
+	- **search**: عبارت جستجو (جستجو در فیلدهای مشخص شده)
+	- **search_fields**: فیلدهای جستجو (مثال: ["first_name", "last_name", "email"])
+	- **filters**: آرایه فیلترها با ساختار:
+	  ```json
 	  [
 		{
 		  "property": "is_active",
@@ -107,20 +119,64 @@ def list_users(
 		  "property": "first_name", 
 		  "operator": "*",
 		  "value": "احمد"
+		},
+		{
+		  "property": "status",
+		  "operator": "in",
+		  "value": ["active", "inactive"]
+		},
+		{
+		  "property": "role",
+		  "operator": "=",
+		  "value": "admin"
 		}
 	  ]
+	  ```
 	
-	عملگرهای پشتیبانی شده:
-	- = : برابر
-	- > : بزرگتر از
-	- >= : بزرگتر یا مساوی
-	- < : کوچکتر از
-	- <= : کوچکتر یا مساوی
-	- != : نامساوی
-	- * : شامل (contains)
-	- ?* : خاتمه یابد (ends with)
-	- *? : شروع شود (starts with)
-	- in : در بین مقادیر آرایه
+	### عملگرهای پشتیبانی شده:
+	- **=**: برابر
+	- **>**: بزرگتر از
+	- **>=**: بزرگتر یا مساوی
+	- **<**: کوچکتر از
+	- **<=**: کوچکتر یا مساوی
+	- **!=**: نامساوی
+	- **\***: شامل (contains)
+	- **?***: خاتمه یابد (ends with)
+	- ***?**: شروع شود (starts with)
+	- **in**: در بین مقادیر آرایه
+	- **not_in**: موجود نیست در لیست
+	- **is_null**: مقدار خالی است
+	- **is_not_null**: مقدار خالی نیست
+	
+	### فیلترهای خاص:
+	- **status**: می‌تواند "active", "inactive", "suspended" باشد (به صورت خودکار به is_active تبدیل می‌شود)
+	- **role**: می‌تواند "user", "admin", "operator", "supervisor" باشد (بر اساس app_permissions)
+	
+	### Cache:
+	- نتایج به مدت 60 ثانیه cache می‌شوند
+	- Cache key بر اساس query parameters و user_id ایجاد می‌شود
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/search" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 -H "Content-Type: application/json" \\
+		 -d '{
+		   "take": 20,
+		   "skip": 0,
+		   "sort_by": "created_at",
+		   "sort_desc": true,
+		   "search": "احمد",
+		   "search_fields": ["first_name", "last_name", "email"],
+		   "filters": [
+			 {
+			   "property": "is_active",
+			   "operator": "=",
+			   "value": true
+			 }
+		   ]
+		 }'
+	```
 	"""
 	repo = UserRepository(db)
 	
@@ -267,7 +323,24 @@ def list_users(
 
 @router.get("", 
 	summary="لیست ساده کاربران", 
-	description="دریافت لیست ساده کاربران. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	دریافت لیست ساده کاربران با صفحه‌بندی.
+	
+	### Query Parameters:
+	- **limit**: تعداد رکورد در هر صفحه (پیش‌فرض: 10، حداقل: 1، حداکثر: 100)
+	- **offset**: تعداد رکورد صرف‌نظر شده (پیش‌فرض: 0، حداقل: 0)
+	
+	### نکات:
+	- این endpoint برای دریافت لیست ساده کاربران بدون فیلتر پیشرفته است
+	- برای جستجو و فیلتر پیشرفته از `POST /users/search` استفاده کنید
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X GET "http://localhost:8000/api/v1/users?limit=20&offset=0" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
+	""",
 	response_model=SuccessResponse,
 	responses={
 		200: {
@@ -286,7 +359,8 @@ def list_users(
 								"last_name": "احمدی",
 								"is_active": True,
 								"referral_code": "ABC123",
-								"created_at": "2024-01-01T00:00:00Z"
+								"created_at": "2024-01-01T00:00:00Z",
+								"updated_at": "2024-01-01T00:00:00Z"
 							}
 						]
 					}
@@ -294,16 +368,37 @@ def list_users(
 			}
 		},
 		401: {
-			"description": "کاربر احراز هویت نشده است"
+			"description": "کاربر احراز هویت نشده است",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "Unauthorized",
+						"error_code": "UNAUTHORIZED"
+					}
+				}
+			}
 		},
 		403: {
-			"description": "دسترسی غیرمجاز - نیاز به مجوز usermanager",
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management",
 			"content": {
 				"application/json": {
 					"example": {
 						"success": False,
 						"message": "Missing app permission: user_management",
 						"error_code": "FORBIDDEN"
+					}
+				}
+			}
+		},
+		422: {
+			"description": "خطا در اعتبارسنجی query parameters",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "limit must be between 1 and 100",
+						"error_code": "VALIDATION_ERROR"
 					}
 				}
 			}
@@ -314,8 +409,8 @@ def list_users(
 def list_users_simple(
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
-	limit: int = Query(10, ge=1, le=100, description="تعداد رکورد در هر صفحه"),
-	offset: int = Query(0, ge=0, description="تعداد رکورد صرف‌نظر شده")
+	limit: int = Query(10, ge=1, le=100, description="تعداد رکورد در هر صفحه (حداقل: 1، حداکثر: 100)"),
+	offset: int = Query(0, ge=0, description="تعداد رکورد صرف‌نظر شده (حداقل: 0)")
 ):
 	"""دریافت لیست ساده کاربران"""
 	repo = UserRepository(db)
@@ -336,8 +431,72 @@ def list_users_simple(
 @router.post(
 	"/me/signature",
 	summary="آپلود امضای کاربر جاری",
-	description="آپلود تصویر امضای کاربر و ذخیره آن در سیستم فایل.",
+	description="""
+	آپلود تصویر امضای کاربر و ذخیره آن در سیستم فایل.
+	
+	### محدودیت‌های فایل:
+	- **فرمت‌های مجاز**: JPG, JPEG, PNG, GIF, WebP, BMP
+	- **حداکثر حجم**: بر اساس تنظیمات سیستم (پیش‌فرض: 10 مگابایت)
+	- **انقضا**: فایل به مدت 10 سال (3650 روز) نگهداری می‌شود
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/me/signature" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 -F "file=@signature.png"
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "امضا با موفقیت آپلود شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "امضا با موفقیت آپلود شد",
+						"data": {
+							"signature_file_id": "550e8400-e29b-41d4-a716-446655440000",
+							"file": {
+								"file_id": "550e8400-e29b-41d4-a716-446655440000",
+								"filename": "signature.png",
+								"mime_type": "image/png",
+								"file_size": 245678,
+								"uploaded_at": "2024-01-15T10:30:00Z"
+							}
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "خطا در آپلود فایل",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند",
+						"error_code": "INVALID_FILE_FORMAT"
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		404: {
+			"description": "کاربر یافت نشد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "کاربر یافت نشد",
+						"error_code": "USER_NOT_FOUND"
+					}
+				}
+			}
+		}
+	}
 )
 async def upload_my_signature(
 	request: Request,
@@ -379,7 +538,54 @@ async def upload_my_signature(
 @router.get(
 	"/me/signature",
 	summary="دریافت فایل امضای کاربر جاری",
-	description="بازگرداندن تصویر امضای کاربر کنونی به‌صورت فایل (برای نمایش در پروفایل یا فاکتور).",
+	description="""
+	بازگرداندن تصویر امضای کاربر کنونی به‌صورت فایل (برای نمایش در پروفایل یا فاکتور).
+	
+	### مثال cURL:
+	```bash
+	curl -X GET "http://localhost:8000/api/v1/users/me/signature" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 --output signature.png
+	```
+	
+	### Response:
+	- Content-Type: image/png (یا فرمت فایل آپلود شده)
+	- Content-Disposition: inline; filename="signature.png"
+	""",
+	responses={
+		200: {
+			"description": "فایل امضا با موفقیت دریافت شد",
+			"content": {
+				"image/png": {
+					"schema": {
+						"type": "string",
+						"format": "binary"
+					}
+				},
+				"image/jpeg": {
+					"schema": {
+						"type": "string",
+						"format": "binary"
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		404: {
+			"description": "امضایی برای این کاربر ثبت نشده است",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "امضایی برای این کاربر ثبت نشده است",
+						"error_code": "SIGNATURE_NOT_SET"
+					}
+				}
+			}
+		}
+	}
 )
 async def get_my_signature(
 	request: Request,
@@ -404,7 +610,15 @@ async def get_my_signature(
 
 @router.get("/{user_id}", 
 	summary="دریافت اطلاعات یک کاربر", 
-	description="دریافت اطلاعات کامل یک کاربر بر اساس شناسه. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	دریافت اطلاعات کامل یک کاربر بر اساس شناسه شامل:
+	- اطلاعات پایه کاربر (ایمیل، موبایل، نام و ...)
+	- لیست کسب‌وکارهای کاربر (مالک یا عضو)
+	- نشست‌های فعال کاربر
+	- آخرین فعالیت‌های کاربر (حداکثر 50 مورد)
+	
+	نیاز به مجوز `user_management` در سطح اپلیکیشن دارد.
+	""",
 	response_model=SuccessResponse,
 	responses={
 		200: {
@@ -422,17 +636,83 @@ async def get_my_signature(
 							"last_name": "احمدی",
 							"is_active": True,
 							"referral_code": "ABC123",
-							"created_at": "2024-01-01T00:00:00Z"
+							"app_permissions": {"user_management": True},
+							"created_at": "2024-01-01T00:00:00Z",
+							"updated_at": "2024-01-01T00:00:00Z",
+							"signature_file_id": "550e8400-e29b-41d4-a716-446655440000",
+							"businesses": [
+								{
+									"id": 1,
+									"name": "شرکت نمونه",
+									"field": "بازرگانی",
+									"role": "owner",
+									"status": "active",
+									"created_at": "2024-01-01T00:00:00Z"
+								},
+								{
+									"id": 2,
+									"name": "فروشگاه نمونه",
+									"field": "خدماتی",
+									"role": "admin",
+									"status": "active",
+									"created_at": "2024-01-05T00:00:00Z"
+								}
+							],
+							"sessions": [
+								{
+									"id": 1,
+									"device": "Chrome on Windows",
+									"ip": "192.168.1.1",
+									"last_active_at": "2024-01-15T10:30:00Z",
+									"created_at": "2024-01-01T00:00:00Z"
+								},
+								{
+									"id": 2,
+									"device": "Firefox on Linux",
+									"ip": "192.168.1.2",
+									"last_active_at": "2024-01-14T15:20:00Z",
+									"created_at": "2024-01-10T00:00:00Z"
+								}
+							],
+							"audit_logs": [
+								{
+									"id": 1,
+									"action": "login",
+									"description": "ورود به سیستم",
+									"category": "authentication",
+									"entity_type": "user",
+									"entity_id": 1,
+									"created_at": "2024-01-15T10:30:00Z"
+								},
+								{
+									"id": 2,
+									"action": "update_profile",
+									"description": "به‌روزرسانی پروفایل",
+									"category": "profile",
+									"entity_type": "user",
+									"entity_id": 1,
+									"created_at": "2024-01-14T09:15:00Z"
+								}
+							]
 						}
 					}
 				}
 			}
 		},
 		401: {
-			"description": "کاربر احراز هویت نشده است"
+			"description": "کاربر احراز هویت نشده است",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "Unauthorized",
+						"error_code": "UNAUTHORIZED"
+					}
+				}
+			}
 		},
 		403: {
-			"description": "دسترسی غیرمجاز - نیاز به مجوز usermanager",
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management",
 			"content": {
 				"application/json": {
 					"example": {
@@ -561,7 +841,24 @@ def get_user(
 
 @router.get("/stats/summary", 
 	summary="آمار کلی کاربران", 
-	description="دریافت آمار کلی کاربران شامل تعداد کل، فعال و غیرفعال. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	دریافت آمار کلی کاربران شامل تعداد کل، فعال و غیرفعال.
+	
+	### اطلاعات بازگشتی:
+	- **total_users**: تعداد کل کاربران
+	- **active_users**: تعداد کاربران فعال
+	- **inactive_users**: تعداد کاربران غیرفعال
+	- **active_percentage**: درصد کاربران فعال (با 2 رقم اعشار)
+	
+	### نکات:
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X GET "http://localhost:8000/api/v1/users/stats/summary" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
+	""",
 	response_model=SuccessResponse,
 	responses={
 		200: {
@@ -582,10 +879,19 @@ def get_user(
 			}
 		},
 		401: {
-			"description": "کاربر احراز هویت نشده است"
+			"description": "کاربر احراز هویت نشده است",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "Unauthorized",
+						"error_code": "UNAUTHORIZED"
+					}
+				}
+			}
 		},
 		403: {
-			"description": "دسترسی غیرمجاز - نیاز به مجوز usermanager",
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management",
 			"content": {
 				"application/json": {
 					"example": {
@@ -630,13 +936,63 @@ def get_users_summary(
 
 @router.post("/bulk-activate",
 	summary="فعال‌سازی دسته‌ای کاربران",
-	description="فعال‌سازی چندین کاربر به صورت همزمان. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	فعال‌سازی چندین کاربر به صورت همزمان.
+	
+	### نکات:
+	- فقط کاربران غیرفعال فعال می‌شوند
+	- کاربران فعال قبلاً نادیده گرفته می‌شوند
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/bulk-activate" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 -H "Content-Type: application/json" \\
+		 -d '{"user_ids": [1, 2, 3, 4, 5]}'
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "عملیات با موفقیت انجام شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "عملیات با موفقیت انجام شد",
+						"data": {
+							"updated_count": 3,
+							"total_requested": 5
+						}
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		422: {
+			"description": "خطا در اعتبارسنجی داده‌ها",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "user_ids باید لیستی از اعداد باشد",
+						"error_code": "VALIDATION_ERROR"
+					}
+				}
+			}
+		}
+	}
 )
 @require_user_management()
 def bulk_activate_users(
 	request: Request,
-	user_ids: list[int],
+	payload: BulkActivateRequest,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -644,7 +1000,7 @@ def bulk_activate_users(
 	repo = UserRepository(db)
 	updated_count = 0
 	
-	for user_id in user_ids:
+	for user_id in payload.user_ids:
 		user = repo.get_by_id(user_id)
 		if user and not user.is_active:
 			user.is_active = True
@@ -660,13 +1016,55 @@ def bulk_activate_users(
 
 @router.post("/bulk-suspend",
 	summary="تعلیق دسته‌ای کاربران",
-	description="تعلیق چندین کاربر به صورت همزمان. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	تعلیق چندین کاربر به صورت همزمان.
+	
+	### نکات:
+	- فقط کاربران فعال تعلیق می‌شوند
+	- کاربران غیرفعال قبلاً نادیده گرفته می‌شوند
+	- نمی‌توانید خود را تعلیق کنید (نادیده گرفته می‌شود)
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/bulk-suspend" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 -H "Content-Type: application/json" \\
+		 -d '{"user_ids": [1, 2, 3, 4, 5]}'
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "عملیات با موفقیت انجام شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "عملیات با موفقیت انجام شد",
+						"data": {
+							"updated_count": 3,
+							"total_requested": 5
+						}
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		422: {
+			"description": "خطا در اعتبارسنجی داده‌ها"
+		}
+	}
 )
 @require_user_management()
 def bulk_suspend_users(
 	request: Request,
-	user_ids: list[int],
+	payload: BulkSuspendRequest,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -674,7 +1072,7 @@ def bulk_suspend_users(
 	repo = UserRepository(db)
 	updated_count = 0
 	
-	for user_id in user_ids:
+	for user_id in payload.user_ids:
 		user = repo.get_by_id(user_id)
 		if user and user.is_active:
 			# جلوگیری از تعلیق خود کاربر
@@ -687,19 +1085,61 @@ def bulk_suspend_users(
 	
 	return success_response({
 		"updated_count": updated_count,
-		"total_requested": len(user_ids)
+		"total_requested": len(payload.user_ids)
 	}, request)
 
 
 @router.post("/bulk-reset-password",
 	summary="بازنشانی رمز عبور دسته‌ای کاربران",
-	description="ایجاد توکن بازنشانی رمز عبور برای چندین کاربر. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	ایجاد توکن بازنشانی رمز عبور برای چندین کاربر.
+	
+	### نکات:
+	- برای هر کاربر یک توکن منحصر به فرد ایجاد می‌شود
+	- فقط برای کاربرانی که ایمیل یا موبایل دارند توکن ایجاد می‌شود
+	- توکن‌ها به صورت خودکار منقضی می‌شوند (بر اساس تنظیمات سیستم)
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/bulk-reset-password" \\
+		 -H "Authorization: Bearer sk_your_api_key" \\
+		 -H "Content-Type: application/json" \\
+		 -d '{"user_ids": [1, 2, 3, 4, 5]}'
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "توکن‌ها با موفقیت ایجاد شدند",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "توکن‌ها با موفقیت ایجاد شدند",
+						"data": {
+							"tokens_created": 4,
+							"total_requested": 5
+						}
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		422: {
+			"description": "خطا در اعتبارسنجی داده‌ها"
+		}
+	}
 )
 @require_user_management()
 def bulk_reset_password(
 	request: Request,
-	user_ids: list[int],
+	payload: BulkResetPasswordRequest,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -715,7 +1155,7 @@ def bulk_reset_password(
 	settings = get_settings()
 	pr_repo = PasswordResetRepository(db)
 	
-	for user_id in user_ids:
+	for user_id in payload.user_ids:
 		user = repo.get_by_id(user_id)
 		if user:
 			identifier = user.email or user.mobile
@@ -733,14 +1173,72 @@ def bulk_reset_password(
 	
 	return success_response({
 		"tokens_created": tokens_created,
-		"total_requested": len(user_ids)
+		"total_requested": len(payload.user_ids)
 	}, request)
 
 
 @router.post("/{user_id}/suspend",
 	summary="تعلیق یک کاربر",
-	description="تعلیق یک کاربر خاص. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	تعلیق یک کاربر خاص.
+	
+	### نکات:
+	- نمی‌توانید خود را تعلیق کنید
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/123/suspend" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کاربر با موفقیت تعلیق شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "کاربر با موفقیت تعلیق شد",
+						"data": {
+							"message": "کاربر با موفقیت تعلیق شد"
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "نمی‌توانید خود را تعلیق کنید",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "نمی‌توانید خود را تعلیق کنید",
+						"error_code": "CANNOT_SUSPEND_SELF"
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		404: {
+			"description": "کاربر یافت نشد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "کاربر یافت نشد",
+						"error_code": "USER_NOT_FOUND"
+					}
+				}
+			}
+		}
+	}
 )
 @require_user_management()
 def suspend_user(
@@ -770,8 +1268,53 @@ def suspend_user(
 
 @router.post("/{user_id}/activate",
 	summary="فعال‌سازی یک کاربر",
-	description="فعال‌سازی یک کاربر خاص. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	فعال‌سازی یک کاربر خاص.
+	
+	### نکات:
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/123/activate" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کاربر با موفقیت فعال شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "کاربر با موفقیت فعال شد",
+						"data": {
+							"message": "کاربر با موفقیت فعال شد"
+						}
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		404: {
+			"description": "کاربر یافت نشد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "کاربر یافت نشد",
+						"error_code": "USER_NOT_FOUND"
+					}
+				}
+			}
+		}
+	}
 )
 @require_user_management()
 def activate_user(
@@ -796,8 +1339,69 @@ def activate_user(
 
 @router.post("/{user_id}/reset-password",
 	summary="بازنشانی رمز عبور یک کاربر",
-	description="ایجاد توکن بازنشانی رمز عبور برای یک کاربر. نیاز به مجوز usermanager در سطح اپلیکیشن دارد.",
+	description="""
+	ایجاد توکن بازنشانی رمز عبور برای یک کاربر.
+	
+	### نکات:
+	- توکن به صورت خودکار منقضی می‌شود (بر اساس تنظیمات سیستم)
+	- کاربر باید ایمیل یا موبایل داشته باشد
+	- در محیط production، توکن نباید در response برگردانده شود
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	
+	### مثال cURL:
+	```bash
+	curl -X POST "http://localhost:8000/api/v1/users/123/reset-password" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
+	""",
 	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "توکن بازنشانی رمز عبور ایجاد شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "توکن بازنشانی رمز عبور ایجاد شد",
+						"data": {
+							"message": "توکن بازنشانی رمز عبور ایجاد شد",
+							"token": "reset_token_1234567890abcdef"
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "کاربر ایمیل یا موبایل ندارد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "کاربر ایمیل یا موبایل ندارد",
+						"error_code": "NO_IDENTIFIER"
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		},
+		403: {
+			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
+		},
+		404: {
+			"description": "کاربر یافت نشد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "کاربر یافت نشد",
+						"error_code": "USER_NOT_FOUND"
+					}
+				}
+			}
+		}
+	}
 )
 @require_user_management()
 def reset_user_password(
