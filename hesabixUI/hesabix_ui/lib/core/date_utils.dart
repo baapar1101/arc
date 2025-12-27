@@ -15,6 +15,19 @@ class HesabixDateUtils {
     }
   }
 
+  /// Format a DateTime for API date-only filters (YYYY-MM-DD).
+  ///
+  /// Why: Many backend filters treat dates as `date` (no time). Sending a UTC ISO string
+  /// can shift the calendar day for users in non-UTC timezones, causing wrong results
+  /// especially when from_date == to_date.
+  static String formatForApiDate(DateTime date) {
+    final local = date.toLocal();
+    final y = local.year.toString().padLeft(4, '0');
+    final m = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   static String formatDateTime(DateTime? date, bool isJalali) {
     if (date == null) return '-';
     final local = date.toLocal();
@@ -61,7 +74,21 @@ class HesabixDateUtils {
           final year = int.parse(parts[0]);
           final month = int.parse(parts[1]);
           final day = int.parse(parts[2]);
-          return DateTime(year, month, day);
+          
+          // اعتبارسنجی محدوده‌های معتبر
+          if (year < 1900 || year > 2100) {
+            return null;
+          }
+          if (month < 1 || month > 12 || day < 1 || day > 31) {
+            return null;
+          }
+          
+          try {
+            return DateTime(year, month, day);
+          } catch (e) {
+            // اگر تاریخ نامعتبر بود (مثلاً 31 فوریه)
+            return null;
+          }
         }
       }
     } catch (e) {
@@ -101,7 +128,21 @@ class HesabixDateUtils {
         final year = int.parse(parts[0]);
         final month = int.parse(parts[1]);
         final day = int.parse(parts[2]);
-        return DateTime(year, month, day);
+        
+        // اعتبارسنجی محدوده‌های معتبر
+        if (year < 1900 || year > 2100) {
+          return null;
+        }
+        if (month < 1 || month > 12 || day < 1 || day > 31) {
+          return null;
+        }
+        
+        try {
+          return DateTime(year, month, day);
+        } catch (e) {
+          // اگر تاریخ نامعتبر بود (مثلاً 31 فوریه)
+          return null;
+        }
       }
     } catch (e) {
       // Return null if parsing fails

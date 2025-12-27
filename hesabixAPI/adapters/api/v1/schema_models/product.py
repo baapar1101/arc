@@ -348,9 +348,15 @@ class ProductResponse(BaseModel):
     track_inventory: bool
     default_warehouse_id: Optional[int] = None
     default_warehouse_name: Optional[str] = None
+    default_warehouse_code: Optional[str] = None
     reorder_point: Optional[int] = None
     min_order_qty: Optional[int] = None
     lead_time_days: Optional[int] = None
+    
+    # حالت موجودی و ردیابی
+    inventory_mode: Optional[str] = None
+    track_serial: bool = False
+    track_barcode: bool = False
     
     is_sales_taxable: bool
     is_purchase_taxable: bool
@@ -386,6 +392,11 @@ class ProductResponse(BaseModel):
     
     # ویژگی‌ها
     attributes: Optional[List[dict]] = None
+    attribute_ids: Optional[List[int]] = None
+    
+    # موجودی (برای جستجو با include_inventory)
+    inventory_stock_accounting: Optional[Decimal] = None
+    inventory_stock_warehouse: Optional[Decimal] = None
     
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

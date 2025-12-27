@@ -7,6 +7,7 @@ import '../../services/zohal_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/zohal/identity_inquiry_dialog.dart';
+import '../../widgets/zohal/zohal_service_widget_factory.dart';
 
 class ZohalInquiriesPage extends StatefulWidget {
   final int businessId;
@@ -133,20 +134,11 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
     }
   }
 
-  Future<void> _submitInquiry() async {
+  Future<void> _submitInquiry(Map<String, dynamic> requestData) async {
     if (_selectedService == null) return;
 
     final serviceCode = _selectedService!['service_code'] as String?;
     if (serviceCode == null) return;
-
-    // جمع‌آوری داده‌های فرم
-    final requestData = <String, dynamic>{};
-    for (var entry in _fieldControllers.entries) {
-      final value = entry.value.text.trim();
-      if (value.isNotEmpty) {
-        requestData[entry.key] = value;
-      }
-    }
 
     setState(() => _submitting = true);
     try {
@@ -257,233 +249,36 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
   Widget _buildInquiryForm() {
     if (_selectedService == null) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
     final formKey = GlobalKey<FormState>();
-    final requestSchema = _selectedService!['request_schema'] as Map<String, dynamic>?;
-    final properties = requestSchema?['properties'] as Map<String, dynamic>? ?? {};
-    final requiredFields = requestSchema?['required'] as List? ?? [];
 
-    // اگر properties خالی است، از description استفاده می‌کنیم
-    if (properties.isEmpty) {
-      return Card(
-        margin: const EdgeInsets.all(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.edit_note, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _selectedService!['service_name'] ?? '',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => setState(() {
-                      _selectedService = null;
-                      _lastResult = null;
-                    }),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 16),
-              Text(
-                'برای این سرویس فیلدهای ورودی از API مستندات دریافت نشده است. لطفاً با پشتیبانی تماس بگیرید.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.edit_note, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _selectedService!['service_name'] ?? '',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => setState(() {
-                      _selectedService = null;
-                      _lastResult = null;
-                    }),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 16),
-              ...properties.entries.map((entry) {
-                final fieldName = entry.key;
-                final fieldSchema = entry.value as Map<String, dynamic>;
-                final isRequired = requiredFields.contains(fieldName);
-                final fieldType = fieldSchema['type']?.toString() ?? 'string';
-                final example = fieldSchema['example']?.toString();
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: TextFormField(
-                    controller: _fieldControllers[fieldName] ?? TextEditingController(),
-                    decoration: InputDecoration(
-                      labelText: fieldName,
-                      hintText: example,
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.input),
-                    ),
-                    keyboardType: fieldType == 'number' ? TextInputType.number : TextInputType.text,
-                    validator: (value) {
-                      if (isRequired && (value == null || value.trim().isEmpty)) {
-                        return 'این فیلد الزامی است';
-                      }
-                      return null;
-                    },
-                  ),
-                );
-              }),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _submitting
-                    ? null
-                    : () {
-                        if (formKey.currentState?.validate() ?? false) {
-                          _submitInquiry();
-                        }
-                      },
-                icon: _submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send),
-                label: Text(_submitting ? 'در حال ارسال...' : 'ارسال درخواست'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    // استفاده از factory برای ساخت ویجت فرم
+    return ZohalServiceWidgetFactory.buildInquiryForm(
+      service: _selectedService!,
+      controllers: _fieldControllers,
+      formKey: formKey,
+      onSubmit: (data) => _submitInquiry(data),
+      isSubmitting: _submitting,
+      onClose: () => setState(() {
+        _selectedService = null;
+        _lastResult = null;
+      }),
     );
   }
 
   Widget _buildResult() {
     if (_lastResult == null) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
-    final success = _lastResult!['success'] as bool? ?? false;
-    final result = _lastResult!['result'] as Map<String, dynamic>?;
-    final amountCharged = (_lastResult!['amount_charged'] as num?)?.toDouble() ?? 0.0;
-    final remainingBalance = (_lastResult!['remaining_balance'] as num?)?.toDouble() ?? 0.0;
+    final serviceCode = _selectedService?['service_code']?.toString();
+    final amountCharged = (_lastResult!['amount_charged'] as num?)?.toDouble();
+    final remainingBalance = (_lastResult!['remaining_balance'] as num?)?.toDouble();
 
-    return Card(
-      margin: const EdgeInsets.all(16),
-      color: success
-          ? theme.colorScheme.primaryContainer
-          : theme.colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  success ? Icons.check_circle : Icons.error,
-                  color: success
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onErrorContainer,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  success ? 'استعلام موفق' : 'استعلام ناموفق',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: success
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (success) ...[
-              if (result != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    result.toString(),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('هزینه:', style: theme.textTheme.bodyMedium),
-                  Text(
-                    '${formatWithThousands(amountCharged)} ${_walletCurrency ?? ''}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('موجودی باقیمانده:', style: theme.textTheme.bodyMedium),
-                  Text(
-                    '${formatWithThousands(remainingBalance)} ${_walletCurrency ?? ''}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ] else ...[
-              Text(
-                result?['response_body']?['message']?.toString() ?? 'خطا در استعلام',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    // استفاده از factory برای ساخت ویجت نتیجه
+    return ZohalServiceWidgetFactory.buildResultWidget(
+      result: _lastResult!,
+      serviceCode: serviceCode,
+      amountCharged: amountCharged,
+      remainingBalance: remainingBalance,
+      walletCurrency: _walletCurrency,
     );
   }
 

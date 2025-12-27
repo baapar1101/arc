@@ -232,30 +232,41 @@ def update_current_fiscal_year(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
 ) -> Dict[str, Any]:
-    """ویرایش سال مالی جاری (فقط عنوان و تاریخ‌ها)"""
+    """ویرایش یا ایجاد سال مالی جاری (اگر وجود نداشت، ایجاد می‌شود)"""
     repo = FiscalYearRepository(db)
-    
-    # دریافت سال مالی جاری
-    fiscal_year = repo.get_current_for_business(business_id)
-    
-    if not fiscal_year:
-        raise ApiError("NO_CURRENT_FISCAL_YEAR", "سال مالی جاری یافت نشد", http_status=404)
-    
-    # بررسی اینکه سال مالی متعلق به این کسب و کار است
-    if int(fiscal_year.business_id) != int(business_id):
-        raise ApiError("FISCAL_YEAR_NOT_FOUND", "سال مالی متعلق به این کسب‌وکار نیست", http_status=404)
     
     # بررسی اعتبار تاریخ‌ها
     if payload.start_date >= payload.end_date:
         raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع باید قبل از تاریخ پایان باشد", http_status=400)
     
-    # به‌روزرسانی فیلدها
-    fiscal_year.title = payload.title
-    fiscal_year.start_date = payload.start_date
-    fiscal_year.end_date = payload.end_date
+    # دریافت سال مالی جاری
+    fiscal_year = repo.get_current_for_business(business_id)
     
-    db.commit()
-    db.refresh(fiscal_year)
+    if fiscal_year:
+        # اگر سال مالی جاری وجود داشت: به‌روزرسانی می‌کنیم
+        # بررسی اینکه سال مالی متعلق به این کسب و کار است
+        if int(fiscal_year.business_id) != int(business_id):
+            raise ApiError("FISCAL_YEAR_NOT_FOUND", "سال مالی متعلق به این کسب‌وکار نیست", http_status=404)
+        
+        # به‌روزرسانی فیلدها
+        fiscal_year.title = payload.title
+        fiscal_year.start_date = payload.start_date
+        fiscal_year.end_date = payload.end_date
+        
+        db.commit()
+        db.refresh(fiscal_year)
+        
+        message = "FISCAL_YEAR_UPDATED_SUCCESSFULLY"
+    else:
+        # اگر سال مالی جاری وجود نداشت: ایجاد می‌کنیم
+        fiscal_year = repo.create_fiscal_year(
+            business_id=business_id,
+            title=payload.title,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            is_last=True,  # سال مالی جدید به عنوان سال مالی جاری ایجاد می‌شود
+        )
+        message = "FISCAL_YEAR_CREATED_SUCCESSFULLY"
     
     data = {
         "id": fiscal_year.id,
@@ -268,7 +279,7 @@ def update_current_fiscal_year(
     return success_response(
         data=format_datetime_fields(data, request),
         request=request,
-        message="FISCAL_YEAR_UPDATED_SUCCESSFULLY"
+        message=message
     )
 
 

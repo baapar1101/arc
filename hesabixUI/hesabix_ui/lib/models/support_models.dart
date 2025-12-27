@@ -1,3 +1,5 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
 class SupportCategory {
   final int id;
   final String name;
@@ -29,33 +31,57 @@ class SupportCategory {
   static DateTime _parseDateTime(dynamic dateTime) {
     if (dateTime is String) {
       try {
-        return DateTime.parse(dateTime);
+        // Parse ISO string and convert UTC to local time
+        final parsed = DateTime.parse(dateTime);
+        return parsed.isUtc ? parsed.toLocal() : parsed;
       } catch (e) {
         // If parsing fails, return current time
         return DateTime.now();
       }
     } else if (dateTime is Map<String, dynamic>) {
       // Handle formatted date from backend
-      final formatted = dateTime['formatted'] as String?;
-      if (formatted != null) {
+      // Try to find raw field (could be 'raw' or 'created_at_raw', etc.)
+      String? raw;
+      for (final key in dateTime.keys) {
+        if (key.endsWith('_raw')) {
+          raw = dateTime[key] as String?;
+          break;
+        }
+      }
+      // If no _raw field found, try 'raw' directly
+      raw ??= dateTime['raw'] as String?;
+      
+      if (raw != null) {
         try {
-          return DateTime.parse(formatted);
+          final parsed = DateTime.parse(raw);
+          return parsed.isUtc ? parsed.toLocal() : parsed;
         } catch (e) {
-          return DateTime.now();
+          // Fall through to try other methods
         }
       }
       
-      // Try to parse raw date if formatted is not available
-      final raw = dateTime['raw'] as String?;
-      if (raw != null) {
+      // Fallback to formatted if raw is not available
+      String? formatted;
+      for (final key in dateTime.keys) {
+        if (key.endsWith('_formatted')) {
+          formatted = dateTime[key] as String?;
+          break;
+        }
+      }
+      // If no _formatted field found, try 'formatted' directly
+      formatted ??= dateTime['formatted'] as String?;
+      
+      if (formatted != null) {
         try {
-          return DateTime.parse(raw);
+          final parsed = DateTime.parse(formatted);
+          return parsed.isUtc ? parsed.toLocal() : parsed;
         } catch (e) {
-          return DateTime.now();
+          // Fall through to try other methods
         }
       }
       
       // Try to parse individual date components
+      // These might be Jalali (Persian) dates, so we need to convert them
       final year = dateTime['year'] as int?;
       final month = dateTime['month'] as int?;
       final day = dateTime['day'] as int?;
@@ -65,7 +91,25 @@ class SupportCategory {
       
       if (year != null && month != null && day != null) {
         try {
-          return DateTime(year, month, day, hour, minute, second);
+          // Check if this is a Jalali date (year > 1300 typically indicates Jalali)
+          // Jalali years are usually between 1300-1500, Gregorian are 1900-2100
+          if (year > 1300 && year < 1500) {
+            // This is a Jalali date, convert to Gregorian
+            final jalali = Jalali(year, month, day);
+            final gregorian = jalali.toDateTime();
+            // Add time components
+            return DateTime(
+              gregorian.year,
+              gregorian.month,
+              gregorian.day,
+              hour,
+              minute,
+              second,
+            ).toLocal();
+          } else {
+            // This is a Gregorian date
+            return DateTime.utc(year, month, day, hour, minute, second).toLocal();
+          }
         } catch (e) {
           return DateTime.now();
         }
@@ -241,6 +285,12 @@ class SupportMessage {
   });
 
   factory SupportMessage.fromJson(Map<String, dynamic> json) {
+    // Try to use created_at_formatted (Map with date components) first, 
+    // then created_at_raw (might be Jalali string), then created_at
+    dynamic createdAtData = json['created_at_formatted'];
+    if (createdAtData == null) {
+      createdAtData = json['created_at_raw'] ?? json['created_at'];
+    }
     return SupportMessage(
       id: json['id'],
       ticketId: json['ticket_id'],
@@ -248,7 +298,7 @@ class SupportMessage {
       senderType: json['sender_type'],
       content: json['content'],
       isInternal: json['is_internal'],
-      createdAt: SupportCategory._parseDateTime(json['created_at']),
+      createdAt: SupportCategory._parseDateTime(createdAtData),
       sender: json['sender'] != null ? SupportUser.fromJson(json['sender']) : null,
     );
   }
@@ -315,6 +365,21 @@ class SupportTicket {
   });
 
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
+    // Try to use _formatted fields (Map with date components) first,
+    // then _raw fields (might be Jalali string), then regular fields
+    dynamic createdAtData = json['created_at_formatted'];
+    if (createdAtData == null) {
+      createdAtData = json['created_at_raw'] ?? json['created_at'];
+    }
+    dynamic updatedAtData = json['updated_at_formatted'];
+    if (updatedAtData == null) {
+      updatedAtData = json['updated_at_raw'] ?? json['updated_at'];
+    }
+    dynamic closedAtData = json['closed_at_formatted'];
+    if (closedAtData == null) {
+      closedAtData = json['closed_at_raw'] ?? json['closed_at'];
+    }
+    
     return SupportTicket(
       id: json['id'],
       title: json['title'],
@@ -325,9 +390,9 @@ class SupportTicket {
       statusId: json['status_id'],
       assignedOperatorId: json['assigned_operator_id'],
       isInternal: json['is_internal'],
-      closedAt: json['closed_at'] != null ? SupportCategory._parseDateTime(json['closed_at']) : null,
-      createdAt: SupportCategory._parseDateTime(json['created_at']),
-      updatedAt: SupportCategory._parseDateTime(json['updated_at']),
+      closedAt: closedAtData != null ? SupportCategory._parseDateTime(closedAtData) : null,
+      createdAt: SupportCategory._parseDateTime(createdAtData),
+      updatedAt: SupportCategory._parseDateTime(updatedAtData),
       user: json['user'] != null ? SupportUser.fromJson(json['user']) : null,
       assignedOperator: json['assigned_operator'] != null ? SupportUser.fromJson(json['assigned_operator']) : null,
       category: json['category'] != null ? SupportCategory.fromJson(json['category']) : null,

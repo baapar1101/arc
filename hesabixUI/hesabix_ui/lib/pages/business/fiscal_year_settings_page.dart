@@ -83,16 +83,16 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       _error = null;
     });
     try {
-      final fiscalYears = await _dashboardService.listFiscalYears(widget.businessId);
-      final current = fiscalYears.firstWhere(
-        (fy) => fy['is_current'] == true,
-        orElse: () => <String, dynamic>{},
-      );
+      final current = await _dashboardService.getCurrentFiscalYear(widget.businessId);
 
       if (mounted) {
-        if (current.isEmpty) {
+        if (current == null || current.isEmpty) {
+          // اگر سال مالی جاری وجود نداشت، فرم خالی نمایش می‌دهیم
           setState(() {
-            _error = 'سال مالی جاری یافت نشد';
+            _currentFiscalYear = null;
+            _titleController.text = '';
+            _startDate = null;
+            _endDate = null;
             _loading = false;
           });
           return;
@@ -180,19 +180,42 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
               final month = int.parse(parts[1]);
               final day = int.parse(parts[2]);
               
+              // اعتبارسنجی محدوده‌های معتبر
+              if (month < 1 || month > 12 || day < 1 || day > 31) {
+                // تاریخ نامعتبر - skip
+                return null;
+              }
+              
               // اگر سال بزرگتر از 1500 است، Jalali است
               if (year > 1500) {
+                // اعتبارسنجی محدوده سال شمسی (معمولاً 1300-1500)
+                if (year < 1300 || year > 1500) {
+                  return null;
+                }
                 // استفاده مستقیم از Jalali برای تبدیل
                 final jalali = Jalali(year, month, day);
                 final dt = jalali.toDateTime();
                 // اطمینان از اینکه DateTime به صورت local است و فقط تاریخ دارد
                 return DateTime(dt.year, dt.month, dt.day);
               } else {
-                // سال میلادی است
-                return DateTime(year, month, day);
+                // سال میلادی است - اعتبارسنجی محدوده معتبر (1900-2100)
+                if (year < 1900 || year > 2100) {
+                  return null;
+                }
+                // اعتبارسنجی ماه و روز
+                if (month < 1 || month > 12 || day < 1 || day > 31) {
+                  return null;
+                }
+                try {
+                  return DateTime(year, month, day);
+                } catch (e) {
+                  // اگر تاریخ نامعتبر بود (مثلاً 31 فوریه)
+                  return null;
+                }
               }
             } catch (e) {
               // اگر پارس ناموفق بود، ادامه بده
+              return null;
             }
           }
         }
@@ -242,7 +265,10 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       );
 
       if (mounted) {
-        SnackBarHelper.show(context, message: 'سال مالی جاری با موفقیت به‌روزرسانی شد', isError: false);
+        final message = _currentFiscalYear == null
+            ? 'سال مالی جدید با موفقیت ایجاد شد'
+            : 'سال مالی جاری با موفقیت به‌روزرسانی شد';
+        SnackBarHelper.show(context, message: message, isError: false);
         await _loadData();
       }
     } catch (e) {
@@ -284,7 +310,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null && _currentFiscalYear == null
+          : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -318,17 +344,32 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Card(
-                          color: cs.primaryContainer,
+                          color: _currentFiscalYear == null 
+                              ? Colors.orange.shade50 
+                              : cs.primaryContainer,
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                Icon(Icons.info_outline, color: cs.onPrimaryContainer),
+                                Icon(
+                                  _currentFiscalYear == null 
+                                      ? Icons.warning_amber_rounded 
+                                      : Icons.info_outline, 
+                                  color: _currentFiscalYear == null 
+                                      ? Colors.orange.shade900 
+                                      : cs.onPrimaryContainer,
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'شما می‌توانید عنوان و تاریخ‌های سال مالی جاری را ویرایش کنید. توجه داشته باشید که تغییر این اطلاعات ممکن است بر روی گزارش‌ها تأثیر بگذارد.',
-                                    style: TextStyle(color: cs.onPrimaryContainer),
+                                    _currentFiscalYear == null
+                                        ? 'سال مالی جاری برای این کسب‌وکار وجود ندارد. لطفاً اطلاعات سال مالی جدید را وارد کنید تا به عنوان سال مالی جاری ایجاد شود.'
+                                        : 'شما می‌توانید عنوان و تاریخ‌های سال مالی جاری را ویرایش کنید. توجه داشته باشید که تغییر این اطلاعات ممکن است بر روی گزارش‌ها تأثیر بگذارد.',
+                                    style: TextStyle(
+                                      color: _currentFiscalYear == null 
+                                          ? Colors.orange.shade900 
+                                          : cs.onPrimaryContainer,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -476,7 +517,13 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                     ),
                                   )
                                 : const Icon(Icons.save),
-                            label: Text(_saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'),
+                            label: Text(
+                              _saving 
+                                  ? 'در حال ذخیره...' 
+                                  : (_currentFiscalYear == null 
+                                      ? 'ایجاد سال مالی' 
+                                      : 'ذخیره تغییرات'),
+                            ),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(

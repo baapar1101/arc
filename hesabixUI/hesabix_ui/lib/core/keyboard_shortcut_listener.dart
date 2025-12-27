@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/ping_pong/ping_pong_dialog.dart';
+import '../widgets/calculator/calculator_dialog.dart';
 import '../main.dart'; // برای دسترسی به navigatorKey
 
 class KeyboardShortcutListener extends StatefulWidget {
@@ -69,6 +70,19 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         onKeyEvent: (node, event) {
           try {
             if (event is KeyDownEvent) {
+              // بررسی کلید میانبر ماشین حساب: Ctrl+Shift+C یا Cmd+Shift+C
+              final keyboard = HardwareKeyboard.instance;
+              final isCtrlOrCmd = keyboard.isControlPressed || keyboard.isMetaPressed;
+              final isShiftPressed = keyboard.isShiftPressed;
+              final isAltPressed = keyboard.isAltPressed;
+              
+              if (event.logicalKey == LogicalKeyboardKey.keyC &&
+                  isCtrlOrCmd &&
+                  isShiftPressed &&
+                  !isAltPressed) {
+                _openCalculator();
+                return KeyEventResult.handled;
+              }
               _handleKeyEvent(event);
             }
             return KeyEventResult.ignored; // اجازه بده سایر widget ها هم event را دریافت کنند
@@ -274,5 +288,28 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
       } catch (e2) {
       }
     }
+  }
+
+  void _openCalculator() {
+    if (!mounted) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      try {
+        final contextToUse = _dialogContext ?? context;
+        final dialogContext = navigatorKey.currentContext ?? contextToUse;
+
+        if (dialogContext != null) {
+          CalculatorDialog.show(dialogContext);
+        }
+      } catch (e) {
+        // خطا در باز کردن ماشین حساب
+      }
+    });
   }
 }

@@ -256,6 +256,7 @@ class ProductRepository(BaseRepository[Product]):
                 "default_warehouse_id": p.default_warehouse_id,
                 "default_warehouse_name": (p.default_warehouse.name if hasattr(p.default_warehouse, 'name') else None) if p.default_warehouse else None,
                 "default_warehouse_code": (p.default_warehouse.code if hasattr(p.default_warehouse, 'code') else None) if p.default_warehouse else None,
+                "is_active": getattr(p, 'is_active', True),  # اضافه کردن فیلد is_active
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
@@ -282,6 +283,8 @@ class ProductRepository(BaseRepository[Product]):
 
         return {
             "items": items,
+            "total_count": total,  # اضافه کردن total_count برای سازگاری با response model
+            "has_more": skip + take < total,  # اضافه کردن has_more برای سازگاری با response model
             "pagination": {
                 "total": total,
                 "page": (skip // take) + 1 if take else 1,

@@ -637,15 +637,15 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         pageSizeOptions: const [10, 20, 50, 100],
         additionalParams: {
           'document_type': _selectedDocumentType,
-          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         },
         getExportParams: () => {
           'business_id': widget.businessId,
           'document_type': _selectedDocumentType,
-          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         },
         onRowTap: (item) => _onView(item as ExpenseIncomeDocument),
@@ -683,8 +683,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         'business_id': widget.businessId,
         // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       },
       columns: [
@@ -830,8 +830,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       additionalParams: {
         // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       },
       onRowTap: (item) => _onView(item),

@@ -122,6 +122,7 @@ flutter run
 ./run_web.sh                    # اجرای وب اپلیکیشن
 ./run_web.sh --port 8081        # اجرا روی پورت مشخص
 ./run_web.sh --mode debug       # اجرا در حالت debug
+./run_web.sh --api-base-url ""  # استفاده از same-origin (نیازمند reverse proxy برای /api و /ws)
 ```
 
 ### اجرای Flutter Linux Desktop

@@ -26,6 +26,10 @@ class DataTableWidget<T> extends StatefulWidget {
   final T Function(Map<String, dynamic>) fromJson;
   final CalendarController? calendarController;
   final VoidCallback? onRefresh;
+  // Local mode: if provided, table will render these rows and skip API fetching.
+  // Useful for screens that already have data in memory but want to reuse the unified table UI.
+  final List<Map<String, dynamic>>? localRawItems;
+  final Map<String, dynamic>? localSummary;
 
   const DataTableWidget({
     super.key,
@@ -33,6 +37,8 @@ class DataTableWidget<T> extends StatefulWidget {
     required this.fromJson,
     this.calendarController,
     this.onRefresh,
+    this.localRawItems,
+    this.localSummary,
   });
 
   @override
@@ -266,6 +272,39 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _error = null;
 
     try {
+      // Local mode: bypass API and just display provided rows
+      if (widget.localRawItems != null) {
+        final raw = widget.localRawItems!;
+        final parsed = <T>[];
+        for (final r in raw) {
+          try {
+            parsed.add(widget.fromJson(r));
+          } catch (e) {
+            debugPrint('Error parsing local item: $e, item: $r');
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _items = parsed;
+            _rawItems = raw;
+            _page = 1;
+            _total = raw.length;
+            _totalPages = raw.isEmpty ? 0 : 1;
+            _summary = widget.localSummary;
+            _selectedRows.clear();
+            _activeRowIndex = _items.isNotEmpty ? 0 : -1;
+            _lastSelectedRowIndex = null;
+          });
+        }
+        await _maybeAutoFitColumns();
+        if (widget.onRefresh != null) {
+          widget.onRefresh!();
+        } else if (widget.config.onRefresh != null) {
+          widget.config.onRefresh!();
+        }
+        return;
+      }
+
       final api = ApiClient();
       
       // Build QueryInfo payload
@@ -332,11 +371,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (body == null) {
         throw Exception('Response data is null');
       }
-      
-      if (body is! Map<String, dynamic>) {
-        throw FormatException('Invalid response format: expected Map<String, dynamic>, got ${body.runtimeType}');
-      }
-      
+
       final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
       
       // Extract summary from API response if available
@@ -381,6 +416,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (mounted) {
         setState(() => _loadingList = false);
       }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DataTableWidget<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If local data changes, refresh immediately.
+    if (widget.localRawItems != null && !identical(oldWidget.localRawItems, widget.localRawItems)) {
+      _fetchData();
     }
   }
   

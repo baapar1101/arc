@@ -203,6 +203,7 @@ class AIService {
     required String content,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
+    CancelToken? cancelToken,
   }) async* {
     try {
       // Use ApiClient with streaming response type
@@ -219,6 +220,7 @@ class AIService {
             'Cache-Control': 'no-cache',
           },
         ),
+        cancelToken: cancelToken,
       );
 
       final responseBody = response.data;

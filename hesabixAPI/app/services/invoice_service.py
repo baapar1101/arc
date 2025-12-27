@@ -3699,6 +3699,7 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         product_lines.append({
             "id": it.id,
             "product_id": it.product_id,
+            "product_code": getattr(product, "code", None) if product else None,
             "product_name": getattr(product, "name", None),
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,

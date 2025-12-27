@@ -655,8 +655,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       },
       additionalParams: {
         'document_type': _selectedInvoiceType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         'tax_status': _selectedTaxStatus,
       },
       emptyStateMessage: t.taxWorkspaceEmpty,

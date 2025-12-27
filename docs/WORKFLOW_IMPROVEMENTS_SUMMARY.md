@@ -275,7 +275,10 @@ flutter pub get
 flutter build web --release
 
 # یا Run برای development
-flutter run -d web-server --web-port=8080
+./run_web.sh --mode debug
+
+# (اگر مستقیم flutter run می‌زنید)
+flutter run -d web-server --web-port=8080 --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
 ---

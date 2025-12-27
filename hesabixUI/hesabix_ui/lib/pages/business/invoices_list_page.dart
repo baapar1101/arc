@@ -804,8 +804,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         pageSizeOptions: const [10, 20, 50, 100],
         additionalParams: {
           'document_type': _selectedInvoiceType,
-          if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-          if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
           if (_isProforma != null) 'is_proforma': _isProforma,
           if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
@@ -1044,8 +1044,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       pageSizeOptions: const [10, 20, 50, 100],
       additionalParams: {
         'document_type': _selectedInvoiceType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_isProforma != null) 'is_proforma': _isProforma,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,

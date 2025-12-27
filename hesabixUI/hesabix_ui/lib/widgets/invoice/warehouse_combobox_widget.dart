@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/warehouse_service.dart';
 import '../../models/warehouse_model.dart';
+import '../../utils/responsive_helper.dart';
 
 class WarehouseComboboxWidget extends StatefulWidget {
   final int businessId;
@@ -10,6 +11,7 @@ class WarehouseComboboxWidget extends StatefulWidget {
   final String label;
   final String hintText;
   final bool isRequired;
+  final double? height; // ارتفاع اختیاری برای هماهنگی با سایر فیلدها
 
   const WarehouseComboboxWidget({
     super.key,
@@ -19,6 +21,7 @@ class WarehouseComboboxWidget extends StatefulWidget {
     this.label = 'انبار',
     this.hintText = 'انتخاب انبار',
     this.isRequired = false,
+    this.height,
   });
 
   @override
@@ -63,9 +66,11 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final effectiveHeight = widget.height ?? 48.0; // پیش‌فرض 48px
+    
     if (_loading) {
       return SizedBox(
-        height: 36,
+        height: effectiveHeight,
         child: Center(
           child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
         ),
@@ -87,15 +92,25 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
       }),
     ];
 
-    return DropdownButtonFormField<int?>(
-      value: _selectedValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        labelText: widget.label,
-        hintText: widget.hintText,
-        border: const OutlineInputBorder(),
+    // استفاده از همان contentPadding که در سایر فیلدها استفاده می‌شود
+    final useDense = false; // همیشه false برای هماهنگی با سایر فیلدها
+    final contentPadding = ResponsiveHelper.isMobile(context)
+        ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+        : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+    
+    return SizedBox(
+      height: effectiveHeight,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: DropdownButtonFormField<int?>(
+          value: _selectedValue,
+          isExpanded: true,
+          decoration: InputDecoration(
+            isDense: useDense,
+            contentPadding: contentPadding,
+            labelText: widget.label,
+            hintText: widget.hintText,
+            border: const OutlineInputBorder(),
         suffixIcon: _selectedValue != null && !widget.isRequired
             ? IconButton(
                 icon: const Icon(Icons.clear, size: 18),
@@ -152,6 +167,8 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
       validator: widget.isRequired
           ? (value) => value == null ? '${widget.label} الزامی است' : null
           : null,
+        ),
+      ),
     );
   }
 }

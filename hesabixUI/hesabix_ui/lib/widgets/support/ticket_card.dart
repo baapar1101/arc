@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'ticket_status_chip.dart';
 import 'priority_indicator.dart';
@@ -269,24 +270,31 @@ class TicketCard extends StatelessWidget {
   }
 
   String _formatDate(DateTime dateTime, AppLocalizations l10n) {
+    // Ensure dateTime is in local timezone
+    final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final difference = now.difference(localDateTime);
 
     // If the difference is negative (future time), show just now
     if (difference.isNegative) {
       return l10n.justNow;
     }
 
-    if (difference.inDays > 0) {
-      return l10n.daysAgo(difference.inDays.toString());
-    } else if (difference.inHours > 0) {
-      return l10n.hoursAgo(difference.inHours.toString());
-    } else if (difference.inMinutes > 0) {
-      return l10n.minutesAgo(difference.inMinutes.toString());
-    } else if (difference.inSeconds > 10) {
-      return l10n.justNow;
-    } else {
-      return l10n.justNow;
+    // For recent tickets (less than 24 hours), show relative time
+    if (difference.inDays == 0) {
+      if (difference.inHours > 0) {
+        return l10n.hoursAgo(difference.inHours.toString());
+      } else if (difference.inMinutes > 0) {
+        return l10n.minutesAgo(difference.inMinutes.toString());
+      } else if (difference.inSeconds > 10) {
+        return l10n.justNow;
+      } else {
+        return l10n.justNow;
+      }
     }
+
+    // For older tickets, show full date
+    final isJalali = calendarController?.isJalali ?? true;
+    return date_utils.HesabixDateUtils.formatForDisplay(localDateTime, isJalali);
   }
 }

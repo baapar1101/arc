@@ -1,6 +1,6 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from fastapi import APIRouter, Depends, Request, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Query, UploadFile, File, Body
 from sqlalchemy.orm import Session
 import io
 
@@ -35,8 +35,10 @@ router = APIRouter(prefix="/users", tags=["کاربران", "مدیریت سیس
 	
 	### نکات:
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
-	- نتایج به مدت 60 ثانیه cache می‌شوند
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	- نتایج به مدت 60 ثانیه cache می‌شوند (Cache key بر اساس query parameters و user_id ایجاد می‌شود)
 	- برای جستجوی ساده از `GET /users` استفاده کنید
+	- حداکثر تعداد رکورد در هر صفحه: 1000 (پارامتر `take`)
 	""",
 	response_model=SuccessResponse,
 	responses={
@@ -87,13 +89,43 @@ router = APIRouter(prefix="/users", tags=["کاربران", "مدیریت سیس
 					}
 				}
 			}
+		},
+		422: {
+			"description": "خطا در اعتبارسنجی داده‌ها",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "take نمی‌تواند بیشتر از 1000 باشد",
+						"error_code": "VALIDATION_ERROR"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
 @require_user_management()
 def list_users(
 	request: Request,
-	query_info: QueryInfo,
+	query_info: QueryInfo = Body(..., description="پارامترهای جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -140,9 +172,9 @@ def list_users(
 	- **<**: کوچکتر از
 	- **<=**: کوچکتر یا مساوی
 	- **!=**: نامساوی
-	- **\***: شامل (contains)
-	- **?***: خاتمه یابد (ends with)
-	- ***?**: شروع شود (starts with)
+	- **\\***: شامل (contains)
+	- **?\\***: خاتمه یابد (ends with)
+	- **\\*?**: شروع شود (starts with)
 	- **in**: در بین مقادیر آرایه
 	- **not_in**: موجود نیست در لیست
 	- **is_null**: مقدار خالی است
@@ -334,6 +366,8 @@ def list_users(
 	- این endpoint برای دریافت لیست ساده کاربران بدون فیلتر پیشرفته است
 	- برای جستجو و فیلتر پیشرفته از `POST /users/search` استفاده کنید
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	- حداکثر تعداد رکورد در هر صفحه: 100 (پارامتر `limit`)
 	
 	### مثال cURL:
 	```bash
@@ -402,6 +436,24 @@ def list_users(
 					}
 				}
 			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
@@ -436,7 +488,10 @@ def list_users_simple(
 	
 	### محدودیت‌های فایل:
 	- **فرمت‌های مجاز**: JPG, JPEG, PNG, GIF, WebP, BMP
+	- **MIME Types**: image/jpeg, image/png, image/gif, image/webp, image/bmp
 	- **حداکثر حجم**: بر اساس تنظیمات سیستم (پیش‌فرض: 10 مگابایت)
+	- **ابعاد تصویر**: محدودیت خاصی ندارد (توصیه می‌شود برای بهینه‌سازی حداکثر 2000x2000 پیکسل)
+	- **نسبت تصویر**: محدودیت خاصی ندارد
 	- **انقضا**: فایل به مدت 10 سال (3650 روز) نگهداری می‌شود
 	
 	### مثال cURL:
@@ -494,6 +549,38 @@ def list_users_simple(
 						"error_code": "USER_NOT_FOUND"
 					}
 				}
+			}
+		},
+		413: {
+			"description": "حجم فایل بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "حجم فایل از حداکثر مجاز (10 مگابایت) تجاوز می‌کند",
+						"error_code": "FILE_SIZE_EXCEEDED",
+						"file_size_mb": 15.5,
+						"max_file_size_mb": 10
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
 			}
 		}
 	}
@@ -584,6 +671,24 @@ async def upload_my_signature(
 					}
 				}
 			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
@@ -617,7 +722,15 @@ async def get_my_signature(
 	- نشست‌های فعال کاربر
 	- آخرین فعالیت‌های کاربر (حداکثر 50 مورد)
 	
-	نیاز به مجوز `user_management` در سطح اپلیکیشن دارد.
+	### نکات:
+	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	
+	### مثال cURL:
+	```bash
+	curl -X GET "http://localhost:8000/api/v1/users/123" \\
+		 -H "Authorization: Bearer sk_your_api_key"
+	```
 	""",
 	response_model=SuccessResponse,
 	responses={
@@ -733,6 +846,24 @@ async def get_my_signature(
 						"error_code": "USER_NOT_FOUND"
 					}
 				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
 			}
 		}
 	}
@@ -901,6 +1032,24 @@ def get_user(
 					}
 				}
 			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
@@ -943,6 +1092,8 @@ def get_users_summary(
 	- فقط کاربران غیرفعال فعال می‌شوند
 	- کاربران فعال قبلاً نادیده گرفته می‌شوند
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	- محدودیت تعداد: توصیه می‌شود حداکثر 100 کاربر در هر درخواست (بدون محدودیت سخت)
 	
 	### مثال cURL:
 	```bash
@@ -981,10 +1132,28 @@ def get_users_summary(
 				"application/json": {
 					"example": {
 						"success": False,
-						"message": "user_ids باید لیستی از اعداد باشد",
+						"message": "user_ids باید لیستی از اعداد باشد و حداقل 1 آیتم داشته باشد",
 						"error_code": "VALIDATION_ERROR"
 					}
 				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
 			}
 		}
 	}
@@ -992,7 +1161,7 @@ def get_users_summary(
 @require_user_management()
 def bulk_activate_users(
 	request: Request,
-	payload: BulkActivateRequest,
+	payload: BulkActivateRequest = Body(..., description="لیست شناسه‌های کاربران برای فعال‌سازی"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -1010,7 +1179,7 @@ def bulk_activate_users(
 	
 	return success_response({
 		"updated_count": updated_count,
-		"total_requested": len(user_ids)
+		"total_requested": len(payload.user_ids)
 	}, request)
 
 
@@ -1024,6 +1193,8 @@ def bulk_activate_users(
 	- کاربران غیرفعال قبلاً نادیده گرفته می‌شوند
 	- نمی‌توانید خود را تعلیق کنید (نادیده گرفته می‌شود)
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	- محدودیت تعداد: توصیه می‌شود حداکثر 100 کاربر در هر درخواست (بدون محدودیت سخت)
 	
 	### مثال cURL:
 	```bash
@@ -1057,14 +1228,41 @@ def bulk_activate_users(
 			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
 		},
 		422: {
-			"description": "خطا در اعتبارسنجی داده‌ها"
+			"description": "خطا در اعتبارسنجی داده‌ها",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "user_ids باید لیستی از اعداد باشد و حداقل 1 آیتم داشته باشد",
+						"error_code": "VALIDATION_ERROR"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
 @require_user_management()
 def bulk_suspend_users(
 	request: Request,
-	payload: BulkSuspendRequest,
+	payload: BulkSuspendRequest = Body(..., description="لیست شناسه‌های کاربران برای تعلیق"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -1099,6 +1297,8 @@ def bulk_suspend_users(
 	- فقط برای کاربرانی که ایمیل یا موبایل دارند توکن ایجاد می‌شود
 	- توکن‌ها به صورت خودکار منقضی می‌شوند (بر اساس تنظیمات سیستم)
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
+	- محدودیت تعداد: توصیه می‌شود حداکثر 100 کاربر در هر درخواست (بدون محدودیت سخت)
 	
 	### مثال cURL:
 	```bash
@@ -1132,14 +1332,41 @@ def bulk_suspend_users(
 			"description": "دسترسی غیرمجاز - نیاز به مجوز user_management"
 		},
 		422: {
-			"description": "خطا در اعتبارسنجی داده‌ها"
+			"description": "خطا در اعتبارسنجی داده‌ها",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "user_ids باید لیستی از اعداد باشد و حداقل 1 آیتم داشته باشد",
+						"error_code": "VALIDATION_ERROR"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
 @require_user_management()
 def bulk_reset_password(
 	request: Request,
-	payload: BulkResetPasswordRequest,
+	payload: BulkResetPasswordRequest = Body(..., description="لیست شناسه‌های کاربران برای بازنشانی رمز عبور"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ):
@@ -1185,6 +1412,7 @@ def bulk_reset_password(
 	### نکات:
 	- نمی‌توانید خود را تعلیق کنید
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
 	
 	### مثال cURL:
 	```bash
@@ -1237,6 +1465,24 @@ def bulk_reset_password(
 					}
 				}
 			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
@@ -1273,6 +1519,7 @@ def suspend_user(
 	
 	### نکات:
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
 	
 	### مثال cURL:
 	```bash
@@ -1313,6 +1560,24 @@ def suspend_user(
 					}
 				}
 			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
+			}
 		}
 	}
 )
@@ -1347,6 +1612,7 @@ def activate_user(
 	- کاربر باید ایمیل یا موبایل داشته باشد
 	- در محیط production، توکن نباید در response برگردانده شود
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
 	
 	### مثال cURL:
 	```bash
@@ -1399,6 +1665,24 @@ def activate_user(
 						"error_code": "USER_NOT_FOUND"
 					}
 				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+						"error_code": "RATE_LIMIT_EXCEEDED"
+					}
+				}
+			},
+			"headers": {
+				"X-RateLimit-Limit": {"description": "حد مجاز درخواست", "schema": {"type": "integer", "example": 500}},
+				"X-RateLimit-Remaining": {"description": "تعداد درخواست‌های باقیمانده", "schema": {"type": "integer", "example": 0}},
+				"X-RateLimit-Reset": {"description": "زمان reset به ثانیه (Unix timestamp)", "schema": {"type": "integer", "example": 1705324800}},
+				"Retry-After": {"description": "زمان باقیمانده تا retry به ثانیه", "schema": {"type": "integer", "example": 30}}
 			}
 		}
 	}

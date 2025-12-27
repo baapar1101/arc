@@ -125,8 +125,8 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
       final res = await widget.service.listDocuments(
         businessId: widget.businessId,
         documentType: _documentType,
-        fromDate: _fromDate?.toUtc().toIso8601String(),
-        toDate: _toDate?.toUtc().toIso8601String(),
+        fromDate: _fromDate == null ? null : HesabixDateUtils.formatForApiDate(_fromDate!),
+        toDate: _toDate == null ? null : HesabixDateUtils.formatForApiDate(_toDate!),
         search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
         page: _page,
         perPage: _perPage,

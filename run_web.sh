@@ -8,15 +8,24 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
 
-DEFAULT_HOST="0.0.0.0"
+# NOTE:
+# Flutter's built-in `web-server` device is intended for local/dev usage.
+# Binding to 0.0.0.0 on an internet-facing machine will attract random/malformed
+# requests (bots/scanners), which can produce noisy logs like:
+# "Error parsing request ... handlerPath ... requestedUri ..."
+#
+# If you intentionally need remote access, run:
+#   ./run_web.sh --host 0.0.0.0
+DEFAULT_HOST="127.0.0.1"
 DEFAULT_PORT=8080
 DEFAULT_MODE="release" # release|debug
+DEFAULT_API_BASE_URL="http://localhost:8000"
 
 USER_PROJECT=""
 HOST="$DEFAULT_HOST"
 PORT=""
 MODE="$DEFAULT_MODE"
-API_BASE_URL=""
+API_BASE_URL="$DEFAULT_API_BASE_URL"
 
 print_usage() {
   cat <<EOF
@@ -27,7 +36,8 @@ Options:
   --host HOST      Host for web server (default: $DEFAULT_HOST).
   --port PORT      Web server port. If not specified, nearest free port from $DEFAULT_PORT will be selected.
   --mode MODE      Run type: release or debug (default: $DEFAULT_MODE).
-  --api-base-url  API base URL passed to app as --dart-define.
+  --api-base-url   API base URL passed to app as --dart-define (default: $DEFAULT_API_BASE_URL).
+                  Tip: pass empty string to use same-origin (requires reverse proxy for /api and /ws).
   -h, --help       Show help.
 
 Usage examples:
@@ -35,6 +45,7 @@ Usage examples:
   ./run_web.sh --port 8081 --mode debug
   ./run_web.sh --project hesabixUI/hesabix_ui
   ./run_web.sh --api-base-url http://localhost:8000
+  ./run_web.sh --api-base-url ""
 EOF
 }
 
@@ -196,6 +207,7 @@ BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
 echo "Repo root: $REPO_ROOT"
 echo "Project path: $APP_DIR"
 echo "Host: $HOST  | Port: $PORT  | Mode: $MODE"
+echo "API Base URL: ${API_BASE_URL:-<same-origin>}"
 echo ""
 echo "CPU Optimization:"
 echo "  Total CPU cores: $AVAILABLE_CORES"

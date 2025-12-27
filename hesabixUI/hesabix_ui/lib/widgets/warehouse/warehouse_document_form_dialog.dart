@@ -1477,18 +1477,35 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                               children: [
                                 Expanded(
                                   child: ProductComboboxWidget(
+                                    key: ValueKey('product_line_$index'), // استفاده از index به جای product_id
                                     businessId: widget.businessId,
-                                    selectedProduct: line['product_id'] != null
-                                        ? {
-                                            'id': line['product_id'],
-                                            'name': line['product_name'],
-                                            'code': line['product_code'],
-                                          }
-                                        : null,
+                                    selectedProduct: () {
+                                      final productId = line['product_id'];
+                                      final productName = line['product_name'];
+                                      final productCode = line['product_code'];
+                                      final selectedProduct = productId != null
+                                          ? {
+                                              'id': productId,
+                                              'name': productName,
+                                              'code': productCode,
+                                            }
+                                          : null;
+                                      debugPrint('[WarehouseDocForm] Building ProductComboboxWidget for line $index');
+                                      debugPrint('[WarehouseDocForm] selectedProduct: $selectedProduct');
+                                      debugPrint('[WarehouseDocForm] line data: product_id=$productId, product_name="$productName", product_code="$productCode"');
+                                      return selectedProduct;
+                                    }(),
                                     onChanged: _isPosted ? (_) {} : (product) {
+                                      debugPrint('[WarehouseDocForm] ProductCombobox onChanged called');
+                                      debugPrint('[WarehouseDocForm] product: $product');
+                                      debugPrint('[WarehouseDocForm] line index: $index');
+                                      debugPrint('[WarehouseDocForm] current line: ${_lines[index]}');
+                                      
                                       final productId = product?['id'];
                                       final productName = product?['name'];
                                       final productCode = product?['code'];
+                                      
+                                      debugPrint('[WarehouseDocForm] Extracted - productId: $productId, productName: "$productName", productCode: "$productCode"');
                                       
                                       _updateLine(index, {
                                         'product_id': productId,
@@ -1497,18 +1514,25 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                         'instance_data': null, // پاک کردن instance_data قبلی
                                       });
                                       
+                                      debugPrint('[WarehouseDocForm] After _updateLine, line is: ${_lines[index]}');
+                                      
                                       // بارگذاری اطلاعات کالا برای بررسی یونیک بودن
                                       if (productId != null) {
                                         _loadProductInfo(productId).then((_) {
                                           // به‌روزرسانی اطلاعات کامل کالا از cache در صورت نیاز
                                           if (_productCache.containsKey(productId)) {
                                             final cachedProduct = _productCache[productId]!;
+                                            debugPrint('[WarehouseDocForm] Updating line with cached product: $cachedProduct');
                                             _updateLine(index, {
                                               'product_name': cachedProduct['name'],
                                               'product_code': cachedProduct['code'],
                                             });
+                                            debugPrint('[WarehouseDocForm] After second _updateLine, line is: ${_lines[index]}');
                                           }
-                                          if (mounted) setState(() {}); // به‌روزرسانی UI
+                                          if (mounted) {
+                                            debugPrint('[WarehouseDocForm] Calling setState to update UI');
+                                            setState(() {}); // به‌روزرسانی UI
+                                          }
                                         });
                                       }
                                     },

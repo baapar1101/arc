@@ -1,18 +1,33 @@
 import 'package:flutter/material.dart';
-import 'zohal_inquiry_form_widget.dart';
-import 'zohal_result_widget.dart';
-import 'inquiry_widgets/card_inquiry_widget.dart';
-import 'inquiry_widgets/shahkar_inquiry_widget.dart';
-import 'inquiry_widgets/vehicle_inquiry_widget.dart';
-import 'inquiry_widgets/company_inquiry_widget.dart';
-import 'inquiry_widgets/identity_inquiry_widget.dart';
-import 'inquiry_widgets/default_inquiry_widget.dart';
-import 'result_widgets/card_inquiry_result_widget.dart';
-import 'result_widgets/shahkar_result_widget.dart';
-import 'result_widgets/vehicle_inquiry_result_widget.dart';
-import 'result_widgets/company_inquiry_result_widget.dart';
-import 'result_widgets/identity_inquiry_result_widget.dart';
-import 'result_widgets/default_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/card_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/shahkar_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/vehicle_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/company_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/identity_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/default_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/card_to_iban_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/iban_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/check_card_with_name_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/account_to_iban_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/check_iban_with_name_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/check_sayad_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/banking/bounced_cheque_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/services/postal_code_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/services/bill_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/services/enamad_inquiry_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/inquiry_widgets/services/persian_to_finglish_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/card_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/shahkar_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/vehicle_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/company_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/identity_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/default_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/banking/card_to_iban_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/banking/iban_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/banking/account_to_iban_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/banking/check_sayad_inquiry_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/banking/bounced_cheque_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/result_widgets/services/postal_code_inquiry_result_widget.dart';
 
 /// فکتوری برای ساخت ویجت‌های اختصاصی ورودی و نمایش نتیجه سرویس‌های زحل
 class ZohalServiceWidgetFactory {
@@ -23,6 +38,7 @@ class ZohalServiceWidgetFactory {
     required GlobalKey<FormState> formKey,
     required Function(Map<String, dynamic>) onSubmit,
     required bool isSubmitting,
+    VoidCallback? onClose,
   }) {
     final serviceCode = service['service_code']?.toString() ?? '';
     
@@ -30,6 +46,7 @@ class ZohalServiceWidgetFactory {
     final normalizedCode = _normalizeServiceCode(serviceCode);
     
     switch (normalizedCode) {
+      // بانکی
       case 'card_inquiry':
         return CardInquiryWidget(
           service: service,
@@ -37,8 +54,154 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
       
+      case 'card_to_iban':
+        return CardToIbanWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'iban':
+        return IbanInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'check_card_with_name':
+        return CheckCardWithNameWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'account_to_iban':
+        return AccountToIbanWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'check_iban_with_name':
+        return CheckIbanWithNameWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'check_sayad_inquiry':
+        return CheckSayadInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'bounced_cheque':
+        return BouncedChequeWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      // خدماتی
+      case 'postal_code_inquiry':
+        return PostalCodeInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'bill_mci':
+        return BillInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          billType: 'mci',
+          onClose: onClose,
+        );
+      
+      case 'bill_irancell':
+        return BillInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          billType: 'irancell',
+          onClose: onClose,
+        );
+      
+      case 'bill_rightel':
+        return BillInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          billType: 'rightel',
+          onClose: onClose,
+        );
+      
+      case 'bill_fixed_line':
+        return FixedLineBillWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'enamad_inquiry':
+        return EnamadInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      case 'persian_to_finglish':
+        return PersianToFinglishWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+          onClose: onClose,
+        );
+      
+      // دیگر سرویس‌ها
       case 'shahkar':
         return ShahkarInquiryWidget(
           service: service,
@@ -46,6 +209,7 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
       
       case 'vehicle_inquiry_total_violations':
@@ -56,6 +220,7 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
       
       case 'company_inquiry':
@@ -65,6 +230,7 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
       
       case 'identity_inquiry':
@@ -77,6 +243,7 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
       
       default:
@@ -86,6 +253,7 @@ class ZohalServiceWidgetFactory {
           formKey: formKey,
           onSubmit: onSubmit,
           isSubmitting: isSubmitting,
+          onClose: onClose,
         );
     }
   }
@@ -101,6 +269,7 @@ class ZohalServiceWidgetFactory {
     final normalizedCode = _normalizeServiceCode(serviceCode ?? '');
     
     switch (normalizedCode) {
+      // بانکی
       case 'card_inquiry':
         return CardInquiryResultWidget(
           result: result,
@@ -109,6 +278,56 @@ class ZohalServiceWidgetFactory {
           walletCurrency: walletCurrency,
         );
       
+      case 'card_to_iban':
+        return CardToIbanResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      case 'iban':
+        return IbanInquiryResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      case 'account_to_iban':
+        return AccountToIbanResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      case 'check_sayad_inquiry':
+        return CheckSayadInquiryResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      case 'bounced_cheque':
+        return BouncedChequeResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      // خدماتی
+      case 'postal_code_inquiry':
+        return PostalCodeInquiryResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      // دیگر سرویس‌ها
       case 'shahkar':
         return ShahkarResultWidget(
           result: result,
@@ -166,6 +385,7 @@ class ZohalServiceWidgetFactory {
     // اگر شامل مسیر کامل API است، استخراج کنیم
     // مثال: /services/inquiry/card_inquiry -> card_inquiry
     // مثال: /services/inquiry/vehicle_inquiry/total_violations -> vehicle_inquiry_total_violations
+    // مثال: /services/inquiry/bill/mci -> bill_mci
     if (code.contains('/')) {
       final parts = code.split('/').where((p) => p.isNotEmpty).toList();
       

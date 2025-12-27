@@ -434,16 +434,16 @@ class _DocumentsPageState extends State<DocumentsPage> {
       getExportParams: () => {
         'business_id': widget.businessId,
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       },
       additionalParams: {
         if (_selectedDocumentType != null)
           'document_type': _selectedDocumentType!,
         if (_fromDate != null)
-          'from_date': _fromDate!.toUtc().toIso8601String(),
+          'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null)
-          'to_date': _toDate!.toUtc().toIso8601String(),
+          'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       },
       columns: [
         // شماره سند

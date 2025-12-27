@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/expense_income_document.dart';
 
 /// سرویس لیست اسناد هزینه/درآمد
@@ -28,8 +29,8 @@ class ExpenseIncomeListService {
         'sort_desc': sortDesc,
         'search': search,
         'document_type': documentType,
-        if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
-        if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
+        if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+        if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
       };
 
       final response = await _apiClient.post(
@@ -105,8 +106,8 @@ class ExpenseIncomeListService {
       final params = {
         'business_id': businessId,
         if (documentType != null) 'document_type': documentType,
-        if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
-        if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
+        if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+        if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
       };
 
       return await _apiClient.downloadExcel(
@@ -130,8 +131,8 @@ class ExpenseIncomeListService {
       final queryParams = <String, dynamic>{
         'business_id': businessId,
         if (documentType != null) 'document_type': documentType,
-        if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
-        if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
+        if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+        if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
       };
 
       final response = await _apiClient.get<List<int>>(

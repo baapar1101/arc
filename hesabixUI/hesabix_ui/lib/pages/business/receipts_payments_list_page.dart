@@ -328,8 +328,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         'business_id': widget.businessId,
         // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       },
       columns: [
         // کد سند
@@ -464,8 +464,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       additionalParams: {
         // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       },
       onRowTap: (item) => _onView(item),
       onRowDoubleTap: (item) => _onEdit(item),

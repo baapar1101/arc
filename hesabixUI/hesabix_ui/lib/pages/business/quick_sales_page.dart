@@ -9,6 +9,7 @@ import '../../services/invoice_service.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
 import '../../services/price_list_service.dart';
+import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -22,6 +23,7 @@ import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/product/product_form_dialog.dart';
+import '../../widgets/product/category_tree_widget.dart';
 import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,6 +50,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   final ProductService _productService = ProductService();
   final WarehouseService _warehouseService = WarehouseService();
   final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
+  final CategoryService _categoryService = CategoryService(ApiClient());
   
   bool _loading = true;
   bool _saving = false;
@@ -90,17 +93,57 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   final FocusNode _keyboardListenerFocus = FocusNode();
   Timer? _searchDebounce;
   String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
+  
+  // دسته‌بندی‌ها
+  List<CategoryNode> _categoryTree = [];
+  bool _loadingCategories = false;
+  int? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _loadRecentProducts();
+    _loadCategories();
     // فوکوس خودکار روی فیلد بارکد
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _barcodeFocus.requestFocus();
       _keyboardListenerFocus.requestFocus();
     });
+  }
+  
+  Future<void> _loadCategories() async {
+    if (_loadingCategories) return;
+    setState(() {
+      _loadingCategories = true;
+    });
+    try {
+      final categories = await _categoryService.getCategoriesTree(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _categoryTree = categories.map((e) => CategoryNode.fromMap(e)).toList();
+          _loadingCategories = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading categories: $e');
+      if (mounted) {
+        setState(() {
+          _loadingCategories = false;
+        });
+      }
+    }
+  }
+  
+  List<int> _getCategoryIdsForFilter(int? categoryId) {
+    if (categoryId == null) return [];
+    
+    // پیدا کردن node مربوط به دسته انتخاب شده
+    final node = findCategoryNode(_categoryTree, categoryId);
+    if (node == null) return [categoryId];
+    
+    // جمع‌آوری تمام IDهای زیردسته‌ها
+    return getAllCategoryIds(node);
   }
   
   Future<void> _loadRecentProducts() async {
@@ -318,11 +361,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     
       // جستجو در محصولات عادی (از طریق کد، بارکد یا نام)
     try {
+      final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
         searchQuery: code.trim(),
         limit: 10, // افزایش limit برای بررسی چند نتیجه
         searchFields: const ['code', 'barcode', 'name'],
+        categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       
       if (products.isEmpty) {
@@ -1157,6 +1202,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     });
   }
 
+  bool _isAnyTextInputFocused() {
+    final primary = FocusManager.instance.primaryFocus;
+    final ctx = primary?.context;
+    if (ctx == null) return false;
+    // اگر فوکوس روی هر نوع فیلد متنی/EditableText باشد (یا داخل آن باشد)، نباید میانبرهای سراسری مثل Enter برای ثبت اجرا شوند.
+    return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
   bool _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       final isControlPressed = HardwareKeyboard.instance.isControlPressed;
@@ -1166,6 +1219,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       if (event.logicalKey == LogicalKeyboardKey.enter &&
           !isControlPressed &&
           !isMetaPressed) {
+        // وقتی کاربر داخل فیلدهای متنی (خصوصاً فیلد جستجو) است، Enter باید همان رفتار ورودی/جستجو را داشته باشد
+        // و نباید به عنوان "ثبت فاکتور" تفسیر شود.
+        if (_isAnyTextInputFocused()) {
+          return false;
+        }
         if (!_saving && _cartItems.isNotEmpty) {
           _saveInvoice(print: false);
           return true;
@@ -1202,7 +1260,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       // Delete: حذف آخرین محصول
       if (event.logicalKey == LogicalKeyboardKey.delete ||
           event.logicalKey == LogicalKeyboardKey.backspace) {
-        if (_cartItems.isNotEmpty && _barcodeFocus.hasFocus) {
+        // فقط وقتی فیلد جستجو خالی است، Backspace/Delete را به حذف آخرین قلم نگاشت می‌کنیم
+        // تا هنگام ویرایش متن، کاربر بتواند به شکل طبیعی کاراکترها را پاک کند.
+        if (_cartItems.isNotEmpty && _barcodeFocus.hasFocus && _barcodeController.text.isEmpty) {
           _removeFromCart(_cartItems.length - 1);
           return true;
         }
@@ -1767,44 +1827,195 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   }
 
   Widget _buildBarcodeSearchField() {
-    return TextField(
-      controller: _barcodeController,
-      focusNode: _barcodeFocus,
-      decoration: InputDecoration(
-        labelText: 'بارکد / کد / نام محصول',
-        hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
-        prefixIcon: const Icon(Icons.qr_code_scanner),
-        border: const OutlineInputBorder(),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
-            if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.add_circle, color: Colors.green),
-                tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
-              ),
-            // دکمه جستجو
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () => _searchByBarcode(_barcodeController.text),
-              tooltip: 'جستجو',
-            ),
-          ],
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        // دکمه فیلتر دسته‌بندی
+        IconButton(
+          icon: Icon(
+            _selectedCategoryId != null ? Icons.filter_alt : Icons.filter_alt_outlined,
+          ),
+          tooltip: 'فیلتر دسته‌بندی',
+          color: _selectedCategoryId != null ? cs.primary : cs.onSurface.withOpacity(0.6),
+          onPressed: () => _showCategoryFilter(context),
         ),
-      ),
-      onSubmitted: _searchByBarcode,
-      onChanged: (value) {
-        // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
-        if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
-          setState(() {
-            _lastFailedSearchQuery = null;
-          });
-        }
-      },
-      textInputAction: TextInputAction.search,
+        // Breadcrumb دسته‌بندی انتخاب شده
+        if (_selectedCategoryId != null)
+          Expanded(
+            flex: 0,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Chip(
+                label: Text(_getCategoryLabel(_selectedCategoryId!)),
+                onDeleted: () {
+                  setState(() {
+                    _selectedCategoryId = null;
+                  });
+                },
+                deleteIcon: const Icon(Icons.close, size: 18),
+                avatar: const Icon(Icons.category, size: 18),
+              ),
+            ),
+          ),
+        // فیلد جستجو
+        Expanded(
+          child: TextField(
+            controller: _barcodeController,
+            focusNode: _barcodeFocus,
+            decoration: InputDecoration(
+              labelText: 'بارکد / کد / نام محصول',
+              hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
+              prefixIcon: const Icon(Icons.qr_code_scanner),
+              border: const OutlineInputBorder(),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
+                  if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.add_circle, color: Colors.green),
+                      tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
+                      onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+                    ),
+                  // دکمه جستجو
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: () => _searchByBarcode(_barcodeController.text),
+                    tooltip: 'جستجو',
+                  ),
+                ],
+              ),
+            ),
+            onSubmitted: _searchByBarcode,
+            onChanged: (value) {
+              // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
+              if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+                setState(() {
+                  _lastFailedSearchQuery = null;
+                });
+              }
+            },
+            textInputAction: TextInputAction.search,
+          ),
+        ),
+      ],
     );
+  }
+  
+  String _getCategoryLabel(int categoryId) {
+    final node = findCategoryNode(_categoryTree, categoryId);
+    return node?.label ?? 'دسته‌بندی';
+  }
+  
+  void _showCategoryFilter(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < _mobileBreakpoint;
+    
+    if (isMobile) {
+      // موبایل: bottom sheet
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'انتخاب دسته‌بندی',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 400,
+                  child: _loadingCategories
+                      ? const Center(child: CircularProgressIndicator())
+                      : CategoryTreeWidget(
+                          categories: _categoryTree,
+                          selectedCategoryId: _selectedCategoryId,
+                          onCategorySelected: (categoryId) {
+                            setState(() {
+                              _selectedCategoryId = categoryId;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      // دسکتاپ: Dialog
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          return Dialog(
+            child: Container(
+              width: 600,
+              height: 500,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'انتخاب دسته‌بندی',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _loadingCategories
+                        ? const Center(child: CircularProgressIndicator())
+                        : CategoryTreeWidget(
+                            categories: _categoryTree,
+                            selectedCategoryId: _selectedCategoryId,
+                            onCategorySelected: (categoryId) {
+                              setState(() {
+                                _selectedCategoryId = categoryId;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
   Widget _buildDesktopCheckoutPanel(ColorScheme cs) {

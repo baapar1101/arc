@@ -96,7 +96,15 @@ flutter build web --release
 
 ### اجرای development server:
 ```bash
-flutter run -d web-server --web-port 8080
+# پیشنهاد: از اسکریپت ریپو استفاده کنید تا API_BASE_URL درست ست شود (پیش‌فرض: http://localhost:8000)
+./run_web.sh --mode debug
+
+# نکته: به‌صورت پیش‌فرض روی 127.0.0.1 اجرا می‌شود (امن‌تر و بدون نویز ربات‌ها).
+# اگر نیاز دارید از بیرون سرور هم دسترسی داشته باشید:
+# ./run_web.sh --host 0.0.0.0 --mode debug
+
+# اگر مستقیم flutter run می‌زنید، برای اینکه درخواست‌ها به خود فرانت نروند، API_BASE_URL را ست کنید:
+flutter run -d web-server --web-port 8080 --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
 ### بررسی مشکلات:

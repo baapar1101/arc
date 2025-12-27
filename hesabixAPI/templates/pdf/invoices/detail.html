@@ -247,66 +247,56 @@
     {% endif %}
 
     <div class="section-card">
-      <div style="margin-top: 4px;">
-        <div class="meta" style="font-weight:bold; margin-bottom:4px; font-size: 12px;">
-          {{ 'مشخصات فروشنده' if is_fa else 'Seller details' }}
-        </div>
-        <div class="meta" style="line-height: 1.4;">
-          <span><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ seller.name or '-' }}</span>
-          {% if seller.national_id or seller.national_code %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ seller.national_id or seller.national_code }}</span>
-          {% endif %}
-          {% if seller.economic_id or seller.economic_code %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ seller.economic_id or seller.economic_code }}</span>
-          {% endif %}
-          {% if seller.registration_number %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ seller.registration_number }}</span>
-          {% endif %}
-          {% if seller.address %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ seller.address }}</span>
-          {% endif %}
-          {% if seller.postal_code %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ seller.postal_code }}</span>
-          {% endif %}
-          {% if seller.phone or seller.mobile %}
-            <span style="margin-inline-start: 8px;"> • </span>
-            <span><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ seller.phone or seller.mobile }}</span>
-          {% endif %}
+      <div style="margin-top: 4px; display: flex; gap: 16px;">
+        <div style="flex: 1;">
+          <div class="meta" style="font-weight:bold; margin-bottom:4px; font-size: 12px;">
+            {{ 'مشخصات فروشنده' if is_fa else 'Seller details' }}
+          </div>
+          <div class="meta" style="line-height: 1.4;">
+            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ seller.name or '-' }}</div>
+            {% if seller.national_id or seller.national_code %}
+              <div><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ seller.national_id or seller.national_code }}</div>
+            {% endif %}
+            {% if seller.economic_id or seller.economic_code %}
+              <div><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ seller.economic_id or seller.economic_code }}</div>
+            {% endif %}
+            {% if seller.registration_number %}
+              <div><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ seller.registration_number }}</div>
+            {% endif %}
+            {% if seller.address %}
+              <div><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ seller.address }}</div>
+            {% endif %}
+            {% if seller.postal_code %}
+              <div><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ seller.postal_code }}</div>
+            {% endif %}
+            {% if seller.phone or seller.mobile %}
+              <div><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ seller.phone or seller.mobile }}</div>
+            {% endif %}
+          </div>
         </div>
 
-        <div style="margin-top: 6px; border-top: 1px dashed #ccc; padding-top: 4px;">
+        <div style="flex: 1; border-inline-start: 1px dashed #ccc; padding-inline-start: 16px;">
           <div class="meta" style="font-weight:bold; margin-bottom:4px; font-size: 12px;">
             {{ 'مشخصات خریدار' if is_fa else 'Buyer details' }}
           </div>
           <div class="meta" style="line-height: 1.4;">
-            <span><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ buyer.name or '-' }}</span>
+            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ buyer.name or '-' }}</div>
             {% if buyer.economic_id or buyer.economic_code %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ buyer.economic_id or buyer.economic_code }}</span>
+              <div><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ buyer.economic_id or buyer.economic_code }}</div>
             {% elif buyer.national_id or buyer.national_code %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ buyer.national_id or buyer.national_code }}</span>
+              <div><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ buyer.national_id or buyer.national_code }}</div>
             {% endif %}
             {% if buyer.registration_number %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ buyer.registration_number }}</span>
+              <div><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ buyer.registration_number }}</div>
             {% endif %}
             {% if buyer.address %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ buyer.address }}</span>
+              <div><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ buyer.address }}</div>
             {% endif %}
             {% if buyer.postal_code %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ buyer.postal_code }}</span>
+              <div><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ buyer.postal_code }}</div>
             {% endif %}
             {% if buyer.mobile or buyer.phone %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ buyer.mobile or buyer.phone }}</span>
+              <div><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ buyer.mobile or buyer.phone }}</div>
             {% endif %}
           </div>
         </div>
@@ -339,7 +329,13 @@
               {% for line in lines or [] %}
                 <tr>
                   <td>{{ loop.index }}</td>
-                  <td>{{ line.product_name or '-' }}</td>
+                  <td>
+                    {% if line.product_code %}
+                      {{ line.product_code }} - {{ line.product_name or '-' }}
+                    {% else %}
+                      {{ line.product_name or '-' }}
+                    {% endif %}
+                  </td>
                   <td>{{ line.description or '' }}</td>
                   <td>{{ line.quantity_display | default('') | ltr | safe }}</td>
                   <td class="amount">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}</td>

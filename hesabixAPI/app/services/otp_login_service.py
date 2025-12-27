@@ -80,15 +80,23 @@ class OtpLoginService:
 		
 		# اگر _detect_identifier شماره را تشخیص نداد یا mobile None است، سعی می‌کنیم با normalize_phone_number
 		# این برای مواردی است که phonenumbers کتابخانه مشکل دارد یا تنظیمات درست نیست
+		# اما فقط اگر identifier به نظر می‌رسد شماره تلفن باشد (حداقل 10 کاراکتر و شامل اعداد)
 		if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
-			try:
-				normalized_fallback = normalize_phone_number(identifier)
-				mobile = normalized_fallback
-				kind = "mobile"
-				logger.info(f"get_available_channels - fallback to normalize_phone_number: {normalized_fallback}")
-			except ValueError as e:
-				logger.warning(f"get_available_channels - normalize_phone_number failed: {e}")
-				return {"available_channels": [], "user_info": None}
+			# بررسی اولیه: اگر identifier خیلی کوتاه است یا فقط اعداد نیست، skip کن
+			identifier_clean = identifier.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+			if len(identifier_clean) >= 10 and any(c.isdigit() for c in identifier_clean):
+				try:
+					normalized_fallback = normalize_phone_number(identifier)
+					mobile = normalized_fallback
+					kind = "mobile"
+					logger.info(f"get_available_channels - fallback to normalize_phone_number: {normalized_fallback}")
+				except ValueError as e:
+					# فقط در سطح debug لاگ کن، نه warning - چون این یک fallback است
+					logger.debug(f"get_available_channels - normalize_phone_number failed (expected for invalid input): {e}")
+					# return نکن، بگذار به بررسی بعدی برود
+			else:
+				# identifier خیلی کوتاه است یا فرمت نامعتبر - skip fallback
+				logger.debug(f"get_available_channels - identifier too short or invalid format, skipping normalize_phone_number fallback")
 		
 		if kind == "invalid" or (kind == "mobile" and mobile is None):
 			logger.warning(f"get_available_channels - invalid identifier: {identifier}")

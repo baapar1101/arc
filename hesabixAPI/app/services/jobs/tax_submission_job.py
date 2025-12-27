@@ -160,3 +160,6 @@ def send_tax_invoices_batch_job(
         logger.error(f"Error in batch tax submission job: {e}", exc_info=True)
         raise
 
+
+
+

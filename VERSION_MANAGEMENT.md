@@ -155,3 +155,6 @@ aapt dump badging app-release.apk | grep version
 3. دوباره بیلد کنید: `flutter build <platform>`
 4. بررسی کنید که فایل‌های native (مثل `build.gradle.kts` برای Android) از متغیرهای Flutter استفاده می‌کنند
 
+
+
+

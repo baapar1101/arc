@@ -29,6 +29,7 @@ import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
+import '../../widgets/calculator/calculator_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 
@@ -1109,6 +1110,13 @@ class _BusinessShellState extends State<BusinessShell> {
           },
           icon: const Icon(Icons.smart_toy_outlined),
         ),
+        IconButton(
+          tooltip: 'ماشین حساب',
+          onPressed: () {
+            CalculatorDialog.show(context);
+          },
+          icon: const Icon(Icons.calculate_outlined),
+        ),
         CombinedUserMenuButton(
           authStore: widget.authStore,
           localeController: widget.localeController,
@@ -1933,6 +1941,9 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
     if (label == 'حواله‌های انبار') return 'warehouse_transfers';
+    // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛
+    // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
+    if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'settings';
     if (label == t.settings) return 'settings';

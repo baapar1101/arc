@@ -17,6 +17,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
   static const Duration _reconnectDelay = Duration(seconds: 2);
   Timer? _reconnectTimer;
   String? _storedApiKey;
+  Completer<void>? _openCompleter;
 
   void Function(Map<String, dynamic>)? _onEvent;
   void Function(List<int>)? _onAudioFrame;
@@ -49,23 +50,34 @@ class VoiceWsClientWeb implements VoiceWsClient {
           : apiBase.replaceFirst('http://', 'ws://');
       final url = '$wsBase/ws/ai/voice?api_key=$apiKey';
 
+      final openCompleter = Completer<void>();
+      _openCompleter = openCompleter;
       _ws = web.WebSocket(url);
       _ws!.binaryType = 'arraybuffer';
 
       _ws!.onOpen.listen((_) {
         _connected = true;
         _reconnectAttempts = 0; // Reset on successful connection
+        if (_openCompleter == openCompleter && !openCompleter.isCompleted) {
+          openCompleter.complete();
+        }
       });
       _ws!.onClose.listen((_) {
         final wasConnected = _connected;
         _connected = false;
         _onDone?.call();
+        if (_openCompleter == openCompleter && !openCompleter.isCompleted) {
+          openCompleter.completeError(StateError('WebSocket closed before open'));
+        }
         _handleDisconnection(wasConnected);
       });
       _ws!.onError.listen((_) {
         final wasConnected = _connected;
         _connected = false;
         _onError?.call('WebSocket error');
+        if (_openCompleter == openCompleter && !openCompleter.isCompleted) {
+          openCompleter.completeError(StateError('WebSocket error'));
+        }
         _handleDisconnection(wasConnected);
       });
       _ws!.onMessage.listen((web.MessageEvent e) {
@@ -89,6 +101,15 @@ class VoiceWsClientWeb implements VoiceWsClient {
           // فعلاً مسیر اصلی وب با base64 است. اگر باینری هم آمد، نادیده می‌گیریم.
         } catch (_) {}
       });
+
+      // IMPORTANT: wait for WebSocket to be open before returning
+      try {
+        await openCompleter.future.timeout(const Duration(seconds: 5));
+      } catch (e) {
+        _onError?.call('خطا در اتصال صوت: $e');
+        disconnect();
+        rethrow;
+      }
     } catch (e) {
       _onError?.call(e);
       disconnect();
@@ -117,7 +138,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
     _ws = null;
     _connected = false;
     
-    if (_shouldReconnect && wasConnected && _reconnectAttempts < _maxReconnectAttempts) {
+    if (_shouldReconnect && _reconnectAttempts < _maxReconnectAttempts) {
       _reconnectAttempts++;
       _reconnectTimer = Timer(_reconnectDelay * _reconnectAttempts, () {
         if (_shouldReconnect && !isConnected && _storedApiKey != null) {
@@ -142,6 +163,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _storedApiKey = null;
+    _openCompleter = null;
     try {
       _ws?.close();
     } catch (_) {}

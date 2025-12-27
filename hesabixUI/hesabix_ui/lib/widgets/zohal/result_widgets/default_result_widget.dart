@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../zohal_result_widget.dart';
-import '../../../utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/widgets/zohal/zohal_result_widget.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 
 /// ویجت پیش‌فرض برای نمایش نتایج سرویس‌های زحل
 /// داده‌های نتیجه را به صورت ساختاریافته نمایش می‌دهد

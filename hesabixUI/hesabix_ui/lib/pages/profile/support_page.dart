@@ -155,6 +155,7 @@ class _SupportPageState extends State<SupportPage> {
       builder: (context) => TicketDetailsDialog(
         ticket: ticket,
         isOperator: false,
+        calendarController: widget.calendarController,
         onTicketUpdated: () {
           setState(() {
             _refreshCounter++;

@@ -7,6 +7,7 @@ abstract class ZohalInquiryFormWidget extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final Function(Map<String, dynamic>) onSubmit;
   final bool isSubmitting;
+  final VoidCallback? onClose;
 
   const ZohalInquiryFormWidget({
     super.key,
@@ -15,6 +16,7 @@ abstract class ZohalInquiryFormWidget extends StatelessWidget {
     required this.formKey,
     required this.onSubmit,
     required this.isSubmitting,
+    this.onClose,
   });
 
   /// ساخت محتوای فرم
@@ -60,7 +62,11 @@ abstract class ZohalInquiryFormWidget extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
           tooltip: 'بستن',
         ),
       ],

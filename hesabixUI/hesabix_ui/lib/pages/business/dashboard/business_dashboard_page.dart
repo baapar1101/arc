@@ -1117,6 +1117,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final points = <FlSpot>[];
     double maxY = 0;
     final barWidth = isMobile ? 10.0 : 12.0;
+    
+    // رنگ اصلی نمودار با کنتراست بهتر
+    final primaryColor = theme.colorScheme.primary;
+    final chartColor = primaryColor.withValues(alpha: 0.85);
+    
     for (int i = 0; i < grouped.length; i++) {
       final it = grouped[i];
       final amount = (it['amount'] as num?)?.toDouble() ?? 0;
@@ -1128,7 +1133,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             BarChartRodData(
               toY: amount,
               width: barWidth,
-              color: theme.colorScheme.primary,
+              color: chartColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ],
@@ -1192,16 +1197,34 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                 : (_salesChartType == 'bar'
                     ? BarChart(
                         BarChartData(
-                          gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
+                          gridData: FlGridData(
+                            show: true,
+                            horizontalInterval: maxY / 4,
+                            drawVerticalLine: false,
+                            getDrawingHorizontalLine: (value) {
+                              return FlLine(
+                                color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                                strokeWidth: 1,
+                                dashArray: [4, 4],
+                              );
+                            },
+                          ),
                           titlesData: FlTitlesData(
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 reservedSize: isMobile ? 35 : 40,
                                 interval: maxY / 4,
-                                getTitlesWidget: (value, meta) => Text(
-                                  formatWithThousands(value, decimalPlaces: 0),
-                                  style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                getTitlesWidget: (value, meta) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: Text(
+                                    formatWithThousands(value, decimalPlaces: 0),
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      fontSize: isMobileChart ? 11 : 13,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1212,7 +1235,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
                                     _labelForIndex(value.toInt()),
-                                    style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      fontSize: isMobileChart ? 11 : 13,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1224,20 +1251,60 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                           barGroups: bars,
                           alignment: BarChartAlignment.spaceBetween,
                           maxY: maxY * 1.2,
+                          barTouchData: BarTouchData(
+                            enabled: true,
+                            touchTooltipData: BarTouchTooltipData(
+                              getTooltipColor: (group) {
+                                // استفاده از رنگ پس‌زمینه سطح با کنتراست مناسب
+                                return theme.colorScheme.surfaceContainerHighest;
+                              },
+                              tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              tooltipMargin: 8,
+                              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                final value = rod.toY;
+                                return BarTooltipItem(
+                                  formatWithThousands(value, decimalPlaces: 0),
+                                  TextStyle(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: theme.textTheme.bodyMedium?.fontSize ?? 14,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                       )
                     : LineChart(
                         LineChartData(
-                          gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
+                          gridData: FlGridData(
+                            show: true,
+                            horizontalInterval: maxY / 4,
+                            drawVerticalLine: false,
+                            getDrawingHorizontalLine: (value) {
+                              return FlLine(
+                                color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                                strokeWidth: 1,
+                                dashArray: [4, 4],
+                              );
+                            },
+                          ),
                           titlesData: FlTitlesData(
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 reservedSize: isMobileChart ? 35 : 40,
                                 interval: maxY / 4,
-                                getTitlesWidget: (value, meta) => Text(
-                                  formatWithThousands(value, decimalPlaces: 0),
-                                  style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                getTitlesWidget: (value, meta) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: Text(
+                                    formatWithThousands(value, decimalPlaces: 0),
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      fontSize: isMobileChart ? 11 : 13,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1248,7 +1315,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
                                     _labelForIndex(value.toInt()),
-                                    style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      fontSize: isMobileChart ? 11 : 13,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1260,14 +1331,52 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                           lineBarsData: [
                             LineChartBarData(
                               isCurved: true,
-                              color: theme.colorScheme.primary,
-                              barWidth: isMobileChart ? 2 : 3,
-                              dotData: FlDotData(show: false),
+                              color: chartColor,
+                              barWidth: isMobileChart ? 2.5 : 3.5,
+                              dotData: FlDotData(
+                                show: true,
+                                getDotPainter: (spot, percent, barData, index) {
+                                  return FlDotCirclePainter(
+                                    radius: isMobileChart ? 3 : 4,
+                                    color: chartColor,
+                                    strokeWidth: 2,
+                                    strokeColor: theme.colorScheme.surface,
+                                  );
+                                },
+                              ),
                               spots: points,
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: chartColor.withValues(alpha: 0.1),
+                              ),
                             ),
                           ],
                           minY: 0,
                           maxY: maxY * 1.2,
+                          lineTouchData: LineTouchData(
+                            enabled: true,
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipColor: (touchedSpot) {
+                                // استفاده از رنگ پس‌زمینه سطح با کنتراست مناسب
+                                return theme.colorScheme.surfaceContainerHighest;
+                              },
+                              tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              tooltipMargin: 8,
+                              getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                                return touchedSpots.map((LineBarSpot touchedSpot) {
+                                  final value = touchedSpot.y;
+                                  return LineTooltipItem(
+                                    formatWithThousands(value, decimalPlaces: 0),
+                                    TextStyle(
+                                      color: theme.colorScheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: theme.textTheme.bodyMedium?.fontSize ?? 14,
+                                    ),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
                         ),
                       )),
           ),
@@ -2164,6 +2273,10 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
       double maxY = 0;
       final List<String> labels = [];
 
+      // رنگ اصلی نمودار با کنتراست بهتر
+      final primaryColor = theme.colorScheme.primary;
+      final chartColor = primaryColor.withValues(alpha: 0.85);
+
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
         final value = _calculationType == 'quantity'
@@ -2181,7 +2294,7 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
               BarChartRodData(
                 toY: value,
                 width: 16,
-                color: theme.colorScheme.primary,
+                color: chartColor,
                 borderRadius: BorderRadius.circular(4),
               ),
             ],
@@ -2200,7 +2313,18 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
           padding: EdgeInsets.all(isMobile ? 4.0 : 8.0),
           child: BarChart(
             BarChartData(
-              gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
+              gridData: FlGridData(
+                show: true,
+                horizontalInterval: maxY / 4,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (value) {
+                  return FlLine(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                    strokeWidth: 1,
+                    dashArray: [4, 4],
+                  );
+                },
+              ),
               titlesData: FlTitlesData(
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -2211,7 +2335,11 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                       padding: const EdgeInsets.only(right: 4),
                       child: Text(
                         formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
-                        style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobile ? 10 : 12),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontSize: isMobile ? 11 : 13,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -2228,7 +2356,11 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                           width: isMobile ? 50 : 60,
                           child: Text(
                             labels[idx],
-                            style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobile ? 10 : 12),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontSize: isMobile ? 11 : 13,
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                              fontWeight: FontWeight.w500,
+                            ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
@@ -2246,6 +2378,28 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
               barGroups: bars,
               alignment: BarChartAlignment.spaceBetween,
               maxY: maxY * 1.2,
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) {
+                    // استفاده از رنگ پس‌زمینه سطح با کنتراست مناسب
+                    return theme.colorScheme.surfaceContainerHighest;
+                  },
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  tooltipMargin: 8,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final value = rod.toY;
+                    return BarTooltipItem(
+                      formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+                      TextStyle(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: theme.textTheme.bodyMedium?.fontSize ?? 14,
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
@@ -2262,17 +2416,20 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
         );
       }
 
+      // پالت رنگ بهبود یافته برای نمودار دایره‌ای با کنتراست و خوانایی بهتر
       final colors = [
         theme.colorScheme.primary,
         theme.colorScheme.secondary,
         theme.colorScheme.tertiary,
-        Colors.orange,
-        Colors.purple,
-        Colors.teal,
-        Colors.pink,
-        Colors.indigo,
-        Colors.amber,
-        Colors.cyan,
+        const Color(0xFF4CAF50), // سبز
+        const Color(0xFF2196F3), // آبی
+        const Color(0xFFFF9800), // نارنجی
+        const Color(0xFF9C27B0), // بنفش
+        const Color(0xFF00BCD4), // فیروزه‌ای
+        const Color(0xFFE91E63), // صورتی
+        const Color(0xFF3F51B5), // نیلی
+        const Color(0xFFFFC107), // زرد
+        const Color(0xFF795548), // قهوه‌ای
       ];
 
       double total = 0;
@@ -2303,15 +2460,21 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
       for (int i = 0; i < chartData.length; i++) {
         final data = chartData[i];
         final percent = (data['value'] as double) / total * 100;
+        final sectionColor = colors[i % colors.length];
+        // تعیین رنگ متن بر اساس روشنایی رنگ پس‌زمینه
+        final luminance = sectionColor.computeLuminance();
+        final textColor = luminance > 0.5 ? Colors.black87 : Colors.white;
+        
         sections.add(
           PieChartSectionData(
             value: data['value'] as double,
             title: percent > 5 ? '${percent.toStringAsFixed(1)}%' : '',
-            color: colors[i % colors.length],
+            color: sectionColor,
             radius: 80,
-            titleStyle: theme.textTheme.labelSmall?.copyWith(
-              color: Colors.white,
+            titleStyle: theme.textTheme.labelMedium?.copyWith(
+              color: textColor,
               fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         );
@@ -2361,7 +2524,10 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                           Expanded(
                             child: Text(
                               label,
-                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.87),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2369,9 +2535,10 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                           const SizedBox(width: 6),
                           Text(
                             formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         ],
@@ -2422,7 +2589,9 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                           Expanded(
                             child: Text(
                               label,
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.87),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2430,7 +2599,10 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                           const SizedBox(width: 8),
                           Text(
                             formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ],
                       ),

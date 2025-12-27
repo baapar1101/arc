@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../zohal_result_widget.dart';
-import '../../../utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/widgets/zohal/zohal_result_widget.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 
 /// ویجت نمایش نتیجه برای استعلام خلافی خودرو
 class VehicleInquiryResultWidget extends ZohalResultWidget {

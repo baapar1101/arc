@@ -100,6 +100,23 @@ class BusinessDashboardService {
     return items.cast<Map<String, dynamic>>();
   }
 
+  /// دریافت سال مالی جاری
+  Future<Map<String, dynamic>?> getCurrentFiscalYear(int businessId) async {
+    try {
+      final res = await _apiClient.get<Map<String, dynamic>>('/api/v1/business/$businessId/fiscal-years/current');
+      final data = res.data as Map<String, dynamic>;
+      if (data['success'] == true) {
+        return data['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
   /// ویرایش سال مالی جاری (فقط عنوان و تاریخ‌ها)
   Future<Map<String, dynamic>> updateCurrentFiscalYear(
     int businessId, {

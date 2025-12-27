@@ -14,10 +14,15 @@ from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.product import (
     ProductCreateRequest,
     ProductUpdateRequest,
+    ProductResponse,
+    ProductListResponse,
     BulkPriceUpdateRequest,
     BulkPriceUpdatePreviewResponse,
     BulkDefaultWarehouseRequest,
+    BulkDefaultWarehousePreviewResponse,
+    BulkDefaultWarehouseApplyResponse,
 )
+from adapters.api.v1.schema_models.common import SuccessResponse, ErrorResponse
 from app.services.product_service import (
     create_product,
     list_products,
@@ -46,7 +51,76 @@ import os
 router = APIRouter(prefix="/products", tags=["محصولات و کالاها", "انبارداری"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد محصول جدید",
+    description="""
+    ایجاد یک محصول یا خدمت جدید برای کسب‌وکار
+    
+    ### ویژگی‌ها:
+    - پشتیبانی از آپلود تصویر (multipart/form-data یا JSON)
+    - پشتیبانی از 60+ فیلد شامل: قیمت‌گذاری، موجودی، مالیات، ویژگی‌ها
+    - اگر کد محصول ارسال نشود، به صورت خودکار تولید می‌شود
+    
+    ### نکات مهم:
+    - برای آپلود تصویر از multipart/form-data استفاده کنید
+    - فیلد `item_type` می‌تواند "کالا" یا "خدمت" باشد
+    - برای کالاهای با کنترل موجودی، `track_inventory` را true قرار دهید
+    """,
+    response_model=SuccessResponse[ProductResponse],
+    responses={
+        200: {
+            "description": "محصول با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "محصول با موفقیت ایجاد شد",
+                        "data": {
+                            "id": 123,
+                            "code": "P1001",
+                            "name": "لپ‌تاپ Asus Vivobook 15",
+                            "item_type": "کالا",
+                            "description": "لپ‌تاپ 15.6 اینچی با پردازنده Core i5",
+                            "category_id": 1,
+                            "category_name": "لپ‌تاپ",
+                            "main_unit": "عدد",
+                            "base_sales_price": 15000000,
+                            "base_purchase_price": 12000000,
+                            "track_inventory": True,
+                            "default_warehouse_id": 1,
+                            "is_sales_taxable": True,
+                            "sales_tax_rate": 9,
+                            "is_active": True,
+                            "created_at": "2024-01-15T10:30:00Z"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها یا محدودیت ذخیره‌سازی",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "VALIDATION_ERROR",
+                        "message": "نام محصول الزامی است"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.add"
+        },
+        404: {
+            "description": "کسب‌وکار یافت نشد"
+        }
+    }
+)
 @require_business_access("business_id")
 async def create_product_endpoint(
     request: Request,
@@ -87,7 +161,69 @@ async def create_product_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجو و فیلتر محصولات",
+    description="""
+    جستجو، فیلتر و لیست‌بندی محصولات با قابلیت‌های پیشرفته
+    
+    ### قابلیت‌ها:
+    - جستجو در چندین فیلد (نام، کد، توضیحات)
+    - فیلتر بر اساس دسته‌بندی، نوع محصول، وضعیت فعال/غیرفعال
+    - مرتب‌سازی بر اساس فیلدهای مختلف
+    - صفحه‌بندی نتایج
+    - فیلتر بر اساس دسته‌بندی (category_ids)
+    
+    ### نکات:
+    - حداکثر تعداد رکورد در هر درخواست: 1000 (پارامتر `take`)
+    - نتایج جستجو برای مدت کوتاهی cache می‌شوند
+    - برای جستجوی دقیق‌تر از فیلترها استفاده کنید
+    """,
+    response_model=SuccessResponse[ProductListResponse],
+    responses={
+        200: {
+            "description": "لیست محصولات با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "لیست محصولات دریافت شد",
+                        "data": {
+                            "items": [
+                                {
+                                    "id": 1,
+                                    "code": "P1001",
+                                    "name": "لپ‌تاپ Asus Vivobook 15",
+                                    "item_type": "کالا",
+                                    "category_name": "لپ‌تاپ",
+                                    "base_sales_price": 15000000,
+                                    "is_active": True
+                                }
+                            ],
+                            "total_count": 100,
+                            "has_more": True
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی پارامترها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.view"
+        },
+        404: {
+            "description": "کسب‌وکار یافت نشد"
+        },
+        500: {
+            "description": "خطای داخلی سرور"
+        }
+    }
+)
 @require_business_access("business_id")
 def search_products_endpoint(
 	request: Request,
@@ -273,7 +409,78 @@ def search_products_endpoint(
 		)
 
 
-@router.get("/business/{business_id}/{product_id}")
+@router.get(
+    "/business/{business_id}/{product_id}",
+    summary="دریافت اطلاعات محصول",
+    description="""
+    دریافت اطلاعات کامل یک محصول یا خدمت
+    
+    ### اطلاعات برگشتی:
+    - اطلاعات پایه محصول (کد، نام، نوع، توضیحات)
+    - اطلاعات دسته‌بندی
+    - قیمت‌گذاری (فروش و خرید)
+    - تنظیمات موجودی و انبار
+    - اطلاعات مالیات
+    - تصویر محصول (در صورت وجود)
+    - ویژگی‌های محصول
+    - موجودی در انبارها (اختیاری)
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "اطلاعات محصول با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "item": {
+                                "id": 123,
+                                "code": "P1001",
+                                "name": "لپ‌تاپ Asus Vivobook 15",
+                                "item_type": "کالا",
+                                "description": "لپ‌تاپ 15.6 اینچی با پردازنده Core i5",
+                                "category_id": 1,
+                                "category_name": "لپ‌تاپ",
+                                "main_unit": "عدد",
+                                "base_sales_price": 15000000,
+                                "base_purchase_price": 12000000,
+                                "track_inventory": True,
+                                "default_warehouse_id": 1,
+                                "default_warehouse_name": "انبار اصلی",
+                                "total_quantity": 25,
+                                "total_value": 300000000,
+                                "is_sales_taxable": True,
+                                "sales_tax_rate": 9,
+                                "is_active": True,
+                                "created_at": "2024-01-15T10:30:00Z",
+                                "updated_at": "2024-01-20T14:20:00Z"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.view"
+        },
+        404: {
+            "description": "محصول یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "NOT_FOUND",
+                        "message": "Product not found"
+                    }
+                }
+            }
+        }
+    }
+)
 @require_business_access("business_id")
 def get_product_endpoint(
     request: Request,
@@ -289,7 +496,66 @@ def get_product_endpoint(
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
 
 
-@router.put("/business/{business_id}/{product_id}")
+@router.put(
+    "/business/{business_id}/{product_id}",
+    summary="ویرایش محصول",
+    description="""
+    ویرایش اطلاعات یک محصول یا خدمت موجود
+    
+    ### ویژگی‌ها:
+    - پشتیبانی از آپلود تصویر جدید (multipart/form-data یا JSON)
+    - تمام فیلدها اختیاری هستند (فقط فیلدهای ارسال شده به‌روزرسانی می‌شوند)
+    - تصویر قبلی در صورت آپلود تصویر جدید حذف می‌شود
+    
+    ### نکات مهم:
+    - برای آپلود تصویر از multipart/form-data استفاده کنید
+    - تغییر کد محصول ممکن است روی فاکتورهای موجود تأثیر بگذارد
+    - تغییر `track_inventory` ممکن است نیاز به بررسی موجودی داشته باشد
+    """,
+    response_model=SuccessResponse[ProductResponse],
+    responses={
+        200: {
+            "description": "محصول با موفقیت به‌روزرسانی شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "محصول با موفقیت به‌روزرسانی شد",
+                        "data": {
+                            "id": 123,
+                            "code": "P1001",
+                            "name": "لپ‌تاپ Asus Vivobook 15 (ویرایش شده)",
+                            "item_type": "کالا",
+                            "base_sales_price": 15500000,
+                            "updated_at": "2024-01-20T14:20:00Z"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها یا محدودیت ذخیره‌سازی"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        },
+        404: {
+            "description": "محصول یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "NOT_FOUND",
+                        "message": "Product not found"
+                    }
+                }
+            }
+        }
+    }
+)
 @require_business_access("business_id")
 async def update_product_endpoint(
     request: Request,
@@ -495,7 +761,66 @@ async def update_product_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.delete("/business/{business_id}/{product_id}")
+@router.delete(
+    "/business/{business_id}/{product_id}",
+    summary="حذف محصول",
+    description="""
+    حذف یک محصول یا خدمت از سیستم
+    
+    ### نکات مهم:
+    - محصولات که در فاکتورها استفاده شده‌اند ممکن است قابل حذف نباشند
+    - در صورت وجود وابستگی‌ها، خطا برگردانده می‌شود
+    - تصویر محصول نیز همراه با محصول حذف می‌شود
+    - این عملیات غیرقابل بازگشت است
+    """,
+    response_model=SuccessResponse[Dict[str, bool]],
+    responses={
+        200: {
+            "description": "محصول با موفقیت حذف شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "کالا با موفقیت حذف شد",
+                        "data": {
+                            "deleted": True
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "محصول قابل حذف نیست (به دلیل وابستگی‌ها)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "HAS_DEPENDENCIES",
+                        "message": "این محصول در فاکتورها استفاده شده و قابل حذف نیست"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.delete"
+        },
+        404: {
+            "description": "محصول یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "NOT_FOUND",
+                        "message": "کالا یافت نشد"
+                    }
+                }
+            }
+        }
+    }
+)
 @require_business_access("business_id")
 def delete_product_endpoint(
     request: Request,
@@ -516,9 +841,55 @@ def delete_product_endpoint(
     return success_response({"deleted": True}, request, message="کالا با موفقیت حذف شد")
 
 
-@router.post("/business/{business_id}/bulk-delete",
+@router.post(
+    "/business/{business_id}/bulk-delete",
     summary="حذف گروهی محصولات",
-    description="حذف چندین آیتم بر اساس شناسه‌ها یا کدها",
+    description="""
+    حذف چندین محصول به صورت همزمان بر اساس شناسه‌ها یا کدها
+    
+    ### ویژگی‌ها:
+    - حذف بر اساس شناسه‌ها (ids) یا کدها (codes) یا هر دو
+    - در صورت وجود وابستگی، محصول نادیده گرفته می‌شود (skipped)
+    - نتیجه شامل تعداد حذف شده، نادیده گرفته شده و خطاها است
+    
+    ### نکات:
+    - محصولاتی که در فاکتورها استفاده شده‌اند قابل حذف نیستند
+    - تصاویر محصولات حذف شده نیز حذف می‌شوند
+    - این عملیات غیرقابل بازگشت است
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "عملیات حذف گروهی انجام شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "deleted": 5,
+                            "skipped": 2,
+                            "errors": [
+                                {
+                                    "product_id": 123,
+                                    "code": "P1001",
+                                    "message": "این محصول در فاکتورها استفاده شده است"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها - ids و codes نباید هر دو خالی باشند"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.delete"
+        }
+    }
 )
 @require_business_access("business_id")
 def bulk_delete_products_endpoint(
@@ -604,9 +975,54 @@ def bulk_delete_products_endpoint(
         "errors": errors
     }, request)
 
-@router.post("/business/{business_id}/export/excel",
+@router.post(
+    "/business/{business_id}/export/excel",
     summary="خروجی Excel لیست محصولات",
-    description="خروجی Excel لیست محصولات با قابلیت فیلتر، انتخاب ستون‌ها و ترتیب آن‌ها",
+    description="""
+    دریافت لیست محصولات به صورت فایل Excel
+    
+    ### قابلیت‌ها:
+    - فیلتر محصولات بر اساس معیارهای مختلف
+    - انتخاب ستون‌های دلخواه برای خروجی
+    - مرتب‌سازی داده‌ها
+    - انتخاب محصولات خاص (selected_indices)
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### فرمت فایل:
+    - فرمت: `.xlsx` (Excel 2007+)
+    - نام فایل شامل نام کسب‌وکار و timestamp است
+    """,
+    responses={
+        200: {
+            "description": "فایل Excel با موفقیت ایجاد شد",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            },
+            "headers": {
+                "Content-Disposition": {
+                    "description": "نام فایل خروجی",
+                    "schema": {
+                        "type": "string",
+                        "example": "attachment; filename=products_business_20240115_103000.xlsx"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.export"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_products_excel(
@@ -755,9 +1171,54 @@ async def export_products_excel(
     )
 
 
-@router.post("/business/{business_id}/import/template",
+@router.post(
+    "/business/{business_id}/import/template",
     summary="دانلود تمپلیت ایمپورت محصولات",
-    description="فایل Excel تمپلیت برای ایمپورت کالا/خدمت را برمی‌گرداند",
+    description="""
+    دریافت فایل Excel تمپلیت برای ایمپورت محصولات
+    
+    ### ویژگی‌ها:
+    - شامل تمام ستون‌های مورد نیاز برای ایمپورت
+    - هدرهای فارسی و انگلیسی
+    - نمونه داده برای راهنمایی
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### استفاده:
+    1. این endpoint را فراخوانی کنید تا تمپلیت را دریافت کنید
+    2. فایل را با اطلاعات محصولات پر کنید
+    3. فایل را از طریق endpoint `/import/excel` آپلود کنید
+    
+    ### فرمت فایل:
+    - فرمت: `.xlsx` (Excel 2007+)
+    """,
+    responses={
+        200: {
+            "description": "فایل تمپلیت با موفقیت ایجاد شد",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            },
+            "headers": {
+                "Content-Disposition": {
+                    "description": "نام فایل تمپلیت",
+                    "schema": {
+                        "type": "string",
+                        "example": "attachment; filename=products_import_template.xlsx"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        }
+    }
 )
 @require_business_access("business_id")
 async def download_products_import_template(
@@ -874,9 +1335,66 @@ async def download_products_import_template(
     )
 
 
-@router.post("/business/{business_id}/import/excel",
+@router.post(
+    "/business/{business_id}/import/excel",
     summary="ایمپورت محصولات از فایل Excel",
-    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+    description="""
+    آپلود و پردازش فایل Excel برای ایمپورت محصولات
+    
+    ### قابلیت‌ها:
+    - پشتیبانی از فایل Excel (.xlsx)
+    - پردازش به صورت dry-run (پیش‌نمایش) یا واقعی
+    - ایجاد یا به‌روزرسانی محصولات بر اساس کد
+    - پشتیبانی از دسته‌بندی، مالیات، ویژگی‌ها و سایر فیلدها
+    - گزارش خطاها و هشدارها
+    
+    ### نکات مهم:
+    - برای دریافت تمپلیت از endpoint `/import/template` استفاده کنید
+    - در حالت dry-run تغییری در داده‌ها ایجاد نمی‌شود
+    - محصولات با کد یکسان به‌روزرسانی می‌شوند
+    - خطاهای اعتبارسنجی در پاسخ برگردانده می‌شوند
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "فایل با موفقیت پردازش شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "ایمپورت با موفقیت انجام شد",
+                        "data": {
+                            "total_rows": 100,
+                            "processed": 95,
+                            "created": 80,
+                            "updated": 15,
+                            "skipped": 5,
+                            "errors": [
+                                {
+                                    "row": 10,
+                                    "code": "P-010",
+                                    "message": "نام محصول الزامی است"
+                                }
+                            ],
+                            "warnings": []
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی فایل یا داده‌ها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        },
+        413: {
+            "description": "حجم فایل بیش از حد مجاز است"
+        }
+    }
 )
 @require_business_access("business_id")
 async def import_products_excel(
@@ -1667,9 +2185,54 @@ async def import_products_excel(
     except Exception as e:
         logger.error(f"Import error: {e}", exc_info=True)
         raise ApiError("IMPORT_ERROR", f"خطا در پردازش فایل: {e}", http_status=500)
-@router.post("/business/{business_id}/export/pdf",
+@router.post(
+    "/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست محصولات",
-    description="خروجی PDF لیست محصولات با قابلیت فیلتر و انتخاب ستون‌ها",
+    description="""
+    دریافت لیست محصولات به صورت فایل PDF
+    
+    ### قابلیت‌ها:
+    - فیلتر محصولات بر اساس معیارهای مختلف
+    - انتخاب ستون‌های دلخواه برای خروجی
+    - مرتب‌سازی داده‌ها
+    - پشتیبانی از تقویم شمسی و میلادی (بر اساس header X-Calendar-Type)
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### فرمت فایل:
+    - فرمت: `.pdf`
+    - نام فایل شامل نام کسب‌وکار و timestamp است
+    """,
+    responses={
+        200: {
+            "description": "فایل PDF با موفقیت ایجاد شد",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            },
+            "headers": {
+                "Content-Disposition": {
+                    "description": "نام فایل خروجی",
+                    "schema": {
+                        "type": "string",
+                        "example": "attachment; filename=products_business_20240115_103000.pdf"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.export"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_products_pdf(
@@ -1965,9 +2528,70 @@ async def export_products_pdf(
     )
 
 
-@router.post("/business/{business_id}/bulk-price-update/preview",
+@router.post(
+    "/business/{business_id}/bulk-price-update/preview",
     summary="پیش‌نمایش تغییر قیمت‌های گروهی",
-    description="پیش‌نمایش تغییرات قیمت قبل از اعمال",
+    description="""
+    پیش‌نمایش تغییرات قیمت قبل از اعمال تغییرات واقعی
+    
+    ### قابلیت‌ها:
+    - تغییر قیمت بر اساس درصد یا مبلغ ثابت
+    - تغییر قیمت فروش، خرید یا هر دو
+    - فیلتر بر اساس دسته‌بندی، ارز، لیست قیمت و نوع محصول
+    - نمایش تغییرات پیش از اعمال
+    
+    ### نکات:
+    - این endpoint فقط پیش‌نمایش است و تغییری در قیمت‌ها ایجاد نمی‌کند
+    - برای اعمال تغییرات از endpoint `/bulk-price-update/apply` استفاده کنید
+    - نتایج شامل خلاصه آماری تغییرات است
+    """,
+    response_model=SuccessResponse[BulkPriceUpdatePreviewResponse],
+    responses={
+        200: {
+            "description": "پیش‌نمایش تغییرات با موفقیت محاسبه شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "total_products": 100,
+                            "affected_products": [
+                                {
+                                    "product_id": 1,
+                                    "product_name": "محصول A",
+                                    "product_code": "P-001",
+                                    "category_name": "دسته ۱",
+                                    "current_sales_price": 100000,
+                                    "current_purchase_price": 80000,
+                                    "new_sales_price": 110000,
+                                    "new_purchase_price": 88000,
+                                    "sales_price_change": 10000,
+                                    "purchase_price_change": 8000
+                                }
+                            ],
+                            "summary": {
+                                "total_products": 100,
+                                "affected_products": 95,
+                                "products_with_sales_change": 95,
+                                "products_with_purchase_change": 95,
+                                "total_sales_change": 950000,
+                                "total_purchase_change": 760000
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        }
+    }
 )
 @require_business_access("business_id")
 def preview_bulk_price_update_endpoint(
@@ -1984,9 +2608,51 @@ def preview_bulk_price_update_endpoint(
     return success_response(data=result.model_dump(), request=request)
 
 
-@router.post("/business/{business_id}/bulk-price-update/apply",
+@router.post(
+    "/business/{business_id}/bulk-price-update/apply",
     summary="اعمال تغییر قیمت‌های گروهی",
-    description="اعمال تغییرات قیمت بر روی کالاهای انتخاب شده",
+    description="""
+    اعمال تغییرات قیمت بر روی کالاهای انتخاب شده
+    
+    ### قابلیت‌ها:
+    - تغییر قیمت بر اساس درصد یا مبلغ ثابت
+    - تغییر قیمت فروش، خرید یا هر دو
+    - فیلتر بر اساس دسته‌بندی، ارز، لیست قیمت و نوع محصول
+    
+    ### نکات مهم:
+    - این عملیات تغییرات را به صورت واقعی اعمال می‌کند
+    - قبل از اعمال، از endpoint `/bulk-price-update/preview` برای پیش‌نمایش استفاده کنید
+    - تغییرات در قیمت پایه محصولات اعمال می‌شود
+    - این عملیات قابل بازگشت نیست (مگر با تغییر مجدد)
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "تغییرات قیمت با موفقیت اعمال شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "تغییرات قیمت با موفقیت اعمال شد",
+                        "data": {
+                            "total_products": 100,
+                            "updated_products": 95,
+                            "skipped_products": 5
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        }
+    }
 )
 @require_business_access("business_id")
 def apply_bulk_price_update_endpoint(
@@ -2005,6 +2671,56 @@ def apply_bulk_price_update_endpoint(
 @router.post(
     "/business/{business_id}/bulk-default-warehouse/preview",
     summary="پیش‌نمایش تغییر گروهی انبار پیش‌فرض کالاها",
+    description="""
+    پیش‌نمایش تغییر انبار پیش‌فرض برای چندین کالا به صورت همزمان
+    
+    ### قابلیت‌ها:
+    - تغییر انبار پیش‌فرض برای لیستی از کالاها
+    - اعمال بر روی کالاهای انبارداری، غیرانبارداری یا همه
+    - نمایش کالاهایی که تغییر می‌یابند و کالاهایی که نادیده گرفته می‌شوند
+    
+    ### نکات:
+    - این endpoint فقط پیش‌نمایش است و تغییری ایجاد نمی‌کند
+    - برای اعمال تغییرات از endpoint `/bulk-default-warehouse/apply` استفاده کنید
+    - کالاهای خدمتی (service) انبار پیش‌فرض ندارند
+    """,
+    response_model=SuccessResponse[BulkDefaultWarehousePreviewResponse],
+    responses={
+        200: {
+            "description": "پیش‌نمایش تغییرات با موفقیت محاسبه شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "total_requested": 50,
+                            "found_count": 48,
+                            "will_update_count": 45,
+                            "forced_service_null_count": 3,
+                            "skipped": [
+                                {
+                                    "id": 100,
+                                    "code": "S-001",
+                                    "name": "خدمت A",
+                                    "reason": "کالاهای خدمتی انبار پیش‌فرض ندارند"
+                                }
+                            ],
+                            "notes": []
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        }
+    }
 )
 @require_business_access("business_id")
 def preview_bulk_default_warehouse_endpoint(
@@ -2022,6 +2738,51 @@ def preview_bulk_default_warehouse_endpoint(
 @router.post(
     "/business/{business_id}/bulk-default-warehouse/apply",
     summary="اعمال تغییر گروهی انبار پیش‌فرض کالاها",
+    description="""
+    اعمال تغییر انبار پیش‌فرض برای چندین کالا به صورت واقعی
+    
+    ### قابلیت‌ها:
+    - تغییر انبار پیش‌فرض برای لیستی از کالاها
+    - اعمال بر روی کالاهای انبارداری، غیرانبارداری یا همه
+    - حذف انبار پیش‌فرض (با ارسال null)
+    
+    ### نکات مهم:
+    - این عملیات تغییرات را به صورت واقعی اعمال می‌کند
+    - قبل از اعمال، از endpoint `/bulk-default-warehouse/preview` برای پیش‌نمایش استفاده کنید
+    - کالاهای خدمتی (service) نادیده گرفته می‌شوند
+    - تغییر انبار پیش‌فرض بر روی موجودی تأثیری ندارد
+    """,
+    response_model=SuccessResponse[BulkDefaultWarehouseApplyResponse],
+    responses={
+        200: {
+            "description": "تغییرات با موفقیت اعمال شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "انبار پیش‌فرض با موفقیت به‌روزرسانی شد",
+                        "data": {
+                            "total_requested": 50,
+                            "found_count": 48,
+                            "updated_count": 45,
+                            "forced_service_null_count": 3,
+                            "skipped": [],
+                            "notes": []
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز - نیاز به مجوز products.edit"
+        }
+    }
 )
 @require_business_access("business_id")
 def apply_bulk_default_warehouse_endpoint(
@@ -2037,9 +2798,61 @@ def apply_bulk_default_warehouse_endpoint(
     return success_response(data=result, request=request)
 
 
-@router.post("/businesses/{business_id}/reports/item-movements",
+@router.post(
+    "/businesses/{business_id}/reports/item-movements",
     summary="گزارش گردش کالا",
-    description="گزارش ورود، خروج و مانده کالاها در یک بازه زمانی",
+    description="""
+    دریافت گزارش گردش کالاها در بازه زمانی مشخص
+    
+    ### اطلاعات گزارش:
+    - ورود و خروج کالاها در بازه زمانی
+    - مانده ابتدا و انتهای دوره
+    - تفکیک بر اساس انبارها
+    - فیلتر بر اساس محصولات، انبارها و تاریخ
+    
+    ### کاربردها:
+    - بررسی حرکت کالاها
+    - تحلیل ورود و خروج
+    - کنترل موجودی در بازه زمانی
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "گزارش با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "items": [
+                                {
+                                    "product_id": 1,
+                                    "product_name": "کالا A",
+                                    "warehouse_id": 1,
+                                    "warehouse_name": "انبار اصلی",
+                                    "opening_balance": 100,
+                                    "incoming": 50,
+                                    "outgoing": 30,
+                                    "closing_balance": 120
+                                }
+                            ],
+                            "total_count": 100,
+                            "summary": {}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی پارامترها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def item_movements_report_endpoint(
@@ -2148,9 +2961,43 @@ async def item_movements_report_endpoint(
     )
 
 
-@router.post("/businesses/{business_id}/reports/item-movements/export/excel",
+@router.post(
+    "/businesses/{business_id}/reports/item-movements/export/excel",
     summary="خروجی Excel گزارش گردش کالا",
-    description="خروجی Excel گزارش گردش کالا با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="""
+    دریافت گزارش گردش کالا به صورت فایل Excel
+    
+    ### قابلیت‌ها:
+    - فیلتر بر اساس محصولات، انبارها و تاریخ
+    - انتخاب سطرهای خاص برای خروجی
+    - انتخاب و مرتب‌سازی ستون‌ها
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### فرمت فایل:
+    - فرمت: `.xlsx` (Excel 2007+)
+    """,
+    responses={
+        200: {
+            "description": "فایل Excel با موفقیت ایجاد شد",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_item_movements_report_excel(
@@ -2372,9 +3219,63 @@ async def export_item_movements_report_excel(
     )
 
 
-@router.post("/businesses/{business_id}/reports/sales-by-product",
+@router.post(
+    "/businesses/{business_id}/reports/sales-by-product",
     summary="گزارش فروش به تفکیک کالا",
-    description="گزارش عملکرد فروش هر کالا در بازه زمانی",
+    description="""
+    دریافت گزارش عملکرد فروش هر کالا در بازه زمانی
+    
+    ### اطلاعات گزارش:
+    - تعداد و مقدار فروش هر کالا
+    - مجموع مبلغ فروش
+    - میانگین قیمت فروش
+    - تعداد فاکتورها
+    - فیلتر بر اساس محصولات، تاریخ و سایر معیارها
+    
+    ### کاربردها:
+    - تحلیل عملکرد فروش محصولات
+    - شناسایی پرفروش‌ترین کالاها
+    - برنامه‌ریزی فروش و موجودی
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "گزارش با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "items": [
+                                {
+                                    "product_id": 1,
+                                    "product_name": "کالا A",
+                                    "quantity": 100,
+                                    "total_amount": 15000000,
+                                    "average_price": 150000,
+                                    "invoice_count": 10
+                                }
+                            ],
+                            "total_count": 50,
+                            "summary": {
+                                "total_amount": 750000000,
+                                "total_quantity": 5000
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی پارامترها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def sales_by_product_report_endpoint(
@@ -2483,9 +3384,65 @@ async def sales_by_product_report_endpoint(
     )
 
 
-@router.post("/businesses/{business_id}/reports/inventory-kardex",
+@router.post(
+    "/businesses/{business_id}/reports/inventory-kardex",
     summary="گزارش کاردکس موجودی",
-    description="گزارش جزئیات حرکات هر کالا در یک بازه زمانی با محاسبه مانده تجمعی",
+    description="""
+    دریافت گزارش کاردکس (کاردکس) موجودی کالاها
+    
+    ### اطلاعات گزارش:
+    - جزئیات تمام حرکات موجودی (ورود، خروج، انتقال)
+    - مانده تجمعی پس از هر حرکت
+    - تاریخ و زمان هر حرکت
+    - نوع سند و شماره سند
+    - فیلتر بر اساس محصولات، انبارها و تاریخ
+    
+    ### کاربردها:
+    - ردیابی دقیق حرکات موجودی
+    - بررسی تاریخچه موجودی
+    - کنترل و ممیزی موجودی
+    - تجزیه و تحلیل الگوهای ورود و خروج
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "گزارش با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "items": [
+                                {
+                                    "date": "2024-01-15",
+                                    "document_type": "فاکتور خرید",
+                                    "document_number": "INV-001",
+                                    "product_id": 1,
+                                    "product_name": "کالا A",
+                                    "warehouse_id": 1,
+                                    "warehouse_name": "انبار اصلی",
+                                    "incoming": 100,
+                                    "outgoing": 0,
+                                    "balance": 100
+                                }
+                            ],
+                            "total_count": 500,
+                            "summary": {}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی پارامترها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def inventory_kardex_report_endpoint(
@@ -2583,9 +3540,71 @@ async def inventory_kardex_report_endpoint(
     )
 
 
-@router.post("/businesses/{business_id}/reports/inventory-stock",
+@router.post(
+    "/businesses/{business_id}/reports/inventory-stock",
     summary="گزارش موجودی انبار",
-    description="گزارش موجودی محصولات به تفکیک انبار با فیلترهای مختلف (کنترل موجودی، موجودی منفی، فاقد حواله)",
+    description="""
+    دریافت گزارش موجودی فعلی محصولات در انبارها
+    
+    ### اطلاعات گزارش:
+    - موجودی فعلی هر محصول در هر انبار
+    - ارزش موجودی
+    - موجودی رزرو شده
+    - موجودی قابل استفاده
+    - فیلترهای مختلف:
+      - فقط کالاهای با کنترل موجودی
+      - موجودی منفی
+      - فاقد حواله (موجودی صفر)
+      - فیلتر بر اساس محصولات و انبارها
+    
+    ### کاربردها:
+    - کنترل موجودی فعلی
+    - شناسایی موجودی منفی
+    - مدیریت سفارشات
+    - ارزیابی ارزش موجودی
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {
+            "description": "گزارش با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "items": [
+                                {
+                                    "product_id": 1,
+                                    "product_name": "کالا A",
+                                    "product_code": "P-001",
+                                    "warehouse_id": 1,
+                                    "warehouse_name": "انبار اصلی",
+                                    "quantity": 100,
+                                    "reserved_quantity": 20,
+                                    "available_quantity": 80,
+                                    "unit_cost": 150000,
+                                    "total_value": 15000000
+                                }
+                            ],
+                            "total_count": 200,
+                            "summary": {
+                                "total_value": 3000000000
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی پارامترها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def inventory_stock_report_endpoint(
@@ -2688,9 +3707,44 @@ async def inventory_stock_report_endpoint(
     )
 
 
-@router.post("/businesses/{business_id}/reports/inventory-kardex/export/excel",
+@router.post(
+    "/businesses/{business_id}/reports/inventory-kardex/export/excel",
     summary="خروجی Excel گزارش کاردکس موجودی",
-    description="خروجی Excel گزارش کاردکس موجودی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="""
+    دریافت گزارش کاردکس موجودی به صورت فایل Excel
+    
+    ### قابلیت‌ها:
+    - فیلتر بر اساس محصولات، انبارها و تاریخ
+    - انتخاب سطرهای خاص برای خروجی
+    - انتخاب و مرتب‌سازی ستون‌ها
+    - نمایش تمام حرکات موجودی با مانده تجمعی
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### فرمت فایل:
+    - فرمت: `.xlsx` (Excel 2007+)
+    """,
+    responses={
+        200: {
+            "description": "فایل Excel با موفقیت ایجاد شد",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_inventory_kardex_report_excel(
@@ -3061,7 +4115,41 @@ async def export_inventory_kardex_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/inventory-kardex/export/pdf",
     summary="خروجی PDF گزارش کاردکس موجودی",
-    description="خروجی PDF گزارش کاردکس موجودی با قابلیت فیلتر و رعایت تقویم (شمسی/میلادی)",
+    description="""
+    دریافت گزارش کاردکس موجودی به صورت فایل PDF
+    
+    ### قابلیت‌ها:
+    - فیلتر بر اساس محصولات، انبارها و تاریخ
+    - نمایش تمام حرکات موجودی با مانده تجمعی
+    - پشتیبانی از تقویم شمسی و میلادی (بر اساس header X-Calendar-Type)
+    - پشتیبانی از RTL برای زبان فارسی
+    - صفحه‌بندی خودکار
+    
+    ### فرمت فایل:
+    - فرمت: `.pdf`
+    """,
+    responses={
+        200: {
+            "description": "فایل PDF با موفقیت ایجاد شد",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_inventory_kardex_report_pdf(
@@ -3381,9 +4469,44 @@ async def export_inventory_kardex_report_pdf(
     )
 
 
-@router.post("/businesses/{business_id}/reports/sales-by-product/export/excel",
+@router.post(
+    "/businesses/{business_id}/reports/sales-by-product/export/excel",
     summary="خروجی Excel گزارش فروش به تفکیک کالا",
-    description="خروجی Excel گزارش فروش به تفکیک کالا با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="""
+    دریافت گزارش فروش به تفکیک کالا به صورت فایل Excel
+    
+    ### قابلیت‌ها:
+    - فیلتر بر اساس محصولات و تاریخ
+    - انتخاب سطرهای خاص برای خروجی
+    - انتخاب و مرتب‌سازی ستون‌ها
+    - نمایش آمار فروش هر محصول
+    - پشتیبانی از RTL برای زبان فارسی
+    
+    ### فرمت فایل:
+    - فرمت: `.xlsx` (Excel 2007+)
+    """,
+    responses={
+        200: {
+            "description": "فایل Excel با موفقیت ایجاد شد",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی درخواست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        }
+    }
 )
 @require_business_access("business_id")
 async def export_sales_by_product_report_excel(

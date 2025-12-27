@@ -41,3 +41,6 @@ class TaxFailedInvoice(Base):
         Index("idx_tax_failed_invoice", "business_id", "invoice_id"),
     )
 
+
+
+

@@ -1952,16 +1952,36 @@ def get_inventory_stock_report(
     products = query.all()
     
     if not products:
+        # اعتبارسنجی take و skip
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+        total_pages = 0
+        current_page = (skip // take) + 1 if take > 0 else 1
+        
         return {
             "items": [],
             "as_of_date": as_of_date_obj.isoformat(),
-            "total_items": 0,
+            "total": 0,
+            "total_items": 0,  # برای سازگاری با کدهای قدیمی
             "summary": {
                 "total_products": 0,
                 "total_with_stock": 0,
                 "total_zero_stock": 0,
                 "total_negative_stock": 0,
                 "total_without_movements": 0,
+            },
+            "pagination": {
+                "total": 0,
+                "page": current_page,
+                "per_page": take,
+                "limit": take,  # برای سازگاری با کدهای قدیمی
+                "total_pages": total_pages,
+                "has_next": False,
+                "has_prev": False,
             }
         }
     
@@ -2104,6 +2124,10 @@ def get_inventory_stock_report(
     
     paginated_items = items[skip:skip + take]
     
+    # محاسبه اطلاعات pagination
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
     # دریافت نام دسته‌بندی‌ها
     category_ids_set = set(item['category_id'] for item in paginated_items if item['category_id'])
     if category_ids_set:
@@ -2125,13 +2149,23 @@ def get_inventory_stock_report(
     return {
         "items": paginated_items,
         "as_of_date": as_of_date_obj.isoformat(),
-        "total_items": total,
+        "total": total,
+        "total_items": total,  # برای سازگاری با کدهای قدیمی
         "summary": {
             "total_products": total_products,
             "total_with_stock": total_with_stock,
             "total_zero_stock": total_zero_stock,
             "total_negative_stock": total_negative_stock,
             "total_without_movements": total_without_movements,
+        },
+        "pagination": {
+            "total": total,
+            "page": current_page,
+            "per_page": take,
+            "limit": take,  # برای سازگاری با کدهای قدیمی
+            "total_pages": total_pages,
+            "has_next": current_page < total_pages,
+            "has_prev": current_page > 1,
         }
     }
 

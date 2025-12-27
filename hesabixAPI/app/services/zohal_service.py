@@ -255,11 +255,28 @@ def call_zohal_api(
 	api_key: str,
 	service_path: str,
 	request_data: Dict[str, Any],
+	max_retries: int = 2,
+	retry_delay: float = 1.0,
 ) -> Dict[str, Any]:
 	"""
-	فراخوانی API زحل
+	فراخوانی API زحل با retry logic برای خطاهای موقت
+	
+	Args:
+		base_url: آدرس پایه API زحل
+		api_key: کلید API
+		service_path: مسیر سرویس
+		request_data: داده‌های درخواست
+		max_retries: حداکثر تعداد تلاش مجدد (پیش‌فرض: 2)
+		retry_delay: تاخیر بین تلاش‌ها به ثانیه (پیش‌فرض: 1.0)
+	
+	Returns:
+		پاسخ JSON از API
+	
+	Raises:
+		ApiError: در صورت خطای دائمی یا اتمام تلاش‌ها
 	"""
 	import httpx
+	import time
 	
 	url = f"{base_url.rstrip('/')}{service_path}"
 	headers = {
@@ -267,14 +284,86 @@ def call_zohal_api(
 		"Content-Type": "application/json",
 	}
 	
-	try:
-		with httpx.Client(timeout=30.0) as client:
-			response = client.post(url, json=request_data, headers=headers)
-			response.raise_for_status()
-			return response.json()
-	except httpx.HTTPError as e:
-		logger.error(f"خطا در فراخوانی API زحل: {e}")
-		raise ApiError("ZOHAL_API_ERROR", f"خطا در فراخوانی API زحل: {str(e)}", http_status=500)
+	last_error = None
+	for attempt in range(max_retries + 1):
+		try:
+			with httpx.Client(timeout=30.0) as client:
+				response = client.post(url, json=request_data, headers=headers)
+				
+				# اگر خطای 503 (Service Unavailable) بود، retry کن
+				if response.status_code == 503:
+					if attempt < max_retries:
+						logger.warning(
+							f"خطا در فراخوانی API زحل: 503 Service Unavailable. تلاش مجدد {attempt + 1}/{max_retries}",
+							url=url,
+							attempt=attempt + 1
+						)
+						time.sleep(retry_delay * (attempt + 1))  # exponential backoff
+						continue
+					else:
+						# آخرین تلاش هم ناموفق بود
+						logger.error(
+							f"خطا در فراخوانی API زحل: 503 Service Unavailable بعد از {max_retries + 1} تلاش",
+							url=url
+						)
+						raise ApiError(
+							"ZOHAL_SERVICE_UNAVAILABLE",
+							"سرویس زحل در حال حاضر در دسترس نیست. لطفاً بعداً تلاش کنید",
+							http_status=503
+						)
+				
+				# برای سایر خطاها، raise_for_status را صدا بزن
+				response.raise_for_status()
+				return response.json()
+				
+		except httpx.HTTPStatusError as e:
+			# خطاهای HTTP که 503 نیستند
+			last_error = e
+			if e.response.status_code in (500, 502, 503, 504) and attempt < max_retries:
+				# خطاهای سرور - retry کن
+				logger.warning(
+					f"خطا در فراخوانی API زحل: {e.response.status_code}. تلاش مجدد {attempt + 1}/{max_retries}",
+					url=url,
+					status_code=e.response.status_code,
+					attempt=attempt + 1
+				)
+				time.sleep(retry_delay * (attempt + 1))
+				continue
+			else:
+				# خطاهای دیگر یا آخرین تلاش
+				logger.error(f"خطا در فراخوانی API زحل: {e}", url=url, status_code=e.response.status_code)
+				raise ApiError(
+					"ZOHAL_API_ERROR",
+					f"خطا در فراخوانی API زحل: {e.response.status_code} - {str(e)}",
+					http_status=e.response.status_code if 400 <= e.response.status_code < 600 else 500
+				)
+		except httpx.TimeoutException as e:
+			last_error = e
+			if attempt < max_retries:
+				logger.warning(
+					f"Timeout در فراخوانی API زحل. تلاش مجدد {attempt + 1}/{max_retries}",
+					url=url,
+					attempt=attempt + 1
+				)
+				time.sleep(retry_delay * (attempt + 1))
+				continue
+			else:
+				logger.error(f"Timeout در فراخوانی API زحل بعد از {max_retries + 1} تلاش", url=url)
+				raise ApiError(
+					"ZOHAL_API_TIMEOUT",
+					"زمان انتظار برای پاسخ از سرویس زحل به پایان رسید. لطفاً بعداً تلاش کنید",
+					http_status=504
+				)
+		except httpx.HTTPError as e:
+			last_error = e
+			logger.error(f"خطا در فراخوانی API زحل: {e}", url=url, exc_info=True)
+			raise ApiError("ZOHAL_API_ERROR", f"خطا در فراخوانی API زحل: {str(e)}", http_status=500)
+	
+	# اگر به اینجا رسیدیم، یعنی همه تلاش‌ها ناموفق بودند
+	if last_error:
+		raise ApiError("ZOHAL_API_ERROR", f"خطا در فراخوانی API زحل بعد از {max_retries + 1} تلاش: {str(last_error)}", http_status=500)
+	else:
+		raise ApiError("ZOHAL_API_ERROR", f"خطا در فراخوانی API زحل", http_status=500)
 
 
 def execute_zohal_inquiry(

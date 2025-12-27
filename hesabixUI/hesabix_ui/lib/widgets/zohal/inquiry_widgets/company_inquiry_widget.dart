@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../zohal_inquiry_form_widget.dart';
-import '../../../utils/number_normalizer.dart';
+import 'package:hesabix_ui/widgets/zohal/zohal_inquiry_form_widget.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart' show toEnglishDigits, EnglishDigitsFormatter;
 
 /// ویجت فرم ورودی برای استعلام اطلاعات شرکت
 class CompanyInquiryWidget extends ZohalInquiryFormWidget {
@@ -12,6 +12,7 @@ class CompanyInquiryWidget extends ZohalInquiryFormWidget {
     required super.formKey,
     required super.onSubmit,
     required super.isSubmitting,
+    super.onClose,
   });
 
   @override

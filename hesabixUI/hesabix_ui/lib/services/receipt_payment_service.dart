@@ -1,6 +1,7 @@
 import '../core/api_client.dart';
 import '../models/receipt_payment_document.dart';
 import 'document_policy_guard.dart';
+import '../core/date_utils.dart' show HesabixDateUtils;
 
 /// سرویس دریافت و پرداخت
 class ReceiptPaymentService {
@@ -84,9 +85,9 @@ class ReceiptPaymentService {
       if (sortBy != null) 'sort_by': sortBy,
       if (search != null && search.isNotEmpty) 'search': search,
       if (documentType != null) 'document_type': documentType,
-      // ارسال تاریخ به صورت ISO8601 با تنظیم timezone
-      if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
-      if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
+      // ارسال تاریخ به صورت YYYY-MM-DD (بدون زمان) برای جلوگیری از جابجایی روز به‌خاطر UTC
+      if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+      if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
 
     final response = await _apiClient.post(

@@ -24,6 +24,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _defaultCurrency;
+  
+  // برای انتخاب ارز پیش‌فرض
+  int? _selectedDefaultCurrencyId;
+  bool _savingDefaultCurrency = false;
 
   @override
   void initState() {
@@ -196,6 +200,38 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
     }
   }
 
+  Future<void> _setDefaultCurrency(int currencyId) async {
+    setState(() {
+      _savingDefaultCurrency = true;
+    });
+    
+    try {
+      // استفاده از API برای تنظیم ارز پیش‌فرض
+      await _apiClient.put<Map<String, dynamic>>(
+        '/api/v1/businesses/${widget.businessId}',
+        data: {'default_currency_id': currencyId},
+      );
+      
+      // بارگذاری مجدد لیست ارزها
+      await _loadCurrencies();
+      
+      if (mounted) {
+        SnackBarHelper.show(context, message: 'ارز پیش‌فرض با موفقیت تنظیم شد');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _savingDefaultCurrency = false;
+          _selectedDefaultCurrencyId = null;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -293,6 +329,90 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                             ),
                           );
                         },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
+              // بخش انتخاب ارز پیش‌فرض (اگر ارز پیش‌فرض وجود نداشته باشد)
+              Card(
+                color: Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade900, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'کسب‌وکار شما ارز پیش‌فرض تنظیم نکرده است',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange.shade900,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'لطفاً یک ارز پیش‌فرض انتخاب کنید تا بتوانید سند حسابداری ثبت کنید.',
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        value: _selectedDefaultCurrencyId,
+                        decoration: InputDecoration(
+                          labelText: 'ارز پیش‌فرض *',
+                          border: const OutlineInputBorder(),
+                          helperText: 'این ارز به صورت پیش‌فرض در تمام اسناد حسابداری استفاده می‌شود',
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        items: _allCurrencies.map((currency) {
+                          return DropdownMenuItem<int>(
+                            value: currency['id'] as int,
+                            child: Text('${currency['title']} (${currency['code']})'),
+                          );
+                        }).toList(),
+                        onChanged: _savingDefaultCurrency
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _selectedDefaultCurrencyId = value;
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _savingDefaultCurrency || _selectedDefaultCurrencyId == null
+                              ? null
+                              : () => _setDefaultCurrency(_selectedDefaultCurrencyId!),
+                          icon: _savingDefaultCurrency
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.check),
+                          label: Text(_savingDefaultCurrency ? 'در حال ذخیره...' : 'تنظیم ارز پیش‌فرض'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.orange.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
                       ),
                     ],
                   ),

@@ -1069,6 +1069,7 @@ async def export_single_invoice_pdf(
                 qty_display = qty
             normalized_lines.append(
                 {
+                    "product_code": pl.get("product_code"),
                     "product_name": pl.get("product_name"),
                     "description": pl.get("description"),
                     "quantity": qty,

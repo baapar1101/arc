@@ -322,6 +322,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       builder: (context) => TicketDetailsDialog(
         ticket: ticket,
         isOperator: true,
+        calendarController: widget.calendarController,
         onTicketUpdated: () {
           // Refresh the data table after ticket update
           _safeSetState(() {

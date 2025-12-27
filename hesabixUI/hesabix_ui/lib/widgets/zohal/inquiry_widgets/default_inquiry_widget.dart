@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../zohal_inquiry_form_widget.dart';
+import 'package:flutter/services.dart';
+import 'package:hesabix_ui/widgets/zohal/zohal_inquiry_form_widget.dart';
 
 /// ویجت پیش‌فرض برای فرم‌های ورودی سرویس‌های زحل
 /// از request_schema استفاده می‌کند تا به صورت خودکار فیلدها را بسازد
@@ -11,6 +12,7 @@ class DefaultInquiryWidget extends ZohalInquiryFormWidget {
     required super.formKey,
     required super.onSubmit,
     required super.isSubmitting,
+    super.onClose,
   });
 
   @override

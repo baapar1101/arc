@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../zohal_result_widget.dart';import '../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/zohal/zohal_result_widget.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 
 /// ویجت نمایش نتیجه برای استعلام اطلاعات هویتی

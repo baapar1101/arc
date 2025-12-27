@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../zohal_result_widget.dart';
+import 'package:hesabix_ui/widgets/zohal/zohal_result_widget.dart';
 
 /// ویجت نمایش نتیجه برای سرویس شاهکار
 class ShahkarResultWidget extends ZohalResultWidget {

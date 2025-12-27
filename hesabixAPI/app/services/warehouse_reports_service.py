@@ -948,6 +948,16 @@ def get_inventory_turnover_report(
         return {
             "items": [],
             "total": 0,
+            "pagination": {
+                "total": 0,
+                "page": 1,
+                "per_page": take,
+                "total_pages": 0,
+            },
+            # Backward-compat fields (some clients read these)
+            "page": 1,
+            "limit": take,
+            "total_pages": 0,
         }
     
     product_ids = [p.id for p in products]
@@ -999,11 +1009,31 @@ def get_inventory_turnover_report(
     
     # مرتب‌سازی بر اساس نرخ گردش
     items.sort(key=lambda x: x["turnover_rate"], reverse=True)
-    
+
+    total = len(items)
+    per_page = max(int(take or 0), 0)
+    safe_per_page = per_page if per_page > 0 else 50
+    safe_skip = max(int(skip or 0), 0)
+    page = (safe_skip // safe_per_page) + 1
+    total_pages = (total + safe_per_page - 1) // safe_per_page if total > 0 else 0
+
+    sliced = items[safe_skip:safe_skip + safe_per_page]
+
     return {
-        "items": items[skip:skip + take],
-        "total": len(items),
+        "items": sliced,
+        "total": total,
         "date_from": date_from_obj.isoformat(),
         "date_to": date_to_obj.isoformat(),
+        # New shape used by `DataTableResponse.fromJson` (preferred)
+        "pagination": {
+            "total": total,
+            "page": page,
+            "per_page": safe_per_page,
+            "total_pages": total_pages,
+        },
+        # Old shape (compat)
+        "page": page,
+        "limit": safe_per_page,
+        "total_pages": total_pages,
     }
 

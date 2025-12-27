@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -172,17 +173,28 @@ class MessageBubble extends StatelessWidget {
   }
 
   String _formatTime(DateTime dateTime, AppLocalizations l10n) {
+    // Ensure dateTime is in local timezone
+    final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final difference = now.difference(localDateTime);
 
     // If the difference is negative (future time), show just now
     if (difference.isNegative) {
       return l10n.justNow;
     }
 
-    if (difference.inDays > 0) {
-      return l10n.daysAgo(difference.inDays.toString());
-    } else if (difference.inHours > 0) {
+    // Calculate total hours (more accurate than inDays for edge cases)
+    final totalHours = difference.inHours;
+    final totalDays = difference.inDays;
+
+    // For messages older than 24 hours, always show full date and time
+    if (totalDays > 0 || totalHours >= 24) {
+      final isJalali = calendarController?.isJalali ?? true;
+      return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+    }
+
+    // For recent messages (less than 24 hours), show relative time
+    if (difference.inHours > 0) {
       return l10n.hoursAgo(difference.inHours.toString());
     } else if (difference.inMinutes > 0) {
       return l10n.minutesAgo(difference.inMinutes.toString());

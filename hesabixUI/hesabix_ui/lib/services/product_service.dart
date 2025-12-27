@@ -144,6 +144,7 @@ class ProductService {
     int skip = 0,
     List<Map<String, dynamic>>? filters,
     List<String>? searchFields,
+    List<int>? categoryIds,
   }) async {
     final body = <String, dynamic>{
       'take': limit,
@@ -151,6 +152,7 @@ class ProductService {
       if (searchQuery != null && searchQuery.trim().isNotEmpty) 'search': searchQuery.trim(),
       if (filters != null && filters.isNotEmpty) 'filters': filters,
       if (searchFields != null && searchFields.isNotEmpty) 'searchFields': searchFields,
+      if (categoryIds != null && categoryIds.isNotEmpty) 'category_ids': categoryIds,
     };
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/products/business/$businessId/search',

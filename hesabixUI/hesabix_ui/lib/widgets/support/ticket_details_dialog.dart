@@ -8,6 +8,8 @@ import 'package:hesabix_ui/models/response_template.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/services/response_templates_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/widgets/support/message_bubble.dart';
 import 'package:hesabix_ui/widgets/support/ai_ticket_assistant.dart';
 
@@ -15,12 +17,14 @@ class TicketDetailsDialog extends StatefulWidget {
   final SupportTicket ticket;
   final bool isOperator;
   final VoidCallback? onTicketUpdated;
+  final CalendarController? calendarController;
 
   const TicketDetailsDialog({
     super.key,
     required this.ticket,
     this.isOperator = false,
     this.onTicketUpdated,
+    this.calendarController,
   });
 
   @override
@@ -301,6 +305,12 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
     );
   }
 
+  String _formatTicketDate(DateTime dateTime) {
+    final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
+    final isJalali = widget.calendarController?.isJalali ?? true;
+    return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+  }
+
   Widget _buildConversationInfo(AppLocalizations l10n, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -418,6 +428,23 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatTicketDate(_ticket.createdAt),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -483,6 +510,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                                           padding: const EdgeInsets.only(bottom: 12),
                                           child: MessageBubble(
                                             message: message,
+                                            calendarController: widget.calendarController,
                                           ),
                                         );
                                       },

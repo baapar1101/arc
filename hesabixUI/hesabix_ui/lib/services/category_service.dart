@@ -1,165 +1,120 @@
-import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 
 class CategoryService {
-  final ApiClient _apiClient;
+  final ApiClient _api;
 
-  CategoryService(this._apiClient);
+  // سازگاری با کدهای قدیمی: positional optional parameter
+  CategoryService([ApiClient? apiClient]) : _api = apiClient ?? ApiClient();
 
-  Future<List<Map<String, dynamic>>> getTree({
+  /// دریافت درخت کامل دسته‌بندی‌ها
+  Future<List<Map<String, dynamic>>> getCategoriesTree({
     required int businessId,
-    String? type, // 'product' | 'service'
   }) async {
-    try {
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId/tree',
-        data: type != null ? {'type': type} : null,
-      );
-      final data = res.data?['data'];
-      final items = (data is Map<String, dynamic>) ? data['items'] : null;
-      if (items is List) {
-        return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
-      }
-      return const <Map<String, dynamic>>[];
-    } on DioException catch (e) {
-      throw Exception(e.message);
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/categories/business/$businessId/tree',
+      data: {},
+    );
+    final data = res.data?['data'];
+    final items = (data is Map<String, dynamic>) ? data['items'] : null;
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
+    return const <Map<String, dynamic>>[];
   }
 
-  Future<List<Map<String, dynamic>>> search({
+  /// Alias برای سازگاری با کدهای قدیمی
+  Future<List<Map<String, dynamic>>> getTree({required int businessId}) {
+    return getCategoriesTree(businessId: businessId);
+  }
+
+  /// جستجوی دسته‌بندی‌ها با breadcrumb
+  Future<List<Map<String, dynamic>>> searchCategories({
     required int businessId,
     required String query,
     int limit = 50,
   }) async {
-    try {
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId/search',
-        data: {
-          'query': query,
-          'limit': limit,
-        },
-      );
-      final data = res.data?['data'];
-      final items = (data is Map<String, dynamic>) ? data['items'] : null;
-      if (items is List) {
-        return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
-      }
-      return const <Map<String, dynamic>>[];
-    } on DioException catch (e) {
-      throw Exception(e.message);
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/categories/business/$businessId/search',
+      data: {
+        'query': query,
+        'limit': limit,
+      },
+    );
+    final data = res.data?['data'];
+    final items = (data is Map<String, dynamic>) ? data['items'] : null;
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
+    return const <Map<String, dynamic>>[];
   }
 
+  /// Alias برای سازگاری با کدهای قدیمی
+  Future<List<Map<String, dynamic>>> search({
+    required int businessId,
+    required String query,
+    int limit = 50,
+  }) {
+    return searchCategories(businessId: businessId, query: query, limit: limit);
+  }
+
+  /// ایجاد دسته‌بندی جدید
   Future<Map<String, dynamic>> create({
     required int businessId,
     int? parentId,
-    required String type, // 'product' | 'service'
+    String? type,
     required String label,
     String? description,
   }) async {
-    try {
-      final data = <String, dynamic>{
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/categories/business/$businessId',
+      data: {
         'parent_id': parentId,
-        'type': type,
         'label': label,
-      };
-      if (description != null) {
-        data['description'] = description;
-      }
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId',
-        data: data,
-      );
-      final responseData = res.data?['data'];
-      final item = (responseData is Map<String, dynamic>) ? responseData['item'] : null;
-      return Map<String, dynamic>.from(item ?? const {});
-    } on DioException catch (e) {
-      throw Exception(e.message);
-    }
+        if (description != null) 'description': description,
+      },
+    );
+    final data = res.data?['data'];
+    return Map<String, dynamic>.from(data?['item'] ?? const {});
   }
 
+  /// به‌روزرسانی دسته‌بندی
   Future<Map<String, dynamic>> update({
     required int businessId,
     required int categoryId,
-    String? type, // optional
+    String? type,
     String? label,
     String? description,
     int? sortOrder,
     int? parentId,
   }) async {
-    try {
-      final body = <String, dynamic>{};
-      body['category_id'] = categoryId;
-      if (type != null) body['type'] = type;
-      if (label != null) body['label'] = label;
-      if (description != null) {
-        body['description'] = description;
-      } else if (description == null && label != null) {
-        // اگر description null است و label هم ارسال شده، description را null بفرست
-        body['description'] = null;
-      }
-      if (sortOrder != null) {
-        body['sort_order'] = sortOrder;
-      }
-      if (parentId != null) {
-        body['parent_id'] = parentId;
-      } else if (parentId == null && label != null) {
-        // اگر parent_id null است و label هم ارسال شده، parent_id را null بفرست (برای تغییر به ریشه)
-        // اما فقط اگر صریحاً null ارسال شده باشد
-      }
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId/update',
-        data: body,
-      );
-      final data = res.data?['data'];
-      final item = (data is Map<String, dynamic>) ? data['item'] : null;
-      return Map<String, dynamic>.from(item ?? const {});
-    } on DioException catch (e) {
-      throw Exception(e.message);
-    }
+    final body = <String, dynamic>{
+      'category_id': categoryId,
+    };
+    if (label != null) body['label'] = label;
+    if (description != null) body['description'] = description;
+    if (sortOrder != null) body['sort_order'] = sortOrder;
+    if (parentId != null) body['parent_id'] = parentId;
+
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/categories/business/$businessId/update',
+      data: body,
+    );
+    final data = res.data?['data'];
+    return Map<String, dynamic>.from(data?['item'] ?? const {});
   }
 
-  Future<Map<String, dynamic>> move({
-    required int businessId,
-    required int categoryId,
-    int? newParentId,
-  }) async {
-    try {
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId/move',
-        data: {
-          'category_id': categoryId,
-          'new_parent_id': newParentId,
-        },
-      );
-      final data = res.data?['data'];
-      final item = (data is Map<String, dynamic>) ? data['item'] : null;
-      return Map<String, dynamic>.from(item ?? const {});
-    } on DioException catch (e) {
-      throw Exception(e.message);
-    }
-  }
-
+  /// حذف دسته‌بندی
   Future<bool> delete({
     required int businessId,
     required int categoryId,
   }) async {
-    try {
-      final res = await _apiClient.post<Map<String, dynamic>>(
-        '/api/v1/categories/business/$businessId/delete',
-        data: {
-          'category_id': categoryId,
-        },
-      );
-      final data = res.data?['data'];
-      if (data is Map<String, dynamic>) {
-        return data['deleted'] == true;
-      }
-      return false;
-    } on DioException catch (e) {
-      throw Exception(e.message);
-    }
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/categories/business/$businessId/delete',
+      data: {
+        'category_id': categoryId,
+      },
+    );
+    final data = res.data?['data'];
+    return data?['deleted'] == true;
   }
 }
-
-
