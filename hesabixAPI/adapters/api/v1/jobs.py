@@ -11,6 +11,23 @@ from app.services.jobs import generate_report_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
+def _ensure_job_access(ctx: AuthContext, job_meta: dict | None, job_id: str) -> None:
+    """
+    کنترل دسترسی به job:
+    - فقط سازنده‌ی job (meta.user_id) یا superadmin مجاز است.
+    """
+    if ctx.is_superadmin():
+        return
+    meta = job_meta or {}
+    meta_user_id = meta.get("user_id")
+    try:
+        if meta_user_id is None or int(meta_user_id) != int(ctx.get_user_id()):
+            raise ApiError("FORBIDDEN", f"No access to job {job_id}", http_status=403)
+    except ApiError:
+        raise
+    except Exception:
+        raise ApiError("FORBIDDEN", f"No access to job {job_id}", http_status=403)
+
 
 @router.get("/{job_id}")
 async def get_job_status(
@@ -24,17 +41,20 @@ async def get_job_status(
     
     # ابتدا از QueueService بررسی کن (برای RQ jobs)
     if queue_service and queue_service.enabled:
+        # بررسی مالکیت/دسترسی قبل از بازگرداندن status/result
+        job = queue_service.get_job(job_id)
+        if job is None:
+            raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
+        _ensure_job_access(ctx, getattr(job, "meta", None), job_id)
+
         job_status = queue_service.get_job_status(job_id)
         if job_status:
             # همیشه وضعیت job را برگردان (نه مستقیماً نتیجه)
             # Frontend خودش نتیجه را از job_status["result"] استخراج می‌کند
             return success_response(job_status, request=request)
     
-    # Fallback به JobManager (برای memory-based jobs)
-    st = JobManager.instance().get(job_id)
-    if not st:
-        raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
-    return success_response(st.to_dict(), request=request)
+    # Fallback به JobManager (برای memory-based jobs) - فعلاً غیرفعال چون مالکیت ندارد
+    raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
 
 
 @router.delete("/{job_id}")
@@ -45,10 +65,11 @@ async def cancel_job(request: Request, job_id: str, ctx: AuthContext = Depends(g
     if not queue_service.enabled:
         raise ApiError("QUEUE_DISABLED", "Queue service is disabled", http_status=503)
     
-    # بررسی وجود job
-    job_status = JobManager.instance().get(job_id)
-    if not job_status:
+    # بررسی وجود job + کنترل دسترسی
+    job = queue_service.get_job(job_id)
+    if job is None:
         raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
+    _ensure_job_access(ctx, getattr(job, "meta", None), job_id)
     
     # لغو job
     cancelled = queue_service.cancel_job(job_id)
@@ -64,6 +85,9 @@ async def cancel_job(request: Request, job_id: str, ctx: AuthContext = Depends(g
 @router.get("/queue/stats")
 async def get_queue_stats(request: Request, ctx: AuthContext = Depends(get_current_user)):
     """دریافت آمار queues"""
+    # اطلاعات عملیاتی → فقط superadmin
+    if not ctx.is_superadmin():
+        raise ApiError("FORBIDDEN", "Superadmin access required", http_status=403)
     queue_service = get_queue_service()
     
     if not queue_service.enabled:
@@ -100,6 +124,9 @@ async def get_failed_jobs(
     ctx: AuthContext = Depends(get_current_user)
 ):
     """دریافت لیست jobs ناموفق"""
+    # رجیستری failed می‌تواند شامل اطلاعات حساس باشد → فقط superadmin
+    if not ctx.is_superadmin():
+        raise ApiError("FORBIDDEN", "Superadmin access required", http_status=403)
     queue_service = get_queue_service()
     
     if not queue_service.enabled:
@@ -133,13 +160,21 @@ async def enqueue_report_job(
     
     if not report_type or not business_id:
         raise ApiError("VALIDATION_ERROR", "report_type و business_id الزامی هستند", http_status=400)
+
+    # business_id از body قابل جعل است → حتماً دسترسی را چک کن
+    try:
+        business_id_int = int(business_id)
+    except Exception:
+        raise ApiError("VALIDATION_ERROR", "business_id نامعتبر است", http_status=400)
+    if not ctx.can_access_business(business_id_int):
+        raise ApiError("FORBIDDEN", f"No access to business {business_id_int}", http_status=403)
     
     user_id = ctx.get_user_id()
     
     job = queue_service.enqueue(
         generate_report_job,
         report_type,
-        int(business_id),
+        business_id_int,
         int(user_id),
         params=params,
         queue_name=QUEUE_REPORTS,
@@ -148,6 +183,20 @@ async def enqueue_report_job(
     )
     if not job:
         raise ApiError("JOB_ENQUEUE_FAILED", "ثبت job گزارش در صف ناموفق بود", http_status=500)
+
+    # متادیتای مالکیت برای enforce کردن دسترسی در /jobs/{job_id}
+    try:
+        job.meta = dict(job.meta or {})
+        job.meta.update({
+            "user_id": int(user_id),
+            "business_id": int(business_id_int),
+            "report_type": report_type,
+        })
+        job.save_meta()
+    except Exception:
+        # اگر save_meta مشکل داشت، لااقل job ساخته شده ولی ممکن است دسترسی بعدی سخت‌تر شود.
+        # فعلاً fail نمی‌کنیم تا صف نخوابد.
+        pass
     
     return success_response(
         {

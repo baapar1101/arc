@@ -44,6 +44,10 @@ async def check_ai_availability(
     (چک پیشگیرانه قبل از ارسال پیام)
     """
     business_id = params.business_id or ctx.business_id
+    if not business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     ai_service = AIService(db, ctx, business_id)
     
     availability = ai_service.check_availability(
@@ -63,10 +67,15 @@ async def get_chat_sessions(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت لیست گفت‌وگوهای کاربر"""
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     repo = AIChatSessionRepository(db)
     sessions = repo.get_user_sessions(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id,
+        business_id=effective_business_id,
         limit=limit,
         skip=skip
     )
@@ -94,9 +103,14 @@ async def create_chat_session(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """ایجاد گفت‌وگوی جدید"""
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     session = AIChatSession(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id,
+        business_id=effective_business_id,
         title=title or DEFAULT_CHAT_TITLE
     )
     db.add(session)

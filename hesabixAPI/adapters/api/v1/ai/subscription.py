@@ -54,10 +54,13 @@ async def get_subscription(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت اشتراک فعال کاربر"""
+    effective_business_id = business_id or ctx.business_id
+    if effective_business_id and (not ctx.can_access_business(int(effective_business_id))):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     repo = AISubscriptionRepository(db)
     subscription = repo.get_active_subscription(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id
+        business_id=effective_business_id
     )
     
     if not subscription:
@@ -74,10 +77,13 @@ async def get_subscription_current(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Alias برای سازگاری با frontend"""
+    effective_business_id = business_id or ctx.business_id
+    if effective_business_id and (not ctx.can_access_business(int(effective_business_id))):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     repo = AISubscriptionRepository(db)
     subscription = repo.get_active_subscription(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id
+        business_id=effective_business_id
     )
     
     if not subscription:
@@ -96,10 +102,15 @@ async def subscribe_to_plan_endpoint(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """اشتراک به یک پلن AI"""
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
     result = subscribe_to_plan(
         db=db,
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id,
+        business_id=effective_business_id,
         plan_id=plan_id,
         period=period
     )
@@ -147,6 +158,10 @@ async def get_usage_statistics(
     """دریافت آمار استفاده از AI"""
     from datetime import datetime
     
+    effective_business_id = business_id or ctx.business_id
+    if effective_business_id and (not ctx.can_access_business(int(effective_business_id))):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
     repo = AIUsageLogRepository(db)
     
     from_dt = datetime.fromisoformat(from_date) if from_date else None
@@ -154,7 +169,7 @@ async def get_usage_statistics(
     
     stats = repo.get_usage_statistics(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id,
+        business_id=effective_business_id,
         from_date=from_dt,
         to_date=to_dt
     )
@@ -170,10 +185,14 @@ async def cancel_subscription(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """لغو اشتراک فعال کاربر"""
+    effective_business_id = business_id or ctx.business_id
+    if effective_business_id and (not ctx.can_access_business(int(effective_business_id))):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
     repo = AISubscriptionRepository(db)
     subscription = repo.get_active_subscription(
         user_id=ctx.get_user_id(),
-        business_id=business_id or ctx.business_id
+        business_id=effective_business_id
     )
     
     if not subscription:

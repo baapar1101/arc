@@ -16,6 +16,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.cache import get_cache
 from app.core.auth_dependency import get_current_user, AuthContext
+from adapters.db.session import get_db_session
+from app.core.responses import ApiError
 
 logger = logging.getLogger(__name__)
 
@@ -56,21 +58,37 @@ def generate_cache_key(request: Request, vary_params: list[str] = None) -> str:
     # Query parameters (sorted برای consistency)
     query_params = dict(sorted(request.query_params.items()))
     
-    # Headers مهم
+    # Headers مهم (فقط موارد غیرحساس/غیرقابل جعل برای authorization)
     headers = {}
-    for header in ["X-Business-ID", "X-Fiscal-Year-ID", "Accept-Language"]:
+    for header in ["Accept-Language"]:
         if header in request.headers:
             headers[header] = request.headers[header]
-    
-    # User ID از context (اگر موجود باشد)
-    user_id = None
+
+    # استخراج user_id/business_id به صورت امن:
+    # نکته امنیتی: به X-Business-ID اعتماد نمی‌کنیم؛ از AuthContext (که خودش validate می‌کند) استفاده می‌کنیم.
+    user_id: Optional[int] = None
+    business_id: Optional[int] = None
     try:
-        if hasattr(request.state, "user_context"):
-            user_context = request.state.user_context
-            if hasattr(user_context, "user_id"):
-                user_id = user_context.user_id
+        with get_db_session() as db:
+            ctx = get_current_user(request, db)
+            user_id = ctx.get_user_id()
+            business_id = ctx.business_id
+    except ApiError:
+        # اگر احراز هویت نشد یا خطای دسترسی داشت، در cache-key user/business را لحاظ نمی‌کنیم
+        user_id = None
+        business_id = None
     except Exception:
-        pass
+        user_id = None
+        business_id = None
+
+    # fiscal_year_id هنوز از header می‌آید (کم‌ریسک برای cache-key)، اما به int محدودش می‌کنیم
+    fiscal_year_id: Optional[int] = None
+    fy_raw = request.headers.get("X-Fiscal-Year-ID")
+    if fy_raw:
+        try:
+            fiscal_year_id = int(str(fy_raw).strip())
+        except Exception:
+            fiscal_year_id = None
     
     # ساخت cache key
     key_parts = [f"response:{path}"]
@@ -87,13 +105,13 @@ def generate_cache_key(request: Request, vary_params: list[str] = None) -> str:
     if "user_id" in vary_params and user_id:
         key_parts.append(f"user:{user_id}")
     
-    # اضافه کردن business_id از header
-    if "business_id" in vary_params and "X-Business-ID" in headers:
-        key_parts.append(f"business:{headers['X-Business-ID']}")
+    # اضافه کردن business_id (امن: از ctx.business_id که validate شده)
+    if "business_id" in vary_params and business_id:
+        key_parts.append(f"business:{business_id}")
     
-    # اضافه کردن fiscal_year_id از header
-    if "fiscal_year_id" in vary_params and "X-Fiscal-Year-ID" in headers:
-        key_parts.append(f"fiscal_year:{headers['X-Fiscal-Year-ID']}")
+    # اضافه کردن fiscal_year_id
+    if "fiscal_year_id" in vary_params and fiscal_year_id:
+        key_parts.append(f"fiscal_year:{fiscal_year_id}")
     
     # Hash کردن برای کوتاه کردن key
     key_string = ":".join(key_parts)

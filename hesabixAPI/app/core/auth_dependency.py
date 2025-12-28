@@ -15,6 +15,56 @@ from app.core.calendar import get_calendar_type_from_header, CalendarType
 from app.core.cache import get_cache
 
 
+def _user_can_access_business(db: Session, user_id: int, business_id: int) -> bool:
+	"""
+	اعتبارسنجی business_id ارسالی از کلاینت (مثل X-Business-ID).
+	این تابع فقط owner/member بودن (join=True) را بررسی می‌کند و به هیچ مقدار client-trusted تکیه نمی‌کند.
+	"""
+	try:
+		from adapters.db.models.business import Business
+		from adapters.db.models.business_permission import BusinessPermission
+	except Exception:
+		return False
+	try:
+		biz = db.get(Business, int(business_id))
+		if not biz:
+			return False
+		# بیزنس حذف شده را غیرقابل دسترس در نظر می‌گیریم
+		if getattr(biz, "deleted_at", None) is not None:
+			return False
+		if getattr(biz, "owner_id", None) == int(user_id):
+			return True
+		perm = (
+			db.query(BusinessPermission)
+			.filter(
+				BusinessPermission.user_id == int(user_id),
+				BusinessPermission.business_id == int(business_id),
+			)
+			.first()
+		)
+		if not perm:
+			return False
+		raw = perm.business_permissions
+		normalized: dict = {}
+		if isinstance(raw, dict):
+			normalized = raw
+		elif isinstance(raw, list):
+			# legacy: [["join", true], ...] یا [{"join": true}, ...]
+			try:
+				if all(isinstance(item, list) and len(item) == 2 for item in raw):
+					normalized = {k: v for k, v in raw if isinstance(k, str)}
+				elif all(isinstance(item, dict) for item in raw):
+					merged: dict = {}
+					for item in raw:
+						merged.update({k: v for k, v in item.items()})
+					normalized = merged
+			except Exception:
+				normalized = {}
+		return normalized.get("join") is True
+	except Exception:
+		return False
+
+
 class AuthContext:
 	"""کلاس مرکزی برای نگهداری اطلاعات کاربر کنونی و تنظیمات"""
 	
@@ -570,7 +620,20 @@ def get_current_user(
 	timezone = _detect_timezone(request)
 	
 	# تشخیص کسب و کار از هدر X-Business-ID (آینده)
-	business_id = _detect_business_id(request)
+	requested_business_id = _detect_business_id(request)
+	business_id: Optional[int] = None
+	if requested_business_id:
+		# نکته امنیتی: X-Business-ID قابل جعل است و نباید مستقیماً مبنای دسترسی قرار گیرد.
+		# فقط در صورتی آن را به context اضافه می‌کنیم که کاربر واقعاً به آن بیزنس دسترسی داشته باشد.
+		try:
+			if _user_can_access_business(db, user.id, int(requested_business_id)):
+				business_id = int(requested_business_id)
+			else:
+				logger.warning(
+					f"Ignoring unauthorized X-Business-ID={requested_business_id} for user_id={user.id}"
+				)
+		except Exception as e:
+			logger.warning(f"Error validating X-Business-ID header: {e}")
 	
 	# تشخیص سال مالی از هدر X-Fiscal-Year-ID (آینده)
 	fiscal_year_id = _detect_fiscal_year_id(request)
@@ -637,7 +700,8 @@ def _detect_business_id(request: Request) -> Optional[int]:
 	logger = logging.getLogger(__name__)
 	
 	business_id_str = request.headers.get("X-Business-ID")
-	logger.info(f"X-Business-ID header: {business_id_str}")
+	# از لاگ کردن مقدار خام header خودداری می‌کنیم (قابل جعل است و نویز ایجاد می‌کند)
+	logger.debug("X-Business-ID header received" if business_id_str else "No X-Business-ID header")
 	
 	if business_id_str:
 		try:
