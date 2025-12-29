@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -1887,6 +1888,21 @@ class _PersonLineTileState extends State<_PersonLineTile> {
   bool _showInstallmentSchedule = false; // برای نمایش/مخفی کردن لیست اقساط
   List<Map<String, dynamic>> _invoices = [];
   bool _loadingInvoices = false;
+  
+  // متغیرهای بهینه‌سازی برای جلوگیری از درخواست‌های مکرر
+  bool _isLoadingInvoices = false;
+  Timer? _loadInvoicesDebounceTimer;
+  String? _lastLoadedPersonId;
+  
+  // Cache برای مانده فاکتورها
+  final Map<int, double> _invoiceRemainingCache = {};
+  DateTime? _cacheTimestamp;
+  static const _cacheValidDuration = Duration(minutes: 5);
+  
+  // Cache برای لیست receipts-payments (برای استفاده در محاسبه مانده همه فاکتورها)
+  Map<String, dynamic>? _cachedReceiptsPaymentsList;
+  DateTime? _receiptsPaymentsCacheTimestamp;
+  static const _receiptsPaymentsCacheValidDuration = Duration(minutes: 2);
 
   @override
   void initState() {
@@ -1897,19 +1913,33 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     // اگر قسط جاری انتخاب شده باشد، لیست را مخفی کن
     _showInstallmentSchedule = widget.line.installmentCurrentSeq == null;
     if (widget.line.linkToInvoice && widget.line.personId != null) {
-      _loadInvoices();
+      debugPrint('🚀 [PersonLineTile] initState - لود فاکتورها (linkToInvoice فعال است)');
+      _loadInvoices(force: true);
     }
     debugPrint('🔵 [PersonLineTile] initState - amount: ${widget.line.amount}, formatted: "$formatted", controller.text: "${_amountController.text}"');
+  }
+
+  @override
+  void dispose() {
+    _loadInvoicesDebounceTimer?.cancel();
+    _amountController.dispose();
+    _descController.dispose();
+    _descFocusNode.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant _PersonLineTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     // اگر شخص تغییر کرد و لینک فاکتور فعال است، فاکتورها را دوباره لود کن
+    // فقط اگر person_id واقعاً تغییر کرده و قبلاً لود نشده باشد
     if (widget.line.linkToInvoice && 
         widget.line.personId != null && 
-        widget.line.personId != oldWidget.line.personId) {
-      _loadInvoices();
+        widget.line.personId != oldWidget.line.personId &&
+        widget.line.personId != _lastLoadedPersonId) {
+      debugPrint('🔄 [PersonLineTile] didUpdateWidget - person_id تغییر کرد: ${oldWidget.line.personId} -> ${widget.line.personId}');
+      debugPrint('🔄 [PersonLineTile] didUpdateWidget - _lastLoadedPersonId: $_lastLoadedPersonId');
+      _loadInvoices(force: true);
     }
     if (oldWidget.line.amount != widget.line.amount) {
       final oldAmount = oldWidget.line.amount;
@@ -1946,13 +1976,50 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     if (widget.line.installmentCurrentSeq != null && oldWidget.line.installmentCurrentSeq == null) {
       _showInstallmentSchedule = false;
     }
+    // اگر invoiceId تغییر کرد، state را به‌روز کن تا dropdown به‌روز شود
+    if (oldWidget.line.invoiceId != widget.line.invoiceId) {
+      debugPrint('🔄 [PersonLineTile] didUpdateWidget - invoiceId تغییر کرد: ${oldWidget.line.invoiceId} -> ${widget.line.invoiceId}');
+      // اگر invoiceId تنظیم شد اما فاکتور در لیست نیست، ممکن است نیاز به لود مجدد باشد
+      if (widget.line.invoiceId != null && _invoices.isNotEmpty) {
+        final invoiceExists = _invoices.any(
+          (inv) => (inv['id'] as num?)?.toInt() == widget.line.invoiceId,
+        );
+        if (!invoiceExists) {
+          debugPrint('⚠️ [PersonLineTile] didUpdateWidget - فاکتور ${widget.line.invoiceId} در لیست نیست، لود مجدد...');
+          _loadInvoices(force: true);
+        } else {
+          debugPrint('✅ [PersonLineTile] didUpdateWidget - فاکتور ${widget.line.invoiceId} در لیست موجود است');
+        }
+      }
+      // force rebuild برای به‌روزرسانی dropdown
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   /// محاسبه مانده فاکتور بر اساس تراکنش‌های مرتبط
-  Future<double> _calculateInvoiceRemaining(Map<String, dynamic> invoice) async {
+  /// [receiptsPaymentsList] لیست receipts-payments که قبلاً لود شده (اختیاری)
+  Future<double> _calculateInvoiceRemaining(
+    Map<String, dynamic> invoice, {
+    Map<String, dynamic>? receiptsPaymentsList,
+  }) async {
     try {
       final invoiceId = (invoice['id'] as num?)?.toInt();
       if (invoiceId == null) return 0;
+      
+      debugPrint('🔵 [InvoiceRemaining] شروع محاسبه مانده برای فاکتور ID: $invoiceId');
+      
+      // بررسی cache
+      if (_invoiceRemainingCache.containsKey(invoiceId) && 
+          _cacheTimestamp != null &&
+          DateTime.now().difference(_cacheTimestamp!) < _cacheValidDuration) {
+        final cached = _invoiceRemainingCache[invoiceId]!;
+        debugPrint('✅ [InvoiceRemaining] استفاده از cache برای فاکتور ID: $invoiceId, مانده: $cached');
+        return cached;
+      }
+      
+      debugPrint('⚠️ [InvoiceRemaining] cache موجود نیست یا منقضی شده برای فاکتور ID: $invoiceId');
       
       // دریافت مبلغ کل فاکتور
       final totalAmount = _getInvoiceTotal(invoice);
@@ -1993,13 +2060,24 @@ class _PersonLineTileState extends State<_PersonLineTile> {
       
       // 2. بررسی از طریق جستجو در اسناد دریافت/پرداخت که invoice_id دارند
       try {
-        final receiptPaymentList = await receiptPaymentService.listReceiptsPayments(
-          businessId: widget.businessId,
-          skip: 0,
-          take: 1000,
-        );
+        List<dynamic> items;
         
-        final items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
+        // اگر لیست receipts-payments از قبل لود شده، از آن استفاده کن
+        if (receiptsPaymentsList != null) {
+          debugPrint('✅ [InvoiceRemaining] استفاده از لیست receipts-payments از قبل لود شده برای فاکتور ID: $invoiceId');
+          items = (receiptsPaymentsList['items'] as List<dynamic>?) ?? [];
+        } else {
+          // در غیر این صورت، لود کن (این حالت نباید اتفاق بیفتد اگر از _loadInvoices استفاده شود)
+          debugPrint('🚨 [InvoiceRemaining] ارسال درخواست POST به receipts-payments برای فاکتور ID: $invoiceId (لیست از قبل لود نشده)');
+          debugPrint('🚨 [InvoiceRemaining] businessId: ${widget.businessId}, skip: 0, take: 1000');
+          final receiptPaymentList = await receiptPaymentService.listReceiptsPayments(
+            businessId: widget.businessId,
+            skip: 0,
+            take: 1000,
+          );
+          debugPrint('✅ [InvoiceRemaining] پاسخ دریافت شد برای فاکتور ID: $invoiceId, تعداد آیتم‌ها: ${(receiptPaymentList['items'] as List<dynamic>?)?.length ?? 0}');
+          items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
+        }
         final Set<int> processedDocIds = {};
         
         // محاسبه receipt_payment_document_ids برای جلوگیری از تکرار
@@ -2065,7 +2143,17 @@ class _PersonLineTileState extends State<_PersonLineTile> {
         // در صورت خطا در جستجو، فقط از links استفاده می‌کنیم
       }
       
-      return totalAmount - totalPaid;
+      final remaining = totalAmount - totalPaid;
+      
+      debugPrint('💰 [InvoiceRemaining] محاسبه مانده برای فاکتور ID: $invoiceId - کل: $totalAmount, پرداخت شده: $totalPaid, مانده: $remaining');
+      
+      // ذخیره در cache
+      _invoiceRemainingCache[invoiceId] = remaining;
+      _cacheTimestamp = DateTime.now();
+      
+      debugPrint('💾 [InvoiceRemaining] ذخیره در cache برای فاکتور ID: $invoiceId');
+      
+      return remaining;
     } catch (e) {
       return 0;
     }
@@ -2105,87 +2193,221 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     }
   }
 
-  Future<void> _loadInvoices() async {
-    if (widget.line.personId == null) return;
+  Future<void> _loadInvoices({bool force = false}) async {
+    debugPrint('📥 [LoadInvoices] فراخوانی _loadInvoices - force: $force, personId: ${widget.line.personId}, _lastLoadedPersonId: $_lastLoadedPersonId, _isLoadingInvoices: $_isLoadingInvoices');
     
-    setState(() {
-      _loadingInvoices = true;
-    });
-
-    try {
-      final invoiceService = InvoiceService(apiClient: widget.apiClient);
-      
-      // تعیین نوع فاکتورهای مناسب
-      final List<String> invoiceTypes;
-      if (widget.isReceipt) {
-        // برای دریافت: فاکتورهای فروش و برگشت از خرید
-        invoiceTypes = ['invoice_sales', 'invoice_purchase_return'];
-      } else {
-        // برای پرداخت: فاکتورهای خرید و برگشت از فروش
-        invoiceTypes = ['invoice_purchase', 'invoice_sales_return'];
-      }
-
-      final filters = <String, dynamic>{
-        'document_type': invoiceTypes,
-        'person_id': int.tryParse(widget.line.personId!) ?? 0,
-        'is_proforma': false, // فقط فاکتورهای قطعی
-      };
-      
-      // اضافه کردن فیلتر ارز اگر انتخاب شده باشد
-      if (widget.selectedCurrencyId != null) {
-        filters['currency_id'] = widget.selectedCurrencyId;
-      }
-
-      final result = await invoiceService.searchInvoices(
-        businessId: widget.businessId,
-        page: 1,
-        limit: 100,
-        filters: filters,
-      );
-
-      if (mounted) {
-        final items = (result['items'] as List<dynamic>?)
-            ?.map((item) => Map<String, dynamic>.from(item as Map))
-            .toList() ?? [];
-        
-        // محاسبه مانده برای هر فاکتور و فیلتر کردن فاکتورهای تسویه شده
-        final List<Map<String, dynamic>> validInvoices = [];
-        for (final invoice in items) {
-          final remaining = await _calculateInvoiceRemaining(invoice);
-          // فقط فاکتورهایی که مانده > 0 دارند (تسویه نشده‌اند)
-          if (remaining > 0.01) { // tolerance برای خطای ممیز شناور
-            validInvoices.add({
-              ...invoice,
-              '_remaining': remaining,
-            });
-          }
-        }
-        
-        setState(() {
-          _invoices = validInvoices;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _invoices = [];
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingInvoices = false;
-        });
-      }
+    if (widget.line.personId == null) {
+      debugPrint('❌ [LoadInvoices] personId null است، خروج');
+      return;
     }
-  }
+    
+    // اگر در حال لود است و force نیست، صبر کن
+    if (_isLoadingInvoices && !force) {
+      debugPrint('⏸️ [LoadInvoices] در حال لود است و force نیست، صبر می‌کنیم');
+      return;
+    }
+    
+    // اگر person_id تغییر نکرده و force نیست، نیازی به لود مجدد نیست
+    if (!force && _lastLoadedPersonId == widget.line.personId) {
+      debugPrint('⏭️ [LoadInvoices] person_id تغییر نکرده و force نیست، نیازی به لود مجدد نیست');
+      return;
+    }
+    
+    // Cancel timer قبلی
+    _loadInvoicesDebounceTimer?.cancel();
+    debugPrint('⏱️ [LoadInvoices] timer قبلی cancel شد، شروع timer جدید (300ms)');
+    
+    // Debounce: صبر کن 300ms قبل از لود
+    _loadInvoicesDebounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      debugPrint('⏰ [LoadInvoices] timer فعال شد - force: $force, personId: ${widget.line.personId}');
+      
+      if (widget.line.personId == null) {
+        debugPrint('❌ [LoadInvoices] personId null است در timer callback، خروج');
+        return;
+      }
+      
+      // اگر در حال لود است و force نیست، صبر کن
+      if (_isLoadingInvoices && !force) {
+        debugPrint('⏸️ [LoadInvoices] در حال لود است و force نیست در timer callback، صبر می‌کنیم');
+        return;
+      }
+      
+      // اگر person_id تغییر نکرده و force نیست، نیازی به لود مجدد نیست
+      if (!force && _lastLoadedPersonId == widget.line.personId) {
+        debugPrint('⏭️ [LoadInvoices] person_id تغییر نکرده و force نیست در timer callback، نیازی به لود مجدد نیست');
+        return;
+      }
+      
+      debugPrint('🔄 [LoadInvoices] شروع لود فاکتورها - personId: ${widget.line.personId}');
+      
+      setState(() {
+        _isLoadingInvoices = true;
+        _loadingInvoices = true;
+      });
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _descController.dispose();
-    _descFocusNode.dispose();
-    super.dispose();
+      try {
+        final invoiceService = InvoiceService(apiClient: widget.apiClient);
+        
+        // تعیین نوع فاکتورهای مناسب
+        final List<String> invoiceTypes;
+        if (widget.isReceipt) {
+          // برای دریافت: فاکتورهای فروش و برگشت از خرید
+          invoiceTypes = ['invoice_sales', 'invoice_purchase_return'];
+        } else {
+          // برای پرداخت: فاکتورهای خرید و برگشت از فروش
+          invoiceTypes = ['invoice_purchase', 'invoice_sales_return'];
+        }
+
+        final filters = <String, dynamic>{
+          'document_type': invoiceTypes,
+          'person_id': int.tryParse(widget.line.personId!) ?? 0,
+          'is_proforma': false, // فقط فاکتورهای قطعی
+        };
+        
+        // اضافه کردن فیلتر ارز اگر انتخاب شده باشد
+        if (widget.selectedCurrencyId != null) {
+          filters['currency_id'] = widget.selectedCurrencyId;
+        }
+
+        debugPrint('🔍 [LoadInvoices] ارسال درخواست searchInvoices - businessId: ${widget.businessId}, filters: $filters');
+        
+        final result = await invoiceService.searchInvoices(
+          businessId: widget.businessId,
+          page: 1,
+          limit: 100,
+          filters: filters,
+        );
+        
+        debugPrint('✅ [LoadInvoices] پاسخ searchInvoices دریافت شد - تعداد فاکتورها: ${(result['items'] as List<dynamic>?)?.length ?? 0}');
+
+        if (mounted) {
+          final items = (result['items'] as List<dynamic>?)
+              ?.map((item) => Map<String, dynamic>.from(item as Map))
+              .toList() ?? [];
+          
+          // لاگ فاکتورهای دریافت شده
+          final itemIds = items.map((item) => (item['id'] as num?)?.toInt()).whereType<int>().toList();
+          debugPrint('📋 [LoadInvoices] فاکتورهای دریافت شده از searchInvoices (IDs): $itemIds');
+          
+          debugPrint('📊 [LoadInvoices] شروع محاسبه مانده برای ${items.length} فاکتور');
+          
+          // استخراج invoice_ids
+          final invoiceIds = items
+              .map((item) => (item['id'] as num?)?.toInt())
+              .whereType<int>()
+              .toList();
+          
+          debugPrint('📋 [LoadInvoices] فاکتورهای دریافت شده از searchInvoices: $invoiceIds');
+          
+          // محاسبه مانده برای همه فاکتورها در یک درخواست
+          Map<int, double> remainingMap = {};
+          if (invoiceIds.isNotEmpty) {
+            debugPrint('🔄 [LoadInvoices] محاسبه مانده برای ${invoiceIds.length} فاکتور در یک درخواست - invoiceIds: $invoiceIds');
+            
+            try {
+              final remainingResult = await invoiceService.calculateInvoicesRemaining(
+                businessId: widget.businessId,
+                invoiceIds: invoiceIds,
+              );
+              
+              debugPrint('📥 [LoadInvoices] پاسخ calculateInvoicesRemaining دریافت شد: $remainingResult');
+              
+              final results = remainingResult['results'] as Map<String, dynamic>? ?? {};
+              final errors = remainingResult['errors'] as Map<String, dynamic>? ?? {};
+              
+              debugPrint('📊 [LoadInvoices] تعداد نتایج: ${results.length}, تعداد خطاها: ${errors.length}');
+              debugPrint('📊 [LoadInvoices] کلیدهای results: ${results.keys.toList()}');
+              
+              for (final entry in results.entries) {
+                final invoiceId = int.tryParse(entry.key);
+                final data = entry.value as Map<String, dynamic>;
+                if (invoiceId != null && data['remaining'] != null) {
+                  remainingMap[invoiceId] = (data['remaining'] as num).toDouble();
+                  debugPrint('✅ [LoadInvoices] مانده برای فاکتور $invoiceId: ${remainingMap[invoiceId]}');
+                } else {
+                  debugPrint('⚠️ [LoadInvoices] خطا در پردازش نتیجه - key: ${entry.key}, invoiceId: $invoiceId, data: $data');
+                }
+              }
+              
+              if (errors.isNotEmpty) {
+                debugPrint('⚠️ [LoadInvoices] خطا در محاسبه مانده ${errors.length} فاکتور: $errors');
+              }
+              
+              debugPrint('✅ [LoadInvoices] مانده ${remainingMap.length} فاکتور محاسبه شد');
+            } catch (e) {
+              debugPrint('❌ [LoadInvoices] خطا در محاسبه مانده: $e');
+              // در صورت خطا، از متد قدیمی استفاده می‌کنیم (fallback)
+              debugPrint('🔄 [LoadInvoices] استفاده از fallback برای محاسبه مانده');
+              for (final invoice in items) {
+                final invoiceId = (invoice['id'] as num?)?.toInt();
+                if (invoiceId != null) {
+                  try {
+                    final remaining = await _calculateInvoiceRemaining(invoice);
+                    remainingMap[invoiceId] = remaining;
+                  } catch (e) {
+                    debugPrint('❌ [LoadInvoices] خطا در محاسبه مانده فاکتور $invoiceId: $e');
+                  }
+                }
+              }
+            }
+          }
+          
+          // فیلتر کردن فاکتورهای تسویه شده
+          final List<Map<String, dynamic>> validInvoices = [];
+          debugPrint('🔍 [LoadInvoices] شروع فیلتر کردن ${items.length} فاکتور');
+          for (final invoice in items) {
+            final invoiceId = (invoice['id'] as num?)?.toInt();
+            if (invoiceId == null) {
+              debugPrint('⚠️ [LoadInvoices] فاکتور بدون ID رد شد');
+              continue;
+            }
+            
+            final remaining = remainingMap[invoiceId] ?? 0.0;
+            debugPrint('🔍 [LoadInvoices] فاکتور ID: $invoiceId, remaining: $remaining, remainingMap.containsKey: ${remainingMap.containsKey(invoiceId)}');
+            
+            // فقط فاکتورهایی که مانده > 0 دارند (تسویه نشده‌اند)
+            if (remaining > 0.01) { // tolerance برای خطای ممیز شناور
+              validInvoices.add({
+                ...invoice,
+                '_remaining': remaining,
+              });
+              debugPrint('✅ [LoadInvoices] فاکتور ID: $invoiceId با مانده $remaining اضافه شد');
+            } else {
+              debugPrint('⏭️ [LoadInvoices] فاکتور ID: $invoiceId با مانده $remaining رد شد (تسویه شده یا مانده محاسبه نشده)');
+            }
+          }
+          
+          debugPrint('📊 [LoadInvoices] فیلتر تمام شد - ${validInvoices.length} فاکتور معتبر از ${items.length} فاکتور');
+          
+          debugPrint('📊 [LoadInvoices] محاسبه مانده تمام شد - ${validInvoices.length} فاکتور معتبر از ${items.length} فاکتور');
+          
+          // ذخیره person_id برای جلوگیری از لود مجدد
+          _lastLoadedPersonId = widget.line.personId;
+          debugPrint('💾 [LoadInvoices] ذخیره _lastLoadedPersonId: $_lastLoadedPersonId');
+          
+          setState(() {
+            _invoices = validInvoices;
+          });
+          
+          debugPrint('✅ [LoadInvoices] لود فاکتورها تمام شد - ${validInvoices.length} فاکتور نمایش داده می‌شود');
+        }
+      } catch (e) {
+        debugPrint('❌ [LoadInvoices] خطا در لود فاکتورها: $e');
+        if (mounted) {
+          setState(() {
+            _invoices = [];
+          });
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoadingInvoices = false;
+            _loadingInvoices = false;
+          });
+          debugPrint('🏁 [LoadInvoices] لود فاکتورها تمام شد (finally)');
+        }
+      }
+    });
   }
 
   @override
@@ -2220,8 +2442,12 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         invoiceCode: opt == null ? null : widget.line.invoiceCode,
                       ));
                       // اگر شخص انتخاب شد و لینک فاکتور فعال است، فاکتورها را لود کن
-                      if (opt != null && widget.line.linkToInvoice) {
-                        Future.microtask(() => _loadInvoices());
+                      // فقط اگر person_id تغییر کرده باشد
+                      if (opt != null && widget.line.linkToInvoice && opt.id?.toString() != _lastLoadedPersonId) {
+                        debugPrint('👤 [PersonLineTile] onChanged PersonCombobox - شخص جدید انتخاب شد: ${opt.id}, _lastLoadedPersonId: $_lastLoadedPersonId');
+                        Future.microtask(() => _loadInvoices(force: true));
+                      } else {
+                        debugPrint('⏭️ [PersonLineTile] onChanged PersonCombobox - شخص تغییر نکرده یا لینک فاکتور غیرفعال است');
                       }
                     },
                     label: t.people,
@@ -2298,7 +2524,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         invoiceCode: value ? null : null,
                       ));
                       if (value) {
-                        _loadInvoices();
+                        debugPrint('🔘 [PersonLineTile] onChanged SwitchListTile - لینک به فاکتور فعال شد');
+                        _loadInvoices(force: true);
+                      } else {
+                        debugPrint('🔘 [PersonLineTile] onChanged SwitchListTile - لینک به فاکتور غیرفعال شد');
                       }
                     }
                   : null,
@@ -2369,6 +2598,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                       }).toList(),
                 selectedItemBuilder: (context) {
                   // نمایش کد فاکتور انتخاب شده در dropdown
+                  debugPrint('🔄 [PersonLineTile] selectedItemBuilder - invoiceId: ${widget.line.invoiceId}, تعداد فاکتورها: ${_invoices.length}');
                   if (widget.line.invoiceId == null) {
                     return [
                       const Text(
@@ -2382,6 +2612,11 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                     orElse: () => <String, dynamic>{},
                   );
                   final code = selectedInvoice['code']?.toString() ?? '';
+                  debugPrint('🔄 [PersonLineTile] selectedItemBuilder - فاکتور پیدا شد: $code (خالی: ${code.isEmpty})');
+                  if (code.isEmpty) {
+                    debugPrint('⚠️ [PersonLineTile] selectedItemBuilder - فاکتور ${widget.line.invoiceId} در لیست نیست!');
+                    debugPrint('⚠️ [PersonLineTile] selectedItemBuilder - فاکتورهای موجود: ${_invoices.map((inv) => (inv['id'] as num?)?.toInt()).toList()}');
+                  }
                   return [
                     Text(
                       code.isNotEmpty ? code : 'انتخاب فاکتور',
@@ -2390,14 +2625,29 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   ];
                 },
                 onChanged: (invoiceId) {
+                  debugPrint('🔄 [PersonLineTile] onChanged - انتخاب فاکتور: $invoiceId');
+                  if (invoiceId == null) {
+                    debugPrint('⚠️ [PersonLineTile] onChanged - invoiceId null است!');
+                    return;
+                  }
                   final invoice = _invoices.firstWhere(
                     (inv) => (inv['id'] as num?)?.toInt() == invoiceId,
                     orElse: () => <String, dynamic>{},
                   );
+                  if (invoice.isEmpty) {
+                    debugPrint('⚠️ [PersonLineTile] onChanged - فاکتور $invoiceId در لیست پیدا نشد!');
+                    return;
+                  }
+                  final invoiceCode = invoice['code']?.toString();
+                  debugPrint('🔄 [PersonLineTile] onChanged - فاکتور پیدا شد: $invoiceCode');
+                  debugPrint('🔄 [PersonLineTile] onChanged - widget.line.invoiceId قبل از تغییر: ${widget.line.invoiceId}');
                   widget.onChanged(widget.line.copyWith(
                     invoiceId: invoiceId,
-                    invoiceCode: invoice['code']?.toString(),
+                    invoiceCode: invoiceCode,
                   ));
+                  debugPrint('🔄 [PersonLineTile] onChanged - widget.onChanged فراخوانی شد با invoiceId: $invoiceId, invoiceCode: $invoiceCode');
+                  // توجه: widget.line.invoiceId هنوز به‌روز نشده است چون state در parent به‌روز نشده
+                  // بعد از rebuild و didUpdateWidget، widget.line.invoiceId به‌روز می‌شود
                 },
               ),
             ],

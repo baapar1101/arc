@@ -90,10 +90,17 @@ class ReceiptPaymentService {
       if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
 
+    print('🚨🚨🚨 [ReceiptPaymentService] ارسال درخواست POST به /businesses/$businessId/receipts-payments');
+    print('🚨🚨🚨 [ReceiptPaymentService] body: $body');
+    print('🚨🚨🚨 [ReceiptPaymentService] Stack trace:');
+    print(StackTrace.current);
+
     final response = await _apiClient.post(
       '/businesses/$businessId/receipts-payments',
       data: body,
     );
+
+    print('✅✅✅ [ReceiptPaymentService] پاسخ دریافت شد - تعداد آیتم‌ها: ${(response.data['data']?['items'] as List<dynamic>?)?.length ?? 0}');
 
     return response.data['data'] as Map<String, dynamic>;
   }

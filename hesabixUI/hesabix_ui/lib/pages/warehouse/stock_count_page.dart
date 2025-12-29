@@ -356,13 +356,14 @@ class _StockCountPageState extends State<StockCountPage> {
       endpoint: 'local_stock_count',
       tableId: 'stock_count_desktop_local',
       title: 'اقلام انبارگردانی',
-      showSearch: false,
+      showSearch: true,
       showFilters: false,
-      showPagination: false,
+      showPagination: true,
       showColumnSearch: false,
       showExportButtons: false,
       enableSorting: false,
-      enableGlobalSearch: false,
+      enableGlobalSearch: true,
+      searchFields: const ['product_code', 'product_name', 'warehouse_name'],
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
@@ -782,28 +783,30 @@ class _StockCountPageState extends State<StockCountPage> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            labelText: 'جستجو (کد/نام/انبار)',
-                            prefixIcon: const Icon(Icons.search),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: _searchController.text.isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip: 'پاک کردن جستجو',
-                                    icon: const Icon(Icons.close),
-                                    onPressed: () {
-                                      setState(() => _searchController.clear());
-                                    },
-                                  ),
+                        if (isMobile) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              labelText: 'جستجو (کد/نام/انبار)',
+                              prefixIcon: const Icon(Icons.search),
+                              border: const OutlineInputBorder(),
+                              suffixIcon: _searchController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'پاک کردن جستجو',
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () {
+                                        setState(() => _searchController.clear());
+                                      },
+                                    ),
+                            ),
+                            onChanged: (_) {
+                              setState(() {});
+                            },
                           ),
-                          onChanged: (_) {
-                            setState(() {});
-                          },
-                        ),
-                        const SizedBox(height: 10),
+                          const SizedBox(height: 10),
+                        ],
                         Wrap(
                           spacing: 12,
                           runSpacing: 8,
@@ -896,7 +899,7 @@ class _StockCountPageState extends State<StockCountPage> {
                   child: DataTableWidget<Map<String, dynamic>>(
                     config: _buildDesktopTableConfig(),
                     fromJson: (json) => json,
-                    localRawItems: visibleRows.map((r) => r.raw).toList(),
+                    localRawItems: _rows.map((r) => r.raw).toList(),
                     localSummary: null,
                   ),
                 ),

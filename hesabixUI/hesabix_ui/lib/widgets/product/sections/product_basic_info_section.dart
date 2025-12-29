@@ -13,6 +13,7 @@ import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
 import '../../../utils/image_cache.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../utils/responsive_helper.dart';
 
 
 class ProductBasicInfoSection extends StatefulWidget {
@@ -119,14 +120,14 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWideScreen = screenWidth > 1000;
-    final isMediumScreen = screenWidth > 700 && screenWidth <= 1000;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isDesktop = ResponsiveHelper.isDesktop(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (isWideScreen) ...[
+        if (isDesktop) ...[
           // دو ستون برای صفحه‌های بزرگ
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +136,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                 child: Column(
                   children: [
                     _buildItemTypeSelector(context),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing),
                     
                     TextFormField(
                       initialValue: widget.formData.code,
@@ -143,7 +144,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                       validator: ProductFormValidator.validateCode,
                       onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing),
                     
                     TextFormField(
                       initialValue: widget.formData.name,
@@ -151,82 +152,25 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                       validator: ProductFormValidator.validateName,
                       onChanged: (value) => _updateFormData(widget.formData.copyWith(name: value)),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing),
                     _buildUnitsSection(context),
                   ],
                 ),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: spacing),
               Expanded(
                 child: Column(
                   children: [
                     _buildImagePicker(context),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing),
                     TextFormField(
                       initialValue: widget.formData.description,
                       decoration: InputDecoration(labelText: t.description),
                       onChanged: (value) => _updateFormData(widget.formData.copyWith(description: value.trim().isEmpty ? null : value)),
                       maxLines: 4,
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing),
                     
-                    CategoryPickerField(
-                      businessId: widget.businessId,
-                      categoriesTree: widget.categories,
-                      initialValue: widget.formData.categoryId,
-                      label: t.categories,
-                      authStore: widget.authStore,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(categoryId: value)),
-                      onCategoriesUpdated: (updatedCategories) {
-                        widget.controller?.refreshCategories();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ] else if (isMediumScreen) ...[
-          // دو ستون برای صفحه‌های متوسط
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildItemTypeSelector(context),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      initialValue: widget.formData.code,
-                      decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
-                      validator: ProductFormValidator.validateCode,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      initialValue: widget.formData.name,
-                      decoration: InputDecoration(labelText: t.title),
-                      validator: ProductFormValidator.validateName,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(name: value)),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildUnitsSection(context),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildImagePicker(context),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      initialValue: widget.formData.description,
-                      decoration: InputDecoration(labelText: t.description),
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(description: value.trim().isEmpty ? null : value)),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 20),
                     CategoryPickerField(
                       businessId: widget.businessId,
                       categoriesTree: widget.categories,
@@ -244,9 +188,9 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             ],
           ),
         ] else ...[
-          // یک ستون برای صفحه‌های کوچک
+          // یک ستون برای موبایل و تبلت
           _buildItemTypeSelector(context),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           
           TextFormField(
             initialValue: widget.formData.code,
@@ -254,7 +198,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             validator: ProductFormValidator.validateCode,
             onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           
           TextFormField(
             initialValue: widget.formData.name,
@@ -262,10 +206,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             validator: ProductFormValidator.validateName,
             onChanged: (value) => _updateFormData(widget.formData.copyWith(name: value)),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           
           _buildImagePicker(context),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           
           TextFormField(
             initialValue: widget.formData.description,
@@ -273,7 +217,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             onChanged: (value) => _updateFormData(widget.formData.copyWith(description: value.trim().isEmpty ? null : value)),
             maxLines: 3,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           
           CategoryPickerField(
             businessId: widget.businessId,
@@ -286,17 +230,17 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               widget.controller?.refreshCategories();
             },
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: spacing),
           _buildUnitsSection(context),
         ],
         
         if (widget.attributes.isNotEmpty) ...[
-          const SizedBox(height: 32),
+          SizedBox(height: spacing * 2),
           Text(t.productAttributes, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 12),
+          SizedBox(height: spacing),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: spacing,
+            runSpacing: spacing,
             children: widget.attributes.map((attr) {
               final id = (attr['id'] as num).toInt();
               final title = (attr['title'] ?? 'ویژگی ${attr['id']}').toString();
@@ -327,15 +271,17 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
 
   Widget _buildUnitsSection(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(t.unitsTitle, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 initialValue: widget.formData.mainUnit ?? '',
                 decoration: InputDecoration(labelText: t.mainUnit),
                 validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
@@ -345,10 +291,8 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                   ));
                 },
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 initialValue: widget.formData.secondaryUnit ?? '',
                 decoration: InputDecoration(labelText: t.secondaryUnit),
                 onChanged: (text) {
@@ -357,10 +301,8 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                   ));
                 },
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 initialValue: widget.formData.unitConversionFactor.toString(),
                 decoration: InputDecoration(labelText: t.unitConversionFactor),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -369,7 +311,6 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]')),
                 ],
                 validator: (value) {
-                  // اگر واحد فرعی انتخاب شده، ضریب اجباری و > 0 است
                   final hasSecondary = widget.formData.secondaryUnit?.trim().isNotEmpty == true;
                   if (hasSecondary && (value == null || value.trim().isEmpty)) {
                     return t.required;
@@ -378,9 +319,57 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                 },
                 onChanged: (value) => _updateFormData(widget.formData.copyWith(unitConversionFactor: num.tryParse(value))),
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: widget.formData.mainUnit ?? '',
+                  decoration: InputDecoration(labelText: t.mainUnit),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+                  onChanged: (text) {
+                    _updateFormData(widget.formData.copyWith(
+                      mainUnit: text.trim().isEmpty ? null : text.trim(),
+                    ));
+                  },
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  initialValue: widget.formData.secondaryUnit ?? '',
+                  decoration: InputDecoration(labelText: t.secondaryUnit),
+                  onChanged: (text) {
+                    _updateFormData(widget.formData.copyWith(
+                      secondaryUnit: text.trim().isEmpty ? null : text.trim(),
+                    ));
+                  },
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  initialValue: widget.formData.unitConversionFactor.toString(),
+                  decoration: InputDecoration(labelText: t.unitConversionFactor),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]')),
+                  ],
+                  validator: (value) {
+                    final hasSecondary = widget.formData.secondaryUnit?.trim().isNotEmpty == true;
+                    if (hasSecondary && (value == null || value.trim().isEmpty)) {
+                      return t.required;
+                    }
+                    return ProductFormValidator.validateConversionFactor(value);
+                  },
+                  onChanged: (value) => _updateFormData(widget.formData.copyWith(unitConversionFactor: num.tryParse(value))),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -388,6 +377,8 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
 
   Widget _buildItemTypeSelector(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -397,20 +388,20 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: spacing),
         Row(
           children: [
             Expanded(
               child: _buildItemTypeCard(
                 context: context,
-                title: t.products,
+                title: 'کالا',
                 subtitle: t.productPhysicalDesc,
                 icon: Icons.inventory_2_outlined,
                 value: 'کالا',
                 isSelected: widget.formData.itemType == 'کالا',
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: spacing),
             Expanded(
               child: _buildItemTypeCard(
                 context: context,
@@ -511,7 +502,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
-          height: 200,
+          height: ResponsiveHelper.isMobile(context) ? 150 : 200,
           decoration: BoxDecoration(
             border: Border.all(color: Theme.of(context).dividerColor),
             borderRadius: BorderRadius.circular(8),

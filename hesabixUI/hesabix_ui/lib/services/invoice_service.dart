@@ -94,6 +94,23 @@ class InvoiceService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  /// محاسبه مانده چند فاکتور در یک درخواست
+  Future<Map<String, dynamic>> calculateInvoicesRemaining({
+    required int businessId,
+    required List<int> invoiceIds,
+  }) async {
+    final body = {
+      'invoice_ids': invoiceIds,
+    };
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/invoices/calculate-remaining',
+      data: body,
+    );
+    
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   /// دریافت اطلاعات مرتبط با فاکتور برای نمایش در هشدار حذف
   Future<Map<String, dynamic>> getInvoiceDeleteInfo({
     required int businessId,

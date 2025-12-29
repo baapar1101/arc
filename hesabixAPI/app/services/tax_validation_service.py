@@ -57,11 +57,18 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
             national_id = (person.national_id or "").strip()
             economic_code = (person.economic_id or "").strip()
             
+            # استخراج نام شخص برای استفاده در پیام‌های خطا
+            person_name = person.alias_name or (
+                f"{person.first_name or ''} {person.last_name or ''}".strip() 
+                if person.first_name or person.last_name 
+                else person.company_name or "نامشخص"
+            )
+            
             if not national_id and not economic_code:
                 issues.append({
                     "code": "PERSON_TAX_ID_MISSING",
                     "message": "طرف حساب فاقد کد ملی و شناسه اقتصادی است.",
-                    "meta": {"person_id": person.id, "person_name": person.name},
+                    "meta": {"person_id": person.id, "person_name": person_name},
                 })
             else:
                 # اعتبارسنجی کد ملی
@@ -70,7 +77,7 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
                     if not is_valid:
                         issues.append({
                             "code": "PERSON_NATIONAL_ID_INVALID",
-                            "message": f"کد ملی طرف حساب '{person.name}' نامعتبر است (باید 10 یا 11 رقم باشد).",
+                            "message": f"کد ملی طرف حساب '{person_name}' نامعتبر است (باید 10 یا 11 رقم باشد).",
                             "meta": {"person_id": person.id, "national_id": national_id},
                         })
                 
@@ -78,7 +85,7 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
                 if economic_code and not validate_economic_code(economic_code):
                     issues.append({
                         "code": "PERSON_ECONOMIC_CODE_INVALID",
-                        "message": f"کد اقتصادی طرف حساب '{person.name}' نامعتبر است (باید 11 یا 14 رقم باشد).",
+                        "message": f"کد اقتصادی طرف حساب '{person_name}' نامعتبر است (باید 11 یا 14 رقم باشد).",
                         "meta": {"person_id": person.id, "economic_code": economic_code},
                     })
 

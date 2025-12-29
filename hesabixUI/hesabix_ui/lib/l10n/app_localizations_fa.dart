@@ -1619,6 +1619,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get products => 'کالا‌ها و خدمات';
 
   @override
+  String get product => 'کالا';
+
+  @override
   String get services => 'خدمات';
 
   @override
@@ -2548,6 +2551,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get persons => 'اشخاص';
+
+  @override
+  String get person => 'شخص';
 
   @override
   String get personsList => 'لیست اشخاص';
@@ -5156,6 +5162,21 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxValidationIssuesEmpty => 'جزئیاتی برای نمایش وجود ندارد.';
 
   @override
+  String get taxValidationIssuesCategoryPerson => 'مشکلات طرف حساب';
+
+  @override
+  String get taxValidationIssuesCategoryProduct => 'مشکلات کالا/خدمت';
+
+  @override
+  String get taxValidationIssuesCategoryOther => 'سایر مشکلات';
+
+  @override
+  String get taxValidationIssuesEditInvoice => 'ویرایش فاکتور';
+
+  @override
+  String get taxValidationIssuesLineNumber => 'ردیف';
+
+  @override
   String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';
 
   @override
@@ -5299,6 +5320,15 @@ class AppLocalizationsFa extends AppLocalizations {
       'فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.';
 
   @override
+  String get taxSendSelectedAllAlreadySent =>
+      'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند.';
+
+  @override
+  String taxSendSelectedSomeAlreadySent(int skipped, int count) {
+    return '$skipped فاکتور قبلاً ارسال شده است. $count فاکتور باقی‌مانده ارسال شود؟';
+  }
+
+  @override
   String taxSendSelectedErrorWithMessage(String error) {
     return 'خطا در ارسال فاکتورهای انتخاب‌شده: $error';
   }
@@ -5355,6 +5385,15 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get taxRemoveSelectedSuccess =>
       'فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.';
+
+  @override
+  String get taxRemoveSelectedAllAlreadySent =>
+      'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند و نمی‌توانند از کارپوشه حذف شوند.';
+
+  @override
+  String taxRemoveSelectedSomeAlreadySent(int skipped, int count) {
+    return '$skipped فاکتور قبلاً ارسال شده است. $count فاکتور باقی‌مانده از کارپوشه حذف شود؟';
+  }
 
   @override
   String taxRemoveSelectedErrorWithMessage(String error) {

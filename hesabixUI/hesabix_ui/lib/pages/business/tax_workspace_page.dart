@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -545,11 +546,23 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               icon: Icons.cloud_upload_outlined,
               label: t.taxSendSingle,
               onTap: (item) => _onSendSingleToSystem(item as Map<String, dynamic>),
+              enabled: (item) {
+                final map = item as Map<String, dynamic>;
+                final status = map['tax_status']?.toString() ?? 'not_sent';
+                // غیرفعال کردن برای فاکتورهای ارسال شده یا قطعی شده
+                return status != 'sent' && status != 'finalized';
+              },
             ),
             DataTableAction(
               icon: Icons.remove_circle_outline,
               label: t.taxRemoveFromWorkspaceSingle,
               onTap: (item) => _onRemoveSingleFromWorkspace(item as Map<String, dynamic>),
+              enabled: (item) {
+                final map = item as Map<String, dynamic>;
+                final status = map['tax_status']?.toString() ?? 'not_sent';
+                // غیرفعال کردن برای فاکتورهای ارسال شده یا قطعی شده
+                return status != 'sent' && status != 'finalized';
+              },
             ),
           ],
         ),
@@ -716,8 +729,10 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      if (!_handleTaxSendError(e)) {
-      SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(e.toString()));
+      // استخراج invoice_id از item برای نمایش بهتر خطاها
+      final invoiceId = item['id'] is int ? item['id'] as int : int.tryParse(item['id']?.toString() ?? '');
+      if (!_handleTaxSendError(e, invoiceId: invoiceId)) {
+        SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(e.toString()));
       }
     }
   }
@@ -790,30 +805,66 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
     if (selectedItems.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.taxSendSelectedDialogTitle),
-        content: Text(t.taxSendSelectedDialogMessage(selectedItems.length)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(t.cancel),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.cloud_upload_outlined),
-            label: Text(t.confirm),
-          ),
-        ],
-      ),
-    );
+    // فیلتر کردن فاکتورهای ارسال شده
+    final sendableItems = selectedItems.where((item) {
+      final status = item['tax_status']?.toString() ?? 'not_sent';
+      return status != 'sent' && status != 'finalized';
+    }).toList();
 
-    if (confirmed != true || !mounted) return;
+    if (sendableItems.isEmpty) {
+      SnackBarHelper.showError(
+        context,
+        message: t.taxSendSelectedAllAlreadySent,
+      );
+      return;
+    }
+
+    if (sendableItems.length < selectedItems.length) {
+      final skippedCount = selectedItems.length - sendableItems.length;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.taxSendSelectedDialogTitle),
+          content: Text(t.taxSendSelectedSomeAlreadySent(skippedCount, sendableItems.length)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.cancel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.taxSendSelectedDialogTitle),
+          content: Text(t.taxSendSelectedDialogMessage(sendableItems.length)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.cancel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
 
     try {
       final api = widget.apiClient;
-      final ids = selectedItems.map((e) => e['id']).toList();
+      final ids = sendableItems.map((e) => e['id']).toList();
       final response = await api.post<Map<String, dynamic>>(
         '/invoices/business/${widget.businessId}/tax-workspace/send-to-system-batch',
         data: {'invoice_ids': ids, 'use_background': true},
@@ -826,7 +877,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       if (jobId != null && jobId.isNotEmpty) {
         // نمایش progress dialog با polling
         if (!mounted) return;
-        _showJobProgressDialog(jobId, selectedItems.length);
+        _showJobProgressDialog(jobId, sendableItems.length);
       } else {
         // Fallback: synchronous processing
         final failed = (result['failed'] as List<dynamic>?) ?? const [];
@@ -1001,26 +1052,62 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
     if (selectedItems.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.taxRemoveSelectedDialogTitle),
-        content: Text(t.taxRemoveSelectedDialogMessage(selectedItems.length)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(t.cancel),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.remove_circle_outline),
-            label: Text(t.confirm),
-          ),
-        ],
-      ),
-    );
+    // فیلتر کردن فاکتورهای ارسال شده
+    final removableItems = selectedItems.where((item) {
+      final status = item['tax_status']?.toString() ?? 'not_sent';
+      return status != 'sent' && status != 'finalized';
+    }).toList();
 
-    if (confirmed != true || !mounted) return;
+    if (removableItems.isEmpty) {
+      SnackBarHelper.showError(
+        context,
+        message: t.taxRemoveSelectedAllAlreadySent,
+      );
+      return;
+    }
+
+    if (removableItems.length < selectedItems.length) {
+      final skippedCount = selectedItems.length - removableItems.length;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.taxRemoveSelectedDialogTitle),
+          content: Text(t.taxRemoveSelectedSomeAlreadySent(skippedCount, removableItems.length)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.cancel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.remove_circle_outline),
+              label: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.taxRemoveSelectedDialogTitle),
+          content: Text(t.taxRemoveSelectedDialogMessage(removableItems.length)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.cancel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.remove_circle_outline),
+              label: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
 
     final navigator = Navigator.of(context, rootNavigator: true);
     showDialog<void>(
@@ -1032,7 +1119,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
     try {
       final api = widget.apiClient;
-      final ids = selectedItems.map((e) => e['id']).toList();
+      final ids = removableItems.map((e) => e['id']).toList();
       await api.post<Map<String, dynamic>>(
         '/invoices/business/${widget.businessId}/tax-workspace/remove-batch',
         data: {'invoice_ids': ids},
@@ -1123,7 +1210,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
   }
 
-  bool _handleTaxSendError(Object error) {
+  bool _handleTaxSendError(Object error, {int? invoiceId}) {
     ApiErrorDetails? apiError;
     if (error is DioException && error.error is ApiErrorDetails) {
       apiError = error.error as ApiErrorDetails;
@@ -1151,7 +1238,16 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
     final issues = apiError.details?['issues'];
     final List<dynamic> issueList = issues is List ? issues : const [];
-    _showValidationIssuesDialog(issueList);
+    // استفاده از invoice_id پاس داده شده یا استخراج از request
+    int? finalInvoiceId = invoiceId;
+    if (finalInvoiceId == null && error is DioException) {
+      final requestPath = error.requestOptions.path;
+      final match = RegExp(r'/invoices/business/\d+/(\d+)/tax-workspace/send-to-system').firstMatch(requestPath);
+      if (match != null) {
+        finalInvoiceId = int.tryParse(match.group(1)!);
+      }
+    }
+    _showValidationIssuesDialog(issueList, invoiceId: finalInvoiceId);
     return true;
   }
 
@@ -1346,52 +1442,302 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     );
   }
 
-  void _showValidationIssuesDialog(List<dynamic> issues) {
+  void _showValidationIssuesDialog(List<dynamic> issues, {int? invoiceId}) {
     final t = AppLocalizations.of(context);
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.taxValidationIssuesTitle),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: issues.isEmpty
-              ? Text(t.taxValidationIssuesEmpty)
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      t.taxValidationIssuesDescription,
-                      style: Theme.of(context).textTheme.bodySmall,
+      builder: (context) {
+        // دسته‌بندی خطاها بر اساس نوع
+        final Map<String, List<Map<String, dynamic>>> categorizedIssues = {};
+        for (final issue in issues) {
+          final map = issue is Map<String, dynamic> ? issue : <String, dynamic>{};
+          final code = map['code']?.toString() ?? 'OTHER';
+          String category;
+          if (code.contains('PERSON_')) {
+            category = 'person';
+          } else if (code.contains('PRODUCT_')) {
+            category = 'product';
+          } else {
+            category = 'other';
+          }
+          if (!categorizedIssues.containsKey(category)) {
+            categorizedIssues[category] = [];
+          }
+          categorizedIssues[category]!.add(map);
+        }
+
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.redAccent),
+              const SizedBox(width: 8),
+              Expanded(child: Text(t.taxValidationIssuesTitle)),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: issues.isEmpty
+                ? Text(t.taxValidationIssuesEmpty)
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Theme.of(context).colorScheme.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  t.taxValidationIssuesDescription,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // نمایش خطاهای مربوط به شخص
+                        if (categorizedIssues.containsKey('person')) ...[
+                          _buildIssueCategoryHeader(
+                            context,
+                            t.taxValidationIssuesCategoryPerson,
+                            Icons.person_outline,
+                            Colors.orange,
+                          ),
+                          const SizedBox(height: 8),
+                          ...categorizedIssues['person']!.map((issue) => _buildIssueItem(context, issue, t, invoiceId: invoiceId)),
+                          const SizedBox(height: 16),
+                        ],
+                        // نمایش خطاهای مربوط به کالا
+                        if (categorizedIssues.containsKey('product')) ...[
+                          _buildIssueCategoryHeader(
+                            context,
+                            t.taxValidationIssuesCategoryProduct,
+                            Icons.inventory_2_outlined,
+                            Colors.blue,
+                          ),
+                          const SizedBox(height: 8),
+                          ...categorizedIssues['product']!.map((issue) => _buildIssueItem(context, issue, t, invoiceId: invoiceId)),
+                          const SizedBox(height: 16),
+                        ],
+                        // نمایش سایر خطاها
+                        if (categorizedIssues.containsKey('other')) ...[
+                          _buildIssueCategoryHeader(
+                            context,
+                            t.taxValidationIssuesCategoryOther,
+                            Icons.warning_outlined,
+                            Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          ...categorizedIssues['other']!.map((issue) => _buildIssueItem(context, issue, t, invoiceId: invoiceId)),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    ...issues.map(
-                      (issue) {
-                        final map = issue is Map<String, dynamic> ? issue : <String, dynamic>{};
-                        final message = map['message']?.toString() ?? '-';
-                        final code = map['code']?.toString();
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.error_outline, color: Colors.redAccent),
-                          title: Text(message),
-                          subtitle: code != null && code.isNotEmpty
-                              ? Text('${t.code}: $code')
-                              : null,
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+          ),
+          actions: [
+            if (invoiceId != null)
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.pushNamed(
+                    'business_edit_invoice',
+                    pathParameters: {
+                      'business_id': widget.businessId.toString(),
+                      'invoice_id': invoiceId.toString(),
+                    },
+                  );
+                },
+                icon: const Icon(Icons.edit, size: 18),
+                label: Text(t.taxValidationIssuesEditInvoice),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(t.close),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildIssueCategoryHeader(BuildContext context, String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
+      ],
+    );
+  }
+
+  Widget _buildIssueItem(BuildContext context, Map<String, dynamic> issue, AppLocalizations t, {int? invoiceId}) {
+    final message = issue['message']?.toString() ?? '-';
+    final code = issue['code']?.toString();
+    final meta = issue['meta'] as Map<String, dynamic>?;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (code != null && code.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${t.code}: $code',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+          if (meta != null && meta.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (meta['person_id'] != null)
+                  _buildMetaChip(
+                    context,
+                    t,
+                    Icons.person,
+                    '${t.person}: ${meta['person_name'] ?? meta['person_id']}',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to persons page - user can search and edit from there
+                      context.pushNamed(
+                        'business_persons',
+                        pathParameters: {
+                          'business_id': widget.businessId.toString(),
+                        },
+                      );
+                    },
+                  ),
+                if (meta['product_id'] != null)
+                  _buildMetaChip(
+                    context,
+                    t,
+                    Icons.inventory_2,
+                    '${t.product}: ${meta['product_name'] ?? meta['product_id']}',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigate to products page - user can search and edit from there
+                      context.pushNamed(
+                        'business_products',
+                        pathParameters: {
+                          'business_id': widget.businessId.toString(),
+                        },
+                      );
+                    },
+                  ),
+                if (meta['line_number'] != null)
+                  _buildMetaChip(
+                    context,
+                    t,
+                    Icons.numbers,
+                    '${t.taxValidationIssuesLineNumber}: ${meta['line_number']}',
+                    onTap: invoiceId != null
+                        ? () {
+                            Navigator.pop(context);
+                            context.pushNamed(
+                              'business_edit_invoice',
+                              pathParameters: {
+                                'business_id': widget.businessId.toString(),
+                                'invoice_id': invoiceId.toString(),
+                              },
+                            );
+                          }
+                        : null,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaChip(BuildContext context, AppLocalizations t, IconData icon, String label, {VoidCallback? onTap}) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Theme.of(context).colorScheme.onPrimaryContainer),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
           ),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: chip,
+      );
+    }
+    return chip;
   }
 
   void _showInquiryResultDialog(List<dynamic> results) {

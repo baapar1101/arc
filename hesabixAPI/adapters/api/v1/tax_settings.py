@@ -186,7 +186,13 @@ def test_tax_connection_endpoint(
             details={"error": str(exc)},
         ) from exc
     finally:
-        client.close()
+        try:
+            client.close()
+        except Exception as close_error:
+            # لاگ می‌کنیم اما exception را propagate نمی‌کنیم
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error closing MoadianClient during test connection: {close_error}")
 
 
 def _generate_rsa_key_pair() -> Tuple[str, str, rsa.RSAPrivateKey]:

@@ -1629,6 +1629,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get products => 'Products and Services';
 
   @override
+  String get product => 'Product';
+
+  @override
   String get services => 'Services';
 
   @override
@@ -2559,6 +2562,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get persons => 'Persons';
+
+  @override
+  String get person => 'Person';
 
   @override
   String get personsList => 'Persons List';
@@ -5187,6 +5193,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxValidationIssuesEmpty => 'No issue details provided.';
 
   @override
+  String get taxValidationIssuesCategoryPerson => 'Person Issues';
+
+  @override
+  String get taxValidationIssuesCategoryProduct => 'Product/Service Issues';
+
+  @override
+  String get taxValidationIssuesCategoryOther => 'Other Issues';
+
+  @override
+  String get taxValidationIssuesEditInvoice => 'Edit Invoice';
+
+  @override
+  String get taxValidationIssuesLineNumber => 'Line';
+
+  @override
   String get taxAddToWorkspaceSingle => 'Add to tax workspace';
 
   @override
@@ -5328,6 +5349,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxSendSelectedSuccess => 'Selected invoices sent to tax system.';
 
   @override
+  String get taxSendSelectedAllAlreadySent =>
+      'All selected invoices have already been sent.';
+
+  @override
+  String taxSendSelectedSomeAlreadySent(int skipped, int count) {
+    return '$skipped invoice(s) have already been sent. Send $count remaining invoice(s)?';
+  }
+
+  @override
   String taxSendSelectedErrorWithMessage(String error) {
     return 'Failed to send selected invoices: $error';
   }
@@ -5385,6 +5415,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get taxRemoveSelectedSuccess =>
       'Selected invoices removed from tax workspace.';
+
+  @override
+  String get taxRemoveSelectedAllAlreadySent =>
+      'All selected invoices have already been sent and cannot be removed from workspace.';
+
+  @override
+  String taxRemoveSelectedSomeAlreadySent(int skipped, int count) {
+    return '$skipped invoice(s) have already been sent. Remove $count remaining invoice(s) from workspace?';
+  }
 
   @override
   String taxRemoveSelectedErrorWithMessage(String error) {

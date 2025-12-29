@@ -9,57 +9,94 @@ from datetime import datetime
 from typing import Optional
 
 
-def generate_tax_id(economic_code: str, timestamp: datetime, internal_id: int) -> str:
+def generate_tax_id(client_id: str, timestamp: datetime, internal_id: int) -> str:
     """
     تولید شناسه یکتای مالیاتی (TAXID)
-    الگوریتم: کد اقتصادی + timestamp + شماره داخلی را hash می‌کنیم
+    مطابق الگوریتم InvoiceIdService در کتابخانه PHP:
+    - clientId (tax_memory_id) + hexDaysPastEpoch (5 hex) + hexInternalInvoiceId (10 hex) + checksum
     
     Args:
-        economic_code: کد اقتصادی فروشنده
+        client_id: شناسه حافظه مالیاتی (tax_memory_id)
         timestamp: زمان صدور فاکتور
         internal_id: شناسه داخلی فاکتور
     
     Returns:
-        شناسه یکتای 32 کاراکتری hexadecimal
+        شناسه یکتای مالیاتی (مثلا: A1B2C3000010000000001)
     """
-    # فرمت: کد_اقتصادی + timestamp + شماره_فاکتور
-    ts_unix = int(timestamp.timestamp() * 1000)  # milliseconds
-    raw_string = f"{economic_code}{ts_unix}{internal_id}"
+    from app.integrations.moadian.verhoeff import verhoeff_checksum
     
-    # SHA256 hash و برداشتن 32 کاراکتر اول
-    hash_object = hashlib.sha256(raw_string.encode('utf-8'))
-    return hash_object.hexdigest()[:32].upper()
+    # تبدیل clientId به عدد (مطابق clientIdToNumber در PHP)
+    def client_id_to_number(client_id: str) -> str:
+        """تبدیل clientId به عدد - حروف به ASCII code"""
+        CHARACTER_TO_NUMBER_CODING = {
+            'A': 65, 'B': 66, 'C': 67, 'D': 68, 'E': 69, 'F': 70,
+            'G': 71, 'H': 72, 'I': 73, 'J': 74, 'K': 75, 'L': 76,
+            'M': 77, 'N': 78, 'O': 79, 'P': 80, 'Q': 81, 'R': 82,
+            'S': 83, 'T': 84, 'U': 85, 'V': 86, 'W': 87, 'X': 88,
+            'Y': 89, 'Z': 90,
+        }
+        result = ""
+        for char in client_id:
+            if char.isdigit():
+                result += char
+            elif char.upper() in CHARACTER_TO_NUMBER_CODING:
+                result += str(CHARACTER_TO_NUMBER_CODING[char.upper()])
+        return result
+    
+    # محاسبه days past epoch
+    days_past_epoch = int(timestamp.timestamp() / (3600 * 24))
+    days_past_epoch_padded = str(days_past_epoch).zfill(6)
+    hex_days_past_epoch = hex(days_past_epoch)[2:].zfill(5).upper()
+    
+    # تبدیل clientId به عدد
+    numeric_client_id = client_id_to_number(client_id)
+    
+    # internal invoice ID
+    internal_id_padded = str(internal_id).zfill(12)
+    hex_internal_id = hex(internal_id)[2:].zfill(10).upper()
+    
+    # ساخت decimal invoice ID برای checksum
+    decimal_invoice_id = numeric_client_id + days_past_epoch_padded + internal_id_padded
+    
+    # محاسبه checksum با Verhoeff algorithm
+    checksum = verhoeff_checksum(decimal_invoice_id)
+    
+    # ساخت شناسه نهایی: clientId + hexDays + hexInternalId + checksum
+    tax_id = client_id.upper() + hex_days_past_epoch + hex_internal_id + str(checksum)
+    
+    return tax_id
 
 
 def normalize_invoice_number(invoice_number: str | int, max_length: int = 20) -> str:
     """
     نرمالایز کردن شماره فاکتور برای ارسال به سامانه
-    - حذف کاراکترهای غیرمجاز
-    - محدود کردن طول
-    - اضافه کردن صفر در ابتدا در صورت نیاز
+    مطابق کتابخانه PHP: str_pad(dechex($internalInvoiceId), 10, 0, STR_PAD_LEFT)
     
     Args:
-        invoice_number: شماره فاکتور
-        max_length: حداکثر طول مجاز
+        invoice_number: شماره فاکتور (باید عدد باشد)
+        max_length: حداکثر طول مجاز (پیش‌فرض 10 برای hex)
     
     Returns:
-        شماره نرمال شده
+        شماره نرمال شده به hex با padding
     """
-    # تبدیل به string
-    num_str = str(invoice_number)
+    # تبدیل به عدد صحیح
+    try:
+        if isinstance(invoice_number, str):
+            # حذف کاراکترهای غیرعددی
+            num_str = re.sub(r'[^0-9]', '', invoice_number)
+            if not num_str:
+                num_str = "0"
+            internal_id = int(num_str)
+        else:
+            internal_id = int(invoice_number)
+    except (ValueError, TypeError):
+        internal_id = 0
     
-    # حذف کاراکترهای غیرعددی و غیرحرفی
-    normalized = re.sub(r'[^A-Za-z0-9]', '', num_str)
+    # تبدیل به hex و padding به 10 کاراکتر (مطابق کتابخانه PHP)
+    hex_value = hex(internal_id)[2:]  # حذف '0x'
+    normalized = hex_value.zfill(10).upper()  # padding به 10 کاراکتر و uppercase
     
-    # محدود کردن طول
-    if len(normalized) > max_length:
-        normalized = normalized[-max_length:]
-    
-    # اگر کوتاه‌تر از حد مطلوب بود، صفر اضافه می‌کنیم
-    if len(normalized) < max_length and normalized.isdigit():
-        normalized = normalized.zfill(max_length)
-    
-    return normalized.upper()
+    return normalized
 
 
 def timestamp_to_unix_ms(dt: datetime) -> int:
@@ -290,37 +327,83 @@ def extract_moadian_error_message(error_data: dict) -> str:
     if not error_data:
         return "خطای نامشخص"
     
-    # نقشه کدهای خطا به پیام فارسی
+    # نقشه کدهای خطا به پیام فارسی (بر اساس مستندات سامانه مودیان)
     error_map = {
+        # خطاهای احراز هویت و تنظیمات
         'TAX-101': 'شناسه حافظه مالیاتی نامعتبر است',
         'TAX-102': 'کد اقتصادی نامعتبر است',
         'TAX-103': 'کلید خصوصی نامعتبر است',
         'TAX-104': 'امضای دیجیتال نامعتبر است',
+        'AUTH-001': 'خطا در احراز هویت',
+        'AUTH-002': 'توکن منقضی شده است',
+        'AUTH-003': 'دسترسی غیرمجاز',
+        'AUTH-004': 'شناسه حافظه مالیاتی یافت نشد',
+        
+        # خطاهای اعتبارسنجی فاکتور
         'TAX-201': 'فاکتور تکراری است',
         'TAX-202': 'شماره فاکتور نامعتبر است',
         'TAX-203': 'تاریخ فاکتور نامعتبر است',
+        'TAX-204': 'نوع فاکتور نامعتبر است',
+        'TAX-205': 'الگوی پرداخت نامعتبر است',
+        'TAX-206': 'موضوع فاکتور نامعتبر است',
+        
+        # خطاهای اقلام فاکتور
         'TAX-301': 'کد مالیاتی کالا نامعتبر است',
         'TAX-302': 'کد ملی خریدار نامعتبر است',
         'TAX-303': 'مبلغ فاکتور نامعتبر است',
+        'TAX-304': 'واحد اندازه‌گیری نامعتبر است',
+        'TAX-305': 'تعداد/مقدار کالا نامعتبر است',
+        'TAX-306': 'نرخ مالیات نامعتبر است',
+        'TAX-307': 'مبلغ مالیات نامعتبر است',
+        
+        # خطاهای شبکه و ارتباط
         'TAX-401': 'خطا در اتصال به سرور',
         'TAX-402': 'زمان انتظار پاسخ تمام شد',
-        'AUTH-001': 'خطا در احراز هویت',
-        'AUTH-002': 'توکن منقضی شده است',
+        'TAX-403': 'سرور در دسترس نیست',
+        'TAX-404': 'مسیر درخواست یافت نشد',
+        
+        # خطاهای پردازش
+        'TAX-501': 'خطا در پردازش درخواست',
+        'TAX-502': 'داده‌های ارسالی ناقص است',
+        'TAX-503': 'سرویس موقتاً در دسترس نیست',
+        
+        # خطاهای عمومی
+        'TAX-999': 'خطای نامشخص از سامانه مودیان',
     }
     
-    error_code = error_data.get('code', '')
-    error_message = error_data.get('message', '')
+    # استخراج error_code و error_message از error_data
+    error_code = ''
+    error_message = ''
+    
+    if isinstance(error_data, dict):
+        error_code = error_data.get('code', '') or error_data.get('errorCode', '')
+        error_message = error_data.get('message', '') or error_data.get('errorMessage', '') or error_data.get('detail', '')
+    elif isinstance(error_data, str):
+        error_message = error_data
+    
+    # نرمالایز کردن error_code
+    if error_code:
+        error_code = str(error_code).strip().upper()
     
     # اگر کد خطا در نقشه بود
-    if error_code in error_map:
-        return f"{error_map[error_code]} ({error_code})"
+    if error_code and error_code in error_map:
+        mapped_message = error_map[error_code]
+        if error_message and error_message != mapped_message:
+            return f"{mapped_message}: {error_message} ({error_code})"
+        return f"{mapped_message} ({error_code})"
     
     # اگر پیام خطا موجود بود
     if error_message:
-        return error_message
+        error_message_str = str(error_message).strip()
+        if error_code:
+            return f"{error_message_str} ({error_code})"
+        return error_message_str
     
     # در غیر این صورت کد خطا را نمایش می‌دهیم
-    return f"خطا: {error_code}" if error_code else "خطای نامشخص"
+    if error_code:
+        return f"خطا: {error_code}"
+    
+    return "خطای نامشخص از سامانه مودیان"
 
 
 

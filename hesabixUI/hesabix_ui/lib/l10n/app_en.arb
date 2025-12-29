@@ -570,6 +570,7 @@
   "receiptsAndPayments": "Receipts and Payments",
   "productsAndServices": "Products and Services",
   "products": "Products",
+  "product": "Product",
   "services": "Services",
   "priceLists": "Price Lists",
   "categories": "Categories",
@@ -938,6 +939,7 @@
   "systemLogsDialogContent": "In this section you can view system reports, errors and user activities.",
   "accountManagement": "Account Management",
   "persons": "Persons",
+  "person": "Person",
   "personsList": "Persons List",
   "addPerson": "Add Person",
   "editPerson": "Edit Person",
@@ -1918,6 +1920,11 @@
   "taxValidationIssuesTitle": "Tax validation issues",
   "taxValidationIssuesDescription": "Resolve the following items before sending invoices to the tax platform.",
   "taxValidationIssuesEmpty": "No issue details provided.",
+  "taxValidationIssuesCategoryPerson": "Person Issues",
+  "taxValidationIssuesCategoryProduct": "Product/Service Issues",
+  "taxValidationIssuesCategoryOther": "Other Issues",
+  "taxValidationIssuesEditInvoice": "Edit Invoice",
+  "taxValidationIssuesLineNumber": "Line",
 
   "taxAddToWorkspaceSingle": "Add to tax workspace",
   "taxRemoveFromWorkspaceSingle": "Remove from tax workspace",
@@ -2035,6 +2042,18 @@
     }
   },
   "taxSendSelectedSuccess": "Selected invoices sent to tax system.",
+  "taxSendSelectedAllAlreadySent": "All selected invoices have already been sent.",
+  "taxSendSelectedSomeAlreadySent": "{skipped} invoice(s) have already been sent. Send {count} remaining invoice(s)?",
+  "@taxSendSelectedSomeAlreadySent": {
+    "placeholders": {
+      "skipped": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "taxSendSelectedErrorWithMessage": "Failed to send selected invoices: {error}",
   "@taxSendSelectedErrorWithMessage": {
     "placeholders": {
@@ -2094,6 +2113,20 @@
 
   "taxRemoveSelectedDialogTitle": "Remove selected from tax workspace",
   "taxRemoveSelectedDialogMessage": "Remove {count} selected invoices from tax workspace?",
+  "taxRemoveSelectedSuccess": "Selected invoices removed from tax workspace.",
+  "taxRemoveSelectedAllAlreadySent": "All selected invoices have already been sent and cannot be removed from workspace.",
+  "taxRemoveSelectedSomeAlreadySent": "{skipped} invoice(s) have already been sent. Remove {count} remaining invoice(s) from workspace?",
+  "@taxRemoveSelectedSomeAlreadySent": {
+    "placeholders": {
+      "skipped": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRemoveSelectedErrorWithMessage": "Failed to remove selected invoices: {error}",
   "@taxRemoveSelectedDialogMessage": {
     "placeholders": {
       "count": {

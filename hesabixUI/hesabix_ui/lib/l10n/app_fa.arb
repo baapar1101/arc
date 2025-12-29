@@ -632,6 +632,7 @@
   "receiptsAndPayments": "دریافت و پرداخت",
   "productsAndServices": "کالا و خدمات",
   "products": "کالاها",
+  "product": "کالا",
   "services": "خدمات",
   "priceLists": "لیست‌های قیمت",
   "categories": "دسته‌بندی‌ها",
@@ -984,6 +985,7 @@
   "systemLogsDialogContent": "در این بخش می‌توانید گزارش‌های سیستم، خطاها و فعالیت‌های کاربران را مشاهده کنید.",
   "accountManagement": "مدیریت حساب کاربری",
   "persons": "اشخاص",
+  "person": "شخص",
   "personsList": "لیست اشخاص",
   "personCode": "کد شخص",
   "addPerson": "افزودن شخص",
@@ -1962,6 +1964,11 @@
   "taxValidationIssuesTitle": "مشکلات اعتبارسنجی مالیاتی",
   "taxValidationIssuesDescription": "برای ارسال موفق به سامانه مودیان، ابتدا موارد زیر را برطرف کنید.",
   "taxValidationIssuesEmpty": "جزئیاتی برای نمایش وجود ندارد.",
+  "taxValidationIssuesCategoryPerson": "مشکلات طرف حساب",
+  "taxValidationIssuesCategoryProduct": "مشکلات کالا/خدمت",
+  "taxValidationIssuesCategoryOther": "سایر مشکلات",
+  "taxValidationIssuesEditInvoice": "ویرایش فاکتور",
+  "taxValidationIssuesLineNumber": "ردیف",
 
   "taxAddToWorkspaceSingle": "افزودن به کارپوشه مالیاتی",
   "taxRemoveFromWorkspaceSingle": "حذف از کارپوشه مالیاتی",
@@ -2079,6 +2086,18 @@
     }
   },
   "taxSendSelectedSuccess": "فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.",
+  "taxSendSelectedAllAlreadySent": "تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند.",
+  "taxSendSelectedSomeAlreadySent": "{skipped} فاکتور قبلاً ارسال شده است. {count} فاکتور باقی‌مانده ارسال شود؟",
+  "@taxSendSelectedSomeAlreadySent": {
+    "placeholders": {
+      "skipped": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "taxSendSelectedErrorWithMessage": "خطا در ارسال فاکتورهای انتخاب‌شده: {error}",
   "@taxSendSelectedErrorWithMessage": {
     "placeholders": {
@@ -2146,6 +2165,18 @@
     }
   },
   "taxRemoveSelectedSuccess": "فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.",
+  "taxRemoveSelectedAllAlreadySent": "تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند و نمی‌توانند از کارپوشه حذف شوند.",
+  "taxRemoveSelectedSomeAlreadySent": "{skipped} فاکتور قبلاً ارسال شده است. {count} فاکتور باقی‌مانده از کارپوشه حذف شود؟",
+  "@taxRemoveSelectedSomeAlreadySent": {
+    "placeholders": {
+      "skipped": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "taxRemoveSelectedErrorWithMessage": "خطا در حذف فاکتورهای انتخاب‌شده: {error}",
   "@taxRemoveSelectedErrorWithMessage": {
     "placeholders": {

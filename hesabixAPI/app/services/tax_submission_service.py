@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import datetime
+import logging
+import time
 from typing import Dict, Any, List
 
 from sqlalchemy.orm import Session
@@ -13,6 +15,8 @@ from app.integrations.moadian.client import MoadianClient
 from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
 from app.services.invoice_service import invoice_document_to_dict
 from app.services.tax_validation_service import validate_document_for_tax
+
+logger = logging.getLogger(__name__)
 
 
 def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, Any]:
@@ -43,60 +47,18 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             details={"issues": validation["issues"]},
         )
 
-    # 2. بررسی تنظیمات (با استفاده از cache)
-    from app.core.cache import get_cache
-    cache = get_cache()
-    cache_key = f"tax_setting:{document.business_id}"
-    
-    # تلاش برای دریافت از cache
-    cached_setting = cache.get(cache_key) if cache.enabled else None
-    tax_setting = None
-    
-    if cached_setting and isinstance(cached_setting, dict):
-        # استفاده از cached data برای ساخت TaxSetting object
-        # اما باید از دیتابیس query کنیم چون ممکن است فیلدهای دیگری نیاز باشد
-        # یا می‌توانیم از cached data استفاده کنیم اگر کامل باشد
-        tax_setting = (
-            db.query(TaxSetting)
-            .filter(TaxSetting.business_id == document.business_id)
-            .first()
+    # 2. بررسی تنظیمات مالیاتی
+    tax_setting = (
+        db.query(TaxSetting)
+        .filter(TaxSetting.business_id == document.business_id)
+        .first()
+    )
+    if not tax_setting:
+        raise ApiError(
+            "TAX_SETTINGS_NOT_CONFIGURED",
+            "تنظیمات سامانه مودیان برای این کسب‌وکار ثبت نشده است.",
+            http_status=400,
         )
-        # اگر از cache استفاده کردیم و tax_setting یافت شد، cache را refresh می‌کنیم
-        if tax_setting and cache.enabled:
-            cache.set(cache_key, {
-                "business_id": tax_setting.business_id,
-                "tax_memory_id": tax_setting.tax_memory_id,
-                "economic_code": tax_setting.economic_code,
-                "private_key": tax_setting.private_key,
-                "public_key": tax_setting.public_key,
-                "certificate": tax_setting.certificate,
-                "sandbox_mode": tax_setting.sandbox_mode,
-            }, ttl=3600)  # 1 ساعت cache
-    else:
-        # دریافت از دیتابیس
-        tax_setting = (
-            db.query(TaxSetting)
-            .filter(TaxSetting.business_id == document.business_id)
-            .first()
-        )
-        if not tax_setting:
-            raise ApiError(
-                "TAX_SETTINGS_NOT_CONFIGURED",
-                "تنظیمات سامانه مودیان برای این کسب‌وکار ثبت نشده است.",
-                http_status=400,
-            )
-        
-        # ذخیره در cache (فقط فیلدهای لازم)
-        if cache.enabled:
-            cache.set(cache_key, {
-                "business_id": tax_setting.business_id,
-                "tax_memory_id": tax_setting.tax_memory_id,
-                "economic_code": tax_setting.economic_code,
-                "private_key": tax_setting.private_key,
-                "public_key": tax_setting.public_key,
-                "certificate": tax_setting.certificate,
-                "sandbox_mode": tax_setting.sandbox_mode,
-            }, ttl=3600)  # 1 ساعت cache
     
     if not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
         raise ApiError(
@@ -111,12 +73,13 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
 
     # 3.5. بررسی rate limit
     from app.services.tax_rate_limiter import get_tax_rate_limiter
+    settings = get_settings()
     rate_limiter = get_tax_rate_limiter()
     allowed, rate_info = rate_limiter.check_rate_limit(
         business_id=document.business_id,
         operation="send_invoice",
-        max_requests=100,  # حداکثر 100 فاکتور در ساعت
-        window_seconds=3600,
+        max_requests=settings.tax_system_rate_limit_max_requests,
+        window_seconds=settings.tax_system_rate_limit_window_seconds,
     )
     if not allowed:
         raise ApiError(
@@ -139,113 +102,152 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
     _mark_document_pending(document, db)
 
     # 5. ارسال به سامانه با retry mechanism
-    client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
-    max_retries = 3
-    retry_delay = 2.0  # ثانیه
-    last_exception = None
+    client = None
+    settings = get_settings()
+    max_retries = settings.tax_system_retry_max_attempts
+    initial_retry_delay = settings.tax_system_retry_initial_delay_seconds
     
-    for attempt in range(max_retries):
-        try:
-            submission = client.send_invoice(invoice_dto)
-            # 6. ذخیره نتیجه
-            _apply_submission_result(document, submission, db)
-            
-            # ثبت لاگ موفقیت
-            from app.services.tax_logging import log_tax_operation
-            log_tax_operation(
-                operation="send_invoice",
-                business_id=document.business_id,
-                invoice_id=document.id,
-                tracking_code=submission.get("tracking_code"),
-                status="completed",
-                details={"status": submission.get("status")},
-            )
-            
-            client.close()
-            return submission
-        except ApiError as e:
-            # خطاهای validation یا business logic را retry نمی‌کنیم
-            if e.http_status in (400, 401, 403, 404):
-                client.close()
-                # در صورت خطای validation، وضعیت را به failed تغییر می‌دهیم
-                _mark_document_failed(document, str(e), db)
+    try:
+        client = MoadianClient(settings=settings, tax_setting=tax_setting)
+        
+        for attempt in range(max_retries):
+            retry_delay = initial_retry_delay * (2 ** attempt)  # exponential backoff
+            try:
+                submission = client.send_invoice(invoice_dto)
+                # 6. ذخیره نتیجه
+                _apply_submission_result(document, submission, db)
                 
-                # ثبت لاگ خطا
+                # ثبت لاگ موفقیت
                 from app.services.tax_logging import log_tax_operation
                 log_tax_operation(
                     operation="send_invoice",
                     business_id=document.business_id,
                     invoice_id=document.id,
-                    status="failed",
-                    error=str(e),
+                    tracking_code=submission.get("tracking_code"),
+                    status="completed",
+                    details={"status": submission.get("status")},
                 )
                 
-                # افزودن به Dead Letter Queue
-                from app.services.tax_dead_letter_queue import add_to_dead_letter_queue
-                try:
-                    error_code = (getattr(e, "detail", {}) or {}).get("error", {}).get("code") if hasattr(e, "detail") else str(e)
-                    add_to_dead_letter_queue(
-                        db,
+                return submission
+                
+            except ApiError as e:
+                # خطاهای validation یا business logic را retry نمی‌کنیم
+                status_code = getattr(e, "status_code", None)
+                if status_code in (400, 401, 403, 404):
+                    # در صورت خطای validation، وضعیت را به failed تغییر می‌دهیم
+                    _mark_document_failed(document, str(e), db)
+                    
+                    # ثبت لاگ خطا
+                    from app.services.tax_logging import log_tax_operation
+                    log_tax_operation(
+                        operation="send_invoice",
                         business_id=document.business_id,
                         invoice_id=document.id,
-                        error_code=error_code or "UNKNOWN_ERROR",
-                        error_message=str(e),
-                        error_details={"http_status": e.http_status} if hasattr(e, "http_status") else None,
+                        status="failed",
+                        error=str(e),
                     )
-                except Exception as dlq_error:
-                    logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
+                    
+                    # افزودن به Dead Letter Queue
+                    from app.services.tax_dead_letter_queue import add_to_dead_letter_queue
+                    try:
+                        error_code = (getattr(e, "detail", {}) or {}).get("error", {}).get("code") if hasattr(e, "detail") else str(e)
+                        add_to_dead_letter_queue(
+                            db,
+                            business_id=document.business_id,
+                            invoice_id=document.id,
+                            error_code=error_code or "UNKNOWN_ERROR",
+                            error_message=str(e),
+                            error_details={"http_status": getattr(e, "status_code", None)} if hasattr(e, "status_code") else None,
+                        )
+                    except Exception as dlq_error:
+                        logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
+                    
+                    raise
                 
-                raise
-            # خطاهای شبکه یا سرور را retry می‌کنیم
-            last_exception = e
-            if attempt < max_retries - 1:
-                import time
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. Retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # exponential backoff
-            else:
-                client.close()
-                # در صورت خطای نهایی، وضعیت را به failed تغییر می‌دهیم
-                _mark_document_failed(document, str(e), db)
-                raise
-        except Exception as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                import time
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. Retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # exponential backoff
-            else:
-                client.close()
-                # در صورت خطای نهایی، وضعیت را به failed تغییر می‌دهیم
-                _mark_document_failed(document, str(e), db)
-                raise
-    
-    # این خط نباید اجرا شود، اما برای اطمینان
-    client.close()
-    if last_exception:
-        _mark_document_failed(document, str(last_exception), db)
+                # خطاهای شبکه یا سرور را retry می‌کنیم
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. "
+                        f"Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    # در صورت خطای نهایی، وضعیت را به failed تغییر می‌دهیم
+                    _mark_document_failed(document, str(e), db)
+                    
+                    # ثبت لاگ خطا
+                    from app.services.tax_logging import log_tax_operation
+                    log_tax_operation(
+                        operation="send_invoice",
+                        business_id=document.business_id,
+                        invoice_id=document.id,
+                        status="failed",
+                        error=str(e),
+                    )
+                    
+                    # افزودن به Dead Letter Queue
+                    from app.services.tax_dead_letter_queue import add_to_dead_letter_queue
+                    try:
+                        error_code = (getattr(e, "detail", {}) or {}).get("error", {}).get("code") if hasattr(e, "detail") else str(e)
+                        add_to_dead_letter_queue(
+                            db,
+                            business_id=document.business_id,
+                            invoice_id=document.id,
+                            error_code=error_code or "RETRY_EXHAUSTED",
+                            error_message=str(e),
+                            error_details={"http_status": getattr(e, "status_code", None), "attempts": max_retries} if hasattr(e, "status_code") else {"attempts": max_retries},
+                        )
+                    except Exception as dlq_error:
+                        logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
+                    
+                    raise
+                    
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. "
+                        f"Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    # در صورت خطای نهایی، وضعیت را به failed تغییر می‌دهیم
+                    _mark_document_failed(document, str(e), db)
+                    
+                    # ثبت لاگ خطا
+                    from app.services.tax_logging import log_tax_operation
+                    log_tax_operation(
+                        operation="send_invoice",
+                        business_id=document.business_id,
+                        invoice_id=document.id,
+                        status="failed",
+                        error=str(e),
+                    )
+                    
+                    # افزودن به Dead Letter Queue
+                    from app.services.tax_dead_letter_queue import add_to_dead_letter_queue
+                    try:
+                        add_to_dead_letter_queue(
+                            db,
+                            business_id=document.business_id,
+                            invoice_id=document.id,
+                            error_code="RETRY_EXHAUSTED",
+                            error_message=str(e),
+                            error_details={"attempts": max_retries},
+                        )
+                    except Exception as dlq_error:
+                        logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
+                    
+                    raise
         
-        # افزودن به Dead Letter Queue
-        from app.services.tax_dead_letter_queue import add_to_dead_letter_queue
-        try:
-            add_to_dead_letter_queue(
-                db,
-                business_id=document.business_id,
-                invoice_id=document.id,
-                error_code="RETRY_EXHAUSTED",
-                error_message=str(last_exception),
-                error_details={"attempts": max_retries},
-            )
-        except Exception as dlq_error:
-            logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
+        # این خط نباید اجرا شود
+        raise ApiError("TAX_SUBMISSION_FAILED", "خطا در ارسال فاکتور پس از چندین تلاش", http_status=500)
         
-        raise last_exception
-    raise ApiError("TAX_SUBMISSION_FAILED", "خطا در ارسال فاکتور پس از چندین تلاش", http_status=500)
+    finally:
+        if client:
+            try:
+                client.close()
+            except Exception as close_error:
+                logger.warning(f"Error closing MoadianClient: {close_error}")
 
 
 def inquire_tax_status(

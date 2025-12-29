@@ -3203,6 +3203,12 @@ abstract class AppLocalizations {
   /// **'Products and Services'**
   String get products;
 
+  /// No description provided for @product.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get product;
+
   /// No description provided for @services.
   ///
   /// In en, this message translates to:
@@ -5008,6 +5014,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Persons'**
   String get persons;
+
+  /// No description provided for @person.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get person;
 
   /// No description provided for @personsList.
   ///
@@ -9881,6 +9893,36 @@ abstract class AppLocalizations {
   /// **'No issue details provided.'**
   String get taxValidationIssuesEmpty;
 
+  /// No description provided for @taxValidationIssuesCategoryPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person Issues'**
+  String get taxValidationIssuesCategoryPerson;
+
+  /// No description provided for @taxValidationIssuesCategoryProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product/Service Issues'**
+  String get taxValidationIssuesCategoryProduct;
+
+  /// No description provided for @taxValidationIssuesCategoryOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Issues'**
+  String get taxValidationIssuesCategoryOther;
+
+  /// No description provided for @taxValidationIssuesEditInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Invoice'**
+  String get taxValidationIssuesEditInvoice;
+
+  /// No description provided for @taxValidationIssuesLineNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Line'**
+  String get taxValidationIssuesLineNumber;
+
   /// No description provided for @taxAddToWorkspaceSingle.
   ///
   /// In en, this message translates to:
@@ -10115,6 +10157,18 @@ abstract class AppLocalizations {
   /// **'Selected invoices sent to tax system.'**
   String get taxSendSelectedSuccess;
 
+  /// No description provided for @taxSendSelectedAllAlreadySent.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected invoices have already been sent.'**
+  String get taxSendSelectedAllAlreadySent;
+
+  /// No description provided for @taxSendSelectedSomeAlreadySent.
+  ///
+  /// In en, this message translates to:
+  /// **'{skipped} invoice(s) have already been sent. Send {count} remaining invoice(s)?'**
+  String taxSendSelectedSomeAlreadySent(int skipped, int count);
+
   /// No description provided for @taxSendSelectedErrorWithMessage.
   ///
   /// In en, this message translates to:
@@ -10198,6 +10252,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Selected invoices removed from tax workspace.'**
   String get taxRemoveSelectedSuccess;
+
+  /// No description provided for @taxRemoveSelectedAllAlreadySent.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected invoices have already been sent and cannot be removed from workspace.'**
+  String get taxRemoveSelectedAllAlreadySent;
+
+  /// No description provided for @taxRemoveSelectedSomeAlreadySent.
+  ///
+  /// In en, this message translates to:
+  /// **'{skipped} invoice(s) have already been sent. Remove {count} remaining invoice(s) from workspace?'**
+  String taxRemoveSelectedSomeAlreadySent(int skipped, int count);
 
   /// No description provided for @taxRemoveSelectedErrorWithMessage.
   ///

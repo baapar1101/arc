@@ -53,6 +53,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   String? _error;
   Map<String, dynamic>? _summary;  // Summary from API response
 
+  // Local mode: store all items for pagination
+  List<T> _allItems = [];
+  List<Map<String, dynamic>> _allRawItems = [];
+
   // Pagination state
   int _page = 1;
   int _limit = 20;
@@ -265,6 +269,67 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     return visibleColumns;
   }
 
+  /// Apply pagination to local items
+  void _applyLocalPagination() {
+    if (widget.localRawItems == null) return;
+    
+    // Apply search filter if search is active
+    List<T> filteredItems = _allItems;
+    List<Map<String, dynamic>> filteredRawItems = _allRawItems;
+    
+    final searchQuery = _searchCtrl.text.trim();
+    if (searchQuery.isNotEmpty && widget.config.searchFields.isNotEmpty) {
+      final lowerQuery = searchQuery.toLowerCase();
+      final filtered = <T>[];
+      final filteredRaw = <Map<String, dynamic>>[];
+      
+      for (int i = 0; i < _allItems.length; i++) {
+        final rawItem = _allRawItems[i];
+        bool matches = false;
+        
+        // Search in specified fields
+        for (final field in widget.config.searchFields) {
+          final value = rawItem[field]?.toString().toLowerCase() ?? '';
+          if (value.contains(lowerQuery)) {
+            matches = true;
+            break;
+          }
+        }
+        
+        if (matches) {
+          filtered.add(_allItems[i]);
+          filteredRaw.add(rawItem);
+        }
+      }
+      
+      filteredItems = filtered;
+      filteredRawItems = filteredRaw;
+    }
+    
+    // Calculate total pages based on filtered items
+    _total = filteredItems.length;
+    _totalPages = _total > 0 ? ((_total - 1) ~/ _limit) + 1 : 0;
+    
+    // Clamp page to valid range
+    if (_page < 1) _page = 1;
+    if (_page > _totalPages && _totalPages > 0) _page = _totalPages;
+    
+    // Handle empty case
+    if (filteredItems.isEmpty) {
+      _items = [];
+      _rawItems = [];
+      return;
+    }
+    
+    // Calculate pagination bounds
+    final startIndex = (_page - 1) * _limit;
+    final endIndex = (startIndex + _limit).clamp(0, filteredItems.length);
+    
+    // Slice items and raw items
+    _items = filteredItems.sublist(startIndex, endIndex);
+    _rawItems = filteredRawItems.sublist(startIndex, endIndex);
+  }
+
   Future<void> _fetchData() async {
     if (mounted) {
       setState(() => _loadingList = true);
@@ -283,13 +348,25 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             debugPrint('Error parsing local item: $e, item: $r');
           }
         }
+        
+        // Check if data has changed (by comparing length or content)
+        final dataChanged = _allItems.length != parsed.length || 
+                           _allRawItems.length != raw.length;
+        
+        // Store all items for pagination
+        _allItems = parsed;
+        _allRawItems = raw;
+        
+        // Reset page to 1 only if data changed
+        if (dataChanged) {
+          _page = 1;
+        }
+        
+        // Apply pagination to items
+        _applyLocalPagination();
+        
         if (mounted) {
           setState(() {
-            _items = parsed;
-            _rawItems = raw;
-            _page = 1;
-            _total = raw.length;
-            _totalPages = raw.isEmpty ? 0 : 1;
             _summary = widget.localSummary;
             _selectedRows.clear();
             _activeRowIndex = _items.isNotEmpty ? 0 : -1;

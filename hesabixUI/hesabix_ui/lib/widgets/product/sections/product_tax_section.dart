@@ -9,6 +9,7 @@ import '../../../services/tax_product_code_service.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../tax_code_search_sheet.dart';
+import '../../../utils/responsive_helper.dart';
 
 class ProductTaxSection extends StatefulWidget {
   final ProductFormData formData;
@@ -148,30 +149,27 @@ class _ProductTaxSectionState extends State<ProductTaxSection> {
   }
 
   Widget _buildTaxCodeTypeUnitRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isDesktop = constraints.maxWidth >= 1000;
-        if (isDesktop) {
-          return Row(
-            children: [
-              Expanded(child: _buildTaxCodeField(context)),
-              const SizedBox(width: 12),
-              Expanded(child: _buildTaxTypeDropdown(context)),
-              const SizedBox(width: 12),
-              Expanded(child: _buildTaxUnitDropdown(context)),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            _buildTaxCodeField(context),
-            const SizedBox(height: 12),
-            _buildTaxTypeDropdown(context),
-            const SizedBox(height: 12),
-            _buildTaxUnitDropdown(context),
-          ],
-        );
-      },
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
+    if (isMobile) {
+      return Column(
+        children: [
+          _buildTaxCodeField(context),
+          SizedBox(height: spacing),
+          _buildTaxTypeDropdown(context),
+          SizedBox(height: spacing),
+          _buildTaxUnitDropdown(context),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: _buildTaxCodeField(context)),
+        SizedBox(width: spacing),
+        Expanded(child: _buildTaxTypeDropdown(context)),
+        SizedBox(width: spacing),
+        Expanded(child: _buildTaxUnitDropdown(context)),
+      ],
     );
   }
 

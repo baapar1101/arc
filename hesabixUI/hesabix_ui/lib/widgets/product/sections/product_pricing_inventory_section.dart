@@ -7,6 +7,7 @@ import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../utils/responsive_helper.dart';
 
 
 class ProductPricingInventorySection extends StatefulWidget {
@@ -235,53 +236,103 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             isRequired: false,
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  key: ValueKey('reorderPoint_${widget.formData.reorderPoint}'),
-                  initialValue: widget.formData.reorderPoint?.toString(),
-                  decoration: InputDecoration(labelText: t.reorderPointRepeat),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    const EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.digitsOnly,
+          Builder(
+            builder: (context) {
+              final isMobile = ResponsiveHelper.isMobile(context);
+              final spacing = ResponsiveHelper.getGridSpacing(context);
+              if (isMobile) {
+                return Column(
+                  children: [
+                    TextFormField(
+                      key: ValueKey('reorderPoint_${widget.formData.reorderPoint}'),
+                      initialValue: widget.formData.reorderPoint?.toString(),
+                      decoration: InputDecoration(labelText: t.reorderPointRepeat),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.reorderPointRepeat),
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(reorderPoint: int.tryParse(value))),
+                    ),
+                    SizedBox(height: spacing),
+                    TextFormField(
+                      key: ValueKey('minOrderQty_${widget.formData.minOrderQty}'),
+                      initialValue: widget.formData.minOrderQty?.toString(),
+                      decoration: InputDecoration(labelText: t.minOrderQty),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.minOrderQty),
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(minOrderQty: int.tryParse(value))),
+                    ),
+                    SizedBox(height: spacing),
+                    TextFormField(
+                      key: ValueKey('leadTimeDays_${widget.formData.leadTimeDays}'),
+                      initialValue: widget.formData.leadTimeDays?.toString(),
+                      decoration: InputDecoration(labelText: t.leadTimeDays),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: ProductFormValidator.validateLeadTime,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(leadTimeDays: int.tryParse(value))),
+                    ),
                   ],
-                  validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.reorderPointRepeat),
-                  onChanged: (value) => _updateFormData(widget.formData.copyWith(reorderPoint: int.tryParse(value))),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  key: ValueKey('minOrderQty_${widget.formData.minOrderQty}'),
-                  initialValue: widget.formData.minOrderQty?.toString(),
-                  decoration: InputDecoration(labelText: t.minOrderQty),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    const EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.minOrderQty),
-                  onChanged: (value) => _updateFormData(widget.formData.copyWith(minOrderQty: int.tryParse(value))),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  key: ValueKey('leadTimeDays_${widget.formData.leadTimeDays}'),
-                  initialValue: widget.formData.leadTimeDays?.toString(),
-                  decoration: InputDecoration(labelText: t.leadTimeDays),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    const EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  validator: ProductFormValidator.validateLeadTime,
-                  onChanged: (value) => _updateFormData(widget.formData.copyWith(leadTimeDays: int.tryParse(value))),
-                ),
-              ),
-            ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      key: ValueKey('reorderPoint_${widget.formData.reorderPoint}'),
+                      initialValue: widget.formData.reorderPoint?.toString(),
+                      decoration: InputDecoration(labelText: t.reorderPointRepeat),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.reorderPointRepeat),
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(reorderPoint: int.tryParse(value))),
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      key: ValueKey('minOrderQty_${widget.formData.minOrderQty}'),
+                      initialValue: widget.formData.minOrderQty?.toString(),
+                      decoration: InputDecoration(labelText: t.minOrderQty),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.minOrderQty),
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(minOrderQty: int.tryParse(value))),
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      key: ValueKey('leadTimeDays_${widget.formData.leadTimeDays}'),
+                      initialValue: widget.formData.leadTimeDays?.toString(),
+                      decoration: InputDecoration(labelText: t.leadTimeDays),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: ProductFormValidator.validateLeadTime,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(leadTimeDays: int.tryParse(value))),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ],
@@ -368,76 +419,158 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         const SizedBox(height: 12),
         ...widget.draftPriceItems.map((it) {
           final minQty = _toNum(it['min_qty']);
+          final isMobile = ResponsiveHelper.isMobile(context);
+          final spacing = ResponsiveHelper.getGridSpacing(context);
           return Card(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            child: ListTile(
-              title: Text(_resolvePriceListTitle(it['price_list_id'])),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.currency_exchange, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(_resolveCurrencyTitle(it['currency_id'])),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.attach_money, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatPrice(it['price']),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+            margin: EdgeInsets.symmetric(vertical: spacing / 2),
+            child: isMobile
+                ? Padding(
+                    padding: EdgeInsets.all(spacing),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _resolvePriceListTitle(it['price_list_id']),
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () async {
+                                    if (widget.priceLists.isEmpty) {
+                                      _showNoPriceListsWarning(context);
+                                      return;
+                                    }
+                                    await _openEditorDialog(context, existing: it);
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => widget.onDeletePriceItem(it),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  if (it['tier_name'] != null && (it['tier_name'] as String).isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.layers, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text('سطح: ${it['tier_name']}'),
+                        SizedBox(height: spacing),
+                        Row(
+                          children: [
+                            Icon(Icons.currency_exchange, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(_resolveCurrencyTitle(it['currency_id'])),
+                          ],
+                        ),
+                        SizedBox(height: spacing / 2),
+                        Row(
+                          children: [
+                            Icon(Icons.attach_money, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatPrice(it['price']),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (it['tier_name'] != null && (it['tier_name'] as String).isNotEmpty) ...[
+                          SizedBox(height: spacing / 2),
+                          Row(
+                            children: [
+                              Icon(Icons.layers, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text('سطح: ${it['tier_name']}'),
+                            ],
+                          ),
+                        ],
+                        if (minQty != null && minQty > 0) ...[
+                          SizedBox(height: spacing / 2),
+                          Row(
+                            children: [
+                              Icon(Icons.shopping_cart, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text('حداقل تعداد: ${minQty.toStringAsFixed(0)}'),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
-                  ],
-                  if (minQty != null && minQty > 0) ...[
-                    const SizedBox(height: 4),
-                    Row(
+                  )
+                : ListTile(
+                    title: Text(_resolvePriceListTitle(it['price_list_id'])),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.shopping_cart, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text('حداقل تعداد: ${minQty.toStringAsFixed(0)}'),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.currency_exchange, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(_resolveCurrencyTitle(it['currency_id'])),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.attach_money, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatPrice(it['price']),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (it['tier_name'] != null && (it['tier_name'] as String).isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.layers, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text('سطح: ${it['tier_name']}'),
+                            ],
+                          ),
+                        ],
+                        if (minQty != null && minQty > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.shopping_cart, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text('حداقل تعداد: ${minQty.toStringAsFixed(0)}'),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
-                  ],
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () async {
-                      if (widget.priceLists.isEmpty) {
-                        _showNoPriceListsWarning(context);
-                        return;
-                      }
-                      await _openEditorDialog(context, existing: it);
-                    },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () async {
+                            if (widget.priceLists.isEmpty) {
+                              _showNoPriceListsWarning(context);
+                              return;
+                            }
+                            await _openEditorDialog(context, existing: it);
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => widget.onDeletePriceItem(it),
+                        ),
+                      ],
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => widget.onDeletePriceItem(it),
-                  ),
-                ],
-              ),
-            ),
           );
         }),
       ],
@@ -587,84 +720,162 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     num price = _toNum(existing?['price']) ?? 0;
 
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
     await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? t.addPriceTitle : t.editPriceTitle),
-        content: SizedBox(
-          width: 560,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  initialValue: priceListId,
-                  items: widget.priceLists
-                      .map((pl) {
-                        final id = _toInt(pl['id']);
-                        if (id == null) return null;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text((pl['name'] ?? '').toString()),
-                        );
-                      })
-                      .whereType<DropdownMenuItem<int>>()
-                      .toList(),
-                  onChanged: (v) => priceListId = v,
-                  decoration: InputDecoration(labelText: t.priceList),
-                  validator: (v) => v == null ? t.required : null,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  initialValue: currencyId,
-                  items: widget.currencies
-                      .map((c) {
-                        final id = _toInt(c['id']);
-                        if (id == null) return null;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text('${c['title'] ?? c['name']} (${c['code']})'),
-                        );
-                      })
-                      .whereType<DropdownMenuItem<int>>()
-                      .toList(),
-                  onChanged: (v) => currencyId = v,
-                  decoration: InputDecoration(labelText: t.currency),
-                  validator: (v) => v == null ? t.required : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: price.toString(),
-                  decoration: InputDecoration(labelText: t.price),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    const EnglishDigitsFormatter(),
-                    ThousandsSeparatorInputFormatter(),
+      builder: (ctx) => Dialog(
+        insetPadding: ResponsiveHelper.getDialogPadding(ctx),
+        child: Container(
+          constraints: ResponsiveHelper.getDialogConstraints(ctx),
+          padding: EdgeInsets.all(ResponsiveHelper.getPadding(ctx)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isMobile)
+                AppBar(
+                  title: Text(existing == null ? t.addPriceTitle : t.editPriceTitle),
+                  automaticallyImplyLeading: false,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          existing == null ? t.addPriceTitle : t.editPriceTitle,
+                          style: Theme.of(ctx).textTheme.headlineSmall,
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                        ),
+                      ],
+                    ),
+                    const Divider(),
                   ],
-                  validator: (v) => (num.tryParse((v ?? '').replaceAll(',', '')) == null) ? t.invalid : null,
-                  onChanged: (v) => price = num.tryParse((v).replaceAll(',', '')) ?? 0,
                 ),
-              ],
-            ),
+              SizedBox(height: isMobile ? 8 : 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<int>(
+                          initialValue: priceListId,
+                          items: widget.priceLists
+                              .map((pl) {
+                                final id = _toInt(pl['id']);
+                                if (id == null) return null;
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text((pl['name'] ?? '').toString()),
+                                );
+                              })
+                              .whereType<DropdownMenuItem<int>>()
+                              .toList(),
+                          onChanged: (v) => priceListId = v,
+                          decoration: InputDecoration(labelText: t.priceList),
+                          validator: (v) => v == null ? t.required : null,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: currencyId,
+                          items: widget.currencies
+                              .map((c) {
+                                final id = _toInt(c['id']);
+                                if (id == null) return null;
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text('${c['title'] ?? c['name']} (${c['code']})'),
+                                );
+                              })
+                              .whereType<DropdownMenuItem<int>>()
+                              .toList(),
+                          onChanged: (v) => currencyId = v,
+                          decoration: InputDecoration(labelText: t.currency),
+                          validator: (v) => v == null ? t.required : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          initialValue: price.toString(),
+                          decoration: InputDecoration(labelText: t.price),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            const EnglishDigitsFormatter(),
+                            ThousandsSeparatorInputFormatter(),
+                          ],
+                          validator: (v) => (num.tryParse((v ?? '').replaceAll(',', '')) == null) ? t.invalid : null,
+                          onChanged: (v) => price = num.tryParse((v).replaceAll(',', '')) ?? 0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(),
+        SizedBox(height: isMobile ? 8 : 16),
+        isMobile
+            ? Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        if (!(formKey.currentState?.validate() ?? false)) return;
+                        final payload = {
+                          'price_list_id': priceListId,
+                          'currency_id': currencyId,
+                          'price': price,
+                        }..removeWhere((k, v) => v == null);
+                        widget.onAddOrUpdatePriceItem(payload);
+                        Navigator.of(ctx).pop(true);
+                      },
+                      child: Text(AppLocalizations.of(ctx).save),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: Text(AppLocalizations.of(ctx).cancel),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: Text(AppLocalizations.of(ctx).cancel),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () {
+                      if (!(formKey.currentState?.validate() ?? false)) return;
+                      final payload = {
+                        'price_list_id': priceListId,
+                        'currency_id': currencyId,
+                        'price': price,
+                      }..removeWhere((k, v) => v == null);
+                      widget.onAddOrUpdatePriceItem(payload);
+                      Navigator.of(ctx).pop(true);
+                    },
+                    child: Text(AppLocalizations.of(ctx).save),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(AppLocalizations.of(ctx).cancel)),
-          FilledButton(
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              final payload = {
-                'price_list_id': priceListId,
-                'currency_id': currencyId,
-                'price': price,
-              }..removeWhere((k, v) => v == null);
-              widget.onAddOrUpdatePriceItem(payload);
-              Navigator.of(ctx).pop(true);
-            },
-            child: Text(AppLocalizations.of(ctx).save),
-          ),
-        ],
       ),
     );
   }

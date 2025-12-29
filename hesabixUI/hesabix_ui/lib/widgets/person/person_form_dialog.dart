@@ -10,6 +10,7 @@ import '../../services/business_dashboard_service.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
@@ -143,9 +144,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionExcludeDiscounts = person.commissionExcludeDiscounts;
       _commissionExcludeAdditionsDeductions = person.commissionExcludeAdditionsDeductions;
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
-    } else if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
-      // اگر در حال افزودن شخص جدید هستیم و مقدار اولیه برای نام مستعار داریم
-      _aliasNameController.text = widget.initialAliasName!;
+    } else {
+      // برای افزودن شخص جدید، نوع شخص به صورت پیش‌فرض "مشتری" انتخاب می‌شود
+      _selectedPersonTypes.add(PersonType.customer);
+      _selectedPersonType = PersonType.customer;
+      
+      if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
+        // اگر مقدار اولیه برای نام مستعار داریم
+        _aliasNameController.text = widget.initialAliasName!;
+      }
     }
     // Load person credit override if editing
     if (widget.person?.id != null) {
@@ -436,35 +443,53 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isEditing = widget.person != null;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final padding = ResponsiveHelper.getPadding(context);
+    final dialogConstraints = ResponsiveHelper.getDialogConstraints(context);
 
     return Dialog(
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(24),
+        constraints: dialogConstraints,
+        padding: EdgeInsets.all(padding),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Header
-            Row(
-              children: [
-                Icon(
-                  isEditing ? Icons.edit : Icons.add,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isEditing ? t.editPerson : t.addPerson,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
+            if (isMobile)
+              AppBar(
+                title: Text(isEditing ? t.editPerson : t.addPerson),
+                leading: IconButton(
                   icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 16),
+                automaticallyImplyLeading: false,
+              )
+            else
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isEditing ? Icons.edit : Icons.add,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isEditing ? t.editPerson : t.addPerson,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                ],
+              ),
+            SizedBox(height: isMobile ? 8 : 16),
 
             // Form with tabs
             Expanded(
@@ -482,31 +507,31 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   final views = <Widget>[
                     SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        child: _buildBasicInfoFields(t),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                        child: _buildBasicInfoFields(t, isMobile),
                       ),
                     ),
                     SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        child: _buildEconomicInfoFields(t),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                        child: _buildEconomicInfoFields(t, isMobile),
                       ),
                     ),
                     SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        child: _buildContactInfoFields(t),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                        child: _buildContactInfoFields(t, isMobile),
                       ),
                     ),
                     SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        child: _buildBankAccountsSection(t),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                        child: _buildBankAccountsSection(t, isMobile),
                       ),
                     ),
                     SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
                         child: _buildCreditOverrideSection(),
                       ),
                     ),
@@ -516,8 +541,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     views.add(
                       SingleChildScrollView(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          child: _buildCommissionTab(),
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                          child: _buildCommissionTab(isMobile),
                         ),
                       ),
                     );
@@ -528,10 +553,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     child: Column(
                       children: [
                         TabBar(
-                          isScrollable: true,
+                          isScrollable: isMobile,
                           tabs: tabs,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: isMobile ? 8 : 12),
                         Expanded(
                           child: TabBarView(children: views),
                         ),
@@ -544,35 +569,63 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
 
             // Actions
             const Divider(),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  child: Text(t.cancel),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _savePerson,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isEditing ? t.update : t.add),
-                ),
-              ],
-            ),
+            SizedBox(height: isMobile ? 8 : 16),
+            if (isMobile)
+              Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _savePerson,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(isEditing ? t.update : t.add),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                      child: Text(t.cancel),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    child: Text(t.cancel),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _savePerson,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(isEditing ? t.update : t.add),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCommissionTab() {
+  Widget _buildCommissionTab(bool isMobile) {
     final t = AppLocalizations.of(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     final isMarketer = _selectedPersonTypes.contains(PersonType.marketer);
     final isSeller = _selectedPersonTypes.contains(PersonType.seller);
     if (!isMarketer && !isSeller) {
@@ -583,10 +636,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
 
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _commissionSalePercentController,
                 decoration: InputDecoration(
                   labelText: t.percentFromSales,
@@ -605,10 +658,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   return null;
                 },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _commissionSalesReturnPercentController,
                 decoration: InputDecoration(
                   labelText: t.percentFromSalesReturn,
@@ -627,14 +678,61 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   return null;
                 },
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _commissionSalePercentController,
+                  decoration: InputDecoration(
+                    labelText: t.percentFromSales,
+                    suffixText: '%',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  validator: (v) {
+                    if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
+                      final num? val = num.tryParse(v);
+                      if (val == null || val < 0 || val > 100) return t.mustBeBetweenZeroAndHundred;
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _commissionSalesReturnPercentController,
+                  decoration: InputDecoration(
+                    labelText: t.percentFromSalesReturn,
+                    suffixText: '%',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  validator: (v) {
+                    if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
+                      final num? val = num.tryParse(v);
+                      if (val == null || val < 0 || val > 100) return t.mustBeBetweenZeroAndHundred;
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _commissionSalesAmountController,
                 decoration: InputDecoration(
                   labelText: t.salesAmount,
@@ -652,10 +750,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   return null;
                 },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _commissionSalesReturnAmountController,
                 decoration: InputDecoration(
                   labelText: t.salesReturnAmount,
@@ -673,30 +769,91 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   return null;
                 },
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: SwitchListTile(
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _commissionSalesAmountController,
+                  decoration: InputDecoration(
+                    labelText: t.salesAmount,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty) {
+                      final num? val = num.tryParse(v);
+                      if (val == null || val < 0) return t.mustBePositiveNumber;
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _commissionSalesReturnAmountController,
+                  decoration: InputDecoration(
+                    labelText: t.salesReturnAmount,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty) {
+                      final num? val = num.tryParse(v);
+                      if (val == null || val < 0) return t.mustBePositiveNumber;
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              SwitchListTile(
                 title: Text(t.commissionExcludeDiscounts),
                 value: _commissionExcludeDiscounts,
                 onChanged: (v) { setState(() { _commissionExcludeDiscounts = v; }); },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SwitchListTile(
+              SwitchListTile(
                 title: Text(t.commissionExcludeAdditionsDeductions),
                 value: _commissionExcludeAdditionsDeductions,
                 onChanged: (v) { setState(() { _commissionExcludeAdditionsDeductions = v; }); },
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: SwitchListTile(
+                  title: Text(t.commissionExcludeDiscounts),
+                  value: _commissionExcludeDiscounts,
+                  onChanged: (v) { setState(() { _commissionExcludeDiscounts = v; }); },
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: SwitchListTile(
+                  title: Text(t.commissionExcludeAdditionsDeductions),
+                  value: _commissionExcludeAdditionsDeductions,
+                  onChanged: (v) { setState(() { _commissionExcludeAdditionsDeductions = v; }); },
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
         SwitchListTile(
           title: Text(t.commissionPostInInvoiceDocument),
           value: _commissionPostInInvoiceDocument,
@@ -775,76 +932,88 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   }
 
 
-  Widget _buildBasicInfoFields(AppLocalizations t) {
+  Widget _buildBasicInfoFields(AppLocalizations t, bool isMobile) {
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _codeController,
-                readOnly: _autoGenerateCode,
+        TextFormField(
+          controller: _codeController,
+          readOnly: _autoGenerateCode,
+          decoration: InputDecoration(
+            labelText: t.personCodeOptional,
+            hintText: t.uniqueCodeNumeric,
+            suffixIcon: Container(
+              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              child: ToggleButtons(
+                isSelected: [_autoGenerateCode, !_autoGenerateCode],
+                borderRadius: BorderRadius.circular(6),
+                constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
+                onPressed: (index) {
+                  setState(() {
+                    _autoGenerateCode = (index == 0);
+                  });
+                },
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(t.automatic),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(t.manual),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          inputFormatters: [
+            const EnglishDigitsFormatter(),
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            if (!_autoGenerateCode) {
+              if (value == null || value.trim().isEmpty) {
+                return t.personCodeRequired;
+              }
+              if (int.tryParse(value.trim()) == null) {
+                return t.codeMustBeNumeric;
+              }
+            }
+            return null;
+          },
+        ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
+                controller: _aliasNameController,
                 decoration: InputDecoration(
-                  labelText: t.personCodeOptional,
-                  hintText: t.uniqueCodeNumeric,
-                  suffixIcon: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    ),
-                    child: ToggleButtons(
-                      isSelected: [_autoGenerateCode, !_autoGenerateCode],
-                      borderRadius: BorderRadius.circular(6),
-                      constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
-                      onPressed: (index) {
-                        setState(() {
-                          _autoGenerateCode = (index == 0);
-                        });
-                      },
+                  label: RichText(
+                    text: TextSpan(
+                      text: t.personAliasName,
+                      style: Theme.of(context).inputDecorationTheme.labelStyle ?? 
+                             Theme.of(context).textTheme.bodyMedium,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(t.automatic),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(t.manual),
+                        TextSpan(
+                          text: ' *',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                inputFormatters: [
-                  const EnglishDigitsFormatter(),
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (!_autoGenerateCode) {
-                    if (value == null || value.trim().isEmpty) {
-                      return t.personCodeRequired;
-                    }
-                    if (int.tryParse(value.trim()) == null) {
-                      return t.codeMustBeNumeric;
-                    }
-                  }
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _aliasNameController,
-                decoration: InputDecoration(
-                  labelText: t.personAliasName,
                   hintText: t.personAliasName,
+                  helperText: t.required,
+                  helperMaxLines: 1,
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -853,107 +1022,182 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   return null;
                 },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: _buildPersonTypesMultiSelect(t)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_selectedPersonTypes.contains(PersonType.shareholder))
+              SizedBox(height: spacing),
+              _buildPersonTypesMultiSelect(t),
+            ],
+          )
+        else
           Row(
             children: [
               Expanded(
                 child: TextFormField(
-                  controller: _shareCountController,
+                  controller: _aliasNameController,
                   decoration: InputDecoration(
-                    labelText: t.shareCount,
-                    hintText: t.integerNoDecimal,
+                    label: RichText(
+                      text: TextSpan(
+                        text: t.personAliasName,
+                        style: Theme.of(context).inputDecorationTheme.labelStyle ?? 
+                               Theme.of(context).textTheme.bodyMedium,
+                        children: [
+                          TextSpan(
+                            text: ' *',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    hintText: t.personAliasName,
+                    helperText: t.required,
+                    helperMaxLines: 1,
                   ),
-                  inputFormatters: [
-                    const EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (_selectedPersonTypes.contains(PersonType.shareholder)) {
-                      if (value == null || value.trim().isEmpty) {
-                        return t.shareholderShareCountRequired;
-                      }
-                      final parsed = int.tryParse(value.trim());
-                      if (parsed == null || parsed <= 0) {
-                        return 'تعداد سهام باید عدد صحیح بزرگتر از صفر باشد';
-                      }
+                    if (value == null || value.trim().isEmpty) {
+                      return t.personAliasNameRequired;
                     }
                     return null;
                   },
                 ),
               ),
+              SizedBox(width: spacing),
+              Expanded(child: _buildPersonTypesMultiSelect(t)),
             ],
           ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        SizedBox(height: spacing),
+        if (_selectedPersonTypes.contains(PersonType.shareholder))
+          TextFormField(
+            controller: _shareCountController,
+            decoration: InputDecoration(
+              labelText: t.shareCount,
+              hintText: t.integerNoDecimal,
+            ),
+            inputFormatters: [
+              const EnglishDigitsFormatter(),
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (_selectedPersonTypes.contains(PersonType.shareholder)) {
+                if (value == null || value.trim().isEmpty) {
+                  return t.shareholderShareCountRequired;
+                }
+                final parsed = int.tryParse(value.trim());
+                if (parsed == null || parsed <= 0) {
+                  return 'تعداد سهام باید عدد صحیح بزرگتر از صفر باشد';
+                }
+              }
+              return null;
+            },
+          ),
+        if (_selectedPersonTypes.contains(PersonType.shareholder))
+          SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _firstNameController,
                 decoration: InputDecoration(
                   labelText: t.personFirstName,
                   hintText: t.personFirstName,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _lastNameController,
                 decoration: InputDecoration(
                   labelText: t.personLastName,
                   hintText: t.personLastName,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _companyNameController,
                 decoration: InputDecoration(
                   labelText: t.personCompanyName,
                   hintText: t.personCompanyName,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _paymentIdController,
                 decoration: InputDecoration(
                   labelText: t.personPaymentId,
                   hintText: t.personPaymentId,
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _firstNameController,
+                      decoration: InputDecoration(
+                        labelText: t.personFirstName,
+                        hintText: t.personFirstName,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lastNameController,
+                      decoration: InputDecoration(
+                        labelText: t.personLastName,
+                        hintText: t.personLastName,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: spacing),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _companyNameController,
+                      decoration: InputDecoration(
+                        labelText: t.personCompanyName,
+                        hintText: t.personCompanyName,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _paymentIdController,
+                      decoration: InputDecoration(
+                        labelText: t.personPaymentId,
+                        hintText: t.personPaymentId,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
       ],
     );
   }
 
   Widget _buildPersonTypesMultiSelect(AppLocalizations t) {
     final types = PersonType.values;
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
+          padding: EdgeInsets.only(bottom: spacing / 2),
           child: Text(t.personType),
         ),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
+          spacing: spacing,
+          runSpacing: spacing / 2,
           children: types.map((type) {
             final selected = _selectedPersonTypes.contains(type);
             return FilterChip(
@@ -994,33 +1238,55 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     }
   }
 
-  Widget _buildEconomicInfoFields(AppLocalizations t) {
+  Widget _buildEconomicInfoFields(AppLocalizations t, bool isMobile) {
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _nationalIdController,
                 decoration: InputDecoration(
                   labelText: t.personNationalId,
                   hintText: t.personNationalId,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _registrationNumberController,
                 decoration: InputDecoration(
                   labelText: t.personRegistrationNumber,
                   hintText: t.personRegistrationNumber,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _nationalIdController,
+                  decoration: InputDecoration(
+                    labelText: t.personNationalId,
+                    hintText: t.personNationalId,
+                  ),
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _registrationNumberController,
+                  decoration: InputDecoration(
+                    labelText: t.personRegistrationNumber,
+                    hintText: t.personRegistrationNumber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
         TextFormField(
           controller: _economicIdController,
           decoration: InputDecoration(
@@ -1032,57 +1298,100 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     );
   }
 
-  Widget _buildContactInfoFields(AppLocalizations t) {
+  Widget _buildContactInfoFields(AppLocalizations t, bool isMobile) {
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _countryController,
                 decoration: InputDecoration(
                   labelText: t.personCountry,
                   hintText: t.personCountry,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _provinceController,
                 decoration: InputDecoration(
                   labelText: t.personProvince,
                   hintText: t.personProvince,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _countryController,
+                  decoration: InputDecoration(
+                    labelText: t.personCountry,
+                    hintText: t.personCountry,
+                  ),
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _provinceController,
+                  decoration: InputDecoration(
+                    labelText: t.personProvince,
+                    hintText: t.personProvince,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _cityController,
                 decoration: InputDecoration(
                   labelText: t.personCity,
                   hintText: t.personCity,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _postalCodeController,
                 decoration: InputDecoration(
                   labelText: t.personPostalCode,
                   hintText: t.personPostalCode,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _cityController,
+                  decoration: InputDecoration(
+                    labelText: t.personCity,
+                    hintText: t.personCity,
+                  ),
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _postalCodeController,
+                  decoration: InputDecoration(
+                    labelText: t.personPostalCode,
+                    hintText: t.personPostalCode,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
         TextFormField(
           controller: _addressController,
           decoration: InputDecoration(
@@ -1091,45 +1400,64 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           ),
           maxLines: 3,
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _phoneController,
                 decoration: InputDecoration(
                   labelText: t.personPhone,
                   hintText: t.personPhone,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _mobileController,
                 decoration: InputDecoration(
                   labelText: t.personMobile,
                   hintText: t.personMobile,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneController,
+                  decoration: InputDecoration(
+                    labelText: t.personPhone,
+                    hintText: t.personPhone,
+                  ),
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _mobileController,
+                  decoration: InputDecoration(
+                    labelText: t.personMobile,
+                    hintText: t.personMobile,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
                 controller: _faxController,
                 decoration: InputDecoration(
                   labelText: t.personFax,
                   hintText: t.personFax,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
+              SizedBox(height: spacing),
+              TextFormField(
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: t.personEmail,
@@ -1137,10 +1465,34 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _faxController,
+                  decoration: InputDecoration(
+                    labelText: t.personFax,
+                    hintText: t.personFax,
+                  ),
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _emailController,
+                  decoration: InputDecoration(
+                    labelText: t.personEmail,
+                    hintText: t.personEmail,
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
         TextFormField(
           controller: _websiteController,
           decoration: InputDecoration(
@@ -1152,27 +1504,45 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     );
   }
 
-  Widget _buildBankAccountsSection(AppLocalizations t) {
+  Widget _buildBankAccountsSection(AppLocalizations t, bool isMobile) {
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              t.personBankAccounts,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            ElevatedButton.icon(
-              onPressed: _addBankAccount,
-              icon: const Icon(Icons.add),
-              label: Text(t.addBankAccount),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                t.personBankAccounts,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _addBankAccount,
+                icon: const Icon(Icons.add),
+                label: Text(t.addBankAccount),
+              ),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                t.personBankAccounts,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              ElevatedButton.icon(
+                onPressed: _addBankAccount,
+                icon: const Icon(Icons.add),
+                label: Text(t.addBankAccount),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
         if (_bankAccounts.isEmpty)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(spacing),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
@@ -1187,65 +1557,108 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _bankAccounts.length,
             itemBuilder: (context, index) {
-              return _buildBankAccountCard(t, index);
+              return _buildBankAccountCard(t, index, isMobile);
             },
           ),
       ],
     );
   }
 
-  Widget _buildBankAccountCard(AppLocalizations t, int index) {
+  Widget _buildBankAccountCard(AppLocalizations t, int index, bool isMobile) {
     final bankAccount = _bankAccounts[index];
+    final spacing = ResponsiveHelper.getGridSpacing(context);
     
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: spacing),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(spacing),
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+            if (isMobile)
+              Column(
+                children: [
+                  TextFormField(
                     initialValue: bankAccount.bankName,
                     decoration: InputDecoration(labelText: t.bankName, hintText: t.bankName),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(bankName: value));
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                IconButton(
-                  onPressed: () => _removeBankAccount(index),
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                  SizedBox(height: spacing),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => _removeBankAccount(index),
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: bankAccount.bankName,
+                      decoration: InputDecoration(labelText: t.bankName, hintText: t.bankName),
+                      onChanged: (value) {
+                        _updateBankAccount(index, bankAccount.copyWith(bankName: value));
+                      },
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  IconButton(
+                    onPressed: () => _removeBankAccount(index),
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                  ),
+                ],
+              ),
+            SizedBox(height: spacing),
+            if (isMobile)
+              Column(
+                children: [
+                  TextFormField(
                     initialValue: bankAccount.accountNumber ?? '',
                     decoration: InputDecoration(labelText: t.accountNumber, hintText: t.accountNumber),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(accountNumber: value.isEmpty ? null : value));
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
+                  SizedBox(height: spacing),
+                  TextFormField(
                     initialValue: bankAccount.cardNumber ?? '',
                     decoration: InputDecoration(labelText: t.cardNumber, hintText: t.cardNumber),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(cardNumber: value.isEmpty ? null : value));
                     },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: bankAccount.accountNumber ?? '',
+                      decoration: InputDecoration(labelText: t.accountNumber, hintText: t.accountNumber),
+                      onChanged: (value) {
+                        _updateBankAccount(index, bankAccount.copyWith(accountNumber: value.isEmpty ? null : value));
+                      },
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: bankAccount.cardNumber ?? '',
+                      decoration: InputDecoration(labelText: t.cardNumber, hintText: t.cardNumber),
+                      onChanged: (value) {
+                        _updateBankAccount(index, bankAccount.copyWith(cardNumber: value.isEmpty ? null : value));
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: spacing),
             TextFormField(
               initialValue: bankAccount.shebaNumber ?? '',
               decoration: InputDecoration(labelText: t.shebaNumber, hintText: t.shebaNumber),

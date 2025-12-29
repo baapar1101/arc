@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, cast, Integer
 from decimal import Decimal
 import io
 import json
@@ -1748,7 +1748,15 @@ async def search_invoices_endpoint(
 				prop = getattr(flt, 'property', None) if not isinstance(flt, dict) else flt.get('property')
 				op = getattr(flt, 'operator', None) if not isinstance(flt, dict) else flt.get('operator')
 				val = getattr(flt, 'value', None) if not isinstance(flt, dict) else flt.get('value')
-				if prop == 'document_date' and isinstance(val, str) and val:
+				if prop == 'person_id' and val is not None:
+					# فیلتر بر اساس person_id در extra_info
+					try:
+						person_id_val = int(val)
+						# استفاده از JSON operator برای فیلتر کردن person_id در extra_info
+						q = q.filter(cast(Document.extra_info['person_id'], Integer) == person_id_val)
+					except (ValueError, TypeError, KeyError):
+						pass
+				elif prop == 'document_date' and isinstance(val, str) and val:
 					from app.services.transfer_service import _parse_iso_date as _p
 					dt = _p(val)
 					col = getattr(Document, prop)
@@ -1771,6 +1779,16 @@ async def search_invoices_endpoint(
 			from app.services.transfer_service import _parse_iso_date as _p
 			q = q.filter(Document.document_date <= _p(body.get("to_date")))
 		except Exception:
+			pass
+
+	# پردازش person_id از body (اگر در filters نبود)
+	person_id = body.get("person_id")
+	if person_id is not None:
+		try:
+			person_id_val = int(person_id)
+			# فیلتر بر اساس person_id در extra_info
+			q = q.filter(cast(Document.extra_info['person_id'], Integer) == person_id_val)
+		except (ValueError, TypeError, KeyError):
 			pass
 
 	# Sorting
@@ -2229,10 +2247,10 @@ def remove_invoice_from_tax_workspace(
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     extra = dict(doc.extra_info or {})
     status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-    if status == "finalized":
+    if status in ("sent", "finalized"):
         raise ApiError(
             "TAX_WORKSPACE_REMOVE_NOT_ALLOWED",
-            "Cannot remove finalized invoice from tax workspace",
+            "Cannot remove invoice that has been sent to tax system from tax workspace",
             http_status=409,
         )
 
@@ -2273,10 +2291,10 @@ def send_invoice_to_tax_system(
             http_status=400,
         )
     status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-    if status == "finalized":
+    if status in ("sent", "finalized"):
         raise ApiError(
-            "TAX_ALREADY_FINALIZED",
-            "Invoice is already finalized in tax system",
+            "TAX_ALREADY_SENT",
+            "Invoice has already been sent to tax system",
             http_status=409,
         )
 
@@ -2324,8 +2342,8 @@ def send_invoices_to_tax_system_batch(
             if not bool(extra.get("tax_workspace")):
                 raise ApiError("TAX_WORKSPACE_NOT_SET", "Invoice is not in tax workspace", http_status=400)
             status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-            if status == "finalized":
-                raise ApiError("TAX_ALREADY_FINALIZED", "Invoice is already finalized in tax system", http_status=409)
+            if status in ("sent", "finalized"):
+                raise ApiError("TAX_ALREADY_SENT", "Invoice has already been sent to tax system", http_status=409)
 
             send_document_to_tax_system(db, doc)
             succeeded.append(invoice_id)
@@ -2381,8 +2399,8 @@ def remove_invoices_from_tax_workspace_batch(
             doc = _get_invoice_for_business(db, business_id, invoice_id)
             extra = dict(doc.extra_info or {})
             status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-            if status == "finalized":
-                raise ApiError("TAX_WORKSPACE_REMOVE_NOT_ALLOWED", "Cannot remove finalized invoice", http_status=409)
+            if status in ("sent", "finalized"):
+                raise ApiError("TAX_WORKSPACE_REMOVE_NOT_ALLOWED", "Cannot remove invoice that has been sent to tax system", http_status=409)
             extra["tax_workspace"] = False
             extra["tax_status"] = status or "not_in_workspace"
             doc.extra_info = extra
@@ -4099,4 +4117,87 @@ async def import_invoices_excel(
     except Exception as e:
         logger.error(f"Import error: {e}", exc_info=True)
         raise ApiError("IMPORT_ERROR", f"خطا در پردازش فایل: {e}", http_status=500)
+
+
+@router.post("/business/{business_id}/invoices/calculate-remaining")
+@require_business_access("business_id")
+async def calculate_invoices_remaining_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
+) -> Dict[str, Any]:
+    """
+    محاسبه مانده چند فاکتور در یک درخواست
+    
+    Body:
+        {
+            "invoice_ids": [123, 456, 789]  # لیست شناسه فاکتورها
+        }
+    
+    Response:
+        {
+            "results": {
+                123: {
+                    "invoice_id": 123,
+                    "total_amount": 1000000.0,
+                    "paid_amount": 500000.0,
+                    "remaining": 500000.0,
+                    "is_settled": false
+                },
+                456: {
+                    "invoice_id": 456,
+                    "total_amount": 2000000.0,
+                    "paid_amount": 2000000.0,
+                    "remaining": 0.0,
+                    "is_settled": true
+                }
+            },
+            "errors": {
+                789: "فاکتور یافت نشد"
+            }
+        }
+    """
+    from app.services.invoice_service import calculate_invoice_remaining
+    
+    invoice_ids = body.get("invoice_ids", [])
+    
+    if not isinstance(invoice_ids, list):
+        raise ApiError("INVALID_INPUT", "invoice_ids باید یک لیست باشد", http_status=400)
+    
+    if len(invoice_ids) > 100:  # محدودیت برای جلوگیری از overload
+        raise ApiError("TOO_MANY_INVOICES", "حداکثر 100 فاکتور در یک درخواست", http_status=400)
+    
+    results = {}
+    errors = {}
+    
+    logger.info(f"محاسبه مانده برای {len(invoice_ids)} فاکتور - invoice_ids: {invoice_ids}")
+    
+    for invoice_id in invoice_ids:
+        try:
+            invoice_id_int = int(invoice_id)
+            logger.info(f"محاسبه مانده فاکتور {invoice_id_int}")
+            result = calculate_invoice_remaining(db, business_id, invoice_id_int)
+            # تبدیل کلید به string برای JSON serialization
+            results[str(invoice_id_int)] = result
+            logger.info(f"نتیجه برای فاکتور {invoice_id_int}: {result}")
+        except ApiError as e:
+            logger.warning(f"ApiError برای فاکتور {invoice_id}: {e.message}")
+            errors[str(invoice_id_int)] = e.message
+        except Exception as e:
+            logger.exception(f"خطا در محاسبه مانده فاکتور {invoice_id}")
+            errors[str(invoice_id_int)] = "خطا در محاسبه مانده"
+    
+    logger.info(f"نتایج: {len(results)} موفق، {len(errors)} خطا")
+    
+    return success_response(
+        data={
+            "results": results,
+            "errors": errors,
+        },
+        request=request,
+        message="INVOICE_REMAINING_CALCULATED",
+    )
 

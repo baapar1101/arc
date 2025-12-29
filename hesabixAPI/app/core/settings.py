@@ -77,11 +77,17 @@ class Settings(BaseSettings):
 	share_link_public_app_url: str = "https://app.hesabix.com/public"
 
 	# Tax system (Moadian) integration
-	tax_system_force_simulation: bool = True
+	# پیش‌فرض روی حالت واقعی است؛ برای محیط‌های توسعه در env روی true ست شود
+	tax_system_force_simulation: bool = False
 	tax_system_timeout_seconds: int = 45
 	tax_system_sandbox_base_url: str = "https://sandboxrc.tax.gov.ir"
 	tax_system_production_base_url: str = "https://tp.tax.gov.ir"
 	tax_system_user_agent: str = "HesabixTaxClient/1.0"
+	tax_system_rate_limit_max_requests: int = 100  # حداکثر تعداد درخواست در window
+	tax_system_rate_limit_window_seconds: int = 3600  # بازه زمانی rate limit (ثانیه)
+	tax_system_inquire_max_workers: int = 5  # حداکثر تعداد thread برای parallel inquiries
+	tax_system_retry_max_attempts: int = 3  # حداکثر تعداد تلاش برای retry
+	tax_system_retry_initial_delay_seconds: float = 2.0  # تاخیر اولیه retry (ثانیه)
 
 	# Redis Cache
 	redis_enabled: bool = False

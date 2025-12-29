@@ -91,15 +91,19 @@ class InvoiceBuilder:
         timestamp_ms = timestamp_to_unix_ms(doc_date)
         
         # شناسه یکتای مالیاتی
+        # استفاده از tax_memory_id به عنوان clientId (مطابق کتابخانه PHP)
+        client_id = tax_setting.tax_memory_id or tax_setting.economic_code
         taxid = generate_tax_id(
-            economic_code=tax_setting.economic_code,
+            client_id=client_id,
             timestamp=doc_date,
             internal_id=document.get('id', 0),
         )
         
         # شماره فاکتور نرمال شده
-        invoice_code = document.get('code', str(document.get('id', 0)))
-        inno = normalize_invoice_number(invoice_code)
+        # مطابق کتابخانه PHP: normalizeInvoiceNumber(int $internalInvoiceId)
+        # باید از internal_id استفاده شود نه invoice_code
+        internal_id = document.get('id', 0)
+        inno = normalize_invoice_number(internal_id)
         
         # نوع فاکتور
         document_type = document.get('document_type', '')
@@ -192,21 +196,29 @@ class InvoiceBuilder:
             # تخفیف
             discount = round_to_int(line_extra.get('line_discount', 0))
             
-            # مالیات
-            tax_amount = round_to_int(line_extra.get('tax_amount', 0))
+            # محاسبه مطابق کتابخانه PHP و نسخه قدیمی:
+            # prdis = count * price (مبلغ قبل از تخفیف)
+            prdis = quantity * unit_price
             
-            # مبلغ کل ردیف
-            line_total = round_to_int(line_extra.get('line_total', 0))
+            # adis = prdis - discount (مبلغ بعد از تخفیف)
+            adis = prdis - discount
             
             # نرخ مالیات (درصد × 100)
-            # اگر tax_rate در line نباشد، از رابطه tax_amount / (quantity * unit_price - discount) محاسبه می‌کنیم
+            # اگر tax_rate در line نباشد، از رابطه tax_amount / adis محاسبه می‌کنیم
             tax_rate = line_extra.get('tax_rate', 0)
-            if not tax_rate and (quantity * unit_price - discount) > 0:
-                tax_rate = (tax_amount / (quantity * unit_price - discount)) * 100
+            if not tax_rate and adis > 0:
+                tax_amount_raw = line_extra.get('tax_amount', 0)
+                if tax_amount_raw:
+                    tax_rate = (tax_amount_raw / adis) * 100
             vra = calculate_vat_rate(tax_rate)
             
-            # مبلغ قبل از تخفیف
-            gross_amount = quantity * unit_price
+            # vam = (adis * vra) / 100 (مالیات محاسبه شده از adis)
+            # مطابق نسخه قدیمی: $ks = ($adis * $vra) / 100;
+            vam = round_to_int((adis * vra) / 100) if vra > 0 else 0
+            
+            # tsstam = adis + vam (مبلغ کل پس از تخفیف و مالیات)
+            # مطابق نسخه قدیمی: $os = $adis + $ks + $ks2 + $ks3;
+            tsstam = adis + vam
             
             body_item = InvoiceBodyDto(
                 sstid=tax_code,
@@ -214,12 +226,12 @@ class InvoiceBuilder:
                 mu=tax_unit_code,
                 am=quantity,
                 fee=unit_price,
-                prdis=0,  # تخفیف قبل از جمع
+                prdis=prdis,  # مبلغ قبل از تخفیف (count * price)
                 dis=discount,  # تخفیف روی جمع
-                adis=0,  # تخفیف بعد از مالیات
+                adis=adis,  # مبلغ بعد از تخفیف (prdis - discount)
                 vra=vra,
-                vam=tax_amount,
-                tsstam=line_total,
+                vam=vam,  # مالیات محاسبه شده از adis
+                tsstam=tsstam,  # مبلغ کل (adis + vam)
             )
             
             # فیلدهای اختیاری

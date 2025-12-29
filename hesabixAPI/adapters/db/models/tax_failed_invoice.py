@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Index
 from sqlalchemy.sql import func
-from adapters.db.base import Base
+from adapters.db.session import Base
 
 
 class TaxFailedInvoice(Base):

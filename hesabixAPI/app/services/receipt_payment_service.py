@@ -532,7 +532,14 @@ def create_receipt_payment(
             logger.warning(f"خط شخص {i+1}: مبلغ صفر یا منفی، رد می‌شود")
             continue
         
-        description = person_line.get("description", "").strip() or None
+        # مدیریت description که ممکن است None باشد
+        description_raw = person_line.get("description")
+        description = None
+        if description_raw:
+            if isinstance(description_raw, str):
+                description = description_raw.strip() or None
+            else:
+                description = str(description_raw).strip() or None
         logger.info(f"توضیحات: {description}")
         
         # دریافت حساب شخص عمومی

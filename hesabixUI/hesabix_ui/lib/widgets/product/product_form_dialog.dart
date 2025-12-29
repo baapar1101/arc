@@ -7,6 +7,7 @@ import 'sections/product_pricing_inventory_section.dart';
 import 'sections/product_tax_section.dart';
 import 'sections/product_bom_section.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -53,25 +54,69 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final padding = ResponsiveHelper.getPadding(context);
+    final dialogConstraints = ResponsiveHelper.getDialogConstraints(context);
     
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, child) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(widget.product == null ? Icons.add : Icons.edit),
-              const SizedBox(width: 8),
-              Text(widget.product == null ? t.addProduct : t.edit),
-            ],
+        return Dialog(
+          insetPadding: ResponsiveHelper.getDialogPadding(context),
+          child: Container(
+            constraints: dialogConstraints,
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                if (isMobile)
+                  AppBar(
+                    title: Text(widget.product == null ? t.addProduct : t.edit),
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                    automaticallyImplyLeading: false,
+                  )
+                else
+                  Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            widget.product == null ? Icons.add : Icons.edit,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.product == null ? t.addProduct : t.edit,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                    ],
+                  ),
+                SizedBox(height: isMobile ? 8 : 16),
+                // Content
+                Expanded(
+                  child: _controller.isLoading
+                      ? _buildLoadingWidget(t)
+                      : _buildFormContent(),
+                ),
+                // Actions
+                const Divider(),
+                SizedBox(height: isMobile ? 8 : 16),
+                _buildActions(t, isMobile),
+              ],
+            ),
           ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width > 1200 ? 1000 : 800,
-            child: _controller.isLoading
-                ? _buildLoadingWidget(t)
-                : _buildFormContent(),
-          ),
-          actions: _buildActions(t),
         );
       },
     );
@@ -97,40 +142,39 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildFormContent() {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return DefaultTabController(
       length: 4,
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height > 800 ? 700 : 600,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildTabBar(),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                child: TabBarView(
-                  children: [
-                    _buildBasicInfoTab(),
-                    _buildPricingInventoryTab(),
-                    _buildTaxTab(),
-                    _buildBomTab(),
-                  ],
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildTabBar(),
+          SizedBox(height: isMobile ? 8 : 12),
+          Expanded(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: TabBarView(
+                children: [
+                  _buildBasicInfoTab(),
+                  _buildPricingInventoryTab(),
+                  _buildTaxTab(),
+                  _buildBomTab(),
+                ],
               ),
             ),
-            if (_controller.errorMessage != null) _buildErrorMessage(),
-          ],
-        ),
+          ),
+          if (_controller.errorMessage != null) _buildErrorMessage(),
+        ],
       ),
     );
   }
 
   Widget _buildTabBar() {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
     return TabBar(
-      isScrollable: true,
+      isScrollable: isMobile,
       tabs: [
         Tab(text: t.productGeneralInfo),
         Tab(text: t.pricingAndInventory),
@@ -141,8 +185,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildBasicInfoTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
       child: ProductBasicInfoSection(
         businessId: widget.businessId,
         formData: _controller.formData,
@@ -156,8 +201,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildPricingInventoryTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
       child: ProductPricingInventorySection(
         businessId: widget.businessId,
         formData: _controller.formData,
@@ -181,8 +227,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildTaxTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
       child: ProductTaxSection(
         formData: _controller.formData,
         onChanged: _controller.updateFormData,
@@ -193,9 +240,10 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildBomTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
     final productId = widget.product != null ? widget.product!['id'] as int? : null;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
       child: ProductBomSection(
         businessId: widget.businessId,
         productId: productId,
@@ -254,32 +302,68 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     );
   }
 
-  List<Widget> _buildActions(AppLocalizations t) {
-    return [
-      TextButton(
-        onPressed: _controller.isLoading 
-            ? null 
-            : () {
-                // پاک کردن فرم در صورت انصراف
-                _controller.resetForm();
-                // بستن دیالوگ
-                if (mounted) {
-                  Navigator.of(context).pop(false);
-                }
-              },
-        child: Text(t.cancel),
-      ),
-      FilledButton(
-        onPressed: _controller.isLoading ? null : _handleSubmit,
-        child: _controller.isLoading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(t.save),
-      ),
-    ];
+  Widget _buildActions(AppLocalizations t, bool isMobile) {
+    if (isMobile) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _controller.isLoading ? null : _handleSubmit,
+              child: _controller.isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(t.save),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: _controller.isLoading 
+                  ? null 
+                  : () {
+                      _controller.resetForm();
+                      if (mounted) {
+                        Navigator.of(context).pop(false);
+                      }
+                    },
+              child: Text(t.cancel),
+            ),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        TextButton(
+          onPressed: _controller.isLoading 
+              ? null 
+              : () {
+                  _controller.resetForm();
+                  if (mounted) {
+                    Navigator.of(context).pop(false);
+                  }
+                },
+          child: Text(t.cancel),
+        ),
+        const SizedBox(width: 8),
+        FilledButton(
+          onPressed: _controller.isLoading ? null : _handleSubmit,
+          child: _controller.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(t.save),
+        ),
+      ],
+    );
   }
 
   Future<void> _handleSubmit() async {
