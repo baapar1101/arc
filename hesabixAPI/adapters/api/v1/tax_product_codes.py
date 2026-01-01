@@ -53,8 +53,17 @@ def get_tax_code_endpoint(
 ):
     _require_authenticated(ctx)
     item = get_tax_product_code(db, code)
+    # نکته:
+    # این endpoint در UI صرفاً برای دریافت "شرح کد" استفاده می‌شود.
+    # اگر کد در دیتابیس (لیست ایمپورت شده) وجود نداشته باشد، 404 باعث ایجاد خطا/هشدار در UI می‌شود
+    # در حالی که ثبت کالا/خدمت می‌تواند ادامه پیدا کند.
+    # بنابراین در حالت عدم وجود، پاسخ 200 موفق (بدون data یا با data حداقلی) برمی‌گردانیم.
     if not item:
-        raise ApiError("TAX_CODE_NOT_FOUND", "کد مالیاتی یافت نشد", http_status=404)
+        return success_response(
+            {"code": code, "found": False},
+            request,
+            "شرح کد مالیاتی در لیست سیستم یافت نشد، اما کد ذخیره می‌شود. (در صورت نیاز برای جستجوی دقیق‌تر، فایل XML کدهای مالیاتی را ایمپورت کنید.)",
+        )
     return success_response(item, request)
 
 

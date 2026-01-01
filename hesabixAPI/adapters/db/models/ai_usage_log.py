@@ -38,7 +38,7 @@ class AIUsageLog(Base):
         String(50),
         nullable=False
     )
-    wallet_transaction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True, index=True)
+    wallet_transaction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="RESTRICT"), nullable=True, index=True)
     document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True)
     
     # Context (JSON)

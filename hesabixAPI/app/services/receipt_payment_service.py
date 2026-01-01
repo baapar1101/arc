@@ -1428,6 +1428,60 @@ def delete_receipt_payment(db: Session, document_id: int) -> bool:
     except Exception:
         pass
     
+    # 4) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد
+    try:
+        from app.services.wallet_service import check_document_has_wallet_transactions
+        wallet_check = check_document_has_wallet_transactions(db, document_id)
+        if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
+            raise ApiError(
+                "DOCUMENT_HAS_WALLET_TRANSACTIONS",
+                wallet_check["message"],
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
+    
+    # حذف لینک این سند از فاکتورهای مرتبط (قبل از حذف سند)
+    try:
+        from adapters.db.models.document_line import DocumentLine
+        # پیدا کردن تمام invoice_id های مرتبط از طریق DocumentLine ها
+        related_lines = db.query(DocumentLine).filter(
+            DocumentLine.document_id == document_id
+        ).all()
+        
+        invoice_ids_set = set()
+        for line in related_lines:
+            line_extra = line.extra_info or {}
+            invoice_id = line_extra.get("invoice_id")
+            if invoice_id:
+                try:
+                    invoice_ids_set.add(int(invoice_id))
+                except (ValueError, TypeError):
+                    pass
+        
+        # حذف این document_id از links فاکتورها
+        if invoice_ids_set:
+            for invoice_id in invoice_ids_set:
+                invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+                if invoice_doc:
+                    extra_info = dict(invoice_doc.extra_info or {})
+                    links = dict(extra_info.get("links", {}))
+                    receipt_payment_ids = list(links.get("receipt_payment_document_ids", []) or [])
+                    
+                    if document_id in receipt_payment_ids:
+                        receipt_payment_ids.remove(document_id)
+                        links["receipt_payment_document_ids"] = receipt_payment_ids
+                        extra_info["links"] = links
+                        invoice_doc.extra_info = extra_info
+                        flag_modified(invoice_doc, "extra_info")
+                        db.add(invoice_doc)
+                        logger.info(f"لینک سند {document_id} از فاکتور {invoice_id} حذف شد")
+    except Exception as ex:
+        logger.warning(f"خطا در حذف لینک از فاکتورها هنگام حذف سند {document_id}: {ex}")
+        # ادامه می‌دهیم حتی اگر خطا رخ داد
+    
     # دریافت اطلاعات قبل از حذف برای invalidation
     business_id = document.business_id
     fiscal_year_id = document.fiscal_year_id

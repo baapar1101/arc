@@ -28,6 +28,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.cache import get_cache
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
+from app.services.receipt_payment_service import DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from adapters.api.v1.schema_models.receipt_payment import (
     ReceiptPaymentCreateRequest,
@@ -269,6 +270,11 @@ async def get_receipt_payment_endpoint(
     )
 
 
+def _validate_receipt_payment_document(document: Document) -> bool:
+    """Validator برای بررسی اینکه سند از نوع receipt یا payment باشد"""
+    return document.document_type in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT)
+
+
 @router.delete(
     "/receipts-payments/{document_id}",
     summary="حذف سند دریافت/پرداخت",
@@ -279,7 +285,7 @@ async def delete_receipt_payment_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "delete", Document, "document_id")),
+    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "delete", Document, "document_id", entity_validator=_validate_receipt_payment_document)),
 ):
     """حذف سند"""
     # دریافت سند برای بررسی دسترسی
@@ -317,7 +323,7 @@ async def update_receipt_payment_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "edit", Document, "document_id")),
+    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "edit", Document, "document_id", entity_validator=_validate_receipt_payment_document)),
 ):
     """ویرایش سند"""
     # دریافت سند برای بررسی دسترسی

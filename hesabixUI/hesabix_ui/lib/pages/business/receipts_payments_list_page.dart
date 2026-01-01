@@ -735,9 +735,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       if (!mounted) return;
       
       // بستن لودینگ
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
       
       // پاک‌سازی شمارنده انتخاب
       setState(() {
@@ -757,9 +755,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       if (!mounted) return;
       
       // بستن لودینگ در صورت بروز خطا
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
       
       String message = 'خطا در حذف اسناد';
       if (e is DioException) {

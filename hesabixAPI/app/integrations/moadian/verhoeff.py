@@ -78,3 +78,7 @@ def verhoeff_validate(number: str) -> bool:
     
     return c == 0
 
+
+
+
+

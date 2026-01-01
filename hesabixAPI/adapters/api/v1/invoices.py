@@ -423,6 +423,19 @@ def get_invoice_delete_info(
             "total_amount": plan.get("principal_total", 0),
         }
     
+    # پاک‌سازی لینک‌های مرده قبل از بررسی اسناد دریافت/پرداخت
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.invoice_service import _cleanup_dead_receipt_payment_links
+        _cleanup_dead_receipt_payment_links(db, doc)
+        db.commit()
+        db.refresh(doc)
+        # به‌روزرسانی extra_info و links
+        extra_info = doc.extra_info or {}
+        links = extra_info.get("links") or {}
+    except Exception as e:
+        logger.warning(f"خطا در پاک‌سازی لینک‌های مرده در get_invoice_delete_info: {e}")
+    
     # بررسی اسناد دریافت/پرداخت
     receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
     receipt_payment_info = []
@@ -502,6 +515,7 @@ def get_invoice_endpoint(
     if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    # پاک‌سازی لینک‌های مرده در invoice_document_to_dict انجام می‌شود
     result = invoice_document_to_dict(db, doc)
     return success_response(data={"item": result}, request=request, message="INVOICE")
 

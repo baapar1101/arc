@@ -73,7 +73,7 @@ class StorageInvoice(Base):
 	status: Mapped[str] = mapped_column(String(20), nullable=False, default="issued")  # issued, paid, void, cancelled
 	issued_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-	wallet_transaction_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True, index=True)
+	wallet_transaction_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="RESTRICT"), nullable=True, index=True)
 	extra_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # اطلاعات اضافی: usage_gb, over_usage_gb, etc.
 
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

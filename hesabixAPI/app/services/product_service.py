@@ -319,6 +319,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
                 tax_unit_id=payload.tax_unit_id,
                 image_file_id=payload.image_file_id,
                 default_warehouse_id=payload.default_warehouse_id,
+                is_active=payload.is_active if payload.is_active is not None else True,  # پیش‌فرض True
             )
             logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
@@ -523,6 +524,7 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
+        is_active=payload.is_active if 'is_active' in fields_set else None,
         default_warehouse_id=(
             None if item_type == ProductItemType.SERVICE.value 
             else (
@@ -947,6 +949,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "default_warehouse_id": obj.default_warehouse_id,
         "default_warehouse_name": obj.default_warehouse.name if obj.default_warehouse else None,
         "default_warehouse_code": obj.default_warehouse.code if obj.default_warehouse else None,
+        "is_active": obj.is_active if hasattr(obj, 'is_active') else True,  # مقدار پیش‌فرض True در صورت عدم وجود فیلد
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

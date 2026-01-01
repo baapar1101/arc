@@ -183,6 +183,22 @@ def delete_document(db: Session, document_id: int) -> bool:
             http_status=400
         )
     
+    # بررسی ارتباط با تراکنش‌های کیف پول
+    try:
+        from app.services.wallet_service import check_document_has_wallet_transactions
+        wallet_check = check_document_has_wallet_transactions(db, document_id)
+        if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
+            raise ApiError(
+                "DOCUMENT_HAS_WALLET_TRANSACTIONS",
+                wallet_check["message"],
+                http_status=409
+            )
+    except ApiError:
+        raise
+    except Exception:
+        # اگر به هر دلیل نتوانستیم بررسی کنیم، حذف را متوقف نکن (برای backward compatibility)
+        pass
+    
     # دریافت اطلاعات قبل از حذف برای invalidation
     business_id = document.business_id
     fiscal_year_id = document.fiscal_year_id

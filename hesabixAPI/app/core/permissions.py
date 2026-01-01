@@ -374,7 +374,8 @@ def require_business_permission_by_entity_dep(
     entity_id_param: str = None,
     business_id_field: str = "business_id",
     allow_null_business_id: bool = False,
-    business_id_param: str = "business_id"
+    business_id_param: str = "business_id",
+    entity_validator: Callable = None
 ):
     """FastAPI dependency برای بررسی دسترسی کسب و کار برای endpoint هایی که business_id در path ندارند.
     
@@ -391,11 +392,16 @@ def require_business_permission_by_entity_dep(
         allow_null_business_id: اگر True باشد، موجودیت‌هایی با business_id = None (مثل حساب‌های عمومی) را پشتیبانی می‌کند
                                 در این صورت از business_id موجود در path استفاده می‌شود
         business_id_param: نام پارامتر business_id در path (پیش‌فرض: "business_id")
+        entity_validator: تابع اختیاری برای اعتبارسنجی entity (مثل بررسی نوع سند)
+                         اگر مشخص شده باشد و entity معتبر نباشد، خطای 404 برمی‌گرداند
+                         تابع باید entity را به عنوان آرگومان بگیرد و True/False برگرداند
     
     استفاده:
         _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id"))
         # برای موجودیت‌های عمومی (مثل Account):
         _: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "view", Account, "account_id", allow_null_business_id=True))
+        # با validator:
+        _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "delete", Document, "document_id", entity_validator=_validate_receipt_payment))
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -441,6 +447,12 @@ def require_business_permission_by_entity_dep(
         if not entity:
             logger.warning(f"Entity {entity_id} not found for model {entity_model.__name__}")
             raise ApiError("NOT_FOUND", f"Entity not found", http_status=404)
+        
+        # اعتبارسنجی entity با استفاده از validator (اگر مشخص شده باشد)
+        if entity_validator is not None:
+            if not entity_validator(entity):
+                logger.warning(f"Entity {entity_id} failed validation")
+                raise ApiError("NOT_FOUND", f"Entity not found", http_status=404)
         
         # استخراج business_id از entity
         business_id = getattr(entity, business_id_field, None)

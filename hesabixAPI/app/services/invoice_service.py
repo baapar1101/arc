@@ -3486,6 +3486,23 @@ def delete_invoice(db: Session, document_id: int) -> bool:
             logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking tax workspace: {ex}")
             pass
         
+        # 3.5) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد
+        try:
+            from app.services.wallet_service import check_document_has_wallet_transactions
+            wallet_check = check_document_has_wallet_transactions(db, document_id)
+            if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
+                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Cannot delete - has wallet transactions")
+                raise ApiError(
+                    "DOCUMENT_HAS_WALLET_TRANSACTIONS",
+                    wallet_check["message"],
+                    http_status=409,
+                )
+        except ApiError:
+            raise
+        except Exception as ex:
+            logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking wallet transactions: {ex}")
+            pass
+        
         # 4) بررسی و حذف حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
         # همه عملیات در یک transaction انجام می‌شوند و در صورت خطا rollback می‌شود
         extra_info = document.extra_info or {}
@@ -3689,6 +3706,59 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         raise ApiError("DELETE_FAILED", f"Failed to delete invoice: {str(e)}", http_status=500)
 
 
+def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool:
+    """
+    پاک‌سازی لینک‌های مرده receipt_payment_document_ids از extra_info فاکتور.
+    این تابع لینک‌هایی که به اسناد حذف شده اشاره می‌کنند را پیدا و حذف می‌کند.
+    
+    Returns:
+        bool: True اگر تغییری اعمال شد، False در غیر این صورت
+    """
+    try:
+        extra_info = document.extra_info or {}
+        links = extra_info.get('links', {})
+        receipt_payment_ids = links.get('receipt_payment_document_ids', [])
+        
+        if not receipt_payment_ids:
+            return False
+        
+        # بررسی وجود واقعی هر سند
+        valid_ids = []
+        for doc_id in receipt_payment_ids:
+            try:
+                doc_id_int = int(doc_id)
+                # بررسی وجود سند در دیتابیس
+                doc = db.query(Document).filter(
+                    Document.id == doc_id_int,
+                    Document.document_type.in_(['receipt', 'payment']),
+                ).first()
+                if doc:
+                    valid_ids.append(doc_id_int)
+            except (ValueError, TypeError):
+                # شناسه نامعتبر، رد می‌شود
+                continue
+        
+        # اگر همه لینک‌ها معتبر هستند، نیازی به به‌روزرسانی نیست
+        if len(valid_ids) == len(receipt_payment_ids):
+            return False
+        
+        # به‌روزرسانی extra_info با لینک‌های معتبر
+        extra_info = dict(extra_info)
+        links = dict(links)
+        links['receipt_payment_document_ids'] = valid_ids
+        extra_info['links'] = links
+        
+        document.extra_info = extra_info
+        flag_modified(document, "extra_info")
+        db.add(document)
+        
+        logger.info(f"پاک‌سازی لینک‌های مرده برای فاکتور {document.id}: {len(receipt_payment_ids)} -> {len(valid_ids)}")
+        return True
+    except Exception as e:
+        logger.warning(f"خطا در پاک‌سازی لینک‌های مرده برای فاکتور {document.id}: {e}")
+        return False
+
+
 def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
     item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
@@ -3754,6 +3824,19 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             logger.warning(f"Error calculating invoice profit for document {document.id}: {e}")
             profit_data = {}
 
+    # پاک‌سازی لینک‌های مرده قبل از بازگرداندن نتیجه
+    try:
+        if _cleanup_dead_receipt_payment_links(db, document):
+            # commit تغییرات
+            db.commit()
+            db.refresh(document)
+    except Exception as e:
+        logger.warning(f"خطا در پاک‌سازی لینک‌های مرده در invoice_document_to_dict: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    
     result = {
         "id": document.id,
         "code": document.code,
@@ -5853,6 +5936,16 @@ def calculate_invoice_remaining(
             raise ApiError("INVOICE_NOT_FOUND", "فاکتور یافت نشد", http_status=404)
         
         logger.info(f"فاکتور یافت شد - code: {invoice.code}, document_type: {invoice.document_type}")
+        
+        # پاک‌سازی لینک‌های مرده قبل از محاسبه مانده
+        try:
+            if _cleanup_dead_receipt_payment_links(db, invoice):
+                # commit تغییرات
+                db.commit()
+                db.refresh(invoice)
+        except Exception as e:
+            logger.warning(f"خطا در پاک‌سازی لینک‌های مرده در calculate_invoice_remaining: {e}")
+            db.rollback()
         
         # محاسبه مبلغ کل فاکتور
         total_amount = Decimal(0)

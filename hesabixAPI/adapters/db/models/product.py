@@ -92,6 +92,9 @@ class Product(Base):
     # انبار پیش‌فرض
     default_warehouse_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True, index=True, comment="انبار پیش‌فرض برای کالا")
 
+    # وضعیت فعال/غیرفعال
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="آیا محصول فعال است؟")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

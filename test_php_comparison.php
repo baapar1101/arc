@@ -84,3 +84,7 @@ echo "AES Hex length: " . strlen($testAesHex) . "\n";
 echo "\nNote: To test encryption, you need the actual tax organization public key.\n";
 echo "Copy the AES hex and IV hex from Python logs and compare with PHP.\n";
 
+
+
+
+

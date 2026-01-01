@@ -94,7 +94,7 @@ class DocumentUsageCharge(Base):
 	status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending, awaiting_payment, paid, canceled, failed
 	amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
 	currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False)
-	wallet_transaction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True, index=True)
+	wallet_transaction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="RESTRICT"), nullable=True, index=True)
 	description: Mapped[str | None] = mapped_column(String(500), nullable=True)
 	metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	period_key: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)

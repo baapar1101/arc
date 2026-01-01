@@ -1077,6 +1077,22 @@ def delete_expense_income(db: Session, document_id: int) -> bool:
         if document.document_type not in (DOCUMENT_TYPE_EXPENSE, DOCUMENT_TYPE_INCOME):
             return False
         
+        # بررسی ارتباط با تراکنش‌های کیف پول
+        try:
+            from app.services.wallet_service import check_document_has_wallet_transactions
+            wallet_check = check_document_has_wallet_transactions(db, document_id)
+            if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
+                raise ApiError(
+                    "DOCUMENT_HAS_WALLET_TRANSACTIONS",
+                    wallet_check["message"],
+                    http_status=409
+                )
+        except ApiError:
+            raise
+        except Exception:
+            # اگر به هر دلیل نتوانستیم بررسی کنیم، حذف را متوقف نکن (برای backward compatibility)
+            pass
+        
         # دریافت اطلاعات قبل از حذف برای invalidation
         business_id = document.business_id
         fiscal_year_id = document.fiscal_year_id

@@ -1554,3 +1554,180 @@ def add_gift_balance_admin(
 	)
 	
 	return result
+
+
+def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dict[str, Any]:
+	"""
+	بررسی می‌کند که آیا یک سند به تراکنش‌های کیف پول مرتبط است یا نه
+	
+	Args:
+		db: جلسه دیتابیس
+		document_id: شناسه سند
+	
+	Returns:
+		{
+			"has_wallet_transactions": bool,
+			"has_protected_transactions": bool,
+			"transaction_count": int,
+			"transaction_ids": List[int],
+			"transaction_types": List[str],
+			"message": str | None
+		}
+	"""
+	transactions = db.query(WalletTransaction).filter(
+		WalletTransaction.document_id == document_id
+	).all()
+	
+	if not transactions:
+		return {
+			"has_wallet_transactions": False,
+			"has_protected_transactions": False,
+			"transaction_count": 0,
+			"transaction_ids": [],
+			"transaction_types": [],
+			"message": None
+		}
+	
+	transaction_ids = [tx.id for tx in transactions]
+	transaction_types = list(set([tx.type for tx in transactions]))
+	
+	# انواع تراکنش‌های سیستمی که نباید حذف شوند
+	protected_types = [
+		"top_up",                    # واریز
+		"payout_request",           # درخواست برداشت
+		"payout_settlement",        # تسویه برداشت
+		"internal_invoice_payment", # پرداخت صورتحساب داخلی
+		"ai_subscription",           # اشتراک هوش مصنوعی
+		"ai_usage",                 # استفاده از هوش مصنوعی
+		"customer_payment",         # پرداخت مشتری (پکیج‌ها)
+		"internal_service_charge",  # کسر سرویس داخلی
+		"zohal_service_charge",     # کسر سرویس زحل
+		"refund",                   # بازگشت وجه
+		"fee",                      # کارمزد
+		"chargeback",               # برگشت تراکنش
+		"reversal"                  # معکوس کردن تراکنش
+	]
+	
+	has_protected = any(tx.type in protected_types for tx in transactions)
+	
+	if has_protected:
+		protected_tx = [tx for tx in transactions if tx.type in protected_types]
+		protected_types_list = list(set([tx.type for tx in protected_tx]))
+		message = f"این سند به {len(protected_tx)} تراکنش کیف پول سیستمی مرتبط است و قابل حذف نمی‌باشد. انواع تراکنش‌ها: {', '.join(protected_types_list)}"
+	else:
+		message = f"این سند به {len(transactions)} تراکنش کیف پول مرتبط است"
+	
+	return {
+		"has_wallet_transactions": True,
+		"has_protected_transactions": has_protected,
+		"transaction_count": len(transactions),
+		"transaction_ids": transaction_ids,
+		"transaction_types": transaction_types,
+		"message": message
+	}
+
+
+def check_wallet_transaction_has_dependencies(db: Session, transaction_id: int) -> Dict[str, Any]:
+	"""
+	بررسی می‌کند که آیا یک تراکنش کیف پول به موجودیت‌های دیگر لینک شده است یا نه
+	
+	Args:
+		db: جلسه دیتابیس
+		transaction_id: شناسه تراکنش کیف پول
+	
+	Returns:
+		{
+			"has_dependencies": bool,
+			"dependencies": {
+				"ai_invoices": List[int],
+				"storage_invoices": List[int],
+				"marketplace_orders": List[int],
+				"zohal_services": List[int],
+				"ai_usage_logs": List[int]
+			},
+			"message": str | None
+		}
+	"""
+	dependencies = {
+		"ai_invoices": [],
+		"storage_invoices": [],
+		"marketplace_orders": [],
+		"zohal_services": [],
+		"ai_usage_logs": []
+	}
+	
+	# بررسی AI Invoices
+	try:
+		from adapters.db.models.ai_invoice import AIInvoice
+		ai_invoices = db.query(AIInvoice).filter(
+			AIInvoice.wallet_transaction_id == transaction_id
+		).all()
+		dependencies["ai_invoices"] = [inv.id for inv in ai_invoices]
+	except Exception:
+		pass
+	
+	# بررسی Storage Invoices
+	try:
+		from adapters.db.models.storage_plan import StorageInvoice
+		storage_invoices = db.query(StorageInvoice).filter(
+			StorageInvoice.wallet_transaction_id == transaction_id
+		).all()
+		dependencies["storage_invoices"] = [inv.id for inv in storage_invoices]
+	except Exception:
+		pass
+	
+	# بررسی Marketplace Orders
+	try:
+		from adapters.db.models.marketplace import MarketplaceOrder
+		marketplace_orders = db.query(MarketplaceOrder).filter(
+			MarketplaceOrder.wallet_transaction_id == transaction_id
+		).all()
+		dependencies["marketplace_orders"] = [order.id for order in marketplace_orders]
+	except Exception:
+		pass
+	
+	# بررسی Zohal Services
+	try:
+		from adapters.db.models.zohal import ZohalServiceUsage
+		zohal_services = db.query(ZohalServiceUsage).filter(
+			ZohalServiceUsage.wallet_transaction_id == transaction_id
+		).all()
+		dependencies["zohal_services"] = [svc.id for svc in zohal_services]
+	except Exception:
+		pass
+	
+	# بررسی AI Usage Logs
+	try:
+		from adapters.db.models.ai_usage_log import AIUsageLog
+		ai_usage_logs = db.query(AIUsageLog).filter(
+			AIUsageLog.wallet_transaction_id == transaction_id
+		).all()
+		dependencies["ai_usage_logs"] = [log.id for log in ai_usage_logs]
+	except Exception:
+		pass
+	
+	total_dependencies = sum(len(v) for v in dependencies.values())
+	has_dependencies = total_dependencies > 0
+	
+	if has_dependencies:
+		dep_list = []
+		if dependencies["ai_invoices"]:
+			dep_list.append(f"{len(dependencies['ai_invoices'])} صورتحساب AI")
+		if dependencies["storage_invoices"]:
+			dep_list.append(f"{len(dependencies['storage_invoices'])} صورتحساب ذخیره‌سازی")
+		if dependencies["marketplace_orders"]:
+			dep_list.append(f"{len(dependencies['marketplace_orders'])} سفارش مارکت‌پلیس")
+		if dependencies["zohal_services"]:
+			dep_list.append(f"{len(dependencies['zohal_services'])} سرویس زحل")
+		if dependencies["ai_usage_logs"]:
+			dep_list.append(f"{len(dependencies['ai_usage_logs'])} لاگ استفاده AI")
+		
+		message = f"این تراکنش به {', '.join(dep_list)} مرتبط است و قابل حذف نمی‌باشد"
+	else:
+		message = None
+	
+	return {
+		"has_dependencies": has_dependencies,
+		"dependencies": dependencies,
+		"message": message
+	}

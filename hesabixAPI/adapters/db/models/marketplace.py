@@ -69,7 +69,7 @@ class MarketplaceOrder(Base):
 	total_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
 	currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False)
 	status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending | paid | failed | cancelled
-	wallet_transaction_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True, index=True)
+	wallet_transaction_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("wallet_transactions.id", ondelete="RESTRICT"), nullable=True, index=True)
 	invoice_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("marketplace_invoices.id", ondelete="SET NULL"), nullable=True, index=True)
 	external_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 	extra_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
