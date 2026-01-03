@@ -2,10 +2,31 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Hesabix one-click deployment script (server-side)
-# - Clones from: https://source.hesabix.ir/morrning/hesabixArc.git
-# - Prompts for API/UI domains and branch
-# - Installs prerequisites, DB, backend (FastAPI), frontend (Flutter Web), Nginx
+# ============================================================================
+# Hesabix - سیستم حسابداری جامع و متن باز
+# ============================================================================
+#
+# Hesabix یک سیستم حسابداری کامل و مدرن است که شامل یک API قدرتمند 
+# (FastAPI + PostgreSQL) و رابط کاربری زیبا (Flutter Web) می‌باشد.
+#
+# این نرم‌افزار تحت مجوز GNU General Public License v3.0 منتشر شده است.
+# برای مشاهده کامل متن لایسنس به آدرس زیر مراجعه کنید:
+# http://www.gnu.org/licenses/gpl-3.0.txt
+#
+# توسعه‌دهندگان: Hesabix Team
+# وب‌سایت: https://hesabix.ir
+# مخزن پروژه: https://source.hesabix.ir/morrning/hesabixArc.git
+# پشتیبانی: https://hesabix.ir/support
+#
+# ============================================================================
+# Deployment Script
+# ============================================================================
+#
+# این اسکریپت برای نصب و راه‌اندازی خودکار Hesabix طراحی شده است:
+# - Clone از مخزن: https://source.hesabix.ir/morrning/hesabixArc.git
+# - دریافت دامنه API و UI از کاربر
+# - نصب پیش‌نیازها، دیتابیس (PostgreSQL)، بک‌اند (FastAPI)، 
+#   فرانت‌اند (Flutter Web)، Nginx و SSL
 #
 # Usage:
 #   sudo bash deploy.sh
@@ -15,6 +36,8 @@ IFS=$'\n\t'
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Idempotent: safe to re-run; will update and restart services
+#
+# ============================================================================
 
 REPO_URL="https://source.hesabix.ir/morrning/hesabixArc.git"
 APP_ROOT="/opt/hesabix"
@@ -80,6 +103,95 @@ require_cmd() {
     echo "$CROSS_MARK Required tool not found: $1"
     exit 1
   fi
+}
+
+show_license_info() {
+  cat <<LICENSE
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║                  Hesabix - سیستم حسابداری جامع                      ║
+║                    نرم‌افزار متن باز تحت GPL v3                       ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+📋 درباره نرم‌افزار:
+   Hesabix یک سیستم حسابداری کامل و مدرن است که شامل:
+   • API قدرتمند (FastAPI + PostgreSQL)
+   • رابط کاربری زیبا (Flutter Web)
+   • متن باز و رایگان
+
+👨‍💻 توسعه‌دهندگان:
+   Hesabix Team
+   وب‌سایت: https://hesabix.ir
+   پشتیبانی: https://hesabix.ir/support
+
+📦 مخزن پروژه:
+   https://source.hesabix.ir/morrning/hesabixArc.git
+
+📄 مجوز:
+   این نرم‌افزار تحت مجوز GNU General Public License v3.0 (GPL-3.0) 
+   منتشر شده است.
+
+   متن کامل لایسنس: http://www.gnu.org/licenses/gpl-3.0.txt
+
+   خلاصه حقوق:
+   ✓ شما آزاد هستید نرم‌افزار را اجرا کنید
+   ✓ شما آزاد هستید نرم‌افزار را مطالعه و تغییر دهید
+   ✓ شما آزاد هستید نرم‌افزار را توزیع کنید
+   ✓ شما آزاد هستید نسخه‌های بهبود یافته را توزیع کنید
+
+   شرط: هر توزیع یا نسخه تغییر یافته باید تحت همان لایسنس GPL v3 
+         باشد و کد منبع باید در دسترس قرار گیرد.
+
+   ⚠️  این نرم‌افزار بدون هیچگونه ضمانتی ارائه می‌شود.
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║                     GNU GENERAL PUBLIC LICENSE                        ║
+║                           Version 3, 29 June 2007                     ║
+║                                                                       ║
+║  Copyright (C) 2024 Hesabix Team <https://hesabix.ir>                ║
+║                                                                       ║
+║  This program is free software: you can redistribute it and/or       ║
+║  modify it under the terms of the GNU General Public License as      ║
+║  published by the Free Software Foundation, either version 3 of the  ║
+║  License, or (at your option) any later version.                     ║
+║                                                                       ║
+║  This program is distributed in the hope that it will be useful,     ║
+║  but WITHOUT ANY WARRANTY; without even the implied warranty of      ║
+║  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU    ║
+║  General Public License for more details.                            ║
+║                                                                       ║
+║  You should have received a copy of the GNU General Public License   ║
+║  along with this program. If not, see                                ║
+║  <http://www.gnu.org/licenses/>.                                     ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+LICENSE
+}
+
+accept_license() {
+  : "${ACCEPT_LICENSE:=}"
+  
+  if [[ -z "${ACCEPT_LICENSE}" ]]; then
+    echo
+    echo "⚠️  برای ادامه نصب، شما باید با شرایط مجوز GNU GPL v3 موافقت کنید."
+    echo
+    read -rp "آیا با شرایط مجوز GNU General Public License v3.0 موافقت می‌کنید؟ (yes/no): " ACCEPT_LICENSE
+  fi
+  
+  case "${ACCEPT_LICENSE}" in
+    [Yy][Ee][Ss]|y|Y)
+      echo "$CHECK_MARK موافقت با لایسنس GNU GPL v3.0 ثبت شد."
+      return 0
+      ;;
+    *)
+      echo "$CROSS_MARK شما باید با شرایط لایسنس موافقت کنید تا بتوانید نصب را ادامه دهید."
+      echo
+      echo "برای مشاهده متن کامل لایسنس به آدرس زیر مراجعه کنید:"
+      echo "  http://www.gnu.org/licenses/gpl-3.0.txt"
+      echo
+      exit 1
+      ;;
+  esac
 }
 
 prompt_vars() {
@@ -150,11 +262,17 @@ prompt_vars() {
 install_prereqs() {
   echo ">> Installing prerequisites..."
   export DEBIAN_FRONTEND=noninteractive
+  
+  # Update package list
   apt-get update -y
+  
+  # Install prerequisites (apt-get install is idempotent - will skip if already installed)
+  echo "Installing: git, curl, unzip, xz-utils, ca-certificates, python3.11, python3.11-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3.11 python3.11-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib
-  echo "$CHECK_MARK Prerequisites installed."
+  
+  echo "$CHECK_MARK Prerequisites installed (or already present)."
 }
 
 clone_repo() {
@@ -439,78 +557,60 @@ UNIT
 }
 
 install_flutter_and_build_frontend() {
-  echo ">> Installing Flutter and building frontend..."
-  local flutter_root="/opt/flutter"
-  local flutter_bin="${flutter_root}/flutter/bin/flutter"
+  echo ">> Building Flutter frontend..."
   
-  # Check if Flutter is already installed
-  if [[ ! -f "${flutter_bin}" ]]; then
-    echo "Installing Flutter ${FLUTTER_VERSION}..."
-    check_disk_space
-    
-    mkdir -p "${flutter_root}"
-    cd "${flutter_root}"
-    
-    local flutter_url="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-    
-    if ! curl -L "${flutter_url}" -o flutter.tar.xz; then
-      echo "$CROSS_MARK Error downloading Flutter"
-      exit 1
-    fi
-    
-    if ! tar -xf flutter.tar.xz; then
-      echo "$CROSS_MARK Error extracting Flutter"
-      rm -f flutter.tar.xz
-      exit 1
-    fi
-    
-    rm -f flutter.tar.xz
-  else
-    echo "$CHECK_MARK Flutter already installed"
-  fi
-  
-  # Verify Flutter installation
-  if [[ ! -f "${flutter_bin}" ]]; then
-    echo "$CROSS_MARK Flutter not installed"
+  local app_dir="${APP_ROOT}/app"
+  if [[ ! -d "${app_dir}" ]]; then
+    echo "$CROSS_MARK App directory not found: ${app_dir}"
     exit 1
   fi
   
-  "${flutter_bin}" --version
-  "${flutter_bin}" config --enable-web --no-analytics
-
-  local ui_dir="${APP_ROOT}/app/hesabixUI/hesabix_ui"
-  if [[ ! -d "${ui_dir}" ]]; then
-    echo "$CROSS_MARK Frontend path not found: ${ui_dir}"
+  local build_script="${app_dir}/build_web.sh"
+  if [[ ! -f "${build_script}" ]]; then
+    echo "$CROSS_MARK build_web.sh not found: ${build_script}"
     exit 1
   fi
   
-  cd "${ui_dir}"
+  # Make build script executable
+  chmod +x "${build_script}"
   
-  echo "Fetching Flutter dependencies..."
-  if ! "${flutter_bin}" pub get; then
-    echo "$CROSS_MARK Error fetching Flutter dependencies"
-    exit 1
-  fi
+  # Build API URL (use HTTPS for API domain)
+  local api_url="https://${API_DOMAIN}"
   
-  echo "Building frontend with optimizations..."
-  if ! "${flutter_bin}" build web --release --web-renderer canvaskit --base-href /; then
+  echo "Building Flutter web with:"
+  echo "  Mode: release"
+  echo "  API URL: ${api_url}"
+  echo "  Output: /var/www/${UI_DOMAIN}"
+  
+  # Build using build_web.sh script
+  cd "${app_dir}"
+  if ! bash build_web.sh \
+    --mode release \
+    --api-base-url "${api_url}" \
+    --clean \
+    --install-deps; then
     echo "$CROSS_MARK Error building frontend"
     exit 1
   fi
   
-  if [[ ! -d "build/web" ]]; then
-    echo "$CROSS_MARK build/web directory not found"
+  # Find the build output directory
+  local ui_project_dir="${app_dir}/hesabixUI/hesabix_ui"
+  local build_output="${ui_project_dir}/build/web"
+  
+  if [[ ! -d "${build_output}" ]]; then
+    echo "$CROSS_MARK Build output directory not found: ${build_output}"
     exit 1
   fi
 
+  # Deploy to web directory
   mkdir -p "/var/www/${UI_DOMAIN}"
-  rsync -a --delete build/web/ "/var/www/${UI_DOMAIN}/"
+  rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
   chown -R www-data:www-data "/var/www/${UI_DOMAIN}"
   echo "$CHECK_MARK Frontend built and deployed to /var/www/${UI_DOMAIN}."
 }
 
-configure_nginx() {
-  echo ">> Configuring Nginx..."
+configure_nginx_api() {
+  echo ">> Configuring Nginx for API..."
   
   # Check if nginx is installed
   if ! command -v nginx >/dev/null 2>&1; then
@@ -523,7 +623,80 @@ configure_nginx() {
     rm -f /etc/nginx/sites-enabled/default
   fi
   
-  cat > /etc/nginx/sites-available/hesabix.conf <<NGINX
+  # Create rate limiting zone configuration (included in http context)
+  if [[ -d /etc/nginx/conf.d ]]; then
+    cat > /etc/nginx/conf.d/rate-limit-api.conf <<RATELIMIT
+# Rate limiting zone for API
+limit_req_zone \$binary_remote_addr zone=api_limit:10m rate=10r/s;
+RATELIMIT
+  fi
+  
+  # Create API-specific configuration
+  cat > /etc/nginx/sites-available/hesabix-api.conf <<NGINX
+# Backend API
+server {
+  listen 80;
+  server_name ${API_DOMAIN};
+
+  # Security headers
+  add_header X-Frame-Options "DENY" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-XSS-Protection "1; mode=block" always;
+
+  location / {
+    return 404;
+  }
+
+  location /api/ {
+    limit_req zone=api_limit burst=20 nodelay;
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
+    client_max_body_size 20m;
+    
+    # WebSocket support (if needed in future)
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+NGINX
+
+  ln -sf /etc/nginx/sites-available/hesabix-api.conf /etc/nginx/sites-enabled/hesabix-api.conf
+  
+  # Test nginx configuration
+  if ! nginx -t; then
+    echo "$CROSS_MARK Error in Nginx configuration"
+    exit 1
+  fi
+  
+  # Reload nginx
+  if systemctl reload nginx; then
+    echo "$CHECK_MARK Nginx configured and reloaded for API."
+  else
+    echo "$CROSS_MARK Error reloading Nginx"
+    exit 1
+  fi
+}
+
+configure_nginx_ui() {
+  echo ">> Configuring Nginx for UI..."
+  
+  # Check if nginx is installed
+  if ! command -v nginx >/dev/null 2>&1; then
+    echo "$CROSS_MARK Nginx is not installed"
+    exit 1
+  fi
+  
+  # Create UI-specific configuration
+  cat > /etc/nginx/sites-available/hesabix-ui.conf <<NGINX
 # Frontend (Flutter Web)
 server {
   listen 80;
@@ -553,47 +726,9 @@ server {
   gzip_types text/plain text/css application/javascript application/json image/svg+xml text/xml application/xml application/xml+rss;
   gzip_comp_level 6;
 }
-
-# Backend API
-server {
-  listen 80;
-  server_name ${API_DOMAIN};
-
-  # Security headers
-  add_header X-Frame-Options "DENY" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header X-XSS-Protection "1; mode=block" always;
-
-  # Rate limiting (basic)
-  limit_req_zone \$binary_remote_addr zone=api_limit:10m rate=10r/s;
-
-  location / {
-    return 404;
-  }
-
-  location /api/ {
-    limit_req zone=api_limit burst=20 nodelay;
-    proxy_pass http://127.0.0.1:8000/api/;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Forwarded-Host \$host;
-    proxy_set_header X-Forwarded-Port \$server_port;
-    proxy_read_timeout 300;
-    proxy_connect_timeout 60;
-    proxy_send_timeout 300;
-    client_max_body_size 20m;
-    
-    # WebSocket support (if needed in future)
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-  }
-}
 NGINX
 
-  ln -sf /etc/nginx/sites-available/hesabix.conf /etc/nginx/sites-enabled/hesabix.conf
+  ln -sf /etc/nginx/sites-available/hesabix-ui.conf /etc/nginx/sites-enabled/hesabix-ui.conf
   
   # Test nginx configuration
   if ! nginx -t; then
@@ -603,23 +738,25 @@ NGINX
   
   # Reload nginx
   if systemctl reload nginx; then
-    echo "$CHECK_MARK Nginx configured and reloaded."
+    echo "$CHECK_MARK Nginx configured and reloaded for UI."
   else
     echo "$CROSS_MARK Error reloading Nginx"
     exit 1
   fi
 }
 
-maybe_enable_tls() {
-  : "${ENABLE_TLS:=}"
-  if [[ -z "${ENABLE_TLS}" ]]; then
+configure_api_ssl() {
+  echo ">> Configuring SSL for API domain..."
+  
+  : "${ENABLE_API_SSL:=}"
+  if [[ -z "${ENABLE_API_SSL}" ]]; then
     echo
-    read -rp "Enable automatic TLS with certbot? (y/N): " ENABLE_TLS
-    ENABLE_TLS=${ENABLE_TLS:-N}
+    read -rp "Enable SSL/TLS for API domain (${API_DOMAIN}) with Let's Encrypt? (y/N): " ENABLE_API_SSL
+    ENABLE_API_SSL=${ENABLE_API_SSL:-N}
   fi
   
-  if [[ "${ENABLE_TLS}" =~ ^[Yy]$ ]]; then
-    echo ">> Installing and configuring TLS..."
+  if [[ "${ENABLE_API_SSL}" =~ ^[Yy]$ ]]; then
+    echo ">> Installing and configuring TLS for API..."
     
     # Check if certbot is already installed
     if ! command -v certbot >/dev/null 2>&1; then
@@ -627,6 +764,54 @@ maybe_enable_tls() {
     fi
     
     # Get email for certbot
+    : "${CERTBOT_EMAIL:=admin@${API_DOMAIN}}"
+    if [[ -z "${CERTBOT_EMAIL}" ]] || [[ "${CERTBOT_EMAIL}" == "admin@${API_DOMAIN}" ]]; then
+      read -rp "Email for SSL certificate (default: admin@${API_DOMAIN}): " input_email
+      CERTBOT_EMAIL=${input_email:-admin@${API_DOMAIN}}
+    fi
+    
+    # Validate email format (basic)
+    if [[ ! "${CERTBOT_EMAIL}" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+      echo "$WARNING_MARK Invalid email format. Using default: admin@${API_DOMAIN}"
+      CERTBOT_EMAIL="admin@${API_DOMAIN}"
+    fi
+    
+    # Configure SSL for API domain only
+    if certbot --nginx -d "${API_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
+      echo "$CHECK_MARK SSL/TLS enabled for API domain."
+      # Setup auto-renewal
+      systemctl enable certbot.timer
+      systemctl start certbot.timer
+      echo "$CHECK_MARK SSL certificate auto-renewal enabled."
+    else
+      echo "$WARNING_MARK Error issuing SSL certificate for API domain. You can run manually later:"
+      echo "  certbot --nginx -d ${API_DOMAIN}"
+    fi
+  else
+    echo "SSL/TLS skipped for API domain; you can run certbot later:"
+    echo "  certbot --nginx -d ${API_DOMAIN}"
+  fi
+}
+
+configure_ui_ssl() {
+  echo ">> Configuring SSL for UI domain..."
+  
+  : "${ENABLE_UI_SSL:=}"
+  if [[ -z "${ENABLE_UI_SSL}" ]]; then
+    echo
+    read -rp "Enable SSL/TLS for UI domain (${UI_DOMAIN}) with Let's Encrypt? (y/N): " ENABLE_UI_SSL
+    ENABLE_UI_SSL=${ENABLE_UI_SSL:-N}
+  fi
+  
+  if [[ "${ENABLE_UI_SSL}" =~ ^[Yy]$ ]]; then
+    echo ">> Installing and configuring TLS for UI..."
+    
+    # Check if certbot is already installed
+    if ! command -v certbot >/dev/null 2>&1; then
+      apt-get install -y certbot python3-certbot-nginx
+    fi
+    
+    # Get email for certbot (use same as API if already set)
     : "${CERTBOT_EMAIL:=admin@${UI_DOMAIN}}"
     if [[ -z "${CERTBOT_EMAIL}" ]] || [[ "${CERTBOT_EMAIL}" == "admin@${UI_DOMAIN}" ]]; then
       read -rp "Email for SSL certificate (default: admin@${UI_DOMAIN}): " input_email
@@ -639,18 +824,22 @@ maybe_enable_tls() {
       CERTBOT_EMAIL="admin@${UI_DOMAIN}"
     fi
     
-    if certbot --nginx -d "${UI_DOMAIN}" -d "${API_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
-      echo "$CHECK_MARK TLS enabled."
-      # Setup auto-renewal
-      systemctl enable certbot.timer
-      systemctl start certbot.timer
+    # Configure SSL for UI domain only
+    if certbot --nginx -d "${UI_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
+      echo "$CHECK_MARK SSL/TLS enabled for UI domain."
+      # Setup auto-renewal (only if not already enabled)
+      if ! systemctl is-enabled certbot.timer >/dev/null 2>&1; then
+        systemctl enable certbot.timer
+        systemctl start certbot.timer
+        echo "$CHECK_MARK SSL certificate auto-renewal enabled."
+      fi
     else
-      echo "$WARNING_MARK Error issuing SSL certificate. You can run manually later:"
-      echo "  certbot --nginx -d ${UI_DOMAIN} -d ${API_DOMAIN}"
+      echo "$WARNING_MARK Error issuing SSL certificate for UI domain. You can run manually later:"
+      echo "  certbot --nginx -d ${UI_DOMAIN}"
     fi
   else
-    echo "TLS skipped; you can run certbot later:"
-    echo "  certbot --nginx -d ${UI_DOMAIN} -d ${API_DOMAIN}"
+    echo "SSL/TLS skipped for UI domain; you can run certbot later:"
+    echo "  certbot --nginx -d ${UI_DOMAIN}"
   fi
 }
 
@@ -660,6 +849,13 @@ main() {
     exit 1
   fi
   
+  # Show license information
+  show_license_info
+  
+  # Require license acceptance
+  accept_license
+  
+  echo
   echo "=========================================="
   echo "  Hesabix Deployment Script"
   echo "=========================================="
@@ -693,10 +889,16 @@ main() {
   install_flutter_and_build_frontend
   echo
   
-  configure_nginx
+  configure_nginx_api
   echo
   
-  maybe_enable_tls
+  configure_nginx_ui
+  echo
+  
+  configure_api_ssl
+  echo
+  
+  configure_ui_ssl
   echo
   
   echo "=========================================="
@@ -704,8 +906,8 @@ main() {
   echo "=========================================="
   echo
   echo "Access URLs:"
-  echo "  API:  http://${API_DOMAIN}/api/v1/health"
-  echo "  UI:   http://${UI_DOMAIN}/"
+  echo "  API:  https://${API_DOMAIN}/api/v1/health"
+  echo "  UI:   https://${UI_DOMAIN}/"
   echo
   echo "Service management:"
   echo "  systemctl status hesabix-api    # API status"
