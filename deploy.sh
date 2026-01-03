@@ -581,6 +581,11 @@ install_flutter_and_build_frontend() {
   echo "  Mode: release"
   echo "  API URL: ${api_url}"
   echo "  Output: /var/www/${UI_DOMAIN}"
+  echo
+  echo "$CHECK_MARK Flutter mirror auto-detection enabled:"
+  echo "  The build script will automatically detect and use available mirrors"
+  echo "  (Chinese mirrors → Official → Other mirrors) if Google services are blocked."
+  echo "  This ensures Flutter packages and SDK downloads work even with sanctions."
   
   # Build using build_web.sh script
   cd "${app_dir}"
