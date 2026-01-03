@@ -430,26 +430,27 @@ if [ ! -f "$BUILD_DIR/manifest.json" ]; then
 fi
 
 # Copy built files to Apache deployment path
-DEPLOY_DIR="/var/www/arc.hesabix.ir"
-if [ -d "$BUILD_DIR" ] && [ -n "$(ls -A "$BUILD_DIR" 2>/dev/null)" ]; then
-  echo ""
-  echo "Copying built files to deployment path..."
-  if [ -d "$DEPLOY_DIR" ] || mkdir -p "$DEPLOY_DIR" 2>/dev/null; then
-    # Use optimized rsync with light compression and progress
-    # --compress-level=1 for fast compression with minimal CPU overhead
-    rsync -azP --compress-level=1 --delete "$BUILD_DIR/" "$DEPLOY_DIR/" 2>/dev/null || {
-      warn "Error copying files to $DEPLOY_DIR"
-      warn "Please copy files manually:"
-      warn "  rsync -azP --compress-level=1 --delete $BUILD_DIR/ $DEPLOY_DIR/"
-    }
-    chown -R www-data:www-data "$DEPLOY_DIR" 2>/dev/null || true
-    echo "✓ Files copied to $DEPLOY_DIR"
-  else
-    warn "Cannot create folder $DEPLOY_DIR. Please check permissions."
-  fi
-else
-  warn "Build path is empty or doesn't exist: $BUILD_DIR"
-fi
+# DISABLED: Deployment to /var/www/arc.hesabix.ir is disabled
+# DEPLOY_DIR="/var/www/arc.hesabix.ir"
+# if [ -d "$BUILD_DIR" ] && [ -n "$(ls -A "$BUILD_DIR" 2>/dev/null)" ]; then
+#   echo ""
+#   echo "Copying built files to deployment path..."
+#   if [ -d "$DEPLOY_DIR" ] || mkdir -p "$DEPLOY_DIR" 2>/dev/null; then
+#     # Use optimized rsync with light compression and progress
+#     # --compress-level=1 for fast compression with minimal CPU overhead
+#     rsync -azP --compress-level=1 --delete "$BUILD_DIR/" "$DEPLOY_DIR/" 2>/dev/null || {
+#       warn "Error copying files to $DEPLOY_DIR"
+#       warn "Please copy files manually:"
+#       warn "  rsync -azP --compress-level=1 --delete $BUILD_DIR/ $DEPLOY_DIR/"
+#     }
+#     chown -R www-data:www-data "$DEPLOY_DIR" 2>/dev/null || true
+#     echo "✓ Files copied to $DEPLOY_DIR"
+#   else
+#     warn "Cannot create folder $DEPLOY_DIR. Please check permissions."
+#   fi
+# else
+#   warn "Build path is empty or doesn't exist: $BUILD_DIR"
+# fi
 
 echo ""
 echo "=========================================="
@@ -457,10 +458,6 @@ echo "✓ Build completed!"
 echo "=========================================="
 echo "Built files are located at:"
 echo "  $BUILD_DIR"
-if [ -d "$DEPLOY_DIR" ]; then
-  echo "  and in deployment path:"
-  echo "  $DEPLOY_DIR"
-fi
 echo ""
 if [ "$MODE" = "release" ]; then
   echo "✓ Applied optimizations:"

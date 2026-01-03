@@ -20,7 +20,7 @@ from sqlalchemy import (
     Date,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.mysql import JSON
+from sqlalchemy import JSON
 
 from adapters.db.session import Base
 

@@ -188,15 +188,13 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             q = q.filter(or_(*group_filters))
 
     # Warehouse filter (JSON attribute inside extra_info)
+    # برای PostgreSQL از astext استفاده می‌کنیم
     if warehouse_ids:
         try:
-            q = q.filter(cast(DocumentLine.extra_info["warehouse_id"].as_string(), Integer).in_(warehouse_ids))
+            q = q.filter(cast(DocumentLine.extra_info["warehouse_id"].astext, Integer).in_(warehouse_ids))
         except Exception:
-            try:
-                q = q.filter(cast(DocumentLine.extra_info["warehouse_id"].astext, Integer).in_(warehouse_ids))
-            except Exception:
-                # در صورت عدم پشتیبانی از عملگر JSON، از فیلتر نرم‌افزاری بعد از واکشی استفاده خواهد شد
-                pass
+            # در صورت عدم پشتیبانی از عملگر JSON، از فیلتر نرم‌افزاری بعد از واکشی استفاده خواهد شد
+            pass
 
     # Sorting
     sort_by = (query.get("sort_by") or "document_date")

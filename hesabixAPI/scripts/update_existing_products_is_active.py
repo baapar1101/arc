@@ -14,7 +14,7 @@ from app.core.settings import get_settings
 def update_existing_products():
     """به‌روزرسانی کالاهای موجود و تنظیم is_active = True برای همه"""
     settings = get_settings()
-    engine = create_engine(settings.mysql_dsn, echo=False)
+    engine = create_engine(settings.postgresql_dsn, echo=False)
     
     with engine.connect() as conn:
         # بررسی وضعیت فعلی

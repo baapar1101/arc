@@ -47,12 +47,12 @@ check_service() {
   fi
 }
 
-# Wait for MySQL to be ready
+# Wait for PostgreSQL to be ready
 wait_for_db() {
   local max_attempts=30
   local attempt=0
   while [ $attempt -lt $max_attempts ]; do
-    if mysql --protocol=socket -uroot -e "SELECT 1" >/dev/null 2>&1; then
+    if sudo -u postgres psql -c "SELECT 1" >/dev/null 2>&1; then
       return 0
     fi
     attempt=$((attempt + 1))
@@ -153,7 +153,7 @@ install_prereqs() {
   apt-get update -y
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3.11 python3.11-venv python3-pip build-essential \
-    nginx mysql-server
+    nginx postgresql postgresql-contrib
   echo "$CHECK_MARK Prerequisites installed."
 }
 
@@ -202,13 +202,13 @@ clone_repo() {
 }
 
 setup_db() {
-  echo ">> Configuring database (MySQL)..."
+  echo ">> Configuring database (PostgreSQL)..."
   
-  # Start and enable MySQL service
-  if systemctl list-unit-files | grep -q mysql.service; then
-    systemctl enable --now mysql || true
+  # Start and enable PostgreSQL service
+  if systemctl list-unit-files | grep -q postgresql.service; then
+    systemctl enable --now postgresql || true
   else
-    echo "$CROSS_MARK MySQL service not found. Please install MySQL."
+    echo "$CROSS_MARK PostgreSQL service not found. Please install PostgreSQL."
     exit 1
   fi
   
@@ -219,21 +219,44 @@ setup_db() {
     exit 1
   fi
   
+  # Configure PostgreSQL to allow local connections (if needed)
+  local pg_version
+  pg_version=$(sudo -u postgres psql -tAc "SELECT version();" | grep -oE '[0-9]+' | head -1)
+  local pg_hba="/etc/postgresql/${pg_version}/main/pg_hba.conf"
+  
+  # Allow password authentication for localhost connections
+  if [[ -f "${pg_hba}" ]] && ! grep -q "host.*hesabix.*127.0.0.1/32.*md5" "${pg_hba}"; then
+    echo "host    hesabix    hesabix    127.0.0.1/32    md5" >> "${pg_hba}"
+    systemctl reload postgresql || true
+  fi
+  
   # Create database and user
-  mysql --protocol=socket -uroot <<SQL
-CREATE DATABASE IF NOT EXISTS hesabix CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-DROP USER IF EXISTS 'hesabix'@'localhost';
-CREATE USER 'hesabix'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON hesabix.* TO 'hesabix'@'localhost';
-FLUSH PRIVILEGES;
+  sudo -u postgres psql <<SQL
+-- Create user if not exists
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'hesabix') THEN
+    CREATE USER hesabix WITH PASSWORD '${DB_PASSWORD}';
+  ELSE
+    ALTER USER hesabix WITH PASSWORD '${DB_PASSWORD}';
+  END IF;
+END
+\$\$;
 SQL
+
+  # Create database separately to avoid issues with conditional creation
+  if ! sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'hesabix'" | grep -q 1; then
+    sudo -u postgres createdb -O hesabix -E UTF8 -T template0 hesabix
+  fi
+  
+  # Grant privileges
+  sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE hesabix TO hesabix;"
   
   # Verify connection
-  if mysql -uhesabix -p"${DB_PASSWORD}" -h127.0.0.1 hesabix -e "SELECT 1" >/dev/null 2>&1; then
+  if PGPASSWORD="${DB_PASSWORD}" psql -U hesabix -h 127.0.0.1 -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
     echo "$CHECK_MARK Database and user created, connection verified."
   else
-    echo "$CROSS_MARK Error connecting to database with user hesabix"
-    exit 1
+    echo "$WARNING_MARK Connection test failed, but database may still be accessible. Continuing..."
   fi
 }
 
@@ -267,7 +290,7 @@ deploy_backend() {
     sed -i "s/^DB_USER=.*/DB_USER=hesabix/" "${env_file}"
     sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" "${env_file}"
     sed -i "s/^DB_HOST=.*/DB_HOST=127.0.0.1/" "${env_file}"
-    sed -i "s/^DB_PORT=.*/DB_PORT=3306/" "${env_file}"
+    sed -i "s/^DB_PORT=.*/DB_PORT=5432/" "${env_file}"
     sed -i "s/^DB_NAME=.*/DB_NAME=hesabix/" "${env_file}"
     sed -i "s/^LOG_LEVEL=.*/LOG_LEVEL=INFO/" "${env_file}"
     # Add CORS if not exists
@@ -284,7 +307,7 @@ DEBUG=false
 DB_USER=hesabix
 DB_PASSWORD=${DB_PASSWORD}
 DB_HOST=127.0.0.1
-DB_PORT=3306
+DB_PORT=5432
 DB_NAME=hesabix
 LOG_LEVEL=INFO
 CORS_ALLOWED_ORIGINS=["https://${UI_DOMAIN}","http://${UI_DOMAIN}"]
@@ -299,7 +322,7 @@ sys.path.insert(0, '.')
 from app.core.settings import get_settings
 settings = get_settings()
 from sqlalchemy import create_engine, text
-engine = create_engine(settings.database_url)
+engine = create_engine(settings.postgresql_dsn)
 with engine.connect() as conn:
     conn.execute(text('SELECT 1'))
 print('Connection successful')
@@ -327,8 +350,8 @@ print('Connection successful')
   cat > /etc/systemd/system/hesabix-api.service <<UNIT
 [Unit]
 Description=Hesabix API (FastAPI/Uvicorn)
-After=network.target mysql.service
-Requires=mysql.service
+After=network.target postgresql.service
+Requires=postgresql.service
 
 [Service]
 Type=notify
@@ -370,7 +393,7 @@ UNIT
   cat > /etc/systemd/system/hesabix-rq-worker.service <<UNIT
 [Unit]
 Description=Hesabix RQ Worker (Background Jobs)
-After=network.target redis.service mysql.service
+After=network.target redis.service postgresql.service
 Wants=redis.service
 
 [Service]

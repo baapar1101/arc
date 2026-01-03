@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 
 
 settings = get_settings()
-engine = create_engine(settings.mysql_dsn, echo=settings.sqlalchemy_echo, pool_pre_ping=True, pool_recycle=3600)
+engine = create_engine(settings.postgresql_dsn, echo=settings.sqlalchemy_echo, pool_pre_ping=True, pool_recycle=3600)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

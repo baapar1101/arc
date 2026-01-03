@@ -47,11 +47,13 @@ def export_tax_report(
     format_type = body.get("format", "excel")
     
     # Query فاکتورها
+    # برای PostgreSQL از JSON operators استفاده می‌کنیم
+    from sqlalchemy import cast, Boolean
     query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
-            func.json_extract(Document.extra_info, '$.tax_workspace') == True,
+            cast(Document.extra_info['tax_workspace'], Boolean) == True,
         )
     )
     
@@ -73,7 +75,7 @@ def export_tax_report(
     # فیلتر وضعیت
     if status:
         query = query.filter(
-            func.json_extract(Document.extra_info, '$.tax_status') == status
+            Document.extra_info['tax_status'].astext == status
         )
     
     docs = query.order_by(Document.date.desc()).limit(10000).all()

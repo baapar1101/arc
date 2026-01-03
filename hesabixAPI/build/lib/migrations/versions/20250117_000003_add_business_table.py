@@ -3,7 +3,6 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
-from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
 revision = "20250117_000003"
@@ -22,8 +21,8 @@ def upgrade() -> None:
             'businesses',
             sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
             sa.Column('name', sa.String(length=255), nullable=False),
-            sa.Column('business_type', mysql.ENUM('شرکت', 'مغازه', 'فروشگاه', 'اتحادیه', 'باشگاه', 'موسسه', 'شخصی', name='businesstype'), nullable=False),
-            sa.Column('business_field', mysql.ENUM('تولیدی', 'بازرگانی', 'خدماتی', 'سایر', name='businessfield'), nullable=False),
+            sa.Column('business_type', sa.Enum('شرکت', 'مغازه', 'فروشگاه', 'اتحادیه', 'باشگاه', 'موسسه', 'شخصی', name='business_type_enum', create_type=False), nullable=False),
+            sa.Column('business_field', sa.Enum('تولیدی', 'بازرگانی', 'خدماتی', 'سایر', name='business_field_enum', create_type=False), nullable=False),
             sa.Column('owner_id', sa.Integer(), nullable=False),
             sa.Column('created_at', sa.DateTime(), nullable=False),
             sa.Column('updated_at', sa.DateTime(), nullable=False),

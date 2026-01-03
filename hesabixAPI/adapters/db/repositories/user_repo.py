@@ -95,8 +95,9 @@ class UserRepository(BaseRepository[User]):
 	
 	def get_support_operators(self) -> List[User]:
 		"""دریافت لیست تمام اپراتورهای پشتیبانی فعال"""
+		from sqlalchemy import cast, Boolean
 		stmt = select(User).where(
-			text("JSON_EXTRACT(app_permissions, '$.support_operator') = true")
+			cast(User.app_permissions['support_operator'], Boolean) == True
 		).where(User.is_active == True)
 		return list(self.db.execute(stmt).scalars().all())
 	

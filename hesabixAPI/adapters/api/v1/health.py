@@ -199,11 +199,10 @@ def database_health(request: Request, db: Session = Depends(get_db)) -> dict:
 	try:
 		result = db.execute(text("""
 			SELECT 
-				table_schema AS 'Database',
-				ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
-			FROM information_schema.TABLES
-			WHERE table_schema = DATABASE()
-			GROUP BY table_schema
+				pg_database.datname AS database,
+				ROUND(pg_database_size(pg_database.datname) / 1024.0 / 1024.0, 2) AS size_mb
+			FROM pg_database
+			WHERE pg_database.datname = current_database()
 		"""))
 		size_info = result.fetchone()
 		health_status["checks"]["database_size"] = {
@@ -219,8 +218,9 @@ def database_health(request: Request, db: Session = Depends(get_db)) -> dict:
 		result = db.execute(text("""
 			SELECT 
 				COUNT(*) as active_connections,
-				SUM(CASE WHEN command != 'Sleep' THEN 1 ELSE 0 END) as running_queries
-			FROM information_schema.processlist
+				SUM(CASE WHEN state != 'idle' THEN 1 ELSE 0 END) as running_queries
+			FROM pg_stat_activity
+			WHERE datname = current_database()
 		"""))
 		conn_info = result.fetchone()
 		health_status["checks"]["active_connections"] = {
@@ -236,9 +236,10 @@ def database_health(request: Request, db: Session = Depends(get_db)) -> dict:
 	try:
 		result = db.execute(text("""
 			SELECT COUNT(*) 
-			FROM information_schema.processlist 
-			WHERE command != 'Sleep' 
-			AND time > 5
+			FROM pg_stat_activity 
+			WHERE datname = current_database()
+			AND state != 'idle'
+			AND now() - query_start > interval '5 seconds'
 		"""))
 		slow_queries = result.scalar()
 		health_status["checks"]["slow_queries"] = {

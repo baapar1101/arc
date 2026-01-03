@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.mysql_dsn)
+config.set_main_option("sqlalchemy.url", settings.postgresql_dsn)
 
 target_metadata = Base.metadata
 
@@ -54,7 +54,7 @@ def run_migrations_online() -> None:
         # Ensure alembic_version.version_num can hold long revision strings
         try:
             res = connection.exec_driver_sql(
-                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns "
+                "SELECT character_maximum_length FROM information_schema.columns "
                 "WHERE table_name='alembic_version' AND column_name='version_num';"
             )
             row = res.fetchone()
@@ -62,7 +62,7 @@ def run_migrations_online() -> None:
                 length = row[0] or 0
                 if length < 255:
                     connection.exec_driver_sql(
-                        "ALTER TABLE alembic_version MODIFY COLUMN version_num VARCHAR(255) NOT NULL;"
+                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
                     )
         except Exception:
             # Best-effort; ignore if table doesn't exist yet

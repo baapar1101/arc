@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 	db_user: str = "hesabix"
 	db_password: str = "change_me"
 	db_host: str = "localhost"
-	db_port: int = 3306
+	db_port: int = 5432
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
 	# DB Pooling - بهینه‌سازی برای مقیاس‌پذیری بالا
@@ -135,9 +135,9 @@ class Settings(BaseSettings):
 	voice_data_collection_dir: str = "/var/lib/hesabix/voice-data"
 
 	@property
-	def mysql_dsn(self) -> str:
+	def postgresql_dsn(self) -> str:
 		return (
-			f"mysql+pymysql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+			f"postgresql+psycopg2://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 		)
 
 

@@ -2701,11 +2701,13 @@ def tax_workspace_quick_actions(
     # دریافت فاکتورها بر اساس وضعیت
     from sqlalchemy import func
     
+    # برای PostgreSQL از JSON operators استفاده می‌کنیم
+    from sqlalchemy import cast, Boolean
     base_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
-            func.json_extract(Document.extra_info, '$.tax_workspace') == True,
+            cast(Document.extra_info['tax_workspace'], Boolean) == True,
         )
     )
     
@@ -2714,7 +2716,7 @@ def tax_workspace_quick_actions(
     if action == "send_all_pending":
         # ارسال همه pending
         docs = base_query.filter(
-            func.json_extract(Document.extra_info, '$.tax_status') == 'pending'
+            Document.extra_info['tax_status'].astext == 'pending'
         ).all()
         invoice_ids = [doc.id for doc in docs]
         
@@ -2731,7 +2733,7 @@ def tax_workspace_quick_actions(
     elif action == "inquire_all_sent":
         # استعلام همه sent
         docs = base_query.filter(
-            func.json_extract(Document.extra_info, '$.tax_status') == 'sent'
+            Document.extra_info['tax_status'].astext == 'sent'
         ).all()
         
         tracking_codes: List[str] = []
@@ -2753,7 +2755,7 @@ def tax_workspace_quick_actions(
     elif action == "retry_all_failed":
         # Retry همه failed
         docs = base_query.filter(
-            func.json_extract(Document.extra_info, '$.tax_status') == 'failed'
+            Document.extra_info['tax_status'].astext == 'failed'
         ).all()
         invoice_ids = [doc.id for doc in docs]
         

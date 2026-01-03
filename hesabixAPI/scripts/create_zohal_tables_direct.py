@@ -14,7 +14,7 @@ from adapters.db.session import get_db
 def create_tables():
     settings = get_settings()
     # ساخت connection string از تنظیمات
-    db_url = f"mysql+pymysql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+    db_url = settings.postgresql_dsn
     engine = create_engine(db_url)
     
     with engine.connect() as conn:

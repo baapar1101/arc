@@ -289,14 +289,12 @@ class ServiceMonitoringService:
 			# تست اتصال دیتابیس
 			self.db.execute(text("SELECT 1"))
 			
-			# محاسبه حجم دیتابیس (MySQL)
+			# محاسبه حجم دیتابیس (PostgreSQL)
 			db_size = None
 			try:
 				result = self.db.execute(
 					text(
-						"SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 1) AS 'DB Size in MB' "
-						"FROM information_schema.tables "
-						"WHERE table_schema = DATABASE()"
+						"SELECT ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 1) AS db_size_mb"
 					)
 				).fetchone()
 				if result:

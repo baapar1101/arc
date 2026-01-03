@@ -7,7 +7,6 @@ Create Date: 2025-09-27 19:18:06.253391
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
 from sqlalchemy import text
 from sqlalchemy import inspect
 
@@ -110,7 +109,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     if _table_exists(conn, 'person_bank_accounts') and _column_exists(conn, 'person_bank_accounts', 'person_id'):
         op.alter_column('person_bank_accounts', 'person_id',
-               existing_type=mysql.INTEGER(),
+               existing_type=sa.Integer(),
                comment=None,
                existing_comment='شناسه شخص',
                existing_nullable=False)
@@ -118,23 +117,23 @@ def upgrade() -> None:
     if _table_exists(conn, 'persons'):
         if _column_exists(conn, 'persons', 'business_id'):
             op.alter_column('persons', 'business_id',
-                   existing_type=mysql.INTEGER(),
+                   existing_type=sa.Integer(),
                    comment=None,
                    existing_comment='شناسه کسب و کار',
                    existing_nullable=False)
         if _column_exists(conn, 'persons', 'code'):
             op.alter_column('persons', 'code',
-                   existing_type=mysql.INTEGER(),
+                   existing_type=sa.Integer(),
                    comment='کد یکتا در هر کسب و کار',
                    existing_nullable=True)
         if _column_exists(conn, 'persons', 'person_types'):
             op.alter_column('persons', 'person_types',
-                   existing_type=mysql.TEXT(collation='utf8mb4_general_ci'),
+                   existing_type=sa.Text(),
                    comment='لیست انواع شخص به صورت JSON',
                    existing_nullable=True)
         if _column_exists(conn, 'persons', 'share_count'):
             op.alter_column('persons', 'share_count',
-                   existing_type=mysql.INTEGER(),
+                   existing_type=sa.Integer(),
                    comment='تعداد سهام (فقط برای سهامدار)',
                    existing_nullable=True)
     # ### end Alembic commands ###
@@ -145,30 +144,30 @@ def downgrade() -> None:
     conn = op.get_bind()
     if _table_exists(conn, 'persons') and _column_exists(conn, 'persons', 'share_count'):
         op.alter_column('persons', 'share_count',
-               existing_type=mysql.INTEGER(),
+               existing_type=sa.Integer(),
                comment=None,
                existing_comment='تعداد سهام (فقط برای سهامدار)',
                existing_nullable=True)
     if _table_exists(conn, 'persons') and _column_exists(conn, 'persons', 'person_types'):
         op.alter_column('persons', 'person_types',
-               existing_type=mysql.TEXT(collation='utf8mb4_general_ci'),
+               existing_type=sa.Text(),
                comment=None,
                existing_comment='لیست انواع شخص به صورت JSON',
                existing_nullable=True)
     if _table_exists(conn, 'persons') and _column_exists(conn, 'persons', 'code'):
         op.alter_column('persons', 'code',
-               existing_type=mysql.INTEGER(),
+               existing_type=sa.Integer(),
                comment=None,
                existing_comment='کد یکتا در هر کسب و کار',
                existing_nullable=True)
     if _table_exists(conn, 'persons') and _column_exists(conn, 'persons', 'business_id'):
         op.alter_column('persons', 'business_id',
-               existing_type=mysql.INTEGER(),
+               existing_type=sa.Integer(),
                comment='شناسه کسب و کار',
                existing_nullable=False)
     if _table_exists(conn, 'person_bank_accounts') and _column_exists(conn, 'person_bank_accounts', 'person_id'):
         op.alter_column('person_bank_accounts', 'person_id',
-               existing_type=mysql.INTEGER(),
+               existing_type=sa.Integer(),
                comment='شناسه شخص',
                existing_nullable=False)
     op.create_index(op.f('ix_fiscal_years_title'), 'fiscal_years', ['title'], unique=False)

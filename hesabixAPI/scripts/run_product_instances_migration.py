@@ -13,7 +13,7 @@ from app.core.settings import get_settings
 
 def run_migration():
     settings = get_settings()
-    engine = create_engine(settings.mysql_dsn, echo=True)
+    engine = create_engine(settings.postgresql_dsn, echo=True)
     
     with engine.connect() as conn:
         inspector = inspect(engine)

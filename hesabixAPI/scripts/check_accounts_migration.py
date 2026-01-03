@@ -17,7 +17,7 @@ def create_connection():
     """ایجاد اتصال به دیتابیس"""
     settings = get_settings()
     engine = create_engine(
-        settings.mysql_dsn,
+        settings.postgresql_dsn,
         echo=False,
         pool_pre_ping=True,
     )

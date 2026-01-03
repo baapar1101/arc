@@ -14,7 +14,7 @@ from app.core.settings import get_settings
 def add_is_active_column():
     """افزودن فیلد is_active به جدول products"""
     settings = get_settings()
-    engine = create_engine(settings.mysql_dsn, echo=False)
+    engine = create_engine(settings.postgresql_dsn, echo=False)
     
     with engine.connect() as conn:
         inspector = inspect(engine)

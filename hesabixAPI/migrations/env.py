@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -24,7 +25,12 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.mysql_dsn)
+# Set password directly
+settings.db_password = os.getenv('DB_PASSWORD', '@@babaK24055')
+from urllib.parse import quote_plus
+dsn = f"postgresql+psycopg2://{settings.db_user}:{quote_plus(settings.db_password)}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+# Set DSN directly in attributes to avoid ConfigParser % interpolation issues
+config.attributes['sqlalchemy.url'] = dsn
 
 target_metadata = Base.metadata
 
@@ -44,17 +50,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Get DSN from attributes (set above) or config
+    url = config.attributes.get('sqlalchemy.url') or config.get_main_option("sqlalchemy.url")
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        {"sqlalchemy.url": url},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
+    with connectable.begin() as connection:
         # Ensure alembic_version.version_num can hold long revision strings
         try:
             res = connection.exec_driver_sql(
-                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns "
+                "SELECT character_maximum_length FROM information_schema.columns "
                 "WHERE table_name='alembic_version' AND column_name='version_num';"
             )
             row = res.fetchone()
@@ -62,7 +70,7 @@ def run_migrations_online() -> None:
                 length = row[0] or 0
                 if length < 255:
                     connection.exec_driver_sql(
-                        "ALTER TABLE alembic_version MODIFY COLUMN version_num VARCHAR(255) NOT NULL;"
+                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
                     )
         except Exception:
             # Best-effort; ignore if table doesn't exist yet

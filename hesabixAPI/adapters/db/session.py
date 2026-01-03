@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
 
 settings = get_settings()
 engine = create_engine(
-    settings.mysql_dsn,
+    settings.postgresql_dsn,
     echo=settings.sqlalchemy_echo,
     poolclass=QueuePool,  # استفاده از QueuePool برای بهتر control
     pool_pre_ping=True,  # بررسی سلامت اتصالات قبل از استفاده
@@ -34,13 +34,10 @@ engine = create_engine(
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
     pool_timeout=settings.db_pool_timeout,
-    # تنظیمات اضافی برای بهبود عملکرد
+    # تنظیمات اضافی برای PostgreSQL
     connect_args={
         "connect_timeout": 10,
-        "read_timeout": 30,  # کاهش برای جلوگیری از query های طولانی و connection leak
-        "write_timeout": 30,
-        "charset": "utf8mb4",
-        "init_command": "SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'",
+        "options": "-c statement_timeout=60000",  # Timeout برای query ها (60 ثانیه)
     },
     # بهینه‌سازی برای Performance
     # استفاده از 'rollback' به جای 'commit' برای جلوگیری از connection leak
@@ -51,24 +48,19 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
-# Event Listener برای تنظیمات MySQL Session
+# Event Listener برای تنظیمات PostgreSQL Session
 @event.listens_for(engine, "connect")
-def set_mysql_session_params(dbapi_conn, connection_record):
-	"""تنظیمات MySQL برای هر Connection جدید"""
+def set_postgresql_session_params(dbapi_conn, connection_record):
+	"""تنظیمات PostgreSQL برای هر Connection جدید"""
 	try:
 		with dbapi_conn.cursor() as cursor:
-			# بهینه‌سازی برای InnoDB
-			cursor.execute("SET SESSION innodb_lock_wait_timeout = 50")
-			# بهینه‌سازی برای Read Performance
-			cursor.execute("SET SESSION transaction_isolation = 'READ-COMMITTED'")
-			# بهینه‌سازی برای Query Performance
-			cursor.execute("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'")
-			# تنظیم timeout برای query ها (60 ثانیه = 60000 میلی‌ثانیه)
+			# تنظیم isolation level برای بهتر Concurrency
+			cursor.execute("SET SESSION transaction_isolation = 'READ COMMITTED'")
+			# تنظیم timeout برای query ها (60 ثانیه)
 			# این باعث می‌شود query های طولانی‌تر از 1 دقیقه timeout شوند
-			# کاهش از 120 ثانیه برای جلوگیری از connection leak
-			cursor.execute("SET SESSION max_execution_time = 60000")
+			cursor.execute("SET SESSION statement_timeout = 60000")
 	except Exception as e:
-		logger.warning(f"Error setting MySQL session variables: {e}")
+		logger.warning(f"Error setting PostgreSQL session variables: {e}")
 
 
 # Event Listeners برای Monitoring Pool Statistics

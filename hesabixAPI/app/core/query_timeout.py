@@ -39,8 +39,8 @@ def query_timeout(
         timeout_seconds = getattr(settings, 'query_timeout_seconds', 30)
     
     try:
-        # تنظیم timeout برای MySQL
-        session.execute(text(f"SET SESSION max_execution_time = {timeout_seconds * 1000}"))
+        # تنظیم timeout برای PostgreSQL (به میلی‌ثانیه)
+        session.execute(text(f"SET SESSION statement_timeout = {timeout_seconds * 1000}"))
         yield session
     except Exception as e:
         logger.warning(f"Error setting query timeout: {e}")
@@ -48,7 +48,7 @@ def query_timeout(
     finally:
         try:
             # بازگرداندن timeout به حالت پیش‌فرض
-            session.execute(text("SET SESSION max_execution_time = 0"))
+            session.execute(text("SET SESSION statement_timeout = 0"))
         except Exception:
             pass
 
@@ -62,7 +62,7 @@ def set_query_timeout(session: Session, timeout_seconds: int) -> None:
         timeout_seconds: Timeout به ثانیه
     """
     try:
-        session.execute(text(f"SET SESSION max_execution_time = {timeout_seconds * 1000}"))
+        session.execute(text(f"SET SESSION statement_timeout = {timeout_seconds * 1000}"))
     except Exception as e:
         logger.warning(f"Error setting query timeout: {e}")
 
@@ -75,7 +75,7 @@ def reset_query_timeout(session: Session) -> None:
         session: SQLAlchemy session
     """
     try:
-        session.execute(text("SET SESSION max_execution_time = 0"))
+        session.execute(text("SET SESSION statement_timeout = 0"))
     except Exception as e:
         logger.warning(f"Error resetting query timeout: {e}")
 
@@ -89,9 +89,9 @@ def set_connection_timeout(dbapi_conn, connection_record):
         settings = get_settings()
         timeout_seconds = getattr(settings, 'query_timeout_seconds', 30)
         
-        # تنظیم timeout برای MySQL connection
+        # تنظیم timeout برای PostgreSQL connection
         with dbapi_conn.cursor() as cursor:
-            cursor.execute(f"SET SESSION max_execution_time = {timeout_seconds * 1000}")
+            cursor.execute(f"SET SESSION statement_timeout = {timeout_seconds * 1000}")
     except Exception as e:
         logger.warning(f"Error setting connection timeout: {e}")
 
