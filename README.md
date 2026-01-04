@@ -1,283 +1,274 @@
-# Hesabix - سیستم حسابداری جامع
+# Hesabix - Comprehensive Accounting System
 
-Hesabix یک سیستم حسابداری کامل و مدرن است که شامل یک API قدرتمند (FastAPI + SQLAlchemy) و رابط کاربری زیبا (Flutter) می‌باشد. این سیستم برای مدیریت مالی کسب‌وکارهای کوچک و متوسط طراحی شده است.
+Hesabix is a complete and modern accounting system designed for small and medium businesses. It includes a powerful API backend (FastAPI + PostgreSQL) and a beautiful web interface (Flutter Web).
 
-## ویژگی‌های اصلی
+## About Hesabix
 
-### 🚀 API Backend (hesabixAPI)
-- **FastAPI** - فریمورک مدرن و سریع برای ساخت API
-- **SQLAlchemy** - ORM قدرتمند برای مدیریت پایگاه داده
-- **MySQL** - پایگاه داده رابطه‌ای قابل اعتماد
-- **Alembic** - مدیریت migration های پایگاه داده
-- **Pydantic** - اعتبارسنجی و سریالیزاسیون داده‌ها
-- **JWT Authentication** - سیستم احراز هویت امن
-- **Multi-language Support** - پشتیبانی از چندین زبان (فارسی/انگلیسی)
-- **Jalali Calendar** - تقویم شمسی برای کاربران ایرانی
+Hesabix is an open-source accounting software that provides comprehensive financial management capabilities. The system is built with modern technologies to ensure high performance, scalability, and ease of use.
 
-### 📱 Frontend (hesabixUI)
-- **Flutter** - فریمورک کراس‌پلتفرم برای موبایل، وب و دسکتاپ
-- **Material Design** - رابط کاربری مدرن و زیبا
-- **Responsive Design** - سازگار با تمام اندازه‌های صفحه
-- **Multi-platform** - اجرا روی Android، iOS، Web و Desktop
-- **Persian Font Support** - پشتیبانی کامل از فونت فارسی (Vazirmatn)
+### Key Features
 
-## ساختار پروژه
+- **Complete Accounting System**: Manage all aspects of your business finances
+- **Modern Architecture**: Built with FastAPI and PostgreSQL for high performance
+- **Beautiful Web Interface**: Responsive Flutter Web application
+- **Multi-user Support**: Support for multiple users and businesses
+- **Real-time Updates**: Live data synchronization
+- **Secure**: JWT authentication and encrypted data transmission
+- **Persian Calendar Support**: Full support for Jalali (Persian) calendar
+- **Multi-language**: Support for Persian and English languages
 
-```
-hesabix/
-├── hesabixAPI/          # Backend API (FastAPI)
-│   ├── app/            # کد اصلی اپلیکیشن
-│   ├── adapters/       # لایه‌های دسترسی به داده
-│   ├── migrations/     # فایل‌های migration پایگاه داده
-│   └── tests/          # تست‌های واحد
-├── hesabixUI/          # Frontend (Flutter)
-│   └── hesabix_ui/     # پروژه Flutter اصلی
-├── docs/               # مستندات پروژه
-└── scripts/            # اسکریپت‌های کمکی
-```
+### Technology Stack
 
-## پیش‌نیازها
-
-### برای Backend (API)
+**Backend:**
+- FastAPI - Modern, fast web framework
+- PostgreSQL - Robust relational database
+- SQLAlchemy - Powerful ORM
+- Alembic - Database migration management
 - Python 3.11+
-- MySQL 8.0+
-- pip (Python package manager)
 
-### برای Frontend (UI)
-- Flutter SDK 3.9.2+
-- Dart SDK
+**Frontend:**
+- Flutter Web - Cross-platform web framework
+- Material Design - Modern UI components
+- Responsive Design - Works on all screen sizes
+
+**Infrastructure:**
+- Nginx - Reverse proxy and web server
+- SSL/TLS - Secure connections with Let's Encrypt
+- Systemd - Service management
+
+## System Requirements
+
+### Operating System
+
+- **Ubuntu 22.04 LTS** or higher
+- **Debian 12** or higher
+
+The installation script automatically detects and verifies the operating system compatibility.
+
+### Hardware Requirements
+
+**Minimum Requirements:**
+- **CPU**: 2 cores
+- **RAM**: 2 GB
+- **Disk Space**: 10 GB free space
+- **Network**: Internet connection for installation and updates
+
+**Recommended Requirements:**
+- **CPU**: 4+ cores (for better performance)
+- **RAM**: 4 GB or more
+- **Disk Space**: 20 GB free space
+- **Network**: Stable internet connection
+
+**Production Requirements (High Load):**
+- **CPU**: 8+ cores
+- **RAM**: 8 GB or more
+- **Disk Space**: 50 GB+ free space
+- **Network**: High-speed internet connection
+
+### Software Requirements
+
+The installation script automatically installs all required software:
 - Git
+- Python 3.11
+- PostgreSQL
+- Nginx
+- Flutter SDK (for building frontend)
+- Certbot (for SSL certificates)
 
-### برای Linux Desktop
-- GTK+ 3.0 development libraries
-- CMake
-- Ninja build system
-- C++ compiler (clang++ یا gcc)
+## Installation
 
-## نصب و راه‌اندازی
+### Quick Installation
 
-### 1. کلون کردن پروژه
-
-```bash
-git clone <repository-url>
-cd hesabix
-```
-
-### 2. راه‌اندازی Backend (API)
+The easiest way to install Hesabix is using the automated installation script:
 
 ```bash
-# ورود به دایرکتوری API
-cd hesabixAPI
-
-# ایجاد محیط مجازی
-python3 -m venv .venv
-source .venv/bin/activate  # در Windows: .venv\Scripts\activate
-
-# نصب وابستگی‌ها
-pip install -e .[dev]
-
-# کپی کردن فایل تنظیمات
-cp env.example .env
-
-# ویرایش فایل .env و تنظیم اطلاعات پایگاه داده
-# DB_USER=root
-# DB_PASSWORD=your_password
-# DB_HOST=localhost
-# DB_PORT=3306
-# DB_NAME=hesabixpy
-
-# اجرای migration ها
-alembic upgrade head
-
-# اجرای سرور API
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd /tmp && curl -sSL https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
-### 3. راه‌اندازی Frontend (UI)
+This command will:
+1. Download the installation script
+2. Make it executable
+3. Run the installation with root privileges
+
+### Installation Process
+
+The installation script will guide you through the following steps:
+
+1. **License Agreement**: You must accept the GNU GPL v3.0 license
+2. **System Check**: Verifies OS compatibility and disk space
+3. **Configuration**: Prompts for:
+   - API domain (e.g., `api.example.com`)
+   - Frontend domain (e.g., `app.example.com`)
+   - Git branch (default: `main`)
+   - Database password (auto-generated if not provided)
+   - Optional: pgAdmin4 installation
+4. **Configuration Summary**: Shows all settings before installation
+5. **Confirmation**: Final confirmation before starting installation
+6. **Installation**: Automated installation of all components
+
+### What Gets Installed
+
+The installation script automatically:
+
+- **Installs Prerequisites**: Git, Python, PostgreSQL, Nginx, and other required packages
+- **Clones Repository**: Downloads the latest code from the repository
+- **Sets Up Database**: Creates PostgreSQL database and user
+- **Deploys Backend**: Sets up Python virtual environment and installs dependencies
+- **Builds Frontend**: Compiles Flutter Web application
+- **Configures Nginx**: Sets up reverse proxy for API and serves frontend
+- **Configures SSL**: Optional Let's Encrypt SSL certificate setup
+- **Creates Services**: Systemd services for API and workers
+- **Optimizes Performance**: Auto-calculates optimal worker count and database pool settings
+
+### Performance Optimization
+
+The installation script automatically optimizes settings based on your server resources:
+
+- **Worker Count**: Automatically calculated as `(2 × CPU cores) + 1`
+- **Database Pool**: Optimized connection pool based on worker count
+- **Persistent Connections**: Configured for reduced response time
+- **Resource Limits**: Appropriate limits set for services
+
+### Post-Installation
+
+After successful installation, you will see:
+
+- **Access URLs**: API and UI URLs
+- **Service Management Commands**: How to manage services
+- **Log File Location**: Where to find installation logs
+- **Database Password Location**: Where the password is stored
+
+### Service Management
 
 ```bash
-# ورود به دایرکتوری UI
-cd hesabixUI/hesabix_ui
+# Check API status
+systemctl status hesabix-api
 
-# نصب وابستگی‌ها
-flutter pub get
+# Restart API
+systemctl restart hesabix-api
 
-# اجرای اپلیکیشن
-flutter run
+# View API logs
+journalctl -u hesabix-api -f
+
+# Check RQ Worker status
+systemctl status hesabix-rq-worker
+
+# Check Notification Moderation Worker
+systemctl status hesabix-notification-moderation
+
+# Check Nginx status
+systemctl status nginx
 ```
 
-## اسکریپت‌های کمکی
+### Upgrading
 
-پروژه شامل چندین اسکریپت کمکی برای سهولت در استفاده است:
-
-### اجرای API محلی
-```bash
-./run_local.sh serve    # اجرای سرور API
-./run_local.sh migrate  # اجرای migration ها
-./run_local.sh test     # اجرای تست‌ها
-```
-
-### اجرای Flutter Web
-```bash
-./run_web.sh                    # اجرای وب اپلیکیشن
-./run_web.sh --port 8081        # اجرا روی پورت مشخص
-./run_web.sh --mode debug       # اجرا در حالت debug
-./run_web.sh --api-base-url ""  # استفاده از same-origin (نیازمند reverse proxy برای /api و /ws)
-```
-
-### اجرای Flutter Linux Desktop
-```bash
-./run_linux.sh                  # اجرای دسکتاپ اپلیکیشن
-./run_linux.sh --mode release   # اجرا در حالت release
-./run_linux.sh --clean          # پاک کردن build و اجرای مجدد
-```
-
-## تنظیمات محیط
-
-### متغیرهای محیطی API (.env)
-
-```env
-# تنظیمات عمومی
-APP_NAME=Hesabix API
-ENVIRONMENT=development
-DEBUG=true
-API_V1_PREFIX=/api/v1
-APP_VERSION=0.1.0
-
-# پایگاه داده
-DB_USER=root
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=hesabixpy
-SQLALCHEMY_ECHO=false
-
-# لاگ‌گیری
-LOG_LEVEL=INFO
-```
-
-### تنظیمات Flutter
-
-برای تنظیم آدرس API در Flutter، از متغیر محیطی استفاده کنید:
+To upgrade to the latest version:
 
 ```bash
-flutter run --dart-define API_BASE_URL=http://localhost:8000
+cd /tmp && curl -sSL https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
-## API Endpoints
+The script is idempotent and safe to re-run. It will update the code and restart services.
 
-### احراز هویت
-- `POST /api/v1/auth/login` - ورود کاربر
-- `POST /api/v1/auth/register` - ثبت نام کاربر
-- `POST /api/v1/auth/refresh` - تمدید توکن
+## Configuration
 
-### سلامت سیستم
-- `GET /api/v1/health` - بررسی وضعیت API
+### Environment Variables
 
-### کسب‌وکار
-- `GET /api/v1/businesses` - لیست کسب‌وکارها
-- `POST /api/v1/businesses` - ایجاد کسب‌وکار جدید
-- `PUT /api/v1/businesses/{id}` - ویرایش کسب‌وکار
+You can customize the installation by setting environment variables:
 
-### محصولات
-- `GET /api/v1/products` - لیست محصولات
-- `POST /api/v1/products` - ایجاد محصول جدید
-- `PUT /api/v1/products/{id}` - ویرایش محصول
-
-### فاکتورها و پرداخت‌ها
-- `GET /api/v1/receipts` - لیست فاکتورها
-- `POST /api/v1/receipts` - ایجاد فاکتور جدید
-- `GET /api/v1/payments` - لیست پرداخت‌ها
-
-## ویژگی‌های خاص
-
-### تقویم شمسی
-سیستم از تقویم شمسی پشتیبانی کامل می‌کند و تمام تاریخ‌ها به صورت خودکار تبدیل می‌شوند.
-
-### چندزبانه
-- پشتیبانی از زبان‌های فارسی و انگلیسی
-- امکان اضافه کردن زبان‌های جدید
-- ترجمه خودکار رابط کاربری
-
-### امنیت
-- احراز هویت JWT
-- رمزگذاری رمز عبور با Argon2
-- اعتبارسنجی ورودی‌ها
-- محافظت در برابر SQL Injection
-
-## توسعه و مشارکت
-
-### اجرای تست‌ها
 ```bash
-# تست‌های Backend
-cd hesabixAPI
-pytest
-
-# تست‌های Frontend
-cd hesabixUI/hesabix_ui
-flutter test
+API_DOMAIN=api.example.com \
+UI_DOMAIN=app.example.com \
+BRANCH=main \
+DB_PASSWORD=your_secure_password \
+UVICORN_WORKERS=17 \
+sudo -E bash installer.sh
 ```
 
-### کد استایل
+### Database Password
+
+The database password is automatically generated and stored in:
+```
+/opt/hesabix/.db_password
+```
+
+You can also provide your own password via the `DB_PASSWORD` environment variable.
+
+### Log Files
+
+Installation logs are saved to:
+```
+/opt/hesabix/deploy.log
+```
+
+Application logs are available via systemd journal:
 ```bash
-# Backend
-black .
-ruff check .
-
-# Frontend
-flutter analyze
+journalctl -u hesabix-api -f
 ```
 
-### ساخت برای تولید
-```bash
-# ساخت API
-cd hesabixAPI
-pip install -e .
+## Troubleshooting
 
-# ساخت Flutter
-cd hesabixUI/hesabix_ui
-flutter build web
-flutter build linux
-flutter build apk
-```
+### Common Issues
 
-## عیب‌یابی
+1. **Installation Fails**
+   - Check disk space (minimum 2GB required)
+   - Verify internet connection
+   - Check installation logs: `/opt/hesabix/deploy.log`
 
-### مشکلات رایج
+2. **Service Won't Start**
+   - Check service status: `systemctl status hesabix-api`
+   - View logs: `journalctl -u hesabix-api`
+   - Verify database connection
 
-1. **خطای اتصال به پایگاه داده**
-   - بررسی تنظیمات .env
-   - اطمینان از اجرای MySQL
-   - بررسی دسترسی‌های کاربر
+3. **SSL Certificate Issues**
+   - Ensure domain DNS is properly configured
+   - Check firewall settings (ports 80 and 443)
+   - Verify domain accessibility
 
-2. **مشکلات Flutter**
-   - اجرای `flutter clean`
-   - حذف پوشه build
-   - اجرای مجدد `flutter pub get`
+4. **Database Connection Errors**
+   - Check PostgreSQL service: `systemctl status postgresql`
+   - Verify database credentials
+   - Check connection from application logs
 
-3. **مشکلات Linux Desktop**
-   - نصب وابستگی‌های مورد نیاز
-   - استفاده از اسکریپت `run_linux.sh`
+### Getting Help
 
-### لاگ‌ها
-- API logs: در کنسول سرور نمایش داده می‌شوند
-- Flutter logs: با `flutter logs` قابل مشاهده است
+- **Documentation**: Check the `/opt/hesabix/app/docs` directory
+- **Logs**: Review installation and application logs
+- **Support**: Visit https://hesabix.ir/support
 
-## مجوز
+## Security
 
-این پروژه تحت مجوز [MIT License](LICENSE) منتشر شده است.
+### Best Practices
 
-## پشتیبانی
+- **SSL/TLS**: Always enable SSL for production deployments
+- **Firewall**: Configure firewall to restrict access
+- **Updates**: Regularly update the system and application
+- **Backups**: Set up regular database backups
+- **Passwords**: Use strong, unique passwords
 
-برای گزارش باگ یا درخواست ویژگی جدید، لطفاً issue جدیدی در repository ایجاد کنید.
+### File Permissions
 
-## تیم توسعه
+The installation script automatically sets appropriate file permissions:
+- `.env` file: `600` (read/write for owner only)
+- Application files: Owned by `www-data` user
+- Database password: Stored securely with restricted access
 
-- **Backend**: FastAPI + SQLAlchemy + MySQL
-- **Frontend**: Flutter + Material Design
-- **DevOps**: Docker + Scripts
-- **Documentation**: Markdown + Persian
+## License
+
+This software is distributed under the **GNU General Public License v3.0 (GPL-3.0)**.
+
+Full license text: http://www.gnu.org/licenses/gpl-3.0.txt
+
+## Support
+
+- **Website**: https://hesabix.ir
+- **Support**: https://hesabix.ir/support
+- **Repository**: https://source.hesabix.ir/hesabix/arc.git
+
+## Development
+
+For development setup and contribution guidelines, please refer to the development documentation in the repository.
 
 ---
 
-**Hesabix** - سیستم حسابداری مدرن برای کسب‌وکارهای ایرانی 🇮🇷
+**Hesabix** - Modern Accounting System for Your Business

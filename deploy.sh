@@ -99,6 +99,50 @@ generate_password() {
   openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
 }
 
+# Calculate optimal worker count based on CPU cores
+calculate_optimal_workers() {
+  local cpu_cores
+  if command -v nproc >/dev/null 2>&1; then
+    cpu_cores=$(nproc)
+  elif [[ -f /proc/cpuinfo ]]; then
+    cpu_cores=$(grep -c "^processor" /proc/cpuinfo)
+  else
+    cpu_cores=4  # Default fallback
+  fi
+  
+  # Formula: (2 * CPU cores) + 1 for optimal performance
+  echo $((2 * cpu_cores + 1))
+}
+
+# Calculate optimal database pool settings based on worker count
+calculate_db_pool_settings() {
+  local workers=$1
+  local pool_size max_overflow
+  
+  # Base pool size per worker: 20 connections
+  # Max overflow per worker: 30 connections
+  # Total per worker: 50 connections
+  # With safety margin: use 80% of calculated value
+  pool_size=$((workers * 20))
+  max_overflow=$((workers * 30))
+  
+  # Set reasonable limits (min 20, max 200 for pool_size)
+  if [[ $pool_size -lt 20 ]]; then
+    pool_size=20
+  elif [[ $pool_size -gt 200 ]]; then
+    pool_size=200
+  fi
+  
+  # Set reasonable limits for max_overflow (min 30, max 300)
+  if [[ $max_overflow -lt 30 ]]; then
+    max_overflow=30
+  elif [[ $max_overflow -gt 300 ]]; then
+    max_overflow=300
+  fi
+  
+  echo "${pool_size}:${max_overflow}"
+}
+
 # Validate domain format
 validate_domain() {
   local domain="$1"
@@ -322,13 +366,21 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  # Optimize worker count for high scalability:
-  # Formula: (2 * CPU cores) + 1
-  # For 8-core server: 17 workers
-  # With pool_size=20 and max_overflow=30, each worker has up to 50 connections
-  # Total: 17 * 50 = 850 maximum connections
-  : "${UVICORN_WORKERS:=17}"
   : "${FLUTTER_VERSION:=3.24.0}"
+  
+  # Calculate optimal worker count based on CPU cores if not provided
+  if [[ -z "${UVICORN_WORKERS}" ]]; then
+    UVICORN_WORKERS=$(calculate_optimal_workers)
+    log_info "Auto-calculated optimal worker count: ${UVICORN_WORKERS} (based on CPU cores)"
+  fi
+  
+  # Calculate optimal database pool settings based on worker count
+  local pool_settings
+  pool_settings=$(calculate_db_pool_settings "${UVICORN_WORKERS}")
+  DB_POOL_SIZE=$(echo "${pool_settings}" | cut -d: -f1)
+  DB_MAX_OVERFLOW=$(echo "${pool_settings}" | cut -d: -f2)
+  
+  log_info "Auto-calculated database pool settings: pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}"
   
   if [[ -z "${API_DOMAIN}" ]]; then
     read -rp "API domain (e.g., api.example.com): " API_DOMAIN
@@ -403,7 +455,7 @@ prompt_vars() {
     fi
   fi
   
-  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD
+  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD DB_POOL_SIZE DB_MAX_OVERFLOW
 }
 
 # Show configuration summary and ask for confirmation
@@ -432,8 +484,10 @@ show_config_summary() {
   fi
   echo
   echo "Server Settings:"
-  echo "  • Uvicorn Workers: ${UVICORN_WORKERS}"
+  echo "  • Uvicorn Workers: ${UVICORN_WORKERS} (auto-calculated based on CPU cores)"
   echo "  • Flutter Version: ${FLUTTER_VERSION}"
+  echo "  • DB Pool Size: ${DB_POOL_SIZE} (auto-calculated)"
+  echo "  • DB Max Overflow: ${DB_MAX_OVERFLOW} (auto-calculated)"
   echo
   if [[ "${INSTALL_PGADMIN4}" =~ ^[Yy]$ ]]; then
     echo "pgAdmin4:"
@@ -638,6 +692,33 @@ deploy_backend() {
     sed -i "s/^DB_PORT=.*/DB_PORT=5432/" "${env_file}"
     sed -i "s/^DB_NAME=.*/DB_NAME=hesabix/" "${env_file}"
     sed -i "s/^LOG_LEVEL=.*/LOG_LEVEL=INFO/" "${env_file}"
+    
+    # Update database connection pool settings for optimal performance
+    if ! grep -q "^DB_POOL_SIZE=" "${env_file}"; then
+      echo "DB_POOL_SIZE=${DB_POOL_SIZE}" >> "${env_file}"
+    else
+      sed -i "s/^DB_POOL_SIZE=.*/DB_POOL_SIZE=${DB_POOL_SIZE}/" "${env_file}"
+    fi
+    
+    if ! grep -q "^DB_MAX_OVERFLOW=" "${env_file}"; then
+      echo "DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}" >> "${env_file}"
+    else
+      sed -i "s/^DB_MAX_OVERFLOW=.*/DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}/" "${env_file}"
+    fi
+    
+    # Set optimal pool timeout and recycle for persistent connections
+    if ! grep -q "^DB_POOL_TIMEOUT=" "${env_file}"; then
+      echo "DB_POOL_TIMEOUT=30" >> "${env_file}"
+    else
+      sed -i "s/^DB_POOL_TIMEOUT=.*/DB_POOL_TIMEOUT=30/" "${env_file}"
+    fi
+    
+    if ! grep -q "^DB_POOL_RECYCLE=" "${env_file}"; then
+      echo "DB_POOL_RECYCLE=300" >> "${env_file}"
+    else
+      sed -i "s/^DB_POOL_RECYCLE=.*/DB_POOL_RECYCLE=300/" "${env_file}"
+    fi
+    
     # Add CORS if not exists (public API - allow all origins)
     if ! grep -q "CORS_ALLOWED_ORIGINS" "${env_file}"; then
       echo "CORS_ALLOWED_ORIGINS=[\"*\"]" >> "${env_file}"
@@ -645,7 +726,7 @@ deploy_backend() {
       sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=[\"*\"]|" "${env_file}"
     fi
   else
-    # Fallback: create minimal .env
+    # Fallback: create minimal .env with optimized settings
     cat > "${env_file}" <<ENV
 ENVIRONMENT=production
 DEBUG=false
@@ -656,8 +737,15 @@ DB_PORT=5432
 DB_NAME=hesabix
 LOG_LEVEL=INFO
 CORS_ALLOWED_ORIGINS=["*"]
+# Database Connection Pool Settings (optimized for performance and persistent connections)
+DB_POOL_SIZE=${DB_POOL_SIZE}
+DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+DB_POOL_TIMEOUT=30
+DB_POOL_RECYCLE=300
 ENV
   fi
+  
+  log_info "Database connection pool configured: pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, timeout=30s, recycle=300s"
   
   # Secure .env file permissions (contains sensitive data like DB_PASSWORD)
   chmod 600 "${env_file}"
