@@ -367,6 +367,7 @@ prompt_vars() {
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
   : "${FLUTTER_VERSION:=3.24.0}"
+  : "${UVICORN_WORKERS:=}"
   
   # Calculate optimal worker count based on CPU cores if not provided
   if [[ -z "${UVICORN_WORKERS}" ]]; then
@@ -534,35 +535,80 @@ confirm_installation() {
 }
 
 install_prereqs() {
-  echo ">> Installing prerequisites..."
+  log_step "Installing prerequisites..."
   export DEBIAN_FRONTEND=noninteractive
   
   # Update package list
+  log_info "Updating package list..."
   apt-get update -y
   
-  # Install prerequisites (apt-get install is idempotent - will skip if already installed)
-  echo "Installing: git, curl, unzip, xz-utils, ca-certificates, python3.11, python3.11-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib..."
+  # Detect Python 3 version and install appropriate packages
+  # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
+  # We'll use python3 and python3-venv which work on all versions
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
-    python3.11 python3.11-venv python3-pip build-essential \
+    python3 python3-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib
   
-  echo "$CHECK_MARK Prerequisites installed (or already present)."
+  # Detect Python version for logging
+  PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+  log_info "Python version detected: ${PYTHON_VERSION}"
+  
+  # Ensure PostgreSQL service is enabled and started
+  if command -v systemctl >/dev/null 2>&1; then
+    # Check if postgresql service exists (may be postgresql or postgresql@*)
+    if systemctl list-unit-files 2>/dev/null | grep -qE "postgresql(@|\.service)"; then
+      log_info "Enabling and starting PostgreSQL service..."
+      systemctl enable postgresql 2>/dev/null || true
+      systemctl start postgresql 2>/dev/null || true
+      
+      # Also try specific version service (e.g., postgresql@16-main)
+      local pg_service
+      pg_service=$(systemctl list-units --type=service --state=inactive,active 2>/dev/null | grep -oE "postgresql@[0-9]+-main" | head -1 || echo "")
+      if [[ -n "${pg_service}" ]]; then
+        log_info "Starting PostgreSQL service: ${pg_service}"
+        systemctl enable "${pg_service}" 2>/dev/null || true
+        systemctl start "${pg_service}" 2>/dev/null || true
+      fi
+    fi
+  fi
+  
+  log_success "Prerequisites installed (or already present)."
 }
 
 clone_repo() {
-  echo ">> Cloning/updating repository..."
+  log_step "Cloning/updating repository..."
   mkdir -p "${APP_ROOT}"
   cd "${APP_ROOT}"
   
   if [[ ! -d "${APP_ROOT}/app/.git" ]]; then
-    echo "Cloning repository..."
-    if ! git clone -b "${BRANCH}" "${REPO_URL}" app; then
-      echo "$CROSS_MARK Error cloning repository"
-      exit 1
+    log_info "Cloning repository..."
+    
+    # Try to clone with specified branch first
+    if git clone -b "${BRANCH}" "${REPO_URL}" app 2>/dev/null; then
+      cd app
+      log_success "Repository cloned successfully on branch: ${BRANCH}"
+    else
+      # If branch doesn't exist, clone without branch and use default
+      log_warning "Branch '${BRANCH}' not found. Cloning default branch..."
+      if ! git clone "${REPO_URL}" app; then
+        log_error "Error cloning repository"
+        exit 1
+      fi
+      cd app
+      
+      # Detect default branch (git clone automatically checks out default branch)
+      local default_branch
+      default_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+      if [[ -n "${default_branch}" ]]; then
+        BRANCH="${default_branch}"
+        log_info "Using default branch: ${default_branch}"
+      else
+        log_warning "Could not detect default branch. Using current HEAD."
+      fi
     fi
-    cd app
   else
-    echo "Updating existing repository..."
+    log_info "Updating existing repository..."
     cd app
     
     # Save current branch
@@ -571,18 +617,18 @@ clone_repo() {
     
     # Fetch all branches
     if ! git fetch --all --prune; then
-      echo "$WARNING_MARK Error fetching. Continuing with current state..."
+      log_warning "Error fetching. Continuing with current state..."
     fi
     
     # Checkout target branch
     if ! git checkout "${BRANCH}" 2>/dev/null; then
-      echo "$WARNING_MARK Branch ${BRANCH} not found. Using current branch: ${current_branch}"
+      log_warning "Branch ${BRANCH} not found. Using current branch: ${current_branch}"
       BRANCH="${current_branch}"
     fi
     
     # Try to pull, but don't fail if it's not a fast-forward
     if ! git pull --ff-only 2>/dev/null; then
-      echo "$WARNING_MARK Pull failed (may need merge). Using current state..."
+      log_warning "Pull failed (may need merge). Using current state..."
       git reset --hard "origin/${BRANCH}" 2>/dev/null || true
     fi
   fi
@@ -590,24 +636,70 @@ clone_repo() {
   # Verify we're on the right branch
   local actual_branch
   actual_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-  echo "$CHECK_MARK Repository ready at ${APP_ROOT}/app (branch: ${actual_branch})"
+  log_success "Repository ready at ${APP_ROOT}/app (branch: ${actual_branch})"
 }
 
 setup_db() {
   log_step "Configuring database (PostgreSQL)..."
   
   # Start and enable PostgreSQL service
-  if systemctl list-unit-files | grep -q postgresql.service; then
-    log_info "Starting PostgreSQL service..."
-    systemctl enable --now postgresql || true
+  # PostgreSQL service may be named 'postgresql' or 'postgresql@VERSION-main'
+  local pg_service_found=false
+  local pg_service=""
+  
+  # Try to find PostgreSQL service
+  if systemctl list-unit-files 2>/dev/null | grep -qE "^postgresql\.service"; then
+    pg_service="postgresql"
+    pg_service_found=true
+  elif systemctl list-units --type=service 2>/dev/null | grep -qE "postgresql@"; then
+    # Try to find specific version service (e.g., postgresql@16-main)
+    pg_service=$(systemctl list-units --type=service --state=inactive,active,failed 2>/dev/null | grep -oE "postgresql@[0-9]+-main" | head -1 || echo "")
+    if [[ -z "${pg_service}" ]]; then
+      # Try listing all postgresql services
+      pg_service=$(systemctl list-unit-files 2>/dev/null | grep -oE "postgresql@[0-9]+-main\.service" | head -1 | sed 's/\.service$//' || echo "")
+    fi
+    if [[ -n "${pg_service}" ]]; then
+      pg_service_found=true
+    fi
+  fi
+  
+  if [[ "${pg_service_found}" == "true" ]]; then
+    log_info "Starting PostgreSQL service: ${pg_service:-postgresql}..."
+    systemctl enable "${pg_service:-postgresql}" 2>/dev/null || true
+    systemctl start "${pg_service:-postgresql}" 2>/dev/null || true
+    
+    # Wait a moment for service to start
+    sleep 2
   else
-    log_error "PostgreSQL service not found. Please install PostgreSQL."
-    exit 1
+    # Check if PostgreSQL is actually installed
+    if ! command -v psql >/dev/null 2>&1 && ! command -v postgres >/dev/null 2>&1; then
+      log_error "PostgreSQL is not installed. Please ensure prerequisites installation completed successfully."
+      exit 1
+    fi
+    
+    # If service not found, try to start postgresql anyway (might work)
+    log_warning "PostgreSQL service unit not found in systemd. Attempting to start postgresql service..."
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable postgresql 2>/dev/null || true
+    systemctl start postgresql 2>/dev/null || true
+    
+    # Also try pg_ctlcluster if available (Debian/Ubuntu specific)
+    if command -v pg_ctlcluster >/dev/null 2>&1; then
+      local pg_version
+      pg_version=$(pg_lsclusters 2>/dev/null | tail -1 | awk '{print $1}' || echo "")
+      if [[ -n "${pg_version}" ]]; then
+        log_info "Starting PostgreSQL cluster ${pg_version} using pg_ctlcluster..."
+        pg_ctlcluster "${pg_version}" main start 2>/dev/null || true
+      fi
+    fi
+    
+    sleep 2
   fi
   
   # Wait for database to be ready
   if ! wait_for_db; then
-    log_error "Database not ready"
+    log_error "Database not ready. Please check PostgreSQL installation and service status."
+    log_error "You can check PostgreSQL status with: systemctl status postgresql"
     exit 1
   fi
   
@@ -672,7 +764,7 @@ deploy_backend() {
 
   # Python venv + install
   if [[ ! -d ".venv" ]]; then
-    python3.11 -m venv .venv
+    python3 -m venv .venv
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate

@@ -24,7 +24,7 @@ Hesabix is an open-source accounting software that provides comprehensive financ
 - PostgreSQL - Robust relational database
 - SQLAlchemy - Powerful ORM
 - Alembic - Database migration management
-- Python 3.11+
+- Python 3.10+ (Python 3.12 on Ubuntu 24.04, Python 3.10/3.11 on Ubuntu 22.04)
 
 **Frontend:**
 - Flutter Web - Cross-platform web framework
@@ -69,7 +69,7 @@ The installation script automatically detects and verifies the operating system 
 
 The installation script automatically installs all required software:
 - Git
-- Python 3.11
+- Python 3 (version depends on Ubuntu/Debian release - Python 3.10+ required)
 - PostgreSQL
 - Nginx
 - Flutter SDK (for building frontend)
@@ -82,7 +82,14 @@ The installation script automatically installs all required software:
 The easiest way to install Hesabix is using the automated installation script:
 
 ```bash
-cd /tmp && curl -sSL https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+```
+
+**Note**: If you encounter HTTP/2 errors, the `--http1.1` flag forces curl to use HTTP/1.1 protocol.
+
+**Alternative method using wget** (if curl still fails):
+```bash
+cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 This command will:
@@ -165,10 +172,12 @@ systemctl status nginx
 To upgrade to the latest version:
 
 ```bash
-cd /tmp && curl -sSL https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 The script is idempotent and safe to re-run. It will update the code and restart services.
+
+**Note**: If you encounter HTTP/2 errors, the `--http1.1` flag forces curl to use HTTP/1.1 protocol.
 
 ## Configuration
 
