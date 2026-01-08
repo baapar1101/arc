@@ -1,8 +1,8 @@
 [Unit]
-Description=Hesabix Notification Moderation Worker
-Documentation=https://hesabix.com/docs/notification-moderation
-After=network.target postgresql.service redis.service
-Requires=postgresql.service
+Description=Hesabix RQ Worker (Background Jobs)
+Documentation=https://hesabix.com/docs/rq-worker
+After=network.target redis.service postgresql.service
+Wants=redis.service
 
 [Service]
 Type=simple
@@ -16,7 +16,7 @@ Environment="PYTHONPATH=/var/www/arc/hesabixAPI"
 Environment="PATH=/var/www/arc/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 # اجرای Worker
-ExecStart=/var/www/arc/hesabixAPI/.venv/bin/python -m app.workers.notification_moderation_worker
+ExecStart=/var/www/arc/hesabixAPI/.venv/bin/python /var/www/arc/hesabixAPI/rq_worker.py
 
 # Restart settings
 Restart=always
@@ -27,7 +27,7 @@ StartLimitBurst=3
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=hesabix-notification-moderation
+SyslogIdentifier=hesabix-rq-worker
 
 # Security
 NoNewPrivileges=true
@@ -36,9 +36,8 @@ PrivateTmp=true
 # Resource limits - حذف محدودیت‌ها برای استفاده حداکثری از منابع
 # MemoryMax: حذف شده - استفاده از RAM مورد نیاز
 # CPUQuota: حذف شده - استفاده از CPU cores مورد نیاز
-# Worker می‌تواند از منابع لازم برای پردازش سریع‌تر notifications استفاده کند
+# Worker می‌تواند از منابع لازم برای پردازش سریع‌تر jobs استفاده کند
 
 [Install]
 WantedBy=multi-user.target
-
 

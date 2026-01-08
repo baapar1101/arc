@@ -183,7 +183,7 @@ async def list_receipts_payments_endpoint(
 @require_business_access("business_id")
 async def create_receipt_payment_endpoint(
     request: Request,
-    business_id: int = Path(..., description="شناسه کسب‌وکار", example=1, gt=0),
+    business_id: int = Path(..., description="شناسه کسب‌وکار", examples={"example": {"value": 1}}, gt=0),
     body: Dict[str, Any] = Body(..., description="اطلاعات سند"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),

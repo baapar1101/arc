@@ -397,12 +397,40 @@ class FileStorageService:
     async def _read_file_from_storage(self, file_path: str, storage_type: str) -> bytes:
         st = (storage_type or "").lower()
         if st == "local":
-            with open(file_path, "rb") as f:
-                return f.read()
+            path = file_path
+            existed = os.path.exists(path)
+            
+            # اگر مسیر موجود نیست، یک مسیر جایگزین بر اساس default storage_config امتحان کن
+            alt_path = None
+            if not existed:
+                try:
+                    default_cfg = await self.config_repo.get_default_config()
+                    if default_cfg and isinstance(default_cfg.config_data, dict):
+                        base_path = default_cfg.config_data.get("base_path")
+                        if base_path:
+                            alt_path = os.path.join(str(base_path), os.path.basename(file_path))
+                except Exception:
+                    alt_path = None
+            
+            # خواندن از مسیر اصلی یا جایگزین
+            target_path = path
+            if not existed and alt_path and os.path.exists(alt_path):
+                target_path = alt_path
+            
+            if not os.path.exists(target_path):
+                raise FileNotFoundError(f"File not found: {path} (alternative path also not found: {alt_path})")
+            
+            try:
+                with open(target_path, "rb") as f:
+                    return f.read()
+            except PermissionError as e:
+                raise PermissionError(f"Permission denied reading file: {target_path}") from e
+            except Exception as e:
+                raise IOError(f"Error reading file: {target_path} - {str(e)}") from e
         elif st == "ftp":
             # TODO: پیاده‌سازی FTP download
-            pass
-        return b""
+            raise NotImplementedError("FTP storage not implemented")
+        raise ValueError(f"Unsupported storage type: {storage_type}")
 
     async def _delete_file_from_storage(self, file_path: str, storage_type: str):
         st = (storage_type or "").lower()

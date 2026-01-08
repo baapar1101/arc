@@ -545,10 +545,11 @@ install_prereqs() {
   # Detect Python 3 version and install appropriate packages
   # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
   # We'll use python3 and python3-venv which work on all versions
-  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib..."
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, redis-server, WeasyPrint system dependencies..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3 python3-venv python3-pip build-essential \
-    nginx postgresql postgresql-contrib
+    nginx postgresql postgresql-contrib redis-server \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
   
   # Detect Python version for logging
   PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
@@ -570,6 +571,13 @@ install_prereqs() {
         systemctl enable "${pg_service}" 2>/dev/null || true
         systemctl start "${pg_service}" 2>/dev/null || true
       fi
+    fi
+    
+    # Ensure Redis service is enabled and started
+    if systemctl list-unit-files 2>/dev/null | grep -qE "redis(@|\.service|server)"; then
+      log_info "Enabling and starting Redis service..."
+      systemctl enable redis-server 2>/dev/null || systemctl enable redis 2>/dev/null || true
+      systemctl start redis-server 2>/dev/null || systemctl start redis 2>/dev/null || true
     fi
   fi
   
@@ -996,7 +1004,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 
 # Resource limits
-MemoryLimit=512M
+MemoryMax=512M
 CPUQuota=50%
 
 [Install]

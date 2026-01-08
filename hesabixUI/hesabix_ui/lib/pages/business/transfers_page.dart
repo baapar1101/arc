@@ -30,6 +30,19 @@ class TransfersPage extends StatefulWidget {
 
   @override
   State<TransfersPage> createState() => _TransfersPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _TransfersPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _TransfersPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _TransfersPageState extends State<TransfersPage> {
@@ -43,7 +56,16 @@ class _TransfersPageState extends State<TransfersPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    TransfersPage._pageStates[widget.businessId] = this;
     _loadProjects();
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    TransfersPage._pageStates.remove(widget.businessId);
+    super.dispose();
   }
 
   /// بارگذاری لیست پروژه‌ها برای فیلتر
@@ -90,6 +112,11 @@ class _TransfersPageState extends State<TransfersPage> {
       } catch (_) {}
     }
     if (mounted) setState(() {});
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refreshData();
   }
 
   @override

@@ -135,32 +135,34 @@ async def list_transfers_endpoint(
     business_id: int = Path(
         ..., 
         description="شناسه کسب‌وکار",
-        example=1,
+        examples={"example": {"value": 1}},
         gt=0
     ),
     query_info: QueryInfo = Body(
         ...,
         description="پارامترهای جستجو، فیلتر و صفحه‌بندی",
-        example={
-            "take": 20,
-            "skip": 0,
-            "sort_by": "document_date",
-            "sort_desc": True,
-            "search": "بانک ملت",
-            "filters": [
-                {
-                    "property": "total_amount",
-                    "operator": ">=",
-                    "value": 1000000
-                }
-            ]
+        examples={
+            "example": {
+                "take": 20,
+                "skip": 0,
+                "sort_by": "document_date",
+                "sort_desc": True,
+                "search": "بانک ملت",
+                "filters": [
+                    {
+                        "property": "total_amount",
+                        "operator": ">=",
+                        "value": 1000000
+                    }
+                ]
+            }
         }
     ),
     x_fiscal_year_id: Optional[int] = Query(
         None,
         alias="X-Fiscal-Year-ID",
         description="شناسه سال مالی (اگر ارسال نشود، سال مالی فعال استفاده می‌شود)",
-        example=1
+        examples={"example": {"value": 1}}
     ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
@@ -377,22 +379,24 @@ async def create_transfer_endpoint(
     business_id: int = Path(
         ..., 
         description="شناسه کسب‌وکار",
-        example=1,
+        examples={"example": {"value": 1}},
         gt=0
     ),
     body: TransferCreateRequest = Body(
         ...,
         description="اطلاعات سند انتقال",
-        example={
-            "source_type": "bank_account",
-            "source_id": 1,
-            "destination_type": "cash_register",
-            "destination_id": 2,
-            "total_amount": 1000000,
-            "commission": 5000,
-            "document_date": "2024-01-15",
-            "currency_id": 1,
-            "description": "انتقال وجه بابت خرید مواد اولیه"
+        examples={
+            "example": {
+                "source_type": "bank_account",
+                "source_id": 1,
+                "destination_type": "cash_register",
+                "destination_id": 2,
+                "total_amount": 1000000,
+                "commission": 5000,
+                "document_date": "2024-01-15",
+                "currency_id": 1,
+                "description": "انتقال وجه بابت خرید مواد اولیه"
+            }
         }
     ),
     db: Session = Depends(get_db),
@@ -542,7 +546,7 @@ async def get_transfer_endpoint(
     document_id: int = Path(
         ..., 
         description="شناسه سند انتقال",
-        example=123,
+        examples={"example": {"value": 123}},
         gt=0
     ),
     include_lines: bool = Query(
@@ -931,7 +935,7 @@ async def delete_transfer_endpoint(
     document_id: int = Path(
         ..., 
         description="شناسه سند انتقال برای حذف",
-        example=123,
+        examples={"example": {"value": 123}},
         gt=0
     ),
     db: Session = Depends(get_db),
@@ -1055,15 +1059,17 @@ async def update_transfer_endpoint(
     document_id: int = Path(
         ..., 
         description="شناسه سند انتقال",
-        example=123,
+        examples={"example": {"value": 123}},
         gt=0
     ),
     body: TransferUpdateRequest = Body(
         ...,
         description="فیلدهای جدید برای ویرایش (فقط فیلدهای ارسال شده تغییر می‌کنند)",
-        example={
-            "total_amount": 1200000,
-            "description": "انتقال وجه بابت خرید مواد اولیه - ویرایش شده"
+        examples={
+            "example": {
+                "total_amount": 1200000,
+                "description": "انتقال وجه بابت خرید مواد اولیه - ویرایش شده"
+            }
         }
     ),
     db: Session = Depends(get_db),

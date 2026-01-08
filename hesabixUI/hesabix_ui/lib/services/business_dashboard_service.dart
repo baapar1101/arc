@@ -192,6 +192,58 @@ class BusinessDashboardService {
     }
   }
 
+  /// دریافت لیست کسب و کارهای کاربر با pagination
+  Future<Map<String, dynamic>> getUserBusinessesPaginated({
+    required int take,
+    required int skip,
+    String sortBy = 'created_at',
+    bool sortDesc = true,
+    String? search,
+  }) async {
+    try {
+      // استفاده از query parameters به جای body
+      final queryParams = <String, dynamic>{
+        'take': take,
+        'skip': skip,
+        'sort_by': sortBy,
+        'sort_desc': sortDesc,
+      };
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/businesses/list',
+        query: queryParams,
+      );
+
+      List<BusinessWithPermission> businesses = [];
+      Map<String, dynamic>? pagination;
+
+      if (response.data?['success'] == true) {
+        final data = response.data!['data'] as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>;
+        businesses.addAll(
+          items.map((item) => BusinessWithPermission.fromJson(item)),
+        );
+        pagination = data['pagination'] as Map<String, dynamic>?;
+      }
+
+      return {
+        'items': businesses,
+        'pagination': pagination,
+      };
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('لطفاً ابتدا وارد شوید');
+      } else {
+        throw Exception('خطا در بارگذاری کسب و کارها: ${e.message}');
+      }
+    } catch (e) {
+      throw Exception('خطا در بارگذاری کسب و کارها: $e');
+    }
+  }
+
   /// دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر
   Future<BusinessWithPermission> getBusinessWithPermissions(int businessId) async {
     try {

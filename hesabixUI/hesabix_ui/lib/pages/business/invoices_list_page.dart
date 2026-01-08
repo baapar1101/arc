@@ -35,6 +35,19 @@ class InvoicesListPage extends StatefulWidget {
 
   @override
   State<InvoicesListPage> createState() => _InvoicesListPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _InvoicesListPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _InvoicesListPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _InvoicesListPageState extends State<InvoicesListPage> {
@@ -74,10 +87,17 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       if (mounted) setState(() {});
     });
   }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refreshData();
+  }
 
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    InvoicesListPage._pageStates[widget.businessId] = this;
     _loadFiscalYears();
     _loadProjects();
     // بعد از اولین build، flag را set کن
@@ -86,6 +106,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _isInitialized = true;
       }
     });
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    InvoicesListPage._pageStates.remove(widget.businessId);
+    super.dispose();
   }
 
   /// بارگذاری لیست پروژه‌ها برای فیلتر

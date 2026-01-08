@@ -36,24 +36,118 @@ async def get_job_status(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """دریافت وضعیت job"""
-    # این endpoint فقط از queue service استفاده می‌کند و نیازی به db ندارد
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[GET_JOB_STATUS] Request for job_id: {job_id}, user_id: {ctx.get_user_id()}")
+    
     queue_service = get_queue_service()
+    logger.info(f"[GET_JOB_STATUS] Queue service enabled: {queue_service.enabled if queue_service else False}")
     
     # ابتدا از QueueService بررسی کن (برای RQ jobs)
     if queue_service and queue_service.enabled:
-        # بررسی مالکیت/دسترسی قبل از بازگرداندن status/result
-        job = queue_service.get_job(job_id)
-        if job is None:
-            raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
-        _ensure_job_access(ctx, getattr(job, "meta", None), job_id)
-
-        job_status = queue_service.get_job_status(job_id)
-        if job_status:
+        logger.info(f"[GET_JOB_STATUS] Checking queue service for job {job_id}")
+        queue_status = queue_service.get_job_status(job_id)
+        if queue_status:
+            logger.info(f"[GET_JOB_STATUS] Job {job_id} found in queue service, state: {queue_status.get('state')}")
+            # بررسی مالکیت/دسترسی قبل از بازگرداندن status/result
+            job_meta = queue_status.get("meta")
+            _ensure_job_access(ctx, job_meta, job_id)
+            
             # همیشه وضعیت job را برگردان (نه مستقیماً نتیجه)
             # Frontend خودش نتیجه را از job_status["result"] استخراج می‌کند
-            return success_response(job_status, request=request)
+            return success_response(queue_status, request=request)
+        else:
+            logger.info(f"[GET_JOB_STATUS] Job {job_id} not found in queue service")
+    else:
+        logger.info(f"[GET_JOB_STATUS] Queue service not enabled or not available")
     
-    # Fallback به JobManager (برای memory-based jobs) - فعلاً غیرفعال چون مالکیت ندارد
+    # Fallback به JobManager (برای memory-based jobs مثل backup)
+    logger.info(f"[GET_JOB_STATUS] Checking JobManager (memory-based) for job {job_id}")
+    jm = JobManager.instance()
+    job_status = jm.get(job_id)
+    if job_status:
+        logger.info(f"[GET_JOB_STATUS] Job {job_id} found in JobManager, state: {job_status.state}, message: {job_status.message}")
+        # تبدیل JobStatus به فرمت مشابه QueueService
+        from datetime import datetime
+        try:
+            created_at = None
+            if job_status.created_at:
+                try:
+                    if isinstance(job_status.created_at, (int, float)):
+                        created_at = datetime.fromtimestamp(job_status.created_at).isoformat()
+                    elif isinstance(job_status.created_at, str):
+                        created_at = job_status.created_at
+                except (ValueError, OSError, TypeError) as e:
+                    logger.warning(f"[GET_JOB_STATUS] Error parsing created_at for job {job_id}: {e}")
+            
+            updated_at = None
+            if job_status.updated_at:
+                try:
+                    if isinstance(job_status.updated_at, (int, float)):
+                        updated_at = datetime.fromtimestamp(job_status.updated_at).isoformat()
+                    elif isinstance(job_status.updated_at, str):
+                        updated_at = job_status.updated_at
+                except (ValueError, OSError, TypeError) as e:
+                    logger.warning(f"[GET_JOB_STATUS] Error parsing updated_at for job {job_id}: {e}")
+            
+            # Parse error message برای نمایش بهتر در frontend
+            error_info = None
+            if job_status.error:
+                error_str = job_status.error
+                # اگر error به صورت "CODE: message" است، parse کن
+                if ":" in error_str:
+                    parts = error_str.split(":", 1)
+                    if len(parts) == 2:
+                        error_code = parts[0].strip()
+                        error_message = parts[1].strip()
+                        error_info = {
+                            "code": error_code,
+                            "message": error_message,
+                        }
+                        # اگر details وجود دارد
+                        if "| Details:" in error_message:
+                            msg_parts = error_message.split("| Details:", 1)
+                            error_info["message"] = msg_parts[0].strip()
+                            try:
+                                import json
+                                # سعی کن details را parse کن
+                                details_str = msg_parts[1].strip()
+                                # اگر به صورت dict stringified است
+                                if details_str.startswith("{") or details_str.startswith("["):
+                                    error_info["details"] = json.loads(details_str)
+                                else:
+                                    error_info["details"] = details_str
+                            except:
+                                error_info["details"] = msg_parts[1].strip() if len(msg_parts) > 1 else None
+                    else:
+                        # اگر format خاصی ندارد، همان string را برگردان
+                        error_info = error_str
+                else:
+                    # اگر format خاصی ندارد، همان string را برگردان
+                    error_info = error_str
+            
+            status_dict = {
+                "id": job_status.id,
+                "state": job_status.state,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "result": job_status.result,
+                "error": error_info if error_info else job_status.error,
+                "meta": {
+                    "message": job_status.message,
+                    "progress": job_status.progress,
+                } if job_status.message else None,
+            }
+            # برای memory-based jobs، دسترسی را بررسی نمی‌کنیم (چون meta.user_id ندارند)
+            # TODO: اضافه کردن کنترل دسترسی برای memory-based jobs
+            return success_response(status_dict, request=request)
+        except Exception as e:
+            logger.error(f"[GET_JOB_STATUS] Error formatting job status for {job_id}: {e}", exc_info=True)
+            raise ApiError("INTERNAL_ERROR", f"Error formatting job status: {str(e)}", http_status=500)
+    else:
+        logger.warning(f"[GET_JOB_STATUS] Job {job_id} not found in queue service or JobManager")
+    
     raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
 
 

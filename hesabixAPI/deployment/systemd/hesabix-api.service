@@ -1,0 +1,50 @@
+[Unit]
+Description=Hesabix API (FastAPI/Uvicorn)
+Documentation=https://hesabix.com/docs/api
+After=network.target postgresql.service redis.service
+Requires=postgresql.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/arc/hesabixAPI
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONPATH=/var/www/arc/hesabixAPI"
+Environment="PATH=/var/www/arc/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+# Python Optimization Flags برای بیشترین کارایی
+Environment="PYTHONOPTIMIZE=1"  # حذف assertions (نه docstrings - برای سازگاری با pycparser)
+Environment="PYTHONDONTWRITEBYTECODE=1"  # جلوگیری از نوشتن .pyc files
+Environment="PYTHONHASHSEED=0"  # استفاده از hash randomization برای امنیت
+
+# اجرای API با uvicorn
+# تعداد workers: 2x تعداد CPU cores برای استفاده حداکثری از منابع
+# با 12 هسته CPU: 24 worker برای بهینه‌سازی عملکرد و کاهش تاخیر
+ExecStart=/var/www/arc/hesabixAPI/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 24
+
+# Restart settings
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hesabix-api
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits - حذف محدودیت‌ها برای استفاده حداکثری از منابع
+# MemoryMax: حذف شده - استفاده از تمام RAM موجود
+# CPUQuota: حذف شده - استفاده از تمام CPU cores
+# برای سرور با 22GB RAM و 12 CPU cores، این تنظیمات بهینه است
+
+[Install]
+WantedBy=multi-user.target
+

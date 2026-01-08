@@ -33,6 +33,19 @@ class DocumentsPage extends StatefulWidget {
 
   @override
   State<DocumentsPage> createState() => _DocumentsPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _DocumentsPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _DocumentsPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _DocumentsPageState extends State<DocumentsPage> {
@@ -66,6 +79,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    DocumentsPage._pageStates[widget.businessId] = this;
     _service = DocumentService(widget.apiClient);
     widget.calendarController.addListener(_onCalendarChanged);
     _loadProjects();
@@ -73,6 +88,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   @override
   void dispose() {
+    // Clean up the page state when disposed
+    DocumentsPage._pageStates.remove(widget.businessId);
     widget.calendarController.removeListener(_onCalendarChanged);
     super.dispose();
   }
@@ -121,6 +138,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
       } catch (_) {}
     }
     if (mounted) setState(() {});
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refreshData();
   }
 
   @override

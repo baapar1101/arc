@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import quote_plus
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,15 +21,14 @@ class Settings(BaseSettings):
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
 	# DB Pooling - بهینه‌سازی برای مقیاس‌پذیری بالا
-	# Phase 1 Optimization: افزایش Connection Pool برای پشتیبانی از بارهای بالا
-	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker) + Buffer
-	# مثال Production: 5 Workers * 100 اتصال = 500 + 300 buffer = 800
-	# برای Development: pool_size=50, max_overflow=50 = 100 max connections
-	# ⚠️ توجه: بعد از رفع connection leak در WebSocket، این مقادیر باید کاهش یابد
-	db_pool_size: int = 50  # افزایش از 20 - اتصالات پایه در Pool
-	db_max_overflow: int = 50  # افزایش از 30 - اتصالات اضافی در صورت نیاز
-	db_pool_timeout: int = 30  # افزایش از 10 - timeout بیشتر برای Pool
-	db_pool_recycle: int = 300  # Recycle اتصالات هر 5 دقیقه - کاهش برای جلوگیری از connection leak و بهبود performance
+	# بهینه‌سازی برای 24 worker و PostgreSQL با max_connections=300
+	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker)
+	# 24 workers * 12 connections = 288 + buffer = 300 (مطابق با max_connections PostgreSQL)
+	# برای استفاده حداکثری از منابع و کمترین زمان پاسخگویی
+	db_pool_size: int = 150  # اتصالات پایه در Pool (50% از max_connections)
+	db_max_overflow: int = 150  # اتصالات اضافی در صورت نیاز (50% از max_connections)
+	db_pool_timeout: int = 30  # Timeout برای Pool (30 ثانیه)
+	db_pool_recycle: int = 1800  # Recycle اتصالات هر 30 دقیقه - بهینه برای جلوگیری از connection leak و بهبود performance
 
 	# Logging
 	log_level: str = "INFO"
@@ -137,7 +137,7 @@ class Settings(BaseSettings):
 	@property
 	def postgresql_dsn(self) -> str:
 		return (
-			f"postgresql+psycopg2://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+			f"postgresql+psycopg2://{self.db_user}:{quote_plus(self.db_password)}@{self.db_host}:{self.db_port}/{self.db_name}"
 		)
 
 

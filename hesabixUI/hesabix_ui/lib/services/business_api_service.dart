@@ -22,6 +22,31 @@ class BusinessApiService {
     }
   }
 
+  // ایجاد کسب و کار جدید از فایل پشتیبان (.hbx)
+  static Future<Map<String, dynamic>> importBusinessFromBackup({
+    required String filename,
+    required List<int> fileBytes,
+    bool asyncMode = true,
+  }) async {
+    final formData = dio.FormData.fromMap({
+      'file': dio.MultipartFile.fromBytes(fileBytes, filename: filename),
+    });
+    
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '$_basePath/import-from-backup',
+      data: formData,
+      query: {'async_mode': asyncMode},
+      options: dio.Options(contentType: 'multipart/form-data'),
+    );
+    
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در ایمپورت کسب و کار از فایل پشتیبان');
+    }
+  }
+
   // دریافت فهرست ارزها
   static Future<List<Map<String, dynamic>>> getCurrencies() async {
     final response = await _apiClient.get(_currencyPath);

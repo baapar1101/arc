@@ -30,6 +30,19 @@ class ChecksPage extends StatefulWidget {
 
   @override
   State<ChecksPage> createState() => _ChecksPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _ChecksPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _ChecksPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _ChecksPageState extends State<ChecksPage> {
@@ -37,8 +50,27 @@ class _ChecksPageState extends State<ChecksPage> {
   Person? _selectedPerson;
   final _checkService = CheckService();
 
+  @override
+  void initState() {
+    super.initState();
+    // Register this page instance for external refresh access
+    ChecksPage._pageStates[widget.businessId] = this;
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    ChecksPage._pageStates.remove(widget.businessId);
+    super.dispose();
+  }
+
   void _refresh() {
     try { (_tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refresh();
   }
 
   @override

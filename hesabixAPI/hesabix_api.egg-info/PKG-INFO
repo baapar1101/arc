@@ -1,14 +1,14 @@
 Metadata-Version: 2.4
 Name: hesabix-api
 Version: 0.1.0
-Summary: Hesabix Accounting API - FastAPI + SQLAlchemy + MySQL
+Summary: Hesabix Accounting API - FastAPI + SQLAlchemy + PostgreSQL
 Author: Hesabix Team
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi>=0.111.0
 Requires-Dist: uvicorn[standard]>=0.30.0
 Requires-Dist: sqlalchemy>=2.0.30
-Requires-Dist: pymysql>=1.1.0
+Requires-Dist: psycopg2-binary>=2.9.0
 Requires-Dist: pydantic>=2.7.0
 Requires-Dist: email-validator>=2.0.0.post2
 Requires-Dist: pydantic-settings>=2.3.0

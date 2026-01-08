@@ -1159,6 +1159,7 @@ def update_business_print_settings(
 def get_all_businesses_admin(db: Session, query_info: Dict[str, Any]) -> Dict[str, Any]:
     """دریافت لیست همه کسب و کارها برای ادمین (فقط سوپر ادمین)"""
     from adapters.db.models.user import User
+    from adapters.api.v1.schemas import PaginationInfo
     from sqlalchemy import or_, func
     
     business_repo = BusinessRepository(db)

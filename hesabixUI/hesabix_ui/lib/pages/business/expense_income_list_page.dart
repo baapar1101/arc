@@ -35,6 +35,19 @@ class ExpenseIncomeListPage extends StatefulWidget {
 
   @override
   State<ExpenseIncomeListPage> createState() => _ExpenseIncomeListPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _ExpenseIncomeListPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _ExpenseIncomeListPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
@@ -52,10 +65,19 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    ExpenseIncomeListPage._pageStates[widget.businessId] = this;
     _service = ExpenseIncomeListService(widget.apiClient);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _isInitialized = true);
     });
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    ExpenseIncomeListPage._pageStates.remove(widget.businessId);
+    super.dispose();
   }
 
   @override
@@ -82,6 +104,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       } catch (_) {}
     }
     if (mounted) setState(() {});
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refreshData();
   }
 
   @override

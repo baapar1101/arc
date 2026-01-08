@@ -21,6 +21,19 @@ class BankAccountsPage extends StatefulWidget {
 
   @override
   State<BankAccountsPage> createState() => _BankAccountsPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _BankAccountsPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _BankAccountsPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _BankAccountsPageState extends State<BankAccountsPage> {
@@ -32,7 +45,16 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    BankAccountsPage._pageStates[widget.businessId] = this;
     _loadCurrencies();
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    BankAccountsPage._pageStates.remove(widget.businessId);
+    super.dispose();
   }
 
   Future<void> _loadCurrencies() async {

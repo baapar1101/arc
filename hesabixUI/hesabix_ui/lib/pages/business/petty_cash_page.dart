@@ -21,6 +21,19 @@ class PettyCashPage extends StatefulWidget {
 
 	@override
 	State<PettyCashPage> createState() => _PettyCashPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _PettyCashPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _PettyCashPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _PettyCashPageState extends State<PettyCashPage> {
@@ -32,7 +45,16 @@ class _PettyCashPageState extends State<PettyCashPage> {
 	@override
 	void initState() {
 		super.initState();
+		// Register this page instance for external refresh access
+		PettyCashPage._pageStates[widget.businessId] = this;
 		_loadCurrencies();
+	}
+	
+	@override
+	void dispose() {
+		// Clean up the page state when disposed
+		PettyCashPage._pageStates.remove(widget.businessId);
+		super.dispose();
 	}
 
 	@override

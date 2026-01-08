@@ -22,13 +22,43 @@ class _BusinessesPageState extends State<BusinessesPage> {
   final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
   List<BusinessWithPermission> _businesses = [];
   bool _loading = true;
+  bool _isLoadingMore = false;
   String? _error;
   final AuthStore _authStore = AuthStore();
+  final ScrollController _scrollController = ScrollController();
+  
+  // Pagination state
+  int _skip = 0;
+  static const int _pageSize = 10;
+  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
     _init();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // جلوگیری از فراخوانی همزمان
+    if (_isLoadingMore || !_hasMore || _loading) return;
+    
+    // بررسی اینکه آیا به انتهای لیست نزدیک شده‌ایم
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    final threshold = maxScroll - 200; // 200 پیکسل مانده به آخر
+    
+    if (currentScroll >= threshold && maxScroll > 0) {
+      // وقتی به 200 پیکسل مانده به آخر رسید، صفحات بعدی را لود کن
+      _loadMore();
+    }
   }
 
   Future<void> _init() async {
@@ -38,19 +68,49 @@ class _BusinessesPageState extends State<BusinessesPage> {
     await _loadBusinesses();
   }
 
-  Future<void> _loadBusinesses() async {
+  Future<void> _loadBusinesses({bool reset = true}) async {
     try {
       setState(() {
-        _loading = true;
+        if (reset) {
+          _loading = true;
+          _skip = 0;
+          _hasMore = true;
+          _businesses = [];
+        }
         _error = null;
       });
 
-      final businesses = await _service.getUserBusinesses();
+      // استفاده از _skip فعلی (0 در reset، یا مقدار قبلی)
+      final currentSkip = reset ? 0 : _skip;
+      
+      final result = await _service.getUserBusinessesPaginated(
+        take: _pageSize,
+        skip: currentSkip,
+        sortBy: 'created_at',
+        sortDesc: true,
+      );
 
       if (mounted) {
+        final newBusinesses = result['items'] as List<BusinessWithPermission>;
+        final pagination = result['pagination'] as Map<String, dynamic>?;
+        
         setState(() {
-          _businesses = businesses;
+          if (reset) {
+            _businesses = newBusinesses;
+            _skip = newBusinesses.length; // به‌روزرسانی skip به تعداد آیتم‌های دریافت شده
+          } else {
+            _businesses.addAll(newBusinesses);
+            _skip += newBusinesses.length; // اضافه کردن به skip موجود
+          }
           _loading = false;
+          
+          // بررسی اینکه آیا صفحات بیشتری وجود دارد
+          if (pagination != null) {
+            _hasMore = pagination['has_next'] as bool? ?? false;
+          } else {
+            // اگر pagination وجود نداشت، بر اساس تعداد آیتم‌ها تصمیم بگیر
+            _hasMore = newBusinesses.length >= _pageSize;
+          }
         });
       }
     } catch (e) {
@@ -60,6 +120,50 @@ class _BusinessesPageState extends State<BusinessesPage> {
           _error = e.toString();
         });
         SnackBarHelper.showError(context, message: '${AppLocalizations.of(context).dataLoadingError}: $e');
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _loading) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      // استفاده از _skip فعلی برای دریافت صفحه بعدی
+      final result = await _service.getUserBusinessesPaginated(
+        take: _pageSize,
+        skip: _skip,
+        sortBy: 'created_at',
+        sortDesc: true,
+      );
+
+      if (mounted) {
+        final newBusinesses = result['items'] as List<BusinessWithPermission>;
+        final pagination = result['pagination'] as Map<String, dynamic>?;
+        
+        setState(() {
+          _businesses.addAll(newBusinesses);
+          _skip += newBusinesses.length; // به‌روزرسانی skip
+          _isLoadingMore = false;
+          
+          // بررسی اینکه آیا صفحات بیشتری وجود دارد
+          if (pagination != null) {
+            _hasMore = pagination['has_next'] as bool? ?? false;
+          } else {
+            // اگر pagination وجود نداشت، بر اساس تعداد آیتم‌ها تصمیم بگیر
+            _hasMore = newBusinesses.length >= _pageSize;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری صفحات بعدی: $e');
       }
     }
   }
@@ -286,14 +390,25 @@ class _BusinessesPageState extends State<BusinessesPage> {
         }
         
         return GridView.builder(
+          controller: _scrollController,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             childAspectRatio: childAspectRatio,
             crossAxisSpacing: spacing,
             mainAxisSpacing: spacing,
           ),
-          itemCount: _businesses.length,
+          itemCount: _businesses.length + (_isLoadingMore ? 1 : 0),
           itemBuilder: (context, index) {
+            // نمایش loading indicator در آخر لیست
+            if (index >= _businesses.length) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(spacing),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            
             final business = _businesses[index];
             return _BusinessCard(
               business: business,

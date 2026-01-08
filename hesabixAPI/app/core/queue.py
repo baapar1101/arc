@@ -13,6 +13,7 @@ from datetime import timedelta
 import rq
 from rq import Queue, Worker
 from rq.job import Job
+from rq.registry import FailedJobRegistry
 from redis import Redis
 
 from app.core.cache import get_redis_client
@@ -149,19 +150,34 @@ class QueueService:
     def get_job(self, job_id: str) -> Optional[Job]:
         """دریافت job با شناسه"""
         if not self.enabled:
+            logger.debug(f"Queue service disabled, cannot fetch job {job_id}")
             return None
         
         try:
-            return Job.fetch(job_id, connection=self.redis_conn)
+            job = Job.fetch(job_id, connection=self.redis_conn)
+            logger.debug(f"Job {job_id} found in Redis")
+            return job
+        except rq.exceptions.NoSuchJobError:
+            # Job وجود ندارد - این یک وضعیت عادی است
+            logger.debug(f"Job {job_id} not found in Redis (NoSuchJobError)")
+            return None
         except Exception as e:
-            logger.warning(f"Error fetching job {job_id}: {e}")
+            logger.warning(f"Error fetching job {job_id}: {e}", exc_info=True)
             return None
     
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """دریافت وضعیت job به صورت dictionary"""
+        logger.info(f"[QUEUE_SERVICE] get_job_status called for job_id: {job_id}")
         job = self.get_job(job_id)
         if job is None:
-            return None
+            logger.info(f"[QUEUE_SERVICE] Job {job_id} not found in main queue, checking failed registry")
+            # اگر job در queue اصلی پیدا نشد، در failed registry بررسی کن
+            failed_status = self._get_failed_job_status(job_id)
+            if failed_status:
+                logger.info(f"[QUEUE_SERVICE] Job {job_id} found in failed registry")
+            else:
+                logger.info(f"[QUEUE_SERVICE] Job {job_id} not found in failed registry either")
+            return failed_status
         
         try:
             status = {
@@ -183,9 +199,17 @@ class QueueService:
                     pass
             elif job.is_failed:
                 try:
-                    status["error"] = str(job.exc_info) if job.exc_info else "Unknown error"
-                except Exception:
-                    pass
+                    if job.exc_info:
+                        status["error"] = str(job.exc_info)
+                    else:
+                        # اگر exc_info نباشد، سعی می‌کنیم از exception message استفاده کنیم
+                        try:
+                            status["error"] = str(job.exc_info) if hasattr(job, 'exc_info') and job.exc_info else "Job failed without error details"
+                        except Exception:
+                            status["error"] = "Job failed without error details"
+                except Exception as e:
+                    logger.warning(f"Error getting job error info for {job_id}: {e}")
+                    status["error"] = "Job failed (error details unavailable)"
             
             # اضافه کردن metadata اگر وجود دارد
             if job.meta:
@@ -231,13 +255,62 @@ class QueueService:
             return 0
         return len(queue)
     
+    def _get_failed_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """بررسی job در failed registry"""
+        if not self.enabled:
+            return None
+        
+        try:
+            # بررسی در تمام queue ها
+            for queue_name in [QUEUE_DEFAULT, QUEUE_REPORTS, QUEUE_HIGH_PRIORITY, 
+                              QUEUE_LOW_PRIORITY, QUEUE_EMAIL, QUEUE_EXPORTS, QUEUE_TAX]:
+                try:
+                    queue = Queue(queue_name, connection=self.redis_conn)
+                    failed_registry = FailedJobRegistry(queue=queue)
+                    if job_id in failed_registry:
+                        # job در failed registry است
+                        try:
+                            job = Job.fetch(job_id, connection=self.redis_conn)
+                            if job:
+                                error_msg = "Job failed"
+                                try:
+                                    if job.exc_info:
+                                        error_msg = str(job.exc_info)
+                                    elif hasattr(job, 'exc_info') and job.exc_info:
+                                        error_msg = str(job.exc_info)
+                                except Exception:
+                                    error_msg = "Job failed (error details unavailable)"
+                                
+                                return {
+                                    "id": job.id,
+                                    "state": "failed",
+                                    "created_at": job.created_at.isoformat() if job.created_at else None,
+                                    "started_at": job.started_at.isoformat() if job.started_at else None,
+                                    "ended_at": job.ended_at.isoformat() if job.ended_at else None,
+                                    "result": None,
+                                    "error": error_msg,
+                                    "updated_at": (job.ended_at or job.started_at or job.created_at).isoformat() if (job.ended_at or job.started_at or job.created_at) else None,
+                                    "meta": job.meta if job.meta else None,
+                                }
+                        except rq.exceptions.NoSuchJobError:
+                            # Job در failed registry است اما از Redis حذف شده
+                            logger.debug(f"Job {job_id} is in failed registry but not in Redis")
+                            continue
+                except Exception as e:
+                    logger.debug(f"Error checking queue {queue_name} for failed job {job_id}: {e}")
+                    continue
+        except Exception as e:
+            logger.debug(f"Error checking failed registry for job {job_id}: {e}")
+        
+        return None
+    
     def get_failed_jobs(self, limit: int = 10) -> list[Dict[str, Any]]:
         """دریافت لیست jobs ناموفق"""
         if not self.enabled:
             return []
         
         try:
-            failed_registry = rq.registry.FailedJobRegistry(queue=Queue(connection=self.redis_conn))
+            failed_registry = FailedJobRegistry(queue=Queue(connection=self.redis_conn))
             job_ids = failed_registry.get_job_ids(0, limit - 1)
             jobs = []
             for job_id in job_ids:

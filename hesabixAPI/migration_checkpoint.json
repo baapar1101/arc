@@ -1,0 +1,726 @@
+{
+  "started_at": "2026-01-04T23:57:53.824200",
+  "tables": {
+    "accounts": {
+      "last_id": "189",
+      "rows_migrated": 175,
+      "completed": true,
+      "updated_at": "2026-01-04T23:57:54.125988"
+    },
+    "activity_logs": {
+      "last_id": "13793",
+      "rows_migrated": 13752,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.267410"
+    },
+    "ai_chat_messages": {
+      "last_id": "119",
+      "rows_migrated": 39,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.307483"
+    },
+    "ai_chat_sessions": {
+      "last_id": "140",
+      "rows_migrated": 130,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.374777"
+    },
+    "ai_configs": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.392815"
+    },
+    "ai_invoices": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.403782"
+    },
+    "ai_plans": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.421079"
+    },
+    "ai_prompts": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.430523"
+    },
+    "ai_usage_logs": {
+      "last_id": "63",
+      "rows_migrated": 63,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.478331"
+    },
+    "ai_voice_interactions": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.489336"
+    },
+    "announcements": {
+      "last_id": "179",
+      "rows_migrated": 115,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:01.567399"
+    },
+    "api_keys": {
+      "last_id": "1322",
+      "rows_migrated": 1322,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:04.341770"
+    },
+    "bank_accounts": {
+      "last_id": "2953",
+      "rows_migrated": 2929,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.646994"
+    },
+    "business_credit_settings": {
+      "last_id": "6",
+      "rows_migrated": 6,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.669361"
+    },
+    "business_currencies": {
+      "last_id": "440",
+      "rows_migrated": 433,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.864240"
+    },
+    "business_document_numbering_settings": {
+      "last_id": "146",
+      "rows_migrated": 145,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.953959"
+    },
+    "business_document_subscriptions": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.965260"
+    },
+    "business_notification_templates": {
+      "last_id": "10",
+      "rows_migrated": 10,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:06.993581"
+    },
+    "business_payment_gateways": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:07.003631"
+    },
+    "business_permissions": {
+      "last_id": "253",
+      "rows_migrated": 245,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:07.152502"
+    },
+    "business_plugins": {
+      "last_id": "26",
+      "rows_migrated": 26,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:07.183459"
+    },
+    "business_print_settings": {
+      "last_id": "38",
+      "rows_migrated": 38,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:07.217663"
+    },
+    "business_storage_subscriptions": {
+      "last_id": "74",
+      "rows_migrated": 74,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:07.266088"
+    },
+    "businesses": {
+      "last_id": "4693",
+      "rows_migrated": 4693,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:10.871673"
+    },
+    "captchas": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:10.914102"
+    },
+    "cash_registers": {
+      "last_id": "1373",
+      "rows_migrated": 1360,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:11.591073"
+    },
+    "categories": {
+      "last_id": "6190",
+      "rows_migrated": 6101,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:14.098214"
+    },
+    "check_reconciliation_items": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:14.109736"
+    },
+    "check_reconciliations": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:14.119279"
+    },
+    "checks": {
+      "last_id": "1385",
+      "rows_migrated": 1384,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:15.042825"
+    },
+    "currencies": {
+      "last_id": "83",
+      "rows_migrated": 82,
+      "completed": true,
+      "updated_at": "2026-01-04T23:58:15.094946"
+    },
+    "document_lines": {
+      "last_id": "179156",
+      "rows_migrated": 110290,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:11.044154"
+    },
+    "document_number_counters": {
+      "last_id": "2129",
+      "rows_migrated": 2128,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:13.281525"
+    },
+    "document_subscription_plans": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:13.292608"
+    },
+    "document_usage_charges": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:13.302303"
+    },
+    "document_usage_cursors": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:13.317585"
+    },
+    "document_usage_periods": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:13.327103"
+    },
+    "document_usage_policies": {
+      "last_id": "3660",
+      "rows_migrated": 3660,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:15.051722"
+    },
+    "documents": {
+      "last_id": "82946",
+      "rows_migrated": 52242,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:44.994377"
+    },
+    "email_configs": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:45.025843"
+    },
+    "email_verification_tokens": {
+      "last_id": "287",
+      "rows_migrated": 287,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:45.147868"
+    },
+    "file_storage": {
+      "last_id": "fe632c1d-fb94-4794-9204-4612370ad1b1",
+      "rows_migrated": 147,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:45.260792"
+    },
+    "file_verifications": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:45.271333"
+    },
+    "fiscal_years": {
+      "last_id": "4716",
+      "rows_migrated": 4716,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:47.221323"
+    },
+    "installment_plan_templates": {
+      "last_id": "3",
+      "rows_migrated": 3,
+      "completed": true,
+      "updated_at": "2026-01-04T23:59:47.242708"
+    },
+    "invoice_item_lines": {
+      "last_id": "211548",
+      "rows_migrated": 148562,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.194853"
+    },
+    "marketplace_invoices": {
+      "last_id": "20",
+      "rows_migrated": 5,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.238413"
+    },
+    "marketplace_orders": {
+      "last_id": "20",
+      "rows_migrated": 5,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.258271"
+    },
+    "marketplace_plugin_plans": {
+      "last_id": "6",
+      "rows_migrated": 4,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.277141"
+    },
+    "marketplace_plugins": {
+      "last_id": "3",
+      "rows_migrated": 2,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.294087"
+    },
+    "mobile_verification_tokens": {
+      "last_id": "34",
+      "rows_migrated": 34,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:45.324707"
+    },
+    "monitoring_alerts": {
+      "last_id": "1846",
+      "rows_migrated": 1846,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.188959"
+    },
+    "notification_event_types": {
+      "last_id": "7",
+      "rows_migrated": 7,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.211575"
+    },
+    "notification_moderation_queue": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.228970"
+    },
+    "notification_templates": {
+      "last_id": "8",
+      "rows_migrated": 8,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.248553"
+    },
+    "otp_login_sessions": {
+      "last_id": "239",
+      "rows_migrated": 232,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.379186"
+    },
+    "password_resets": {
+      "last_id": "155",
+      "rows_migrated": 147,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.452900"
+    },
+    "payment_gateways": {
+      "last_id": "3",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.471295"
+    },
+    "person_bank_accounts": {
+      "last_id": "21",
+      "rows_migrated": 18,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.494226"
+    },
+    "person_share_links": {
+      "last_id": "12",
+      "rows_migrated": 12,
+      "completed": true,
+      "updated_at": "2026-01-05T00:00:46.517633"
+    },
+    "persons": {
+      "last_id": "50966",
+      "rows_migrated": 50157,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.393546"
+    },
+    "petty_cash": {
+      "last_id": "412",
+      "rows_migrated": 407,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.580084"
+    },
+    "ping_pong_scores": {
+      "last_id": "3",
+      "rows_migrated": 3,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.599171"
+    },
+    "price_items": {
+      "last_id": "9",
+      "rows_migrated": 9,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.620291"
+    },
+    "price_lists": {
+      "last_id": "19",
+      "rows_migrated": 15,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.641687"
+    },
+    "product_attribute_links": {
+      "last_id": "342",
+      "rows_migrated": 273,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.746630"
+    },
+    "product_attributes": {
+      "last_id": "35",
+      "rows_migrated": 31,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.776415"
+    },
+    "product_bom_items": {
+      "last_id": "125",
+      "rows_migrated": 34,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.810613"
+    },
+    "product_bom_operations": {
+      "last_id": "2",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.828942"
+    },
+    "product_bom_outputs": {
+      "last_id": "48",
+      "rows_migrated": 14,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.852039"
+    },
+    "product_boms": {
+      "last_id": "40",
+      "rows_migrated": 24,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.887301"
+    },
+    "product_instances": {
+      "last_id": "6",
+      "rows_migrated": 6,
+      "completed": true,
+      "updated_at": "2026-01-05T00:01:21.909323"
+    },
+    "product_tax_codes": {
+      "last_id": "1059499",
+      "rows_migrated": 1005683,
+      "completed": true,
+      "updated_at": "2026-01-05T00:10:10.364522"
+    },
+    "products": {
+      "last_id": "221128",
+      "rows_migrated": 213374,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:41.760731"
+    },
+    "projects": {
+      "last_id": "31",
+      "rows_migrated": 31,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:41.811457"
+    },
+    "quick_sales_settings": {
+      "last_id": "278",
+      "rows_migrated": 278,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:41.967719"
+    },
+    "repair_invoices": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:41.980271"
+    },
+    "repair_order_attachments": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:41.990416"
+    },
+    "repair_order_parts": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.002190"
+    },
+    "repair_order_statuses": {
+      "last_id": "59",
+      "rows_migrated": 59,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.043731"
+    },
+    "repair_orders": {
+      "last_id": "59",
+      "rows_migrated": 59,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.100677"
+    },
+    "repair_shop_settings": {
+      "last_id": "15",
+      "rows_migrated": 11,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.125318"
+    },
+    "repair_technicians": {
+      "last_id": "8",
+      "rows_migrated": 8,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.147408"
+    },
+    "report_templates": {
+      "last_id": "27",
+      "rows_migrated": 11,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.183597"
+    },
+    "storage_configs": {
+      "last_id": "36a51587-14ec-4c5f-a959-8ed8bc32c83c",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.202423"
+    },
+    "storage_invoices": {
+      "last_id": "74",
+      "rows_migrated": 65,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.252559"
+    },
+    "storage_plans": {
+      "last_id": "1",
+      "rows_migrated": 1,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.271827"
+    },
+    "storage_usage_transactions": {
+      "last_id": "161",
+      "rows_migrated": 137,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.342418"
+    },
+    "support_categories": {
+      "last_id": "6",
+      "rows_migrated": 6,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:42.363981"
+    },
+    "support_messages": {
+      "last_id": "3590",
+      "rows_migrated": 3579,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:43.808005"
+    },
+    "support_priorities": {
+      "last_id": "4",
+      "rows_migrated": 4,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:43.828814"
+    },
+    "support_statuses": {
+      "last_id": "5",
+      "rows_migrated": 5,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:43.848308"
+    },
+    "support_tickets": {
+      "last_id": "1048",
+      "rows_migrated": 1041,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.354973"
+    },
+    "system_settings": {
+      "last_id": "31",
+      "rows_migrated": 30,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.384148"
+    },
+    "tax_settings": {
+      "last_id": "8",
+      "rows_migrated": 8,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.409191"
+    },
+    "tax_types": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.419957"
+    },
+    "tax_units": {
+      "last_id": "92",
+      "rows_migrated": 92,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.469900"
+    },
+    "telegram_ai_sessions": {
+      "last_id": "6",
+      "rows_migrated": 6,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.490398"
+    },
+    "telegram_link_tokens": {
+      "last_id": "108",
+      "rows_migrated": 108,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.550751"
+    },
+    "user_ai_subscriptions": {
+      "last_id": "138",
+      "rows_migrated": 138,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.631991"
+    },
+    "user_announcements": {
+      "last_id": "884",
+      "rows_migrated": 608,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.901326"
+    },
+    "user_notification_settings": {
+      "last_id": "28",
+      "rows_migrated": 28,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:44.931086"
+    },
+    "users": {
+      "last_id": "4709",
+      "rows_migrated": 4709,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:47.402919"
+    },
+    "wallet_accounts": {
+      "last_id": "955",
+      "rows_migrated": 305,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:47.540223"
+    },
+    "wallet_payouts": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:47.552621"
+    },
+    "wallet_settings": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:47.562800"
+    },
+    "wallet_transactions": {
+      "last_id": "99",
+      "rows_migrated": 92,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:47.626162"
+    },
+    "warehouse_document_lines": {
+      "last_id": "24333",
+      "rows_migrated": 16142,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:54.327704"
+    },
+    "warehouse_documents": {
+      "last_id": "88770",
+      "rows_migrated": 8784,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:58.758237"
+    },
+    "warehouses": {
+      "last_id": "8468",
+      "rows_migrated": 1124,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.271332"
+    },
+    "warranty_activations": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.283802"
+    },
+    "warranty_codes": {
+      "last_id": "7",
+      "rows_migrated": 5,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.305854"
+    },
+    "warranty_settings": {
+      "last_id": "4",
+      "rows_migrated": 4,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.327788"
+    },
+    "warranty_tracking": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.339486"
+    },
+    "warranty_tracking_links": {
+      "last_id": "0",
+      "rows_migrated": 0,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.350594"
+    },
+    "workflow_executions": {
+      "last_id": "85",
+      "rows_migrated": 47,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.392820"
+    },
+    "workflow_logs": {
+      "last_id": "343",
+      "rows_migrated": 204,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.497742"
+    },
+    "workflows": {
+      "last_id": "12",
+      "rows_migrated": 7,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.524110"
+    },
+    "zohal_service_logs": {
+      "last_id": "18",
+      "rows_migrated": 18,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.555055"
+    },
+    "zohal_services": {
+      "last_id": "28",
+      "rows_migrated": 28,
+      "completed": true,
+      "updated_at": "2026-01-05T00:12:59.596657"
+    }
+  },
+  "updated_at": "2026-01-05T00:12:59.596665"
+}

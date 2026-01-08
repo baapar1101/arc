@@ -27,6 +27,19 @@ class PersonsPage extends StatefulWidget {
 
   @override
   State<PersonsPage> createState() => _PersonsPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _PersonsPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _PersonsPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _PersonsPageState extends State<PersonsPage> {
@@ -39,7 +52,23 @@ class _PersonsPageState extends State<PersonsPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    PersonsPage._pageStates[widget.businessId] = this;
     _loadBusinessPlugins();
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    PersonsPage._pageStates.remove(widget.businessId);
+    super.dispose();
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    try {
+      (_personsTableKey.currentState as dynamic)?.refresh();
+    } catch (_) {}
   }
 
   Future<void> _loadBusinessPlugins() async {

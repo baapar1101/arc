@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:shamsi_date/shamsi_date.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 import '../../models/business_models.dart';
 import '../../services/business_api_service.dart';
 import '../../core/calendar_controller.dart';
@@ -10,8 +12,10 @@ import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/snackbar_helper.dart';
 import 'package:dio/dio.dart';
 import '../../services/errors/api_error.dart';
+import '../../services/job_service.dart';
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -29,6 +33,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   final int _fiscalTabIndex = 0;
   late TextEditingController _fiscalTitleController;
   List<Map<String, dynamic>> _currencies = [];
+  String? _importJobId;
+  int _importProgress = 0;
+  String? _importMessage;
 
   @override
   void initState() {
@@ -84,6 +91,151 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _importFromBackup() async {
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['hbx', 'hs60'],
+        withData: true,
+      );
+      
+      if (result == null || result.files.isEmpty) return;
+      
+      final file = result.files.first;
+      if (file.bytes == null || file.bytes!.isEmpty) {
+        SnackBarHelper.showError(context, message: 'فایل انتخاب شده خالی است');
+        return;
+      }
+      
+      final filename = file.name;
+      final fileExt = filename.toLowerCase().split('.').last;
+      
+      // بررسی فایل .hs60
+      if (fileExt == 'hs60') {
+        SnackBarHelper.showError(
+          context,
+          message: 'فرمت فایل .hs60 در حال حاضر پشتیبانی نمی‌شود. این قابلیت در آینده اضافه خواهد شد.',
+        );
+        return;
+      }
+      
+      setState(() {
+        _isLoading = true;
+        _importJobId = null;
+        _importProgress = 0;
+        _importMessage = null;
+      });
+      
+      try {
+        final result = await BusinessApiService.importBusinessFromBackup(
+          filename: filename,
+          fileBytes: file.bytes!,
+          asyncMode: true,
+        );
+        
+        final jobId = result['job_id'] as String?;
+        if (jobId != null) {
+          setState(() {
+            _importJobId = jobId;
+            _importMessage = 'در حال پردازش...';
+          });
+          _pollImportJob(jobId);
+        } else {
+          // اگر هم‌زمان بود
+          final businessId = result['business_id'] as int?;
+          if (businessId != null) {
+            SnackBarHelper.showSuccess(context, message: 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد');
+            if (mounted) {
+              context.goNamed('profile_businesses');
+            }
+          }
+        }
+      } on DioException catch (e) {
+        String errorMessage = 'خطا در ایمپورت فایل پشتیبان';
+        if (e.response?.data != null) {
+          final errorData = e.response!.data;
+          if (errorData is Map) {
+            final error = errorData['error'];
+            if (error is Map) {
+              errorMessage = error['message'] ?? errorMessage;
+            } else if (errorData['message'] != null) {
+              errorMessage = errorData['message'];
+            }
+          }
+        }
+        SnackBarHelper.showError(context, message: errorMessage);
+      } catch (e) {
+        SnackBarHelper.showError(context, message: 'خطا در ایمپورت: $e');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در انتخاب فایل: $e');
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  Future<void> _pollImportJob(String jobId) async {
+    final jobService = JobService();
+    
+    while (mounted && _importJobId == jobId) {
+      await Future.delayed(const Duration(seconds: 1));
+      
+      try {
+        final status = await jobService.getJobStatus(jobId);
+        final progress = status['progress'] as int? ?? 0;
+        final message = status['message'] as String? ?? '';
+        final state = status['state'] as String? ?? '';
+        
+        if (mounted) {
+          setState(() {
+            _importProgress = progress;
+            _importMessage = message;
+          });
+        }
+        
+        if (state == 'completed') {
+          final result = status['result'];
+          if (result != null && result['business_id'] != null) {
+            if (mounted) {
+              SnackBarHelper.showSuccess(context, message: 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد');
+              context.goNamed('profile_businesses');
+            }
+          }
+          break;
+        } else if (state == 'failed') {
+          final error = status['error'] as String? ?? 'خطا در ایمپورت';
+          if (mounted) {
+            SnackBarHelper.showError(context, message: error);
+          }
+          break;
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.showError(context, message: 'خطا در بررسی وضعیت: $e');
+        }
+        break;
+      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _importJobId = null;
+        _isLoading = false;
+      });
+    }
   }
 
   Widget _buildFiscalStep() {
@@ -926,6 +1078,93 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+                // دکمه ایمپورت از فایل پشتیبان
+                Card(
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: _isLoading ? null : _importFromBackup,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: EdgeInsets.all(spacing),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.upload_file,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          SizedBox(width: spacing * 0.5),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'ایجاد از فایل پشتیبان',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'آپلود فایل .hbx برای ایجاد کسب‌وکار',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_isLoading && _importJobId != null)
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: _importProgress / 100,
+                              ),
+                            )
+                          else if (_isLoading)
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_importMessage != null) ...[
+                  SizedBox(height: spacing * 0.5),
+                  Text(
+                    _importMessage!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+                SizedBox(height: spacing),
+                Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: spacing * 0.5),
+                      child: Text(
+                        'یا',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                SizedBox(height: spacing),
                 Text(
                   t.businessBasicInfo,
                   style: Theme.of(context).textTheme.titleLarge,

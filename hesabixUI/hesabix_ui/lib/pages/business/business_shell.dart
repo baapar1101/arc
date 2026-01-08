@@ -32,6 +32,16 @@ import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
+import 'bank_accounts_page.dart';
+import 'persons_page.dart';
+import 'cash_registers_page.dart';
+import 'petty_cash_page.dart';
+import 'checks_page.dart';
+import 'invoices_list_page.dart';
+import 'receipts_payments_list_page.dart';
+import 'expense_income_list_page.dart';
+import 'transfers_page.dart';
+import 'documents_page.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -118,7 +128,7 @@ class _BusinessShellState extends State<BusinessShell> {
       );
       if (result == true) {
         // Refresh the receipts payments page if it's currently open
-        _refreshCurrentPage();
+        _refreshReceiptsPaymentsPageIfOpen();
       }
     }
 
@@ -137,7 +147,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ),
       );
       if (result == true) {
-        _refreshCurrentPage();
+        _refreshTransfersPageIfOpen();
       }
     }
 
@@ -157,7 +167,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ),
       );
       if (result == true) {
-        _refreshCurrentPage();
+        _refreshExpenseIncomePageIfOpen();
       }
     }
 
@@ -173,12 +183,12 @@ class _BusinessShellState extends State<BusinessShell> {
           authStore: widget.authStore,
           calendarController: calendarController,
           onSuccess: () {
-            _refreshCurrentPage();
+            _refreshChecksPageIfOpen();
           },
         ),
       );
       if (result == true) {
-        _refreshCurrentPage();
+        _refreshChecksPageIfOpen();
       }
     }
 
@@ -189,6 +199,178 @@ class _BusinessShellState extends State<BusinessShell> {
       // and if it's PettyCashPage, it will refresh its data
     });
   }
+
+    /// Refresh the bank accounts page if it's currently open
+    void _refreshBankAccountsPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final accountsPath = '/business/${widget.businessId}/accounts';
+        if (currentPath == accountsPath) {
+          // Try to get the page state and refresh the page
+          final pageState = BankAccountsPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        // If we can't determine the current path or refresh, just refresh current page
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the persons page if it's currently open
+    void _refreshPersonsPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final personsPath = '/business/${widget.businessId}/persons';
+        if (currentPath == personsPath) {
+          final pageState = PersonsPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the cash registers page if it's currently open
+    void _refreshCashRegistersPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final cashBoxPath = '/business/${widget.businessId}/cash-box';
+        if (currentPath == cashBoxPath) {
+          final pageState = CashRegistersPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the petty cash page if it's currently open
+    void _refreshPettyCashPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final pettyCashPath = '/business/${widget.businessId}/petty-cash';
+        if (currentPath == pettyCashPath) {
+          final pageState = PettyCashPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the checks page if it's currently open
+    void _refreshChecksPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final checksPath = '/business/${widget.businessId}/checks';
+        if (currentPath == checksPath) {
+          final pageState = ChecksPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the invoices page if it's currently open
+    void _refreshInvoicesPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final invoicesPath = '/business/${widget.businessId}/invoice';
+        if (currentPath == invoicesPath) {
+          final pageState = InvoicesListPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the receipts payments page if it's currently open
+    void _refreshReceiptsPaymentsPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final receiptsPaymentsPath = '/business/${widget.businessId}/receipts-payments';
+        if (currentPath == receiptsPaymentsPath) {
+          final pageState = ReceiptsPaymentsListPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the expense income page if it's currently open
+    void _refreshExpenseIncomePageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final expenseIncomePath = '/business/${widget.businessId}/expense-income';
+        if (currentPath == expenseIncomePath) {
+          final pageState = ExpenseIncomeListPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the transfers page if it's currently open
+    void _refreshTransfersPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final transfersPath = '/business/${widget.businessId}/transfers';
+        if (currentPath == transfersPath) {
+          final pageState = TransfersPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    /// Refresh the documents page if it's currently open
+    void _refreshDocumentsPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final documentsPath = '/business/${widget.businessId}/documents';
+        if (currentPath == documentsPath) {
+          final pageState = DocumentsPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
 
     Future<void> showWalletTopUpDialog() async {
       if (!context.mounted) return;
@@ -850,13 +1032,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddPersonDialog() async {
-      // نتیجه دیالوگ در اینجا استفاده نمی‌شود؛ نوع generic لازم نیست.
-      await showDialog(
+      final result = await showDialog<bool>(
         context: context,
         builder: (context) => PersonFormDialog(
           businessId: widget.businessId,
+          onSuccess: () {
+            _refreshPersonsPageIfOpen();
+          },
         ),
       );
+      if (result == true) {
+        _refreshPersonsPageIfOpen();
+      }
     }
 
     void _refreshProductsPageIfOpen() {
@@ -898,13 +1085,13 @@ class _BusinessShellState extends State<BusinessShell> {
           businessId: widget.businessId,
           onSuccess: () {
             // Refresh the cash registers page if it's currently open
-            _refreshCurrentPage();
+            _refreshCashRegistersPageIfOpen();
           },
         ),
       );
       if (result == true) {
-        // Cash register was successfully added, refresh the current page
-        _refreshCurrentPage();
+        // Cash register was successfully added, refresh the cash registers page if open
+        _refreshCashRegistersPageIfOpen();
       }
     }
 
@@ -915,13 +1102,13 @@ class _BusinessShellState extends State<BusinessShell> {
           businessId: widget.businessId,
           onSuccess: () {
             // Refresh the petty cash page if it's currently open
-            _refreshCurrentPage();
+            _refreshPettyCashPageIfOpen();
           },
         ),
       );
       if (result == true) {
-        // Petty cash was successfully added, refresh the current page
-        _refreshCurrentPage();
+        // Petty cash was successfully added, refresh the petty cash page if open
+        _refreshPettyCashPageIfOpen();
       }
     }
 
@@ -932,13 +1119,13 @@ class _BusinessShellState extends State<BusinessShell> {
           businessId: widget.businessId,
           onSuccess: () {
             // Refresh the bank accounts page if it's currently open
-            _refreshCurrentPage();
+            _refreshBankAccountsPageIfOpen();
           },
         ),
       );
       if (result == true) {
-        // Bank account was successfully added, refresh the current page
-        _refreshCurrentPage();
+        // Bank account was successfully added, refresh the bank accounts page if open
+        _refreshBankAccountsPageIfOpen();
       }
     }
 
@@ -960,8 +1147,8 @@ class _BusinessShellState extends State<BusinessShell> {
         ),
       );
       if (result == true) {
-        // Document was successfully added, refresh the current page
-        _refreshCurrentPage();
+        // Document was successfully added, refresh the documents page if open
+        _refreshDocumentsPageIfOpen();
       }
     }
 

@@ -1,18 +1,24 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from typing import Dict, Any
-
-from fastapi import APIRouter, Depends, Request, Query, HTTPException, UploadFile, File, Body
-from sqlalchemy.orm import Session
-from uuid import UUID
+from typing import Dict, Any, List
+from datetime import datetime, date
+from decimal import Decimal
+import json
+import zipfile
 import io
+
+from fastapi import APIRouter, Depends, Request, Query, HTTPException, UploadFile, File, Body, BackgroundTasks
+from sqlalchemy.orm import Session
+from sqlalchemy import text, inspect
+from uuid import UUID
 
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import (
     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
-    BusinessListResponse, BusinessSummaryResponse, SuccessResponse
+    BusinessListResponse, BusinessSummaryResponse, SuccessResponse,
+    BusinessType, BusinessField
 )
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management, require_business_access, require_business_permission_dep
 from app.core.cache import get_cache
@@ -36,6 +42,7 @@ from app.services.business_service import (
 from app.services.file_storage_service import FileStorageService
 from adapters.db.models.business import Business
 from starlette.responses import StreamingResponse
+from app.services.job_manager import JobManager
 
 
 router = APIRouter(prefix="/businesses", tags=["کسب‌وکارها"])
@@ -84,6 +91,364 @@ def create_new_business(
     business = create_business(db, business_data, owner_id)
     formatted_data = format_datetime_fields(business, request)
     return success_response(formatted_data, request)
+
+
+def _normalize_business_type(value: Any) -> BusinessType:
+    """
+    تبدیل business_type از بکاپ به BusinessType enum.
+    پشتیبانی از enum name (مثل 'SHOP') و مقدار فارسی (مثل 'مغازه').
+    """
+    if value is None:
+        return BusinessType.COMPANY
+    
+    value_str = str(value).strip()
+    
+    # اگر مقدار فارسی است، مستقیماً استفاده می‌کنیم
+    persian_values = {
+        "شرکت": BusinessType.COMPANY,
+        "مغازه": BusinessType.SHOP,
+        "فروشگاه": BusinessType.STORE,
+        "اتحادیه": BusinessType.UNION,
+        "باشگاه": BusinessType.CLUB,
+        "موسسه": BusinessType.INSTITUTE,
+        "شخصی": BusinessType.INDIVIDUAL,
+    }
+    if value_str in persian_values:
+        return persian_values[value_str]
+    
+    # اگر enum name است (مثل 'SHOP', 'COMPANY')
+    enum_name_to_type = {
+        "COMPANY": BusinessType.COMPANY,
+        "SHOP": BusinessType.SHOP,
+        "STORE": BusinessType.STORE,
+        "UNION": BusinessType.UNION,
+        "CLUB": BusinessType.CLUB,
+        "INSTITUTE": BusinessType.INSTITUTE,
+        "INDIVIDUAL": BusinessType.INDIVIDUAL,
+    }
+    if value_str.upper() in enum_name_to_type:
+        return enum_name_to_type[value_str.upper()]
+    
+    # تلاش برای پیدا کردن در enum
+    try:
+        return BusinessType(value_str)
+    except ValueError:
+        # اگر پیدا نشد، پیش‌فرض شرکت
+        return BusinessType.COMPANY
+
+
+def _normalize_business_field(value: Any) -> BusinessField:
+    """
+    تبدیل business_field از بکاپ به BusinessField enum.
+    پشتیبانی از enum name (مثل 'MANUFACTURING', 'COMMERCIAL', 'TRADING') و مقدار فارسی (مثل 'تولیدی').
+    """
+    if value is None:
+        return BusinessField.OTHER
+    
+    value_str = str(value).strip()
+    
+    # اگر مقدار فارسی است، مستقیماً استفاده می‌کنیم
+    persian_values = {
+        "تولیدی": BusinessField.MANUFACTURING,
+        "بازرگانی": BusinessField.COMMERCIAL,
+        "خدماتی": BusinessField.SERVICE,
+        "سایر": BusinessField.OTHER,
+    }
+    if value_str in persian_values:
+        return persian_values[value_str]
+    
+    # اگر enum name است
+    enum_name_to_field = {
+        "MANUFACTURING": BusinessField.MANUFACTURING,
+        "COMMERCIAL": BusinessField.COMMERCIAL,
+        "TRADING": BusinessField.COMMERCIAL,  # تبدیل TRADING به COMMERCIAL (برای سازگاری)
+        "SERVICE": BusinessField.SERVICE,
+        "OTHER": BusinessField.OTHER,
+    }
+    if value_str.upper() in enum_name_to_field:
+        return enum_name_to_field[value_str.upper()]
+    
+    # تلاش برای پیدا کردن در enum
+    try:
+        return BusinessField(value_str)
+    except ValueError:
+        # اگر پیدا نشد، پیش‌فرض سایر
+        return BusinessField.OTHER
+
+
+@router.post("/import-from-backup",
+    summary="ایجاد کسب و کار جدید از فایل پشتیبان",
+    description="ایجاد کسب و کار جدید از فایل پشتیبان (.hbx). فایل‌های .hs60 در حال حاضر پشتیبانی نمی‌شوند.",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "کسب و کار با موفقیت از فایل پشتیبان ایجاد شد",
+        },
+        400: {
+            "description": "خطا در فایل پشتیبان یا فرمت نامعتبر"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        }
+    }
+)
+async def import_business_from_backup(
+    request: Request,
+    file: UploadFile = File(...),
+    async_mode: bool = True,
+    background: BackgroundTasks = None,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    ایجاد کسب و کار جدید از فایل پشتیبان (.hbx)
+    
+    - پشتیبانی از فایل‌های .hbx (فرمت ZIP با metadata.json و tables/*.jsonl)
+    - فایل‌های .hs60 در حال حاضر پشتیبانی نمی‌شوند
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # بررسی پسوند فایل
+    filename = file.filename or ""
+    file_ext = filename.lower().split('.')[-1] if '.' in filename else ""
+    
+    # بررسی فایل .hs60 - نمایش خطا
+    if file_ext == "hs60":
+        raise ApiError(
+            "HS60_NOT_SUPPORTED",
+            "فرمت فایل .hs60 در حال حاضر پشتیبانی نمی‌شود. این قابلیت در آینده اضافه خواهد شد.",
+            http_status=400
+        )
+    
+    # بررسی فایل .hbx
+    if file_ext != "hbx":
+        raise ApiError(
+            "INVALID_FILE_FORMAT",
+            "فرمت فایل معتبر نیست. فقط فایل‌های .hbx پشتیبانی می‌شوند.",
+            http_status=400
+        )
+    
+    if async_mode:
+        jm = JobManager.instance()
+        job_id = jm.create("Import business from backup queued")
+        
+        # خواندن محتوای فایل قبل از شروع background task
+        file_bytes: bytes
+        try:
+            file_bytes = await file.read()
+        except Exception as e:
+            logger.error(f"Error reading file: {e}")
+            raise ApiError("FILE_READ_ERROR", f"خطا در خواندن فایل: {str(e)}", http_status=400)
+        
+        def task():
+            # استفاده از get_db_session برای background task
+            from adapters.db.session import get_db_session
+            with get_db_session() as db:
+                try:
+                    jm.start(job_id, "Starting import")
+                    jm.update(job_id, 10, "Loading backup file")
+                    
+                    # بررسی و خواندن فایل ZIP
+                    buf = io.BytesIO(file_bytes)
+                    try:
+                        zf = zipfile.ZipFile(buf, mode="r")
+                    except zipfile.BadZipFile:
+                        raise ApiError("INVALID_BACKUP", "فایل ZIP معتبر نیست", http_status=400)
+                    
+                    # خواندن metadata.json
+                    try:
+                        metadata = json.loads(zf.read("metadata.json").decode("utf-8"))
+                    except KeyError:
+                        raise ApiError("INVALID_BACKUP", "metadata.json در فایل پشتیبان یافت نشد", http_status=400)
+                    
+                    jm.update(job_id, 20, "Reading business data")
+                    
+                    # خواندن اطلاعات کسب‌وکار
+                    try:
+                        business_rows = []
+                        with zf.open("tables/businesses.jsonl", "r") as f:
+                            for raw in f:
+                                if not raw:
+                                    continue
+                                business_rows.append(json.loads(raw.decode("utf-8")))
+                        
+                        if not business_rows:
+                            raise ApiError("INVALID_BACKUP", "اطلاعات کسب‌وکار در فایل پشتیبان یافت نشد", http_status=400)
+                        
+                        original_business = business_rows[0]
+                    except KeyError:
+                        raise ApiError("INVALID_BACKUP", "tables/businesses.jsonl در فایل پشتیبان یافت نشد", http_status=400)
+                    
+                    jm.update(job_id, 30, "Creating new business")
+                    
+                    # تبدیل به BusinessCreateRequest
+                    business_create_data = BusinessCreateRequest(
+                        name=original_business.get('name', 'کسب‌وکار جدید'),
+                        business_type=_normalize_business_type(original_business.get('business_type')),
+                        business_field=_normalize_business_field(original_business.get('business_field')),
+                        address=original_business.get('address'),
+                        phone=original_business.get('phone'),
+                        mobile=original_business.get('mobile'),
+                        national_id=original_business.get('national_id'),
+                        registration_number=original_business.get('registration_number'),
+                        economic_id=original_business.get('economic_id'),
+                        country=original_business.get('country'),
+                        province=original_business.get('province'),
+                        city=original_business.get('city'),
+                        postal_code=original_business.get('postal_code'),
+                        default_currency_id=original_business.get('default_currency_id'),
+                        default_credit_limit=float(original_business.get('default_credit_limit')) if original_business.get('default_credit_limit') else None,
+                        check_credit_enabled_by_default=bool(original_business.get('check_credit_enabled_by_default', False)),
+                    )
+                    
+                    # ایجاد کسب‌وکار جدید
+                    new_business = create_business(db, business_create_data, ctx.get_user_id())
+                    new_business_id = new_business['id']
+                    db.commit()
+                    
+                    jm.update(job_id, 40, f"Business created (ID: {new_business_id})")
+                    
+                    # ایمپورت داده‌های سایر جداول
+                    from sqlalchemy import inspect
+                    from adapters.api.v1.business_backups import _discover_scoped_tables
+                    
+                    jm.update(job_id, 50, "Importing data")
+                    
+                    tables_info = _discover_scoped_tables(db)
+                    target_tables = [t for t in tables_info.keys() if t != "businesses"]
+                    
+                    conn = db.connection()
+                    # PostgreSQL: غیرفعال کردن foreign key checks (موقت)
+                    try:
+                        conn.execute(text("SET session_replication_role = 'replica'"))  # PostgreSQL equivalent
+                    except Exception:
+                        pass
+                    
+                    # Insert data for other tables
+                    for table in target_tables:
+                        try:
+                            zinfo = zf.getinfo(f"tables/{table}.jsonl")
+                        except KeyError:
+                            continue
+                        
+                        col_list = tables_info[table]["columns"]
+                        
+                        # حذف id برای auto-increment
+                        insert_col_list = col_list.copy()
+                        if "id" in insert_col_list:
+                            insert_col_list.remove("id")
+                        
+                        placeholders = ", ".join([f":{c}" for c in insert_col_list])
+                        columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])  # PostgreSQL uses double quotes
+                        
+                        # PostgreSQL: ON CONFLICT DO NOTHING (works for any unique constraint)
+                        insert_sql = text(f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders}) ON CONFLICT DO NOTHING')
+                        
+                        batch: list[Dict[str, Any]] = []
+                        with zf.open(f"tables/{table}.jsonl", "r") as f:
+                            for raw in f:
+                                if not raw:
+                                    continue
+                                rec = json.loads(raw.decode("utf-8"))
+                                if "business_id" in rec:
+                                    rec["business_id"] = new_business_id
+                                
+                                # حذف id برای auto-increment
+                                if "id" in rec:
+                                    del rec["id"]
+                                
+                                params = {c: rec.get(c) for c in insert_col_list}
+                                batch.append(params)
+                                if len(batch) >= 500:
+                                    # هر batch در یک transaction جداگانه
+                                    max_retries = 3
+                                    retry_count = 0
+                                    while retry_count < max_retries:
+                                        try:
+                                            conn.execute(insert_sql, batch)
+                                            db.commit()
+                                            break  # موفق شد
+                                        except Exception as e:
+                                            db.rollback()
+                                            # شروع transaction جدید
+                                            db.begin()
+                                            retry_count += 1
+                                            if retry_count >= max_retries:
+                                                logger.error(f"Error inserting batch into {table} after {max_retries} retries: {e}")
+                                                raise
+                                            logger.warning(f"Error inserting batch into {table}, retry {retry_count}/{max_retries}: {e}")
+                                    batch.clear()
+                        
+                        if batch:
+                            # آخرین batch
+                            max_retries = 3
+                            retry_count = 0
+                            while retry_count < max_retries:
+                                try:
+                                    conn.execute(insert_sql, batch)
+                                    db.commit()
+                                    break  # موفق شد
+                                except Exception as e:
+                                    db.rollback()
+                                    db.begin()
+                                    retry_count += 1
+                                    if retry_count >= max_retries:
+                                        logger.error(f"Error inserting final batch into {table} after {max_retries} retries: {e}")
+                                        raise
+                                    logger.warning(f"Error inserting final batch into {table}, retry {retry_count}/{max_retries}: {e}")
+                    
+                    # فعال کردن دوباره foreign key checks
+                    try:
+                        conn.execute(text("SET session_replication_role = 'origin'"))  # PostgreSQL equivalent
+                    except Exception:
+                        pass
+                    
+                    zf.close()
+                    
+                    result_data = {
+                        "business_id": new_business_id,
+                        "business": new_business,
+                    }
+                    jm.succeed(job_id, result_data, "Import completed")
+                except Exception as e:
+                    # استخراج error message به صورت مناسب
+                    error_msg = None
+                    error_code = None
+                    error_details = None
+                    
+                    # بررسی ApiError یا HTTPException
+                    from fastapi import HTTPException
+                    if isinstance(e, (ApiError, HTTPException)):
+                        if hasattr(e, 'detail') and isinstance(e.detail, dict):
+                            error_info = e.detail.get("error", {})
+                            if isinstance(error_info, dict):
+                                error_code = error_info.get("code")
+                                error_msg = error_info.get("message")
+                                error_details = error_info.get("details")
+                        elif isinstance(e.detail, str):
+                            error_msg = e.detail
+                    
+                    # اگر error message پیدا نشد، از str(e) استفاده کن
+                    if not error_msg:
+                        error_msg = str(e) if e else "Unknown error"
+                    
+                    # ساخت error message مناسب برای frontend
+                    if error_code:
+                        final_error = f"{error_code}: {error_msg}"
+                        if error_details:
+                            final_error += f" | Details: {error_details}"
+                    else:
+                        final_error = error_msg
+                    
+                    jm.fail(job_id, final_error, "Import failed")
+                    raise
+        
+        background.add_task(task)
+        return success_response({"job_id": job_id}, request=request, message="ایمپورت کسب‌وکار شروع شد")
+    else:
+        # مسیر هم‌زمان (برای تست - توصیه نمی‌شود برای فایل‌های بزرگ)
+        raise ApiError("SYNC_DISABLED", "لطفاً از async_mode=true استفاده کنید", http_status=400)
 
 
 @router.post("/list", 

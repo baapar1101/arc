@@ -48,6 +48,19 @@ class ReceiptsPaymentsListPage extends StatefulWidget {
 
   @override
   State<ReceiptsPaymentsListPage> createState() => _ReceiptsPaymentsListPageState();
+  
+  /// Static map to store page states by business ID for external refresh
+  static final Map<int, _ReceiptsPaymentsListPageState> _pageStates = {};
+  
+  /// Get the page state for a specific business ID
+  static _ReceiptsPaymentsListPageState? getPageState(int businessId) {
+    return _pageStates[businessId];
+  }
+  
+  /// Clear the page state for a specific business ID
+  static void clearPageState(int businessId) {
+    _pageStates.remove(businessId);
+  }
 }
 
 class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
@@ -64,8 +77,17 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   @override
   void initState() {
     super.initState();
+    // Register this page instance for external refresh access
+    ReceiptsPaymentsListPage._pageStates[widget.businessId] = this;
     _service = ReceiptPaymentListService(widget.apiClient);
     _loadProjects();
+  }
+  
+  @override
+  void dispose() {
+    // Clean up the page state when disposed
+    ReceiptsPaymentsListPage._pageStates.remove(widget.businessId);
+    super.dispose();
   }
 
   /// بارگذاری لیست پروژه‌ها برای فیلتر
@@ -124,6 +146,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (mounted) {
       setState(() {});
     }
+  }
+  
+  /// Public method to refresh the data table
+  void refresh() {
+    _refreshData();
   }
 
   @override
