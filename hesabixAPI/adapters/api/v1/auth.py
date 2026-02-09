@@ -173,6 +173,8 @@ def get_current_user_info(
 	error_message="تعداد درخواست‌های ثبت‌نام بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
 )
 async def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+	import logging
+	logger = logging.getLogger(__name__)
 	# ساخت base_url از request برای verification email
 	base_url = None
 	if request.headers.get("X-Forwarded-Host"):
@@ -181,42 +183,54 @@ async def register(request: Request, payload: RegisterRequest, db: Session = Dep
 		base_url = f"{proto}://{host}"
 	elif request.url:
 		base_url = str(request.url).replace(request.url.path, "").rstrip("/")
-	
-	user_id = register_user(
-		db=db,
-		first_name=payload.first_name,
-		last_name=payload.last_name,
-		email=payload.email,
-		mobile=payload.mobile,
-		password=payload.password,
-		captcha_id=payload.captcha_id,
-		captcha_code=payload.captcha_code,
-		referrer_code=payload.referrer_code,
-		base_url=base_url,
-	)
-	# Create a session api key similar to login
-	user_agent = request.headers.get("User-Agent")
-	ip = request.client.host if request.client else None
-	from app.core.security import generate_api_key
-	from adapters.db.repositories.api_key_repo import ApiKeyRepository
-	api_key, key_hash = generate_api_key()
-	api_repo = ApiKeyRepository(db)
-	api_repo.create_session_key(user_id=user_id, key_hash=key_hash, device_id=payload.device_id, user_agent=user_agent, ip=ip, expires_at=None)
-	from adapters.db.models.user import User
-	user_obj = db.get(User, user_id)
-	user = {
-		"id": user_id, 
-		"first_name": payload.first_name, 
-		"last_name": payload.last_name, 
-		"email": payload.email, 
-		"mobile": payload.mobile, 
-		"referral_code": getattr(user_obj, "referral_code", None), 
-		"app_permissions": getattr(user_obj, "app_permissions", None),
-		"email_verified": getattr(user_obj, "email_verified", False)
-	}
-	response_data = {"api_key": api_key, "expires_at": None, "user": user}
-	formatted_data = format_datetime_fields(response_data, request)
-	return success_response(formatted_data, request)
+	try:
+		user_id = register_user(
+			db=db,
+			first_name=payload.first_name,
+			last_name=payload.last_name,
+			email=payload.email,
+			mobile=payload.mobile,
+			password=payload.password,
+			captcha_id=payload.captcha_id,
+			captcha_code=payload.captcha_code,
+			referrer_code=payload.referrer_code,
+			base_url=base_url,
+		)
+		# Create a session api key similar to login
+		user_agent = request.headers.get("User-Agent")
+		ip = request.client.host if request.client else None
+		from app.core.security import generate_api_key
+		from adapters.db.repositories.api_key_repo import ApiKeyRepository
+		api_key, key_hash = generate_api_key()
+		api_repo = ApiKeyRepository(db)
+		api_repo.create_session_key(user_id=user_id, key_hash=key_hash, device_id=payload.device_id, user_agent=user_agent, ip=ip, expires_at=None)
+		from adapters.db.models.user import User
+		user_obj = db.get(User, user_id)
+		user = {
+			"id": user_id,
+			"first_name": payload.first_name,
+			"last_name": payload.last_name,
+			"email": payload.email,
+			"mobile": payload.mobile,
+			"referral_code": getattr(user_obj, "referral_code", None),
+			"app_permissions": getattr(user_obj, "app_permissions", None),
+			"email_verified": getattr(user_obj, "email_verified", False)
+		}
+		response_data = {"api_key": api_key, "expires_at": None, "user": user}
+		formatted_data = format_datetime_fields(response_data, request)
+		return success_response(formatted_data, request)
+	except Exception as exc:
+		from app.core.responses import ApiError
+		if isinstance(exc, ApiError):
+			raise
+		logger.error(
+			"POST /api/v1/auth/register failed: %s: %s",
+			type(exc).__name__,
+			str(exc),
+			exc_info=True,
+			extra={"path": request.url.path, "method": request.method},
+		)
+		raise
 
 
 @router.post("/login", 

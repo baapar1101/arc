@@ -49,12 +49,15 @@ ensure_flutter_in_path() {
   if cmd_exists flutter; then
     return 0
   fi
-  local SNAP_FLUTTER_BIN="$HOME/snap/flutter/common/flutter/bin"
-  if [ -d "$SNAP_FLUTTER_BIN" ]; then
-    export PATH="$PATH:$SNAP_FLUTTER_BIN"
-  fi
+  # Check common install locations (deploy.sh may install to /opt/flutter)
+  for candidate in "/opt/flutter/bin" "/snap/bin" "$HOME/snap/flutter/current/flutter/bin" "$HOME/snap/flutter/common/flutter/bin"; do
+    if [ -x "${candidate}/flutter" ]; then
+      export PATH="${candidate}:$PATH"
+      return 0
+    fi
+  done
   if ! cmd_exists flutter; then
-    die "Flutter not found. Please install it or configure PATH. Suggested path: $SNAP_FLUTTER_BIN"
+    die "Flutter not found. Please install it or configure PATH. Suggested: sudo snap install flutter --classic, or deploy.sh will install to /opt/flutter."
   fi
 }
 
@@ -255,14 +258,12 @@ echo "Using Flutter Storage URL: $FLUTTER_STORAGE_BASE_URL"
 if [ "$INSTALL_DEPS" = true ]; then
   echo "Installing dependencies..."
   if ! flutter pub get; then
-    die "Error downloading dependencies. Please check internet connection and DNS."
+    die "Flutter/Dart step failed. If the process was 'Killed', the server likely ran out of memory (OOM). Add swap or use a machine with more RAM, then re-run."
   fi
 elif [ ! -d "$APP_DIR/.dart_tool" ] || [ ! -f "$APP_DIR/pubspec.lock" ]; then
-  # If dependencies are not installed, try to install them
   echo "Dependencies not installed. Installing..."
   if ! flutter pub get; then
-    warn "Error downloading dependencies. Trying to continue without them..."
-    warn "If build fails, please run the following command:"
+    warn "Flutter/Dart step failed (if 'Killed', increase RAM or add swap). Trying to continue..."
     warn "  cd $APP_DIR && flutter pub get"
   fi
 fi
@@ -279,19 +280,31 @@ DART_DEFINE_ARGS=(--dart-define "API_BASE_URL=$API_BASE_URL")
 # Determine PWA strategy and optimizations based on mode
 BUILD_FLAGS=()
 
+# Memory check first (used for optimization level and workers)
+TOTAL_RAM_MB=$(free -m | awk '/^Mem:/ {print $2}')
+AVAILABLE_RAM_MB=$(free -m | awk '/^Mem:/ {print $7}')
+LOW_RAM=0
+[ "$TOTAL_RAM_MB" -lt 2500 ] && LOW_RAM=1
+
 # For release mode, use PWA strategy and full optimizations
 if [ "$MODE" = "release" ]; then
   BUILD_FLAGS+=(--pwa-strategy offline-first)
   BUILD_FLAGS+=(--base-href /)
-  # Reduce optimization-level from 4 to 2 to prevent OOM (Out of Memory)
-  # Level 4 requires too much memory and may cause exit code -9
-  BUILD_FLAGS+=(--optimization-level 2)
-  echo "Building Flutter for Web (Production) with full optimizations..."
-  echo "  - PWA Strategy: offline-first (Service Worker enabled)"
-  echo "  - Base Href: /"
-  echo "  - Optimization Level: 2 (balanced optimization to prevent OOM)"
+  # On low-RAM use -O1 to avoid dart2js OOM (exit code -9). Otherwise -O2.
+  if [ "$LOW_RAM" -eq 1 ]; then
+    BUILD_FLAGS+=(--optimization-level 1)
+    echo "Building Flutter for Web (Production) with low-memory settings..."
+    echo "  - PWA Strategy: offline-first (Service Worker enabled)"
+    echo "  - Base Href: /"
+    echo "  - Optimization Level: 1 (reduces memory use on <2.5GB RAM)"
+  else
+    BUILD_FLAGS+=(--optimization-level 2)
+    echo "Building Flutter for Web (Production) with full optimizations..."
+    echo "  - PWA Strategy: offline-first (Service Worker enabled)"
+    echo "  - Base Href: /"
+    echo "  - Optimization Level: 2 (balanced optimization)"
+  fi
 else
-  # For debug/profile, only add base-href
   BUILD_FLAGS+=(--base-href /)
   echo "Building Flutter for Web ($MODE) with basic optimizations..."
   echo "  - Base Href: /"
@@ -300,50 +313,34 @@ fi
 echo "Full command: flutter build web --$MODE ${BUILD_FLAGS[*]} --dart-define API_BASE_URL=$API_BASE_URL"
 echo ""
 
-# Configure CPU cores for parallel compilation
-# Detect available CPU cores and use 80% of them
+# Configure CPU workers: on low-RAM use 1 worker only to avoid OOM
 AVAILABLE_CORES=$(nproc)
-BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
-# Ensure at least 1 worker is used
-[ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
-# Cap at 16 workers to prevent issues
-[ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
-
-echo "CPU Optimization:"
-echo "  Total CPU cores: $AVAILABLE_CORES"
-echo "  Using cores (80%): $BUILD_WORKERS"
+if [ "$LOW_RAM" -eq 1 ]; then
+  BUILD_WORKERS=1
+  echo "CPU: 1 worker (low-memory mode to avoid OOM)"
+else
+  BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
+  [ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
+  [ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
+  echo "CPU Optimization: cores=$AVAILABLE_CORES, workers=$BUILD_WORKERS"
+fi
 echo ""
 
-# Configure memory limits for dart compile js to prevent OOM
-# Detect total system memory and use 80% for build process
-TOTAL_RAM_MB=$(free -m | awk '/^Mem:/ {print $2}')
-AVAILABLE_RAM_MB=$(free -m | awk '/^Mem:/ {print $7}')
-
-# Calculate 80% of total RAM for heap size
-HEAP_SIZE_MB=$((TOTAL_RAM_MB * 80 / 100))
-
-# Ensure minimum 2GB and maximum 16GB for heap
-[ "$HEAP_SIZE_MB" -lt 2048 ] && HEAP_SIZE_MB=2048
-[ "$HEAP_SIZE_MB" -gt 16384 ] && HEAP_SIZE_MB=16384
-
-# If available RAM is less than calculated heap, use 80% of available RAM instead
-if [ "$AVAILABLE_RAM_MB" -lt "$HEAP_SIZE_MB" ]; then
-  HEAP_SIZE_MB=$((AVAILABLE_RAM_MB * 80 / 100))
-  # Ensure minimum 1GB in this case
+# Heap for dart2js: on low-RAM cap at 512MB so process is not OOM-killed
+if [ "$LOW_RAM" -eq 1 ]; then
+  HEAP_SIZE_MB=$((AVAILABLE_RAM_MB * 45 / 100))
+  [ "$HEAP_SIZE_MB" -lt 256 ] && HEAP_SIZE_MB=256
+  [ "$HEAP_SIZE_MB" -gt 512 ] && HEAP_SIZE_MB=512
+else
+  HEAP_SIZE_MB=$((AVAILABLE_RAM_MB * 65 / 100))
   [ "$HEAP_SIZE_MB" -lt 1024 ] && HEAP_SIZE_MB=1024
+  [ "$HEAP_SIZE_MB" -gt 16384 ] && HEAP_SIZE_MB=16384
 fi
 
-echo "Memory Optimization:"
-echo "  Total RAM: ${TOTAL_RAM_MB}MB"
-echo "  Available RAM: ${AVAILABLE_RAM_MB}MB"
-echo "  Heap Size (80%): ${HEAP_SIZE_MB}MB"
+echo "Memory: Total=${TOTAL_RAM_MB}MB Available=${AVAILABLE_RAM_MB}MB Dart heap=${HEAP_SIZE_MB}MB"
 echo ""
 
-# Set Dart VM heap size
 export DART_VM_OPTIONS="--old-gen-heap-size=$HEAP_SIZE_MB"
-
-# Configure parallel workers for dart2js compiler
-# This significantly speeds up JavaScript compilation
 export DART_COMPILE_JS_WORKERS="$BUILD_WORKERS"
 
 # Check available memory details
@@ -352,7 +349,12 @@ free -h | head -2
 echo ""
 
 # Run build with memory settings and parallel compilation
-flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"
+if ! flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"; then
+  die "flutter build web failed. If you saw 'exit code -9' or 'Killed', the server ran out of memory (OOM). Add more swap or use a machine with more RAM, then re-run."
+fi
+if [ ! -f "$BUILD_DIR/index.html" ]; then
+  die "flutter build web did not produce index.html. Flutter SDK may be broken (e.g. Dart SDK download failed). Try: rm -rf /opt/flutter && re-run deploy with mirror set."
+fi
 
 # Fix flutter_bootstrap.js to use local CanvasKit instead of CDN
 echo ""
