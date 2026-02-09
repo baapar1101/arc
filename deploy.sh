@@ -545,11 +545,12 @@ install_prereqs() {
   # Detect Python 3 version and install appropriate packages
   # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
   # We'll use python3 and python3-venv which work on all versions
-  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, redis-server, WeasyPrint system dependencies..."
+  # WeasyPrint (PDF) requires: libcairo2, libpango*, libgdk-pixbuf-2.0-0 (note: hyphen in package name on Ubuntu 24)
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, redis-server, WeasyPrint system deps (libpango/cairo)..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3 python3-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib redis-server \
-    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
   
   # Detect Python version for logging
   PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
@@ -884,6 +885,8 @@ print('Connection successful')
   chown -R www-data:www-data "${api_dir}"
 
   # systemd service
+  # Type=simple: uvicorn does not send sd_notify; Type=notify would cause start timeout.
+  # TimeoutStartSec=300: app startup (WeasyPrint/imports) can take 60-90+ seconds.
   cat > /etc/systemd/system/hesabix-api.service <<UNIT
 [Unit]
 Description=Hesabix API (FastAPI/Uvicorn)
@@ -891,7 +894,8 @@ After=network.target postgresql.service
 Requires=postgresql.service
 
 [Service]
-Type=notify
+Type=simple
+TimeoutStartSec=300
 User=www-data
 Group=www-data
 WorkingDirectory=${api_dir}
@@ -908,23 +912,28 @@ WantedBy=multi-user.target
 UNIT
 
   systemctl daemon-reload
-  
-  # Stop service if running to avoid conflicts
+
+  # Stop service if running so the new unit definition is used on next start
   if check_service hesabix-api; then
     systemctl stop hesabix-api
   fi
-  
+
   systemctl enable hesabix-api
   systemctl start hesabix-api
-  
-  # Wait a bit and check if service started successfully
-  sleep 3
-  if check_service hesabix-api; then
-    log_success "Backend started (service: hesabix-api)."
-  else
-    log_error "Backend failed to start. Check logs: journalctl -u hesabix-api"
-    exit 1
-  fi
+
+  # Wait for service to become active (startup with WeasyPrint can take 30-90s)
+  log_info "Waiting for hesabix-api to become active (up to 120s)..."
+  for i in $(seq 1 24); do
+    if systemctl is-active --quiet hesabix-api 2>/dev/null; then
+      log_success "Backend started (service: hesabix-api)."
+      break
+    fi
+    if [ "$i" -eq 24 ]; then
+      log_error "Backend failed to start within 120s. Check logs: journalctl -xeu hesabix-api"
+      exit 1
+    fi
+    sleep 5
+  done
 
   # RQ Worker service for background jobs
   cat > /etc/systemd/system/hesabix-rq-worker.service <<UNIT
@@ -1030,27 +1039,160 @@ UNIT
   fi
 }
 
+# Detect and export Flutter/Dart mirror so SDK and package downloads work when Google is blocked.
+# Call this before any "flutter" command (including first run that downloads Dart SDK).
+set_flutter_mirror_env() {
+  if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
+    log_info "Using existing Flutter mirror: PUB_HOSTED_URL=$PUB_HOSTED_URL"
+    return 0
+  fi
+  log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
+  local mirrors=(
+    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
+    "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
+    "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
+    "https://pub.dev|https://storage.googleapis.com"
+    "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
+  )
+  for pair in "${mirrors[@]}"; do
+    IFS='|' read -r pub_url storage_url <<< "$pair"
+    if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "$pub_url" 2>/dev/null | grep -q '^[23]'; then
+      export PUB_HOSTED_URL="$pub_url"
+      export FLUTTER_STORAGE_BASE_URL="$storage_url"
+      log_success "Using Flutter mirror: $pub_url"
+      return 0
+    fi
+  done
+  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
+  export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
+  log_warning "No reachable Flutter mirror; using default (may fail if Google is blocked)."
+}
+
+# Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
+# Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
+# When a non-Google mirror is set, only /opt/flutter is used (snap Flutter ignores FLUTTER_STORAGE_BASE_URL for engine downloads).
+ensure_flutter_sdk() {
+  local opt_flutter="/opt/flutter/bin"
+  local use_mirror=0
+  if [[ -n "${FLUTTER_STORAGE_BASE_URL:-}" && "${FLUTTER_STORAGE_BASE_URL}" != *"storage.googleapis.com"* ]]; then
+    use_mirror=1
+    log_info "Mirror is set (non-Google); using /opt/flutter only (snap Flutter would ignore mirror for engine downloads)."
+  fi
+
+  if [[ $use_mirror -eq 1 ]]; then
+    if [[ -x "${opt_flutter}/flutter" ]]; then
+      export PATH="${opt_flutter}:$PATH"
+      log_info "Using Flutter from ${opt_flutter}"
+      return 0
+    fi
+    # Install to /opt/flutter (skip snap)
+  else
+    if command -v flutter >/dev/null 2>&1; then
+      log_info "Flutter found in PATH: $(command -v flutter)"
+      return 0
+    fi
+    if [[ -x "${opt_flutter}/flutter" ]]; then
+      export PATH="${opt_flutter}:$PATH"
+      log_info "Using Flutter from ${opt_flutter}"
+      return 0
+    fi
+    local snap_bin="$HOME/snap/flutter/current/flutter/bin"
+    local snap_bin_common="$HOME/snap/flutter/common/flutter/bin"
+    if [[ -d "${snap_bin}" && -x "${snap_bin}/flutter" ]]; then
+      export PATH="${snap_bin}:$PATH"
+      log_info "Using Flutter from snap (current): ${snap_bin}"
+      return 0
+    fi
+    if [[ -d "${snap_bin_common}" && -x "${snap_bin_common}/flutter" ]]; then
+      export PATH="${snap_bin_common}:$PATH"
+      log_info "Using Flutter from snap (common): ${snap_bin_common}"
+      return 0
+    fi
+    if command -v snap >/dev/null 2>&1 && ! snap list flutter 2>/dev/null | grep -q flutter; then
+      log_info "Installing Flutter via snap (this may take a few minutes)..."
+      if snap install flutter --classic 2>/dev/null; then
+        export PATH="/snap/bin:$PATH"
+        if command -v flutter >/dev/null 2>&1; then
+          log_success "Flutter installed via snap."
+          return 0
+        fi
+      fi
+    fi
+  fi
+
+  # Install to /opt/flutter (stable branch) - respects FLUTTER_STORAGE_BASE_URL
+  log_info "Flutter not found or mirror mode: installing to /opt/flutter..."
+  apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
+  if [[ ! -d /opt/flutter ]]; then
+    if ! git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /opt/flutter 2>/dev/null; then
+      log_error "Failed to clone Flutter SDK. Install manually: https://docs.flutter.dev/get-started/install/linux"
+      exit 1
+    fi
+  else
+    (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
+  fi
+  export PATH="/opt/flutter/bin:$PATH"
+  if ! command -v flutter >/dev/null 2>&1; then
+    log_error "Flutter binary not found after install. Check /opt/flutter/bin."
+    exit 1
+  fi
+  log_info "Running flutter doctor (first run may download Dart SDK from mirror)..."
+  if ! flutter doctor -v 2>&1; then
+    log_warning "flutter doctor had issues; continuing. If build fails, set PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL to a working mirror."
+  fi
+  log_success "Flutter SDK ready at /opt/flutter."
+}
+
+# On low-RAM servers, add swap so Flutter/dart2js build is not OOM-killed (exit -9).
+ensure_swap_for_flutter_build() {
+  local total_mb avail_mb
+  total_mb=$(free -m | awk '/^Mem:/ {print $2}')
+  avail_mb=$(free -m | awk '/^Mem:/ {print $7}')
+  if [ "${total_mb:-0}" -lt 2500 ] || [ "${avail_mb:-0}" -lt 1000 ]; then
+    local swapfile="${APP_ROOT}/swap.flutter.bin"
+    # On <2.5GB RAM use 2.5GB swap so dart compile js can finish
+    local swap_mb=2560
+    [ "${total_mb:-0}" -ge 2500 ] && swap_mb=1536
+    local swap_bytes=$((swap_mb * 1024 * 1024))
+    if [ ! -f "$swapfile" ] || [ "$(stat -c%s "$swapfile" 2>/dev/null)" -lt "$swap_bytes" ]; then
+      log_info "Low memory (total ${total_mb}MB, available ${avail_mb}MB). Creating ${swap_mb}MB swap for Flutter build..."
+      dd if=/dev/zero of="$swapfile" bs=1M count="$swap_mb" status=none 2>/dev/null || true
+      chmod 600 "$swapfile"
+      mkswap "$swapfile" 2>/dev/null || true
+    fi
+    swapon "$swapfile" 2>/dev/null || true
+  fi
+}
+
 install_flutter_and_build_frontend() {
   log_step "Building Flutter frontend..."
-  
+  set_flutter_mirror_env
+  ensure_flutter_sdk
+  ensure_swap_for_flutter_build
+  export PATH="/opt/flutter/bin:/snap/bin:$PATH"
+  if ! command -v flutter >/dev/null 2>&1; then
+    log_error "Flutter not in PATH after ensure_flutter_sdk. PATH=$PATH"
+    exit 1
+  fi
+
   local app_dir="${APP_ROOT}/app"
   if [[ ! -d "${app_dir}" ]]; then
     log_error "App directory not found: ${app_dir}"
     exit 1
   fi
-  
+
   local build_script="${app_dir}/build_web.sh"
   if [[ ! -f "${build_script}" ]]; then
     log_error "build_web.sh not found: ${build_script}"
     exit 1
   fi
-  
+
   # Make build script executable
   chmod +x "${build_script}"
-  
+
   # Build API URL (use HTTPS for API domain)
   local api_url="https://${API_DOMAIN}"
-  
+
   echo "Building Flutter web with:"
   echo "  Mode: release"
   echo "  API URL: ${api_url}"
@@ -1060,11 +1202,13 @@ install_flutter_and_build_frontend() {
   echo "  The build script will automatically detect and use available mirrors"
   echo "  (Chinese mirrors → Official → Other mirrors) if Google services are blocked."
   echo "  This ensures Flutter packages and SDK downloads work even with sanctions."
-  
-  # Build using build_web.sh script
+
+  # Build using build_web.sh (pass PATH and mirror so Flutter/Dart downloads work)
   cd "${app_dir}"
   log_info "Building Flutter web application..."
-  if ! bash build_web.sh \
+  if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
+      PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
+      bash build_web.sh \
     --mode release \
     --api-base-url "${api_url}" \
     --clean \
@@ -1348,72 +1492,85 @@ configure_ui_ssl() {
 }
 
 install_pgadmin4() {
-  echo ">> Installing pgAdmin4..."
+  echo ">> Installing pgAdmin4 (Nginx + Gunicorn, no Apache)..."
   
-  # Check if pgAdmin4 is already installed
-  if command -v /usr/pgadmin4/bin/setup-web.sh >/dev/null 2>&1; then
-    echo "$CHECK_MARK pgAdmin4 is already installed. Skipping installation..."
+  local pgadmin_venv="/opt/pgadmin4/venv"
+  local pgadmin_data="/var/lib/pgadmin4"
+  local pgadmin_log="/var/log/pgadmin4"
+  
+  if [[ -x "${pgadmin_venv}/bin/gunicorn" ]] && [[ -d "${pgadmin_venv}/lib" ]]; then
+    echo "$CHECK_MARK pgAdmin4 (Gunicorn) is already installed. Skipping..."
     return 0
   fi
   
-  # Install Apache2 (required for pgAdmin4 web)
-  if ! command -v apache2 >/dev/null 2>&1; then
-    echo "Installing Apache2 (required for pgAdmin4)..."
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get install -y apache2
-    systemctl enable apache2
-    systemctl start apache2
-  fi
-  
-  # Add pgAdmin4 repository
-  if [[ ! -f /usr/share/keyrings/pgadmin4-archive-keyring.gpg ]]; then
-    echo "Adding pgAdmin4 repository..."
-    curl -fsS https://www.pgadmin.org/static/packages_pgadmin_org.pub | gpg --dearmor -o /usr/share/keyrings/pgadmin4-archive-keyring.gpg
-    local distro_codename
-    distro_codename=$(lsb_release -cs)
-    echo "deb [signed-by=/usr/share/keyrings/pgadmin4-archive-keyring.gpg] https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/${distro_codename} pgadmin4 main" > /etc/apt/sources.list.d/pgadmin4.list
-    apt-get update -y
-  fi
-  
-  # Install pgAdmin4 web
-  echo "Installing pgAdmin4 web..."
   export DEBIAN_FRONTEND=noninteractive
-  apt-get install -y pgadmin4-web
+  apt-get install -y -qq python3-venv python3-pip libpq-dev >/dev/null 2>&1
   
-  # Configure pgAdmin4
-  echo "Configuring pgAdmin4..."
-  if [[ -n "${PGADMIN4_EMAIL}" ]] && [[ -n "${PGADMIN4_PASSWORD}" ]]; then
-    # Install expect if not available
-    if ! command -v expect >/dev/null 2>&1; then
-      apt-get install -y expect
-    fi
-    
-    # Use expect to automate setup-web.sh
-    expect <<EOF
-set timeout 300
-spawn /usr/pgadmin4/bin/setup-web.sh
-expect "Email address:"
-send "${PGADMIN4_EMAIL}\r"
-expect "Password:"
-send "${PGADMIN4_PASSWORD}\r"
-expect "Retype password:"
-send "${PGADMIN4_PASSWORD}\r"
-expect eof
-EOF
-    
-    if [[ $? -eq 0 ]]; then
-      echo "$CHECK_MARK pgAdmin4 configured successfully."
-    else
-      echo "$WARNING_MARK pgAdmin4 setup had issues. Please verify manually:"
-      echo "  /usr/pgadmin4/bin/setup-web.sh"
-    fi
-  else
-    echo "$WARNING_MARK pgAdmin4 email/password not provided. Please run setup manually:"
-    echo "  /usr/pgadmin4/bin/setup-web.sh"
+  mkdir -p /opt/pgadmin4
+  if [[ ! -d "${pgadmin_venv}" ]]; then
+    echo "Creating Python venv for pgAdmin4..."
+    python3 -m venv "${pgadmin_venv}"
+    "${pgadmin_venv}/bin/pip" install -U pip -q
+    "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q
+  fi
+  
+  mkdir -p "${pgadmin_data}"/{sessions,storage,azurecredentialcache,kerberoscache}
+  mkdir -p "${pgadmin_log}"
+  chown -R www-data:www-data "${pgadmin_data}" "${pgadmin_log}"
+  
+  local pgadmin_site
+  pgadmin_site=$("${pgadmin_venv}/bin/python3" -c "import pgadmin4; print(pgadmin4.__path__[0])" 2>/dev/null)
+  if [[ -z "$pgadmin_site" || ! -d "$pgadmin_site" ]]; then
+    echo "$CROSS_MARK Could not find pgAdmin4 package path."
     return 1
   fi
   
-  echo "$CHECK_MARK pgAdmin4 installed and configured."
+  # config_local.py for server mode
+  cat > "${pgadmin_site}/config_local.py" <<CONFIG
+SERVER_MODE = True
+LOG_FILE = '${pgadmin_log}/pgadmin4.log'
+SQLITE_PATH = '${pgadmin_data}/pgadmin4.db'
+SESSION_DB_PATH = '${pgadmin_data}/sessions'
+STORAGE_DIR = '${pgadmin_data}/storage'
+AZURE_CREDENTIAL_CACHE_DIR = '${pgadmin_data}/azurecredentialcache'
+KERBEROS_CCACHE_DIR = '${pgadmin_data}/kerberoscache'
+CONFIG
+  chown www-data:www-data "${pgadmin_site}/config_local.py"
+  
+  # Setup database (must run as www-data)
+  if [[ ! -f "${pgadmin_data}/pgadmin4.db" ]]; then
+    echo "Initializing pgAdmin4 database..."
+    sudo -u www-data "${pgadmin_venv}/bin/python3" "${pgadmin_site}/setup.py" setup-db 2>/dev/null || true
+  fi
+  
+  # Systemd service: Gunicorn (single worker as required by pgAdmin for connection affinity)
+  cat > /etc/systemd/system/pgadmin4.service <<UNIT
+[Unit]
+Description=pgAdmin4 (Gunicorn)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${pgadmin_site}
+Environment="PATH=${pgadmin_venv}/bin"
+ExecStart=${pgadmin_venv}/bin/gunicorn --bind 127.0.0.1:5050 --workers 1 --threads 25 --timeout 300 pgAdmin4:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  
+  systemctl daemon-reload
+  systemctl enable pgadmin4
+  systemctl start pgadmin4
+  
+  if [[ -n "${PGADMIN4_EMAIL}" ]] && [[ -n "${PGADMIN4_PASSWORD}" ]]; then
+    echo "  First login: open https://${PGADMIN4_DOMAIN:-pgadmin.example.com} and register with email: ${PGADMIN4_EMAIL}"
+  fi
+  echo "$CHECK_MARK pgAdmin4 installed (Gunicorn on 127.0.0.1:5050). Nginx will proxy to it."
 }
 
 configure_nginx_pgadmin4() {
@@ -1424,48 +1581,39 @@ configure_nginx_pgadmin4() {
     return 1
   fi
   
-  # Check if nginx is installed
   if ! command -v nginx >/dev/null 2>&1; then
     echo "$CROSS_MARK Nginx is not installed"
     return 1
   fi
   
-  # Check if Apache2 is running (required for pgAdmin4)
-  if ! systemctl is-active --quiet apache2; then
-    echo "Starting Apache2 service..."
-    systemctl start apache2
-    systemctl enable apache2
+  if ! systemctl is-active --quiet pgadmin4; then
+    echo "Starting pgAdmin4 (Gunicorn) service..."
+    systemctl start pgadmin4
+    systemctl enable pgadmin4
   fi
   
-  # Create pgAdmin4 Nginx configuration (reverse proxy to Apache2)
+  # Nginx reverse proxy to Gunicorn (no Apache)
   cat > /etc/nginx/sites-available/pgadmin4.conf <<NGINX
-# pgAdmin4 (reverse proxy to Apache2)
+# pgAdmin4 (reverse proxy to Gunicorn on 127.0.0.1:5050)
 server {
   listen 80;
   server_name ${PGADMIN4_DOMAIN};
 
-  # Security headers
   add_header X-Frame-Options "SAMEORIGIN" always;
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
   location / {
-    proxy_pass http://127.0.0.1/pgadmin4;
+    proxy_pass http://127.0.0.1:5050;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Script-Name /;
-    proxy_set_header X-Scheme \$scheme;
     proxy_redirect off;
-    
-    # Increase timeouts for long-running queries
     proxy_read_timeout 300;
     proxy_connect_timeout 60;
     proxy_send_timeout 300;
-    
-    # WebSocket support
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
     proxy_set_header Connection "upgrade";
