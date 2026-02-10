@@ -533,19 +533,25 @@ def upgrade() -> None:
         {"id":2618,"level":4,"code":"70509","name":"هزینه سرویس‌های استعلامات","parentId":2566,"accountType":0},
         ]
 
-        # تبدیل parentId های 2452 و 2453 به 0 (چون اینها حساب‌های ریشه هستند)
-        for item in items:
-            item["parentId"] = 0
+        # 2452 و 2453 در لیست items نیستند (ارجاع به چارت قدیمی).
+        # نگاشت به idهای معادل در این چارت: 2452 -> 2613 (دارایی ها)، 2453 -> 2614 (دارایی های جاری)
+        LEGACY_PARENT_2452 = 2613
+        LEGACY_PARENT_2453 = 2614
 
-        # ایجاد حساب‌ها به ترتیب level
+        # ایجاد حساب‌ها به ترتیب level تا والد قبل از فرزند درج شود
         items.sort(key=lambda x: (x["level"], int(x["code"])))
 
         for item in items:
-            # پیدا کردن parent_id
+            # پیدا کردن parent_id با رعایت ساختار درختی
             parent_internal_id = None
-            if item["parentId"] != 0:
-                # پیدا کردن parent از ext_to_internal
-                parent_internal_id = ext_to_internal.get(item["parentId"])
+            pid = item["parentId"]
+            if pid != 0:
+                if pid == 2452:
+                    parent_internal_id = ext_to_internal.get(LEGACY_PARENT_2452)
+                elif pid == 2453:
+                    parent_internal_id = ext_to_internal.get(LEGACY_PARENT_2453)
+                else:
+                    parent_internal_id = ext_to_internal.get(pid)
 
             # بررسی اینکه آیا حساب از قبل وجود دارد
             existing = conn.execute(select_existing, {"code": item["code"]}).fetchone()
