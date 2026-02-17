@@ -25,8 +25,9 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 
 settings = get_settings()
-# Set password directly
-settings.db_password = os.getenv('DB_PASSWORD', '@@babaK24055')
+# استفاده از رمز از .env (pydantic-settings)؛ override فقط اگر DB_PASSWORD در محیط ست شده
+if (pw := os.getenv('DB_PASSWORD')) is not None:
+    settings.db_password = pw
 from urllib.parse import quote_plus
 dsn = f"postgresql+psycopg2://{settings.db_user}:{quote_plus(settings.db_password)}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
 # Set DSN directly in attributes to avoid ConfigParser % interpolation issues

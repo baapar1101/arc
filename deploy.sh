@@ -852,7 +852,7 @@ ENV
   chmod 600 "${env_file}"
   chown www-data:www-data "${env_file}"
 
-  # Verify database connection before migrations
+  # Verify database connection before init
   echo "Verifying database connection..."
   if ! python3 -c "
 import sys
@@ -865,15 +865,44 @@ with engine.connect() as conn:
     conn.execute(text('SELECT 1'))
 print('Connection successful')
 " 2>/dev/null; then
-    echo "$WARNING_MARK Database connection failed. Migrations may fail."
+    echo "$WARNING_MARK Database connection failed. Initial data import may fail."
   fi
 
-  # Alembic migrations
-  echo "Running migrations..."
+  # Import seed when DB is empty, then always run migrations
+  local backup_dir="${APP_ROOT}/app/backup"
+  local seed_dump
+  seed_dump=$(ls -t "${backup_dir}"/hesabix_seed*.dump 2>/dev/null | head -1)
+  local table_count
+  table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null || echo "999")
+
+  if [[ "${table_count}" -eq "0" ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
+    echo "Importing seed database from: ${seed_dump}"
+    if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" 2>/dev/null; then
+      log_success "Seed database imported successfully."
+    else
+      # pg_restore may exit 1 for non-fatal warnings; verify DB is usable
+      if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
+        log_success "Seed database imported (some non-fatal warnings may have occurred)."
+      else
+        log_error "Error importing seed database. Check pg_restore output."
+        exit 1
+      fi
+    fi
+  elif [[ "${table_count}" -gt "0" ]]; then
+    log_info "Database already initialized (${table_count} tables). Skipping seed import."
+  else
+    if [[ -z "${seed_dump}" || ! -f "${seed_dump}" ]]; then
+      echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
+    fi
+  fi
+
+  # Always run migrations (after optional seed import, or when DB was already initialized)
+  log_step "Running Alembic migrations..."
   if ! alembic upgrade head; then
     echo "$CROSS_MARK Error running migrations"
     exit 1
   fi
+  log_success "Migrations completed."
 
   # Check if www-data user exists
   if ! id -u www-data >/dev/null 2>&1; then
