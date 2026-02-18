@@ -44,11 +44,14 @@ IFS=$'\n\t'
 #   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
+# - Flutter SDK tarball: FLUTTER_SDK_TARBALL_URL (default: shell.hesabix.ir) is tried before git clone; pub packages are still fetched via PUB_HOSTED_URL.
 #
 # ============================================================================
 
 REPO_URL="https://source.hesabix.ir/hesabix/arc.git"
 APP_ROOT="/opt/hesabix"
+# مخزن داخلی Flutter (فقط SDK؛ کتابخانه‌های pub از PUB_HOSTED_URL گرفته می‌شوند)
+: "${FLUTTER_SDK_TARBALL_URL:=https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz}"
 STATE_FILE="${APP_ROOT}/.deploy_state"
 LOG_FILE="${APP_ROOT}/deploy.log"
 CHECK_MARK=$'\xE2\x9C\x94'
@@ -1357,12 +1360,54 @@ ensure_flutter_sdk() {
     fi
   fi
 
-  # 3) Git clone to /opt/flutter (official GitHub first, then alternative mirrors)
-  log_info "Flutter not found via official channels; installing to /opt/flutter via git clone..."
+  # 3) Internal tarball (e.g. Iranian mirror): try first if URL is set; SDK only, pub packages via mirror
+  if [[ ! -d /opt/flutter ]] && [[ -n "${FLUTTER_SDK_TARBALL_URL:-}" ]]; then
+    log_info "Trying to install Flutter SDK from tarball (internal mirror): ${FLUTTER_SDK_TARBALL_URL}"
+    apt-get install -y -qq curl xz-utils >/dev/null 2>&1 || true
+    local tarball_ok=0
+    if curl -sfL --connect-timeout 15 --max-time 120 -o /tmp/flutter_sdk.tar.xz "${FLUTTER_SDK_TARBALL_URL}"; then
+      if tar -xJf /tmp/flutter_sdk.tar.xz -C /opt 2>/dev/null; then
+        rm -f /tmp/flutter_sdk.tar.xz
+        # Tarball may extract as "flutter" or e.g. "flutter_linux_3.41.1-stable"
+        if [[ -d /opt/flutter && -x /opt/flutter/bin/flutter ]]; then
+          tarball_ok=1
+        else
+          local single_dir
+          single_dir=$(ls -1 /opt 2>/dev/null | grep -E '^flutter' | head -1)
+          if [[ -n "${single_dir}" && -d "/opt/${single_dir}" && -x "/opt/${single_dir}/bin/flutter" ]]; then
+            mv "/opt/${single_dir}" /opt/flutter 2>/dev/null && tarball_ok=1
+          fi
+        fi
+        if [[ $tarball_ok -eq 0 ]]; then
+          log_warning "Tarball extracted but Flutter binary not found in expected path; will try git clone."
+          rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
+        fi
+      else
+        rm -f /tmp/flutter_sdk.tar.xz
+        log_warning "Failed to extract Flutter tarball; will try git clone."
+      fi
+    else
+      rm -f /tmp/flutter_sdk.tar.xz
+      log_info "Tarball not available (${FLUTTER_SDK_TARBALL_URL}); will try git clone."
+    fi
+    if [[ $tarball_ok -eq 1 ]]; then
+      export PATH="/opt/flutter/bin:$PATH"
+      log_success "Flutter SDK installed from tarball (internal mirror). Pub packages will use PUB_HOSTED_URL."
+      log_info "Running flutter doctor (first run may download packages from mirror)..."
+      if ! flutter doctor -v 2>&1; then
+        log_warning "flutter doctor had issues; continuing. Packages will be fetched via mirror during build."
+      fi
+      log_success "Flutter SDK ready at /opt/flutter."
+      return 0
+    fi
+  fi
+
+  # 4) Git clone to /opt/flutter (official GitHub first, then alternative mirrors)
+  log_info "Flutter not found via tarball; installing to /opt/flutter via git clone..."
   apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
   if [[ ! -d /opt/flutter ]]; then
     local flutter_cloned=0
-    # 1) Official source first: GitHub
+    # 4a) Official source first: GitHub
     log_info "Trying to clone Flutter SDK from official source (GitHub)..."
     if git clone --depth 1 --branch stable "https://github.com/flutter/flutter.git" /opt/flutter 2>/dev/null; then
       flutter_cloned=1
@@ -1388,7 +1433,7 @@ ensure_flutter_sdk() {
       done
     fi
     if [[ $flutter_cloned -eq 0 ]]; then
-      log_error "Failed to clone Flutter SDK (official and alternatives). If GitHub is blocked, set FLUTTER_SDK_GIT_URL to a mirror (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git). See: https://docs.flutter.dev/get-started/install/linux"
+      log_error "Failed to clone Flutter SDK (official and alternatives). You can set FLUTTER_SDK_TARBALL_URL to an internal tarball (e.g. https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz) or FLUTTER_SDK_GIT_URL to a git mirror. See: https://docs.flutter.dev/get-started/install/linux"
       exit 1
     fi
   else
