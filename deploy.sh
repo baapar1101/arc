@@ -37,6 +37,8 @@ IFS=$'\n\t'
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Resume from failure: if a step fails, re-run the script to continue from that step
 #   (completed steps are skipped using .deploy_state)
+# - Saved inputs: last entered domain, branch, pgAdmin4 options, etc. are stored in .deploy_saved_vars
+#   and used as defaults on next run (override by env vars or leave blank to be prompted again).
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
 # - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
 #   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
@@ -263,6 +265,40 @@ clear_deployment_state() {
   if [[ -f "${STATE_FILE}" ]]; then
     rm -f "${STATE_FILE}"
   fi
+}
+
+# Load saved deploy inputs (domain, branch, pgAdmin4, etc.) as defaults. Only sets vars that are not already set (env overrides).
+load_saved_deploy_vars() {
+  local file="${APP_ROOT}/.deploy_saved_vars"
+  [[ ! -f "${file}" ]] && return 0
+  log_info "Loading saved inputs from previous run (use env vars to override)..."
+  local line key val
+  while IFS= read -r line; do
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    val="${BASH_REMATCH[2]}"
+    # Only set if not already set by environment
+    if [[ -z "${!key:-}" ]]; then
+      export "${key}=${val}"
+    fi
+  done < "${file}"
+}
+
+# Save current deploy inputs so next run can use them as defaults (resume after failure without re-entering).
+save_deploy_saved_vars() {
+  mkdir -p "${APP_ROOT}"
+  local file="${APP_ROOT}/.deploy_saved_vars"
+  {
+    echo "API_DOMAIN=${API_DOMAIN:-}"
+    echo "UI_DOMAIN=${UI_DOMAIN:-}"
+    echo "BRANCH=${BRANCH:-main}"
+    echo "INSTALL_PGADMIN4=${INSTALL_PGADMIN4:-N}"
+    echo "PGADMIN4_DOMAIN=${PGADMIN4_DOMAIN:-}"
+    echo "PGADMIN4_EMAIL=${PGADMIN4_EMAIL:-}"
+    echo "PGADMIN4_PASSWORD=${PGADMIN4_PASSWORD:-}"
+  } > "${file}"
+  chmod 600 "${file}"
+  log_info "Saved inputs for next run (${file})"
 }
 
 # Save deployment config for hesabix -update and install /usr/local/bin/hesabix
@@ -528,6 +564,7 @@ prompt_vars() {
     fi
   fi
   
+  save_deploy_saved_vars
   export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD DB_POOL_SIZE DB_MAX_OVERFLOW
 }
 
@@ -850,14 +887,27 @@ deploy_backend() {
   cd "${api_dir}"
 
   set_pip_mirror_env
-  # Python venv + install
+  # Python venv + install (retry with next mirror if one fails)
   if [[ ! -d ".venv" ]]; then
     python3 -m venv .venv
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
-  pip install --upgrade pip setuptools wheel
-  pip install -e .
+  local pip_ok=0
+  while IFS= read -r pip_url; do
+    set_pip_mirror_for_url "$pip_url"
+    log_info "Trying PyPI: ${PIP_INDEX_URL}"
+    if pip install --upgrade pip setuptools wheel && pip install -e .; then
+      pip_ok=1
+      log_success "Backend dependencies installed from ${PIP_INDEX_URL}"
+      break
+    fi
+    log_warning "PyPI mirror failed: ${PIP_INDEX_URL}; trying next..."
+  done < <(get_pip_mirrors_list)
+  if [[ $pip_ok -eq 0 ]]; then
+    log_error "Failed to install backend dependencies from any PyPI mirror. Set PIP_INDEX_URL to a working mirror if needed."
+    exit 1
+  fi
 
   # Check if .env.example exists and use it as base
   local env_file=".env"
@@ -1150,8 +1200,37 @@ UNIT
   fi
 }
 
+# List of PyPI mirrors to try in order (url only; PIP_TRUSTED_HOST is set for non-pypi.org).
+# Used for retry-on-failure: if one mirror fails, we try the next.
+get_pip_mirrors_list() {
+  local list=()
+  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
+    list+=("${PIP_INDEX_URL}")
+  fi
+  list+=(
+    "https://pypi.org/simple"
+    "https://pypi.tuna.tsinghua.edu.cn/simple"
+    "https://mirrors.aliyun.com/pypi/simple/"
+    "https://mirrors.cloud.tencent.com/pypi/simple"
+  )
+  printf '%s\n' "${list[@]}"
+}
+
+# Set PIP_INDEX_URL and PIP_TRUSTED_HOST for a given mirror URL. Call before pip install.
+set_pip_mirror_for_url() {
+  local index_url="$1"
+  export PIP_INDEX_URL="${index_url}"
+  if [[ "${index_url}" != *"pypi.org"* ]]; then
+    local host
+    host=$(echo "${index_url}" | sed -n 's|https\?://\([^/]*\).*|\1|p')
+    export PIP_TRUSTED_HOST="${host}"
+  else
+    unset PIP_TRUSTED_HOST
+  fi
+}
+
 # Set PyPI index (mirror) so pip works when pypi.org is blocked. Export PIP_INDEX_URL, PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
-# Call before any "pip install" (backend and pgAdmin4).
+# Call before any "pip install" (backend and pgAdmin4). For retry-on-failure use get_pip_mirrors_list + set_pip_mirror_for_url in a loop.
 set_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     log_info "Using custom PyPI index: PIP_INDEX_URL=$PIP_INDEX_URL"
@@ -1179,19 +1258,25 @@ set_pip_mirror_env() {
     done
   fi
   if [[ -n "${index_url}" ]]; then
-    export PIP_INDEX_URL="${index_url}"
-    if [[ "${index_url}" != *"pypi.org"* ]]; then
-      local host
-      host=$(echo "${index_url}" | sed -n 's|https\?://\([^/]*\).*|\1|p')
-      export PIP_TRUSTED_HOST="${host}"
-      log_success "Using PyPI mirror: ${index_url}"
-    else
-      log_success "Using PyPI: ${index_url}"
-    fi
+    set_pip_mirror_for_url "${index_url}"
+    log_success "Using PyPI mirror: ${index_url}"
     return 0
   fi
   log_warning "No reachable PyPI mirror; pip will use default (may fail if pypi.org is blocked). Set PIP_INDEX_URL to a mirror if needed."
   return 0
+}
+
+# List of Flutter/Dart mirror pairs (pub_url|storage_url), one per line. Used for retry-on-failure.
+# If PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL are set, that pair is tried first.
+get_flutter_mirrors_list() {
+  if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
+    echo "${PUB_HOSTED_URL}|${FLUTTER_STORAGE_BASE_URL}"
+  fi
+  echo "https://pub.dev|https://storage.googleapis.com"
+  echo "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
+  echo "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
+  echo "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
+  echo "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
 }
 
 # Detect and export Flutter/Dart mirror so SDK and package downloads work when Google is blocked.
@@ -1203,10 +1288,10 @@ set_flutter_mirror_env() {
   fi
   log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
   local mirrors=(
+    "https://pub.dev|https://storage.googleapis.com"
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
     "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-    "https://pub.dev|https://storage.googleapis.com"
     "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
   )
   for pair in "${mirrors[@]}"; do
@@ -1376,22 +1461,31 @@ install_flutter_and_build_frontend() {
   echo "  API URL: ${api_url}"
   echo "  Output: /var/www/${UI_DOMAIN}"
   echo
-  echo "$CHECK_MARK Flutter mirror auto-detection enabled:"
-  echo "  The build script will automatically detect and use available mirrors"
-  echo "  (Chinese mirrors → Official → Other mirrors) if Google services are blocked."
-  echo "  This ensures Flutter packages and SDK downloads work even with sanctions."
+  echo "$CHECK_MARK Flutter build will try mirrors in order; if one fails, the next is used."
 
-  # Build using build_web.sh (pass PATH and mirror so Flutter/Dart downloads work)
+  # Build using build_web.sh; retry with next mirror if one fails
   cd "${app_dir}"
-  log_info "Building Flutter web application..."
-  if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
-      PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
-      bash build_web.sh \
-    --mode release \
-    --api-base-url "${api_url}" \
-    --clean \
-    --install-deps; then
-    log_error "Error building frontend"
+  local flutter_build_ok=0
+  while IFS='|' read -r pub_url storage_url; do
+    [[ -z "$pub_url" ]] && continue
+    export PUB_HOSTED_URL="$pub_url"
+    export FLUTTER_STORAGE_BASE_URL="$storage_url"
+    log_info "Building Flutter web with mirror: ${pub_url}"
+    if env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
+        PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
+        bash build_web.sh \
+      --mode release \
+      --api-base-url "${api_url}" \
+      --clean \
+      --install-deps; then
+      flutter_build_ok=1
+      log_success "Flutter build succeeded with mirror: ${pub_url}"
+      break
+    fi
+    log_warning "Flutter build failed with mirror ${pub_url}; trying next mirror..."
+  done < <(get_flutter_mirrors_list)
+  if [[ $flutter_build_ok -eq 0 ]]; then
+    log_error "Flutter build failed with all mirrors. Check network or set PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL to a working mirror."
     exit 1
   fi
   
@@ -1689,8 +1783,21 @@ install_pgadmin4() {
   if [[ ! -d "${pgadmin_venv}" ]]; then
     echo "Creating Python venv for pgAdmin4..."
     python3 -m venv "${pgadmin_venv}"
-    "${pgadmin_venv}/bin/pip" install -U pip -q
-    "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q
+    local pgadmin_pip_ok=0
+    while IFS= read -r pip_url; do
+      set_pip_mirror_for_url "$pip_url"
+      log_info "Trying PyPI for pgAdmin4: ${PIP_INDEX_URL}"
+      if "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+        pgadmin_pip_ok=1
+        log_success "pgAdmin4 installed from ${PIP_INDEX_URL}"
+        break
+      fi
+      log_warning "PyPI mirror failed for pgAdmin4: ${PIP_INDEX_URL}; trying next..."
+    done < <(get_pip_mirrors_list)
+    if [[ $pgadmin_pip_ok -eq 0 ]]; then
+      log_error "Failed to install pgAdmin4 from any PyPI mirror. Set PIP_INDEX_URL to a working mirror if needed."
+      return 1
+    fi
   fi
   
   mkdir -p "${pgadmin_data}"/{sessions,storage,azurecredentialcache,kerberoscache}
@@ -1913,6 +2020,14 @@ main() {
     if netstat -tuln | grep -q ":8000 "; then
       log_warning "Port 8000 is in use. You may need to stop the previous service."
     fi
+  fi
+  
+  # Load saved inputs from previous run (so re-run after failure doesn't require re-entering)
+  load_saved_deploy_vars
+  if [[ -f "${APP_ROOT}/.deploy_saved_vars" ]]; then
+    echo "مقادیر قبلی (دامنه، برنچ، pgAdmin4 و ...) بارگذاری شدند و به‌صورت پیش‌فرض استفاده می‌شوند."
+    echo "برای تغییر: متغیرهای محیطی را ست کنید (مثلاً API_DOMAIN=api.example.com) یا در هر سؤال Enter بزنید تا دوباره پرسیده شود."
+    echo
   fi
   
   # Prompt user for configuration
