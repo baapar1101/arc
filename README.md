@@ -85,7 +85,7 @@ The easiest way to install Hesabix is using the automated installation script:
 cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
-**Note**: If you encounter HTTP/2 errors, the `--http1.1` flag forces curl to use HTTP/1.1 protocol.
+> **مشکل HTTP/2 روی بعضی سرورها**: در برخی سرورها (مثلاً نسخه‌های قدیمی‌تر curl یا پیکربندی خاص شبکه/فایروال) استفاده از پروتکل HTTP/2 باعث خطا می‌شود. در دستور بالا از پرچم `--http1.1` استفاده شده تا همیشه از HTTP/1.1 استفاده شود. اگر با curl خطا گرفتید، به بخش [رفع مشکل HTTP/2](#رفع-مشکل-http2-در-دانلود-اسکریپت-نصب) در عیب‌یابی مراجعه کنید.
 
 **Alternative method using wget** (if curl still fails):
 ```bash
@@ -177,7 +177,7 @@ cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' >
 
 The script is idempotent and safe to re-run. It will update the code and restart services.
 
-**Note**: If you encounter HTTP/2 errors, the `--http1.1` flag forces curl to use HTTP/1.1 protocol.
+> **مشکل HTTP/2**: در صورت بروز خطای مربوط به HTTP/2، از همان دستور با پرچم `--http1.1` استفاده کنید یا به بخش [رفع مشکل HTTP/2](#رفع-مشکل-http2-در-دانلود-اسکریپت-نصب) مراجعه کنید.
 
 ## Configuration
 
@@ -216,6 +216,42 @@ journalctl -u hesabix-api -f
 ```
 
 ## Troubleshooting
+
+### رفع مشکل HTTP/2 در دانلود اسکریپت نصب
+
+برخی سرورها به‌دلیل نسخه curl، پیکربندی شبکه یا فایروال با پروتکل HTTP/2 مشکل دارند. در این حالت ممکن است هنگام دانلود اسکریپت نصب با خطاهایی مثل `curl: (92) HTTP/2 stream 1 was not closed cleanly` یا `HTTP/2 framing layer problem` مواجه شوید.
+
+**راه‌حل‌ها (به ترتیب اولویت):**
+
+1. **استفاده از HTTP/1.1 با curl**  
+   پرچم `--http1.1` را حتماً در دستور قرار دهید:
+   ```bash
+   curl -sSL --http1.1 -o installer.sh https://shell.hesabix.ir/deploy.sh
+   ```
+   سپس:
+   ```bash
+   cd /tmp && tr -d '\r' < installer.sh > installer_clean.sh && chmod +x installer_clean.sh && sudo bash installer_clean.sh
+   ```
+
+2. **استفاده از wget به‌جای curl**  
+   wget به‌طور پیش‌فرض از HTTP/1.1 استفاده می‌کند:
+   ```bash
+   cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+   ```
+   در صورت بروز خطای مربوط به گواهی SSL، می‌توانید به دستور wget گزینه `--no-check-certificate` اضافه کنید (فقط در محیط تست یا در صورت اطمینان).
+
+3. **بروزرسانی curl**  
+   اگر نسخه curl قدیمی است، آن را به‌روز کنید و دوباره با `--http1.1` امتحان کنید:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt update && sudo apt install --only-upgrade curl
+   ```
+
+4. **دانلود دستی و آپلود به سرور**  
+   اگر هیچ‌کدام جواب نداد، فایل را روی سیستم دیگری با مرورگر یا curl دانلود کنید و با SCP/SFTP به سرور منتقل کنید، سپس اجرا کنید:
+   ```bash
+   chmod +x installer.sh && sudo bash installer.sh
+   ```
 
 ### Common Issues
 
