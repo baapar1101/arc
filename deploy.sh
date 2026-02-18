@@ -1323,26 +1323,36 @@ ensure_flutter_sdk() {
   fi
 
   # 1) Use existing Flutter if already available
-  if command -v flutter >/dev/null 2>&1; then
-    log_info "Flutter found in PATH: $(command -v flutter)"
-    return 0
-  fi
-  if [[ -x "${opt_flutter}/flutter" ]]; then
-    export PATH="${opt_flutter}:$PATH"
-    log_info "Using Flutter from ${opt_flutter}"
-    return 0
-  fi
-  local snap_bin="$HOME/snap/flutter/current/flutter/bin"
-  local snap_bin_common="$HOME/snap/flutter/common/flutter/bin"
-  if [[ -d "${snap_bin}" && -x "${snap_bin}/flutter" ]]; then
-    export PATH="${snap_bin}:$PATH"
-    log_info "Using Flutter from snap (current): ${snap_bin}"
-    return 0
-  fi
-  if [[ -d "${snap_bin_common}" && -x "${snap_bin_common}/flutter" ]]; then
-    export PATH="${snap_bin_common}:$PATH"
-    log_info "Using Flutter from snap (common): ${snap_bin_common}"
-    return 0
+  # با mirror غیر گوگل فقط /opt/flutter قابل قبول است (snap از storage.googleapis.com دانلود می‌کند و تحریم می‌خورد)
+  if [[ $use_mirror -eq 1 ]]; then
+    if [[ -x "${opt_flutter}/flutter" ]]; then
+      export PATH="${opt_flutter}:$PATH"
+      log_info "Using Flutter from ${opt_flutter} (mirror mode; snap ignored so engine uses mirror)"
+      return 0
+    fi
+    log_info "Mirror mode: skipping snap Flutter; will use /opt/flutter (tarball or git clone)."
+  else
+    if command -v flutter >/dev/null 2>&1; then
+      log_info "Flutter found in PATH: $(command -v flutter)"
+      return 0
+    fi
+    if [[ -x "${opt_flutter}/flutter" ]]; then
+      export PATH="${opt_flutter}:$PATH"
+      log_info "Using Flutter from ${opt_flutter}"
+      return 0
+    fi
+    local snap_bin="$HOME/snap/flutter/current/flutter/bin"
+    local snap_bin_common="$HOME/snap/flutter/common/flutter/bin"
+    if [[ -d "${snap_bin}" && -x "${snap_bin}/flutter" ]]; then
+      export PATH="${snap_bin}:$PATH"
+      log_info "Using Flutter from snap (current): ${snap_bin}"
+      return 0
+    fi
+    if [[ -d "${snap_bin_common}" && -x "${snap_bin_common}/flutter" ]]; then
+      export PATH="${snap_bin_common}:$PATH"
+      log_info "Using Flutter from snap (common): ${snap_bin_common}"
+      return 0
+    fi
   fi
 
   # 2) اول: مخزن داخلی (دقیقا همین آدرس) — فقط SDK؛ کتابخانه‌های pub از mirror
