@@ -41,6 +41,7 @@ IFS=$'\n\t'
 # - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
 #   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
+# - Flutter SDK git clone: if GitHub is blocked set FLUTTER_SDK_GIT_URL (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git); script also tries Tsinghua and Gitee on failure.
 #
 # ============================================================================
 
@@ -1278,8 +1279,32 @@ ensure_flutter_sdk() {
   log_info "Flutter not found or mirror mode: installing to /opt/flutter..."
   apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
   if [[ ! -d /opt/flutter ]]; then
-    if ! git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /opt/flutter 2>/dev/null; then
-      log_error "Failed to clone Flutter SDK. Install manually: https://docs.flutter.dev/get-started/install/linux"
+    local flutter_cloned=0
+    if [[ -n "${FLUTTER_SDK_GIT_URL:-}" ]]; then
+      log_info "Cloning Flutter SDK from FLUTTER_SDK_GIT_URL: ${FLUTTER_SDK_GIT_URL}"
+      if git clone --depth 1 --branch stable "${FLUTTER_SDK_GIT_URL}" /opt/flutter 2>/dev/null; then
+        flutter_cloned=1
+        log_success "Flutter SDK cloned from ${FLUTTER_SDK_GIT_URL}"
+      fi
+    fi
+    if [[ $flutter_cloned -eq 0 ]]; then
+      local flutter_git_urls=(
+        "https://github.com/flutter/flutter.git"
+        "https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git"
+        "https://gitee.com/mirrors/Flutter.git"
+      )
+      for repo_url in "${flutter_git_urls[@]}"; do
+        log_info "Trying to clone Flutter SDK from ${repo_url} ..."
+        if git clone --depth 1 --branch stable "${repo_url}" /opt/flutter 2>/dev/null; then
+          flutter_cloned=1
+          log_success "Flutter SDK cloned from ${repo_url}"
+          break
+        fi
+        rm -rf /opt/flutter 2>/dev/null || true
+      done
+    fi
+    if [[ $flutter_cloned -eq 0 ]]; then
+      log_error "Failed to clone Flutter SDK from any source. If GitHub is blocked, set FLUTTER_SDK_GIT_URL to a mirror (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git). See: https://docs.flutter.dev/get-started/install/linux"
       exit 1
     fi
   else
