@@ -41,7 +41,7 @@ IFS=$'\n\t'
 # - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
 #   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
-# - Flutter SDK git clone: if GitHub is blocked set FLUTTER_SDK_GIT_URL (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git); script also tries Tsinghua and Gitee on failure.
+# - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 #
 # ============================================================================
 
@@ -1280,31 +1280,33 @@ ensure_flutter_sdk() {
   apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
   if [[ ! -d /opt/flutter ]]; then
     local flutter_cloned=0
-    if [[ -n "${FLUTTER_SDK_GIT_URL:-}" ]]; then
-      log_info "Cloning Flutter SDK from FLUTTER_SDK_GIT_URL: ${FLUTTER_SDK_GIT_URL}"
-      if git clone --depth 1 --branch stable "${FLUTTER_SDK_GIT_URL}" /opt/flutter 2>/dev/null; then
-        flutter_cloned=1
-        log_success "Flutter SDK cloned from ${FLUTTER_SDK_GIT_URL}"
-      fi
+    # 1) Official source first: GitHub
+    log_info "Trying to clone Flutter SDK from official source (GitHub)..."
+    if git clone --depth 1 --branch stable "https://github.com/flutter/flutter.git" /opt/flutter 2>/dev/null; then
+      flutter_cloned=1
+      log_success "Flutter SDK cloned from official source (GitHub)."
     fi
+    # 2) If official failed, try alternative mirrors
     if [[ $flutter_cloned -eq 0 ]]; then
-      local flutter_git_urls=(
-        "https://github.com/flutter/flutter.git"
+      log_info "Official source failed; trying alternative mirrors..."
+      local flutter_git_urls=()
+      [[ -n "${FLUTTER_SDK_GIT_URL:-}" ]] && flutter_git_urls+=("${FLUTTER_SDK_GIT_URL}")
+      flutter_git_urls+=(
         "https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git"
         "https://gitee.com/mirrors/Flutter.git"
       )
       for repo_url in "${flutter_git_urls[@]}"; do
-        log_info "Trying to clone Flutter SDK from ${repo_url} ..."
+        log_info "Trying alternative: ${repo_url} ..."
         if git clone --depth 1 --branch stable "${repo_url}" /opt/flutter 2>/dev/null; then
           flutter_cloned=1
-          log_success "Flutter SDK cloned from ${repo_url}"
+          log_success "Flutter SDK cloned from alternative: ${repo_url}"
           break
         fi
         rm -rf /opt/flutter 2>/dev/null || true
       done
     fi
     if [[ $flutter_cloned -eq 0 ]]; then
-      log_error "Failed to clone Flutter SDK from any source. If GitHub is blocked, set FLUTTER_SDK_GIT_URL to a mirror (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git). See: https://docs.flutter.dev/get-started/install/linux"
+      log_error "Failed to clone Flutter SDK (official and alternatives). If GitHub is blocked, set FLUTTER_SDK_GIT_URL to a mirror (e.g. https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git). See: https://docs.flutter.dev/get-started/install/linux"
       exit 1
     fi
   else
