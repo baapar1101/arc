@@ -44,14 +44,14 @@ IFS=$'\n\t'
 #   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
-# - Flutter SDK tarball: FLUTTER_SDK_TARBALL_URL (default: shell.hesabix.ir) is tried before git clone; pub packages are still fetched via PUB_HOSTED_URL.
+# - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 #
 # ============================================================================
 
 REPO_URL="https://source.hesabix.ir/hesabix/arc.git"
 APP_ROOT="/opt/hesabix"
-# مخزن داخلی Flutter (فقط SDK؛ کتابخانه‌های pub از PUB_HOSTED_URL گرفته می‌شوند)
-: "${FLUTTER_SDK_TARBALL_URL:=https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz}"
+# مخزن داخلی Flutter (ایران) — همیشه اول از این آدرس امتحان می‌شود؛ فقط SDK، کتابخانه‌های pub از PUB_HOSTED_URL
+FLUTTER_SDK_TARBALL_URL_INTERNAL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
 STATE_FILE="${APP_ROOT}/.deploy_state"
 LOG_FILE="${APP_ROOT}/deploy.log"
 CHECK_MARK=$'\xE2\x9C\x94'
@@ -1313,8 +1313,7 @@ set_flutter_mirror_env() {
 
 # Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
 # Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
-# Order: 1) Existing install (PATH, /opt/flutter, snap) 2) Official install (snap) 3) Git clone (GitHub then mirrors).
-# When a non-Google mirror is set, /opt/flutter is preferred for engine downloads (snap may ignore FLUTTER_STORAGE_BASE_URL).
+# Order: 1) Existing 2) مخزن داخلی (دقیقا FLUTTER_SDK_TARBALL_URL_INTERNAL) 3) Snap 4) Git clone.
 ensure_flutter_sdk() {
   local opt_flutter="/opt/flutter/bin"
   local use_mirror=0
@@ -1346,7 +1345,48 @@ ensure_flutter_sdk() {
     return 0
   fi
 
-  # 2) Official install: try snap first (then apt if we add it later)
+  # 2) اول: مخزن داخلی (دقیقا همین آدرس) — فقط SDK؛ کتابخانه‌های pub از mirror
+  if [[ ! -d /opt/flutter ]]; then
+    log_info "Trying Flutter SDK from internal mirror (first): ${FLUTTER_SDK_TARBALL_URL_INTERNAL}"
+    apt-get install -y -qq curl xz-utils >/dev/null 2>&1 || true
+    local tarball_ok=0
+    if curl -sfL --connect-timeout 15 --max-time 120 -o /tmp/flutter_sdk.tar.xz "${FLUTTER_SDK_TARBALL_URL_INTERNAL}"; then
+      if tar -xJf /tmp/flutter_sdk.tar.xz -C /opt 2>/dev/null; then
+        rm -f /tmp/flutter_sdk.tar.xz
+        if [[ -d /opt/flutter && -x /opt/flutter/bin/flutter ]]; then
+          tarball_ok=1
+        else
+          local single_dir
+          single_dir=$(ls -1 /opt 2>/dev/null | grep -E '^flutter' | head -1)
+          if [[ -n "${single_dir}" && -d "/opt/${single_dir}" && -x "/opt/${single_dir}/bin/flutter" ]]; then
+            mv "/opt/${single_dir}" /opt/flutter 2>/dev/null && tarball_ok=1
+          fi
+        fi
+        if [[ $tarball_ok -eq 0 ]]; then
+          log_warning "Tarball extracted but Flutter binary not found; trying next method."
+          rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
+        fi
+      else
+        rm -f /tmp/flutter_sdk.tar.xz
+        log_warning "Failed to extract Flutter tarball; trying next method."
+      fi
+    else
+      rm -f /tmp/flutter_sdk.tar.xz
+      log_info "Internal tarball not available; trying next method."
+    fi
+    if [[ $tarball_ok -eq 1 ]]; then
+      export PATH="/opt/flutter/bin:$PATH"
+      log_success "Flutter SDK installed from internal mirror (${FLUTTER_SDK_TARBALL_URL_INTERNAL}). Pub packages will use PUB_HOSTED_URL."
+      log_info "Running flutter doctor (first run may download packages from mirror)..."
+      if ! flutter doctor -v 2>&1; then
+        log_warning "flutter doctor had issues; continuing. Packages will be fetched via mirror during build."
+      fi
+      log_success "Flutter SDK ready at /opt/flutter."
+      return 0
+    fi
+  fi
+
+  # 3) Official install: snap
   if command -v snap >/dev/null 2>&1 && ! snap list flutter 2>/dev/null | grep -q flutter; then
     log_info "Trying official install: snap install flutter (this may take a few minutes)..."
     if snap install flutter --classic 2>/dev/null; then
@@ -1360,50 +1400,8 @@ ensure_flutter_sdk() {
     fi
   fi
 
-  # 3) Internal tarball (e.g. Iranian mirror): try first if URL is set; SDK only, pub packages via mirror
-  if [[ ! -d /opt/flutter ]] && [[ -n "${FLUTTER_SDK_TARBALL_URL:-}" ]]; then
-    log_info "Trying to install Flutter SDK from tarball (internal mirror): ${FLUTTER_SDK_TARBALL_URL}"
-    apt-get install -y -qq curl xz-utils >/dev/null 2>&1 || true
-    local tarball_ok=0
-    if curl -sfL --connect-timeout 15 --max-time 120 -o /tmp/flutter_sdk.tar.xz "${FLUTTER_SDK_TARBALL_URL}"; then
-      if tar -xJf /tmp/flutter_sdk.tar.xz -C /opt 2>/dev/null; then
-        rm -f /tmp/flutter_sdk.tar.xz
-        # Tarball may extract as "flutter" or e.g. "flutter_linux_3.41.1-stable"
-        if [[ -d /opt/flutter && -x /opt/flutter/bin/flutter ]]; then
-          tarball_ok=1
-        else
-          local single_dir
-          single_dir=$(ls -1 /opt 2>/dev/null | grep -E '^flutter' | head -1)
-          if [[ -n "${single_dir}" && -d "/opt/${single_dir}" && -x "/opt/${single_dir}/bin/flutter" ]]; then
-            mv "/opt/${single_dir}" /opt/flutter 2>/dev/null && tarball_ok=1
-          fi
-        fi
-        if [[ $tarball_ok -eq 0 ]]; then
-          log_warning "Tarball extracted but Flutter binary not found in expected path; will try git clone."
-          rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
-        fi
-      else
-        rm -f /tmp/flutter_sdk.tar.xz
-        log_warning "Failed to extract Flutter tarball; will try git clone."
-      fi
-    else
-      rm -f /tmp/flutter_sdk.tar.xz
-      log_info "Tarball not available (${FLUTTER_SDK_TARBALL_URL}); will try git clone."
-    fi
-    if [[ $tarball_ok -eq 1 ]]; then
-      export PATH="/opt/flutter/bin:$PATH"
-      log_success "Flutter SDK installed from tarball (internal mirror). Pub packages will use PUB_HOSTED_URL."
-      log_info "Running flutter doctor (first run may download packages from mirror)..."
-      if ! flutter doctor -v 2>&1; then
-        log_warning "flutter doctor had issues; continuing. Packages will be fetched via mirror during build."
-      fi
-      log_success "Flutter SDK ready at /opt/flutter."
-      return 0
-    fi
-  fi
-
   # 4) Git clone to /opt/flutter (official GitHub first, then alternative mirrors)
-  log_info "Flutter not found via tarball; installing to /opt/flutter via git clone..."
+  log_info "Installing Flutter SDK via git clone..."
   apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
   if [[ ! -d /opt/flutter ]]; then
     local flutter_cloned=0
@@ -1433,7 +1431,7 @@ ensure_flutter_sdk() {
       done
     fi
     if [[ $flutter_cloned -eq 0 ]]; then
-      log_error "Failed to clone Flutter SDK (official and alternatives). You can set FLUTTER_SDK_TARBALL_URL to an internal tarball (e.g. https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz) or FLUTTER_SDK_GIT_URL to a git mirror. See: https://docs.flutter.dev/get-started/install/linux"
+      log_error "Failed to install Flutter SDK (internal tarball, snap, and git clone all failed). Internal URL tried first: ${FLUTTER_SDK_TARBALL_URL_INTERNAL}. For git clone you can set FLUTTER_SDK_GIT_URL. See: https://docs.flutter.dev/get-started/install/linux"
       exit 1
     fi
   else
