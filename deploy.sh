@@ -1225,58 +1225,55 @@ set_flutter_mirror_env() {
 
 # Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
 # Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
-# When a non-Google mirror is set, only /opt/flutter is used (snap Flutter ignores FLUTTER_STORAGE_BASE_URL for engine downloads).
+# Order: 1) Existing install (PATH, /opt/flutter, snap) 2) Official install (snap) 3) Git clone (GitHub then mirrors).
+# When a non-Google mirror is set, /opt/flutter is preferred for engine downloads (snap may ignore FLUTTER_STORAGE_BASE_URL).
 ensure_flutter_sdk() {
   local opt_flutter="/opt/flutter/bin"
   local use_mirror=0
   if [[ -n "${FLUTTER_STORAGE_BASE_URL:-}" && "${FLUTTER_STORAGE_BASE_URL}" != *"storage.googleapis.com"* ]]; then
     use_mirror=1
-    log_info "Mirror is set (non-Google); using /opt/flutter only (snap Flutter would ignore mirror for engine downloads)."
+    log_info "Mirror is set (non-Google); /opt/flutter will be preferred for engine downloads."
   fi
 
-  if [[ $use_mirror -eq 1 ]]; then
-    if [[ -x "${opt_flutter}/flutter" ]]; then
-      export PATH="${opt_flutter}:$PATH"
-      log_info "Using Flutter from ${opt_flutter}"
-      return 0
-    fi
-    # Install to /opt/flutter (skip snap)
-  else
-    if command -v flutter >/dev/null 2>&1; then
-      log_info "Flutter found in PATH: $(command -v flutter)"
-      return 0
-    fi
-    if [[ -x "${opt_flutter}/flutter" ]]; then
-      export PATH="${opt_flutter}:$PATH"
-      log_info "Using Flutter from ${opt_flutter}"
-      return 0
-    fi
-    local snap_bin="$HOME/snap/flutter/current/flutter/bin"
-    local snap_bin_common="$HOME/snap/flutter/common/flutter/bin"
-    if [[ -d "${snap_bin}" && -x "${snap_bin}/flutter" ]]; then
-      export PATH="${snap_bin}:$PATH"
-      log_info "Using Flutter from snap (current): ${snap_bin}"
-      return 0
-    fi
-    if [[ -d "${snap_bin_common}" && -x "${snap_bin_common}/flutter" ]]; then
-      export PATH="${snap_bin_common}:$PATH"
-      log_info "Using Flutter from snap (common): ${snap_bin_common}"
-      return 0
-    fi
-    if command -v snap >/dev/null 2>&1 && ! snap list flutter 2>/dev/null | grep -q flutter; then
-      log_info "Installing Flutter via snap (this may take a few minutes)..."
-      if snap install flutter --classic 2>/dev/null; then
-        export PATH="/snap/bin:$PATH"
-        if command -v flutter >/dev/null 2>&1; then
-          log_success "Flutter installed via snap."
-          return 0
-        fi
+  # 1) Use existing Flutter if already available
+  if command -v flutter >/dev/null 2>&1; then
+    log_info "Flutter found in PATH: $(command -v flutter)"
+    return 0
+  fi
+  if [[ -x "${opt_flutter}/flutter" ]]; then
+    export PATH="${opt_flutter}:$PATH"
+    log_info "Using Flutter from ${opt_flutter}"
+    return 0
+  fi
+  local snap_bin="$HOME/snap/flutter/current/flutter/bin"
+  local snap_bin_common="$HOME/snap/flutter/common/flutter/bin"
+  if [[ -d "${snap_bin}" && -x "${snap_bin}/flutter" ]]; then
+    export PATH="${snap_bin}:$PATH"
+    log_info "Using Flutter from snap (current): ${snap_bin}"
+    return 0
+  fi
+  if [[ -d "${snap_bin_common}" && -x "${snap_bin_common}/flutter" ]]; then
+    export PATH="${snap_bin_common}:$PATH"
+    log_info "Using Flutter from snap (common): ${snap_bin_common}"
+    return 0
+  fi
+
+  # 2) Official install: try snap first (then apt if we add it later)
+  if command -v snap >/dev/null 2>&1 && ! snap list flutter 2>/dev/null | grep -q flutter; then
+    log_info "Trying official install: snap install flutter (this may take a few minutes)..."
+    if snap install flutter --classic 2>/dev/null; then
+      export PATH="/snap/bin:$PATH"
+      if command -v flutter >/dev/null 2>&1; then
+        log_success "Flutter installed via snap (official)."
+        return 0
       fi
+    else
+      log_info "Snap install failed or unavailable; will try git clone next."
     fi
   fi
 
-  # Install to /opt/flutter (stable branch) - respects FLUTTER_STORAGE_BASE_URL
-  log_info "Flutter not found or mirror mode: installing to /opt/flutter..."
+  # 3) Git clone to /opt/flutter (official GitHub first, then alternative mirrors)
+  log_info "Flutter not found via official channels; installing to /opt/flutter via git clone..."
   apt-get install -y -qq git curl unzip xz-utils zip libglu1-mesa >/dev/null 2>&1 || true
   if [[ ! -d /opt/flutter ]]; then
     local flutter_cloned=0
