@@ -443,7 +443,6 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
-migrations/versions/18007e7f5ca0_init.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py

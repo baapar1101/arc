@@ -35,7 +35,9 @@ IFS=$'\n\t'
 #
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
-# - Idempotent: safe to re-run; will update and restart services
+# - Resume from failure: if a step fails, re-run the script to continue from that step
+#   (completed steps are skipped using .deploy_state)
+# - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
 #
 # ============================================================================
 
@@ -590,6 +592,12 @@ clone_repo() {
   mkdir -p "${APP_ROOT}"
   cd "${APP_ROOT}"
   
+  # If app exists but .git is missing (e.g. previous clone failed halfway), remove for fresh clone
+  if [[ -d "${APP_ROOT}/app" ]] && [[ ! -d "${APP_ROOT}/app/.git" ]]; then
+    log_info "Removing incomplete app directory for fresh clone..."
+    rm -rf "${APP_ROOT}/app"
+  fi
+  
   if [[ ! -d "${APP_ROOT}/app/.git" ]]; then
     log_info "Cloning repository..."
     
@@ -965,11 +973,12 @@ UNIT
   done
 
   # RQ Worker service for background jobs
+  # redis-server.service = Debian/Ubuntu; redis.service = other distros
   cat > /etc/systemd/system/hesabix-rq-worker.service <<UNIT
 [Unit]
 Description=Hesabix RQ Worker (Background Jobs)
-After=network.target redis.service postgresql.service
-Wants=redis.service
+After=network.target postgresql.service redis-server.service redis.service
+Wants=redis-server.service redis.service
 
 [Service]
 Type=simple
@@ -997,8 +1006,9 @@ UNIT
   
   systemctl enable hesabix-rq-worker
   
-  # Start RQ worker only if Redis is available
-  if systemctl is-active --quiet redis || systemctl is-enabled --quiet redis 2>/dev/null; then
+  # Start RQ worker only if Redis is available (redis-server.service on Debian/Ubuntu, or redis.service)
+  if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null || \
+     systemctl is-enabled --quiet redis-server 2>/dev/null || systemctl is-enabled --quiet redis 2>/dev/null; then
     systemctl start hesabix-rq-worker
     sleep 2
     if check_service hesabix-rq-worker; then
@@ -1013,11 +1023,12 @@ UNIT
   fi
 
   # Notification Moderation Worker service
+  # redis-server.service = Debian/Ubuntu; redis.service = other distros
   cat > /etc/systemd/system/hesabix-notification-moderation.service <<UNIT
 [Unit]
 Description=Hesabix Notification Moderation Worker
 Documentation=https://hesabix.com/docs/notification-moderation
-After=network.target postgresql.service redis.service
+After=network.target postgresql.service redis-server.service redis.service
 Requires=postgresql.service
 
 [Service]
@@ -1593,6 +1604,12 @@ WantedBy=multi-user.target
 UNIT
   
   systemctl daemon-reload
+  
+  # Stop if already running so the new unit definition is used on next start
+  if check_service pgadmin4; then
+    systemctl stop pgadmin4
+  fi
+  
   systemctl enable pgadmin4
   systemctl start pgadmin4
   
@@ -1782,9 +1799,13 @@ main() {
   fi
   echo
   
-  # Clone repository (always update)
-  clone_repo
-  mark_step_completed "repo"
+  # Clone repository (skip if already done; resume will retry from here if previous run failed after repo)
+  if ! check_step_completed "repo"; then
+    clone_repo
+    mark_step_completed "repo"
+  else
+    echo "$CHECK_MARK Repository already cloned/updated. Skipping..."
+  fi
   echo
   
   # Setup database (idempotent)
@@ -1796,24 +1817,40 @@ main() {
   fi
   echo
   
-  # Deploy backend (always update)
-  deploy_backend
-  mark_step_completed "backend"
+  # Deploy backend (skip if already done; resume from here if previous run failed during/after backend)
+  if ! check_step_completed "backend"; then
+    deploy_backend
+    mark_step_completed "backend"
+  else
+    echo "$CHECK_MARK Backend already deployed. Skipping..."
+  fi
   echo
   
-  # Build frontend (always rebuild for latest changes)
-  install_flutter_and_build_frontend
-  mark_step_completed "frontend"
+  # Build frontend (skip if already done; resume from here if previous run failed during frontend)
+  if ! check_step_completed "frontend"; then
+    install_flutter_and_build_frontend
+    mark_step_completed "frontend"
+  else
+    echo "$CHECK_MARK Frontend already built and deployed. Skipping..."
+  fi
   echo
   
-  # Configure Nginx API (always update)
-  configure_nginx_api
-  mark_step_completed "nginx_api"
+  # Configure Nginx API (skip if already done)
+  if ! check_step_completed "nginx_api"; then
+    configure_nginx_api
+    mark_step_completed "nginx_api"
+  else
+    echo "$CHECK_MARK Nginx for API already configured. Skipping..."
+  fi
   echo
   
-  # Configure Nginx UI (always update)
-  configure_nginx_ui
-  mark_step_completed "nginx_ui"
+  # Configure Nginx UI (skip if already done)
+  if ! check_step_completed "nginx_ui"; then
+    configure_nginx_ui
+    mark_step_completed "nginx_ui"
+  else
+    echo "$CHECK_MARK Nginx for UI already configured. Skipping..."
+  fi
   echo
   
   # Configure SSL API (skip if already configured)
@@ -1886,8 +1923,9 @@ main() {
   log_info "Deployment log file:"
   echo "  ${LOG_FILE}"
   echo
-  log_info "To re-run/upgrade:"
+  log_info "To re-run (resume from last step or upgrade):"
   echo "  BRANCH=${BRANCH} API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN} sudo -E bash deploy.sh"
+  echo "  (Use RESET_STATE=y to run all steps from the beginning, e.g. to pull and rebuild everything)"
   echo
   log_info "Database password is stored in:"
   echo "  ${APP_ROOT}/.db_password"
