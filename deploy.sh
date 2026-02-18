@@ -261,6 +261,72 @@ clear_deployment_state() {
   fi
 }
 
+# Save deployment config for hesabix -update and install /usr/local/bin/hesabix
+install_hesabix_command() {
+  mkdir -p "${APP_ROOT}"
+  local env_file="${APP_ROOT}/.deploy_env"
+  cat > "${env_file}" <<ENV
+API_DOMAIN=${API_DOMAIN}
+UI_DOMAIN=${UI_DOMAIN}
+BRANCH=${BRANCH}
+REPO_URL=${REPO_URL}
+ENV
+  chmod 600 "${env_file}"
+  log_info "Saved deployment config to ${env_file}"
+
+  local bin_hesabix="/usr/local/bin/hesabix"
+  cat > "${bin_hesabix}" <<'HESABIX_SCRIPT'
+#!/usr/bin/env bash
+# Hesabix CLI – update from repo and rebuild (run after deploy.sh at least once).
+set -euo pipefail
+APP_ROOT="${APP_ROOT:-/opt/hesabix}"
+if [[ $EUID -ne 0 ]]; then
+  echo "Run as root (e.g. sudo hesabix -update)" >&2
+  exit 1
+fi
+if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+  echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+  exit 1
+fi
+UPDATE_MODE=""
+SOURCE_URL=""
+BRANCH_OVERRIDE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -update) UPDATE_MODE=1 ;;
+    -source) SOURCE_URL="${2:-}"; shift ;;
+    -branch) BRANCH_OVERRIDE="${2:-}"; shift ;;
+    -h|--help)
+      echo "Usage: hesabix -update [-source REPO_URL] [-branch BRANCH]"
+      echo "  -update         Run update (pull, migrate, restart, rebuild frontend, reload nginx)"
+      echo "  -source URL     Override repo URL (default: from initial deploy)"
+      echo "  -branch NAME    Override branch (default: from initial deploy)"
+      exit 0 ;;
+    *) echo "Unknown option: $1. Use -h for help." >&2; exit 1 ;;
+  esac
+  shift
+done
+if [[ -z "${UPDATE_MODE}" ]]; then
+  echo "Usage: hesabix -update [-source REPO_URL] [-branch BRANCH]. Use -h for help."
+  exit 0
+fi
+set -a
+# shellcheck source=/dev/null
+source "${APP_ROOT}/.deploy_env"
+set +a
+[[ -n "${SOURCE_URL}" ]] && export REPO_URL="${SOURCE_URL}"
+[[ -n "${BRANCH_OVERRIDE}" ]] && export BRANCH="${BRANCH_OVERRIDE}"
+export APP_ROOT
+if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
+  echo "Update script not found: ${APP_ROOT}/app/update.sh. Pull the latest repo and run deploy again." >&2
+  exit 1
+fi
+exec bash "${APP_ROOT}/app/update.sh"
+HESABIX_SCRIPT
+  chmod 755 "${bin_hesabix}"
+  log_success "Command installed: hesabix (e.g. sudo hesabix -update)"
+}
+
 reset_deployment_state() {
   : "${RESET_STATE:=}"
   if [[ -z "${RESET_STATE}" ]] && [[ -f "${STATE_FILE}" ]]; then
@@ -1741,7 +1807,7 @@ configure_pgadmin4_ssl() {
 
 main() {
   if [[ $EUID -ne 0 ]]; then
-    echo "$CROSS_MARK Please run this script with root privileges (sudo)."
+    echo "$CROSS_MARK Please run this script with root privileges (e.g. sudo bash deploy.sh)."
     exit 1
   fi
   
@@ -1898,6 +1964,10 @@ main() {
     echo
   fi
   
+  # Save config and install hesabix command for future updates
+  install_hesabix_command
+  echo
+  
   # Clear state file on successful completion
   clear_deployment_state
   
@@ -1923,9 +1993,13 @@ main() {
   log_info "Deployment log file:"
   echo "  ${LOG_FILE}"
   echo
-  log_info "To re-run (resume from last step or upgrade):"
+  log_info "To update (pull, migrate, rebuild, restart):"
+  echo "  sudo hesabix -update"
+  echo "  sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git   # override repo"
+  echo
+  log_info "To re-run deploy (resume from last step or full upgrade):"
   echo "  BRANCH=${BRANCH} API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN} sudo -E bash deploy.sh"
-  echo "  (Use RESET_STATE=y to run all steps from the beginning, e.g. to pull and rebuild everything)"
+  echo "  (Use RESET_STATE=y to run all steps from the beginning)"
   echo
   log_info "Database password is stored in:"
   echo "  ${APP_ROOT}/.db_password"
