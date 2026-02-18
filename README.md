@@ -85,7 +85,7 @@ The easiest way to install Hesabix is using the automated installation script:
 cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
-> **مشکل HTTP/2 روی بعضی سرورها**: در برخی سرورها (مثلاً نسخه‌های قدیمی‌تر curl یا پیکربندی خاص شبکه/فایروال) استفاده از پروتکل HTTP/2 باعث خطا می‌شود. در دستور بالا از پرچم `--http1.1` استفاده شده تا همیشه از HTTP/1.1 استفاده شود. اگر با curl خطا گرفتید، به بخش [رفع مشکل HTTP/2](#رفع-مشکل-http2-در-دانلود-اسکریپت-نصب) در عیب‌یابی مراجعه کنید.
+> **HTTP/2 issue on some servers**: On some servers (e.g. older curl versions or specific network/firewall configuration), using HTTP/2 may cause errors. The command above uses the `--http1.1` flag to always use HTTP/1.1. If you get a curl error, see the [Troubleshooting HTTP/2](#troubleshooting-http2-when-downloading-install-script) section.
 
 **Alternative method using wget** (if curl still fails):
 ```bash
@@ -177,7 +177,7 @@ cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' >
 
 The script is idempotent and safe to re-run. It will update the code and restart services.
 
-> **مشکل HTTP/2**: در صورت بروز خطای مربوط به HTTP/2، از همان دستور با پرچم `--http1.1` استفاده کنید یا به بخش [رفع مشکل HTTP/2](#رفع-مشکل-http2-در-دانلود-اسکریپت-نصب) مراجعه کنید.
+> **HTTP/2 issue**: If you encounter an HTTP/2-related error, use the same command with the `--http1.1` flag or refer to the [Troubleshooting HTTP/2](#troubleshooting-http2-when-downloading-install-script) section.
 
 ## Configuration
 
@@ -217,38 +217,38 @@ journalctl -u hesabix-api -f
 
 ## Troubleshooting
 
-### رفع مشکل HTTP/2 در دانلود اسکریپت نصب
+### Troubleshooting HTTP/2 When Downloading Install Script
 
-برخی سرورها به‌دلیل نسخه curl، پیکربندی شبکه یا فایروال با پروتکل HTTP/2 مشکل دارند. در این حالت ممکن است هنگام دانلود اسکریپت نصب با خطاهایی مثل `curl: (92) HTTP/2 stream 1 was not closed cleanly` یا `HTTP/2 framing layer problem` مواجه شوید.
+Some servers have issues with HTTP/2 due to curl version, network configuration, or firewall. In such cases, you may see errors like `curl: (92) HTTP/2 stream 1 was not closed cleanly` or `HTTP/2 framing layer problem` when downloading the install script.
 
-**راه‌حل‌ها (به ترتیب اولویت):**
+**Solutions (in order of preference):**
 
-1. **استفاده از HTTP/1.1 با curl**  
-   پرچم `--http1.1` را حتماً در دستور قرار دهید:
+1. **Use HTTP/1.1 with curl**  
+   Always include the `--http1.1` flag in the command:
    ```bash
    curl -sSL --http1.1 -o installer.sh https://shell.hesabix.ir/deploy.sh
    ```
-   سپس:
+   Then run:
    ```bash
    cd /tmp && tr -d '\r' < installer.sh > installer_clean.sh && chmod +x installer_clean.sh && sudo bash installer_clean.sh
    ```
 
-2. **استفاده از wget به‌جای curl**  
-   wget به‌طور پیش‌فرض از HTTP/1.1 استفاده می‌کند:
+2. **Use wget instead of curl**  
+   wget uses HTTP/1.1 by default:
    ```bash
    cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
    ```
-   در صورت بروز خطای مربوط به گواهی SSL، می‌توانید به دستور wget گزینه `--no-check-certificate` اضافه کنید (فقط در محیط تست یا در صورت اطمینان).
+   If you get an SSL certificate error, you can add `--no-check-certificate` to the wget command (only in test environments or when you are sure it is safe).
 
-3. **بروزرسانی curl**  
-   اگر نسخه curl قدیمی است، آن را به‌روز کنید و دوباره با `--http1.1` امتحان کنید:
+3. **Update curl**  
+   If your curl version is old, update it and try again with `--http1.1`:
    ```bash
    # Ubuntu/Debian
    sudo apt update && sudo apt install --only-upgrade curl
    ```
 
-4. **دانلود دستی و آپلود به سرور**  
-   اگر هیچ‌کدام جواب نداد، فایل را روی سیستم دیگری با مرورگر یا curl دانلود کنید و با SCP/SFTP به سرور منتقل کنید، سپس اجرا کنید:
+4. **Manual download and upload to server**  
+   If none of the above works, download the file on another system using a browser or curl, then transfer it to the server via SCP/SFTP and run:
    ```bash
    chmod +x installer.sh && sudo bash installer.sh
    ```
