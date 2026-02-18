@@ -1327,6 +1327,7 @@ ensure_flutter_sdk() {
   if [[ $use_mirror -eq 1 ]]; then
     if [[ -x "${opt_flutter}/flutter" ]]; then
       export PATH="${opt_flutter}:$PATH"
+      git config --global --add safe.directory /opt/flutter 2>/dev/null || true
       log_info "Using Flutter from ${opt_flutter} (mirror mode; snap ignored so engine uses mirror)"
       return 0
     fi
@@ -1338,6 +1339,7 @@ ensure_flutter_sdk() {
     fi
     if [[ -x "${opt_flutter}/flutter" ]]; then
       export PATH="${opt_flutter}:$PATH"
+      git config --global --add safe.directory /opt/flutter 2>/dev/null || true
       log_info "Using Flutter from ${opt_flutter}"
       return 0
     fi
@@ -1386,6 +1388,7 @@ ensure_flutter_sdk() {
     fi
     if [[ $tarball_ok -eq 1 ]]; then
       export PATH="/opt/flutter/bin:$PATH"
+      git config --global --add safe.directory /opt/flutter 2>/dev/null || true
       log_success "Flutter SDK installed from internal mirror (${FLUTTER_SDK_TARBALL_URL_INTERNAL}). Pub packages will use PUB_HOSTED_URL."
       log_info "Running flutter doctor (first run may download packages from mirror)..."
       if ! flutter doctor -v 2>&1; then
@@ -1448,6 +1451,7 @@ ensure_flutter_sdk() {
     (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
   fi
   export PATH="/opt/flutter/bin:$PATH"
+  git config --global --add safe.directory /opt/flutter 2>/dev/null || true
   if ! command -v flutter >/dev/null 2>&1; then
     log_error "Flutter binary not found after install. Check /opt/flutter/bin."
     exit 1
