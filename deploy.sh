@@ -38,6 +38,9 @@ IFS=$'\n\t'
 # - Resume from failure: if a step fails, re-run the script to continue from that step
 #   (completed steps are skipped using .deploy_state)
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
+# - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
+#   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
+# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
 #
 # ============================================================================
 
@@ -845,6 +848,7 @@ deploy_backend() {
   
   cd "${api_dir}"
 
+  set_pip_mirror_env
   # Python venv + install
   if [[ ! -d ".venv" ]]; then
     python3 -m venv .venv
@@ -1143,6 +1147,50 @@ UNIT
   else
     log_warning "Notification Moderation Worker failed to start. Check logs: journalctl -u hesabix-notification-moderation"
   fi
+}
+
+# Set PyPI index (mirror) so pip works when pypi.org is blocked. Export PIP_INDEX_URL, PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
+# Call before any "pip install" (backend and pgAdmin4).
+set_pip_mirror_env() {
+  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
+    log_info "Using custom PyPI index: PIP_INDEX_URL=$PIP_INDEX_URL"
+    export PIP_INDEX_URL
+    [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && export PIP_EXTRA_INDEX_URL
+    [[ -n "${PIP_TRUSTED_HOST:-}" ]] && export PIP_TRUSTED_HOST
+    return 0
+  fi
+  log_info "Detecting PyPI mirror (for pip packages)..."
+  local index_url=""
+  if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://pypi.org/simple/" 2>/dev/null | grep -q '^[23]'; then
+    index_url="https://pypi.org/simple"
+  fi
+  if [[ -z "${index_url}" ]]; then
+    local mirrors=(
+      "https://pypi.tuna.tsinghua.edu.cn/simple"
+      "https://mirrors.aliyun.com/pypi/simple/"
+      "https://mirrors.cloud.tencent.com/pypi/simple"
+    )
+    for url in "${mirrors[@]}"; do
+      if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "${url}" 2>/dev/null | grep -q '^[23]'; then
+        index_url="$url"
+        break
+      fi
+    done
+  fi
+  if [[ -n "${index_url}" ]]; then
+    export PIP_INDEX_URL="${index_url}"
+    if [[ "${index_url}" != *"pypi.org"* ]]; then
+      local host
+      host=$(echo "${index_url}" | sed -n 's|https\?://\([^/]*\).*|\1|p')
+      export PIP_TRUSTED_HOST="${host}"
+      log_success "Using PyPI mirror: ${index_url}"
+    else
+      log_success "Using PyPI: ${index_url}"
+    fi
+    return 0
+  fi
+  log_warning "No reachable PyPI mirror; pip will use default (may fail if pypi.org is blocked). Set PIP_INDEX_URL to a mirror if needed."
+  return 0
 }
 
 # Detect and export Flutter/Dart mirror so SDK and package downloads work when Google is blocked.
@@ -1609,6 +1657,7 @@ install_pgadmin4() {
     return 0
   fi
   
+  set_pip_mirror_env
   export DEBIAN_FRONTEND=noninteractive
   apt-get install -y -qq python3-venv python3-pip libpq-dev >/dev/null 2>&1
   
