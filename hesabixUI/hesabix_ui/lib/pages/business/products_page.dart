@@ -22,6 +22,7 @@ import '../../utils/image_cache.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class ProductsPage extends StatefulWidget {
   final int businessId;
@@ -1309,17 +1310,29 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   );
                   if (confirm != true) return;
+                  final rawId = row['id'];
+                  final productId = rawId is int
+                      ? rawId
+                      : (rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''));
+                  if (productId == null) {
+                    if (!context.mounted) return;
+                    SnackBarHelper.showError(context, message: '${t.error}: شناسه کالا نامعتبر است');
+                    return;
+                  }
                   try {
                     final api = ApiClient();
                     await api.delete<Map<String, dynamic>>(
-                      '/products/business/${widget.businessId}/${row['id']}',
+                      '/products/business/${widget.businessId}/$productId',
                     );
                     if (!context.mounted) return;
                     SnackBarHelper.show(context, message: t.productDeletedSuccessfully);
                     try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
                   } catch (e) {
                     if (!context.mounted) return;
-                    SnackBarHelper.showError(context, message: '${t.error}: $e');
+                    SnackBarHelper.showError(
+                      context,
+                      message: ErrorExtractor.extractErrorMessage(e),
+                    );
                   }
                 },
               ),
@@ -1347,8 +1360,11 @@ class _ProductsPageState extends State<ProductsPage> {
                       final ids = <int>[];
                       for (final row in items) {
                         if (row is Map<String, dynamic>) {
-                          final id = row['id'];
-                          if (id is int) ids.add(id);
+                          final rawId = row['id'];
+                          final id = rawId is int
+                              ? rawId
+                              : (rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''));
+                          if (id != null) ids.add(id);
                         }
                       }
                       if (ids.isEmpty) return;
@@ -1375,8 +1391,10 @@ class _ProductsPageState extends State<ProductsPage> {
                       SnackBarHelper.show(context, message: t.productsDeletedSuccessfully);
                     } catch (e) {
                       if (!context.mounted) return;
-                      final t = AppLocalizations.of(context);
-                      SnackBarHelper.showError(context, message: '${t.error}: $e');
+                      SnackBarHelper.showError(
+                        context,
+                        message: ErrorExtractor.extractErrorMessage(e),
+                      );
                     }
                   },
                   icon: const Icon(Icons.delete_sweep_outlined),

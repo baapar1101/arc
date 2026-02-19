@@ -848,6 +848,18 @@ def check_product_has_related_documents(db: Session, product_id: int) -> tuple[b
         if "خط فاکتور" not in related_types:
             related_types.append("خط فاکتور")
     
+    # بررسی استفاده در فرمول تولید (BOM) - component یا output
+    from adapters.db.models.product_bom import ProductBOM
+    bom_component_count = db.query(func.count(ProductBOM.id)).filter(
+        ProductBOM.component_product_id == product_id
+    ).scalar()
+    bom_output_count = db.query(func.count(ProductBOM.id)).filter(
+        ProductBOM.output_product_id == product_id
+    ).scalar()
+    if (bom_component_count and bom_component_count > 0) or (bom_output_count and bom_output_count > 0):
+        if "فرمول تولید (BOM)" not in related_types:
+            related_types.append("فرمول تولید (BOM)")
+    
     return len(related_types) > 0, related_types
 
 

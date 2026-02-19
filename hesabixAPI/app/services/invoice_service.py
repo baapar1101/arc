@@ -779,6 +779,33 @@ def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
         return None
 
 
+def _normalize_document_extra_info_for_storage(extra_info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """نرمال‌سازی extra_info قبل از ذخیره در دیتابیس تا فیلدهای عددی (مثل person_id) به صورت int ذخیره شوند."""
+    if not extra_info or not isinstance(extra_info, dict):
+        return extra_info
+    from copy import deepcopy
+    out = deepcopy(extra_info)
+    for key in ("person_id", "seller_id"):
+        val = out.get(key)
+        if val is not None:
+            try:
+                out[key] = int(val)
+            except (TypeError, ValueError):
+                pass
+    links = out.get("links")
+    if isinstance(links, dict):
+        links = dict(links)
+        for key in ("warehouse_document_ids", "receipt_payment_document_ids"):
+            arr = links.get(key)
+            if isinstance(arr, list):
+                try:
+                    links[key] = [int(x) for x in arr if x is not None]
+                except (TypeError, ValueError):
+                    pass
+        out["links"] = links
+    return out
+
+
 def _movement_from_type(invoice_type: str) -> Tuple[Optional[str], Optional[str]]:
     # Returns (movement_for_goods, reverse_movement) hints. Not strictly used for accounting.
     if invoice_type == INVOICE_SALES:
@@ -1844,8 +1871,8 @@ def create_invoice(
         amount=abs(total_with_tax),
     )
 
-    # Enrich extra_info
-    new_extra_info = dict(header_extra)
+    # Enrich extra_info (نرمال‌سازی person_id و سایر فیلدهای عددی برای ذخیره یکسان در دیتابیس)
+    new_extra_info = _normalize_document_extra_info_for_storage(dict(header_extra)) or {}
     new_extra_info["totals"] = {
         "gross": float(Decimal(str(totals["gross"]))),
         "discount": float(Decimal(str(totals["discount"]))),
@@ -1983,7 +2010,7 @@ def create_invoice(
                 # در همه حالات طرح روی سند ذخیره می‌شود
                 extra = document.extra_info or {}
                 extra["installment_plan"] = plan_dict
-                document.extra_info = extra
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 # اگر سود اقساط مثبت باشد، ثبت‌های حسابداری سود اعمال می‌شود
                 if total_interest > 0:
                     # افزایش بدهکار دریافتنی به میزان سود کل اقساط
@@ -2528,8 +2555,8 @@ def create_invoice(
         links = dict(extra.get("links", {}))
         links["receipt_payment_document_ids"] = payment_docs
         extra["links"] = links
-        # به‌روزرسانی extra_info
-        document.extra_info = extra
+        # به‌روزرسانی extra_info (نرمال‌سازی برای ذخیره یکسان)
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
         # علامت‌گذاری برای به‌روزرسانی (برای JSON fields در SQLAlchemy)
         flag_modified(document, "extra_info")
         try:
@@ -2604,7 +2631,7 @@ def create_invoice(
                 links = dict((extra.get("links") or {}))
                 links["warehouse_document_ids"] = created_wh_ids
                 extra["links"] = links
-                document.extra_info = extra
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")
                 db.commit()
     except Exception as ex:
@@ -2713,8 +2740,8 @@ def update_invoice(
         # merge extra_info: ابتدا old_extra را کپی کن، سپس new_extra را merge کن
         old_extra = dict(document.extra_info) if document.extra_info else {}
         new_extra = dict(data.get("extra_info") or {})
-        # merge کردن: new_extra فیلدهای old_extra را override می‌کند
-        merged_extra = {**old_extra, **new_extra}
+        # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
+        merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
         document.extra_info = merged_extra
     if isinstance(data.get("description"), str) or data.get("description") is None:
         if data.get("description") is not None:
@@ -2867,7 +2894,7 @@ def update_invoice(
                 ex_old = document.extra_info or {}
                 ex_new = dict(ex_old)
                 ex_new["installment_plan"] = plan_dict
-                document.extra_info = ex_new
+                document.extra_info = _normalize_document_extra_info_for_storage(ex_new)
                 if total_interest > 0:
                     if person_id:
                         db.add(DocumentLine(
@@ -3364,7 +3391,7 @@ def update_invoice(
                     links = dict(extra.get("links", {}))
                     links["receipt_payment_document_ids"] = payment_docs
                     extra["links"] = links
-                    document.extra_info = extra
+                    document.extra_info = _normalize_document_extra_info_for_storage(extra)
                     from sqlalchemy.orm.attributes import flag_modified
                     flag_modified(document, "extra_info")
         except Exception as ex:
@@ -3747,8 +3774,8 @@ def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool
         links = dict(links)
         links['receipt_payment_document_ids'] = valid_ids
         extra_info['links'] = links
-        
-        document.extra_info = extra_info
+
+        document.extra_info = _normalize_document_extra_info_for_storage(extra_info)
         flag_modified(document, "extra_info")
         db.add(document)
         
@@ -3852,7 +3879,7 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "description": document.description,
         "project_id": document.project_id,
         "project_name": project_name,
-        "extra_info": document.extra_info,
+        "extra_info": _normalize_document_extra_info_for_storage(document.extra_info),
         "product_lines": product_lines,
         "account_lines": account_lines,
         "created_at": document.created_at.isoformat(),

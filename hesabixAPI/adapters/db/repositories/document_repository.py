@@ -5,6 +5,7 @@ Repository برای مدیریت اسناد حسابداری (Documents)
 from __future__ import annotations
 
 from typing import Optional, List, Dict, Any
+from copy import deepcopy
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func, desc, asc
 from datetime import date
@@ -274,6 +275,34 @@ class DocumentRepository:
         self.db.commit()
         return True
 
+    @staticmethod
+    def _normalize_extra_info_for_response(extra_info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """نرمال‌سازی extra_info برای پاسخ API تا فیلدهای عددی (مثل person_id) به صورت int برگردند."""
+        if not extra_info or not isinstance(extra_info, dict):
+            return extra_info
+        out = deepcopy(extra_info)
+        pid = out.get("person_id")
+        if pid is not None:
+            try:
+                out["person_id"] = int(pid)
+            except (TypeError, ValueError):
+                pass
+        links = out.get("links")
+        if isinstance(links, dict):
+            links = dict(links)
+            for key in ("warehouse_document_ids", "receipt_payment_document_ids"):
+                arr = links.get(key)
+                if isinstance(arr, list):
+                    normalized = []
+                    for x in arr:
+                        try:
+                            normalized.append(int(x))
+                        except (TypeError, ValueError):
+                            normalized.append(x)
+                    links[key] = normalized
+            out["links"] = links
+        return out
+
     def to_dict(self, document: Document) -> Dict[str, Any]:
         """تبدیل Document به dictionary (بدون سطرها)"""
         return {
@@ -289,7 +318,7 @@ class DocumentRepository:
             "is_proforma": document.is_proforma,
             "description": document.description,
             "project_id": document.project_id,
-            "extra_info": document.extra_info,
+            "extra_info": self._normalize_extra_info_for_response(document.extra_info),
             "developer_settings": document.developer_settings,
             "created_at": document.created_at,
             "updated_at": document.updated_at,
