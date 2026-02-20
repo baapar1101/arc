@@ -143,8 +143,16 @@ rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
 chown -R www-data:www-data "/var/www/${UI_DOMAIN}"
 log_ok "Frontend built and deployed to /var/www/${UI_DOMAIN}."
 
-# --- 4. Nginx reload ---
-log_info "Step 4: Reloading Nginx..."
+# --- 4. Nginx: ensure client_max_body_size 1g for database restore, then reload ---
+log_info "Step 4: Updating Nginx config and reloading..."
+if [[ -f /etc/nginx/sites-available/hesabix-api.conf ]]; then
+  if grep -q 'client_max_body_size' /etc/nginx/sites-available/hesabix-api.conf; then
+    sed -i 's/client_max_body_size [0-9]*[kmgKMG]*/client_max_body_size 1g/' /etc/nginx/sites-available/hesabix-api.conf
+  else
+    sed -i '/proxy_send_timeout 300;/a\    client_max_body_size 1g;' /etc/nginx/sites-available/hesabix-api.conf
+  fi
+  log_info "Ensured client_max_body_size 1g (database restore uploads)."
+fi
 if ! nginx -t 2>/dev/null; then
   log_err "Nginx config test failed."
   exit 1

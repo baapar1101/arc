@@ -304,6 +304,8 @@ app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
 app/services/dashboard_widgets_service.py
+app/services/database_backup_service.py
+app/services/database_restore_service.py
 app/services/document_monetization_background_jobs.py
 app/services/document_monetization_jobs.py
 app/services/document_monetization_service.py

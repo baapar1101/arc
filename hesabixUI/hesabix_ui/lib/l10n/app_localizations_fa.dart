@@ -6252,6 +6252,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها';
 
   @override
+  String get settingsDatabaseBackup => 'بکاپ دیتابیس';
+
+  @override
+  String get settingsDatabaseBackupDescription =>
+      'تهیه بکاپ از کل دیتابیس و ارسال به ایمیل، FTP یا دانلود مستقیم';
+
+  @override
   String get warranty => 'گارانتی';
 
   @override

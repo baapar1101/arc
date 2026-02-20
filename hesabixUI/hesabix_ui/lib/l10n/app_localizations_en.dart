@@ -6283,6 +6283,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'View logs of hesabix-api and hesabix-rq-worker and manage services';
 
   @override
+  String get settingsDatabaseBackup => 'Database Backup';
+
+  @override
+  String get settingsDatabaseBackupDescription =>
+      'Create full database backup and send to email, FTP or download directly';
+
+  @override
   String get warranty => 'Warranty';
 
   @override

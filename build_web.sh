@@ -349,8 +349,16 @@ free -h | head -2
 echo ""
 
 # Run build with memory settings and parallel compilation
+# Flutter always outputs to build/web inside the project; copy to BUILD_DIR if different
+FLUTTER_OUTPUT="$APP_DIR/build/web"
 if ! flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"; then
   die "flutter build web failed. If you saw 'exit code -9' or 'Killed', the server ran out of memory (OOM). Add more swap or use a machine with more RAM, then re-run."
+fi
+# Copy to custom build-dir when user specified a path other than default
+if [ "$BUILD_DIR" != "$FLUTTER_OUTPUT" ]; then
+  echo "Copying build output to $BUILD_DIR ..."
+  mkdir -p "$BUILD_DIR"
+  cp -r "$FLUTTER_OUTPUT"/* "$BUILD_DIR/" || die "Failed to copy build output to $BUILD_DIR"
 fi
 if [ ! -f "$BUILD_DIR/index.html" ]; then
   die "flutter build web did not produce index.html. Flutter SDK may be broken (e.g. Dart SDK download failed). Try: rm -rf /opt/flutter && re-run deploy with mirror set."

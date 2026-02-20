@@ -4,12 +4,21 @@ from typing import Dict, Any, Optional
 from urllib.parse import urlsplit, urlunsplit
 import structlog
 
-from fastapi import APIRouter, Depends, Body, Request
+from fastapi import APIRouter, Depends, Body, Request, Query, UploadFile, File, BackgroundTasks
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
+from app.services.database_backup_service import DatabaseBackupService, DatabaseBackupError
+from app.services.database_restore_service import (
+	DatabaseRestoreService,
+	DatabaseRestoreError,
+	CONFIRMATION_TOKEN,
+	CONFIRMATION_TOKEN_EN,
+)
+from app.services.job_manager import JobManager
 from pydantic import BaseModel, Field
 from app.services.system_settings_service import (
 	get_wallet_settings,
@@ -539,3 +548,164 @@ def set_notification_sms_pricing_endpoint(
 		event_type_prices=payload.event_type_prices,
 	)
 	return success_response(data, request, message="NOTIFICATION_SMS_PRICING_UPDATED")
+
+
+# --- Database Backup ---
+
+
+class DatabaseBackupPayload(BaseModel):
+	"""Payload اختیاری برای بکاپ. برای email نیاز به email، برای ftp نیاز به storage_config_id."""
+	email: Optional[str] = Field(None, description="آدرس ایمیل گیرنده (برای delivery=email)")
+	storage_config_id: Optional[str] = Field(None, description="شناسه StorageConfig با نوع ftp (برای delivery=ftp)")
+
+
+@router.post(
+	"/database-backup",
+	summary="بکاپ دیتابیس",
+	description="ایجاد بکاپ کامل دیتابیس و تحویل به روش download، email یا ftp. تنها برای مدیر سیستم.",
+)
+def create_database_backup_endpoint(
+	request: Request,
+	delivery: str = Query(..., description="download | email | ftp"),
+	compress: bool = Query(True, description="فشرده‌سازی با gzip"),
+	payload: Optional[DatabaseBackupPayload] = Body(None),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+):
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+
+	service = DatabaseBackupService(db)
+	delivery_lower = (delivery or "").lower().strip()
+
+	try:
+		if delivery_lower == "download":
+			content, filename = service.deliver_download(compress=compress)
+			return Response(
+				content=content,
+				media_type="application/octet-stream",
+				headers={
+					"Content-Disposition": f'attachment; filename="{filename}"',
+				},
+			)
+
+		elif delivery_lower == "email":
+			email_val = (payload and payload.email or "").strip()
+			if not email_val:
+				raise ApiError("EMAIL_REQUIRED", "آدرس ایمیل برای تحویل به ایمیل الزامی است.", http_status=400)
+			ok = service.deliver_email(to_email=email_val, compress=compress)
+			if not ok:
+				raise ApiError("EMAIL_SEND_FAILED", "ارسال ایمیل ناموفق بود.", http_status=500)
+			return success_response(
+				{"sent": True, "to": email_val},
+				request,
+				message="DATABASE_BACKUP_EMAIL_SENT",
+			)
+
+		elif delivery_lower == "ftp":
+			config_id = (payload and payload.storage_config_id or "").strip()
+			if not config_id:
+				raise ApiError("STORAGE_CONFIG_REQUIRED", "شناسه تنظیمات FTP الزامی است.", http_status=400)
+			result = service.deliver_ftp(storage_config_id=config_id, compress=compress)
+			return success_response(result, request, message="DATABASE_BACKUP_FTP_UPLOADED")
+
+		else:
+			raise ApiError(
+				"INVALID_DELIVERY",
+				"مقدار delivery باید یکی از download، email یا ftp باشد.",
+				http_status=400,
+			)
+
+	except DatabaseBackupError as e:
+		raise ApiError("BACKUP_FAILED", str(e), http_status=500)
+
+
+@router.post(
+	"/database-restore",
+	summary="ریستور دیتابیس",
+	description="بازیابی کامل دیتابیس از فایل بکاپ .sql یا .sql.gz. نیاز به تأیید. به صورت Job پس‌زمینه اجرا می‌شود. تنها برای superadmin.",
+)
+async def create_database_restore_endpoint(
+	request: Request,
+	file: UploadFile = File(..., description="فایل بکاپ .sql یا .sql.gz"),
+	confirmation: str = Query(..., description="برای تأیید عبارت 'بازیابی' یا 'RESTORE' را وارد کنید"),
+	background_tasks: BackgroundTasks = None,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+):
+	if not ctx.has_any_permission("superadmin"):
+		raise ApiError("FORBIDDEN", "فقط superadmin می‌تواند ریستور دیتابیس انجام دهد.", http_status=403)
+
+	confirmation_clean = (confirmation or "").strip()
+	if confirmation_clean not in (CONFIRMATION_TOKEN, CONFIRMATION_TOKEN_EN):
+		raise ApiError(
+			"CONFIRMATION_REQUIRED",
+			f"برای تأیید ریستور، عبارت '{CONFIRMATION_TOKEN}' یا '{CONFIRMATION_TOKEN_EN}' را وارد کنید.",
+			http_status=400,
+		)
+
+	filename = (file.filename or "").strip()
+	if not filename:
+		raise ApiError("FILE_REQUIRED", "فایل بکاپ الزامی است.", http_status=400)
+
+	basename = filename.lower()
+	if not (basename.endswith(".sql") or basename.endswith(".sql.gz") or basename.endswith(".gz")):
+		raise ApiError(
+			"INVALID_FILE_TYPE",
+			"فرمت فایل باید .sql یا .sql.gz باشد.",
+			http_status=400,
+		)
+
+	try:
+		content = await file.read()
+	except Exception as e:
+		raise ApiError("FILE_READ_ERROR", f"خواندن فایل ناموفق بود: {str(e)}", http_status=400) from e
+
+	if len(content) < 100:
+		raise ApiError("INVALID_FILE", "فایل بکاپ خیلی کوچک است یا نامعتبر است.", http_status=400)
+
+	# ذخیره در فایل موقت
+	import tempfile
+	import os
+	suffix = ".sql.gz" if basename.endswith(".gz") else ".sql"
+	fd, temp_path = tempfile.mkstemp(suffix=suffix)
+	try:
+		os.write(fd, content)
+		os.close(fd)
+	except Exception as e:
+		try:
+			os.close(fd)
+		except Exception:
+			pass
+		raise ApiError("TEMP_FILE_ERROR", f"ذخیره موقت فایل ناموفق بود: {str(e)}", http_status=500) from e
+
+	jm = JobManager.instance()
+	job_id = jm.create("ریستور دیتابیس در صف")
+
+	def task():
+		try:
+			jm.start(job_id, "شروع ریستور دیتابیس")
+
+			def on_progress(percent: int, message: str):
+				jm.update(job_id, percent, message)
+
+			service = DatabaseRestoreService(on_progress=on_progress)
+			service.restore(temp_path)
+			jm.succeed(job_id, {"message": "ریستور با موفقیت انجام شد"})
+		except DatabaseRestoreError as e:
+			jm.fail(job_id, str(e))
+		except Exception as e:
+			jm.fail(job_id, str(e))
+		finally:
+			try:
+				os.unlink(temp_path)
+			except Exception:
+				pass
+
+	background_tasks.add_task(task)
+
+	return success_response(
+		{"job_id": job_id, "message": "ریستور در پس‌زمینه شروع شد"},
+		request,
+		message="DATABASE_RESTORE_STARTED",
+	)

@@ -2529,6 +2529,8 @@
   "settingsSystemMonitoringDescription": "بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها",
   "settingsServiceLogs": "لاگ‌های سرویس‌ها",
   "settingsServiceLogsDescription": "مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها",
+  "settingsDatabaseBackup": "بکاپ دیتابیس",
+  "settingsDatabaseBackupDescription": "تهیه بکاپ از کل دیتابیس و ارسال به ایمیل، FTP یا دانلود مستقیم",
   "warranty": "گارانتی",
   "warrantyManagement": "مدیریت گارانتی",
   "warrantySettings": "تنظیمات گارانتی",

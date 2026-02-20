@@ -32,6 +32,7 @@ import 'pages/admin/email_settings_page.dart';
 import 'pages/admin/redis_settings_page.dart';
 import 'pages/admin/system_monitoring_page.dart';
 import 'pages/admin/service_logs_page.dart';
+import 'pages/admin/database_backup_page.dart';
 import 'pages/admin/announcements_admin_page.dart';
 import 'pages/admin/businesses_list_page.dart';
 import 'pages/admin/support_operators_page.dart';
@@ -1419,6 +1420,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const ServiceLogsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'database-backup',
+                  name: 'system_settings_database_backup',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const DatabaseBackupPage();
                   },
                 ),
               ],

@@ -58,12 +58,16 @@ ensure_flutter_in_path() {
   if cmd_exists flutter; then
     return 0
   fi
-  local SNAP_FLUTTER_BIN="$HOME/snap/flutter/common/flutter/bin"
-  if [ -d "$SNAP_FLUTTER_BIN" ]; then
-    export PATH="$PATH:$SNAP_FLUTTER_BIN"
-  fi
+  # Same locations as deploy.sh: /opt/flutter (tarball/git), then snap
+  local candidates=("/opt/flutter/bin" "/snap/bin" "$HOME/snap/flutter/current/flutter/bin" "$HOME/snap/flutter/common/flutter/bin")
+  for candidate in "${candidates[@]}"; do
+    if [ -n "$candidate" ] && [ -x "${candidate}/flutter" ] 2>/dev/null; then
+      export PATH="${candidate}:$PATH"
+      break
+    fi
+  done
   if ! cmd_exists flutter; then
-    die "Flutter not found. Please install it or configure PATH. Suggested path: $SNAP_FLUTTER_BIN"
+    die "Flutter not found. Please install it or configure PATH. Suggested: /opt/flutter/bin (deploy.sh) or $HOME/snap/flutter/common/flutter/bin"
   fi
 }
 

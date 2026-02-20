@@ -1,6 +1,8 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -96,6 +98,52 @@ class EmailService:
         html_body = context.get('html_body')
         
         return self.send_email(to, subject, body, html_body, config_id)
+
+    def send_email_with_attachment(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        attachment_filename: str,
+        attachment_content: bytes,
+        config_id: Optional[int] = None,
+    ) -> bool:
+        """
+        ارسال ایمیل با فایل پیوست.
+        برای فایل‌های بکاپ و گزارش‌ها استفاده می‌شود.
+        """
+        try:
+            if config_id:
+                config = self.email_repo.get_by_id(config_id)
+            else:
+                config = self.email_repo.get_default_config()
+                if not config:
+                    config = self.email_repo.get_active_config()
+            if not config:
+                return False
+
+            msg = MIMEMultipart("mixed")
+            msg["From"] = f"{config.from_name} <{config.from_email}>"
+            msg["To"] = to
+            msg["Subject"] = subject
+
+            text_part = MIMEText(body, "plain", "utf-8")
+            msg.attach(text_part)
+
+            attachment_part = MIMEBase("application", "octet-stream")
+            attachment_part.set_payload(attachment_content)
+            encoders.encode_base64(attachment_part)
+            attachment_part.add_header(
+                "Content-Disposition",
+                "attachment",
+                filename=("utf-8", "", attachment_filename),
+            )
+            msg.attach(attachment_part)
+
+            return self._send_smtp_email(config, msg)
+        except Exception as e:
+            print(f"Error sending email with attachment: {e}")
+            return False
 
     def test_connection(self, config_id: int) -> bool:
         """

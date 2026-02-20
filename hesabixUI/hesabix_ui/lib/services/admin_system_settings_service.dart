@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import '../core/api_client.dart';
 
 class AdminSystemSettingsService {
@@ -64,6 +68,85 @@ class AdminSystemSettingsService {
       '/api/v1/admin/system-settings/notification-sms-pricing',
       data: data,
     );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  /// ایجاد بکاپ دیتابیس و دانلود مستقیم. برگرداندن بایت‌های فایل.
+  Future<Uint8List> createDatabaseBackupDownload({bool compress = true}) async {
+    final res = await _api.post<List<int>>(
+      '/api/v1/admin/system-settings/database-backup',
+      data: {},
+      query: {'delivery': 'download', 'compress': compress.toString()},
+      responseType: ResponseType.bytes,
+      options: Options(
+        headers: {'Accept': 'application/octet-stream'},
+        receiveTimeout: const Duration(minutes: 10),
+      ),
+    );
+    final data = res.data ?? const <int>[];
+    return Uint8List.fromList(data);
+  }
+
+  /// ارسال بکاپ دیتابیس به ایمیل.
+  Future<Map<String, dynamic>> createDatabaseBackupEmail({
+    required String email,
+    bool compress = true,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/database-backup',
+      data: {'email': email},
+      query: {'delivery': 'email', 'compress': compress.toString()},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  /// ارسال بکاپ دیتابیس به FTP.
+  Future<Map<String, dynamic>> createDatabaseBackupFtp({
+    required String storageConfigId,
+    bool compress = true,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/database-backup',
+      data: {'storage_config_id': storageConfigId},
+      query: {'delivery': 'ftp', 'compress': compress.toString()},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  /// ریستور دیتابیس از فایل بکاپ. برگرداندن job_id برای پیگیری وضعیت.
+  Future<String> startDatabaseRestore({
+    required List<int> fileBytes,
+    required String filename,
+    required String confirmation,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        fileBytes,
+        filename: filename,
+      ),
+    });
+
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/database-restore',
+      data: formData,
+      query: {'confirmation': confirmation},
+      options: Options(
+        headers: {'Content-Type': 'multipart/form-data'},
+        receiveTimeout: const Duration(seconds: 10),
+      ),
+    );
+
+    final data = res.data?['data'] as Map?;
+    final jobId = data?['job_id'] as String?;
+    if (jobId == null || jobId.isEmpty) {
+      throw Exception('job_id دریافت نشد');
+    }
+    return jobId;
+  }
+
+  /// دریافت وضعیت job ریستور دیتابیس.
+  Future<Map<String, dynamic>> getJobStatus(String jobId) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/jobs/$jobId');
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 }

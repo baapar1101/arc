@@ -2487,6 +2487,8 @@
   "settingsSystemMonitoringDescription": "Check system status, hardware resources and services",
   "settingsServiceLogs": "Service Logs",
   "settingsServiceLogsDescription": "View logs of hesabix-api and hesabix-rq-worker and manage services",
+  "settingsDatabaseBackup": "Database Backup",
+  "settingsDatabaseBackupDescription": "Create full database backup and send to email, FTP or download directly",
   "warranty": "Warranty",
   "warrantyManagement": "Warranty Management",
   "warrantySettings": "Warranty Settings",

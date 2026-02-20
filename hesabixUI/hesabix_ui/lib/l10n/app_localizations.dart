@@ -11861,6 +11861,18 @@ abstract class AppLocalizations {
   /// **'View logs of hesabix-api and hesabix-rq-worker and manage services'**
   String get settingsServiceLogsDescription;
 
+  /// No description provided for @settingsDatabaseBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Database Backup'**
+  String get settingsDatabaseBackup;
+
+  /// No description provided for @settingsDatabaseBackupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create full database backup and send to email, FTP or download directly'**
+  String get settingsDatabaseBackupDescription;
+
   /// No description provided for @warranty.
   ///
   /// In en, this message translates to:

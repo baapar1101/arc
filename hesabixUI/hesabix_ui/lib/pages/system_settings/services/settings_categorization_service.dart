@@ -382,6 +382,17 @@ class SettingsCategorizationService {
             categoryId: 'monitoring_logs',
             order: 3,
           ),
+          SettingsItem(
+            id: 'database_backup',
+            title: 'settingsDatabaseBackup',
+            description: 'settingsDatabaseBackupDescription',
+            icon: Icons.backup_outlined,
+            color: const Color(0xFF37474F),
+            route: '/user/profile/system-settings/database-backup',
+            categoryId: 'monitoring_logs',
+            order: 4,
+            requiresSuperAdmin: true,
+          ),
         ],
       ),
     ];

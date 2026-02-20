@@ -1636,7 +1636,7 @@ server {
     proxy_read_timeout 300;
     proxy_connect_timeout 60;
     proxy_send_timeout 300;
-    client_max_body_size 20m;
+    client_max_body_size 1g;
     
     # WebSocket support (if needed in future)
     proxy_set_header Upgrade \$http_upgrade;

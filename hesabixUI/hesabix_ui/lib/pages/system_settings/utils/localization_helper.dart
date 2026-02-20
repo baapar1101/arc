@@ -53,6 +53,8 @@ class LocalizationHelper {
         return t.settingsSystemMonitoring;
       case 'settingsServiceLogs':
         return t.settingsServiceLogs;
+      case 'settingsDatabaseBackup':
+        return t.settingsDatabaseBackup;
       default:
         return key;
     }
@@ -109,6 +111,8 @@ class LocalizationHelper {
         return t.settingsSystemMonitoringDescription;
       case 'settingsServiceLogsDescription':
         return t.settingsServiceLogsDescription;
+      case 'settingsDatabaseBackupDescription':
+        return t.settingsDatabaseBackupDescription;
       default:
         return key;
     }
