@@ -2,11 +2,11 @@
 
 import datetime
 from fastapi import APIRouter, Depends, Request, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.captcha_service import create_captcha
 from app.services.auth_service import register_user, login_user, create_password_reset, reset_password, change_password, referral_stats
 from app.services.email_verification_service import verify_email_token, resend_verification_email
@@ -1401,17 +1401,61 @@ def verify_email(
 	request: Request,
 	token: str = Query(..., description="Token verification از ایمیل"),
 	db: Session = Depends(get_db)
-) -> dict:
-	"""تایید ایمیل کاربر با token"""
-	user = verify_email_token(db, token)
-	
+):
+	"""تایید ایمیل کاربر با token. در مرورگر یک صفحهٔ خوانا و در API همان JSON برمی‌گردد."""
+	accept = request.headers.get("accept", "") or ""
+	wants_html = "text/html" in accept
+
+	try:
+		user = verify_email_token(db, token)
+	except ApiError as e:
+		if wants_html:
+			msg = "لینک نامعتبر یا منقضی شده است."
+			if isinstance(getattr(e, "detail", None), dict):
+				err = e.detail.get("error") if isinstance(e.detail.get("error"), dict) else {}
+				msg = err.get("message", msg)
+			html = _verify_email_html(success=False, message=msg)
+			return HTMLResponse(content=html, status_code=e.status_code)
+		raise
+
 	response_data = {
 		"user_id": user.id,
 		"email": user.email,
 		"email_verified": user.email_verified
 	}
-	
+	if wants_html:
+		html = _verify_email_html(success=True, message="ایمیل شما با موفقیت تایید شد.")
+		return HTMLResponse(content=html)
+
 	return success_response(response_data, request, message="EMAIL_VERIFIED")
+
+
+def _verify_email_html(*, success: bool, message: str) -> str:
+	"""صفحهٔ HTML ساده برای نمایش نتیجهٔ تایید ایمیل در مرورگر (RTL)."""
+	title = "تایید ایمیل" if success else "خطا در تایید ایمیل"
+	icon = "✅" if success else "❌"
+	color = "#22c55e" if success else "#dc2626"
+	return f"""<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{title}</title>
+	<style>
+		body {{ font-family: Tahoma, Arial, sans-serif; background: #f8fafc; margin: 0; padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }}
+		.card {{ background: white; border-radius: 12px; padding: 2rem; max-width: 420px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }}
+		.icon {{ font-size: 3rem; margin-bottom: 1rem; }}
+		.message {{ color: #334155; font-size: 1.1rem; line-height: 1.6; }}
+	</style>
+</head>
+<body>
+	<div class="card">
+		<div class="icon">{icon}</div>
+		<h1 style="color: {color}; margin: 0 0 1rem;">{title}</h1>
+		<p class="message">{message}</p>
+	</div>
+</body>
+</html>"""
 
 
 @router.post(
