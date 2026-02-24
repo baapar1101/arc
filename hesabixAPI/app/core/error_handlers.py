@@ -89,7 +89,8 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 		message = detail
 	elif isinstance(detail, dict) and "detail" in detail:
 		message = str(detail["detail"])
-	if translator is not None:
+	# اگر پیام مشخص از اپلیکیشن داریم، همان را نگه می‌داریم؛ وگرنه از ترجمهٔ عمومی HTTP_ERROR استفاده می‌کنیم
+	if not (message and message.strip()) and translator is not None:
 		message = translator.t("HTTP_ERROR", default=message)
 	return JSONResponse(status_code=status_code, content={"success": False, "error": {"code": "HTTP_ERROR", "message": message}})
 

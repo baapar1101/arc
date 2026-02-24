@@ -1643,6 +1643,27 @@ server {
     proxy_set_header X-Forwarded-Port \$server_port;
   }
 
+  # لینک اشتراک عمومی: /p/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  location /p/ {
+    proxy_pass http://127.0.0.1:8000/p/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+  # وقتی API و UI روی یک دامنه هستند: مسیرهای /public/ را از روت UI سرو کن (SPA)
+  location /public/ {
+    root /var/www/${UI_DOMAIN};
+    try_files \$uri \$uri/ /index.html;
+  }
+
   location / {
     return 404;
   }
@@ -1741,6 +1762,21 @@ server {
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+  # لینک اشتراک عمومی: /p/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  location /p/ {
+    proxy_pass http://127.0.0.1:8000/p/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
   location /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
@@ -1766,6 +1802,11 @@ server {
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_read_timeout 86400;
     proxy_send_timeout 86400;
+  }
+
+  # SPA: مسیرهای عمومی (لینک اشتراک و غیره) → index.html
+  location /public/ {
+    try_files \$uri \$uri/ /index.html;
   }
 
   location / {

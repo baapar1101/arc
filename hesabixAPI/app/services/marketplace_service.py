@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -804,18 +804,23 @@ def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) ->
 
 	# بررسی انقضا
 	is_expired = False
-	if license.ends_at and license.ends_at < now:
-		is_expired = True
-		if license.status == "active":
-			license.status = "expired"
-			db.commit()
+	if license.ends_at:
+		ends_at_val = license.ends_at.date() if isinstance(license.ends_at, datetime) else license.ends_at
+		now_val = now.date() if isinstance(now, datetime) else now
+		if ends_at_val < now_val:
+			is_expired = True
+			if license.status == "active":
+				license.status = "expired"
+				db.commit()
 
 	is_active = license.status == "active" and not is_expired
 	
 	# محاسبه روزهای باقی‌مانده trial
 	trial_remaining_days = None
 	if license.is_trial and license.ends_at:
-		remaining = (license.ends_at - now).days
+		ends_at_val = license.ends_at.date() if isinstance(license.ends_at, datetime) else license.ends_at
+		now_val = now.date() if isinstance(now, datetime) else now
+		remaining = (ends_at_val - now_val).days
 		trial_remaining_days = max(0, remaining)
 
 	return {
@@ -862,26 +867,31 @@ def list_business_plugins(db: Session, business_id: int) -> List[Dict[str, Any]]
 
 				# بررسی انقضا
 				is_expired = False
-				if license.ends_at and license.ends_at < now:
-					is_expired = True
-					if license.status == "active":
-						try:
-							license.status = "expired"
-							db.commit()
-						except SQLAlchemyError as e:
-							logger.warning(
-								f"Failed to update expired license status for license_id={license.id}: {str(e)}",
-								extra={"license_id": license.id, "business_id": business_id}
-							)
-							db.rollback()
-							# ادامه می‌دهیم حتی اگر commit fail شود
+				if license.ends_at:
+					ends_at_val = license.ends_at.date() if isinstance(license.ends_at, datetime) else license.ends_at
+					now_val = now.date() if isinstance(now, datetime) else now
+					if ends_at_val < now_val:
+						is_expired = True
+						if license.status == "active":
+							try:
+								license.status = "expired"
+								db.commit()
+							except SQLAlchemyError as e:
+								logger.warning(
+									f"Failed to update expired license status for license_id={license.id}: {str(e)}",
+									extra={"license_id": license.id, "business_id": business_id}
+								)
+								db.rollback()
+								# ادامه می‌دهیم حتی اگر commit fail شود
 
 				is_active = license.status == "active" and not is_expired
 				
 				# محاسبه روزهای باقی‌مانده trial
 				trial_remaining_days = None
 				if license.is_trial and license.ends_at:
-					remaining = (license.ends_at - now).days
+					ends_at_val = license.ends_at.date() if isinstance(license.ends_at, datetime) else license.ends_at
+					now_val = now.date() if isinstance(now, datetime) else now
+					remaining = (ends_at_val - now_val).days
 					trial_remaining_days = max(0, remaining)
 
 				result.append({

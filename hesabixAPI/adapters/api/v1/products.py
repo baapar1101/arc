@@ -51,6 +51,74 @@ import os
 router = APIRouter(prefix="/products", tags=["محصولات و کالاها", "انبارداری"])
 
 
+async def _get_products_search_query_info(request: Request) -> QueryInfo:
+	"""
+	خواندن پارامترهای جستجوی محصولات از body (JSON) یا در صورت خالی بودن از query string.
+	برای سازگاری با پروکسی/کلاینت‌هایی که body را در query می‌فرستند.
+	"""
+	import json
+	body_bytes = await request.body()
+	if body_bytes and body_bytes.strip():
+		try:
+			data = json.loads(body_bytes)
+			if isinstance(data, dict) and data:
+				return QueryInfo(**{k: v for k, v in data.items() if k in (
+					"take", "skip", "sort_by", "sort_desc", "search", "search_fields",
+					"filters", "include_inventory", "inventory_as_of_date"
+				)})
+		except (json.JSONDecodeError, TypeError, ValueError):
+			pass
+	q = request.query_params
+	def _int(name: str, default: int) -> int:
+		v = q.get(name)
+		if v is None:
+			return default
+		try:
+			return int(v)
+		except (ValueError, TypeError):
+			return default
+	def _bool(name: str, default: bool) -> bool:
+		v = q.get(name)
+		if v is None:
+			return default
+		return str(v).lower() in ("1", "true", "yes", "on")
+	filters_val = q.get("filters")
+	filters_parsed = None
+	if filters_val:
+		try:
+			filters_parsed = json.loads(filters_val)
+			if not isinstance(filters_parsed, list):
+				filters_parsed = None
+		except (json.JSONDecodeError, TypeError):
+			pass
+	return QueryInfo(
+		take=max(1, min(1000, _int("take", 20))),
+		skip=max(0, _int("skip", 0)),
+		sort_by=q.get("sort_by") or None,
+		sort_desc=_bool("sort_desc", False),
+		search=q.get("search") or None,
+		search_fields=None,
+		filters=filters_parsed,
+		include_inventory=_bool("include_inventory", False),
+		inventory_as_of_date=q.get("inventory_as_of_date") or None,
+	)
+
+
+def _ensure_products_pagination(result: Dict[str, Any], take: int, skip: int) -> None:
+	"""
+	اطمینان از وجود فیلدهای pagination (total_count, has_more) در پاسخ.
+	برای پاسخ تازه از list_products معمولاً وجود دارند؛ برای کش قدیمی ممکن است نباشند.
+	"""
+	if not isinstance(result, dict):
+		return
+	items = result.get("items") or []
+	if "total_count" not in result:
+		result["total_count"] = len(items)
+	if "has_more" not in result:
+		total = result.get("total_count", len(items))
+		result["has_more"] = (skip + take) < total
+
+
 @router.post(
     "/business/{business_id}",
     summary="ایجاد محصول جدید",
@@ -317,6 +385,8 @@ def search_products_endpoint(
 		cache_key = f"products_search:{business_id}:{ctx.get_user_id()}:{key_hash}"
 		cached = cache.get(cache_key)
 		if cached is not None:
+			# پاسخ کش‌شده ممکن است فاقد pagination باشد (کش قدیمی)؛ برای فرانت همیشه pagination لازم است
+			_ensure_products_pagination(cached, query_info.take, query_info.skip)
 			return success_response(data=cached, request=request)
 
 	try:
@@ -330,6 +400,7 @@ def search_products_endpoint(
 			"include_inventory": query_info.include_inventory,
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		})
+		_ensure_products_pagination(result, query_info.take, query_info.skip)
 		formatted = format_datetime_fields(result, request)
 
 		if cache.enabled and cache_key:

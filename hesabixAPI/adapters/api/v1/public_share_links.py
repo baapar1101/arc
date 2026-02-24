@@ -63,6 +63,7 @@ async def get_public_invoice_details_endpoint(
 )
 async def redirect_public_person_link(
 	code: str,
+	request: Request,
 	db: Session = Depends(get_db),
 ):
 	settings = get_share_link_settings(db)
@@ -70,7 +71,9 @@ async def redirect_public_person_link(
 	default_base = (get_settings().share_link_public_app_url or "").strip()
 	if default_base.lower().endswith("/public"):
 		default_base = default_base[:-len("/public")].rstrip("/")
-	base_url = configured_base or default_base
+	# اگر در تنظیمات base مشخص نشده، از همان دامنهٔ درخواست استفاده کن (مثلاً hsxn.hesabix.ir)
+	same_origin_base = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+	base_url = configured_base or same_origin_base or default_base
 	target_base = (base_url.rstrip("/") or "/public") + "/public"
 	target_url = f"{target_base}/person-link/{code}"
 	return RedirectResponse(url=target_url, status_code=307)
