@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import logging
 
 from fastapi import APIRouter, Depends, Request, Body, HTTPException
@@ -40,11 +40,14 @@ def create_link(
 	bot_username = settings.get("telegram_bot_username") or ""
 	deep_link = f"https://t.me/{bot_username}?start={link.token}" if bot_username else None
 	# اطمینان از اینکه expires_at با Z (UTC) برگردانده می‌شود
-	# اگر datetime بدون timezone باشد، آن را به UTC تبدیل کن
-	if link.expires_at.tzinfo is None:
-		expires_at_utc = link.expires_at.replace(tzinfo=timezone.utc)
+	# پشتیبانی از date و datetime (برخی دیتابیس‌ها date برمی‌گردانند)
+	exp = link.expires_at
+	if isinstance(exp, date) and not isinstance(exp, datetime):
+		expires_at_utc = datetime.combine(exp, datetime.min.time(), tzinfo=timezone.utc)
+	elif exp.tzinfo is None:
+		expires_at_utc = exp.replace(tzinfo=timezone.utc)
 	else:
-		expires_at_utc = link.expires_at.astimezone(timezone.utc)
+		expires_at_utc = exp.astimezone(timezone.utc)
 	expires_at_iso = expires_at_utc.isoformat()
 	return success_response(
 		{

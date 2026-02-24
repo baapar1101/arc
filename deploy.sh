@@ -876,6 +876,18 @@ SQL
   else
     log_warning "Connection test failed, but database may still be accessible. Continuing..."
   fi
+
+  # Apply PostgreSQL optimization config (max_connections=300, shared_buffers, work_mem, etc.)
+  local pg_conf_source="${APP_ROOT}/app/config/postgresql-hesabix.conf"
+  local pg_conf_dest="/etc/postgresql/${pg_version}/main/conf.d/hesabix-optimization.conf"
+  if [[ -f "${pg_conf_source}" ]]; then
+    log_info "Applying PostgreSQL optimization config..."
+    sudo cp "${pg_conf_source}" "${pg_conf_dest}" 2>/dev/null && \
+      sudo chown postgres:postgres "${pg_conf_dest}" && \
+      sudo chmod 644 "${pg_conf_dest}" && \
+      log_success "PostgreSQL optimization config applied. Restarting PostgreSQL..." && \
+      systemctl restart "${pg_service:-postgresql}" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
+  fi
 }
 
 deploy_backend() {
@@ -1619,8 +1631,35 @@ server {
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+  # روت ریشه (اطلاعات سرویس و نسخه)
+  location = / {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+  }
+
   location / {
     return 404;
+  }
+
+  # Swagger UI, ReDoc, OpenAPI schema و assets مستندات
+  location ~ ^/(docs|docs-custom|redoc|openapi\.json|assets/) {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
   }
 
   location /api/ {
@@ -1638,9 +1677,24 @@ server {
     proxy_send_timeout 300;
     client_max_body_size 1g;
     
-    # WebSocket support (if needed in future)
     proxy_set_header Upgrade \$http_upgrade;
     proxy_set_header Connection "upgrade";
+  }
+
+  # WebSocket endpoints (/ws/notifications, /ws/ai/voice, etc.)
+  location /ws/ {
+    proxy_pass http://127.0.0.1:8000/ws/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 86400;
+    proxy_send_timeout 86400;
   }
 }
 NGINX
@@ -1686,6 +1740,33 @@ server {
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+  # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 300;
+    proxy_send_timeout 300;
+    client_max_body_size 1g;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+  location /ws/ {
+    proxy_pass http://127.0.0.1:8000/ws/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 86400;
+    proxy_send_timeout 86400;
+  }
 
   location / {
     try_files \$uri \$uri/ /index.html;

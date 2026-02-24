@@ -401,21 +401,23 @@ class ServiceMonitoringService:
 	def check_notification_moderation_worker(self) -> Dict[str, Any]:
 		"""بررسی وضعیت Notification Moderation Worker"""
 		try:
+			import shutil
 			import subprocess
 			
 			service_name = "hesabix-notification-moderation"
+			is_active = False
 			
-			# بررسی فعال بودن سرویس
-			is_active_cmd = ["systemctl", "is-active", service_name]
-			is_active_result = subprocess.run(
-				is_active_cmd,
-				capture_output=True,
-				text=True,
-				timeout=5,
-				check=False
-			)
-			
-			is_active = is_active_result.stdout.strip() == "active"
+			# بررسی فعال بودن سرویس - فقط اگر systemctl در دسترس باشد
+			if shutil.which("systemctl"):
+				is_active_cmd = ["systemctl", "is-active", service_name]
+				is_active_result = subprocess.run(
+					is_active_cmd,
+					capture_output=True,
+					text=True,
+					timeout=5,
+					check=False
+				)
+				is_active = is_active_result.stdout.strip() == "active"
 			
 			# دریافت آمار از دیتابیس
 			from adapters.db.models.business_notification import NotificationModerationQueue
