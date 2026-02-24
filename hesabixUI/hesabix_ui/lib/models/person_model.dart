@@ -1,3 +1,12 @@
+/// Converts JSON value to bool safely (handles int 0/1 and string 'true'/'false' from API).
+bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
+  if (v == null) return defaultValue;
+  if (v is bool) return v;
+  if (v is int) return v != 0;
+  if (v is String) return v.toLowerCase() == 'true' || v == '1';
+  return defaultValue;
+}
+
 class PersonBankAccount {
   final int? id;
   final int personId;
@@ -29,7 +38,7 @@ class PersonBankAccount {
       accountNumber: json['account_number'],
       cardNumber: json['card_number'],
       shebaNumber: json['sheba_number'],
-      isActive: json['is_active'] ?? true,
+      isActive: _fromJsonBool(json['is_active'], true),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -203,7 +212,7 @@ class Person {
       fax: json['fax'],
       email: json['email'],
       website: json['website'],
-      isActive: json['is_active'] ?? true,
+      isActive: _fromJsonBool(json['is_active'], true),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
@@ -214,9 +223,9 @@ class Person {
       commissionSalesReturnPercent: (json['commission_sales_return_percent'] as num?)?.toDouble(),
       commissionSalesAmount: (json['commission_sales_amount'] as num?)?.toDouble(),
       commissionSalesReturnAmount: (json['commission_sales_return_amount'] as num?)?.toDouble(),
-      commissionExcludeDiscounts: json['commission_exclude_discounts'] ?? false,
-      commissionExcludeAdditionsDeductions: json['commission_exclude_additions_deductions'] ?? false,
-      commissionPostInInvoiceDocument: json['commission_post_in_invoice_document'] ?? false,
+      commissionExcludeDiscounts: _fromJsonBool(json['commission_exclude_discounts'], false),
+      commissionExcludeAdditionsDeductions: _fromJsonBool(json['commission_exclude_additions_deductions'], false),
+      commissionPostInInvoiceDocument: _fromJsonBool(json['commission_post_in_invoice_document'], false),
       balance: (json['balance'] as num?)?.toDouble(),
       status: json['status'] as String?,
     );
