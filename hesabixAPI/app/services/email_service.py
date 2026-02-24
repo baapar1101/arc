@@ -165,6 +165,12 @@ class EmailService:
         """Get the currently active email configuration"""
         return self.email_repo.get_active_config()
 
+    def is_configured(self) -> bool:
+        """بررسی وجود پیکربندی ایمیل (پیش‌فرض یا فعال) برای ارسال"""
+        return bool(
+            self.email_repo.get_default_config() or self.email_repo.get_active_config()
+        )
+
     def get_all_configs(self) -> List[EmailConfig]:
         """Get all email configurations"""
         return self.email_repo.get_all_configs()

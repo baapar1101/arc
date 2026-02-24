@@ -485,20 +485,29 @@ class DataTableResponse<T> {
       items = [];
     }
     
-    // Support both old and new pagination shapes
+    // Support both old and new pagination shapes (persons-style pagination + products-style total_count/has_more)
     final pagination = data['pagination'] as Map<String, dynamic>?;
-    final total = pagination != null
+    int total = pagination != null
         ? (pagination['total'] as num?)?.toInt() ?? 0
         : (data['total'] as num?)?.toInt() ?? 0;
-    final page = pagination != null
+    int page = pagination != null
         ? (pagination['page'] as num?)?.toInt() ?? 1
         : (data['page'] as num?)?.toInt() ?? 1;
-    final limit = pagination != null
+    int limit = pagination != null
         ? (pagination['per_page'] as num?)?.toInt() ?? 20
-        : (data['limit'] as num?)?.toInt() ?? 20;
-    final totalPages = pagination != null
+        : (data['limit'] as num?)?.toInt() ?? (data['per_page'] as num?)?.toInt() ?? 20;
+    int totalPages = pagination != null
         ? (pagination['total_pages'] as num?)?.toInt() ?? 0
         : (data['total_pages'] as num?)?.toInt() ?? 0;
+    // Fallback: اگر pagination نبود ولی total_count یا has_more برگشته (مثلاً API کالاها)، برای DataTable محاسبه کن
+    if (total == 0 && (data['total_count'] as num?) != null) {
+      total = (data['total_count'] as num).toInt();
+    }
+    if (totalPages == 0 && total > 0 && limit > 0) {
+      totalPages = ((total - 1) ~/ limit) + 1;
+    }
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 20;
     
     // Parse items safely
     final parsedItems = <T>[];

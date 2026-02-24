@@ -77,13 +77,12 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 	if not user:
 		return False
 	
-	# ساخت لینک verification
+	# ساخت لینک verification (مسیر API: /api/v1/auth/verify-email)
+	settings = get_settings()
 	if not base_url:
-		settings = get_settings()
-		# استفاده از تنظیمات یا مقدار پیش‌فرض
-		base_url = "https://app.hesabix.com"  # TODO: از تنظیمات سیستم بخوان
-	
-	verify_url = f"{base_url}/verify-email?{urlencode({'token': token})}"
+		base_url = getattr(settings, "public_base_url", None) or "https://app.hesabix.com"
+	api_prefix = getattr(settings, "api_v1_prefix", "/api/v1")
+	verify_url = f"{base_url.rstrip('/')}{api_prefix}/auth/verify-email?{urlencode({'token': token})}"
 	
 	# ساخت محتوای ایمیل
 	user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "کاربر گرامی"

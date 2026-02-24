@@ -13,6 +13,10 @@ class EmailProvider:
 		self.email_service = EmailService(db)
 		self.user_repo = UserRepository(db)
 
+	def is_configured(self) -> bool:
+		"""بررسی اینکه پیکربندی ایمیل (SMTP) برای ارسال وجود دارد یا نه"""
+		return self.email_service.is_configured()
+
 	def send(self, *, user_id: int, subject: str, body_text: str, body_html: Optional[str] = None) -> bool:
 		user = self.user_repo.db.get(self.user_repo.model_class, user_id)
 		if user is None or not getattr(user, "email", None):

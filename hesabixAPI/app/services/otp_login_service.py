@@ -149,13 +149,11 @@ class OtpLoginService:
 			available_channels.append("sms")
 			logger.info(f"get_available_channels - SMS channel added")
 		
-		# بررسی Email
-		if email:
-			# بررسی اینکه Email Provider پیکربندی شده باشد
-			# EmailProvider نیاز به user_id دارد، پس باید کاربر وجود داشته باشد
-			if user:
-				available_channels.append("email")
-				logger.info(f"get_available_channels - Email channel added for user_id: {user.id}")
+		# بررسی Email - هم برای شناسهٔ ایمیل هم برای شناسهٔ موبایل (اگر کاربر در پروفایل ایمیل داشته باشد)
+		email_configured = self.email_provider.is_configured()
+		if user and getattr(user, "email", None) and email_configured:
+			available_channels.append("email")
+			logger.info(f"get_available_channels - Email channel added for user_id: {user.id}")
 		
 		# بررسی Telegram
 		telegram_configured = self.telegram_provider.is_configured()
@@ -309,6 +307,8 @@ class OtpLoginService:
 			if not user:
 				# برای جلوگیری از user enumeration، همان خطای کانال را برمی‌گردانیم
 				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال ایمیل برای این شناسه در دسترس نیست", http_status=400)
+			if not self.email_provider.is_configured():
+				raise ApiError("EMAIL_NOT_CONFIGURED", "سرویس ایمیل پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
 		if channel == "telegram":
 			# بررسی دقیق‌تر: اگر user پیدا نشد یا telegram_chat_id ندارد
 			logger.info(f"send_login_otp - checking telegram channel - user: {user is not None}, user_id: {user.id if user else None}, telegram_chat_id: {user.telegram_chat_id if user else None}")

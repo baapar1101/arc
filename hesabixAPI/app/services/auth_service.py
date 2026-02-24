@@ -709,7 +709,15 @@ def update_user_email(
 				http_status=400
 			)
 	
-	# 8. باطل کردن verification tokens قبلی (اختیاری - tokens قبلی خود به خود منقضی می‌شوند)
+	# 8. اگر با force_unverified ایمیل کاربر دیگری (تایید نشده) را می‌گیریم، ابتدا ایمیل آن کاربر را خالی می‌کنیم تا محدودیت یکتایی نقض نشود
+	if not availability["available"] and availability["requires_confirmation"]:
+		repo = UserRepository(db)
+		other_user = repo.get_by_email(email_n)
+		if other_user and other_user.id != user_id:
+			other_user.email = None
+			other_user.email_verified = False
+			db.add(other_user)
+			db.flush()
 	
 	# 9. به‌روزرسانی ایمیل
 	user.email = email_n

@@ -421,11 +421,25 @@ class ProductResponse(BaseModel):
         }
 
 
+class ProductListPagination(BaseModel):
+    """اطلاعات صفحه‌بندی لیست (هم‌شکل با پاسخ لیست اشخاص برای DataTable)"""
+    total: int = Field(..., description="تعداد کل رکوردها")
+    page: int = Field(..., description="شماره صفحه فعلی (از ۱)")
+    per_page: int = Field(..., description="تعداد در هر صفحه")
+    total_pages: int = Field(..., description="تعداد کل صفحات")
+    has_next: bool = Field(..., description="آیا صفحه بعدی وجود دارد")
+    has_prev: bool = Field(..., description="آیا صفحه قبلی وجود دارد")
+
+
 class ProductListResponse(BaseModel):
-    """پاسخ لیست محصولات"""
+    """پاسخ لیست محصولات (هم‌شکل با لیست اشخاص برای DataTable و pagination)"""
     items: List[ProductResponse] = Field(..., description="لیست محصولات")
     total_count: int = Field(..., description="تعداد کل")
     has_more: bool = Field(..., description="آیا رکورد بیشتری وجود دارد")
+    pagination: Optional[ProductListPagination] = Field(
+        None,
+        description="اطلاعات صفحه‌بندی برای نمایش دکمه‌های صفحه بعدی/قبلی در DataTable",
+    )
 
 
 class BulkPriceUpdateType(str, Enum):
