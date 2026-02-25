@@ -23,6 +23,7 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/warranty/warranty_code_details_dialog.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../utils/snackbar_helper.dart';
 
 class PersonDetailsDialog extends StatefulWidget {
@@ -213,7 +214,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _shareLinkError = e.toString();
+        _shareLinkError = _friendlyShareLinkError(e);
         _loadingShareLink = false;
       });
     }
@@ -244,13 +245,14 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       setState(() {
         _shareLink = link;
       });
-      SnackBarHelper.showSuccess(context, message: 'لینک اشتراک با موفقیت ایجاد شد');
+      SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).personShareLinkCreated);
     } catch (e) {
       if (!mounted) return;
+      final friendly = _friendlyShareLinkError(e);
       setState(() {
-        _shareLinkError = e.toString();
+        _shareLinkError = friendly;
       });
-      SnackBarHelper.showError(context, message: 'خطا در ایجاد لینک: $e');
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).personShareLinkCreateError);
     } finally {
       if (mounted) {
         setState(() => _creatingShareLink = false);
@@ -267,12 +269,20 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       if (!mounted) return;
       setState(() {
         _shareLink = null;
+        _shareLinkError = null;
         _maxViewsController.clear();
+        _selectedExpiryHours = 168;
+        _includeLedger = true;
+        _includeInvoices = true;
+        _documentsLimit = 50;
       });
-      SnackBarHelper.show(context, message: 'لینک اشتراک لغو شد');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).personShareLinkRevoked);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در لغو لینک: $e');
+      setState(() {
+        _shareLinkError = _friendlyShareLinkError(e);
+      });
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).personShareLinkRevokeError);
     } finally {
       if (mounted) {
         setState(() => _revokingShareLink = false);
@@ -280,12 +290,37 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     }
   }
 
+  /// پیام خطای قابل‌نمایش برای کاربر (بدون جزئیات فنی)
+  static String _friendlyShareLinkError(Object? e) {
+    if (e is DioException) {
+      final code = e.response?.statusCode;
+      if (code == 403) return 'دسترسی غیرمجاز.';
+      if (code == 404) return 'منبع یافت نشد.';
+      if (code != null && code >= 500) return 'خطای سرور. لطفاً بعداً تلاش کنید.';
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        return 'خطای ارتباط با سرور.';
+      }
+    }
+    return 'عملیات ناموفق بود.';
+  }
+
   Future<void> _copyShareLink() async {
     final link = _shareLink?.shortUrl;
     if (link == null || link.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
-    SnackBarHelper.showSuccess(context, message: 'لینک در کلیپ‌بورد کپی شد');
+    SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).personShareLinkCopied);
+  }
+
+  Future<void> _copyAndShareLink() async {
+    final link = _shareLink?.shortUrl;
+    if (link == null || link.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: link));
+    await Share.share(link);
+    if (!mounted) return;
+    SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).personShareLinkCopiedAndShare);
   }
 
   Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
@@ -421,7 +456,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   _buildAccountCardTab(t, theme),
                   if (widget.isWarrantyPluginActive) _buildWarrantyTab(t, theme),
                   _buildAttachmentsTab(theme),
-                  _buildShareTab(theme),
+                  _buildShareTab(t, theme),
                 ],
               ),
             ),
@@ -935,7 +970,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     );
   }
 
-  Widget _buildShareTab(ThemeData theme) {
+  Widget _buildShareTab(AppLocalizations t, ThemeData theme) {
     if (_loadingShareLink) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -955,30 +990,31 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             FilledButton.icon(
               onPressed: _loadShareLinkStatus,
               icon: const Icon(Icons.refresh),
-              label: const Text('تلاش مجدد'),
+              label: Text(t.personShareRetry),
             ),
           ],
         ),
       );
     }
 
+    final canEditPeople = widget.authStore.canWriteSection('people');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_shareLink != null) _buildActiveShareLinkCard(theme, _shareLink!),
-          _buildShareLinkSettingsCard(theme),
+          if (_shareLink != null) _buildActiveShareLinkCard(t, theme, _shareLink!, canEditPeople),
+          _buildShareLinkSettingsCard(t, theme, canEditPeople),
         ],
       ),
     );
   }
 
-  Widget _buildActiveShareLinkCard(ThemeData theme, PersonShareLink link) {
+  Widget _buildActiveShareLinkCard(AppLocalizations t, ThemeData theme, PersonShareLink link, bool canEditPeople) {
     final formatter = NumberFormat('#,##0');
     final isJalali = _calendarController?.isJalali ?? true;
-    final expiryText = link.expiresAt != null ? HesabixDateUtils.formatDateTime(link.expiresAt, isJalali) : 'بدون انقضا';
-    final lastViewText = link.lastViewAt != null ? HesabixDateUtils.formatDateTime(link.lastViewAt, isJalali) : 'ثبت نشده';
+    final expiryText = link.expiresAt != null ? HesabixDateUtils.formatDateTime(link.expiresAt, isJalali) : t.personShareNoExpiry;
+    final lastViewText = link.lastViewAt != null ? HesabixDateUtils.formatDateTime(link.lastViewAt, isJalali) : t.personShareNotSet;
     final viewCount = formatter.format(link.viewCount);
 
     Color statusColor;
@@ -1006,7 +1042,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('لینک فعال', style: theme.textTheme.titleMedium),
+                      Text(t.personShareLinkActive, style: theme.textTheme.titleMedium),
                       const SizedBox(height: 6),
                       SelectableText(
                         link.shortUrl,
@@ -1019,7 +1055,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   ),
                 ),
                 IconButton(
-                  tooltip: 'کپی لینک',
+                  tooltip: t.copyLink,
                   onPressed: _copyShareLink,
                   icon: const Icon(Icons.copy),
                 ),
@@ -1030,10 +1066,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               spacing: 12,
               runSpacing: 12,
               children: [
-                _shareLinkStatChip(theme, 'وضعیت', link.status, statusColor),
-                _shareLinkStatChip(theme, 'انقضا', expiryText, theme.colorScheme.onSurface),
-                _shareLinkStatChip(theme, 'بازدید', viewCount, theme.colorScheme.primary),
-                _shareLinkStatChip(theme, 'آخرین بازدید', lastViewText, theme.colorScheme.onSurface),
+                _shareLinkStatChip(theme, t.personShareStatus, link.status, statusColor),
+                _shareLinkStatChip(theme, t.personShareExpiry, expiryText, theme.colorScheme.onSurface),
+                _shareLinkStatChip(theme, t.personShareViews, viewCount, theme.colorScheme.primary),
+                _shareLinkStatChip(theme, t.personShareLastView, lastViewText, theme.colorScheme.onSurface),
               ],
             ),
             const SizedBox(height: 16),
@@ -1042,12 +1078,12 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               runSpacing: 12,
               children: [
                 FilledButton.icon(
-                  onPressed: _copyShareLink,
+                  onPressed: _copyAndShareLink,
                   icon: const Icon(Icons.share),
                   label: const Text('کپی و ارسال لینک'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _revokingShareLink ? null : _revokeShareLink,
+                  onPressed: canEditPeople && !_revokingShareLink ? _revokeShareLink : null,
                   icon: _revokingShareLink
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.link_off),
@@ -1062,7 +1098,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             ),
             const SizedBox(height: 8),
             Text(
-              'این لینک کوتاه برای ارسال در پیامک و شبکه‌های اجتماعی آماده است.',
+              t.personShareLinkHint,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
@@ -1096,12 +1132,12 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     );
   }
 
-  Widget _buildShareLinkSettingsCard(ThemeData theme) {
+  Widget _buildShareLinkSettingsCard(AppLocalizations t, ThemeData theme, bool canEditPeople) {
     final expiryOptions = <Map<String, dynamic>>[
-      {'label': '۷ روز (پیش‌فرض)', 'value': 168},
-      {'label': '۱۴ روز', 'value': 336},
-      {'label': '۳۰ روز', 'value': 720},
-      {'label': 'بدون انقضا', 'value': null},
+      {'label': t.personShareExpiry7Days, 'value': 168},
+      {'label': t.personShareExpiry14Days, 'value': 336},
+      {'label': t.personShareExpiry30Days, 'value': 720},
+      {'label': t.personShareExpiryNone, 'value': null},
     ];
 
     return Card(
@@ -1110,16 +1146,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ساخت لینک جدید', style: theme.textTheme.titleMedium),
+            Text(t.personShareCreateNew, style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             Text(
-              'با ایجاد لینک جدید، لینک قبلی (در صورت وجود) غیرفعال می‌شود.',
+              t.personShareCreateWarning,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<int?>(
               value: _selectedExpiryHours,
-              decoration: const InputDecoration(labelText: 'زمان اعتبار لینک'),
+              decoration: InputDecoration(labelText: t.personShareExpiryLabel),
               items: expiryOptions
                   .map(
                     (opt) => DropdownMenuItem<int?>(
@@ -1134,16 +1170,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             TextField(
               controller: _maxViewsController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'حداکثر تعداد بازدید مجاز',
-                hintText: 'مثلاً 5 (خالی = بدون محدودیت)',
+              decoration: InputDecoration(
+                labelText: t.personShareMaxViewsLabel,
+                hintText: t.personShareMaxViewsHint,
               ),
             ),
             const SizedBox(height: 20),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('تعداد ردیف کارت حساب', style: theme.textTheme.bodyMedium),
+                Text(t.personShareDocumentsLimit, style: theme.textTheme.bodyMedium),
                 Slider(
                   value: _documentsLimit.toDouble(),
                   min: 10,
@@ -1156,32 +1192,39 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             ),
             SwitchListTile.adaptive(
               value: _includeLedger,
-              title: const Text('نمایش کارت حساب'),
-              subtitle: const Text('فهرست تراکنش‌های حساب شخص'),
+              title: Text(t.personShareIncludeLedger),
+              subtitle: Text(t.personShareIncludeLedgerSubtitle),
               onChanged: (value) => setState(() => _includeLedger = value),
             ),
             SwitchListTile.adaptive(
               value: _includeInvoices,
-              title: const Text('نمایش لیست فاکتورها'),
-              subtitle: const Text('آخرین فاکتورهای مرتبط با این شخص'),
+              title: Text(t.personShareIncludeInvoices),
+              subtitle: Text(t.personShareIncludeInvoicesSubtitle),
               onChanged: (value) => setState(() => _includeInvoices = value),
             ),
+            if (!_includeLedger && !_includeInvoices) ...[
+              const SizedBox(height: 8),
+              Text(
+                t.personShareValidationAtLeastOne,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
                 FilledButton.icon(
-                  onPressed: _creatingShareLink ? null : _createShareLink,
+                  onPressed: canEditPeople && !_creatingShareLink && (_includeLedger || _includeInvoices) ? _createShareLink : null,
                   icon: _creatingShareLink
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.link),
-                  label: Text(_creatingShareLink ? 'در حال تولید...' : _shareLink == null ? 'ایجاد لینک' : 'تولید لینک جدید'),
+                  label: Text(_creatingShareLink ? t.personShareCreating : _shareLink == null ? t.personShareCreateButton : t.personShareCreateButtonNew),
                 ),
                 TextButton.icon(
                   onPressed: _loadingShareLink ? null : _loadShareLinkStatus,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('تازه‌سازی اطلاعات'),
+                  label: Text(t.personShareRefresh),
                 ),
               ],
             ),
@@ -1190,6 +1233,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               Text(
                 _shareLinkError!,
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+            ],
+            if (!canEditPeople) ...[
+              const SizedBox(height: 12),
+              Text(
+                t.personSharePermissionHint,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ],

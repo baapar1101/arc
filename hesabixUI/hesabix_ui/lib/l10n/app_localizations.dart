@@ -11645,6 +11645,240 @@ abstract class AppLocalizations {
   /// **'Configure public share link destinations'**
   String get settingsShareLinksDescription;
 
+  /// No description provided for @personShareLinkActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active link'**
+  String get personShareLinkActive;
+
+  /// No description provided for @personShareCopyAndSendLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy and share link'**
+  String get personShareCopyAndSendLink;
+
+  /// No description provided for @personShareRevokeLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke link'**
+  String get personShareRevokeLink;
+
+  /// No description provided for @personShareRevoking.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoking...'**
+  String get personShareRevoking;
+
+  /// No description provided for @personShareRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get personShareRefreshStatus;
+
+  /// No description provided for @personShareLinkHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This short link is ready to share via SMS or social networks.'**
+  String get personShareLinkHint;
+
+  /// No description provided for @personShareStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get personShareStatus;
+
+  /// No description provided for @personShareExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry'**
+  String get personShareExpiry;
+
+  /// No description provided for @personShareViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get personShareViews;
+
+  /// No description provided for @personShareLastView.
+  ///
+  /// In en, this message translates to:
+  /// **'Last view'**
+  String get personShareLastView;
+
+  /// No description provided for @personShareCreateNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new link'**
+  String get personShareCreateNew;
+
+  /// No description provided for @personShareCreateWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a new link will deactivate the previous one (if any).'**
+  String get personShareCreateWarning;
+
+  /// No description provided for @personShareExpiryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Link validity'**
+  String get personShareExpiryLabel;
+
+  /// No description provided for @personShareExpiry7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days (default)'**
+  String get personShareExpiry7Days;
+
+  /// No description provided for @personShareExpiry14Days.
+  ///
+  /// In en, this message translates to:
+  /// **'14 days'**
+  String get personShareExpiry14Days;
+
+  /// No description provided for @personShareExpiry30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get personShareExpiry30Days;
+
+  /// No description provided for @personShareExpiryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get personShareExpiryNone;
+
+  /// No description provided for @personShareMaxViewsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Max views allowed'**
+  String get personShareMaxViewsLabel;
+
+  /// No description provided for @personShareMaxViewsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'1–1000 or empty (unlimited). e.g. 5'**
+  String get personShareMaxViewsHint;
+
+  /// No description provided for @personShareDocumentsLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Account card row count'**
+  String get personShareDocumentsLimit;
+
+  /// No description provided for @personShareIncludeLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'Show account card'**
+  String get personShareIncludeLedger;
+
+  /// No description provided for @personShareIncludeLedgerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'List of person account transactions'**
+  String get personShareIncludeLedgerSubtitle;
+
+  /// No description provided for @personShareIncludeInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Show invoice list'**
+  String get personShareIncludeInvoices;
+
+  /// No description provided for @personShareIncludeInvoicesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest invoices for this person'**
+  String get personShareIncludeInvoicesSubtitle;
+
+  /// No description provided for @personShareCreateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create link'**
+  String get personShareCreateButton;
+
+  /// No description provided for @personShareCreateButtonNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new link'**
+  String get personShareCreateButtonNew;
+
+  /// No description provided for @personShareCreating.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating...'**
+  String get personShareCreating;
+
+  /// No description provided for @personShareRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get personShareRefresh;
+
+  /// No description provided for @personShareValidationAtLeastOne.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one of “Show account card” or “Show invoice list” must be enabled.'**
+  String get personShareValidationAtLeastOne;
+
+  /// No description provided for @personSharePermissionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You need edit permission on people to create or revoke links.'**
+  String get personSharePermissionHint;
+
+  /// No description provided for @personShareLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get personShareLinkCopied;
+
+  /// No description provided for @personShareLinkCopiedAndShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied; you can share it via SMS or social networks.'**
+  String get personShareLinkCopiedAndShare;
+
+  /// No description provided for @personShareRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get personShareRetry;
+
+  /// No description provided for @personShareNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get personShareNoExpiry;
+
+  /// No description provided for @personShareNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get personShareNotSet;
+
+  /// No description provided for @personShareLinkCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Share link created successfully'**
+  String get personShareLinkCreated;
+
+  /// No description provided for @personShareLinkRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Share link revoked'**
+  String get personShareLinkRevoked;
+
+  /// No description provided for @personShareLinkCreateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create link'**
+  String get personShareLinkCreateError;
+
+  /// No description provided for @personShareLinkRevokeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to revoke link'**
+  String get personShareLinkRevokeError;
+
   /// No description provided for @settingsRedisCache.
   ///
   /// In en, this message translates to:

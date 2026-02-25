@@ -6128,6 +6128,130 @@ class AppLocalizationsFa extends AppLocalizations {
       'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی';
 
   @override
+  String get personShareLinkActive => 'لینک فعال';
+
+  @override
+  String get personShareCopyAndSendLink => 'کپی و ارسال لینک';
+
+  @override
+  String get personShareRevokeLink => 'لغو لینک';
+
+  @override
+  String get personShareRevoking => 'در حال لغو...';
+
+  @override
+  String get personShareRefreshStatus => 'بروزرسانی وضعیت';
+
+  @override
+  String get personShareLinkHint =>
+      'این لینک کوتاه برای ارسال در پیامک و شبکه‌های اجتماعی آماده است.';
+
+  @override
+  String get personShareStatus => 'وضعیت';
+
+  @override
+  String get personShareExpiry => 'انقضا';
+
+  @override
+  String get personShareViews => 'بازدید';
+
+  @override
+  String get personShareLastView => 'آخرین بازدید';
+
+  @override
+  String get personShareCreateNew => 'ساخت لینک جدید';
+
+  @override
+  String get personShareCreateWarning =>
+      'با ایجاد لینک جدید، لینک قبلی (در صورت وجود) غیرفعال می‌شود.';
+
+  @override
+  String get personShareExpiryLabel => 'زمان اعتبار لینک';
+
+  @override
+  String get personShareExpiry7Days => '۷ روز (پیش‌فرض)';
+
+  @override
+  String get personShareExpiry14Days => '۱۴ روز';
+
+  @override
+  String get personShareExpiry30Days => '۳۰ روز';
+
+  @override
+  String get personShareExpiryNone => 'بدون انقضا';
+
+  @override
+  String get personShareMaxViewsLabel => 'حداکثر تعداد بازدید مجاز';
+
+  @override
+  String get personShareMaxViewsHint =>
+      '۱ تا ۱۰۰۰ یا خالی (بدون محدودیت). مثلاً ۵';
+
+  @override
+  String get personShareDocumentsLimit => 'تعداد ردیف کارت حساب';
+
+  @override
+  String get personShareIncludeLedger => 'نمایش کارت حساب';
+
+  @override
+  String get personShareIncludeLedgerSubtitle => 'فهرست تراکنش‌های حساب شخص';
+
+  @override
+  String get personShareIncludeInvoices => 'نمایش لیست فاکتورها';
+
+  @override
+  String get personShareIncludeInvoicesSubtitle =>
+      'آخرین فاکتورهای مرتبط با این شخص';
+
+  @override
+  String get personShareCreateButton => 'ایجاد لینک';
+
+  @override
+  String get personShareCreateButtonNew => 'تولید لینک جدید';
+
+  @override
+  String get personShareCreating => 'در حال تولید...';
+
+  @override
+  String get personShareRefresh => 'تازه‌سازی اطلاعات';
+
+  @override
+  String get personShareValidationAtLeastOne =>
+      'حداقل یکی از «نمایش کارت حساب» یا «نمایش لیست فاکتورها» باید فعال باشد.';
+
+  @override
+  String get personSharePermissionHint =>
+      'برای ایجاد یا لغو لینک به دسترسی ویرایش اشخاص نیاز است.';
+
+  @override
+  String get personShareLinkCopied => 'لینک در کلیپ‌بورد کپی شد';
+
+  @override
+  String get personShareLinkCopiedAndShare =>
+      'لینک کپی شد؛ می‌توانید در پیامک یا شبکه‌های اجتماعی ارسال کنید.';
+
+  @override
+  String get personShareRetry => 'تلاش مجدد';
+
+  @override
+  String get personShareNoExpiry => 'بدون انقضا';
+
+  @override
+  String get personShareNotSet => 'ثبت نشده';
+
+  @override
+  String get personShareLinkCreated => 'لینک اشتراک با موفقیت ایجاد شد';
+
+  @override
+  String get personShareLinkRevoked => 'لینک اشتراک لغو شد';
+
+  @override
+  String get personShareLinkCreateError => 'خطا در ایجاد لینک';
+
+  @override
+  String get personShareLinkRevokeError => 'خطا در لغو لینک';
+
+  @override
   String get settingsRedisCache => 'تنظیمات Redis Cache';
 
   @override

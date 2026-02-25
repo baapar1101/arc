@@ -6158,6 +6158,130 @@ class AppLocalizationsEn extends AppLocalizations {
       'Configure public share link destinations';
 
   @override
+  String get personShareLinkActive => 'Active link';
+
+  @override
+  String get personShareCopyAndSendLink => 'Copy and share link';
+
+  @override
+  String get personShareRevokeLink => 'Revoke link';
+
+  @override
+  String get personShareRevoking => 'Revoking...';
+
+  @override
+  String get personShareRefreshStatus => 'Refresh status';
+
+  @override
+  String get personShareLinkHint =>
+      'This short link is ready to share via SMS or social networks.';
+
+  @override
+  String get personShareStatus => 'Status';
+
+  @override
+  String get personShareExpiry => 'Expiry';
+
+  @override
+  String get personShareViews => 'Views';
+
+  @override
+  String get personShareLastView => 'Last view';
+
+  @override
+  String get personShareCreateNew => 'Create new link';
+
+  @override
+  String get personShareCreateWarning =>
+      'Creating a new link will deactivate the previous one (if any).';
+
+  @override
+  String get personShareExpiryLabel => 'Link validity';
+
+  @override
+  String get personShareExpiry7Days => '7 days (default)';
+
+  @override
+  String get personShareExpiry14Days => '14 days';
+
+  @override
+  String get personShareExpiry30Days => '30 days';
+
+  @override
+  String get personShareExpiryNone => 'No expiry';
+
+  @override
+  String get personShareMaxViewsLabel => 'Max views allowed';
+
+  @override
+  String get personShareMaxViewsHint => '1–1000 or empty (unlimited). e.g. 5';
+
+  @override
+  String get personShareDocumentsLimit => 'Account card row count';
+
+  @override
+  String get personShareIncludeLedger => 'Show account card';
+
+  @override
+  String get personShareIncludeLedgerSubtitle =>
+      'List of person account transactions';
+
+  @override
+  String get personShareIncludeInvoices => 'Show invoice list';
+
+  @override
+  String get personShareIncludeInvoicesSubtitle =>
+      'Latest invoices for this person';
+
+  @override
+  String get personShareCreateButton => 'Create link';
+
+  @override
+  String get personShareCreateButtonNew => 'Create new link';
+
+  @override
+  String get personShareCreating => 'Creating...';
+
+  @override
+  String get personShareRefresh => 'Refresh';
+
+  @override
+  String get personShareValidationAtLeastOne =>
+      'At least one of “Show account card” or “Show invoice list” must be enabled.';
+
+  @override
+  String get personSharePermissionHint =>
+      'You need edit permission on people to create or revoke links.';
+
+  @override
+  String get personShareLinkCopied => 'Link copied to clipboard';
+
+  @override
+  String get personShareLinkCopiedAndShare =>
+      'Link copied; you can share it via SMS or social networks.';
+
+  @override
+  String get personShareRetry => 'Retry';
+
+  @override
+  String get personShareNoExpiry => 'No expiry';
+
+  @override
+  String get personShareNotSet => 'Not set';
+
+  @override
+  String get personShareLinkCreated => 'Share link created successfully';
+
+  @override
+  String get personShareLinkRevoked => 'Share link revoked';
+
+  @override
+  String get personShareLinkCreateError => 'Failed to create link';
+
+  @override
+  String get personShareLinkRevokeError => 'Failed to revoke link';
+
+  @override
   String get settingsRedisCache => 'Redis Cache';
 
   @override
