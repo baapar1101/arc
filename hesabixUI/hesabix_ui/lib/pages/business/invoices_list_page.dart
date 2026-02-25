@@ -70,7 +70,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
   bool _showDesktopFilters = false;
-  
+  int _selectedCount = 0;
+
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
     // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
@@ -1069,6 +1070,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       enableMultiRowSelection: true,
       defaultPageSize: 20,
       pageSizeOptions: const [10, 20, 50, 100],
+      onRowSelectionChanged: (rows) {
+        setState(() {
+          _selectedCount = rows.length;
+        });
+      },
       additionalParams: {
         'document_type': _selectedInvoiceType,
         if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
@@ -1082,6 +1088,19 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       loadingMessage: t.loadingInvoices,
       errorMessage: t.errorLoadingInvoices,
       customHeaderActions: [
+        if (widget.authStore.canWriteSection('invoices'))
+          Tooltip(
+            message: 'حذف انتخاب‌شده‌ها',
+            child: FilledButton.icon(
+              onPressed: _selectedCount > 0 ? _onBulkDelete : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+              icon: const Icon(Icons.delete_forever),
+              label: Text('حذف ($_selectedCount)'),
+            ),
+          ),
         Tooltip(
           message: 'ایمپورت فاکتورها از فایل Excel',
           child: IconButton(
@@ -1327,6 +1346,118 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     );
     if (!mounted) return;
     _refreshData();
+  }
+
+  Future<void> _onBulkDelete() async {
+    if (!mounted) return;
+    final state = _tableKey.currentState;
+    if (state == null) return;
+
+    List<dynamic> selectedItems = const [];
+    try {
+      // ignore: avoid_dynamic_calls
+      selectedItems = (state as dynamic).getSelectedItems();
+    } catch (_) {}
+
+    if (selectedItems.isEmpty) return;
+
+    final items = selectedItems.cast<InvoiceListItem>();
+    final ids = items.map((e) => e.id).toList();
+    final codes = items.map((e) => e.code).toList();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('تأیید حذف گروهی'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('تعداد فاکتورهای انتخاب‌شده: ${ids.length}'),
+              const SizedBox(height: 8),
+              const Text('این عملیات غیرقابل بازگشت است. ادامه می‌دهید؟'),
+              if (codes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'نمونه کدها: ${codes.take(5).join(', ')}${codes.length > 5 ? ' ...' : ''}',
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('حذف'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await _invoiceService.deleteMultiple(
+        businessId: widget.businessId,
+        invoiceIds: ids,
+      );
+      if (!mounted) return;
+
+      rootNavigator.pop();
+
+      if (!mounted) return;
+      setState(() {
+        _selectedCount = 0;
+      });
+
+      final deletedList = result['deleted'] as List<dynamic>? ?? [];
+      final deleted = deletedList.map((e) => (e is num) ? e.toInt() : int.tryParse(e.toString()) ?? 0).where((e) => e > 0).toList();
+      final skippedList = result['skipped'] as List<dynamic>? ?? [];
+
+      if (deleted.isNotEmpty) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: '${deleted.length} فاکتور با موفقیت حذف شد',
+        );
+      }
+      if (skippedList.isNotEmpty) {
+        final sample = skippedList.take(3).map((s) {
+          final m = s is Map ? s : <String, dynamic>{};
+          return '${m['code']}: ${m['reason']}';
+        }).join('؛ ');
+        SnackBarHelper.showWarning(
+          context,
+          message: '${skippedList.length} فاکتور حذف نشد: $sample',
+        );
+      }
+      if (deleted.isEmpty && skippedList.isEmpty) {
+        SnackBarHelper.show(context, message: 'عملیات انجام شد.');
+      }
+
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _refreshData();
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      rootNavigator.pop();
+      final message = e is Exception ? e.toString() : 'خطا در حذف فاکتورها';
+      SnackBarHelper.showError(context, message: message);
+    }
   }
 
   Future<void> _onDelete(InvoiceListItem item) async {

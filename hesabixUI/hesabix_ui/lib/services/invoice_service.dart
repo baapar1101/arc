@@ -145,6 +145,25 @@ class InvoiceService {
     }
   }
 
+  /// حذف گروهی فاکتورها. نتیجه شامل deleted (لیست idهای حذف‌شده) و skipped (لیست {id, code, reason}) است.
+  Future<Map<String, dynamic>> deleteMultiple({
+    required int businessId,
+    required List<int> invoiceIds,
+  }) async {
+    if (invoiceIds.isEmpty) {
+      return {'deleted': <int>[], 'skipped': <Map<String, dynamic>>[]};
+    }
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/bulk-delete',
+      data: {'invoice_ids': invoiceIds},
+    );
+    final data = res.data?['data'];
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return {'deleted': <int>[], 'skipped': <Map<String, dynamic>>[]};
+  }
+
   /// افزودن یک فاکتور به کارپوشه مودیان
   Future<bool> addToTaxWorkspace({
     required int businessId,

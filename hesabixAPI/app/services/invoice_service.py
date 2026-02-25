@@ -3733,6 +3733,56 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         raise ApiError("DELETE_FAILED", f"Failed to delete invoice: {str(e)}", http_status=500)
 
 
+BULK_DELETE_INVOICES_MAX = 100
+
+
+def bulk_delete_invoices(
+    db: Session,
+    business_id: int,
+    invoice_ids: List[int],
+) -> Dict[str, Any]:
+    """
+    حذف گروهی فاکتورها. برای هر فاکتور delete_invoice فراخوانی می‌شود.
+    مواردی که به هر دلیل حذف نشوند در skipped با دلیل برگردانده می‌شوند.
+
+    Returns:
+        {"deleted": [id, ...], "skipped": [{"id": int, "code": str, "reason": str}, ...]}
+    """
+    invoice_ids = list(dict.fromkeys(invoice_ids))  # unique, preserve order
+    if len(invoice_ids) > BULK_DELETE_INVOICES_MAX:
+        raise ApiError(
+            "TOO_MANY_ITEMS",
+            f"حداکثر {BULK_DELETE_INVOICES_MAX} فاکتور در هر درخواست قابل حذف است",
+            http_status=400,
+        )
+    deleted: List[int] = []
+    skipped: List[Dict[str, Any]] = []
+
+    for invoice_id in invoice_ids:
+        doc = db.query(Document).filter(Document.id == invoice_id).first()
+        code = doc.code if doc else ""
+        if not doc or doc.business_id != business_id:
+            skipped.append({"id": invoice_id, "code": code, "reason": "سند یافت نشد یا متعلق به این کسب‌وکار نیست"})
+            continue
+        if doc.document_type not in SUPPORTED_INVOICE_TYPES:
+            skipped.append({"id": invoice_id, "code": code, "reason": "نوع سند فاکتور نیست"})
+            continue
+        try:
+            delete_invoice(db, invoice_id)
+            deleted.append(invoice_id)
+        except ApiError as api_err:
+            detail = api_err.detail
+            if isinstance(detail, dict) and "error" in detail and isinstance(detail["error"], dict):
+                reason = detail["error"].get("message", str(detail))
+            else:
+                reason = str(detail) if detail else api_err.detail
+            skipped.append({"id": invoice_id, "code": code, "reason": reason})
+        except Exception as e:
+            skipped.append({"id": invoice_id, "code": code, "reason": str(e)})
+
+    return {"deleted": deleted, "skipped": skipped}
+
+
 def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool:
     """
     پاک‌سازی لینک‌های مرده receipt_payment_document_ids از extra_info فاکتور.

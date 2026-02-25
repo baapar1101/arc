@@ -34,6 +34,7 @@ from app.services.invoice_service import (
     create_invoice,
     update_invoice,
     delete_invoice,
+    bulk_delete_invoices,
     invoice_document_to_dict,
     SUPPORTED_INVOICE_TYPES,
     get_invoice_installment_plan,
@@ -385,6 +386,39 @@ def delete_invoice_endpoint(
         data={"deleted": True, "invoice_id": invoice_id},
         request=request,
         message="INVOICE_DELETED"
+    )
+
+
+@router.post(
+    "/business/{business_id}/bulk-delete",
+    summary="حذف گروهی فاکتورها",
+    description="حذف چندین فاکتور به صورت همزمان. فاکتورهایی که به هر دلیل حذف نشوند در skipped با دلیل برگردانده می‌شوند.",
+)
+@require_business_access("business_id")
+def bulk_delete_invoices_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "delete")),
+) -> Dict[str, Any]:
+    """حذف گروهی فاکتورها"""
+    invoice_ids = body.get("invoice_ids") or []
+    if not isinstance(invoice_ids, list):
+        raise ApiError("INVALID_REQUEST", "invoice_ids must be a list", http_status=400)
+    invoice_ids = [int(x) for x in invoice_ids if isinstance(x, (int, str)) and str(x).strip().isdigit()]
+    if not invoice_ids:
+        return success_response(
+            data={"deleted": [], "skipped": []},
+            request=request,
+            message="INVOICE_BULK_DELETED",
+        )
+    result = bulk_delete_invoices(db, business_id, invoice_ids)
+    return success_response(
+        data=result,
+        request=request,
+        message="INVOICE_BULK_DELETED",
     )
 
 
