@@ -315,6 +315,7 @@ class BusinessNotificationService:
         event_type: str,
         context: Dict[str, Any],
         channel: Optional[str] = None,
+        recipient_mobile_override: Optional[str] = None,
         triggered_by_user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
@@ -326,6 +327,7 @@ class BusinessNotificationService:
             event_type: نوع رویداد (مثلاً "invoice.created")
             context: داده‌های متغیرها
             channel: کانال ارسال (None = همه کانال‌های فعال)
+            recipient_mobile_override: شماره موبایل مقصد (اختیاری؛ برای SMS به این شماره ارسال می‌شود)
             triggered_by_user_id: کاربری که این ارسال را trigger کرده
         
         Returns:
@@ -336,6 +338,23 @@ class BusinessNotificationService:
         if not person:
             raise ApiError("PERSON_NOT_FOUND", "شخص یافت نشد", http_status=404)
         
+        # نرمال‌سازی شماره override در صورت ارسال
+        sms_destination = None
+        if recipient_mobile_override and recipient_mobile_override.strip():
+            try:
+                sms_destination = normalize_phone_number(recipient_mobile_override.strip())
+            except Exception as e:
+                raise ApiError(
+                    "INVALID_RECIPIENT_MOBILE",
+                    f"شماره موبایل مقصد معتبر نیست: {e}",
+                    http_status=400
+                )
+        elif person.mobile:
+            try:
+                sms_destination = normalize_phone_number(person.mobile)
+            except Exception:
+                sms_destination = None
+        
         # دریافت کسب‌وکار برای اضافه کردن به context
         business = self.db.query(Business).filter(Business.id == business_id).first()
         if business:
@@ -345,10 +364,16 @@ class BusinessNotificationService:
         # تعیین کانال‌های ارسال
         channels_to_send = []
         if channel:
+            if channel == "sms" and not sms_destination:
+                raise ApiError(
+                    "NO_SMS_RECIPIENT",
+                    "شماره موبایل در پرونده شخص ثبت نشده و شماره مقصد هم ارسال نشده است.",
+                    http_status=400
+                )
             channels_to_send = [channel]
         else:
             # ارسال به همه کانال‌هایی که قالب فعال دارند
-            if person.mobile:
+            if sms_destination:
                 channels_to_send.append('sms')
             if person.email:
                 channels_to_send.append('email')
@@ -475,11 +500,13 @@ class BusinessNotificationService:
                         raise
                 
                 # ارسال
+                to_phone = sms_destination if ch == 'sms' else None
                 send_result = self._send_message(
                     channel=ch,
                     recipient=person,
                     subject=rendered_subject,
-                    body=rendered_body
+                    body=rendered_body,
+                    to_phone_override=to_phone
                 )
                 
                 # اگر SMS بود و هزینه محاسبه شده، cost را تنظیم کن
@@ -533,13 +560,14 @@ class BusinessNotificationService:
                             exc_info=True
                         )
                 
-                # ثبت لاگ
+                # ثبت لاگ (شماره/ایمیل واقعی که به آن ارسال شد)
+                recipient_identifier = (sms_destination if ch == 'sms' else None) or (person.mobile if ch == 'sms' else person.email)
                 log = self._create_log(
                     business_id=business_id,
                     template_id=template.id,
                     recipient_type='person',
                     recipient_id=person_id,
-                    recipient_identifier=person.mobile if ch == 'sms' else person.email,
+                    recipient_identifier=recipient_identifier,
                     channel=ch,
                     subject=rendered_subject,
                     body=rendered_body,
@@ -590,12 +618,19 @@ class BusinessNotificationService:
         
         self.db.commit()
         
+        # نام نمایشی شخص (first_name + last_name یا alias_name)
+        display_name = ""
+        if person.first_name or person.last_name:
+            display_name = " ".join(filter(None, [person.first_name, person.last_name])).strip()
+        if not display_name:
+            display_name = person.alias_name or ""
+
         return {
             "event_type": event_type,
             "recipient": {
                 "type": "person",
                 "id": person_id,
-                "name": person.name
+                "name": display_name
             },
             "results": results
         }
@@ -625,9 +660,10 @@ class BusinessNotificationService:
         channel: str,
         recipient: Person,
         subject: Optional[str],
-        body: str
+        body: str,
+        to_phone_override: Optional[str] = None
     ) -> Dict[str, Any]:
-        """ارسال پیام از طریق کانال مشخص"""
+        """ارسال پیام از طریق کانال مشخص. برای SMS در صورت ارسال to_phone_override از آن استفاده می‌شود."""
         result = {
             "success": False,
             "error": None,
@@ -637,11 +673,13 @@ class BusinessNotificationService:
         
         try:
             if channel == 'sms':
-                if not recipient.mobile:
+                mobile = to_phone_override
+                if not mobile and recipient.mobile:
+                    mobile = normalize_phone_number(recipient.mobile)
+                if not mobile:
                     result["error"] = "شماره موبایل یافت نشد"
                     return result
                 
-                mobile = normalize_phone_number(recipient.mobile)
                 success, message_id, error_msg = self.sms_provider.send_text_with_details(
                     to_phone=mobile,
                     text=body

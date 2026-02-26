@@ -19,6 +19,25 @@ from adapters.db.models.business import Business
 router = APIRouter(prefix="/admin/notification-moderation", tags=["Admin - Notification Moderation"])
 
 
+def _build_ai_summary_for_owner(queue_item) -> str:
+    """ساخت متن خلاصه نظر AI برای نمایش به مالک کسب‌وکار"""
+    parts = []
+    if queue_item.ai_decision:
+        decision_label = {"approve": "تایید", "reject": "رد", "review_required": "نیاز به بررسی مدیر"}.get(
+            queue_item.ai_decision, queue_item.ai_decision
+        )
+        parts.append(f"نظر هوش مصنوعی: {decision_label}")
+    if queue_item.ai_confidence is not None:
+        parts.append(f"اطمینان: {float(queue_item.ai_confidence):.0f}٪")
+    if queue_item.ai_suggestions and str(queue_item.ai_suggestions).strip():
+        parts.append(f"پیشنهادات: {queue_item.ai_suggestions.strip()}")
+    if queue_item.ai_flags and isinstance(queue_item.ai_flags, list) and len(queue_item.ai_flags) > 0:
+        parts.append("موارد: " + "؛ ".join(str(f) for f in queue_item.ai_flags))
+    if not parts:
+        return ""
+    return "\n".join(parts)
+
+
 class ApproveTemplateRequest(BaseModel):
     """درخواست تایید قالب"""
     notes: Optional[str] = Field(None, description="یادداشت مدیر")
@@ -28,6 +47,12 @@ class RejectTemplateRequest(BaseModel):
     """درخواست رد قالب"""
     reason: str = Field(..., description="دلیل رد")
     notes: Optional[str] = Field(None, description="یادداشت اضافی")
+
+
+class AdminEditTemplateRequest(BaseModel):
+    """ویرایش قالب توسط مدیر (فقط برای آیتم‌های در صف)"""
+    subject: Optional[str] = Field(None, description="موضوع")
+    body: Optional[str] = Field(None, description="متن قالب")
 
 
 @router.get("/queue")
@@ -194,6 +219,12 @@ def approve_template(
     if not template:
         raise ApiError("TEMPLATE_NOT_FOUND", "قالب یافت نشد", http_status=404)
     
+    # ادغام دلیل AI با یادداشت مدیر برای مالک
+    ai_summary = _build_ai_summary_for_owner(queue_item)
+    admin_notes_combined = ai_summary
+    if data.notes and data.notes.strip():
+        admin_notes_combined = (ai_summary + "\n\nیادداشت مدیر: " + data.notes.strip()) if ai_summary else data.notes.strip()
+
     # به‌روزرسانی صف
     queue_repo.update(queue_item, {
         "status": "completed",
@@ -210,7 +241,7 @@ def approve_template(
         "approval_status": "admin_approved",
         "is_active": True,
         "approved_by_admin_id": ctx.user.id,
-        "admin_review_notes": data.notes,
+        "admin_review_notes": admin_notes_combined or None,
         "approved_at": datetime.utcnow()
     })
     
@@ -249,6 +280,15 @@ def reject_template(
     if not template:
         raise ApiError("TEMPLATE_NOT_FOUND", "قالب یافت نشد", http_status=404)
     
+    # ادغام دلیل AI با دلیل رد و یادداشت برای مالک
+    ai_summary = _build_ai_summary_for_owner(queue_item)
+    rejection_display = data.reason.strip()
+    admin_notes_combined = ai_summary
+    if data.notes and data.notes.strip():
+        admin_notes_combined = (ai_summary + "\n\nیادداشت مدیر: " + data.notes.strip()) if ai_summary else data.notes.strip()
+    if ai_summary:
+        rejection_display = f"دلیل AI: {ai_summary}\n\nدلیل رد: {data.reason.strip()}"
+
     # به‌روزرسانی صف
     queue_repo.update(queue_item, {
         "status": "completed",
@@ -264,8 +304,8 @@ def reject_template(
         "status": "rejected",
         "approval_status": "rejected",
         "is_active": False,
-        "rejection_reason": data.reason,
-        "admin_review_notes": data.notes,
+        "rejection_reason": rejection_display,
+        "admin_review_notes": admin_notes_combined or None,
         "rejected_at": datetime.utcnow()
     })
     
@@ -273,6 +313,45 @@ def reject_template(
     
     return success_response({
         "message": "قالب رد شد",
+        "template_id": template.id
+    }, request)
+
+
+@router.patch("/queue/{queue_id}/template")
+@require_app_permission("moderate_notifications")
+def admin_edit_queue_template(
+    request: Request,
+    queue_id: int,
+    data: AdminEditTemplateRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """ویرایش محتوای قالب توسط مدیر (فقط برای آیتم‌های در وضعیت قابل بررسی)"""
+    queue_repo = NotificationModerationQueueRepository(db)
+    queue_item = queue_repo.get_by_id(queue_id)
+    if not queue_item:
+        raise ApiError("QUEUE_ITEM_NOT_FOUND", "آیتم صف یافت نشد", http_status=404)
+    if queue_item.status not in ("admin_reviewing", "ai_reviewed"):
+        raise ApiError(
+            "INVALID_STATUS",
+            "فقط برای آیتم‌های در وضعیت «بررسی شده AI» یا «در بررسی مدیر» امکان ویرایش وجود دارد",
+            http_status=400
+        )
+    template_repo = BusinessNotificationTemplateRepository(db)
+    template = template_repo.get_by_id(queue_item.template_id, business_id=queue_item.business_id)
+    if not template:
+        raise ApiError("TEMPLATE_NOT_FOUND", "قالب یافت نشد", http_status=404)
+    update_data = {}
+    if data.subject is not None:
+        update_data["subject"] = data.subject
+    if data.body is not None:
+        update_data["body"] = data.body
+    if not update_data:
+        return success_response({"message": "چیزی برای به‌روزرسانی ارسال نشده", "template_id": template.id}, request)
+    template_repo.update(template, update_data)
+    db.commit()
+    return success_response({
+        "message": "قالب به‌روزرسانی شد",
         "template_id": template.id
     }, request)
 

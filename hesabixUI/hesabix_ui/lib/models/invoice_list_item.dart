@@ -24,6 +24,9 @@ class InvoiceListItem {
   final double? grossProfitPercent;
   final double? netProfit;
   final double? netProfitPercent;
+  // مبلغ پرداخت‌شده و مبلغ باقی‌مانده فاکتور
+  final double? paidAmount;
+  final double? remainingAmount;
 
   const InvoiceListItem({
     required this.id,
@@ -48,6 +51,8 @@ class InvoiceListItem {
     this.grossProfitPercent,
     this.netProfit,
     this.netProfitPercent,
+    this.paidAmount,
+    this.remainingAmount,
   });
 
   factory InvoiceListItem.fromJson(Map<String, dynamic> json) {
@@ -87,6 +92,8 @@ class InvoiceListItem {
       grossProfitPercent: _toDouble(json['gross_profit_percent']),
       netProfit: _toDouble(json['net_profit']),
       netProfitPercent: _toDouble(json['net_profit_percent']),
+      paidAmount: _toDouble(json['paid_amount']),
+      remainingAmount: _toDouble(json['remaining_amount']),
     );
   }
 }

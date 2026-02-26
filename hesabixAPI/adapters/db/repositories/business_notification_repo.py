@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
 from decimal import Decimal
 
-from sqlalchemy import and_, or_, desc, func
+from sqlalchemy import and_, or_, desc, func, case
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business_notification import (
@@ -252,7 +252,9 @@ class NotificationModerationQueueRepository:
         
         total = query.count()
         
+        # اولویت با آیتم‌های قابل اقدام (غیر completed) تا همهٔ قالب‌های در انتظار دیده شوند
         query = query.order_by(
+            case((self.model_class.status == 'completed', 1), else_=0),
             desc(self.model_class.priority),
             self.model_class.created_at
         )

@@ -253,6 +253,8 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
     final statusColor = _getStatusColor(status, isActive);
     final statusLabel = _getStatusLabel(status, approvalStatus);
 
+    final isDraftOrRejected = status == 'draft' || status == 'rejected';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -343,14 +345,54 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
               // تاریخ
               if (template['created_at'] != null)
                 Text(
-                  'ایجاد شده: ${_formatDate(template['created_at'] as String)}',
+                  'ایجاد شده: ${_formatDate(template['created_at']?.toString())}',
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[500], fontSize: 11),
                 ),
+              // دکمه‌های اقدام برای پیش‌نویس و رد شده: ارسال برای تایید + ویرایش
+              if (isDraftOrRejected) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _viewTemplate(template),
+                        icon: const Icon(Icons.info_outline, size: 18),
+                        label: const Text('جزئیات'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _submitForApproval(template['id'] as int),
+                        icon: const Icon(Icons.send, size: 18),
+                        label: const Text('ارسال برای تایید'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openEditPage(template['id'] as int),
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: const Text('ویرایش'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _openEditPage(int templateId) async {
+    final result = await context.push<bool>(
+      '/business/${widget.businessId}/notification-templates/$templateId/edit',
+    );
+    if (result == true && mounted) _loadTemplates();
   }
 
   Color _getStatusColor(String status, bool isActive) {
@@ -376,26 +418,9 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
   }
 
   void _viewTemplate(Map<String, dynamic> template) async {
-    final templateId = template['id'] as int;
-    final status = template['status'] as String;
-    
-    // اگر approved باشد، فقط نمایش
-    // اگر draft یا rejected باشد، امکان ویرایش
-    final canEdit = status != 'approved' && status != 'pending_approval';
-    
-    if (canEdit) {
-      // باز کردن صفحه ویرایش
-      final result = await context.push(
-        '/business/${widget.businessId}/notification-templates/$templateId/edit',
-      );
-      
-      if (result == true) {
-        _loadTemplates();
-      }
-    } else {
-      // نمایش جزئیات با امکان submit for approval
-      _showTemplateDetails(template);
-    }
+    // پیش‌نویس و رد شده: نمایش جزئیات (دلیل رد، محتوا) با دکمه‌های ارسال برای تایید و ویرایش
+    // تایید شده / در انتظار تایید: فقط نمایش جزئیات
+    _showTemplateDetails(template);
   }
 
   void _createTemplate() async {
@@ -409,31 +434,80 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
   }
   
   void _showTemplateDetails(Map<String, dynamic> template) {
+    final name = template['name'] as String? ?? '';
+    final code = template['code'] as String? ?? '-';
+    final eventType = template['event_type'] as String? ?? '-';
+    final channel = template['channel'] as String? ?? '-';
+    final status = template['status'] as String? ?? '-';
+    final body = template['body'] as String? ?? '';
+    final rejectionReason = template['rejection_reason'] as String?;
+    final adminNotes = template['admin_review_notes'] as String?;
+    final rawId = template['id'];
+    final templateId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(template['name'] as String),
+        title: Text(name.isEmpty ? 'قالب' : name),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('کد: ${template['code']}'),
-              Text('رویداد: ${template['event_type']}'),
-              Text('کانال: ${template['channel']}'),
-              Text('وضعیت: ${template['status']}'),
+              Text('کد: $code'),
+              Text('رویداد: $eventType'),
+              Text('کانال: $channel'),
+              Text('وضعیت: $status'),
+              // نمایش توضیحات/یادداشت برای مالک (دلیل تایید یا رد + نظر AI)
+              if ((rejectionReason?.trim().isNotEmpty == true) ||
+                  (adminNotes?.trim().isNotEmpty == true)) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                const Text('توضیحات بررسی (برای مالک کسب‌وکار):', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                if (rejectionReason != null && rejectionReason.trim().isNotEmpty) ...[
+                  SelectableText(
+                    rejectionReason,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red.shade700),
+                  ),
+                  if (adminNotes != null && adminNotes.trim().isNotEmpty) const SizedBox(height: 8),
+                ],
+                if (adminNotes != null && adminNotes.trim().isNotEmpty)
+                  SelectableText(
+                    adminNotes,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+              ],
               const Divider(),
               const Text('محتوا:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text(template['body'] as String),
-              if (template['status'] == 'draft' || template['status'] == 'rejected') ...[
+              Text(body),
+              if ((status == 'draft' || status == 'rejected') && templateId != null && templateId > 0) ...[
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _submitForApproval(template['id'] as int);
-                  },
-                  child: const Text('ارسال برای تایید'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _openEditPage(templateId);
+                        },
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: const Text('ویرایش'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _submitForApproval(templateId);
+                        },
+                        icon: const Icon(Icons.send, size: 18),
+                        label: const Text('ارسال برای تایید'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -501,13 +575,14 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
     );
   }
 
-  String _formatDate(String isoDate) {
+  String _formatDate(String? isoDate) {
+    if (isoDate == null || isoDate.isEmpty) return '-';
     try {
       final date = DateTime.parse(isoDate);
       final persianDate = '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
       return persianDate;
     } catch (e) {
-      return isoDate.substring(0, 10);
+      return isoDate.length >= 10 ? isoDate.substring(0, 10) : isoDate;
     }
   }
 }

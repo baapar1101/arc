@@ -155,6 +155,23 @@ EVENT_TYPES = [
         "default_email_subject": "یادآوری اتمام گارانتی - {{ product_name }}",
         "is_active": True,
         "requires_approval": True
+    },
+    {
+        "code": "person_share_link.sms",
+        "name": "ارسال لینک کارت حساب به مشتری",
+        "description": "ارسال لینک مشاهده کارت حساب (و در صورت تنظیم، فاکتورها) به مشتری از طریق پیامک",
+        "category": "people",
+        "available_variables": [
+            {"key": "share_link", "type": "string", "description": "لینک کوتاه کارت حساب"},
+            {"key": "customer_name", "type": "string", "description": "نام مشتری"},
+            {"key": "customer_mobile", "type": "string", "description": "شماره موبایل مشتری"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+            {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"}
+        ],
+        "default_sms_template": "سلام {{ customer_name }}، لینک کارت حساب شما: {{ share_link }} — {{ business_name }}",
+        "default_email_subject": "لینک کارت حساب — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": True
     }
 ]
 

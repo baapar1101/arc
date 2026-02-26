@@ -56,6 +56,7 @@ class SendNotificationRequest(BaseModel):
     event_type: str = Field(..., description="نوع رویداد")
     context: Dict[str, Any] = Field(..., description="داده‌های متغیرها")
     channel: Optional[str] = Field(None, description="کانال (None = همه)")
+    recipient_mobile: Optional[str] = Field(None, description="شماره موبایل مقصد (اختیاری؛ در صورت ارسال برای SMS به این شماره ارسال می‌شود)")
 
 
 class PreviewTemplateRequest(BaseModel):
@@ -138,6 +139,8 @@ def list_templates(
             "approval_status": t.approval_status,
             "approved_by_ai": t.approved_by_ai,
             "ai_confidence_score": float(t.ai_confidence_score) if t.ai_confidence_score else None,
+            "admin_review_notes": t.admin_review_notes,
+            "rejection_reason": t.rejection_reason,
             "daily_limit": t.daily_limit,
             "is_automated": t.is_automated,
             "created_at": t.created_at.isoformat(),
@@ -432,6 +435,7 @@ def send_notification(
         event_type=data.event_type,
         context=data.context,
         channel=data.channel,
+        recipient_mobile_override=(data.recipient_mobile.strip() or None) if data.recipient_mobile else None,
         triggered_by_user_id=ctx.user.id
     )
     

@@ -3500,6 +3500,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get totalAmount => 'Total amount';
 
   @override
+  String get invoicePaidAmount => 'Invoice paid amount';
+
+  @override
+  String get invoiceRemainingAmount => 'Invoice remaining amount';
+
+  @override
   String get unknown => 'Unknown';
 
   @override
@@ -6280,6 +6286,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personShareLinkRevokeError => 'Failed to revoke link';
+
+  @override
+  String get personShareSendLinkBySms => 'Send link via SMS';
+
+  @override
+  String get personShareSendingSms => 'Sending...';
+
+  @override
+  String get personShareNoMobileHint =>
+      'Mobile number is not set for this customer.';
+
+  @override
+  String get personShareNoTemplateHint =>
+      'No approved template found for account card link. Create and approve a template for the “Send account card link” event in Notification Templates.';
+
+  @override
+  String get personShareSmsSent => 'SMS sent successfully.';
+
+  @override
+  String get personShareCreateLinkFirst => 'Create a link first.';
+
+  @override
+  String get personShareSendToNumberLabel =>
+      'Send to another number (optional)';
+
+  @override
+  String get personShareSendToNumberHint =>
+      'Leave empty to use the number saved for this customer';
 
   @override
   String get settingsRedisCache => 'Redis Cache';

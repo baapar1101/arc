@@ -963,6 +963,20 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           width: ColumnWidth.large,
           formatter: (item) => item.totalAmount != null ? '${formatWithThousands(item.totalAmount!, decimalPlaces: 2)} ${item.currencyCode ?? 'ریال'}' : '-',
         ),
+        // مبلغ پرداخت‌شده فاکتور
+        TextColumn(
+          'paid_amount',
+          t.invoicePaidAmount,
+          width: ColumnWidth.large,
+          formatter: (item) => item.paidAmount != null ? '${formatWithThousands(item.paidAmount!, decimalPlaces: 2)} ${item.currencyCode ?? 'ریال'}' : '-',
+        ),
+        // مبلغ باقی‌مانده فاکتور
+        TextColumn(
+          'remaining_amount',
+          t.invoiceRemainingAmount,
+          width: ColumnWidth.large,
+          formatter: (item) => item.remainingAmount != null ? '${formatWithThousands(item.remainingAmount!, decimalPlaces: 2)} ${item.currencyCode ?? 'ریال'}' : '-',
+        ),
         // سود
         CustomColumn(
           'total_profit',
@@ -1110,7 +1124,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           ),
         ),
       ],
-      footerTotals: { 'total_amount': 'جمع مبلغ این صفحه' },
+      footerTotals: {
+        'total_amount': 'جمع مبلغ این صفحه',
+        'paid_amount': t.invoicePaidAmount,
+        'remaining_amount': t.invoiceRemainingAmount,
+      },
     );
   }
 
@@ -1121,6 +1139,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final amount = invoice.totalAmount != null
         ? '${formatWithThousands(invoice.totalAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
         : '-';
+    final paidStr = invoice.paidAmount != null
+        ? '${formatWithThousands(invoice.paidAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
+        : null;
+    final remainingStr = invoice.remainingAmount != null
+        ? '${formatWithThousands(invoice.remainingAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
+        : null;
     final dateText = HesabixDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
     final typeText = (invoice.documentTypeName).trim().isNotEmpty ? invoice.documentTypeName : _invoiceTypeLabel(t, invoice.documentType);
     final counterparty = (invoice.counterparty == null || invoice.counterparty!.trim().isEmpty) ? t.unknown : invoice.counterparty!;
@@ -1197,6 +1221,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       badge(icon: Icons.event, text: dateText),
       badge(icon: Icons.folder_open, text: project),
       badge(icon: Icons.person, text: createdBy),
+      if (paidStr != null) badge(icon: Icons.payments, text: '${t.invoicePaidAmount}: $paidStr'),
+      if (remainingStr != null) badge(icon: Icons.account_balance_wallet, text: '${t.invoiceRemainingAmount}: $remainingStr'),
       if (invoice.isProforma) badge(icon: Icons.description_outlined, text: t.proforma),
       if (invoice.isInstallmentSale) badge(icon: Icons.calendar_month, text: t.installmentColumn),
       if (tax.isNotEmpty) badge(icon: Icons.verified_outlined, text: tax),

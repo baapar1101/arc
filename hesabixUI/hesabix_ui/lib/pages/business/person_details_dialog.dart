@@ -71,11 +71,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   String? _shareLinkError;
   bool _creatingShareLink = false;
   bool _revokingShareLink = false;
+  bool _sendingLinkSms = false;
   int? _selectedExpiryHours = 168;
   bool _includeLedger = true;
   bool _includeInvoices = true;
   int _documentsLimit = 50;
   final TextEditingController _maxViewsController = TextEditingController();
+  final TextEditingController _smsRecipientController = TextEditingController();
 
   @override
   void initState() {
@@ -323,6 +325,79 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).personShareLinkCopiedAndShare);
   }
 
+  /// ارسال لینک کارت حساب با پیامک از طریق قالب تایید‌شده نوتیفیکیشن
+  Future<void> _sendShareLinkBySms() async {
+    final t = AppLocalizations.of(context);
+    final personId = _person?.id;
+    final link = _shareLink?.shortUrl;
+    final mobileFromPerson = _person?.mobile?.trim();
+    final mobileOverride = _smsRecipientController.text.trim();
+    final effectiveMobile = mobileOverride.isNotEmpty ? mobileOverride : mobileFromPerson;
+
+    if (link == null || link.isEmpty) {
+      SnackBarHelper.show(context, message: t.personShareCreateLinkFirst);
+      return;
+    }
+    if (personId == null) {
+      SnackBarHelper.showError(context, message: 'شناسه شخص معتبر نیست.');
+      return;
+    }
+    if ((effectiveMobile ?? '').isEmpty) {
+      SnackBarHelper.show(context, message: t.personShareNoMobileHint);
+      return;
+    }
+    if (!widget.authStore.hasBusinessPermission('notifications', 'send')) {
+      SnackBarHelper.showError(context, message: 'دسترسی ارسال نوتیفیکیشن ندارید.');
+      return;
+    }
+
+    setState(() => _sendingLinkSms = true);
+    try {
+      final api = ApiClient();
+      final response = await api.post<Map<String, dynamic>>(
+        '/api/v1/business-notifications/businesses/${widget.businessId}/send',
+        data: {
+          'person_id': personId,
+          'event_type': 'person_share_link.sms',
+          'context': {
+            'share_link': link,
+            'customer_name': _person?.displayName ?? '',
+            'customer_mobile': effectiveMobile,
+          },
+          'channel': 'sms',
+          if (mobileOverride.isNotEmpty) 'recipient_mobile': mobileOverride,
+        },
+      );
+      if (!mounted) return;
+      final result = (response.data as Map<String, dynamic>?)?['data'] as Map<String, dynamic>?;
+      final results = result?['results'] as Map<String, dynamic>?;
+      final smsResult = results?['sms'] as Map<String, dynamic>?;
+      final success = smsResult?['success'] == true;
+      if (success) {
+        SnackBarHelper.showSuccess(context, message: t.personShareSmsSent);
+      } else {
+        final error = smsResult?['error']?.toString() ?? 'خطا در ارسال';
+        if (error.contains('قالب') || error.contains('فعال')) {
+          SnackBarHelper.showError(context, message: t.personShareNoTemplateHint);
+        } else {
+          SnackBarHelper.showError(context, message: error);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      if (msg.contains('403') || msg.contains('FORBIDDEN')) {
+        SnackBarHelper.showError(context, message: 'دسترسی ارسال نوتیفیکیشن ندارید.');
+      } else if (msg.contains('قالب') || msg.contains('فعال')) {
+        SnackBarHelper.showError(context, message: t.personShareNoTemplateHint);
+      } else {
+        SnackBarHelper.showError(context, message: 'خطا در ارسال پیامک.');
+      }
+    } finally {
+      if (mounted) setState(() => _sendingLinkSms = false);
+    }
+  }
+
   Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
     final api = ApiClient();
     const pageSize = 250;
@@ -418,6 +493,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   void dispose() {
     _tabController.dispose();
     _maxViewsController.dispose();
+    _smsRecipientController.dispose();
     super.dispose();
   }
 
@@ -1073,6 +1149,19 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               ],
             ),
             const SizedBox(height: 16),
+            TextField(
+              controller: _smsRecipientController,
+              decoration: InputDecoration(
+                labelText: t.personShareSendToNumberLabel,
+                hintText: t.personShareSendToNumberHint,
+                prefixIcon: const Icon(Icons.phone_outlined),
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              keyboardType: TextInputType.phone,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -1080,19 +1169,31 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 FilledButton.icon(
                   onPressed: _copyAndShareLink,
                   icon: const Icon(Icons.share),
-                  label: const Text('کپی و ارسال لینک'),
+                  label: Text(t.personShareCopyAndSendLink),
+                ),
+                OutlinedButton.icon(
+                  onPressed: ((_person?.mobile?.trim().isNotEmpty == true ||
+                              _smsRecipientController.text.trim().isNotEmpty) &&
+                          widget.authStore.hasBusinessPermission('notifications', 'send') &&
+                          !_sendingLinkSms)
+                      ? _sendShareLinkBySms
+                      : null,
+                  icon: _sendingLinkSms
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.sms),
+                  label: Text(_sendingLinkSms ? t.personShareSendingSms : t.personShareSendLinkBySms),
                 ),
                 OutlinedButton.icon(
                   onPressed: canEditPeople && !_revokingShareLink ? _revokeShareLink : null,
                   icon: _revokingShareLink
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.link_off),
-                  label: Text(_revokingShareLink ? 'در حال لغو...' : 'لغو لینک'),
+                  label: Text(_revokingShareLink ? t.personShareRevoking : t.personShareRevokeLink),
                 ),
                 TextButton.icon(
                   onPressed: _loadingShareLink ? null : _loadShareLinkStatus,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('بروزرسانی وضعیت'),
+                  label: Text(t.personShareRefreshStatus),
                 ),
               ],
             ),

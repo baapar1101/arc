@@ -3482,6 +3482,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get totalAmount => 'مبلغ کل';
 
   @override
+  String get invoicePaidAmount => 'مبلغ پرداخت‌شده فاکتور';
+
+  @override
+  String get invoiceRemainingAmount => 'مبلغ باقی‌مانده فاکتور';
+
+  @override
   String get unknown => 'نامشخص';
 
   @override
@@ -6250,6 +6256,33 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get personShareLinkRevokeError => 'خطا در لغو لینک';
+
+  @override
+  String get personShareSendLinkBySms => 'ارسال لینک با پیامک';
+
+  @override
+  String get personShareSendingSms => 'در حال ارسال...';
+
+  @override
+  String get personShareNoMobileHint =>
+      'شماره موبایل در پرونده مشتری ثبت نشده است.';
+
+  @override
+  String get personShareNoTemplateHint =>
+      'قالب تایید‌شده برای ارسال لینک کارت حساب یافت نشد. از بخش قالب‌های نوتیفیکیشن یک قالب برای رویداد «ارسال لینک کارت حساب» تعریف و تایید کنید.';
+
+  @override
+  String get personShareSmsSent => 'پیامک با موفقیت ارسال شد.';
+
+  @override
+  String get personShareCreateLinkFirst => 'ابتدا لینک ایجاد کنید.';
+
+  @override
+  String get personShareSendToNumberLabel => 'ارسال به شماره دیگر (اختیاری)';
+
+  @override
+  String get personShareSendToNumberHint =>
+      'خالی = ارسال به شماره ثبت‌شده در پرونده مشتری';
 
   @override
   String get settingsRedisCache => 'تنظیمات Redis Cache';

@@ -36,6 +36,7 @@ from app.services.invoice_service import (
     delete_invoice,
     bulk_delete_invoices,
     invoice_document_to_dict,
+    calculate_invoice_remaining,
     SUPPORTED_INVOICE_TYPES,
     get_invoice_installment_plan,
     search_installments,
@@ -1926,10 +1927,19 @@ async def search_invoices_endpoint(
 		item['document_type_name'] = _type_name(item.get('document_type'))
 		if total_amount is not None:
 			item['total_amount'] = total_amount
-		
+
+		# مبلغ پرداخت‌شده و مبلغ باقی‌مانده فاکتور
+		try:
+			remaining_result = calculate_invoice_remaining(db, business_id, d.id)
+			item["paid_amount"] = remaining_result.get("paid_amount")
+			item["remaining_amount"] = remaining_result.get("remaining")
+		except Exception:
+			item["paid_amount"] = None
+			item["remaining_amount"] = None
+
 		# افزودن counterparty
 		_add_counterparty_to_invoice_item(db, item)
-		
+
 		data_items.append(format_datetime_fields(item, request))
 
 	# Build pagination info

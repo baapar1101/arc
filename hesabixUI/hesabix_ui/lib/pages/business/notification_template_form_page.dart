@@ -164,6 +164,22 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
           'default_sms_template': 'سلام {{ customer_name }}، پرداخت شما به مبلغ {{ amount | format_currency }} دریافت شد. رسید: {{ receipt_number }}. {{ business_name }}',
           'default_email_subject': 'رسید پرداخت - {{ receipt_number }}',
         },
+        {
+          'id': 0,
+          'code': 'person_share_link.sms',
+          'name': 'ارسال لینک کارت حساب به مشتری',
+          'description': 'ارسال لینک مشاهده کارت حساب به مشتری از طریق پیامک',
+          'category': 'people',
+          'available_variables': [
+            {'key': 'share_link', 'type': 'string', 'description': 'لینک کوتاه کارت حساب'},
+            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
+            {'key': 'customer_mobile', 'type': 'string', 'description': 'شماره موبایل مشتری'},
+            {'key': 'business_name', 'type': 'string', 'description': 'نام کسب‌وکار'},
+            {'key': 'business_phone', 'type': 'string', 'description': 'تلفن کسب‌وکار'},
+          ],
+          'default_sms_template': 'سلام {{ customer_name }}، لینک کارت حساب شما: {{ share_link }} — {{ business_name }}',
+          'default_email_subject': 'لینک کارت حساب — {{ business_name }}',
+        },
       ];
     });
   }

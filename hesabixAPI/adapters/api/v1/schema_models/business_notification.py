@@ -48,6 +48,7 @@ class SendNotificationRequest(BaseModel):
     event_type: str = Field(..., description="نوع رویداد")
     context: Dict[str, Any] = Field(..., description="داده‌های متغیرها")
     channel: Optional[str] = Field(None, description="کانال (None = همه)")
+    recipient_mobile: Optional[str] = Field(None, description="شماره موبایل مقصد (اختیاری؛ برای SMS)")
     
     @validator('channel')
     def validate_channel(cls, v):

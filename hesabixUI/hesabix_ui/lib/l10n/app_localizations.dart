@@ -6845,6 +6845,18 @@ abstract class AppLocalizations {
   /// **'Total amount'**
   String get totalAmount;
 
+  /// No description provided for @invoicePaidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice paid amount'**
+  String get invoicePaidAmount;
+
+  /// No description provided for @invoiceRemainingAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice remaining amount'**
+  String get invoiceRemainingAmount;
+
   /// No description provided for @unknown.
   ///
   /// In en, this message translates to:
@@ -11878,6 +11890,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to revoke link'**
   String get personShareLinkRevokeError;
+
+  /// No description provided for @personShareSendLinkBySms.
+  ///
+  /// In en, this message translates to:
+  /// **'Send link via SMS'**
+  String get personShareSendLinkBySms;
+
+  /// No description provided for @personShareSendingSms.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending...'**
+  String get personShareSendingSms;
+
+  /// No description provided for @personShareNoMobileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number is not set for this customer.'**
+  String get personShareNoMobileHint;
+
+  /// No description provided for @personShareNoTemplateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No approved template found for account card link. Create and approve a template for the “Send account card link” event in Notification Templates.'**
+  String get personShareNoTemplateHint;
+
+  /// No description provided for @personShareSmsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS sent successfully.'**
+  String get personShareSmsSent;
+
+  /// No description provided for @personShareCreateLinkFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a link first.'**
+  String get personShareCreateLinkFirst;
+
+  /// No description provided for @personShareSendToNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to another number (optional)'**
+  String get personShareSendToNumberLabel;
+
+  /// No description provided for @personShareSendToNumberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use the number saved for this customer'**
+  String get personShareSendToNumberHint;
 
   /// No description provided for @settingsRedisCache.
   ///

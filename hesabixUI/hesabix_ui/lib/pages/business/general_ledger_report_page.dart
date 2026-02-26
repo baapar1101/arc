@@ -14,7 +14,8 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
-import 'package:hesabix_ui/widgets/reports/common_report_filters.dart';
+import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
+import 'package:hesabix_ui/utils/responsive_helper.dart';
 
 class GeneralLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -48,6 +49,9 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   
   // Summary from API response
   Map<String, dynamic>? _summary;
+
+  /// فیلترها به‌صورت پیش‌فرض بسته تا فضای کمتری اشغال شود
+  bool _filtersExpanded = false;
 
   @override
   void initState() {
@@ -270,6 +274,275 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     );
   }
 
+  /// چیدمان فشرده و رسپانسیو فیلترها (داخل پنل جمع‌شونده)
+  Widget _buildFilterGrid(BuildContext context, ColorScheme cs, bool isMobile) {
+    final fullWidth = MediaQuery.sizeOf(context).width - 32;
+    final fieldWidth = isMobile ? fullWidth : (fullWidth / 2).clamp(140.0, 260.0);
+
+    Widget cell(Widget child) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SizedBox(
+        width: isMobile ? double.infinity : fieldWidth,
+        child: child,
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ردیف اول: سال مالی، از تاریخ، تا تاریخ، ارز
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            cell(
+              DropdownButtonFormField<int>(
+                value: _selectedFiscalYearId,
+                decoration: InputDecoration(
+                  hintText: 'سال مالی',
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  isDense: true,
+                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                ),
+                isExpanded: true,
+                items: _fiscalYears.map((fy) {
+                  return DropdownMenuItem<int>(
+                    value: fy['id'] as int?,
+                    child: Text(
+                      fy['title']?.toString() ?? '',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFiscalYearId = value;
+                  });
+                  _refreshData();
+                },
+              ),
+            ),
+            cell(
+              DateInputField(
+                value: _fromDate,
+                calendarController: widget.calendarController,
+                onChanged: (date) {
+                  setState(() => _fromDate = date);
+                  _refreshData();
+                },
+                hintText: 'از تاریخ',
+              ),
+            ),
+            cell(
+              DateInputField(
+                value: _toDate,
+                calendarController: widget.calendarController,
+                onChanged: (date) {
+                  setState(() => _toDate = date);
+                  _refreshData();
+                },
+                hintText: 'تا تاریخ',
+              ),
+            ),
+            cell(
+              DropdownButtonFormField<int>(
+                value: _selectedCurrencyId,
+                decoration: InputDecoration(
+                  hintText: 'ارز',
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  isDense: true,
+                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                ),
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
+                  ..._currencies.map<DropdownMenuItem<int>>((c) {
+                    final id = c['id'] as int?;
+                    final code = (c['code'] ?? '').toString();
+                    final name = (c['name'] ?? '').toString();
+                    final displayName = code.isNotEmpty ? '$code - $name' : name;
+                    return DropdownMenuItem<int>(
+                      key: ValueKey('currency_$id'),
+                      value: id,
+                      child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+                    );
+                  }),
+                ],
+                onChanged: (val) {
+                  setState(() => _selectedCurrencyId = val);
+                  _refreshData();
+                },
+              ),
+            ),
+          ],
+        ),
+        // ردیف دوم: طرف حساب، پروژه، پیش‌نویس
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            cell(
+              PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: _selectedPerson,
+                onChanged: (person) {
+                  setState(() => _selectedPerson = person);
+                  _refreshData();
+                },
+              ),
+            ),
+            cell(
+              ProjectSelectorWidget(
+                businessId: widget.businessId,
+                apiClient: ApiClient(),
+                selectedProjectId: _selectedProjectId,
+                onChanged: (projectId) {
+                  setState(() => _selectedProjectId = projectId);
+                  _refreshData();
+                },
+                allowNull: true,
+                labelText: 'پروژه (همه)',
+              ),
+            ),
+            cell(
+              CheckboxListTile(
+                title: const Text('شامل اسناد پیش‌نویس', style: TextStyle(fontSize: 13)),
+                value: _includeProforma,
+                onChanged: (value) {
+                  setState(() => _includeProforma = value ?? false);
+                  _refreshData();
+                },
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ),
+          ],
+        ),
+        // افزودن حساب و چیپ‌ها
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: isMobile ? fullWidth : 260,
+              child: AccountTreeComboboxWidget(
+                businessId: widget.businessId,
+                selectedAccount: _accountToAdd,
+                onChanged: _addAccount,
+                label: 'افزودن حساب',
+                hintText: 'انتخاب حساب',
+              ),
+            ),
+            if (!isMobile) const SizedBox(width: 12),
+            if (!isMobile)
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _selectedAccounts.isEmpty
+                      ? [
+                          Text(
+                            'هیچ حسابی انتخاب نشده',
+                            style: TextStyle(color: cs.error, fontSize: 12),
+                          ),
+                        ]
+                      : _selectedAccounts.map((account) {
+                          return Chip(
+                            label: Text(
+                              '${account.code} - ${account.name}',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onDeleted: () => _removeAccount(account),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          );
+                        }).toList(),
+                ),
+              ),
+          ],
+        ),
+        if (isMobile && _selectedAccounts.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _selectedAccounts.map((account) {
+              return Chip(
+                label: Text(
+                  '${account.code} - ${account.name}',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onDeleted: () => _removeAccount(account),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSummaryCards(BuildContext context, ColorScheme cs, bool isMobile) {
+    final cards = [
+      ('مانده ابتدای دوره', _formatBalance(_summary!['opening_balance'], _summary!['opening_balance_type'])),
+      ('جمع بدهکار', _formatNumber(_summary!['total_debit'])),
+      ('جمع بستانکار', _formatNumber(_summary!['total_credit'])),
+      ('مانده انتهای دوره', _formatBalance(_summary!['closing_balance'], _summary!['closing_balance_type'])),
+    ];
+    if (isMobile) {
+      return Column(
+        children: cards.map((e) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(e.$1, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.7))),
+                    Text(e.$2, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    return Row(
+      children: [
+        for (int i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(cards[i].$1, style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.7))),
+                    const SizedBox(height: 2),
+                    Text(cards[i].$2, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -291,393 +564,99 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filters
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      // Fiscal Year
-                      SizedBox(
-                        width: 280,
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedFiscalYearId,
-                          decoration: InputDecoration(
-                            labelText: 'سال مالی',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          ),
-                          items: _fiscalYears.map((fy) {
-                            return DropdownMenuItem<int>(
-                              value: fy['id'] as int?,
-                              child: Text(
-                                fy['title']?.toString() ?? '',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedFiscalYearId = value;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Date From
-                      SizedBox(
-                        width: 180,
-                        child: DateInputField(
-                          value: _fromDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _fromDate = date;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Date To
-                      SizedBox(
-                        width: 180,
-                        child: DateInputField(
-                          value: _toDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _toDate = date;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Currency
-                      SizedBox(
-                        width: 200,
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedCurrencyId,
-                          decoration: InputDecoration(
-                            labelText: 'ارز',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          ),
-                          items: [
-                            const DropdownMenuItem<int>(
-                              value: null,
-                              child: Text('همه ارزها'),
-                            ),
-                            ..._currencies.map<DropdownMenuItem<int>>((c) {
-                              final id = c['id'] as int?;
-                              final code = (c['code'] ?? '').toString();
-                              final name = (c['name'] ?? '').toString();
-                              final displayName = code.isNotEmpty ? '$code - $name' : name;
-                              return DropdownMenuItem<int>(
-                                key: ValueKey('currency_$id'),
-                                value: id,
-                                child: Text(
-                                  displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedCurrencyId = val;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Person
-                      SizedBox(
-                        width: 280,
-                        child: PersonComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedPerson: _selectedPerson,
-                          onChanged: (person) {
-                            setState(() {
-                              _selectedPerson = person;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Include Proforma
-                      SizedBox(
-                        width: 200,
-                        child: CheckboxListTile(
-                          title: const Text('شامل اسناد پیش‌نویس'),
-                          value: _includeProforma,
-                          onChanged: (value) {
-                            setState(() {
-                              _includeProforma = value ?? false;
-                            });
-                            _refreshData();
-                          },
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // 🆕 فیلتر پروژه
-                  CommonReportFilters(
-                    businessId: widget.businessId,
-                    apiClient: ApiClient(),
-                    calendarController: widget.calendarController,
-                    fromDate: _fromDate,
-                    toDate: _toDate,
-                    onFromDateChanged: (date) {
-                      setState(() => _fromDate = date);
-                      _refreshData();
-                    },
-                    onToDateChanged: (date) {
-                      setState(() => _toDate = date);
-                      _refreshData();
-                    },
-                    onClearDates: () {
-                      setState(() {
-                        _fromDate = null;
-                        _toDate = null;
-                      });
-                      _refreshData();
-                    },
-                    selectedFiscalYearId: _selectedFiscalYearId,
-                    fiscalYears: _fiscalYears,
-                    onFiscalYearChanged: (fyId) {
-                      setState(() => _selectedFiscalYearId = fyId);
-                      _refreshData();
-                    },
-                    selectedProjectId: _selectedProjectId,
-                    onProjectChanged: (projectId) {
-                      setState(() => _selectedProjectId = projectId);
-                      _refreshData();
-                    },
-                    showDateFilters: false,  // فیلترهای تاریخ بالاتر هستند
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Account Selection
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 280,
-                        child: AccountTreeComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedAccount: _accountToAdd,
-                          onChanged: _addAccount,
-                          label: 'افزودن حساب',
-                          hintText: 'انتخاب حساب',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (_selectedAccounts.isEmpty)
-                              Text(
-                                'هیچ حسابی انتخاب نشده است',
-                                style: TextStyle(color: cs.error),
-                              )
-                            else
-                              ..._selectedAccounts.map((account) {
-                                return Chip(
-                                  label: Text('${account.code} - ${account.name}'),
-                                  onDeleted: () => _removeAccount(account),
-                                  deleteIcon: const Icon(Icons.close, size: 18),
-                                );
-                              }),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Summary Cards (if available)
-          if (_summary != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'مانده ابتدای دوره',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatBalance(
-                                _summary!['opening_balance'],
-                                _summary!['opening_balance_type'],
-                              ),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع بدهکار',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_debit']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع بستانکار',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_credit']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'مانده انتهای دوره',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatBalance(
-                                _summary!['closing_balance'],
-                                _summary!['closing_balance_type'],
-                              ),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Data Table
-          Expanded(
-            child: _selectedAccounts.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final viewportHeight = constraints.maxHeight;
+          final isMobile = ResponsiveHelper.isMobile(context);
+          final tableHeight = (viewportHeight * 0.55).clamp(320.0, 800.0);
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // فیلترها — قابل جمع شدن، کمترین فضا
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ExpansionTile(
+                    initiallyExpanded: _filtersExpanded,
+                    onExpansionChanged: (v) => setState(() => _filtersExpanded = v),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    title: Row(
                       children: [
-                        Icon(Icons.account_tree_outlined, size: 64, color: cs.onSurface.withOpacity(0.5)),
-                        const SizedBox(height: 16),
+                        Icon(Icons.filter_list, size: 20, color: cs.primary),
+                        const SizedBox(width: 8),
                         Text(
-                          'لطفاً حداقل یک حساب انتخاب کنید',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: cs.onSurface.withOpacity(0.7),
+                          'فیلترها',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        if (_selectedAccounts.isNotEmpty)
+                          Text(
+                            '(${_selectedAccounts.length} حساب)',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface.withOpacity(0.7),
+                            ),
+                          ),
                       ],
                     ),
-                  )
-                : DataTableWidget<Map<String, dynamic>>(
-                    key: ValueKey(
-                      'general_ledger_${_selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
-                    ),
-                    config: _buildTableConfig(t),
-                    fromJson: (json) => Map<String, dynamic>.from(json),
-                    calendarController: widget.calendarController,
-                    onRefresh: _fetchSummary,
+                    subtitle: _selectedAccounts.isEmpty
+                        ? Text(
+                            'حداقل یک حساب انتخاب کنید',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.error.withOpacity(0.9),
+                            ),
+                          )
+                        : null,
+                    children: [
+                      _buildFilterGrid(context, cs, isMobile),
+                    ],
                   ),
-          ),
-        ],
+                ),
+                const SizedBox(height: 12),
+                // کارت‌های خلاصه
+                if (_summary != null) ...[
+                  _buildSummaryCards(context, cs, isMobile),
+                  const SizedBox(height: 12),
+                ],
+                // جدول با ارتفاع بر اساس viewport
+                SizedBox(
+                  height: tableHeight,
+                  child: _selectedAccounts.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.account_tree_outlined, size: 48, color: cs.onSurface.withOpacity(0.5)),
+                              const SizedBox(height: 12),
+                              Text(
+                                'لطفاً حداقل یک حساب انتخاب کنید',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: cs.onSurface.withOpacity(0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : DataTableWidget<Map<String, dynamic>>(
+                          key: ValueKey(
+                            'general_ledger_${_selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
+                          ),
+                          config: _buildTableConfig(t),
+                          fromJson: (json) => Map<String, dynamic>.from(json),
+                          calendarController: widget.calendarController,
+                          onRefresh: _fetchSummary,
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
