@@ -13,6 +13,7 @@ from adapters.db.repositories.otp_login_repo import OtpLoginRepository
 from app.services.providers.sms_provider import SmsProvider
 from app.services.providers.email_provider import EmailProvider
 from app.services.providers.telegram_provider import TelegramProvider
+from app.services.providers.bale_provider import BaleProvider
 from app.services.system_settings_service import get_effective_notifications_settings
 from app.services.notification_service import NotificationService
 from app.core.responses import ApiError
@@ -60,6 +61,7 @@ class OtpLoginService:
 			bot_token=notify_cfg.get("telegram_bot_token"),
 			proxy_config=notify_cfg.get("telegram_proxy"),
 		)
+		self.bale_provider = BaleProvider(bot_token=notify_cfg.get("bale_bot_token"))
 	
 	def get_available_channels(self, identifier: str) -> dict:
 		"""
@@ -171,10 +173,17 @@ class OtpLoginService:
 		else:
 			logger.warning(f"get_available_channels - user not found, cannot add telegram channel")
 		
+		# بررسی بله
+		bale_configured = self.bale_provider.is_configured()
+		if user and getattr(user, "bale_chat_id", None) and bale_configured:
+			available_channels.append("bale")
+			logger.info(f"get_available_channels - Bale channel added for user_id: {user.id}")
+		
 		return {
 			"available_channels": available_channels,
 			"user_info": {
 				"has_telegram": bool(user and user.telegram_chat_id),
+				"has_bale": bool(user and getattr(user, "bale_chat_id", None)),
 				"has_email": bool(user and user.email),
 				"has_mobile": bool(user and user.mobile),
 			} if user else None
@@ -310,18 +319,20 @@ class OtpLoginService:
 			if not self.email_provider.is_configured():
 				raise ApiError("EMAIL_NOT_CONFIGURED", "سرویس ایمیل پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
 		if channel == "telegram":
-			# بررسی دقیق‌تر: اگر user پیدا نشد یا telegram_chat_id ندارد
 			logger.info(f"send_login_otp - checking telegram channel - user: {user is not None}, user_id: {user.id if user else None}, telegram_chat_id: {user.telegram_chat_id if user else None}")
 			if not user:
-				logger.error(f"send_login_otp - User not found for telegram channel - identifier: {identifier}, mobile: {mobile}, email: {email}")
 				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
 			if not user.telegram_chat_id:
-				logger.error(f"send_login_otp - User found but telegram_chat_id is None - user_id: {user.id}, identifier: {identifier}, mobile_in_db: {user.mobile}")
 				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
-			telegram_configured = self.telegram_provider.is_configured()
-			logger.info(f"send_login_otp - telegram_provider configured: {telegram_configured}")
-			if not telegram_configured:
+			if not self.telegram_provider.is_configured():
 				raise ApiError("TELEGRAM_NOT_CONFIGURED", "سرویس تلگرام پیکربندی نشده است", http_status=503)
+		if channel == "bale":
+			if not user:
+				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال بله برای این شناسه در دسترس نیست", http_status=400)
+			if not getattr(user, "bale_chat_id", None):
+				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال بله برای این شناسه در دسترس نیست", http_status=400)
+			if not self.bale_provider.is_configured():
+				raise ApiError("BALE_NOT_CONFIGURED", "سرویس بله پیکربندی نشده است", http_status=503)
 		
 		# تولید OTP
 		otp_code = generate_otp()
@@ -402,6 +413,15 @@ class OtpLoginService:
 				)
 				if not success:
 					logger.error("telegram_login_otp_send_failed", user_id=user.id, chat_id=user.telegram_chat_id)
+			elif channel == "bale":
+				if not user or not getattr(user, "bale_chat_id", None):
+					raise ApiError("BALE_NOT_CONNECTED", "حساب بله شما به سیستم متصل نشده است", http_status=400)
+				success = self.bale_provider.send_text(
+					chat_id=int(user.bale_chat_id),
+					text=message
+				)
+				if not success:
+					logger.error("bale_login_otp_send_failed", user_id=user.id, chat_id=user.bale_chat_id)
 		
 		# به‌روزرسانی last_otp_sent_at (اگر session موجود است)
 		if session:

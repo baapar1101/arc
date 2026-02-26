@@ -20,6 +20,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   bool _loading = true;
   String? _error;
   bool _telegram = true;
+  bool _bale = true;
   bool _email = true;
   bool _sms = true;
   bool _inapp = true;
@@ -31,6 +32,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   final _tgSecretHeaderCtrl = TextEditingController();
   final _tgProxyBaseUrlCtrl = TextEditingController();
   final _tgProxyApiKeyCtrl = TextEditingController();
+  final _baleTokenCtrl = TextEditingController();
+  final _baleUsernameCtrl = TextEditingController();
+  final _baleWebhookSecretCtrl = TextEditingController();
   final _smsProviderCtrl = TextEditingController();
   final _smsApiKeyCtrl = TextEditingController();
   final _smsSenderCtrl = TextEditingController();
@@ -77,6 +81,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     _tgSecretHeaderCtrl.dispose();
     _tgProxyBaseUrlCtrl.dispose();
     _tgProxyApiKeyCtrl.dispose();
+    _baleTokenCtrl.dispose();
+    _baleUsernameCtrl.dispose();
+    _baleWebhookSecretCtrl.dispose();
     _smsProviderCtrl.dispose();
     _smsApiKeyCtrl.dispose();
     _smsSenderCtrl.dispose();
@@ -103,6 +110,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _tgProxyBaseUrlCtrl.text = '${admin['telegram_proxy_base_url'] ?? ''}';
         _tgProxyApiKeyCtrl.text = '${admin['telegram_proxy_api_key'] ?? ''}';
         proxyEnabled = (admin['telegram_proxy_enabled'] ?? false) == true;
+        _baleTokenCtrl.text = '${admin['bale_bot_token'] ?? ''}';
+        _baleUsernameCtrl.text = '${admin['bale_bot_username'] ?? ''}';
+        _baleWebhookSecretCtrl.text = '${admin['bale_webhook_secret'] ?? ''}';
         final providerName = '${admin['sms_provider_name'] ?? ''}';
         _smsApiKeyCtrl.text = '${admin['sms_api_key'] ?? ''}';
         _smsSenderCtrl.text = '${admin['sms_sender'] ?? ''}';
@@ -128,6 +138,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       if (!mounted) return;
       setState(() {
         _telegram = (s['telegram_enabled'] ?? true) == true;
+        _bale = (s['bale_enabled'] ?? true) == true;
         _email = (s['email_enabled'] ?? true) == true;
         _sms = (s['sms_enabled'] ?? true) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
@@ -152,6 +163,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     try {
       await _svc.updateSettings(
         telegramEnabled: _telegram,
+        baleEnabled: _bale,
         emailEnabled: _email,
         smsEnabled: _sms,
         inappEnabled: _inapp,
@@ -242,6 +254,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       'telegram_proxy_enabled': _tgProxyEnabled,
       'telegram_proxy_base_url': _tgProxyBaseUrlCtrl.text.trim(),
       'telegram_proxy_api_key': _tgProxyApiKeyCtrl.text.trim(),
+      'bale_bot_token': _baleTokenCtrl.text.trim(),
+      'bale_bot_username': _baleUsernameCtrl.text.trim(),
+      'bale_webhook_secret': _baleWebhookSecretCtrl.text.trim(),
       'sms_provider_name': providerName,
       'sms_api_key': _smsApiKeyCtrl.text.trim(),
       'sms_sender': _smsSenderCtrl.text.trim(),
@@ -290,6 +305,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           _buildHeader(t, theme, colorScheme),
           const SizedBox(height: 16),
           _buildTelegramCard(t, theme, colorScheme),
+          const SizedBox(height: 16),
+          _buildBaleCard(t, theme, colorScheme),
           const SizedBox(height: 16),
           _buildEmailCard(t, theme, colorScheme),
           const SizedBox(height: 16),
@@ -374,6 +391,52 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                   if (_isAdmin) ...[
                     const SizedBox(height: 24),
                     _buildTelegramAdvancedSection(t, theme, colorScheme),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBaleCard(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile.adaptive(
+            value: _bale,
+            onChanged: (v) => setState(() => _bale = v),
+            title: Text(t.notificationsChannelBale),
+            subtitle: Text(t.notificationsChannelBaleDescription),
+            secondary: Icon(
+              Icons.chat_bubble_outline,
+              color: _bale ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+            activeColor: colorScheme.primary,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          if (_bale) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _testChannel('bale', t.notificationsChannelBale, t),
+                      icon: const Icon(Icons.send_outlined, size: 20),
+                      label: Text(t.notificationsTestButton(t.notificationsChannelBale)),
+                    ),
+                  ),
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _buildBaleAdvancedSection(t, theme, colorScheme),
                   ],
                 ],
               ),
@@ -542,6 +605,58 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
             _buildWebhookControls(t, theme, colorScheme),
             const SizedBox(height: 24),
             _buildProxySection(t, theme, colorScheme),
+            const SizedBox(height: 16),
+            Text(
+              t.notificationsAdvancedRestartHint,
+              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: FilledButton.icon(
+                onPressed: _adminSaving ? null : () => _saveAdvanced(t),
+                icon: _adminSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(t.notificationsAdvancedSave),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBaleAdvancedSection(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(Icons.admin_panel_settings_outlined, color: colorScheme.primary),
+        title: Text(
+          t.notificationsBaleAdvancedTitle,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          t.notificationsBaleAdvancedSubtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          if (_adminLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            Column(
+              children: [
+                _buildCredentialField(_baleTokenCtrl, t.notificationsFieldBaleToken, helper: t.notificationsFieldBaleTokenHint),
+                const SizedBox(height: 12),
+                _buildCredentialField(_baleUsernameCtrl, t.notificationsFieldBaleUsername),
+                const SizedBox(height: 12),
+                _buildCredentialField(_baleWebhookSecretCtrl, t.notificationsFieldBaleWebhookSecret),
+              ],
+            ),
             const SizedBox(height: 16),
             Text(
               t.notificationsAdvancedRestartHint,

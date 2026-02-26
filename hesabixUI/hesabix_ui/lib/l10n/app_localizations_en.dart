@@ -4180,6 +4180,58 @@ class AppLocalizationsEn extends AppLocalizations {
       'Send messages through a connected Telegram bot for operators.';
 
   @override
+  String get notificationsChannelBale => 'Bale';
+
+  @override
+  String get notificationsChannelBaleDescription =>
+      'Send messages through Bale messenger (connected bot).';
+
+  @override
+  String get notificationsBaleAdvancedTitle => 'Bale advanced settings';
+
+  @override
+  String get notificationsBaleAdvancedSubtitle =>
+      'Configure Bale bot for notifications';
+
+  @override
+  String get notificationsFieldBaleToken => 'Bale bot token';
+
+  @override
+  String get notificationsFieldBaleTokenHint =>
+      'Bot token from @BotFather in Bale';
+
+  @override
+  String get notificationsFieldBaleUsername => 'Bale bot username';
+
+  @override
+  String get notificationsFieldBaleWebhookSecret => 'Bale webhook secret';
+
+  @override
+  String get notificationsBaleConnected => 'Connected';
+
+  @override
+  String get notificationsBaleNotConnected => 'Not connected';
+
+  @override
+  String get notificationsBaleConnectButton => 'Connect Bale';
+
+  @override
+  String get notificationsBaleDisconnectButton => 'Disconnect Bale';
+
+  @override
+  String get notificationsBaleConnectionSuccess =>
+      'Bale connected successfully.';
+
+  @override
+  String get notificationsBaleConnectionError => 'Error connecting Bale.';
+
+  @override
+  String get notificationsBaleDisconnectSuccess => 'Bale disconnected.';
+
+  @override
+  String get notificationsBaleDisconnectError => 'Error disconnecting Bale.';
+
+  @override
   String get notificationsChannelEmail => 'Email';
 
   @override

@@ -4156,6 +4156,58 @@ class AppLocalizationsFa extends AppLocalizations {
       'ارسال پیام از طریق ربات تلگرام متصل برای اپراتورها.';
 
   @override
+  String get notificationsChannelBale => 'بله';
+
+  @override
+  String get notificationsChannelBaleDescription =>
+      'ارسال پیام از طریق پیام‌رسان بله (متصل به ربات).';
+
+  @override
+  String get notificationsBaleAdvancedTitle => 'تنظیمات پیشرفته بله';
+
+  @override
+  String get notificationsBaleAdvancedSubtitle =>
+      'پیکربندی ربات بله برای نوتیفیکیشن';
+
+  @override
+  String get notificationsFieldBaleToken => 'توکن ربات بله';
+
+  @override
+  String get notificationsFieldBaleTokenHint =>
+      'توکن ربات از @BotFather در بله';
+
+  @override
+  String get notificationsFieldBaleUsername => 'نام کاربری ربات بله';
+
+  @override
+  String get notificationsFieldBaleWebhookSecret => 'رمز وب‌هوک بله';
+
+  @override
+  String get notificationsBaleConnected => 'متصل';
+
+  @override
+  String get notificationsBaleNotConnected => 'قطع شده';
+
+  @override
+  String get notificationsBaleConnectButton => 'اتصال به بله';
+
+  @override
+  String get notificationsBaleDisconnectButton => 'قطع اتصال بله';
+
+  @override
+  String get notificationsBaleConnectionSuccess =>
+      'اتصال بله با موفقیت برقرار شد.';
+
+  @override
+  String get notificationsBaleConnectionError => 'خطا در اتصال بله.';
+
+  @override
+  String get notificationsBaleDisconnectSuccess => 'اتصال بله قطع شد.';
+
+  @override
+  String get notificationsBaleDisconnectError => 'خطا در قطع اتصال بله.';
+
+  @override
   String get notificationsChannelEmail => 'ایمیل';
 
   @override

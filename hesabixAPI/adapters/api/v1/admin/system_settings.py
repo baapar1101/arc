@@ -83,6 +83,9 @@ class NotificationsConfigPayload(BaseModel):
 	telegram_bot_username: str | None = None
 	telegram_webhook_secret: str | None = None
 	telegram_secret_header: str | None = None
+	bale_bot_token: str | None = None
+	bale_bot_username: str | None = None
+	bale_webhook_secret: str | None = None
 	sms_provider_name: str | None = None
 	sms_api_key: str | None = None
 	sms_sender: str | None = None
@@ -166,6 +169,9 @@ def put_notifications_settings_endpoint(
 		telegram_bot_username=payload.telegram_bot_username,
 		telegram_webhook_secret=payload.telegram_webhook_secret,
 		telegram_secret_header=payload.telegram_secret_header,
+		bale_bot_token=payload.bale_bot_token,
+		bale_bot_username=payload.bale_bot_username,
+		bale_webhook_secret=payload.bale_webhook_secret,
 		sms_provider_name=payload.sms_provider_name,
 		sms_api_key=payload.sms_api_key,
 		sms_sender=payload.sms_sender,

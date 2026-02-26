@@ -1915,14 +1915,15 @@ def send_login_otp(
 		)
 		
 		if not success:
-			channel_names = {"sms": "پیامک", "email": "ایمیل", "telegram": "تلگرام"}
+			channel_names = {"sms": "پیامک", "email": "ایمیل", "telegram": "تلگرام", "bale": "بله"}
 			channel_name = channel_names.get(payload.channel, payload.channel)
 			raise ApiError("SEND_FAILED", f"خطا در ارسال {channel_name}", http_status=500)
 		
 		channel_messages = {
 			"sms": "کد ورود به شماره موبایل ارسال شد",
 			"email": "کد ورود به ایمیل ارسال شد",
-			"telegram": "کد ورود به تلگرام ارسال شد"
+			"telegram": "کد ورود به تلگرام ارسال شد",
+			"bale": "کد ورود به بله ارسال شد"
 		}
 		
 		return success_response({

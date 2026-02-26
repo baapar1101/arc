@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/api_client.dart';
@@ -10,6 +11,7 @@ import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../services/notifications_service.dart';
 import '../../services/telegram_integration_service.dart';
+import '../../services/bale_integration_service.dart';
 import '../../utils/snackbar_helper.dart';
 
 class UserNotificationsPage extends StatefulWidget {
@@ -45,9 +47,11 @@ class _ChannelOption {
 class _UserNotificationsPageState extends State<UserNotificationsPage> {
   final _svc = NotificationsService(ApiClient());
   final _telegramSvc = TelegramIntegrationService(ApiClient());
+  final _baleSvc = BaleIntegrationService(ApiClient());
   bool _loading = true;
   String? _error;
   bool _telegram = true;
+  bool _bale = true;
   bool _email = true;
   bool _sms = true;
   bool _inapp = true;
@@ -64,8 +68,12 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   DateTime? _telegramLinkExpiresAt;
   Timer? _timer;
   int _remainingSeconds = 0;
-  bool _isPolling = false; // برای جلوگیری از بسته شدن بخش در حین polling
-  bool _showLinkSection = false; // متغیر جداگانه برای کنترل نمایش بخش QR code
+  bool _isPolling = false;
+  bool _showLinkSection = false;
+  // Bale connection state
+  bool _baleLinked = false;
+  String? _baleConnectedAt;
+  bool _baleLoading = false;
 
   @override
   void initState() {
@@ -87,11 +95,13 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       });
       final s = await _svc.getSettings();
       await _loadTelegramStatus();
+      await _loadBaleStatus();
       if (!mounted) return;
       setState(() {
         _emailVerified = (s['email_verified'] ?? false) == true;
         _mobileVerified = (s['mobile_verified'] ?? false) == true;
         _telegram = (s['telegram_enabled'] ?? false) == true;
+        _bale = (s['bale_enabled'] ?? true) == true;
         _email = (s['email_enabled'] ?? false) == true;
         _sms = (s['sms_enabled'] ?? false) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
@@ -103,6 +113,21 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         _error = '$e';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadBaleStatus({bool updateLoading = true}) async {
+    try {
+      if (updateLoading && mounted) setState(() => _baleLoading = true);
+      final status = await _baleSvc.getStatus();
+      if (!mounted) return;
+      setState(() {
+        _baleLinked = (status['linked'] ?? false) == true;
+        _baleConnectedAt = status['connected_at']?.toString();
+        _baleLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _baleLoading = false);
     }
   }
 
@@ -461,12 +486,13 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   Future<void> _save(AppLocalizations t) async {
     setState(() => _saving = true);
     try {
-      await _svc.updateSettings(
-        telegramEnabled: _telegram,
-        emailEnabled: _email,
-        smsEnabled: _sms,
-        inappEnabled: _inapp,
-      );
+    await _svc.updateSettings(
+      telegramEnabled: _telegram,
+      baleEnabled: _bale,
+      emailEnabled: _email,
+      smsEnabled: _sms,
+      inappEnabled: _inapp,
+    );
       if (!mounted) return;
       SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
@@ -528,7 +554,16 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         title: t.notificationsChannelTelegram,
         description: t.notificationsChannelTelegramDescription,
         onChanged: (v) => setState(() => _telegram = v),
-        canEnable: true, // Telegram همیشه قابل استفاده است
+        canEnable: true,
+      ),
+      _ChannelOption(
+        key: 'bale',
+        enabled: _bale,
+        icon: Icons.chat_bubble_outline,
+        title: t.notificationsChannelBale,
+        description: t.notificationsChannelBaleDescription,
+        onChanged: (v) => setState(() => _bale = v),
+        canEnable: true,
       ),
       _ChannelOption(
         key: 'email',
@@ -631,6 +666,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           for (var i = 0; i < options.length; i++) ...[
             if (options[i].key == 'telegram') ...[
               _buildTelegramChannelTile(t, theme, colorScheme, options[i]),
+            ] else if (options[i].key == 'bale') ...[
+              _buildBaleChannelTile(t, theme, colorScheme, options[i]),
             ] else ...[
               SwitchListTile.adaptive(
                 value: options[i].enabled,
@@ -959,6 +996,123 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildBaleChannelTile(AppLocalizations t, ThemeData theme, ColorScheme colorScheme, _ChannelOption option) {
+    return Column(
+      children: [
+        SwitchListTile.adaptive(
+          value: option.enabled,
+          onChanged: option.canEnable ? option.onChanged : null,
+          title: Text(option.title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(option.description),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    _baleLinked ? Icons.check_circle : Icons.cancel,
+                    size: 16,
+                    color: _baleLinked ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _baleLinked ? t.notificationsBaleConnected : t.notificationsBaleNotConnected,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _baleLinked ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          secondary: Icon(
+            option.icon,
+            color: option.enabled && option.canEnable ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          activeColor: colorScheme.primary,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              if (_baleLinked)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _baleLoading ? null : () => _disconnectBale(t),
+                    icon: _baleLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.link_off, size: 18),
+                    label: Text(t.notificationsBaleDisconnectButton),
+                  ),
+                )
+              else
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _baleLoading ? null : () => _connectBale(t),
+                    icon: _baleLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.link, size: 18),
+                    label: Text(t.notificationsBaleConnectButton),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _connectBale(AppLocalizations t) async {
+    try {
+      setState(() => _baleLoading = true);
+      final linkData = await _baleSvc.createLink();
+      if (!mounted) return;
+      final deepLink = linkData['deep_link']?.toString();
+      final linkToken = linkData['link_token']?.toString();
+      if (deepLink != null && deepLink.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: deepLink));
+        if (mounted) SnackBarHelper.show(context, message: t.copyLink);
+        try {
+          await launchUrl(Uri.parse(deepLink));
+        } catch (_) {}
+      } else if (linkToken != null) {
+        await Clipboard.setData(ClipboardData(text: linkToken));
+        if (mounted) SnackBarHelper.show(context, message: t.copyLink);
+      }
+      await _loadBaleStatus();
+      for (var i = 0; i < 24 && mounted; i++) {
+        await Future<void>.delayed(const Duration(seconds: 5));
+        await _loadBaleStatus();
+        if (mounted && _baleLinked) {
+          SnackBarHelper.show(context, message: t.notificationsBaleConnectionSuccess);
+          break;
+        }
+      }
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
+    } finally {
+      if (mounted) setState(() => _baleLoading = false);
+    }
+  }
+
+  Future<void> _disconnectBale(AppLocalizations t) async {
+    try {
+      setState(() => _baleLoading = true);
+      await _baleSvc.unlink();
+      await _loadBaleStatus();
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.notificationsBaleDisconnectSuccess);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: '${t.notificationsBaleDisconnectError}\n$e');
+    } finally {
+      if (mounted) setState(() => _baleLoading = false);
+    }
   }
 }
 

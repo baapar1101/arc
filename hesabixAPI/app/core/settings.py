@@ -61,6 +61,10 @@ class Settings(BaseSettings):
 	telegram_proxy_enabled: bool | None = None
 	telegram_proxy_base_url: str | None = None
 	telegram_proxy_api_key: str | None = None
+	# Bale messenger (optional)
+	bale_bot_token: str | None = None
+	bale_bot_username: str | None = None  # for deep-link to bot
+	bale_webhook_secret: str | None = None
 	# SMS (optional)
 	sms_provider_name: str | None = None  # e.g., "twilio" or custom
 	sms_api_key: str | None = None

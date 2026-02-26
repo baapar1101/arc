@@ -11,6 +11,7 @@ from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedEr
 from adapters.db.models.notification import NotificationOutbox, NotificationDeliveryAttempt
 from adapters.db.repositories.user_repo import UserRepository
 from app.services.providers.telegram_provider import TelegramProvider
+from app.services.providers.bale_provider import BaleProvider
 from app.services.providers.email_provider import EmailProvider
 from app.services.providers.inapp_provider import InAppProvider
 from app.services.providers.sms_provider import SmsProvider
@@ -34,6 +35,7 @@ class NotificationService:
 			bot_token=notify_cfg.get("telegram_bot_token"),
 			proxy_config=notify_cfg.get("telegram_proxy"),
 		)
+		self.bale = BaleProvider(bot_token=notify_cfg.get("bale_bot_token"))
 		self.email = EmailProvider(db)
 		self.sms = SmsProvider(
 			provider_name=notify_cfg.get("sms_provider_name"),
@@ -128,7 +130,7 @@ class NotificationService:
 		if user is None:
 			return False
 
-		channels = list(preferred_channels) if preferred_channels else ["telegram", "sms", "email", "inapp"]
+		channels = list(preferred_channels) if preferred_channels else ["telegram", "bale", "sms", "email", "inapp"]
 
 		# Render templates با جایگزینی پارامترها (fallback به متن ساده)
 		def render_for(channel: str) -> tuple[str, str]:
@@ -167,6 +169,7 @@ class NotificationService:
 
 		subject_email, body_email = render_for("email")
 		_, body_tg = render_for("telegram")
+		_, body_bale = render_for("bale")
 		_, body_sms = render_for("sms")
 		subject_inapp, body_inapp = render_for("inapp")
 
@@ -217,6 +220,46 @@ class NotificationService:
 				
 				ok = self.telegram.send_text(chat_id=int(chat_id), text=body_tg)
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "telegram_send_failed")
+				if ok:
+					outbox.status = "sent"
+					self.db.add(outbox)
+					self.db.commit()
+					sent = True
+					if not broadcast_mode:
+						break
+				else:
+					outbox.status = "failed"
+					outbox.retry_count = outbox.retry_count + 1
+					outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=5)
+					self.db.add(outbox)
+					self.db.commit()
+			elif channel == "bale":
+				if not self.bale.is_configured():
+					outbox.status = "failed"
+					outbox.error_message = "bale_not_configured"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="ربات بله پیکربندی نشده است")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				chat_id = getattr(user, "bale_chat_id", None)
+				if not chat_id:
+					outbox.status = "failed"
+					outbox.error_message = "no_bale_chat_id"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="کاربر به ربات بله متصل نیست")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				if not body_bale or not body_bale.strip():
+					body_bale = context.get("message", "")
+					if not body_bale or not body_bale.strip():
+						outbox.status = "failed"
+						outbox.error_message = "empty_bale_body"
+						self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="متن پیام بله خالی است")
+						self.db.add(outbox)
+						self.db.commit()
+						continue
+				ok = self.bale.send_text(chat_id=int(chat_id), text=body_bale)
+				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "bale_send_failed")
 				if ok:
 					outbox.status = "sent"
 					self.db.add(outbox)
@@ -425,7 +468,7 @@ class NotificationService:
 						user_id=operator.id,
 						event_key=event_key,
 						context=context,
-						preferred_channels=["inapp", "email", "telegram", "sms"],
+						preferred_channels=["inapp", "email", "telegram", "bale", "sms"],
 						locale=locale
 					)
 				except Exception as e:
@@ -448,7 +491,7 @@ class NotificationService:
 						user_id=operator.id,
 						event_key=event_key,
 						context=context,
-						preferred_channels=["inapp", "email", "telegram", "sms"],
+						preferred_channels=["inapp", "email", "telegram", "bale", "sms"],
 						locale=locale
 					)
 				except Exception as e:

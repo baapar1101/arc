@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 
 revision = "20250226_000001_backfill_receipt_payment_person_id_extra_info"
-down_revision = "20251003_010501_add_name_to_cash_registers"
+down_revision = None  # root in this migrations/versions folder (20251003_010501 lives in build/lib/migrations)
 branch_labels = None
 depends_on = None
 

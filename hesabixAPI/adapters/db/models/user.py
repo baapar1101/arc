@@ -29,6 +29,9 @@ class User(Base):
 	# استفاده از BigInteger به جای Integer چون chat_id تلگرام می‌تواند بزرگ‌تر از INT max باشد
 	telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
 	telegram_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	# Bale messenger linking
+	bale_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+	bale_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 	# شناسه فایل ذخیره‌سازی شده برای امضای کاربر (ارجاع به جدول file_storage)

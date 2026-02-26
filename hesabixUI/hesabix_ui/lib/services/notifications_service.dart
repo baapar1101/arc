@@ -11,12 +11,14 @@ class NotificationsService {
 
   Future<void> updateSettings({
     bool? telegramEnabled,
+    bool? baleEnabled,
     bool? emailEnabled,
     bool? smsEnabled,
     bool? inappEnabled,
   }) async {
     final body = <String, dynamic>{
       if (telegramEnabled != null) 'telegram_enabled': telegramEnabled,
+      if (baleEnabled != null) 'bale_enabled': baleEnabled,
       if (emailEnabled != null) 'email_enabled': emailEnabled,
       if (smsEnabled != null) 'sms_enabled': smsEnabled,
       if (inappEnabled != null) 'inapp_enabled': inappEnabled,

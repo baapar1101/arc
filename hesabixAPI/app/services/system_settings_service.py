@@ -29,6 +29,9 @@ NOTIFY_SMS_IS_FLASH = "sms_is_flash"
 NOTIFY_TG_PROXY_ENABLED = "telegram_proxy_enabled"
 NOTIFY_TG_PROXY_BASE_URL = "telegram_proxy_base_url"
 NOTIFY_TG_PROXY_API_KEY = "telegram_proxy_api_key"
+NOTIFY_BALE_BOT_TOKEN = "bale_bot_token"
+NOTIFY_BALE_BOT_USERNAME = "bale_bot_username"
+NOTIFY_BALE_WEBHOOK_SECRET = "bale_webhook_secret"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 
@@ -193,6 +196,9 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 	tg_proxy_enabled = _get_setting_bool(db, NOTIFY_TG_PROXY_ENABLED)
 	tg_proxy_base = _get_setting(db, NOTIFY_TG_PROXY_BASE_URL)
 	tg_proxy_api_key = _get_setting(db, NOTIFY_TG_PROXY_API_KEY)
+	bale_token = _get_setting(db, NOTIFY_BALE_BOT_TOKEN)
+	bale_username = _get_setting(db, NOTIFY_BALE_BOT_USERNAME)
+	bale_webhook = _get_setting(db, NOTIFY_BALE_WEBHOOK_SECRET)
 	return {
 		"telegram_bot_token": (tg_token.value_string if tg_token and tg_token.value_string else None),
 		"telegram_bot_username": (tg_username.value_string if tg_username and tg_username.value_string else None),
@@ -207,6 +213,9 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 		"telegram_proxy_enabled": tg_proxy_enabled,
 		"telegram_proxy_base_url": (tg_proxy_base.value_string if tg_proxy_base and tg_proxy_base.value_string else None),
 		"telegram_proxy_api_key": (tg_proxy_api_key.value_string if tg_proxy_api_key and tg_proxy_api_key.value_string else None),
+		"bale_bot_token": (bale_token.value_string if bale_token and bale_token.value_string else None),
+		"bale_bot_username": (bale_username.value_string if bale_username and bale_username.value_string else None),
+		"bale_webhook_secret": (bale_webhook.value_string if bale_webhook and bale_webhook.value_string else None),
 	}
 
 
@@ -236,6 +245,9 @@ def get_effective_notifications_settings(db: Session) -> Dict[str, Any]:
 			"base_url": db_values.get("telegram_proxy_base_url") or env.telegram_proxy_base_url,
 			"api_key": db_values.get("telegram_proxy_api_key") or env.telegram_proxy_api_key,
 		},
+		"bale_bot_token": db_values.get("bale_bot_token") or getattr(env, "bale_bot_token", None),
+		"bale_bot_username": db_values.get("bale_bot_username") or getattr(env, "bale_bot_username", None),
+		"bale_webhook_secret": db_values.get("bale_webhook_secret") or getattr(env, "bale_webhook_secret", None),
 	}
 
 def set_notifications_settings(
@@ -244,6 +256,9 @@ def set_notifications_settings(
 	telegram_bot_username: str | None = None,
 	telegram_webhook_secret: str | None = None,
 	telegram_secret_header: str | None = None,
+	bale_bot_token: str | None = None,
+	bale_bot_username: str | None = None,
+	bale_webhook_secret: str | None = None,
 	sms_provider_name: str | None = None,
 	sms_api_key: str | None = None,
 	sms_sender: str | None = None,
@@ -262,6 +277,12 @@ def set_notifications_settings(
 		_upsert_setting_string(db, NOTIFY_TG_WEBHOOK_SECRET, telegram_webhook_secret)
 	if telegram_secret_header is not None:
 		_upsert_setting_string(db, NOTIFY_TG_SECRET_HEADER, telegram_secret_header)
+	if bale_bot_token is not None:
+		_upsert_setting_string(db, NOTIFY_BALE_BOT_TOKEN, bale_bot_token)
+	if bale_bot_username is not None:
+		_upsert_setting_string(db, NOTIFY_BALE_BOT_USERNAME, bale_bot_username)
+	if bale_webhook_secret is not None:
+		_upsert_setting_string(db, NOTIFY_BALE_WEBHOOK_SECRET, bale_webhook_secret)
 	if sms_provider_name is not None:
 		_upsert_setting_string(db, NOTIFY_SMS_PROVIDER, sms_provider_name)
 	if sms_api_key is not None:

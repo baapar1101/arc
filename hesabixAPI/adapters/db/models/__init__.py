@@ -101,3 +101,5 @@ from .warranty import (  # noqa: F401
 )
 # Project models
 from .project import Project  # noqa: F401
+# Bale messenger linking
+from .bale import BaleLinkToken  # noqa: F401

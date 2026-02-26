@@ -18,6 +18,7 @@ router = APIRouter(prefix="/notifications", tags=["اطلاع‌رسانی"])
 
 class SettingsPayload(BaseModel):
 	telegram_enabled: Optional[bool] = None
+	bale_enabled: Optional[bool] = None
 	email_enabled: Optional[bool] = None
 	sms_enabled: Optional[bool] = None
 	inapp_enabled: Optional[bool] = None
@@ -44,18 +45,20 @@ def get_settings(
 	# اگر ایمیل تایید نشده باشد، Email غیرفعال
 	# Telegram و InApp همیشه فعال هستند (نیازی به احراز هویت ندارند)
 	res = {
-		"telegram_enabled": True,  # Telegram همیشه فعال است
-		"email_enabled": email_verified,  # Email نیاز به ایمیل تایید شده دارد
-		"sms_enabled": mobile_verified,  # SMS نیاز به موبایل تایید شده دارد
-		"inapp_enabled": True,  # InApp همیشه فعال است
+		"telegram_enabled": True,
+		"bale_enabled": True,
+		"email_enabled": email_verified,
+		"sms_enabled": mobile_verified,
+		"inapp_enabled": True,
 	}
 	
 	# اعمال تنظیمات ذخیره شده کاربر
 	for r in rows:
 		if r.event_key is None:
 			if r.channel == "telegram":
-				# Telegram همیشه قابل تنظیم است
 				res["telegram_enabled"] = r.enabled
+			elif r.channel == "bale":
+				res["bale_enabled"] = r.enabled
 			elif r.channel == "email":
 				# فقط اگر ایمیل تایید شده باشد، تنظیمات کاربر اعمال می‌شود
 				if email_verified:
@@ -99,8 +102,9 @@ def put_settings(
 	
 	# بررسی و اعمال محدودیت‌ها
 	if payload.telegram_enabled is not None:
-		# Telegram همیشه قابل تنظیم است (نیازی به احراز هویت ندارد)
 		repo.upsert(user_id=user_id, channel="telegram", event_key=None, enabled=payload.telegram_enabled)
+	if payload.bale_enabled is not None:
+		repo.upsert(user_id=user_id, channel="bale", event_key=None, enabled=payload.bale_enabled)
 	
 	if payload.email_enabled is not None:
 		# اگر کاربر می‌خواهد Email را فعال کند اما ایمیل تایید نشده
@@ -131,7 +135,7 @@ def put_settings(
 
 @router.post("/test", summary="ارسال تست نوتیفیکیشن")
 def test_notification(
-	channel: str = Query(..., pattern="^(telegram|email|sms|inapp)$"),
+	channel: str = Query(..., pattern="^(telegram|bale|email|sms|inapp)$"),
 	request: Request = None,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),

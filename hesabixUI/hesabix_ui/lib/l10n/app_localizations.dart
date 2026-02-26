@@ -8087,6 +8087,102 @@ abstract class AppLocalizations {
   /// **'Send messages through a connected Telegram bot for operators.'**
   String get notificationsChannelTelegramDescription;
 
+  /// No description provided for @notificationsChannelBale.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale'**
+  String get notificationsChannelBale;
+
+  /// No description provided for @notificationsChannelBaleDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Send messages through Bale messenger (connected bot).'**
+  String get notificationsChannelBaleDescription;
+
+  /// No description provided for @notificationsBaleAdvancedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale advanced settings'**
+  String get notificationsBaleAdvancedTitle;
+
+  /// No description provided for @notificationsBaleAdvancedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Bale bot for notifications'**
+  String get notificationsBaleAdvancedSubtitle;
+
+  /// No description provided for @notificationsFieldBaleToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale bot token'**
+  String get notificationsFieldBaleToken;
+
+  /// No description provided for @notificationsFieldBaleTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot token from @BotFather in Bale'**
+  String get notificationsFieldBaleTokenHint;
+
+  /// No description provided for @notificationsFieldBaleUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale bot username'**
+  String get notificationsFieldBaleUsername;
+
+  /// No description provided for @notificationsFieldBaleWebhookSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale webhook secret'**
+  String get notificationsFieldBaleWebhookSecret;
+
+  /// No description provided for @notificationsBaleConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get notificationsBaleConnected;
+
+  /// No description provided for @notificationsBaleNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get notificationsBaleNotConnected;
+
+  /// No description provided for @notificationsBaleConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Bale'**
+  String get notificationsBaleConnectButton;
+
+  /// No description provided for @notificationsBaleDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect Bale'**
+  String get notificationsBaleDisconnectButton;
+
+  /// No description provided for @notificationsBaleConnectionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale connected successfully.'**
+  String get notificationsBaleConnectionSuccess;
+
+  /// No description provided for @notificationsBaleConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error connecting Bale.'**
+  String get notificationsBaleConnectionError;
+
+  /// No description provided for @notificationsBaleDisconnectSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale disconnected.'**
+  String get notificationsBaleDisconnectSuccess;
+
+  /// No description provided for @notificationsBaleDisconnectError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error disconnecting Bale.'**
+  String get notificationsBaleDisconnectError;
+
   /// No description provided for @notificationsChannelEmail.
   ///
   /// In en, this message translates to:

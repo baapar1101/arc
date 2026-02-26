@@ -23,7 +23,7 @@ class TemplatePayload(BaseModel):
 
 	@staticmethod
 	def validate_channel(ch: str) -> str:
-		allowed = {"telegram", "email", "sms", "inapp"}
+		allowed = {"telegram", "bale", "email", "sms", "inapp"}
 		if ch not in allowed:
 			raise HTTPException(status_code=400, detail=f"کانال نامعتبر است. مقادیر مجاز: {', '.join(sorted(allowed))}")
 		return ch

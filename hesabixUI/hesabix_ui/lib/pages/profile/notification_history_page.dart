@@ -71,6 +71,11 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                     color = Colors.lightBlue;
                     label = 'تلگرام';
                     break;
+                  case 'bale':
+                    icon = Icons.chat_bubble_outline;
+                    color = Colors.indigo;
+                    label = 'بله';
+                    break;
                   case 'inapp':
                     icon = Icons.notifications_active_outlined;
                     color = Colors.orange;
@@ -528,6 +533,8 @@ class _NotificationDetailsDialog extends StatelessWidget {
         return 'پیامک';
       case 'telegram':
         return 'تلگرام';
+      case 'bale':
+        return 'بله';
       case 'inapp':
         return 'درون برنامه';
       default:
