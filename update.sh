@@ -78,6 +78,19 @@ cd "${api_dir}"
 source .venv/bin/activate
 pip install --upgrade pip setuptools wheel -q
 pip install -e . -q
+# Ensure alembic_version.version_num is VARCHAR(255) for long revision IDs (fixes StringDataRightTruncation)
+log_info "Ensuring alembic_version schema compatibility..."
+PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -U hesabix -d hesabix -tAc "
+  DO \$\$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='alembic_version') THEN
+      ALTER TABLE public.alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);
+    ELSE
+      CREATE TABLE public.alembic_version (version_num VARCHAR(255) PRIMARY KEY);
+    END IF;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END \$\$;
+" 2>/dev/null || true
 log_info "Running Alembic migrations..."
 if ! alembic upgrade head; then
   log_err "Migrations failed."
