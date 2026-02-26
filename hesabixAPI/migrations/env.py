@@ -65,23 +65,24 @@ def run_migrations_online() -> None:
         with aux.begin():
             try:
                 res = aux.exec_driver_sql(
-                    "SELECT 1 FROM information_schema.tables WHERE table_name='alembic_version';"
+                    "SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_name='alembic_version';"
                 )
                 if res.fetchone() is None:
                     # Table doesn't exist: create with VARCHAR(255) so Alembic won't create it with VARCHAR(32)
                     aux.exec_driver_sql(
-                        "CREATE TABLE alembic_version (version_num VARCHAR(255) PRIMARY KEY);"
+                        "CREATE TABLE public.alembic_version (version_num VARCHAR(255) PRIMARY KEY);"
                     )
                 else:
                     # Table exists: expand version_num if too short
                     res = aux.exec_driver_sql(
                         "SELECT character_maximum_length FROM information_schema.columns "
-                        "WHERE table_name='alembic_version' AND column_name='version_num';"
+                        "WHERE table_schema='public' AND table_name='alembic_version' AND column_name='version_num';"
                     )
                     row = res.fetchone()
                     if row is not None and (row[0] or 0) < 255:
                         aux.exec_driver_sql(
-                            "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
+                            "ALTER TABLE public.alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
                         )
             except Exception:
                 # Best-effort; ignore errors
