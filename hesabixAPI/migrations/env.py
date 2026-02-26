@@ -59,23 +59,27 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
+    # Ensure alembic_version.version_num can hold long revision strings.
+    # Run in a separate connection so any failure doesn't abort the migration transaction.
+    with connectable.connect() as aux:
+        with aux.begin():
+            try:
+                res = aux.exec_driver_sql(
+                    "SELECT character_maximum_length FROM information_schema.columns "
+                    "WHERE table_name='alembic_version' AND column_name='version_num';"
+                )
+                row = res.fetchone()
+                if row is not None:
+                    length = row[0] or 0
+                    if length < 255:
+                        aux.exec_driver_sql(
+                            "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
+                        )
+            except Exception:
+                # Best-effort; ignore if table doesn't exist yet
+                pass
+
     with connectable.begin() as connection:
-        # Ensure alembic_version.version_num can hold long revision strings
-        try:
-            res = connection.exec_driver_sql(
-                "SELECT character_maximum_length FROM information_schema.columns "
-                "WHERE table_name='alembic_version' AND column_name='version_num';"
-            )
-            row = res.fetchone()
-            if row is not None:
-                length = row[0] or 0
-                if length < 255:
-                    connection.exec_driver_sql(
-                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
-                    )
-        except Exception:
-            # Best-effort; ignore if table doesn't exist yet
-            pass
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
