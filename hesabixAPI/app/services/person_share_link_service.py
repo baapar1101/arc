@@ -406,15 +406,9 @@ def _fetch_invoice_items(
             Document.document_type.in_(tuple(SUPPORTED_INVOICE_TYPES)),
             DocumentLine.person_id == person_id,
         )
-        .group_by(
-            Document.id,
-            Document.code,
-            Document.document_type,
-            Document.document_date,
-            Document.description,
-            Document.extra_info,
-            Currency.code,
-        )
+        # GROUP BY فقط id و currency: در PostgreSQL ستون‌های دیگر سند تابع id هستند.
+        # قرار دادن extra_info (نوع json) در GROUP BY در PostgreSQL خطای عدم وجود عملگر برابری می‌دهد.
+        .group_by(Document.id, Currency.code)
         .order_by(Document.document_date.desc(), Document.id.desc())
         .limit(min(limit, 40))
         .all()
