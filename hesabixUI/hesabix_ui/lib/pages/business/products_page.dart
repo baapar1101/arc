@@ -1277,7 +1277,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 icon: Icons.edit,
                 label: t.edit,
                 onTap: (row) async {
-                  await showDialog<bool>(
+                  await showDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,
@@ -1484,7 +1484,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.addProduct,
               child: IconButton(
                 onPressed: () async {
-                  await showDialog<bool>(
+                  await showDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,

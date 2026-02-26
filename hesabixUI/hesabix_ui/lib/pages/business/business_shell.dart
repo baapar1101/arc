@@ -8,6 +8,7 @@ import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
+import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
 import '../../widgets/banking/cash_register_form_dialog.dart';
@@ -1040,7 +1041,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddPersonDialog() async {
-      final result = await showDialog<bool>(
+      final result = await showDialog<Person?>(
         context: context,
         builder: (context) => PersonFormDialog(
           businessId: widget.businessId,
@@ -1049,7 +1050,7 @@ class _BusinessShellState extends State<BusinessShell> {
           },
         ),
       );
-      if (result == true) {
+      if (result != null) {
         _refreshPersonsPageIfOpen();
       }
     }
@@ -1069,7 +1070,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddProductDialog() async {
-      final result = await showDialog<bool>(
+      final result = await showDialog<Object?>(
         context: context,
         builder: (context) => ProductFormDialog(
           businessId: widget.businessId,
@@ -1080,8 +1081,8 @@ class _BusinessShellState extends State<BusinessShell> {
           },
         ),
       );
-      if (result == true) {
-        // Product was successfully added, refresh if products page is open
+      if (result != null && result != false) {
+        // Product was successfully added (returns true or int ID), refresh if products page is open
         _refreshProductsPageIfOpen();
       }
     }
