@@ -39,6 +39,31 @@ class HesabixDateUtils {
     return '$datePart $timePart';
   }
 
+  /// نام روزهای هفته برای شمسی/میلادی (شنبه تا جمعه) به فارسی و انگلیسی
+  static const List<String> _weekdayNamesFa = [
+    'شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه',
+  ];
+  static const List<String> _weekdayNamesEn = [
+    'Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+  ];
+
+  /// تاریخ و زمان به‌همراه نام روز هفته؛ چندزبانه بر اساس [localeLanguageCode] (مثلاً 'fa' یا 'en').
+  static String formatDateTimeWithWeekday(DateTime? date, bool isJalali, String localeLanguageCode) {
+    if (date == null) return '-';
+    final local = date.toLocal();
+    final datePart = formatForDisplay(local, isJalali);
+    final timePart = '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    // روز هفته برای هر تاریخ در شمسی و میلادی یکسان است؛ از DateTime استفاده می‌کنیم (۰=شنبه، ۶=جمعه)
+    final int weekdayIndex = (local.weekday + 1) % 7;
+    final String weekdayName = localeLanguageCode.startsWith('fa')
+        ? _weekdayNamesFa[weekdayIndex]
+        : _weekdayNamesEn[weekdayIndex];
+    if (datePart.isEmpty) {
+      return '$weekdayName $timePart';
+    }
+    return '$weekdayName $datePart $timePart';
+  }
+
   /// Convert DateTime to Jalali string with month name for display
   static String formatForDisplayWithMonthName(DateTime? date, bool isJalali) {
     if (date == null) return '';

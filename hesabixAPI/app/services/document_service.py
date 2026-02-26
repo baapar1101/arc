@@ -47,11 +47,11 @@ def invalidate_documents_cache(business_id: int, fiscal_year_id: Optional[int] =
 		if deleted_count > 0:
 			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}, document_id {document_id}, document_type {document_type}")
 		
-		# روش 2: حذف تمام کلیدهای documents_list:* (fallback برای اطمینان کامل)
-		pattern = "documents_list:*"
-		deleted_pattern = cache.delete_pattern(pattern)
-		if deleted_pattern > 0:
-			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		# روش 2: حذف تمام کلیدهای documents_list:* و receipts_payments_list:* (fallback برای اطمینان کامل)
+		for pattern in ("documents_list:*", "receipts_payments_list:*"):
+			deleted_pattern = cache.delete_pattern(pattern)
+			if deleted_pattern > 0:
+				logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
 		
 		# حذف کش سند خاص اگر مشخص شده باشد
 		if document_id:

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
@@ -30,6 +31,7 @@ import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
+import '../../core/date_utils.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 import 'bank_accounts_page.dart';
@@ -82,6 +84,7 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _pluginsLoaded = false;
   bool _isBusinessLoading = false;
   String? _businessLoadError;
+  Timer? _dateTimeUpdateTimer;
 
   @override
   void initState() {
@@ -101,10 +104,15 @@ class _BusinessShellState extends State<BusinessShell> {
     _loadBusinessInfo();
     _loadBusinessPlugins();
     _initNotifications();
+    // به‌روزرسانی خودکار ساعت در نوار بالا هر دقیقه
+    _dateTimeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _dateTimeUpdateTimer?.cancel();
     try {
       _ws?.disconnect();
     } catch (_) {}
@@ -1314,6 +1322,61 @@ class _BusinessShellState extends State<BusinessShell> {
       ],
     );
 
+    // نوار باریک بالای AppBar: نام کسب‌وکار و (در نمای دسکتاپ/تبلت) تاریخ و زمان
+    const double _businessTopBarHeight = 32;
+    final bool isMobile = width < 700;
+    final String businessName = currentBusiness?.name ?? '';
+    final bool isJalali = widget.calendarController?.isJalali ?? true;
+    final String dateTimeStr = HesabixDateUtils.formatDateTimeWithWeekday(
+      DateTime.now(),
+      isJalali,
+      t.localeName,
+    );
+    const Color topBarBg = Color(0xFF020D1A);
+
+    final Widget businessTopBar = Container(
+      height: _businessTopBarHeight,
+      width: double.infinity,
+      color: topBarBg,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              businessName,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (!isMobile)
+            Text(
+              dateTimeStr,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final PreferredSizeWidget preferredAppBar = PreferredSize(
+      preferredSize: const Size.fromHeight(_businessTopBarHeight + kToolbarHeight),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          businessTopBar,
+          appBar,
+        ],
+      ),
+    );
+
     final content = Container(
       color: scheme.surface,
       child: SafeArea(
@@ -1331,7 +1394,7 @@ class _BusinessShellState extends State<BusinessShell> {
 
     if (useRail) {
       return Scaffold(
-        appBar: appBar,
+        appBar: preferredAppBar,
         body: Row(
           children: [
             Container(
@@ -1709,7 +1772,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
       return Scaffold(
-        appBar: appBar,
+        appBar: preferredAppBar,
       drawer: Drawer(
         backgroundColor: sideBg,
         child: SafeArea(

@@ -2302,7 +2302,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
                 line_dict["check_id"] = line.extra_info["check_id"]
             if "check_number" in line.extra_info:
                 line_dict["check_number"] = line.extra_info["check_number"]
-            if "person_name" in line.extra_info:
+            # فقط وقتی نام در extra_info مقدار داشته باشد استفاده کن؛ وگرنه بعداً از جدول Person خوانده می‌شود
+            if line.extra_info.get("person_name"):
                 line_dict["person_name"] = line.extra_info["person_name"]
             # اضافه کردن اطلاعات فاکتور از extra_info
             if "invoice_id" in line.extra_info:
@@ -2333,8 +2334,11 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         if is_commission_line:
             # خط کارمزد - در account_lines قرار می‌گیرد
             account_lines.append(line_dict)
-        elif line.extra_info and line.extra_info.get("person_id"):
-            # خط شخص
+        elif (line.extra_info and line.extra_info.get("person_id")) or (
+            line.person_id and account.account_type == "person"
+        ):
+            # خط شخص: یا extra_info دارای person_id است، یا ستون person_id پر است و حساب از نوع شخص (دریافتنی/پرداختنی)
+            # برای داده‌های قدیمی که فقط person_id در ستون دارند، بدون نیاز به extra_info هم درست نمایش داده می‌شود
             person_lines.append(line_dict)
         else:
             account_lines.append(line_dict)
