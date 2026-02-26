@@ -49,10 +49,10 @@ def create_link(
 		created_ip=(request.client.host if request.client else None),
 		user_agent=request.headers.get("User-Agent"),
 	)
-	bot_username = (settings.get("bale_bot_username") or "").strip()
-	# لینک مستقیم به ربات بله (فرمت متداول: آدرس وب یا اپ با پارامتر start)
+	bot_username = (settings.get("bale_bot_username") or "").strip().lstrip("@")
+	# لینک ble.ir اپ موبایل را باز می‌کند؛ web.bale.ai همیشه نسخه وب را باز می‌کند
 	if bot_username:
-		deep_link = f"https://web.bale.ai/chat/{bot_username}?start={link.token}"
+		deep_link = f"https://ble.ir/{bot_username}?start={link.token}"
 	else:
 		deep_link = None
 	return success_response(
