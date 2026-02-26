@@ -109,7 +109,8 @@ def bale_webhook(
 		raise HTTPException(status_code=403, detail="Forbidden")
 
 	provider = BaleProvider(bot_token=settings.get("bale_bot_token"))
-	message = payload.get("message") or {}
+	# بله Update می‌فرستد: message یا edited_message
+	message = payload.get("message") or payload.get("edited_message") or {}
 	text: str = (message.get("text") or "").strip()
 	chat = message.get("chat") or {}
 	chat_id = chat.get("id")

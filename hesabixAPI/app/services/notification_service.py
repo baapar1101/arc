@@ -258,7 +258,7 @@ class NotificationService:
 						self.db.add(outbox)
 						self.db.commit()
 						continue
-				ok = self.bale.send_text(chat_id=int(chat_id), text=body_bale)
+				ok = self.bale.send_text(chat_id=int(chat_id), text=body_bale, parse_mode="Markdown")
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "bale_send_failed")
 				if ok:
 					outbox.status = "sent"

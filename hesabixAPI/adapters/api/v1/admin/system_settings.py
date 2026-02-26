@@ -38,6 +38,7 @@ from app.services.system_settings_service import (
 	set_notification_sms_pricing,
 )
 from app.services.providers.telegram_provider import TelegramProvider
+from app.services.providers.bale_provider import BaleProvider
 
 logger = structlog.get_logger()
 
@@ -270,6 +271,54 @@ def register_telegram_webhook_endpoint(
 		"description": description,
 	}
 	message = "TELEGRAM_WEBHOOK_REGISTERED" if ok else "TELEGRAM_WEBHOOK_FAILED"
+	return success_response(data, request, message=message)
+
+
+@router.post(
+	"/notifications/bale/webhook",
+	summary="ثبت وب‌هوک بله",
+	description="با استفاده از کانفیگ فعلی، آدرس وب‌هوک به سرور بله اعلام می‌شود. پورت‌های مجاز: 443، 88",
+)
+def register_bale_webhook_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+
+	cfg = get_effective_notifications_settings(db)
+	bot_token = cfg.get("bale_bot_token")
+	webhook_secret = cfg.get("bale_webhook_secret")
+
+	if not bot_token:
+		raise ApiError("BALE_BOT_TOKEN_MISSING", "توکن ربات بله تنظیم نشده است.", http_status=400)
+	if not webhook_secret:
+		raise ApiError("BALE_WEBHOOK_SECRET_MISSING", "رمز وب‌هوک بله تنظیم نشده است.", http_status=400)
+
+	webhook_url = str(request.url_for("bale_webhook", secret=webhook_secret))
+	forwarded_proto = request.headers.get("X-Forwarded-Proto")
+	if forwarded_proto and forwarded_proto.lower() in ("http", "https"):
+		parts = urlsplit(webhook_url)
+		webhook_url = urlunsplit(
+			(forwarded_proto.lower(), parts.netloc, parts.path, parts.query, parts.fragment)
+		)
+	else:
+		parts = urlsplit(webhook_url)
+		scheme = parts.scheme or (getattr(request.url, "scheme", None) or "https")
+		if scheme == "http":
+			scheme = "https"
+		webhook_url = urlunsplit((scheme, parts.netloc, parts.path, parts.query, parts.fragment))
+
+	provider = BaleProvider(bot_token=bot_token)
+	ok, description = provider.set_webhook(url=webhook_url)
+
+	data = {
+		"ok": ok,
+		"webhook_url": webhook_url,
+		"description": description,
+	}
+	message = "BALE_WEBHOOK_REGISTERED" if ok else "BALE_WEBHOOK_FAILED"
 	return success_response(data, request, message=message)
 
 
