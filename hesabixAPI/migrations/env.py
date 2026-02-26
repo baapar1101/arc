@@ -59,23 +59,36 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    with connectable.begin() as connection:
-        # Ensure alembic_version.version_num can hold long revision strings
-        try:
-            res = connection.exec_driver_sql(
-                "SELECT character_maximum_length FROM information_schema.columns "
-                "WHERE table_name='alembic_version' AND column_name='version_num';"
-            )
-            row = res.fetchone()
-            if row is not None:
-                length = row[0] or 0
-                if length < 255:
-                    connection.exec_driver_sql(
-                        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
+    # Ensure alembic_version exists with version_num VARCHAR(255) for long revision IDs.
+    # Run in a separate connection so any failure doesn't abort the migration transaction.
+    with connectable.connect() as aux:
+        with aux.begin():
+            try:
+                res = aux.exec_driver_sql(
+                    "SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_name='alembic_version';"
+                )
+                if res.fetchone() is None:
+                    # Table doesn't exist: create with VARCHAR(255) so Alembic won't create it with VARCHAR(32)
+                    aux.exec_driver_sql(
+                        "CREATE TABLE public.alembic_version (version_num VARCHAR(255) PRIMARY KEY);"
                     )
-        except Exception:
-            # Best-effort; ignore if table doesn't exist yet
-            pass
+                else:
+                    # Table exists: expand version_num if too short
+                    res = aux.exec_driver_sql(
+                        "SELECT character_maximum_length FROM information_schema.columns "
+                        "WHERE table_schema='public' AND table_name='alembic_version' AND column_name='version_num';"
+                    )
+                    row = res.fetchone()
+                    if row is not None and (row[0] or 0) < 255:
+                        aux.exec_driver_sql(
+                            "ALTER TABLE public.alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);"
+                        )
+            except Exception:
+                # Best-effort; ignore errors
+                pass
+
+    with connectable.begin() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

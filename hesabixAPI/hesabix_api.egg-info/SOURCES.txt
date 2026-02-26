@@ -92,6 +92,7 @@ adapters/api/v1/ai/voice_ws.py
 adapters/api/v1/business/document_monetization.py
 adapters/api/v1/business/storage.py
 adapters/api/v1/helpers/product_request_helper.py
+adapters/api/v1/integrations/bale.py
 adapters/api/v1/integrations/telegram.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
@@ -140,6 +141,7 @@ adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
 adapters/db/models/announcement.py
 adapters/db/models/api_key.py
+adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_notification.py
@@ -213,6 +215,7 @@ adapters/db/repositories/ai_prompt_repository.py
 adapters/db/repositories/ai_subscription_repository.py
 adapters/db/repositories/ai_usage_log_repository.py
 adapters/db/repositories/api_key_repo.py
+adapters/db/repositories/bale_repo.py
 adapters/db/repositories/base_repo.py
 adapters/db/repositories/business_notification_repo.py
 adapters/db/repositories/business_permission_repo.py
@@ -404,6 +407,7 @@ app/services/pdf/template_renderer.py
 app/services/pdf/modules/__init__.py
 app/services/pdf/modules/marketing/__init__.py
 app/services/pdf/modules/marketing/marketing_module.py
+app/services/providers/bale_provider.py
 app/services/providers/behin_sms_provider.py
 app/services/providers/email_provider.py
 app/services/providers/inapp_provider.py
@@ -446,6 +450,7 @@ hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
 migrations/versions/20250226_000001_backfill_receipt_payment_person_id_extra_info.py
+migrations/versions/20250226_000002_add_bale_messenger_support.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py
