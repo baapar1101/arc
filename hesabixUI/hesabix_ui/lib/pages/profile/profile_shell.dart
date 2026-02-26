@@ -85,6 +85,7 @@ class _ProfileShellState extends State<ProfileShell> {
       final items = (data['items'] as List? ?? const <dynamic>[])
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
+      final total = (data['total'] is int) ? data['total'] as int : (int.tryParse('${data['total']}') ?? items.length);
       if (!mounted) return;
       setState(() {
         // تبدیل به ساختار یکسان برای مرکز اعلان
@@ -97,7 +98,7 @@ class _ProfileShellState extends State<ProfileShell> {
             'id': it['id'],
           });
         }
-        _unreadCount = _notifications.length.clamp(0, 99);
+        _unreadCount = total.clamp(0, 99);
       });
     } catch (_) {}
   }
@@ -433,7 +434,7 @@ class _ProfileShellState extends State<ProfileShell> {
                     ),
                     constraints: const BoxConstraints(minWidth: 18),
                     child: Text(
-                      _unreadCount > 9 ? '9+' : '$_unreadCount',
+                      _unreadCount > 99 ? '99+' : '$_unreadCount',
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),

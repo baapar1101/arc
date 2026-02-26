@@ -190,11 +190,13 @@ def user_list(
 	user_app_permissions = user.app_permissions
 	
 	now = datetime.utcnow()
+	uid = int(user_id)
+
 	q = db.query(Announcement, UserAnnouncement).outerjoin(
 		UserAnnouncement,
 		and_(
 			UserAnnouncement.announcement_id == Announcement.id,
-			UserAnnouncement.user_id == int(user_id),
+			UserAnnouncement.user_id == uid,
 		)
 	).filter(
 		Announcement.is_active == True,
@@ -205,10 +207,9 @@ def user_list(
 		q = q.filter(Announcement.level == level)
 	if only_unread:
 		# فقط اعلان‌هایی که نه خوانده شده‌اند و نه پنهان شده‌اند
-		# یا اصلاً در UserAnnouncement نیستند (یعنی خوانده نشده‌اند) یا اگر هستند، read_at و dismissed_at باید None باشند
 		q = q.filter(
 			or_(
-				UserAnnouncement.id == None,  # اعلان‌هایی که اصلاً در UserAnnouncement نیستند
+				UserAnnouncement.id == None,
 				and_(
 					UserAnnouncement.read_at == None,
 					UserAnnouncement.dismissed_at == None,
@@ -257,19 +258,22 @@ def user_list(
 
 
 def mark_read(db: Session, user_id: int, announcement_id: int) -> bool:
+	user_id = int(user_id)
+	announcement_id = int(announcement_id)
 	ua = db.query(UserAnnouncement).filter(
 		and_(
-			UserAnnouncement.user_id == int(user_id),
-			UserAnnouncement.announcement_id == int(announcement_id),
+			UserAnnouncement.user_id == user_id,
+			UserAnnouncement.announcement_id == announcement_id,
 		)
 	).first()
 	now = datetime.utcnow()
 	if ua:
 		ua.read_at = now
 	else:
-		ua = UserAnnouncement(user_id=int(user_id), announcement_id=int(announcement_id), read_at=now, first_seen_at=now)
+		ua = UserAnnouncement(user_id=user_id, announcement_id=announcement_id, read_at=now, first_seen_at=now)
 		db.add(ua)
 	db.commit()
+	db.refresh(ua)
 	return True
 
 

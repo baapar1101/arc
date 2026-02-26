@@ -24,31 +24,8 @@ def list_announcements_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-	cache = get_cache()
-	cache_key = None
-
-	if cache.enabled:
-		import json, hashlib
-		key_payload = {
-			"user_id": ctx.get_user_id(),
-			"page": page,
-			"limit": limit,
-			"level": level,
-			"only_unread": only_unread,
-			"locale": locale,
-		}
-		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
-		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
-		cache_key = f"announcements:{key_hash}"
-		cached = cache.get(cache_key)
-		if cached is not None:
-			return success_response(cached, request)
-
+	# کش برای لیست اعلان‌ها غیرفعال است تا وضعیت خوانده/خوانده‌نشده همیشه از DB بیاید
 	data = user_list(db, ctx.get_user_id(), page=page, limit=limit, level=level, only_unread=only_unread, locale=locale)
-
-	if cache.enabled and cache_key:
-		# وضعیت خوانده‌بودن ممکن است سریع تغییر کند → TTL کوتاه
-		cache.set(cache_key, data, ttl=30)
 
 	return success_response(data, request)
 
@@ -60,9 +37,13 @@ def mark_read_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-	ok = mark_read(db, ctx.get_user_id(), announcement_id)
+	user_id = ctx.get_user_id()
+	ok = mark_read(db, user_id, announcement_id)
 	if not ok:
 		raise ApiError("UNKNOWN", "Operation failed", http_status=500)
+	cache = get_cache()
+	if cache.enabled:
+		cache.delete_pattern(f"announcements:user:{user_id}:*")
 	return success_response({"ok": True}, request)
 
 
@@ -73,9 +54,13 @@ def dismiss_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-	ok = dismiss(db, ctx.get_user_id(), announcement_id)
+	user_id = ctx.get_user_id()
+	ok = dismiss(db, user_id, announcement_id)
 	if not ok:
 		raise ApiError("UNKNOWN", "Operation failed", http_status=500)
+	cache = get_cache()
+	if cache.enabled:
+		cache.delete_pattern(f"announcements:user:{user_id}:*")
 	return success_response({"ok": True}, request)
 
 

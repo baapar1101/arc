@@ -445,6 +445,7 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
+migrations/versions/20250226_000001_backfill_receipt_payment_person_id_extra_info.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py
