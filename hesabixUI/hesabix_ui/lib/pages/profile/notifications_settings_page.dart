@@ -56,6 +56,10 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   bool? _webhookLastOk;
   String? _webhookLastMessage;
   String? _webhookLastUrl;
+  bool _baleWebhookRegistering = false;
+  bool? _baleWebhookLastOk;
+  String? _baleWebhookLastMessage;
+  String? _baleWebhookLastUrl;
   bool _tgProxyEnabled = false;
   bool _isAdmin = false;
 
@@ -234,6 +238,38 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     } finally {
       if (!mounted) return;
       setState(() => _webhookRegistering = false);
+    }
+  }
+
+  Future<void> _registerBaleWebhook(AppLocalizations t) async {
+    setState(() => _baleWebhookRegistering = true);
+    try {
+      final res = await _adminSvc.registerBaleWebhook();
+      final ok = (res['ok'] ?? false) == true;
+      final description = res['description']?.toString();
+      final webhookUrl = res['webhook_url']?.toString();
+      if (!mounted) return;
+      setState(() {
+        _baleWebhookLastOk = ok;
+        _baleWebhookLastMessage = description?.isNotEmpty == true ? description : null;
+        _baleWebhookLastUrl = webhookUrl;
+      });
+      if (ok) {
+        SnackBarHelper.show(context, message: t.notificationsBaleConnectionSuccess);
+      } else {
+        final msg = description?.isNotEmpty == true ? description! : t.notificationsBaleConnectionError;
+        SnackBarHelper.showError(context, message: msg);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _baleWebhookLastOk = false;
+        _baleWebhookLastMessage = '$e';
+      });
+      SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
+    } finally {
+      if (!mounted) return;
+      setState(() => _baleWebhookRegistering = false);
     }
   }
 
@@ -658,6 +694,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
               ],
             ),
             const SizedBox(height: 16),
+            _buildBaleWebhookControls(t, theme, colorScheme),
+            const SizedBox(height: 16),
             Text(
               t.notificationsAdvancedRestartHint,
               style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -852,6 +890,80 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       textInputAction: TextInputAction.next,
       enableSuggestions: false,
       autocorrect: false,
+    );
+  }
+
+  Widget _buildBaleWebhookControls(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    final statusColor = _baleWebhookLastOk == true ? colorScheme.primary : colorScheme.error;
+    final backgroundColor = (_baleWebhookLastOk == true ? colorScheme.primaryContainer : colorScheme.errorContainer).withValues(alpha: 0.3);
+    final statusText = _baleWebhookLastOk == true ? t.notificationsBaleConnected : t.notificationsBaleConnectionError;
+    final displayMessage = _baleWebhookLastMessage?.isNotEmpty == true ? _baleWebhookLastMessage! : statusText;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.icon(
+          onPressed: _baleWebhookRegistering ? null : () => _registerBaleWebhook(t),
+          icon: _baleWebhookRegistering
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.link_outlined),
+          label: Text(t.notificationsBaleConnectButton),
+        ),
+        if (_baleWebhookLastOk != null)
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _baleWebhookLastOk == true ? Icons.check_circle_outline : Icons.error_outline,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayMessage,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: statusColor, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_baleWebhookLastUrl?.isNotEmpty == true)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.link, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            _baleWebhookLastUrl!,
+                            style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: t.copyLink,
+                          onPressed: () => _copyToClipboard(_baleWebhookLastUrl!, t.copied),
+                          icon: const Icon(Icons.copy_all_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
