@@ -672,7 +672,11 @@ def create_database_backup_endpoint(
 			)
 
 	except DatabaseBackupError as e:
+		logger.error("database_backup_endpoint_failed", error=str(e), delivery=delivery_lower)
 		raise ApiError("BACKUP_FAILED", str(e), http_status=500)
+	except Exception as e:
+		logger.exception("database_backup_endpoint_unexpected_error", error=str(e), delivery=delivery_lower)
+		raise
 
 
 @router.post(

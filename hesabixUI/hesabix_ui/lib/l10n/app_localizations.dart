@@ -8159,6 +8159,36 @@ abstract class AppLocalizations {
   /// **'Disconnect Bale'**
   String get notificationsBaleDisconnectButton;
 
+  /// No description provided for @notificationsBaleConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get notificationsBaleConnecting;
+
+  /// No description provided for @notificationsBaleConnectionWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'To enable Bale notifications, please connect first.'**
+  String get notificationsBaleConnectionWarning;
+
+  /// No description provided for @notificationsBaleLinkInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the link below or open the bot in Bale and send /start {token}.'**
+  String notificationsBaleLinkInstructions(String token);
+
+  /// No description provided for @notificationsBaleLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection link expired. Please create a new link.'**
+  String get notificationsBaleLinkExpired;
+
+  /// No description provided for @notificationsBaleConnectedSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected since {date}'**
+  String notificationsBaleConnectedSince(String date);
+
   /// No description provided for @notificationsBaleConnectionSuccess.
   ///
   /// In en, this message translates to:

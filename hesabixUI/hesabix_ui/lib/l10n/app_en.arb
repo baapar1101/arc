@@ -1526,6 +1526,21 @@
   "notificationsBaleNotConnected": "Not connected",
   "notificationsBaleConnectButton": "Connect Bale",
   "notificationsBaleDisconnectButton": "Disconnect Bale",
+  "notificationsBaleConnecting": "Connecting...",
+  "notificationsBaleConnectionWarning": "To enable Bale notifications, please connect first.",
+  "notificationsBaleLinkInstructions": "Click the link below or open the bot in Bale and send /start {token}.",
+  "notificationsBaleLinkExpired": "Connection link expired. Please create a new link.",
+  "notificationsBaleConnectedSince": "Connected since {date}",
+  "@notificationsBaleConnectedSince": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "@notificationsBaleLinkInstructions": {
+    "placeholders": {
+      "token": {"type": "String"}
+    }
+  },
   "notificationsBaleConnectionSuccess": "Bale connected successfully.",
   "notificationsBaleConnectionError": "Error connecting Bale.",
   "notificationsBaleDisconnectSuccess": "Bale disconnected.",

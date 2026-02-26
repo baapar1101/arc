@@ -4195,6 +4195,27 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsBaleDisconnectButton => 'قطع اتصال بله';
 
   @override
+  String get notificationsBaleConnecting => 'در حال اتصال...';
+
+  @override
+  String get notificationsBaleConnectionWarning =>
+      'برای فعال شدن ناتیفیکیشن‌های بله، ابتدا اتصال را برقرار کنید.';
+
+  @override
+  String notificationsBaleLinkInstructions(String token) {
+    return 'روی لینک زیر کلیک کنید یا در بله ربات را باز کرده و دستور /start $token را ارسال کنید.';
+  }
+
+  @override
+  String get notificationsBaleLinkExpired =>
+      'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
+
+  @override
+  String notificationsBaleConnectedSince(String date) {
+    return 'متصل از $date';
+  }
+
+  @override
   String get notificationsBaleConnectionSuccess =>
       'اتصال بله با موفقیت برقرار شد.';
 

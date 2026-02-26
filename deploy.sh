@@ -658,10 +658,10 @@ install_prereqs() {
   # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
   # We'll use python3 and python3-venv which work on all versions
   # WeasyPrint (PDF) requires: libcairo2, libpango*, libgdk-pixbuf-2.0-0 (note: hyphen in package name on Ubuntu 24)
-  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, redis-server, WeasyPrint system deps (libpango/cairo)..."
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3 python3-venv python3-pip build-essential \
-    nginx postgresql postgresql-contrib redis-server \
+    nginx postgresql postgresql-contrib postgresql-client redis-server \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
   
   # Detect Python version for logging
@@ -1072,7 +1072,7 @@ TimeoutStartSec=300
 User=www-data
 Group=www-data
 WorkingDirectory=${api_dir}
-Environment=PATH=${api_dir}/.venv/bin
+Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
 Restart=always

@@ -1355,6 +1355,21 @@
   "notificationsBaleNotConnected": "قطع شده",
   "notificationsBaleConnectButton": "اتصال به بله",
   "notificationsBaleDisconnectButton": "قطع اتصال بله",
+  "notificationsBaleConnecting": "در حال اتصال...",
+  "notificationsBaleConnectionWarning": "برای فعال شدن ناتیفیکیشن‌های بله، ابتدا اتصال را برقرار کنید.",
+  "notificationsBaleLinkInstructions": "روی لینک زیر کلیک کنید یا در بله ربات را باز کرده و دستور /start {token} را ارسال کنید.",
+  "notificationsBaleLinkExpired": "لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.",
+  "notificationsBaleConnectedSince": "متصل از {date}",
+  "@notificationsBaleConnectedSince": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "@notificationsBaleLinkInstructions": {
+    "placeholders": {
+      "token": {"type": "String"}
+    }
+  },
   "notificationsBaleConnectionSuccess": "اتصال بله با موفقیت برقرار شد.",
   "notificationsBaleConnectionError": "خطا در اتصال بله.",
   "notificationsBaleDisconnectSuccess": "اتصال بله قطع شد.",

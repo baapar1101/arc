@@ -4219,6 +4219,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationsBaleDisconnectButton => 'Disconnect Bale';
 
   @override
+  String get notificationsBaleConnecting => 'Connecting...';
+
+  @override
+  String get notificationsBaleConnectionWarning =>
+      'To enable Bale notifications, please connect first.';
+
+  @override
+  String notificationsBaleLinkInstructions(String token) {
+    return 'Click the link below or open the bot in Bale and send /start $token.';
+  }
+
+  @override
+  String get notificationsBaleLinkExpired =>
+      'Connection link expired. Please create a new link.';
+
+  @override
+  String notificationsBaleConnectedSince(String date) {
+    return 'Connected since $date';
+  }
+
+  @override
   String get notificationsBaleConnectionSuccess =>
       'Bale connected successfully.';
 

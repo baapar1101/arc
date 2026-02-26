@@ -43,6 +43,8 @@ class DatabaseBackupService:
         """
         env = os.environ.copy()
         env["PGPASSWORD"] = self.settings.db_password
+        # سرویس با PATH محدود (فقط .venv/bin) اجرا می‌شود؛ pg_dump در /usr/bin است
+        env["PATH"] = "/usr/bin:/usr/local/bin:" + env.get("PATH", "")
 
         cmd = [
             "pg_dump",
@@ -58,6 +60,13 @@ class DatabaseBackupService:
             "--no-acl",
         ]
 
+        logger.info(
+            "database_backup_start db_host=%s db_port=%s db_name=%s compress=%s",
+            self.settings.db_host,
+            self.settings.db_port,
+            self.settings.db_name,
+            compress,
+        )
         try:
             result = subprocess.run(
                 cmd,
@@ -67,18 +76,24 @@ class DatabaseBackupService:
                 check=True,
             )
             raw_data = result.stdout
-        except subprocess.TimeoutExpired:
-            raise DatabaseBackupError("زمان بکاپ به پایان رسید (timeout)")
+        except subprocess.TimeoutExpired as e:
+            logger.error("database_backup_timeout: pg_dump exceeded 3600s limit")
+            raise DatabaseBackupError("زمان بکاپ به پایان رسید (timeout)") from e
         except subprocess.CalledProcessError as e:
             stderr = (e.stderr or b"").decode("utf-8", errors="replace")
-            logger.error("pg_dump failed: %s", stderr)
-            raise DatabaseBackupError(f"خطا در pg_dump: {stderr[:200]}")
-        except FileNotFoundError:
+            logger.error(
+                "database_backup_pg_dump_failed exit_code=%s stderr=%s",
+                e.returncode,
+                stderr[:500],
+            )
+            raise DatabaseBackupError(f"خطا در pg_dump: {stderr[:200]}") from e
+        except FileNotFoundError as e:
+            logger.error("database_backup_pg_dump_not_found: %s", e)
             raise DatabaseBackupError(
                 "ابزار pg_dump یافت نشد. لطفاً PostgreSQL client tools را نصب کنید."
-            )
+            ) from e
         except Exception as e:
-            logger.exception("database_backup_unexpected_error")
+            logger.exception("database_backup_unexpected_error error=%s", str(e))
             raise DatabaseBackupError(str(e)) from e
 
         if compress:

@@ -1,35 +1,45 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart' as dio;
 
 /// کلاس کمکی برای استخراج پیام خطا از exception
 class ErrorExtractor {
+  /// استخراج پیام خطا از response.data (پشتیبانی از Map و bytes)
+  static String? _extractFromResponseData(dynamic data) {
+    Map<String, dynamic>? dataMap;
+    if (data is Map) {
+      dataMap = Map<String, dynamic>.from(data);
+    } else if (data is List<int> || data is Iterable<int>) {
+      try {
+        final decoded = utf8.decode(data is List<int> ? data : data.toList());
+        dataMap = jsonDecode(decoded) as Map<String, dynamic>?;
+      } catch (_) {
+        return null;
+      }
+    }
+    if (dataMap == null) return null;
+    final error = dataMap['error'];
+    if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
+      return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
+    }
+    if (error is Map && error['message'] is String) {
+      final message = error['message'] as String;
+      if (message.isNotEmpty) return message;
+    }
+    if (dataMap['message'] is String) {
+      final message = dataMap['message'] as String;
+      if (message.isNotEmpty) return message;
+    }
+    return null;
+  }
+
   /// استخراج پیام خطا از exception
   static String extractErrorMessage(Object e) {
     if (e is dio.DioException) {
       final response = e.response;
-      if (response != null && response.data is Map) {
-        final data = Map<String, dynamic>.from(response.data as Map);
-        final error = data['error'];
-        
-        // بررسی خطای STORAGE_LIMIT_EXCEEDED
-        if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
-          return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
-        }
-        
-        // استخراج پیام خطا از error object
-        if (error is Map && error['message'] is String) {
-          final message = error['message'] as String;
-          if (message.isNotEmpty) {
-            return message;
-          }
-        }
-        
-        // استخراج پیام خطا از data
-        if (data['message'] is String) {
-          final message = data['message'] as String;
-          if (message.isNotEmpty) {
-            return message;
-          }
-        }
+      if (response != null && response.data != null) {
+        final msg = _extractFromResponseData(response.data);
+        if (msg != null) return msg;
       }
       
       // پیام خطای دیو

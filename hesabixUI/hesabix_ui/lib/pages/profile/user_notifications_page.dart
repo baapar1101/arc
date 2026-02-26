@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/api_client.dart';
@@ -74,6 +73,14 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   bool _baleLinked = false;
   String? _baleConnectedAt;
   bool _baleLoading = false;
+  bool _baleConnecting = false;
+  String? _baleLinkToken;
+  String? _baleDeepLink;
+  DateTime? _baleLinkExpiresAt;
+  Timer? _baleTimer;
+  int _baleRemainingSeconds = 0;
+  bool _baleIsPolling = false;
+  bool _baleShowLinkSection = false;
 
   @override
   void initState() {
@@ -84,6 +91,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _baleTimer?.cancel();
     super.dispose();
   }
 
@@ -1025,8 +1033,46 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (_baleLinked && _baleConnectedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t.notificationsBaleConnectedSince(
+                          HesabixDateUtils.formatForDisplay(
+                            DateTime.tryParse(_baleConnectedAt!),
+                            widget.calendarController.isJalali,
+                          ),
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ],
               ),
+              if (option.enabled && !_baleLinked) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.notificationsBaleConnectionWarning,
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           secondary: Icon(
@@ -1040,7 +1086,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              if (_baleLinked)
+              if (_baleLinked) ...[
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _baleLoading ? null : () => _disconnectBale(t),
@@ -1049,54 +1095,274 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                         : const Icon(Icons.link_off, size: 18),
                     label: Text(t.notificationsBaleDisconnectButton),
                   ),
-                )
-              else
+                ),
+              ] else ...[
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _baleLoading ? null : () => _connectBale(t),
-                    icon: _baleLoading
+                    onPressed: (_baleConnecting || _baleLoading) ? null : () => _connectBale(t),
+                    icon: _baleConnecting || _baleLoading
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.link, size: 18),
-                    label: Text(t.notificationsBaleConnectButton),
+                    label: Text(_baleConnecting ? t.notificationsBaleConnecting : t.notificationsBaleConnectButton),
                   ),
                 ),
+              ],
             ],
           ),
         ),
+        if (_baleShowLinkSection && _baleLinkToken != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.notificationsBaleLinkInstructions(_baleLinkToken!),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  if (_baleDeepLink != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                          ),
+                          child: QrImageView(
+                            data: _baleDeepLink!,
+                            version: QrVersions.auto,
+                            size: 120,
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.copyLink,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              SelectableText(
+                                _baleDeepLink!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontFamily: 'monospace',
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: () => _copyToClipboard(_baleDeepLink!, t.copied),
+                                icon: const Icon(Icons.copy_all_outlined, size: 16),
+                                label: Text(t.copyLink),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (_baleLinkExpiresAt != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _baleRemainingSeconds <= 0
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : (_baleRemainingSeconds < 60
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : colorScheme.primaryContainer.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _baleRemainingSeconds <= 0
+                              ? Colors.orange.withValues(alpha: 0.3)
+                              : (_baleRemainingSeconds < 60
+                                  ? Colors.red.withValues(alpha: 0.3)
+                                  : colorScheme.primary.withValues(alpha: 0.3)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _baleRemainingSeconds <= 0 ? Icons.warning_amber_rounded : Icons.timer_outlined,
+                            size: 16,
+                            color: _baleRemainingSeconds <= 0
+                                ? Colors.orange
+                                : (_baleRemainingSeconds < 60 ? Colors.red : colorScheme.primary),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _baleRemainingSeconds <= 0
+                                  ? t.notificationsBaleLinkExpired
+                                  : _formatRemainingTime(_baleRemainingSeconds),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: _baleRemainingSeconds <= 0
+                                    ? Colors.orange.shade700
+                                    : (_baleRemainingSeconds < 60
+                                        ? Colors.red.shade700
+                                        : colorScheme.onPrimaryContainer),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
 
   Future<void> _connectBale(AppLocalizations t) async {
     try {
-      setState(() => _baleLoading = true);
+      setState(() => _baleConnecting = true);
       final linkData = await _baleSvc.createLink();
       if (!mounted) return;
-      final deepLink = linkData['deep_link']?.toString();
-      final linkToken = linkData['link_token']?.toString();
-      if (deepLink != null && deepLink.isNotEmpty) {
-        await Clipboard.setData(ClipboardData(text: deepLink));
-        if (mounted) SnackBarHelper.show(context, message: t.copyLink);
+      final expiresAtStr = linkData['expires_at']?.toString();
+      DateTime? expiresAt;
+      if (expiresAtStr != null) {
         try {
-          await launchUrl(Uri.parse(deepLink));
-        } catch (_) {}
-      } else if (linkToken != null) {
-        await Clipboard.setData(ClipboardData(text: linkToken));
-        if (mounted) SnackBarHelper.show(context, message: t.copyLink);
+          String utcStr = expiresAtStr.trim();
+          final hasZ = utcStr.endsWith('Z');
+          final hasTimezoneOffset = RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(utcStr);
+          if (!hasZ && !hasTimezoneOffset) utcStr = '${utcStr}Z';
+          expiresAt = DateTime.parse(utcStr);
+          if (!expiresAt.isUtc) expiresAt = expiresAt.toUtc();
+          final now = DateTime.now().toUtc();
+          final diff = expiresAt.difference(now).inSeconds;
+          if (diff < -3600) {
+            expiresAt = now.add(const Duration(minutes: 10));
+          }
+        } catch (_) {
+          expiresAt = null;
+        }
       }
-      await _loadBaleStatus();
-      for (var i = 0; i < 24 && mounted; i++) {
-        await Future<void>.delayed(const Duration(seconds: 5));
+      setState(() {
+        _baleLinkToken = linkData['link_token']?.toString();
+        _baleDeepLink = linkData['deep_link']?.toString();
+        _baleLinkExpiresAt = expiresAt;
+        _baleShowLinkSection = true;
+        if (_baleLinkExpiresAt != null) {
+          final now = DateTime.now().toUtc();
+          final expiresAtUtc = _baleLinkExpiresAt!.isUtc
+              ? _baleLinkExpiresAt!
+              : _baleLinkExpiresAt!.toUtc();
+          _baleRemainingSeconds = expiresAtUtc.difference(now).inSeconds;
+          if (_baleRemainingSeconds > 0) _startBaleTimer();
+        }
+        _baleConnecting = false;
+      });
+      _pollBaleStatus(t);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _baleConnecting = false);
+      SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
+    }
+  }
+
+  void _startBaleTimer() {
+    _baleTimer?.cancel();
+    _baleTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_baleLinkExpiresAt != null) {
+        final now = DateTime.now().toUtc();
+        final expiresAt = _baleLinkExpiresAt!.isUtc
+            ? _baleLinkExpiresAt!
+            : _baleLinkExpiresAt!.toUtc();
+        _baleRemainingSeconds = expiresAt.difference(now).inSeconds;
+        if (mounted) setState(() {});
+      }
+      if (_baleRemainingSeconds <= 0) {
+        timer.cancel();
+        if (mounted) {
+          setState(() {
+            _baleLinkToken = null;
+            _baleDeepLink = null;
+            _baleLinkExpiresAt = null;
+            _baleRemainingSeconds = 0;
+            _baleShowLinkSection = false;
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _pollBaleStatus(AppLocalizations t) async {
+    if (_baleIsPolling) return;
+    _baleIsPolling = true;
+    try {
+      for (var i = 0; i < 120 && mounted; i++) {
+        await Future.delayed(const Duration(seconds: 5));
         await _loadBaleStatus();
-        if (mounted && _baleLinked) {
-          SnackBarHelper.show(context, message: t.notificationsBaleConnectionSuccess);
+        if (_baleLinked) {
+          _baleTimer?.cancel();
+          if (mounted) {
+            setState(() {
+              _baleLinkToken = null;
+              _baleDeepLink = null;
+              _baleLinkExpiresAt = null;
+              _baleRemainingSeconds = 0;
+              _baleIsPolling = false;
+              _baleShowLinkSection = false;
+            });
+          }
+          if (mounted) {
+            SnackBarHelper.show(context, message: t.notificationsBaleConnectionSuccess);
+          }
           break;
         }
       }
-    } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
-    } finally {
-      if (mounted) setState(() => _baleLoading = false);
+      if (!_baleLinked && mounted && _baleShowLinkSection && _baleLinkExpiresAt != null) {
+        final now = DateTime.now().toUtc();
+        final expiresAt = _baleLinkExpiresAt!.isUtc
+            ? _baleLinkExpiresAt!
+            : _baleLinkExpiresAt!.toUtc();
+        if (expiresAt.difference(now).inSeconds <= 0) {
+          if (mounted) {
+            setState(() {
+              _baleLinkToken = null;
+              _baleDeepLink = null;
+              _baleLinkExpiresAt = null;
+              _baleRemainingSeconds = 0;
+              _baleIsPolling = false;
+              _baleShowLinkSection = false;
+            });
+          }
+        } else if (mounted) {
+          setState(() => _baleIsPolling = false);
+        }
+      } else if (mounted) {
+        setState(() => _baleIsPolling = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _baleIsPolling = false);
     }
   }
 

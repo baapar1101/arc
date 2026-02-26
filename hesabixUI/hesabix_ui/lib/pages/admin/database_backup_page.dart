@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_system_settings_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
@@ -103,7 +104,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در بکاپ: ${e.toString()}',
+          message: ErrorExtractor.extractErrorMessage(e),
         );
       }
     } finally {
