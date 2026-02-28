@@ -612,7 +612,7 @@ Person _minimalPersonForDisplay(int businessId, int? id, String? name) {
     id: id,
     businessId: businessId,
     aliasName: name?.trim().isNotEmpty == true ? name! : 'مشتری',
-    personTypes: [PersonType.customer.persianName],
+    personTypes: [PersonType.customer],
     createdAt: DateTime(2020, 1, 1),
     updatedAt: DateTime(2020, 1, 1),
   );
