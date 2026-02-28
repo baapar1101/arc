@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../services/workflow_service.dart';
 import 'workflow_analytics_dialog.dart';
@@ -57,7 +58,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری تاریخچه: $e');
+        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadHistory}: $e');
       }
     }
   }
@@ -74,7 +75,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
       });
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری لاگ‌ها: $e');
+        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadLogs}: $e');
       }
     }
   }

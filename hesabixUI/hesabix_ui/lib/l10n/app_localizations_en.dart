@@ -447,6 +447,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordMinLength => 'Password must be at least 8 characters';
 
   @override
+  String get passwordMaxLength =>
+      'Password must not exceed 72 bytes (about 72 ASCII characters)';
+
+  @override
   String get calendar => 'Calendar';
 
   @override
@@ -559,10 +563,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'File download is only available on the web version';
 
   @override
-  String get installmentsInvoicePickerTitle => 'Select invoice';
+  String get installmentsInvoicePickerTitle => 'Select installment invoice';
 
   @override
-  String get installmentsInvoicePickerSearchLabel => 'Search invoice';
+  String get installmentsInvoicePickerSearchLabel =>
+      'Search by code, description...';
+
+  @override
+  String get installmentInvoicesLoadMore => 'Load more';
+
+  @override
+  String installmentInvoicesCount(Object count) {
+    return '$count installment invoice(s)';
+  }
 
   @override
   String get installmentsTableInvoice => 'Invoice';
@@ -5987,10 +6000,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowSaved => 'Workflow saved';
 
   @override
-  String get workflowDeleted => 'Node deleted';
+  String get workflowDeleted => 'Workflow deleted';
 
   @override
-  String get workflowDuplicated => 'Node duplicated';
+  String get workflowDuplicated => 'Workflow duplicated';
 
   @override
   String get workflowCopy => 'Copy';
@@ -6104,10 +6117,666 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowNodeFieldRequired => 'This field is required';
 
   @override
-  String get workflowNodeArrayType => 'Array (needs more complex UI)';
+  String get workflowNodeArrayType => 'Array';
 
   @override
-  String get workflowNodeObjectType => 'Object (needs more complex UI)';
+  String get workflowNodeObjectType => 'Object';
+
+  @override
+  String get workflowConfigUsePreviousNode => 'Use previous node';
+
+  @override
+  String get workflowConfigSelectFromNodes => 'Select from previous nodes';
+
+  @override
+  String get workflowConfigValueUsesNode => 'This value uses a previous node';
+
+  @override
+  String get workflowConfigSelectDate => 'Select date';
+
+  @override
+  String get workflowConfigToday => 'Today';
+
+  @override
+  String get workflowConfigDateHelper => 'Select date (ISO: YYYY-MM-DD)';
+
+  @override
+  String get workflowConfigNoNodesToSelect => 'No nodes available to select';
+
+  @override
+  String get workflowConfigNoTelegramUsers =>
+      'No users connected to Telegram bot. Please connect users first.';
+
+  @override
+  String get workflowConfigNoBaleUsers =>
+      'No users connected to Bale bot. Please connect users first.';
+
+  @override
+  String get workflowConfigOwner => 'Owner';
+
+  @override
+  String get workflowConfigSearchSelectPerson => 'Search and select person';
+
+  @override
+  String get workflowConfigPersonIdLabel => 'Person ID';
+
+  @override
+  String get workflowConfigPersonIdHelper =>
+      'Enter ID or use previous node: \$node_id.person_id';
+
+  @override
+  String get workflowConfigSearchSelectProduct =>
+      'Search and select product/service';
+
+  @override
+  String get workflowConfigProductIdLabel => 'Product ID';
+
+  @override
+  String get workflowConfigProductIdHelper => 'Product/service ID';
+
+  @override
+  String get workflowConfigType => 'Type';
+
+  @override
+  String get workflowConfigPercent => 'Percent';
+
+  @override
+  String get workflowConfigFixedAmount => 'Fixed amount';
+
+  @override
+  String get workflowConfigDiscountPercent => 'Discount %';
+
+  @override
+  String get workflowConfigDiscountAmount => 'Discount amount';
+
+  @override
+  String workflowConfigItemN(int n) {
+    return 'Item $n';
+  }
+
+  @override
+  String get workflowConfigAddItem => 'Add item';
+
+  @override
+  String get workflowConfigAddLineItem => 'Add line item';
+
+  @override
+  String get workflowConfigProduct => 'Product';
+
+  @override
+  String get workflowConfigQuantity => 'Quantity';
+
+  @override
+  String get workflowConfigUnitPrice => 'Unit price';
+
+  @override
+  String get workflowConfigTaxPercent => 'Tax %';
+
+  @override
+  String get workflowConfigDescription => 'Description';
+
+  @override
+  String get workflowConfigPaymentMethod => 'Payment method';
+
+  @override
+  String get workflowConfigAmount => 'Amount';
+
+  @override
+  String get workflowConfigAccountSelect => 'Bank account / Cash register';
+
+  @override
+  String get workflowConfigAddPayment => 'Add payment';
+
+  @override
+  String get workflowConfigNoPaymentsYet =>
+      'No payments added yet. Use the button below to add.';
+
+  @override
+  String workflowConfigPaymentN(int n) {
+    return 'Payment $n';
+  }
+
+  @override
+  String get workflowConfigNotSelected => 'Not selected';
+
+  @override
+  String get workflowConfigSelectWarehouse => 'Select warehouse';
+
+  @override
+  String get workflowConfigSelectAccount => 'Select account';
+
+  @override
+  String get workflowConfigSelectFiscalYear => 'Select fiscal year';
+
+  @override
+  String get workflowConfigInvalidJson => 'Invalid JSON';
+
+  @override
+  String get workflowConfigJsonHint => '{\"key\": \"value\"}';
+
+  @override
+  String get workflowConfigCash => 'Cash';
+
+  @override
+  String get workflowConfigBank => 'Bank';
+
+  @override
+  String get workflowConfigCheck => 'Check';
+
+  @override
+  String get workflowConfigCard => 'Card';
+
+  @override
+  String get workflowConfigSelectTelegramUser =>
+      'Select user connected to Telegram bot';
+
+  @override
+  String get workflowConfigSelectBaleUser =>
+      'Select user connected to Bale bot';
+
+  @override
+  String get workflowConfigSelectAtLeastOne => 'Select at least one item';
+
+  @override
+  String get workflowConfigReferenceTitle => 'Select from previous nodes';
+
+  @override
+  String get workflowConfigNoNodesAvailable => 'No nodes available to select';
+
+  @override
+  String get workflowConfigStep1Node => 'Step 1: Select node';
+
+  @override
+  String get workflowConfigStep2Data => 'Step 2: Select data';
+
+  @override
+  String workflowConfigSelectDataFrom(String label) {
+    return 'Select data from \"$label\"';
+  }
+
+  @override
+  String get workflowConfigOrSelectField => 'Or select a specific field:';
+
+  @override
+  String get workflowConfigUseFullNodeOutput => 'Use full node output';
+
+  @override
+  String get workflowConfigFullNodeOutputDesc =>
+      'All output data from the node';
+
+  @override
+  String get workflowConfigBack => 'Back';
+
+  @override
+  String get workflowConfigCancel => 'Cancel';
+
+  @override
+  String get workflowConfigGroupFilters => 'Filters';
+
+  @override
+  String get workflowConfigGroupScheduling => 'Scheduling';
+
+  @override
+  String get workflowConfigGroupErrorManagement => 'Error management';
+
+  @override
+  String get workflowConfigGroupMainSettings => 'Main settings';
+
+  @override
+  String get workflowConfigGroupAdvanced => 'Advanced settings';
+
+  @override
+  String get workflowConfigUserDefault => 'User';
+
+  @override
+  String get workflowConfigFiscalYearDefault => 'Fiscal year';
+
+  @override
+  String get workflowConfigJsonLabel => 'JSON';
+
+  @override
+  String get workflowPaletteSearch => 'Search...';
+
+  @override
+  String get workflowPaletteAll => 'All';
+
+  @override
+  String get workflowPaletteTriggers => 'Triggers';
+
+  @override
+  String get workflowPaletteActions => 'Actions';
+
+  @override
+  String get workflowPaletteLoops => 'Loops';
+
+  @override
+  String get workflowPaletteConditions => 'Conditions';
+
+  @override
+  String get workflowNodeUnknown => 'Unknown node';
+
+  @override
+  String get workflowConfigEnumRequiredForMultiSelect =>
+      'Error: enum values required for multi-select';
+
+  @override
+  String get workflowConfigFieldEnabled => 'Enabled';
+
+  @override
+  String get workflowConfigFieldTo => 'To';
+
+  @override
+  String get workflowConfigFieldSubject => 'Subject';
+
+  @override
+  String get workflowConfigFieldBody => 'Body';
+
+  @override
+  String get workflowConfigFieldMessage => 'Message';
+
+  @override
+  String get workflowConfigFieldMinAmount => 'Minimum amount';
+
+  @override
+  String get workflowConfigFieldMaxAmount => 'Maximum amount';
+
+  @override
+  String get workflowConfigFieldStatusFilter => 'Status filter';
+
+  @override
+  String get workflowConfigFieldPersonType => 'Person type';
+
+  @override
+  String get workflowConfigFieldCurrency => 'Currency';
+
+  @override
+  String get workflowConfigFieldPersonId => 'Person ID';
+
+  @override
+  String get workflowConfigFieldProductId => 'Product ID';
+
+  @override
+  String get workflowConfigFieldWarehouseId => 'Warehouse ID';
+
+  @override
+  String get workflowConfigFieldAccountId => 'Account ID';
+
+  @override
+  String get workflowConfigFieldRetryCount => 'Retry count';
+
+  @override
+  String get workflowConfigFieldRetryDelay => 'Retry delay';
+
+  @override
+  String get workflowConfigFieldOnError => 'On error';
+
+  @override
+  String get workflowConfigFieldBreakOnError => 'Break on error';
+
+  @override
+  String get workflowConfigFieldContinueOnError => 'Continue on error';
+
+  @override
+  String get workflowConfigFieldTriggerType => 'Trigger type';
+
+  @override
+  String get workflowConfigFieldActionType => 'Action type';
+
+  @override
+  String get workflowConfigFieldLoopType => 'Loop type';
+
+  @override
+  String get workflowConfigFieldItemsSource => 'Items source';
+
+  @override
+  String get workflowConfigFieldItemVariable => 'Item variable';
+
+  @override
+  String get workflowConfigFieldIndexVariable => 'Index variable';
+
+  @override
+  String get workflowConfigFieldMaxIterations => 'Max iterations';
+
+  @override
+  String get workflowConfigFieldStart => 'Start';
+
+  @override
+  String get workflowConfigFieldEnd => 'End';
+
+  @override
+  String get workflowConfigFieldStep => 'Step';
+
+  @override
+  String get workflowConfigFieldConditionLeft => 'Left value';
+
+  @override
+  String get workflowConfigFieldConditionOperator => 'Comparison operator';
+
+  @override
+  String get workflowConfigFieldConditionRight => 'Right value';
+
+  @override
+  String get workflowConfigFieldTimeout => 'Timeout';
+
+  @override
+  String get workflowConfigFieldCooldown => 'Cooldown';
+
+  @override
+  String get workflowConfigFieldSchedule => 'Schedule';
+
+  @override
+  String get workflowConfigFieldDelay => 'Delay';
+
+  @override
+  String get workflowConfigFieldDocumentType => 'Document type';
+
+  @override
+  String get workflowConfigFieldFiscalYearFilter => 'Fiscal year filter';
+
+  @override
+  String get workflowConfigFieldFiscalYearId => 'Fiscal year';
+
+  @override
+  String get workflowConfigFieldUserIdFilter => 'User filter';
+
+  @override
+  String get workflowConfigFieldDescriptionContains => 'Description contains';
+
+  @override
+  String get workflowConfigFieldCooldownSeconds => 'Cooldown (seconds)';
+
+  @override
+  String get workflowConfigFieldTimeoutSeconds => 'Timeout (seconds)';
+
+  @override
+  String get workflowConfigFieldInvoiceType => 'Invoice type';
+
+  @override
+  String get workflowConfigFieldPersonTypeFilter => 'Person type filter';
+
+  @override
+  String get workflowConfigFieldCurrencyId => 'Currency';
+
+  @override
+  String get workflowConfigFieldIncludeTaxDetails => 'Include tax details';
+
+  @override
+  String get workflowConfigFieldIncludePaymentStatus =>
+      'Include payment status';
+
+  @override
+  String get workflowConfigFieldAccountIdFilter => 'Account filter';
+
+  @override
+  String get workflowConfigFieldPaymentMethodFilter => 'Payment method filter';
+
+  @override
+  String get workflowConfigFieldIncludeBalance => 'Include balance';
+
+  @override
+  String get workflowConfigFieldCheckDuplicate => 'Check duplicate';
+
+  @override
+  String get workflowConfigFieldTypeFilter => 'Type filter';
+
+  @override
+  String get workflowConfigFieldCheckType => 'Check type';
+
+  @override
+  String get workflowConfigFieldDaysBefore => 'Days before due';
+
+  @override
+  String get workflowConfigFieldReferenceCode => 'Reference code';
+
+  @override
+  String get workflowConfigFieldExtraInfo => 'Extra info';
+
+  @override
+  String get workflowConfigFieldIsProforma => 'Proforma invoice';
+
+  @override
+  String get workflowConnectionHelpTitle => 'How to Connect Nodes';
+
+  @override
+  String get workflowConnectionHelpMethod1 =>
+      'Method 1: Drag & Drop (Recommended)';
+
+  @override
+  String get workflowConnectionHelpMethod1Step1 =>
+      '1. Click and hold on the output point of a node';
+
+  @override
+  String get workflowConnectionHelpMethod1Step2 =>
+      '2. Drag your mouse - a temporary line will appear';
+
+  @override
+  String get workflowConnectionHelpMethod1Step3 =>
+      '3. Release on the input point of another node';
+
+  @override
+  String get workflowConnectionHelpMethod2 => 'Method 2: Click & Click';
+
+  @override
+  String get workflowConnectionHelpMethod2Step1 =>
+      '1. Click on the output point of a node';
+
+  @override
+  String get workflowConnectionHelpMethod2Step2 =>
+      '2. Click on the input point of another node';
+
+  @override
+  String get workflowConnectionHelpTips => 'Tips';
+
+  @override
+  String get workflowConnectionHelpTipsText =>
+      '• Trigger nodes only have output points\n• Action nodes have both input and output points\n• To delete connection: click on it and press Delete';
+
+  @override
+  String get workflowConnectionHelpGotIt => 'Got it';
+
+  @override
+  String get workflowEditNameDescription => 'Edit name and description';
+
+  @override
+  String get workflowNameRequired => 'Workflow name *';
+
+  @override
+  String get workflowNameHint => 'e.g. Invoice approval process';
+
+  @override
+  String get workflowDescription => 'Description';
+
+  @override
+  String get workflowDescriptionHint =>
+      'Optional description for this workflow...';
+
+  @override
+  String get workflowSaveWorkflow => 'Save workflow';
+
+  @override
+  String get workflowEnterName => 'Please enter workflow name';
+
+  @override
+  String get workflowInfoUpdated =>
+      'Info updated. For permanent save, click the Save button.';
+
+  @override
+  String get workflowNoteComment => 'Note / Comment';
+
+  @override
+  String get workflowNoteHint => 'Note or comment for this node...';
+
+  @override
+  String get workflowNoteDeleted => 'Note deleted';
+
+  @override
+  String get workflowNoteCleared => 'Note cleared';
+
+  @override
+  String get workflowNoteSaved => 'Note saved';
+
+  @override
+  String get workflowSaveAsTemplate => 'Save as template';
+
+  @override
+  String get workflowTemplateName => 'Template name';
+
+  @override
+  String get workflowTemplateNameHint => 'e.g. Invoice process';
+
+  @override
+  String workflowTemplateSaved(String name) {
+    return 'Template \"$name\" saved';
+  }
+
+  @override
+  String workflowTemplateLoaded(String name) {
+    return 'Template \"$name\" loaded';
+  }
+
+  @override
+  String get workflowSelectTemplate => 'Select template';
+
+  @override
+  String get workflowBuiltinTemplates => 'Built-in templates';
+
+  @override
+  String get workflowSavedTemplates => 'Saved templates';
+
+  @override
+  String get workflowNoSavedTemplates => 'No saved templates';
+
+  @override
+  String get workflowTemplateDefault => 'Template';
+
+  @override
+  String workflowTemplateN(int n) {
+    return 'Template $n';
+  }
+
+  @override
+  String workflowCreatedAt(String date) {
+    return 'Created: $date';
+  }
+
+  @override
+  String get workflowErrorAddNode => 'Error adding node';
+
+  @override
+  String get workflowErrorSaveTemplate => 'Error saving template';
+
+  @override
+  String get workflowErrorLoadTemplate => 'Error loading template';
+
+  @override
+  String get workflowTimelineTitle => 'Execution timeline';
+
+  @override
+  String get workflowTimelineRefresh => 'Refresh';
+
+  @override
+  String get workflowAnalyticsTitle => 'Analytics';
+
+  @override
+  String get workflowPerformance => 'Performance';
+
+  @override
+  String get workflowNoData => 'No data available';
+
+  @override
+  String get workflowErrorLoadTimeline => 'Error loading timeline';
+
+  @override
+  String get workflowAllLogs => 'All logs';
+
+  @override
+  String get workflowAllNodes => 'All nodes';
+
+  @override
+  String get workflowErrors => 'Errors';
+
+  @override
+  String get workflowNodeStats => 'Node stats';
+
+  @override
+  String get workflowColumnNode => 'Node';
+
+  @override
+  String get workflowColumnType => 'Type';
+
+  @override
+  String get workflowColumnExecutions => 'Executions';
+
+  @override
+  String get workflowColumnAvgTime => 'Avg. time';
+
+  @override
+  String get workflowErrorLoadAnalytics => 'Error loading analytics';
+
+  @override
+  String get workflowErrorLoadErrorStats => 'Error loading error stats';
+
+  @override
+  String get workflowTotalExecutions => 'Total executions';
+
+  @override
+  String get workflowSuccessful => 'Successful';
+
+  @override
+  String get workflowFailed => 'Failed';
+
+  @override
+  String get workflowAvgTime => 'Avg. time';
+
+  @override
+  String get workflowSuccessRate => 'Success rate';
+
+  @override
+  String get workflowNoErrorsRecorded => 'No errors recorded!';
+
+  @override
+  String get workflowTotalErrors => 'Total errors';
+
+  @override
+  String get workflowErrorTypes => 'Error types';
+
+  @override
+  String get workflowErrorLoadHistory => 'Error loading history';
+
+  @override
+  String get workflowErrorLoadLogs => 'Error loading logs';
+
+  @override
+  String get workflowDeleteWorkflow => 'Delete workflow';
+
+  @override
+  String workflowDeleteConfirm(String name) {
+    return 'Are you sure you want to delete workflow \"$name\"?';
+  }
+
+  @override
+  String get workflowDeletedSuccess => 'Workflow deleted successfully';
+
+  @override
+  String get workflowErrorDelete => 'Error deleting workflow';
+
+  @override
+  String get workflowStatusActive => 'Active';
+
+  @override
+  String get workflowStatusInactive => 'Inactive';
+
+  @override
+  String get workflowStatusDraft => 'Draft';
+
+  @override
+  String get workflowNoNodesDefined => 'No nodes defined';
+
+  @override
+  String get workflowEmpty => 'This workflow is empty';
+
+  @override
+  String get workflowErrorDisplay => 'Error displaying workflow';
 
   @override
   String get workflowExecutionLogs => 'Execution logs';
@@ -6139,6 +6808,404 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workflowForceDirectedLayoutApplied =>
       'Force-directed layout applied';
+
+  @override
+  String get workflowValidationSuccess => 'Validation successful';
+
+  @override
+  String get workflowAllNodesValid => 'All nodes are valid!';
+
+  @override
+  String workflowNodesWithErrors(int count) {
+    return '$count nodes have errors';
+  }
+
+  @override
+  String get workflowToolbarOpenPalette => 'Open node palette';
+
+  @override
+  String get workflowToolbarZoomOut => 'Zoom out';
+
+  @override
+  String get workflowToolbarZoomIn => 'Zoom in';
+
+  @override
+  String get workflowToolbarResetZoom => 'Reset zoom';
+
+  @override
+  String get workflowToolbarConnectionHelp => 'Connection help';
+
+  @override
+  String get workflowToolbarHideGrid => 'Hide Grid';
+
+  @override
+  String get workflowToolbarShowGrid => 'Show Grid';
+
+  @override
+  String get workflowToolbarDisableSnapToGrid => 'Disable Snap to Grid';
+
+  @override
+  String get workflowToolbarEnableSnapToGrid => 'Enable Snap to Grid';
+
+  @override
+  String get workflowToolbarAlignmentTools => 'Alignment tools';
+
+  @override
+  String get workflowToolbarAlignLeft => 'Align left';
+
+  @override
+  String get workflowToolbarAlignRight => 'Align right';
+
+  @override
+  String get workflowToolbarAlignTop => 'Align top';
+
+  @override
+  String get workflowToolbarAlignBottom => 'Align bottom';
+
+  @override
+  String get workflowToolbarDistributeHorizontally => 'Distribute horizontally';
+
+  @override
+  String get workflowToolbarDistributeVertically => 'Distribute vertically';
+
+  @override
+  String get workflowToolbarAlignToGrid => 'Align to grid';
+
+  @override
+  String get workflowToolbarClearAll => 'Clear all';
+
+  @override
+  String get workflowToolbarAutoLayout => 'Auto layout';
+
+  @override
+  String get workflowToolbarTemplates => 'Templates';
+
+  @override
+  String get workflowToolbarLoadTemplate => 'Load template';
+
+  @override
+  String get workflowToolbarSelectLayoutType => 'Select layout type';
+
+  @override
+  String get workflowToolbarHierarchical => 'Hierarchical';
+
+  @override
+  String get workflowToolbarForceDirected => 'Force-directed';
+
+  @override
+  String get workflowToolbarShowValidationErrors => 'Show validation errors';
+
+  @override
+  String get workflowToolbarUndo => 'Undo';
+
+  @override
+  String get workflowToolbarRedo => 'Redo';
+
+  @override
+  String get workflowToolbarNodes => 'Nodes';
+
+  @override
+  String get workflowToolbarConnections => 'Connections';
+
+  @override
+  String get workflowNoSuggestedFields => 'No suggested fields for this node';
+
+  @override
+  String workflowTypeFieldManually(String nodeId) {
+    return 'You can type the field manually: $nodeId.field_name';
+  }
+
+  @override
+  String get workflowFieldInvoiceId => 'Invoice ID';
+
+  @override
+  String get workflowFieldDescInvoiceId => 'Numeric invoice ID';
+
+  @override
+  String get workflowFieldInvoiceCode => 'Invoice code';
+
+  @override
+  String get workflowFieldDescInvoiceCode => 'Unique invoice code';
+
+  @override
+  String get workflowFieldInvoiceNumber => 'Invoice number';
+
+  @override
+  String get workflowFieldDescInvoiceNumber => 'Invoice number';
+
+  @override
+  String get workflowFieldInvoiceDate => 'Invoice date';
+
+  @override
+  String get workflowFieldDescInvoiceDate => 'Invoice issue date';
+
+  @override
+  String get workflowFieldTotalAmount => 'Total amount';
+
+  @override
+  String get workflowFieldDescTotalAmount => 'Total amount';
+
+  @override
+  String get workflowFieldDiscountAmount => 'Discount amount';
+
+  @override
+  String get workflowFieldDescDiscountAmount => 'Total discounts';
+
+  @override
+  String get workflowFieldTaxAmount => 'Tax amount';
+
+  @override
+  String get workflowFieldDescTaxAmount => 'Total tax';
+
+  @override
+  String get workflowFieldFinalAmount => 'Final amount';
+
+  @override
+  String get workflowFieldDescFinalAmount => 'Payable amount';
+
+  @override
+  String get workflowFieldCustomerName => 'Customer name';
+
+  @override
+  String get workflowFieldDescCustomerName => 'Counterparty name';
+
+  @override
+  String get workflowFieldCustomerId => 'Customer ID';
+
+  @override
+  String get workflowFieldDescCustomerId => 'Counterparty ID';
+
+  @override
+  String get workflowFieldDescription => 'Description';
+
+  @override
+  String get workflowFieldDescDescription => 'Description';
+
+  @override
+  String get workflowFieldInvoiceDescription => 'Invoice description';
+
+  @override
+  String get workflowFieldStatus => 'Status';
+
+  @override
+  String get workflowFieldDescStatus => 'Status';
+
+  @override
+  String get workflowFieldInvoiceStatus => 'Invoice status';
+
+  @override
+  String get workflowFieldPaymentId => 'Payment ID';
+
+  @override
+  String get workflowFieldDescPaymentId => 'Numeric payment ID';
+
+  @override
+  String get workflowFieldAmount => 'Amount';
+
+  @override
+  String get workflowFieldDescAmount => 'Amount';
+
+  @override
+  String get workflowFieldPaymentAmount => 'Payment amount';
+
+  @override
+  String get workflowFieldPaymentDate => 'Payment date';
+
+  @override
+  String get workflowFieldDescPaymentDate => 'Payment date';
+
+  @override
+  String get workflowFieldPaymentMethod => 'Payment method';
+
+  @override
+  String get workflowFieldDescPaymentMethod => 'Payment method type';
+
+  @override
+  String get workflowFieldPaymentStatus => 'Payment status';
+
+  @override
+  String get workflowFieldReferenceCode => 'Reference code';
+
+  @override
+  String get workflowFieldDescReferenceCode => 'Transaction reference code';
+
+  @override
+  String get workflowFieldDocumentId => 'Document ID';
+
+  @override
+  String get workflowFieldDescDocumentId => 'Numeric document ID';
+
+  @override
+  String get workflowFieldDocumentType => 'Document type';
+
+  @override
+  String get workflowFieldDescDocumentType => 'Accounting document type';
+
+  @override
+  String get workflowFieldDocTotalAmount => 'Document total';
+
+  @override
+  String get workflowFieldDescDocTotalAmount => 'Document total amount';
+
+  @override
+  String get workflowFieldDocDescription => 'Document description';
+
+  @override
+  String get workflowFieldDescDocDescription => 'Document description';
+
+  @override
+  String get workflowFieldReceiptPaymentId => 'Receipt/Payment ID';
+
+  @override
+  String get workflowFieldDescReceiptPaymentId => 'Numeric ID';
+
+  @override
+  String get workflowFieldType => 'Type';
+
+  @override
+  String get workflowFieldDescType => 'Receipt or payment';
+
+  @override
+  String get workflowFieldPersonId => 'ID';
+
+  @override
+  String get workflowFieldDescPersonId => 'Counterparty ID';
+
+  @override
+  String get workflowFieldPersonName => 'Name';
+
+  @override
+  String get workflowFieldDescPersonName => 'Counterparty name';
+
+  @override
+  String get workflowFieldEmail => 'Email';
+
+  @override
+  String get workflowFieldDescEmail => 'Email address';
+
+  @override
+  String get workflowFieldPhone => 'Phone';
+
+  @override
+  String get workflowFieldDescPhone => 'Phone number';
+
+  @override
+  String get workflowFieldMobile => 'Mobile';
+
+  @override
+  String get workflowFieldDescMobile => 'Mobile number';
+
+  @override
+  String get workflowFieldPersonType => 'Type';
+
+  @override
+  String get workflowFieldDescPersonType => 'Counterparty type';
+
+  @override
+  String get workflowFieldProductId => 'Product ID';
+
+  @override
+  String get workflowFieldDescProductId => 'Numeric product ID';
+
+  @override
+  String get workflowFieldProductName => 'Product name';
+
+  @override
+  String get workflowFieldDescProductName => 'Product name';
+
+  @override
+  String get workflowFieldProductCode => 'Product code';
+
+  @override
+  String get workflowFieldDescProductCode => 'Product code';
+
+  @override
+  String get workflowFieldPrice => 'Price';
+
+  @override
+  String get workflowFieldDescPrice => 'Sale price';
+
+  @override
+  String get workflowFieldQuantity => 'Quantity';
+
+  @override
+  String get workflowFieldDescQuantity => 'Stock quantity';
+
+  @override
+  String get workflowFieldId => 'ID';
+
+  @override
+  String get workflowFieldDescId => 'Record ID';
+
+  @override
+  String get workflowFieldName => 'Name';
+
+  @override
+  String get workflowFieldDescName => 'Name';
+
+  @override
+  String get workflowFieldTitle => 'Title';
+
+  @override
+  String get workflowFieldDescTitle => 'Title';
+
+  @override
+  String get workflowFieldGenDescription => 'Description';
+
+  @override
+  String get workflowFieldDescGenDescription => 'Description';
+
+  @override
+  String get workflowFieldGenStatus => 'Status';
+
+  @override
+  String get workflowFieldDescGenStatus => 'Status';
+
+  @override
+  String get workflowFieldCreatedAt => 'Created date';
+
+  @override
+  String get workflowFieldDescCreatedAt => 'Creation date and time';
+
+  @override
+  String get workflowTemplateInvoiceSalesName => 'Invoice sales notification';
+
+  @override
+  String get workflowTemplateInvoiceSalesDesc =>
+      'After creating sales invoice, email and Telegram are sent';
+
+  @override
+  String get workflowCategoryInvoice => 'Invoice';
+
+  @override
+  String get workflowTemplateInventoryLowName => 'Low inventory alert';
+
+  @override
+  String get workflowTemplateInventoryLowDesc =>
+      'When product stock is low, notification is sent';
+
+  @override
+  String get workflowCategoryInventory => 'Inventory';
+
+  @override
+  String get workflowTemplateReceiptPaymentName => 'Receipt/Payment log';
+
+  @override
+  String get workflowTemplateReceiptPaymentDesc =>
+      'After recording receipt/payment, log is created';
+
+  @override
+  String get workflowCategoryFinancial => 'Financial';
+
+  @override
+  String get workflowTemplatePersonWelcomeName => 'New person welcome';
+
+  @override
+  String get workflowTemplatePersonWelcomeDesc =>
+      'After creating new person, welcome message is sent';
+
+  @override
+  String get workflowCategoryPersons => 'Persons';
 
   @override
   String get settingsCategoriesCount => 'Categories';

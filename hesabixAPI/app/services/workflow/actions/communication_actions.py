@@ -398,6 +398,194 @@ class SendTelegramAction(ActionHandler):
         }
 
 
+class SendBaleAction(ActionHandler):
+    """ارسال پیام به پیام‌رسان بله"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "ارسال پیام به بله",
+            "description": "ارسال پیام به کاربر عضو کسب و کار از طریق پیام‌رسان بله (فقط کاربران متصل به ربات)",
+            "config_schema": {
+                "user_id": {
+                    "type": "string",
+                    "description": "شناسه کاربر عضو کسب و کار که به ربات بله متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
+                    "required": True,
+                    "ui_type": "bale_user_selector",
+                    "ui_config": {
+                        "filter": "bale_connected",
+                        "business_scoped": True
+                    }
+                },
+                "message": {
+                    "type": "string",
+                    "description": "متن پیام",
+                    "required": True
+                },
+                "parse_mode": {
+                    "type": "string",
+                    "description": "حالت پارس متن",
+                    "enum": ["None", "HTML", "Markdown"],
+                    "default": "None",
+                    "ui_config": {
+                        "labels": {
+                            "None": "متن ساده",
+                            "HTML": "HTML - با فرمت HTML",
+                            "Markdown": "Markdown - با فرمت مارک‌داون"
+                        }
+                    },
+                    "required": False
+                },
+                "retry_on_failure": {
+                    "type": "boolean",
+                    "description": "تلاش مجدد در صورت خطا",
+                    "default": True,
+                    "required": False
+                },
+                "retry_attempts": {
+                    "type": "integer",
+                    "description": "تعداد تلاش‌های مجدد",
+                    "default": 3,
+                    "required": False
+                },
+                "retry_delay_seconds": {
+                    "type": "integer",
+                    "description": "تاخیر بین تلاش‌ها (ثانیه)",
+                    "default": 60,
+                    "required": False
+                }
+            }
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        from adapters.db.session import get_db_session
+        from app.services.providers.bale_provider import BaleProvider
+        from app.services.system_settings_service import get_effective_notifications_settings
+        from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
+        from adapters.db.models.user import User
+        from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+
+        db = context.get("db")
+        if not db:
+            db = get_db_session().__enter__()
+
+        business_id = context.get("business_id")
+        if not business_id:
+            return {
+                "success": False,
+                "error": "business_id در context موجود نیست"
+            }
+
+        user_id_raw = config.get("user_id")
+        if not user_id_raw:
+            return {
+                "success": False,
+                "error": "user_id مشخص نشده است"
+            }
+
+        user_id_resolved = WorkflowEngine._resolve_value_static(user_id_raw, context, node_results)
+        try:
+            user_id = int(user_id_resolved) if user_id_resolved else None
+        except (ValueError, TypeError):
+            return {
+                "success": False,
+                "error": f"user_id نامعتبر: {user_id_resolved}"
+            }
+
+        if not user_id:
+            return {
+                "success": False,
+                "error": "user_id مشخص نشده است"
+            }
+
+        permission_repo = BusinessPermissionRepository(db)
+        is_owner = False
+        is_member = False
+        from adapters.db.models.business import Business
+        business = db.get(Business, business_id)
+        if business and business.owner_id == user_id:
+            is_owner = True
+        else:
+            permission = permission_repo.get_by_user_and_business(user_id, business_id)
+            if permission:
+                is_member = True
+
+        if not is_owner and not is_member:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} عضو کسب و کار {business_id} نیست"
+            }
+
+        user = db.get(User, user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} یافت نشد"
+            }
+
+        bale_chat_id = getattr(user, "bale_chat_id", None)
+        if not bale_chat_id:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} به ربات بله متصل نیست"
+            }
+
+        notify_cfg = get_effective_notifications_settings(db)
+        bale = BaleProvider(bot_token=notify_cfg.get("bale_bot_token"))
+
+        if not bale.is_configured():
+            return {
+                "success": False,
+                "error": "ربات بله پیکربندی نشده است"
+            }
+
+        message = WorkflowEngine._resolve_value_static(config.get("message"), context, node_results)
+        if not message:
+            return {
+                "success": False,
+                "error": "متن پیام مشخص نشده است"
+            }
+
+        parse_mode = config.get("parse_mode", "None")
+        if parse_mode == "None":
+            parse_mode = None
+
+        def _send_bale():
+            return bale.send_text(
+                chat_id=int(bale_chat_id),
+                text=str(message),
+                parse_mode=parse_mode
+            )
+
+        retry_on_failure = config.get("retry_on_failure", True)
+        try:
+            if retry_on_failure:
+                retry_config = get_retry_config_from_action_config(config)
+                success = execute_with_retry(_send_bale, **retry_config)
+            else:
+                success = _send_bale()
+        except Exception as e:
+            logger.error(f"Error sending bale message: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "user_id": user_id,
+                "bale_chat_id": bale_chat_id
+            }
+
+        return {
+            "success": success,
+            "user_id": user_id,
+            "bale_chat_id": bale_chat_id,
+            "message": message
+        }
+
+
 class CreateNotificationAction(ActionHandler):
     """ایجاد notification در سیستم"""
     

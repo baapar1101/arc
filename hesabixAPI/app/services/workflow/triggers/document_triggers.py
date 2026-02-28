@@ -22,8 +22,21 @@ class DocumentCreatedTrigger(BaseTrigger):
                 },
                 "document_type": {
                     "type": "string",
-                    "description": "نوع سند (اختیاری)",
-                    "required": False
+                    "description": "نوع سند (اختیاری - خالی = همه انواع)",
+                    "required": False,
+                    "enum": ["expense", "income", "receipt", "payment", "transfer", "manual", "opening_balance", "year_end_closing"],
+                    "ui_config": {
+                        "labels": {
+                            "expense": "هزینه",
+                            "income": "درآمد",
+                            "receipt": "دریافت",
+                            "payment": "پرداخت",
+                            "transfer": "انتقال",
+                            "manual": "دستی",
+                            "opening_balance": "تراز افتتاحیه",
+                            "year_end_closing": "سربندی سال"
+                        }
+                    }
                 },
                 "min_amount": {
                     "type": "number",
@@ -38,12 +51,16 @@ class DocumentCreatedTrigger(BaseTrigger):
                 "fiscal_year_filter": {
                     "type": "integer",
                     "description": "فیلتر بر اساس سال مالی خاص",
-                    "required": False
+                    "required": False,
+                    "ui_type": "fiscal_year_selector",
+                    "ui_config": {"business_scoped": True}
                 },
                 "user_id_filter": {
                     "type": "integer",
                     "description": "فیلتر بر اساس کاربر ایجادکننده",
-                    "required": False
+                    "required": False,
+                    "ui_type": "user_selector",
+                    "ui_config": {"business_scoped": True}
                 },
                 "description_contains": {
                     "type": "string",

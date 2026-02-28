@@ -7,12 +7,15 @@ from fastapi import HTTPException, status, Request
 from .calendar import CalendarConverter, CalendarType
 
 
-def success_response(data: Any, request: Request = None, message: str = None) -> dict[str, Any]:
+def success_response(data: Any, request: Request = None, message: str = None, **kwargs) -> dict[str, Any]:
 	response = {"success": True}
 	
 	# Add data if provided
 	if data is not None:
 		response["data"] = data
+	
+	# Add extra fields (e.g. restricted_to_self)
+	response.update(kwargs)
 	
 	# Add message if provided (translate if translator exists)
 	if message is not None:

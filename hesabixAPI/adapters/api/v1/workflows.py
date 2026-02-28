@@ -2,6 +2,7 @@
 API endpoints برای مدیریت Workflow
 """
 
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Body, HTTPException, Query
@@ -15,6 +16,7 @@ from adapters.db.models.workflow import (
     WorkflowExecution,
     WorkflowExecutionStatus,
     WorkflowLog,
+    WorkflowLogLevel,
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
@@ -501,37 +503,43 @@ async def get_workflow_errors_analytics(
 ):
     """تحلیل خطاهای workflow"""
     
-    # Query پایه
-    stmt = select(
-        func.coalesce(
-            cast(WorkflowLog.data['error_type'], Text),
-            'Unknown'
-        ).label('error_type'),
-        func.count(WorkflowLog.id).label('count'),
-        func.max(WorkflowLog.timestamp).label('last_occurrence'),
-        func.min(WorkflowLog.timestamp).label('first_occurrence')
-    ).select_from(WorkflowLog) \
-     .join(WorkflowExecution, WorkflowExecution.id == WorkflowLog.execution_id) \
-     .join(Workflow, Workflow.id == WorkflowExecution.workflow_id) \
-     .where(
-         and_(
-             Workflow.business_id == business_id,
-             WorkflowLog.level == 'error',
-             WorkflowLog.timestamp >= datetime.utcnow() - timedelta(days=days)
-         )
-     )
-    
-    # فیلتر بر اساس workflow
+    # Query پایه - واکشی در Python برای سازگاری با دیتابیس و data=None
+    stmt = select(WorkflowLog).select_from(WorkflowLog).join(
+        WorkflowExecution, WorkflowExecution.id == WorkflowLog.execution_id
+    ).join(Workflow, Workflow.id == WorkflowExecution.workflow_id).where(
+        and_(
+            Workflow.business_id == business_id,
+            WorkflowLog.level == WorkflowLogLevel.ERROR,
+            WorkflowLog.timestamp >= datetime.utcnow() - timedelta(days=days)
+        )
+    )
     if workflow_id:
         stmt = stmt.where(Workflow.id == workflow_id)
     
-    stmt = stmt.group_by(cast(WorkflowLog.data['error_type'], Text)) \
-               .order_by(func.count(WorkflowLog.id).desc())
+    logs = list(db.execute(stmt).scalars().all())
     
-    results = list(db.execute(stmt).all())
+    # گروه‌بندی در Python
+    error_stats = defaultdict(lambda: {"count": 0, "last_occurrence": None, "first_occurrence": None})
+    for log in logs:
+        data = log.data or {}
+        error_type = data.get("error_type") or data.get("error_message") or "Unknown"
+        if isinstance(error_type, str) and len(error_type) > 100:
+            error_type = error_type[:100] + "..."
+        else:
+            error_type = str(error_type)
+        error_stats[error_type]["count"] += 1
+        ts = log.timestamp
+        if error_stats[error_type]["last_occurrence"] is None or ts > error_stats[error_type]["last_occurrence"]:
+            error_stats[error_type]["last_occurrence"] = ts
+        if error_stats[error_type]["first_occurrence"] is None or ts < error_stats[error_type]["first_occurrence"]:
+            error_stats[error_type]["first_occurrence"] = ts
     
-    # محاسبه آمار کلی
-    total_errors = sum(r.count for r in results)
+    total_errors = sum(s["count"] for s in error_stats.values())
+    results = sorted(
+        [{"error_type": k, "count": v["count"], "last_occurrence": v["last_occurrence"], "first_occurrence": v["first_occurrence"]} for k, v in error_stats.items()],
+        key=lambda x: x["count"],
+        reverse=True
+    )
     
     return success_response(
         data={
@@ -540,11 +548,11 @@ async def get_workflow_errors_analytics(
             "period_days": days,
             "errors_by_type": [
                 {
-                    "error_type": r.error_type,
-                    "count": r.count,
-                    "percentage": round((r.count / total_errors * 100), 2) if total_errors > 0 else 0,
-                    "last_occurrence": format_datetime_fields({"timestamp": r.last_occurrence}, request)["timestamp"],
-                    "first_occurrence": format_datetime_fields({"timestamp": r.first_occurrence}, request)["timestamp"]
+                    "error_type": r["error_type"],
+                    "count": r["count"],
+                    "percentage": round((r["count"] / total_errors * 100), 2) if total_errors > 0 else 0,
+                    "last_occurrence": format_datetime_fields({"timestamp": r["last_occurrence"]}, request)["timestamp"],
+                    "first_occurrence": format_datetime_fields({"timestamp": r["first_occurrence"]}, request)["timestamp"]
                 }
                 for r in results
             ]
@@ -817,8 +825,12 @@ async def get_actions_metadata(
         
         # تعیین context برای ترجمه
         translation_context = None
-        if "invoice" in action_key and "create" in action_key:
+        if action_key == "ai_agent":
+            translation_context = "ai_agent"
+        elif "invoice" in action_key and "create" in action_key:
             translation_context = "create_invoice"
+        elif "bale" in action_key:
+            translation_context = "send_bale"
         elif "telegram" in action_key:
             translation_context = "send_telegram"
         elif "email" in action_key:

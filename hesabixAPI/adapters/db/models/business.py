@@ -86,3 +86,11 @@ class Business(Base):
     documents = relationship("Document", back_populates="business", cascade="all, delete-orphan")
     accounts = relationship("Account", back_populates="business", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="business", cascade="all, delete-orphan")
+    crm_process_definitions = relationship(
+        "CrmProcessDefinition",
+        back_populates="business",
+        cascade="all, delete-orphan",
+    )
+    crm_leads = relationship("Lead", back_populates="business", cascade="all, delete-orphan")
+    crm_deals = relationship("Deal", back_populates="business", cascade="all, delete-orphan")
+    crm_activities = relationship("CrmActivity", back_populates="business", cascade="all, delete-orphan")

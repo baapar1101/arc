@@ -15,18 +15,13 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-
-    String localizedText(String faText, String enText) {
-      return t.localeName.startsWith('fa') ? faText : enText;
-    }
 
     return AlertDialog(
       title: Row(
         children: [
           const Icon(Icons.info_outline, color: Colors.blue),
           const SizedBox(width: 8),
-          Text(localizedText('راهنمای اتصال نودها', 'How to Connect Nodes')),
+          Text(t.workflowConnectionHelpTitle),
         ],
       ),
       content: SingleChildScrollView(
@@ -36,11 +31,11 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
           children: [
             _buildMethodSection(
               context,
-              localizedText('روش 1: Drag & Drop (پیشنهادی)', 'Method 1: Drag & Drop (Recommended)'),
+              t.workflowConnectionHelpMethod1,
               [
-                localizedText('1. روی نقطه خروجی (Output) یک نود کلیک کنید و نگه دارید', '1. Click and hold on the output point of a node'),
-                localizedText('2. ماوس را بکشید - یک خط موقت نمایش داده می‌شود', '2. Drag your mouse - a temporary line will appear'),
-                localizedText('3. ماوس را روی نقطه ورودی (Input) نود دیگر رها کنید', '3. Release on the input point of another node'),
+                t.workflowConnectionHelpMethod1Step1,
+                t.workflowConnectionHelpMethod1Step2,
+                t.workflowConnectionHelpMethod1Step3,
               ],
               Icons.drag_handle,
               Colors.blue,
@@ -48,10 +43,10 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
             const SizedBox(height: 16),
             _buildMethodSection(
               context,
-              localizedText('روش 2: Click & Click', 'Method 2: Click & Click'),
+              t.workflowConnectionHelpMethod2,
               [
-                localizedText('1. روی نقطه خروجی (Output) یک نود کلیک کنید', '1. Click on the output point of a node'),
-                localizedText('2. روی نقطه ورودی (Input) نود دیگر کلیک کنید', '2. Click on the input point of another node'),
+                t.workflowConnectionHelpMethod2Step1,
+                t.workflowConnectionHelpMethod2Step2,
               ],
               Icons.touch_app,
               Colors.green,
@@ -72,7 +67,7 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
                       Icon(Icons.lightbulb_outline, size: 20, color: Colors.orange.shade700),
                       const SizedBox(width: 8),
                       Text(
-                        localizedText('نکات مهم:', 'Tips:'),
+                        t.workflowConnectionHelpTips,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.orange.shade900,
@@ -82,10 +77,7 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    localizedText(
-                      '• نودهای Trigger فقط نقطه خروجی دارند\n• نودهای Action هم ورودی و هم خروجی دارند\n• برای حذف اتصال: روی آن کلیک کرده و Delete بزنید',
-                      '• Trigger nodes only have output points\n• Action nodes have both input and output points\n• To delete connection: click on it and press Delete',
-                    ),
+                    t.workflowConnectionHelpTipsText,
                     style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
                   ),
                 ],
@@ -97,7 +89,7 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(localizedText('متوجه شدم', 'Got it')),
+          child: Text(t.workflowConnectionHelpGotIt),
         ),
       ],
     );

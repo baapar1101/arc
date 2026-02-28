@@ -13,6 +13,7 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/person_share_link.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
+import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/services/warranty_service.dart';
 import 'package:hesabix_ui/models/warranty_models.dart';
@@ -76,6 +77,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   bool _includeLedger = true;
   bool _includeInvoices = true;
   int _documentsLimit = 50;
+  int _activitiesRefreshKey = 0;
   final TextEditingController _maxViewsController = TextEditingController();
   final TextEditingController _smsRecipientController = TextEditingController();
 
@@ -86,7 +88,11 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     _personService = PersonService();
     _storageService = BusinessStorageService(ApiClient());
     _warrantyService = WarrantyService();
-    _tabController = TabController(length: widget.isWarrantyPluginActive ? 5 : 4, vsync: this);
+    final crmTab = widget.authStore.canReadSection('crm');
+    _tabController = TabController(
+      length: 4 + (widget.isWarrantyPluginActive ? 1 : 0) + (crmTab ? 2 : 0),
+      vsync: this,
+    );
     _loadPersonDetails();
     _ensureCalendarController();
     _initFinancialContext();
@@ -520,6 +526,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   if (widget.isWarrantyPluginActive)
                     Tab(icon: const Icon(Icons.verified_user), text: t.warranty ?? 'گارانتی'),
                   const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
+                  if (widget.authStore.canReadSection('crm'))
+                    const Tab(icon: Icon(Icons.history), text: 'تاریخچه تعامل'),
+                  if (widget.authStore.canReadSection('crm'))
+                    const Tab(icon: Icon(Icons.trending_up), text: 'فرصت‌های فروش'),
                   const Tab(icon: Icon(Icons.share), text: 'اشتراک‌گذاری'),
                 ],
               ),
@@ -532,6 +542,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   _buildAccountCardTab(t, theme),
                   if (widget.isWarrantyPluginActive) _buildWarrantyTab(t, theme),
                   _buildAttachmentsTab(theme),
+                  if (widget.authStore.canReadSection('crm')) _buildActivitiesTab(t, theme),
+                  if (widget.authStore.canReadSection('crm')) _buildDealsTab(t, theme),
                   _buildShareTab(t, theme),
                 ],
               ),
@@ -1044,6 +1056,430 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         ],
       ),
     );
+  }
+
+  Widget _buildActivitiesTab(AppLocalizations t, ThemeData theme) {
+    final personId = widget.person.id;
+    if (personId == null) {
+      return const Center(child: Text('برای مشاهده تاریخچه تعامل نیاز به شناسه معتبر شخص است.'));
+    }
+    final crmService = CrmService(apiClient: ApiClient());
+    final canAdd = widget.authStore.hasBusinessPermission('crm', 'write');
+    return KeyedSubtree(
+      key: ValueKey('activities_$_activitiesRefreshKey'),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: crmService.listActivities(businessId: widget.businessId, personId: personId, limit: 100),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                const SizedBox(height: 12),
+                Text('خطا در بارگذاری: ${snapshot.error}', textAlign: TextAlign.center),
+              ],
+            ),
+          );
+        }
+        final data = snapshot.data ?? <String, dynamic>{};
+        final items = data['items'] is List ? (data['items'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (canAdd)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton.icon(
+                  onPressed: () => _showAddActivityDialog(personId, crmService, () {
+                    setState(() => _activitiesRefreshKey++);
+                  }),
+                  icon: const Icon(Icons.add),
+                  label: const Text('ثبت فعالیت'),
+                ),
+              ),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.history, size: 48, color: theme.colorScheme.outline),
+                          const SizedBox(height: 12),
+                          Text('هنوز فعالیتی ثبت نشده است.', style: theme.textTheme.bodyMedium),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final a = items[index];
+                        final type = a['activity_type']?.toString() ?? '';
+                        final subject = a['subject']?.toString() ?? '';
+                        final desc = a['description']?.toString() ?? '';
+                        final date = a['activity_date_formatted'] ?? a['activity_date']?.toString() ?? '';
+                        final typeLabel = _activityTypeLabel(type);
+                        final activityId = a['id'] as int?;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: theme.colorScheme.primaryContainer,
+                              child: Icon(_activityTypeIcon(type), color: theme.colorScheme.onPrimaryContainer),
+                            ),
+                            title: Text(subject.isNotEmpty ? subject : typeLabel),
+                            subtitle: Text(desc.isNotEmpty ? desc : typeLabel),
+                            trailing: canAdd
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(date, style: theme.textTheme.bodySmall),
+                                      PopupMenuButton<String>(
+                                        onSelected: (v) {
+                                          if (v == 'edit') _showEditActivityDialog(personId, crmService, a, () => setState(() => _activitiesRefreshKey++));
+                                          if (v == 'delete' && activityId != null) _deleteActivity(crmService, activityId, () => setState(() => _activitiesRefreshKey++));
+                                        },
+                                        itemBuilder: (_) => [
+                                          const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                                          const PopupMenuItem(value: 'delete', child: Text('حذف')),
+                                        ],
+                                      ),
+                                    ],
+                                  )
+                                : Text(date, style: theme.textTheme.bodySmall),
+                            onTap: canAdd ? () => _showEditActivityDialog(personId, crmService, a, () => setState(() => _activitiesRefreshKey++)) : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+      ),
+    );
+  }
+
+  Widget _buildDealsTab(AppLocalizations t, ThemeData theme) {
+    final personId = widget.person.id;
+    if (personId == null) {
+      return const Center(child: Text('برای مشاهده فرصت‌های فروش نیاز به شناسه معتبر شخص است.'));
+    }
+    final crmService = CrmService(apiClient: ApiClient());
+    return FutureBuilder<Map<String, dynamic>>(
+      future: crmService.listDeals(
+        businessId: widget.businessId,
+        personId: personId,
+        limit: 100,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                const SizedBox(height: 12),
+                Text('خطا در بارگذاری: ${snapshot.error}', textAlign: TextAlign.center),
+              ],
+            ),
+          );
+        }
+        final data = snapshot.data ?? <String, dynamic>{};
+        final items = data['items'] is List
+            ? (data['items'] as List).cast<Map<String, dynamic>>()
+            : <Map<String, dynamic>>[];
+        if (items.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.trending_up_outlined, size: 48, color: theme.colorScheme.outline),
+                const SizedBox(height: 12),
+                Text('فرصت فروشی برای این مشتری ثبت نشده است.', style: theme.textTheme.bodyMedium),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final d = items[index];
+            final title = d['title']?.toString() ?? '';
+            final stageName = d['stage_name']?.toString() ?? '';
+            final amount = (d['amount'] is num) ? (d['amount'] as num).toDouble() : 0.0;
+            final formatter = NumberFormat('#,##0');
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(Icons.trending_up, color: theme.colorScheme.onPrimaryContainer),
+                ),
+                title: Text(title),
+                subtitle: Text('$stageName · ${formatter.format(amount)} ریال'),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  IconData _activityTypeIcon(String type) {
+    switch (type) {
+      case 'call':
+        return Icons.phone;
+      case 'email':
+        return Icons.email;
+      case 'meeting':
+        return Icons.event;
+      case 'note':
+        return Icons.note;
+      default:
+        return Icons.history;
+    }
+  }
+
+  String _activityTypeLabel(String type) {
+    switch (type) {
+      case 'call':
+        return 'تماس';
+      case 'email':
+        return 'ایمیل';
+      case 'meeting':
+        return 'جلسه';
+      case 'note':
+        return 'یادداشت';
+      default:
+        return type.isNotEmpty ? type : 'فعالیت';
+    }
+  }
+
+  Future<void> _showAddActivityDialog(int personId, CrmService crmService, VoidCallback onSaved) async {
+    List<Map<String, dynamic>> activityTypes = [];
+    try {
+      final result = await crmService.listProcessDefinitions(
+        businessId: widget.businessId,
+        processType: 'activity_type',
+        isActive: true,
+      );
+      final list = result is List ? result : (result is Map && result['data'] is List ? result['data'] as List : <dynamic>[]);
+      for (final p in list) {
+        final proc = p as Map<String, dynamic>?;
+        if (proc == null) continue;
+        final stages = proc['stages'] as List<dynamic>? ?? [];
+        for (final s in stages) {
+          final stage = s as Map<String, dynamic>?;
+          if (stage == null) continue;
+          final code = stage['stage_code']?.toString() ?? '';
+          final name = stage['name']?.toString() ?? code;
+          if (code.isNotEmpty) {
+            activityTypes.add({'code': code, 'name': name});
+          }
+        }
+      }
+    } catch (_) {}
+    if (activityTypes.isEmpty) {
+      activityTypes = [
+        {'code': 'call', 'name': 'تماس'},
+        {'code': 'email', 'name': 'ایمیل'},
+        {'code': 'meeting', 'name': 'جلسه'},
+        {'code': 'note', 'name': 'یادداشت'},
+      ];
+    }
+    final subjectController = TextEditingController();
+    final descController = TextEditingController();
+    var selectedType = 'call';
+    if (activityTypes.isNotEmpty) {
+      final firstCode = activityTypes.first['code'] as String?;
+      if (firstCode != null && firstCode.isNotEmpty) selectedType = firstCode;
+    }
+    var selectedDate = DateTime.now();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('ثبت فعالیت'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  decoration: const InputDecoration(labelText: 'نوع فعالیت'),
+                  items: activityTypes.map((t) => DropdownMenuItem<String>(
+                        value: t['code'] as String?,
+                        child: Text(t['name']?.toString() ?? t['code']?.toString() ?? ''),
+                      )).toList(),
+                  onChanged: (v) => setState(() => selectedType = v ?? selectedType),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: subjectController,
+                  decoration: const InputDecoration(labelText: 'موضوع'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(labelText: 'توضیحات'),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: Text('تاریخ: ${selectedDate.toLocal().toString().split(' ')[0]}'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) setState(() => selectedDate = picked);
+                    },
+                    child: const Text('تغییر'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await crmService.createActivity(
+                    businessId: widget.businessId,
+                    personId: personId,
+                    activityType: selectedType,
+                    subject: subjectController.text.trim().isEmpty ? null : subjectController.text.trim(),
+                    description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+                    activityDate: selectedDate,
+                  );
+                  if (!mounted) return;
+                  Navigator.of(ctx).pop(true);
+                  SnackBarHelper.show(context, message: 'فعالیت ثبت شد');
+                  onSaved();
+                } catch (e) {
+                  if (mounted) SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+                }
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showEditActivityDialog(int personId, CrmService crmService, Map<String, dynamic> a, VoidCallback onSaved) async {
+    final activityId = (a['id'] as num?)?.toInt();
+    if (activityId == null) return;
+    final subjectController = TextEditingController(text: a['subject']?.toString() ?? '');
+    final descController = TextEditingController(text: a['description']?.toString() ?? '');
+    var selectedType = a['activity_type']?.toString() ?? 'call';
+    var selectedDate = a['activity_date'] != null ? DateTime.tryParse(a['activity_date'].toString()) ?? DateTime.now() : DateTime.now();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('ویرایش فعالیت'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  decoration: const InputDecoration(labelText: 'نوع فعالیت'),
+                  items: const [
+                    DropdownMenuItem(value: 'call', child: Text('تماس')),
+                    DropdownMenuItem(value: 'email', child: Text('ایمیل')),
+                    DropdownMenuItem(value: 'meeting', child: Text('جلسه')),
+                    DropdownMenuItem(value: 'note', child: Text('یادداشت')),
+                  ],
+                  onChanged: (v) => setState(() => selectedType = v ?? selectedType),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: subjectController, decoration: const InputDecoration(labelText: 'موضوع')),
+                const SizedBox(height: 12),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: 'توضیحات'), maxLines: 3),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: Text('تاریخ: ${selectedDate.toLocal().toString().split(' ')[0]}'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(2000), lastDate: DateTime(2100));
+                      if (picked != null) setState(() => selectedDate = picked);
+                    },
+                    child: const Text('تغییر'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await crmService.updateActivity(
+                    businessId: widget.businessId,
+                    activityId: activityId,
+                    activityType: selectedType,
+                    subject: subjectController.text.trim().isEmpty ? null : subjectController.text.trim(),
+                    description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+                    activityDate: selectedDate,
+                  );
+                  if (!mounted) return;
+                  Navigator.of(ctx).pop(true);
+                  SnackBarHelper.show(context, message: 'فعالیت ویرایش شد');
+                  onSaved();
+                } catch (e) {
+                  if (mounted) SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+                }
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) onSaved();
+  }
+
+  Future<void> _deleteActivity(CrmService crmService, int activityId, VoidCallback onSaved) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف فعالیت'),
+        content: const Text('آیا از حذف این فعالیت اطمینان دارید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await crmService.deleteActivity(businessId: widget.businessId, activityId: activityId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'فعالیت حذف شد');
+      onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+    }
   }
 
   Widget _buildShareTab(AppLocalizations t, ThemeData theme) {

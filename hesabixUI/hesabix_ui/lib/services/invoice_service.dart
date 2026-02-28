@@ -68,6 +68,9 @@ class InvoiceService {
     int limit = 20,
     String? search,
     Map<String, dynamic>? filters,
+    bool isInstallmentSale = false,
+    String? sortBy,
+    bool sortDesc = true,
   }) async {
     // Normalize filters: backend expects a list of {property, operator, value}
     List<Map<String, dynamic>>? normalizedFilters;
@@ -81,17 +84,53 @@ class InvoiceService {
           .toList();
     }
 
-    final body = {
+    final body = <String, dynamic>{
       'take': limit,
       'skip': (page - 1) * limit,
       if (search != null && search.isNotEmpty) 'search': search,
       if (normalizedFilters != null) 'filters': normalizedFilters,
+      if (isInstallmentSale) 'is_installment_sale': true,
+      if (sortBy != null && sortBy.isNotEmpty) 'sort_by': sortBy,
+      'sort_desc': sortDesc,
     };
+    // Backend also reads person_id and currency_id from flat body keys
+    if (filters != null) {
+      if (filters['person_id'] != null) body['person_id'] = filters['person_id'];
+      if (filters['currency_id'] != null) body['currency_id'] = filters['currency_id'];
+    }
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/invoices/business/$businessId/search',
       data: body,
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  /// جستجوی فاکتورهای اقساطی برای انتخاب در سند دریافت (تخصیص به اقساط)
+  /// شامل: فیلتر شخص، ارز، جستجو، مرتب‌سازی بر اساس مانده، صفحه‌بندی
+  Future<Map<String, dynamic>> searchInstallmentInvoices({
+    required int businessId,
+    int? personId,
+    int? currencyId,
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String sortBy = 'remaining_amount',
+    bool sortDesc = true,
+  }) async {
+    final filters = <String, dynamic>{};
+    if (personId != null) filters['person_id'] = personId;
+    if (currencyId != null) filters['currency_id'] = currencyId;
+
+    return searchInvoices(
+      businessId: businessId,
+      page: page,
+      limit: limit,
+      search: search?.trim().isEmpty ?? true ? null : search,
+      filters: filters.isEmpty ? null : filters,
+      isInstallmentSale: true,
+      sortBy: sortBy,
+      sortDesc: sortDesc,
+    );
   }
 
   /// محاسبه مانده چند فاکتور در یک درخواست

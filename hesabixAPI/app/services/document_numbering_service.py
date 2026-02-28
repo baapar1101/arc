@@ -119,6 +119,36 @@ def _get_default_setting_for_type(document_type: str) -> dict:
             "number_padding": 4,
             "reset_period": "never",
         },
+        "crm_lead": {
+            "prefix": "L",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+            "separator": "-",
+            "start_number": 1,
+            "number_padding": 4,
+            "reset_period": "never",
+        },
+        "crm_deal": {
+            "prefix": "D",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+            "separator": "-",
+            "start_number": 1,
+            "number_padding": 4,
+            "reset_period": "never",
+        },
+        "crm_activity": {
+            "prefix": "A",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+            "separator": "-",
+            "start_number": 1,
+            "number_padding": 4,
+            "reset_period": "never",
+        },
     }
 
     default = defaults.get(

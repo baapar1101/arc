@@ -58,12 +58,22 @@ class ActionRegistry:
             else:
                 result[action_type] = {"name": action_type}
         return result
+
+    def get_all_metadata(self) -> list:
+        """لیست metadata تمام actionها به فرمت لیست برای API"""
+        result = []
+        for action_type, metadata in self.list_actions().items():
+            item = dict(metadata)
+            item["key"] = action_type
+            result.append(item)
+        return result
     
     def _register_default_actions(self):
         """ثبت actionهای پیش‌فرض"""
         from app.services.workflow.actions import (
             SendEmailAction,
             SendTelegramAction,
+            SendBaleAction,
             CreateDocumentAction,
             CreateInvoiceAction,
             UpdateInventoryAction,
@@ -71,11 +81,13 @@ class ActionRegistry:
             HttpRequestAction,
             SetVariableAction,
             LogAction,
+            AIAgentAction,
         )
         
         # Communication actions
         self.register("send_email", SendEmailAction())
         self.register("send_telegram", SendTelegramAction())
+        self.register("send_bale", SendBaleAction())
         self.register("create_notification", CreateNotificationAction())
         
         # Document actions
@@ -91,4 +103,7 @@ class ActionRegistry:
         # Utility actions
         self.register("set_variable", SetVariableAction())
         self.register("log", LogAction())
+
+        # AI Agent
+        self.register("ai_agent", AIAgentAction())
 

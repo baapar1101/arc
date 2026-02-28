@@ -15,6 +15,7 @@ import '../core/locale_controller.dart';
 import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
+import '../utils/password_validator.dart';
 import '../widgets/auth_footer.dart';
 import '../../utils/snackbar_helper.dart';
 import '../utils/responsive_helper.dart';
@@ -931,6 +932,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       if (v.length < 6) {
                         return 'رمز عبور باید حداقل 6 کاراکتر باشد';
                       }
+                      if (passwordExceedsMaxBytes(v)) {
+                        return AppLocalizations.of(dialogContext).passwordMaxLength;
+                      }
                       return null;
                     },
                   ),
@@ -1156,7 +1160,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   controller: _passwordCtrl,
                                                   decoration: InputDecoration(labelText: t.password),
                                                   obscureText: true,
-                                                  validator: (v) => (v == null || v.isEmpty) ? '${t.password} ${t.requiredField}' : null,
+                                                  validator: (v) {
+                                                    if (v == null || v.isEmpty) return '${t.password} ${t.requiredField}';
+                                                    if (passwordExceedsMaxBytes(v)) return t.passwordMaxLength;
+                                                    return null;
+                                                  },
                                                   onFieldSubmitted: (_) => _onSubmit(),
                                                 ),
                                                 const SizedBox(height: 12),
@@ -1265,7 +1273,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   controller: _registerPasswordCtrl,
                                                   decoration: InputDecoration(labelText: t.password),
                                                   obscureText: true,
-                                                  validator: (v) => (v == null || v.isEmpty) ? '${t.password} ${t.requiredField}' : null,
+                                                  validator: (v) => validatePassword(
+                                                    value: v,
+                                                    getRequiredError: () => '${t.password} ${t.requiredField}',
+                                                    getMinLengthError: () => t.passwordMinLength,
+                                                    getMaxLengthError: () => t.passwordMaxLength,
+                                                    minLength: 8,
+                                                  ),
                                                   onFieldSubmitted: (_) => _onRegister(),
                                                 ),
                                                 const SizedBox(height: 12),

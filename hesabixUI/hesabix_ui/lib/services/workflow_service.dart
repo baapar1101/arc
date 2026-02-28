@@ -162,6 +162,22 @@ class WorkflowService {
     return users;
   }
 
+  Future<List<Map<String, dynamic>>> getBaleConnectedUsers({
+    required int businessId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/business/$businessId/users/bale-connected',
+    );
+    final data = _asMap(res.data?['data']);
+    final users = (data['users'] as List?)
+            ?.map<Map<String, dynamic>>(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    return users;
+  }
+
   Future<List<Map<String, dynamic>>> getBusinessCurrencies({
     required int businessId,
   }) async {

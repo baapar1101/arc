@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
@@ -134,12 +135,46 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
             // این کار توسط InteractiveViewer انجام می‌شود
           }
         },
-        onPanEnd: (details) {
+        onPanEnd: (details) async {
           if (widget.state.isConnecting) {
-            // تبدیل موقعیت برای بررسی node
             final canvasPosition = _localToCanvasCoordinates(details.localPosition);
             final droppedNode = _findNodeAtPosition(canvasPosition);
-            widget.state.endConnection(droppedNode?.id);
+            final fromNodeId = widget.state.connectingFromNodeId;
+            String? sourceOutputId;
+            if (fromNodeId != null && droppedNode != null && mounted) {
+              final fromNode = widget.state.getNodeById(fromNodeId);
+              if (fromNode?.type == WorkflowNodeType.condition) {
+                sourceOutputId = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('شاخه شرط'),
+                    content: const Text(
+                      'این اتصال به شاخه برست یا نادرست نود شرط متصل می‌شود:',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('انصراف'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop('false'),
+                        child: const Text('نادرست'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(ctx).pop('true'),
+                        child: const Text('برست'),
+                      ),
+                    ],
+                  ),
+                );
+                if (sourceOutputId == null && mounted) {
+                  widget.state.cancelConnection();
+                  _connectingToPosition = null;
+                  return;
+                }
+              }
+            }
+            widget.state.endConnection(droppedNode?.id, sourceOutputId: sourceOutputId);
             _connectingToPosition = null;
           } else if (widget.state.isSelecting) {
             widget.state.endSelection();
@@ -277,8 +312,44 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                       onStartConnection: () {
                         widget.state.startConnection(node.id);
                       },
-                      onEndConnection: () {
-                        widget.state.endConnection(node.id);
+                      onEndConnection: () async {
+                        final fromNodeId = widget.state.connectingFromNodeId;
+                        String? sourceOutputId;
+                        if (fromNodeId != null && mounted) {
+                          final fromNode = widget.state.getNodeById(fromNodeId);
+                          if (fromNode?.type == WorkflowNodeType.condition) {
+                            sourceOutputId = await showDialog<String>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('شاخه شرط'),
+                                content: const Text(
+                                  'این اتصال به شاخه برست یا نادرست نود شرط متصل می‌شود:',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                    child: const Text('انصراف'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop('false'),
+                                    child: const Text('نادرست'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () => Navigator.of(ctx).pop('true'),
+                                    child: const Text('برست'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (sourceOutputId == null && mounted) {
+                              widget.state.cancelConnection();
+                              return;
+                            }
+                          }
+                        }
+                        if (mounted) {
+                          widget.state.endConnection(node.id, sourceOutputId: sourceOutputId);
+                        }
                       },
                       onConnectionDragUpdate: (globalPosition) {
                         try {
@@ -292,6 +363,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                           debugPrint('خطا در onConnectionDragUpdate: $e');
                         }
                       },
+                      onConnectionDragEnd: _handleConnectionDragEnd,
                   );
                 } catch (e, stackTrace) {
                   debugPrint('خطا در ساخت widget برای node ${node.id}: $e');
@@ -318,13 +390,13 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('خطا در نمایش workflow: ${e.toString()}'),
+            Text('${AppLocalizations.of(context).workflowErrorDisplay}: ${e.toString()}'),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () {
                 setState(() {});
               },
-              child: const Text('تلاش مجدد'),
+              child: Text(AppLocalizations.of(context).retry),
             ),
           ],
         ),
@@ -375,6 +447,52 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
     return _findNodeAtPosition(position) != null;
   }
 
+  /// وقتی کشیدن سیم از output رها می‌شود؛ canvas روی PanEnd نمی‌گیرد چون gesture را connection point برده
+  Future<void> _handleConnectionDragEnd() async {
+    if (!widget.state.isConnecting) return;
+    final canvasPosition = widget.state.connectingPosition ?? _connectingToPosition;
+    _connectingToPosition = null;
+    final droppedNode = canvasPosition != null ? _findNodeAtPosition(canvasPosition) : null;
+    final fromNodeId = widget.state.connectingFromNodeId;
+    String? sourceOutputId;
+    if (fromNodeId != null && droppedNode != null && mounted) {
+      final fromNode = widget.state.getNodeById(fromNodeId);
+      if (fromNode?.type == WorkflowNodeType.condition) {
+        sourceOutputId = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('شاخه شرط'),
+            content: const Text(
+              'این اتصال به شاخه برست یا نادرست نود شرط متصل می‌شود:',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('انصراف'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop('false'),
+                child: const Text('نادرست'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop('true'),
+                child: const Text('برست'),
+              ),
+            ],
+          ),
+        );
+        if (sourceOutputId == null && mounted) {
+          widget.state.cancelConnection();
+          return;
+        }
+      }
+    }
+    if (mounted) {
+      widget.state.endConnection(droppedNode?.id, sourceOutputId: sourceOutputId);
+    }
+    setState(() {});
+  }
+
   /// تبدیل موقعیت local (نسبت به InteractiveViewer) به canvas coordinates
   Offset _localToCanvasCoordinates(Offset localPosition) {
     try {
@@ -400,17 +518,15 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   }
 
   /// تبدیل موقعیت global به canvas coordinates
+  /// canvasBox داخل InteractiveViewer است و globalToLocal خودش transform را وارونه می‌کند،
+  /// پس نیازی به _localToCanvasCoordinates نیست (double transformation می‌شد)
   Offset _globalToCanvasCoordinates(Offset globalPosition) {
     try {
-      // پیدا کردن RenderBox برای Canvas container
       final RenderBox? canvasBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
       if (canvasBox == null) {
         return const Offset(0, 0);
       }
-      
-      // تبدیل global به local و سپس به canvas coordinates
-      final localPosition = canvasBox.globalToLocal(globalPosition);
-      return _localToCanvasCoordinates(localPosition);
+      return canvasBox.globalToLocal(globalPosition);
     } catch (e) {
       return const Offset(0, 0);
     }

@@ -285,8 +285,11 @@ class WorkflowEngine:
                     }
                 )
                 
-                # پیدا کردن nodeهای بعدی
-                next_nodes = self._get_next_nodes(node_id, connections)
+                # پیدا کردن nodeهای بعدی (برای condition: فقط شاخه منطبق با نتیجه)
+                condition_result = result if node.get("type") == "condition" else None
+                next_nodes = self._get_next_nodes(
+                    node_id, connections, condition_result=condition_result
+                )
                 queue.extend(next_nodes)
                 
             except Exception as e:
@@ -335,7 +338,10 @@ class WorkflowEngine:
                             logger.error(f"Fallback action failed: {fallback_error}", exc_info=True)
                     
                     # پیدا کردن nodeهای بعدی و ادامه
-                    next_nodes = self._get_next_nodes(node_id, connections)
+                    condition_result = node_results.get(node_id, {}).get("result") if node.get("type") == "condition" else None
+                    next_nodes = self._get_next_nodes(
+                        node_id, connections, condition_result=condition_result
+                    )
                     queue.extend(next_nodes)
                 elif strategy == "retry":
                     # تلاش مجدد
@@ -386,7 +392,10 @@ class WorkflowEngine:
                             raise last_exception
                     else:
                         # پیدا کردن nodeهای بعدی
-                        next_nodes = self._get_next_nodes(node_id, connections)
+                        condition_result = result if node.get("type") == "condition" else None
+                        next_nodes = self._get_next_nodes(
+                            node_id, connections, condition_result=condition_result
+                        )
                         queue.extend(next_nodes)
         
         # حذف db از context قبل از ذخیره‌سازی (چون قابل serialize نیست)
@@ -1019,17 +1028,28 @@ class WorkflowEngine:
     def _get_next_nodes(
         self,
         node_id: str,
-        connections: List[Dict[str, Any]]
+        connections: List[Dict[str, Any]],
+        condition_result: Optional[bool] = None
     ) -> List[str]:
         """
-        پیدا کردن nodeهای بعدی بر اساس connections
+        پیدا کردن nodeهای بعدی بر اساس connections.
+        برای نود شرط: اگر condition_result مشخص باشد، فقط اتصالاتی با sourceHandle
+        منطبق (true/false) دنبال می‌شوند. اگر sourceHandle در اتصال نباشد،
+        برای سازگاری با گذشته همه اتصالات دنبال می‌شوند.
         """
         next_nodes = []
+        expected_handle = "true" if condition_result else "false" if condition_result is False else None
         for conn in connections:
-            if conn.get("source") == node_id:
-                target = conn.get("target")
-                if target:
-                    next_nodes.append(target)
+            if conn.get("source") != node_id:
+                continue
+            target = conn.get("target")
+            if not target:
+                continue
+            source_handle = conn.get("sourceHandle") or conn.get("source_output")
+            if condition_result is not None and source_handle is not None:
+                if source_handle != expected_handle:
+                    continue
+            next_nodes.append(target)
         return next_nodes
     
     def _execute_fallback_action(

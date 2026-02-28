@@ -24,6 +24,8 @@ class InvoicesListPage extends StatefulWidget {
   final CalendarController calendarController;
   final AuthStore authStore;
   final ApiClient apiClient;
+  /// برای رفرش خودکار هنگام بازگشت از صفحه افزودن/ویرایش فاکتور
+  final RouteObserver<ModalRoute<void>>? routeObserver;
 
   const InvoicesListPage({
     super.key,
@@ -31,6 +33,7 @@ class InvoicesListPage extends StatefulWidget {
     required this.calendarController,
     required this.authStore,
     required this.apiClient,
+    this.routeObserver,
   });
 
   @override
@@ -50,7 +53,7 @@ class InvoicesListPage extends StatefulWidget {
   }
 }
 
-class _InvoicesListPageState extends State<InvoicesListPage> {
+class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
   final GlobalKey _tableKey = GlobalKey();
   final InvoiceService _invoiceService = InvoiceService();
   late final BusinessDashboardService _dashboardService = BusinessDashboardService(widget.apiClient);
@@ -111,6 +114,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   
   @override
   void dispose() {
+    widget.routeObserver?.unsubscribe(this);
     // Clean up the page state when disposed
     InvoicesListPage._pageStates.remove(widget.businessId);
     super.dispose();
@@ -173,6 +177,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // ثبت در RouteObserver برای رفرش هنگام بازگشت از صفحه افزودن/ویرایش فاکتور
+    final route = ModalRoute.of(context);
+    if (widget.routeObserver != null && route is ModalRoute<void>) {
+      widget.routeObserver!.unsubscribe(this);
+      widget.routeObserver!.subscribe(this, route);
+    }
     // اگر صفحه قبلاً initialize شده بود، داده‌ها را refresh کن
     // این برای زمانی است که از صفحه دیگری (مثل ثبت فاکتور) به این صفحه برمی‌گردیم
     if (_isInitialized) {
@@ -182,6 +192,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         }
       });
     }
+  }
+
+  @override
+  void didPopNext() {
+    // هنگام بازگشت از صفحه رویی (مثل افزودن/ویرایش فاکتور)، جدول را رفرش کن
+    if (mounted) _refreshData();
   }
 
   @override

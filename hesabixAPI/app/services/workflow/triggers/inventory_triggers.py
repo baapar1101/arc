@@ -16,13 +16,17 @@ class InventoryLowTrigger(BaseTrigger):
             "config_schema": {
                 "product_id": {
                     "type": "integer",
-                    "description": "شناسه محصول (اختیاری - اگر مشخص نشود برای همه محصولات)",
-                    "required": False
+                    "description": "محصول (اختیاری - خالی = همه محصولات)",
+                    "required": False,
+                    "ui_type": "product_selector",
+                    "ui_config": {"business_scoped": True}
                 },
                 "warehouse_id": {
                     "type": "integer",
-                    "description": "شناسه انبار (اختیاری)",
-                    "required": False
+                    "description": "انبار (اختیاری)",
+                    "required": False,
+                    "ui_type": "warehouse_selector",
+                    "ui_config": {"business_scoped": True}
                 }
             }
         }

@@ -911,6 +911,12 @@ abstract class AppLocalizations {
   /// **'Password must be at least 8 characters'**
   String get passwordMinLength;
 
+  /// No description provided for @passwordMaxLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must not exceed 72 bytes (about 72 ASCII characters)'**
+  String get passwordMaxLength;
+
   /// No description provided for @calendar.
   ///
   /// In en, this message translates to:
@@ -1136,14 +1142,26 @@ abstract class AppLocalizations {
   /// No description provided for @installmentsInvoicePickerTitle.
   ///
   /// In en, this message translates to:
-  /// **'Select invoice'**
+  /// **'Select installment invoice'**
   String get installmentsInvoicePickerTitle;
 
   /// No description provided for @installmentsInvoicePickerSearchLabel.
   ///
   /// In en, this message translates to:
-  /// **'Search invoice'**
+  /// **'Search by code, description...'**
   String get installmentsInvoicePickerSearchLabel;
+
+  /// No description provided for @installmentInvoicesLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get installmentInvoicesLoadMore;
+
+  /// No description provided for @installmentInvoicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} installment invoice(s)'**
+  String installmentInvoicesCount(Object count);
 
   /// No description provided for @installmentsTableInvoice.
   ///
@@ -11318,13 +11336,13 @@ abstract class AppLocalizations {
   /// No description provided for @workflowDeleted.
   ///
   /// In en, this message translates to:
-  /// **'Node deleted'**
+  /// **'Workflow deleted'**
   String get workflowDeleted;
 
   /// No description provided for @workflowDuplicated.
   ///
   /// In en, this message translates to:
-  /// **'Node duplicated'**
+  /// **'Workflow duplicated'**
   String get workflowDuplicated;
 
   /// No description provided for @workflowCopy.
@@ -11546,14 +11564,1256 @@ abstract class AppLocalizations {
   /// No description provided for @workflowNodeArrayType.
   ///
   /// In en, this message translates to:
-  /// **'Array (needs more complex UI)'**
+  /// **'Array'**
   String get workflowNodeArrayType;
 
   /// No description provided for @workflowNodeObjectType.
   ///
   /// In en, this message translates to:
-  /// **'Object (needs more complex UI)'**
+  /// **'Object'**
   String get workflowNodeObjectType;
+
+  /// No description provided for @workflowConfigUsePreviousNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Use previous node'**
+  String get workflowConfigUsePreviousNode;
+
+  /// No description provided for @workflowConfigSelectFromNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Select from previous nodes'**
+  String get workflowConfigSelectFromNodes;
+
+  /// No description provided for @workflowConfigValueUsesNode.
+  ///
+  /// In en, this message translates to:
+  /// **'This value uses a previous node'**
+  String get workflowConfigValueUsesNode;
+
+  /// No description provided for @workflowConfigSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get workflowConfigSelectDate;
+
+  /// No description provided for @workflowConfigToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get workflowConfigToday;
+
+  /// No description provided for @workflowConfigDateHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date (ISO: YYYY-MM-DD)'**
+  String get workflowConfigDateHelper;
+
+  /// No description provided for @workflowConfigNoNodesToSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'No nodes available to select'**
+  String get workflowConfigNoNodesToSelect;
+
+  /// No description provided for @workflowConfigNoTelegramUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'No users connected to Telegram bot. Please connect users first.'**
+  String get workflowConfigNoTelegramUsers;
+
+  /// No description provided for @workflowConfigNoBaleUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'No users connected to Bale bot. Please connect users first.'**
+  String get workflowConfigNoBaleUsers;
+
+  /// No description provided for @workflowConfigOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get workflowConfigOwner;
+
+  /// No description provided for @workflowConfigSearchSelectPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and select person'**
+  String get workflowConfigSearchSelectPerson;
+
+  /// No description provided for @workflowConfigPersonIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Person ID'**
+  String get workflowConfigPersonIdLabel;
+
+  /// No description provided for @workflowConfigPersonIdHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter ID or use previous node: \$node_id.person_id'**
+  String get workflowConfigPersonIdHelper;
+
+  /// No description provided for @workflowConfigSearchSelectProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and select product/service'**
+  String get workflowConfigSearchSelectProduct;
+
+  /// No description provided for @workflowConfigProductIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get workflowConfigProductIdLabel;
+
+  /// No description provided for @workflowConfigProductIdHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Product/service ID'**
+  String get workflowConfigProductIdHelper;
+
+  /// No description provided for @workflowConfigType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowConfigType;
+
+  /// No description provided for @workflowConfigPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get workflowConfigPercent;
+
+  /// No description provided for @workflowConfigFixedAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed amount'**
+  String get workflowConfigFixedAmount;
+
+  /// No description provided for @workflowConfigDiscountPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount %'**
+  String get workflowConfigDiscountPercent;
+
+  /// No description provided for @workflowConfigDiscountAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount amount'**
+  String get workflowConfigDiscountAmount;
+
+  /// No description provided for @workflowConfigItemN.
+  ///
+  /// In en, this message translates to:
+  /// **'Item {n}'**
+  String workflowConfigItemN(int n);
+
+  /// No description provided for @workflowConfigAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add item'**
+  String get workflowConfigAddItem;
+
+  /// No description provided for @workflowConfigAddLineItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add line item'**
+  String get workflowConfigAddLineItem;
+
+  /// No description provided for @workflowConfigProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get workflowConfigProduct;
+
+  /// No description provided for @workflowConfigQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get workflowConfigQuantity;
+
+  /// No description provided for @workflowConfigUnitPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit price'**
+  String get workflowConfigUnitPrice;
+
+  /// No description provided for @workflowConfigTaxPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax %'**
+  String get workflowConfigTaxPercent;
+
+  /// No description provided for @workflowConfigDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowConfigDescription;
+
+  /// No description provided for @workflowConfigPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get workflowConfigPaymentMethod;
+
+  /// No description provided for @workflowConfigAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get workflowConfigAmount;
+
+  /// No description provided for @workflowConfigAccountSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account / Cash register'**
+  String get workflowConfigAccountSelect;
+
+  /// No description provided for @workflowConfigAddPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payment'**
+  String get workflowConfigAddPayment;
+
+  /// No description provided for @workflowConfigNoPaymentsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payments added yet. Use the button below to add.'**
+  String get workflowConfigNoPaymentsYet;
+
+  /// No description provided for @workflowConfigPaymentN.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment {n}'**
+  String workflowConfigPaymentN(int n);
+
+  /// No description provided for @workflowConfigNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get workflowConfigNotSelected;
+
+  /// No description provided for @workflowConfigSelectWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select warehouse'**
+  String get workflowConfigSelectWarehouse;
+
+  /// No description provided for @workflowConfigSelectAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Select account'**
+  String get workflowConfigSelectAccount;
+
+  /// No description provided for @workflowConfigSelectFiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Select fiscal year'**
+  String get workflowConfigSelectFiscalYear;
+
+  /// No description provided for @workflowConfigInvalidJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid JSON'**
+  String get workflowConfigInvalidJson;
+
+  /// No description provided for @workflowConfigJsonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'\'{\"key\": \"value\"}\''**
+  String get workflowConfigJsonHint;
+
+  /// No description provided for @workflowConfigCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get workflowConfigCash;
+
+  /// No description provided for @workflowConfigBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get workflowConfigBank;
+
+  /// No description provided for @workflowConfigCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get workflowConfigCheck;
+
+  /// No description provided for @workflowConfigCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get workflowConfigCard;
+
+  /// No description provided for @workflowConfigSelectTelegramUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Select user connected to Telegram bot'**
+  String get workflowConfigSelectTelegramUser;
+
+  /// No description provided for @workflowConfigSelectBaleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Select user connected to Bale bot'**
+  String get workflowConfigSelectBaleUser;
+
+  /// No description provided for @workflowConfigSelectAtLeastOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one item'**
+  String get workflowConfigSelectAtLeastOne;
+
+  /// No description provided for @workflowConfigReferenceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select from previous nodes'**
+  String get workflowConfigReferenceTitle;
+
+  /// No description provided for @workflowConfigNoNodesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No nodes available to select'**
+  String get workflowConfigNoNodesAvailable;
+
+  /// No description provided for @workflowConfigStep1Node.
+  ///
+  /// In en, this message translates to:
+  /// **'Step 1: Select node'**
+  String get workflowConfigStep1Node;
+
+  /// No description provided for @workflowConfigStep2Data.
+  ///
+  /// In en, this message translates to:
+  /// **'Step 2: Select data'**
+  String get workflowConfigStep2Data;
+
+  /// No description provided for @workflowConfigSelectDataFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Select data from \"{label}\"'**
+  String workflowConfigSelectDataFrom(String label);
+
+  /// No description provided for @workflowConfigOrSelectField.
+  ///
+  /// In en, this message translates to:
+  /// **'Or select a specific field:'**
+  String get workflowConfigOrSelectField;
+
+  /// No description provided for @workflowConfigUseFullNodeOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Use full node output'**
+  String get workflowConfigUseFullNodeOutput;
+
+  /// No description provided for @workflowConfigFullNodeOutputDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'All output data from the node'**
+  String get workflowConfigFullNodeOutputDesc;
+
+  /// No description provided for @workflowConfigBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get workflowConfigBack;
+
+  /// No description provided for @workflowConfigCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workflowConfigCancel;
+
+  /// No description provided for @workflowConfigGroupFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get workflowConfigGroupFilters;
+
+  /// No description provided for @workflowConfigGroupScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduling'**
+  String get workflowConfigGroupScheduling;
+
+  /// No description provided for @workflowConfigGroupErrorManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Error management'**
+  String get workflowConfigGroupErrorManagement;
+
+  /// No description provided for @workflowConfigGroupMainSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Main settings'**
+  String get workflowConfigGroupMainSettings;
+
+  /// No description provided for @workflowConfigGroupAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced settings'**
+  String get workflowConfigGroupAdvanced;
+
+  /// No description provided for @workflowConfigUserDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get workflowConfigUserDefault;
+
+  /// No description provided for @workflowConfigFiscalYearDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get workflowConfigFiscalYearDefault;
+
+  /// No description provided for @workflowConfigJsonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON'**
+  String get workflowConfigJsonLabel;
+
+  /// No description provided for @workflowPaletteSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search...'**
+  String get workflowPaletteSearch;
+
+  /// No description provided for @workflowPaletteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get workflowPaletteAll;
+
+  /// No description provided for @workflowPaletteTriggers.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggers'**
+  String get workflowPaletteTriggers;
+
+  /// No description provided for @workflowPaletteActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get workflowPaletteActions;
+
+  /// No description provided for @workflowPaletteLoops.
+  ///
+  /// In en, this message translates to:
+  /// **'Loops'**
+  String get workflowPaletteLoops;
+
+  /// No description provided for @workflowPaletteConditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Conditions'**
+  String get workflowPaletteConditions;
+
+  /// No description provided for @workflowNodeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown node'**
+  String get workflowNodeUnknown;
+
+  /// No description provided for @workflowConfigEnumRequiredForMultiSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: enum values required for multi-select'**
+  String get workflowConfigEnumRequiredForMultiSelect;
+
+  /// No description provided for @workflowConfigFieldEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get workflowConfigFieldEnabled;
+
+  /// No description provided for @workflowConfigFieldTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get workflowConfigFieldTo;
+
+  /// No description provided for @workflowConfigFieldSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject'**
+  String get workflowConfigFieldSubject;
+
+  /// No description provided for @workflowConfigFieldBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get workflowConfigFieldBody;
+
+  /// No description provided for @workflowConfigFieldMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get workflowConfigFieldMessage;
+
+  /// No description provided for @workflowConfigFieldMinAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum amount'**
+  String get workflowConfigFieldMinAmount;
+
+  /// No description provided for @workflowConfigFieldMaxAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum amount'**
+  String get workflowConfigFieldMaxAmount;
+
+  /// No description provided for @workflowConfigFieldStatusFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Status filter'**
+  String get workflowConfigFieldStatusFilter;
+
+  /// No description provided for @workflowConfigFieldPersonType.
+  ///
+  /// In en, this message translates to:
+  /// **'Person type'**
+  String get workflowConfigFieldPersonType;
+
+  /// No description provided for @workflowConfigFieldCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get workflowConfigFieldCurrency;
+
+  /// No description provided for @workflowConfigFieldPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Person ID'**
+  String get workflowConfigFieldPersonId;
+
+  /// No description provided for @workflowConfigFieldProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get workflowConfigFieldProductId;
+
+  /// No description provided for @workflowConfigFieldWarehouseId.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse ID'**
+  String get workflowConfigFieldWarehouseId;
+
+  /// No description provided for @workflowConfigFieldAccountId.
+  ///
+  /// In en, this message translates to:
+  /// **'Account ID'**
+  String get workflowConfigFieldAccountId;
+
+  /// No description provided for @workflowConfigFieldRetryCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry count'**
+  String get workflowConfigFieldRetryCount;
+
+  /// No description provided for @workflowConfigFieldRetryDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry delay'**
+  String get workflowConfigFieldRetryDelay;
+
+  /// No description provided for @workflowConfigFieldOnError.
+  ///
+  /// In en, this message translates to:
+  /// **'On error'**
+  String get workflowConfigFieldOnError;
+
+  /// No description provided for @workflowConfigFieldBreakOnError.
+  ///
+  /// In en, this message translates to:
+  /// **'Break on error'**
+  String get workflowConfigFieldBreakOnError;
+
+  /// No description provided for @workflowConfigFieldContinueOnError.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue on error'**
+  String get workflowConfigFieldContinueOnError;
+
+  /// No description provided for @workflowConfigFieldTriggerType.
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger type'**
+  String get workflowConfigFieldTriggerType;
+
+  /// No description provided for @workflowConfigFieldActionType.
+  ///
+  /// In en, this message translates to:
+  /// **'Action type'**
+  String get workflowConfigFieldActionType;
+
+  /// No description provided for @workflowConfigFieldLoopType.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop type'**
+  String get workflowConfigFieldLoopType;
+
+  /// No description provided for @workflowConfigFieldItemsSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Items source'**
+  String get workflowConfigFieldItemsSource;
+
+  /// No description provided for @workflowConfigFieldItemVariable.
+  ///
+  /// In en, this message translates to:
+  /// **'Item variable'**
+  String get workflowConfigFieldItemVariable;
+
+  /// No description provided for @workflowConfigFieldIndexVariable.
+  ///
+  /// In en, this message translates to:
+  /// **'Index variable'**
+  String get workflowConfigFieldIndexVariable;
+
+  /// No description provided for @workflowConfigFieldMaxIterations.
+  ///
+  /// In en, this message translates to:
+  /// **'Max iterations'**
+  String get workflowConfigFieldMaxIterations;
+
+  /// No description provided for @workflowConfigFieldStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get workflowConfigFieldStart;
+
+  /// No description provided for @workflowConfigFieldEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get workflowConfigFieldEnd;
+
+  /// No description provided for @workflowConfigFieldStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get workflowConfigFieldStep;
+
+  /// No description provided for @workflowConfigFieldConditionLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left value'**
+  String get workflowConfigFieldConditionLeft;
+
+  /// No description provided for @workflowConfigFieldConditionOperator.
+  ///
+  /// In en, this message translates to:
+  /// **'Comparison operator'**
+  String get workflowConfigFieldConditionOperator;
+
+  /// No description provided for @workflowConfigFieldConditionRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right value'**
+  String get workflowConfigFieldConditionRight;
+
+  /// No description provided for @workflowConfigFieldTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeout'**
+  String get workflowConfigFieldTimeout;
+
+  /// No description provided for @workflowConfigFieldCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown'**
+  String get workflowConfigFieldCooldown;
+
+  /// No description provided for @workflowConfigFieldSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get workflowConfigFieldSchedule;
+
+  /// No description provided for @workflowConfigFieldDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay'**
+  String get workflowConfigFieldDelay;
+
+  /// No description provided for @workflowConfigFieldDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Document type'**
+  String get workflowConfigFieldDocumentType;
+
+  /// No description provided for @workflowConfigFieldFiscalYearFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year filter'**
+  String get workflowConfigFieldFiscalYearFilter;
+
+  /// No description provided for @workflowConfigFieldFiscalYearId.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get workflowConfigFieldFiscalYearId;
+
+  /// No description provided for @workflowConfigFieldUserIdFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'User filter'**
+  String get workflowConfigFieldUserIdFilter;
+
+  /// No description provided for @workflowConfigFieldDescriptionContains.
+  ///
+  /// In en, this message translates to:
+  /// **'Description contains'**
+  String get workflowConfigFieldDescriptionContains;
+
+  /// No description provided for @workflowConfigFieldCooldownSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown (seconds)'**
+  String get workflowConfigFieldCooldownSeconds;
+
+  /// No description provided for @workflowConfigFieldTimeoutSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeout (seconds)'**
+  String get workflowConfigFieldTimeoutSeconds;
+
+  /// No description provided for @workflowConfigFieldInvoiceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice type'**
+  String get workflowConfigFieldInvoiceType;
+
+  /// No description provided for @workflowConfigFieldPersonTypeFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Person type filter'**
+  String get workflowConfigFieldPersonTypeFilter;
+
+  /// No description provided for @workflowConfigFieldCurrencyId.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get workflowConfigFieldCurrencyId;
+
+  /// No description provided for @workflowConfigFieldIncludeTaxDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Include tax details'**
+  String get workflowConfigFieldIncludeTaxDetails;
+
+  /// No description provided for @workflowConfigFieldIncludePaymentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Include payment status'**
+  String get workflowConfigFieldIncludePaymentStatus;
+
+  /// No description provided for @workflowConfigFieldAccountIdFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Account filter'**
+  String get workflowConfigFieldAccountIdFilter;
+
+  /// No description provided for @workflowConfigFieldPaymentMethodFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method filter'**
+  String get workflowConfigFieldPaymentMethodFilter;
+
+  /// No description provided for @workflowConfigFieldIncludeBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Include balance'**
+  String get workflowConfigFieldIncludeBalance;
+
+  /// No description provided for @workflowConfigFieldCheckDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Check duplicate'**
+  String get workflowConfigFieldCheckDuplicate;
+
+  /// No description provided for @workflowConfigFieldTypeFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Type filter'**
+  String get workflowConfigFieldTypeFilter;
+
+  /// No description provided for @workflowConfigFieldCheckType.
+  ///
+  /// In en, this message translates to:
+  /// **'Check type'**
+  String get workflowConfigFieldCheckType;
+
+  /// No description provided for @workflowConfigFieldDaysBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'Days before due'**
+  String get workflowConfigFieldDaysBefore;
+
+  /// No description provided for @workflowConfigFieldReferenceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference code'**
+  String get workflowConfigFieldReferenceCode;
+
+  /// No description provided for @workflowConfigFieldExtraInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra info'**
+  String get workflowConfigFieldExtraInfo;
+
+  /// No description provided for @workflowConfigFieldIsProforma.
+  ///
+  /// In en, this message translates to:
+  /// **'Proforma invoice'**
+  String get workflowConfigFieldIsProforma;
+
+  /// No description provided for @workflowConnectionHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to Connect Nodes'**
+  String get workflowConnectionHelpTitle;
+
+  /// No description provided for @workflowConnectionHelpMethod1.
+  ///
+  /// In en, this message translates to:
+  /// **'Method 1: Drag & Drop (Recommended)'**
+  String get workflowConnectionHelpMethod1;
+
+  /// No description provided for @workflowConnectionHelpMethod1Step1.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Click and hold on the output point of a node'**
+  String get workflowConnectionHelpMethod1Step1;
+
+  /// No description provided for @workflowConnectionHelpMethod1Step2.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Drag your mouse - a temporary line will appear'**
+  String get workflowConnectionHelpMethod1Step2;
+
+  /// No description provided for @workflowConnectionHelpMethod1Step3.
+  ///
+  /// In en, this message translates to:
+  /// **'3. Release on the input point of another node'**
+  String get workflowConnectionHelpMethod1Step3;
+
+  /// No description provided for @workflowConnectionHelpMethod2.
+  ///
+  /// In en, this message translates to:
+  /// **'Method 2: Click & Click'**
+  String get workflowConnectionHelpMethod2;
+
+  /// No description provided for @workflowConnectionHelpMethod2Step1.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Click on the output point of a node'**
+  String get workflowConnectionHelpMethod2Step1;
+
+  /// No description provided for @workflowConnectionHelpMethod2Step2.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Click on the input point of another node'**
+  String get workflowConnectionHelpMethod2Step2;
+
+  /// No description provided for @workflowConnectionHelpTips.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get workflowConnectionHelpTips;
+
+  /// No description provided for @workflowConnectionHelpTipsText.
+  ///
+  /// In en, this message translates to:
+  /// **'• Trigger nodes only have output points\n• Action nodes have both input and output points\n• To delete connection: click on it and press Delete'**
+  String get workflowConnectionHelpTipsText;
+
+  /// No description provided for @workflowConnectionHelpGotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get workflowConnectionHelpGotIt;
+
+  /// No description provided for @workflowEditNameDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit name and description'**
+  String get workflowEditNameDescription;
+
+  /// No description provided for @workflowNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow name *'**
+  String get workflowNameRequired;
+
+  /// No description provided for @workflowNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Invoice approval process'**
+  String get workflowNameHint;
+
+  /// No description provided for @workflowDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowDescription;
+
+  /// No description provided for @workflowDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional description for this workflow...'**
+  String get workflowDescriptionHint;
+
+  /// No description provided for @workflowSaveWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Save workflow'**
+  String get workflowSaveWorkflow;
+
+  /// No description provided for @workflowEnterName.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter workflow name'**
+  String get workflowEnterName;
+
+  /// No description provided for @workflowInfoUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Info updated. For permanent save, click the Save button.'**
+  String get workflowInfoUpdated;
+
+  /// No description provided for @workflowNoteComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Note / Comment'**
+  String get workflowNoteComment;
+
+  /// No description provided for @workflowNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Note or comment for this node...'**
+  String get workflowNoteHint;
+
+  /// No description provided for @workflowNoteDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Note deleted'**
+  String get workflowNoteDeleted;
+
+  /// No description provided for @workflowNoteCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Note cleared'**
+  String get workflowNoteCleared;
+
+  /// No description provided for @workflowNoteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Note saved'**
+  String get workflowNoteSaved;
+
+  /// No description provided for @workflowSaveAsTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as template'**
+  String get workflowSaveAsTemplate;
+
+  /// No description provided for @workflowTemplateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Template name'**
+  String get workflowTemplateName;
+
+  /// No description provided for @workflowTemplateNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Invoice process'**
+  String get workflowTemplateNameHint;
+
+  /// No description provided for @workflowTemplateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Template \"{name}\" saved'**
+  String workflowTemplateSaved(String name);
+
+  /// No description provided for @workflowTemplateLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Template \"{name}\" loaded'**
+  String workflowTemplateLoaded(String name);
+
+  /// No description provided for @workflowSelectTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select template'**
+  String get workflowSelectTemplate;
+
+  /// No description provided for @workflowBuiltinTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in templates'**
+  String get workflowBuiltinTemplates;
+
+  /// No description provided for @workflowSavedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved templates'**
+  String get workflowSavedTemplates;
+
+  /// No description provided for @workflowNoSavedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved templates'**
+  String get workflowNoSavedTemplates;
+
+  /// No description provided for @workflowTemplateDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Template'**
+  String get workflowTemplateDefault;
+
+  /// No description provided for @workflowTemplateN.
+  ///
+  /// In en, this message translates to:
+  /// **'Template {n}'**
+  String workflowTemplateN(int n);
+
+  /// No description provided for @workflowCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created: {date}'**
+  String workflowCreatedAt(String date);
+
+  /// No description provided for @workflowErrorAddNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Error adding node'**
+  String get workflowErrorAddNode;
+
+  /// No description provided for @workflowErrorSaveTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving template'**
+  String get workflowErrorSaveTemplate;
+
+  /// No description provided for @workflowErrorLoadTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading template'**
+  String get workflowErrorLoadTemplate;
+
+  /// No description provided for @workflowTimelineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution timeline'**
+  String get workflowTimelineTitle;
+
+  /// No description provided for @workflowTimelineRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get workflowTimelineRefresh;
+
+  /// No description provided for @workflowAnalyticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analytics'**
+  String get workflowAnalyticsTitle;
+
+  /// No description provided for @workflowPerformance.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance'**
+  String get workflowPerformance;
+
+  /// No description provided for @workflowNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data available'**
+  String get workflowNoData;
+
+  /// No description provided for @workflowErrorLoadTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading timeline'**
+  String get workflowErrorLoadTimeline;
+
+  /// No description provided for @workflowAllLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'All logs'**
+  String get workflowAllLogs;
+
+  /// No description provided for @workflowAllNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'All nodes'**
+  String get workflowAllNodes;
+
+  /// No description provided for @workflowErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get workflowErrors;
+
+  /// No description provided for @workflowNodeStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Node stats'**
+  String get workflowNodeStats;
+
+  /// No description provided for @workflowColumnNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Node'**
+  String get workflowColumnNode;
+
+  /// No description provided for @workflowColumnType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowColumnType;
+
+  /// No description provided for @workflowColumnExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Executions'**
+  String get workflowColumnExecutions;
+
+  /// No description provided for @workflowColumnAvgTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. time'**
+  String get workflowColumnAvgTime;
+
+  /// No description provided for @workflowErrorLoadAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading analytics'**
+  String get workflowErrorLoadAnalytics;
+
+  /// No description provided for @workflowErrorLoadErrorStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading error stats'**
+  String get workflowErrorLoadErrorStats;
+
+  /// No description provided for @workflowTotalExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Total executions'**
+  String get workflowTotalExecutions;
+
+  /// No description provided for @workflowSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Successful'**
+  String get workflowSuccessful;
+
+  /// No description provided for @workflowFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get workflowFailed;
+
+  /// No description provided for @workflowAvgTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. time'**
+  String get workflowAvgTime;
+
+  /// No description provided for @workflowSuccessRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Success rate'**
+  String get workflowSuccessRate;
+
+  /// No description provided for @workflowNoErrorsRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'No errors recorded!'**
+  String get workflowNoErrorsRecorded;
+
+  /// No description provided for @workflowTotalErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Total errors'**
+  String get workflowTotalErrors;
+
+  /// No description provided for @workflowErrorTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'Error types'**
+  String get workflowErrorTypes;
+
+  /// No description provided for @workflowErrorLoadHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading history'**
+  String get workflowErrorLoadHistory;
+
+  /// No description provided for @workflowErrorLoadLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading logs'**
+  String get workflowErrorLoadLogs;
+
+  /// No description provided for @workflowDeleteWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete workflow'**
+  String get workflowDeleteWorkflow;
+
+  /// No description provided for @workflowDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete workflow \"{name}\"?'**
+  String workflowDeleteConfirm(String name);
+
+  /// No description provided for @workflowDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow deleted successfully'**
+  String get workflowDeletedSuccess;
+
+  /// No description provided for @workflowErrorDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting workflow'**
+  String get workflowErrorDelete;
+
+  /// No description provided for @workflowStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get workflowStatusActive;
+
+  /// No description provided for @workflowStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get workflowStatusInactive;
+
+  /// No description provided for @workflowStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get workflowStatusDraft;
+
+  /// No description provided for @workflowNoNodesDefined.
+  ///
+  /// In en, this message translates to:
+  /// **'No nodes defined'**
+  String get workflowNoNodesDefined;
+
+  /// No description provided for @workflowEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This workflow is empty'**
+  String get workflowEmpty;
+
+  /// No description provided for @workflowErrorDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Error displaying workflow'**
+  String get workflowErrorDisplay;
 
   /// No description provided for @workflowExecutionLogs.
   ///
@@ -11614,6 +12874,786 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Force-directed layout applied'**
   String get workflowForceDirectedLayoutApplied;
+
+  /// No description provided for @workflowValidationSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation successful'**
+  String get workflowValidationSuccess;
+
+  /// No description provided for @workflowAllNodesValid.
+  ///
+  /// In en, this message translates to:
+  /// **'All nodes are valid!'**
+  String get workflowAllNodesValid;
+
+  /// No description provided for @workflowNodesWithErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} nodes have errors'**
+  String workflowNodesWithErrors(int count);
+
+  /// No description provided for @workflowToolbarOpenPalette.
+  ///
+  /// In en, this message translates to:
+  /// **'Open node palette'**
+  String get workflowToolbarOpenPalette;
+
+  /// No description provided for @workflowToolbarZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get workflowToolbarZoomOut;
+
+  /// No description provided for @workflowToolbarZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get workflowToolbarZoomIn;
+
+  /// No description provided for @workflowToolbarResetZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset zoom'**
+  String get workflowToolbarResetZoom;
+
+  /// No description provided for @workflowToolbarConnectionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection help'**
+  String get workflowToolbarConnectionHelp;
+
+  /// No description provided for @workflowToolbarHideGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Grid'**
+  String get workflowToolbarHideGrid;
+
+  /// No description provided for @workflowToolbarShowGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Grid'**
+  String get workflowToolbarShowGrid;
+
+  /// No description provided for @workflowToolbarDisableSnapToGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Snap to Grid'**
+  String get workflowToolbarDisableSnapToGrid;
+
+  /// No description provided for @workflowToolbarEnableSnapToGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Snap to Grid'**
+  String get workflowToolbarEnableSnapToGrid;
+
+  /// No description provided for @workflowToolbarAlignmentTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment tools'**
+  String get workflowToolbarAlignmentTools;
+
+  /// No description provided for @workflowToolbarAlignLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Align left'**
+  String get workflowToolbarAlignLeft;
+
+  /// No description provided for @workflowToolbarAlignRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Align right'**
+  String get workflowToolbarAlignRight;
+
+  /// No description provided for @workflowToolbarAlignTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Align top'**
+  String get workflowToolbarAlignTop;
+
+  /// No description provided for @workflowToolbarAlignBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Align bottom'**
+  String get workflowToolbarAlignBottom;
+
+  /// No description provided for @workflowToolbarDistributeHorizontally.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribute horizontally'**
+  String get workflowToolbarDistributeHorizontally;
+
+  /// No description provided for @workflowToolbarDistributeVertically.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribute vertically'**
+  String get workflowToolbarDistributeVertically;
+
+  /// No description provided for @workflowToolbarAlignToGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Align to grid'**
+  String get workflowToolbarAlignToGrid;
+
+  /// No description provided for @workflowToolbarClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get workflowToolbarClearAll;
+
+  /// No description provided for @workflowToolbarAutoLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto layout'**
+  String get workflowToolbarAutoLayout;
+
+  /// No description provided for @workflowToolbarTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get workflowToolbarTemplates;
+
+  /// No description provided for @workflowToolbarLoadTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Load template'**
+  String get workflowToolbarLoadTemplate;
+
+  /// No description provided for @workflowToolbarSelectLayoutType.
+  ///
+  /// In en, this message translates to:
+  /// **'Select layout type'**
+  String get workflowToolbarSelectLayoutType;
+
+  /// No description provided for @workflowToolbarHierarchical.
+  ///
+  /// In en, this message translates to:
+  /// **'Hierarchical'**
+  String get workflowToolbarHierarchical;
+
+  /// No description provided for @workflowToolbarForceDirected.
+  ///
+  /// In en, this message translates to:
+  /// **'Force-directed'**
+  String get workflowToolbarForceDirected;
+
+  /// No description provided for @workflowToolbarShowValidationErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Show validation errors'**
+  String get workflowToolbarShowValidationErrors;
+
+  /// No description provided for @workflowToolbarUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workflowToolbarUndo;
+
+  /// No description provided for @workflowToolbarRedo.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get workflowToolbarRedo;
+
+  /// No description provided for @workflowToolbarNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nodes'**
+  String get workflowToolbarNodes;
+
+  /// No description provided for @workflowToolbarConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Connections'**
+  String get workflowToolbarConnections;
+
+  /// No description provided for @workflowNoSuggestedFields.
+  ///
+  /// In en, this message translates to:
+  /// **'No suggested fields for this node'**
+  String get workflowNoSuggestedFields;
+
+  /// No description provided for @workflowTypeFieldManually.
+  ///
+  /// In en, this message translates to:
+  /// **'You can type the field manually: {nodeId}.field_name'**
+  String workflowTypeFieldManually(String nodeId);
+
+  /// No description provided for @workflowFieldInvoiceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice ID'**
+  String get workflowFieldInvoiceId;
+
+  /// No description provided for @workflowFieldDescInvoiceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric invoice ID'**
+  String get workflowFieldDescInvoiceId;
+
+  /// No description provided for @workflowFieldInvoiceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice code'**
+  String get workflowFieldInvoiceCode;
+
+  /// No description provided for @workflowFieldDescInvoiceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique invoice code'**
+  String get workflowFieldDescInvoiceCode;
+
+  /// No description provided for @workflowFieldInvoiceNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice number'**
+  String get workflowFieldInvoiceNumber;
+
+  /// No description provided for @workflowFieldDescInvoiceNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice number'**
+  String get workflowFieldDescInvoiceNumber;
+
+  /// No description provided for @workflowFieldInvoiceDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice date'**
+  String get workflowFieldInvoiceDate;
+
+  /// No description provided for @workflowFieldDescInvoiceDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice issue date'**
+  String get workflowFieldDescInvoiceDate;
+
+  /// No description provided for @workflowFieldTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total amount'**
+  String get workflowFieldTotalAmount;
+
+  /// No description provided for @workflowFieldDescTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total amount'**
+  String get workflowFieldDescTotalAmount;
+
+  /// No description provided for @workflowFieldDiscountAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount amount'**
+  String get workflowFieldDiscountAmount;
+
+  /// No description provided for @workflowFieldDescDiscountAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total discounts'**
+  String get workflowFieldDescDiscountAmount;
+
+  /// No description provided for @workflowFieldTaxAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax amount'**
+  String get workflowFieldTaxAmount;
+
+  /// No description provided for @workflowFieldDescTaxAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tax'**
+  String get workflowFieldDescTaxAmount;
+
+  /// No description provided for @workflowFieldFinalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Final amount'**
+  String get workflowFieldFinalAmount;
+
+  /// No description provided for @workflowFieldDescFinalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Payable amount'**
+  String get workflowFieldDescFinalAmount;
+
+  /// No description provided for @workflowFieldCustomerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer name'**
+  String get workflowFieldCustomerName;
+
+  /// No description provided for @workflowFieldDescCustomerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterparty name'**
+  String get workflowFieldDescCustomerName;
+
+  /// No description provided for @workflowFieldCustomerId.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer ID'**
+  String get workflowFieldCustomerId;
+
+  /// No description provided for @workflowFieldDescCustomerId.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterparty ID'**
+  String get workflowFieldDescCustomerId;
+
+  /// No description provided for @workflowFieldDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowFieldDescription;
+
+  /// No description provided for @workflowFieldDescDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowFieldDescDescription;
+
+  /// No description provided for @workflowFieldInvoiceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice description'**
+  String get workflowFieldInvoiceDescription;
+
+  /// No description provided for @workflowFieldStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowFieldStatus;
+
+  /// No description provided for @workflowFieldDescStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowFieldDescStatus;
+
+  /// No description provided for @workflowFieldInvoiceStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice status'**
+  String get workflowFieldInvoiceStatus;
+
+  /// No description provided for @workflowFieldPaymentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment ID'**
+  String get workflowFieldPaymentId;
+
+  /// No description provided for @workflowFieldDescPaymentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric payment ID'**
+  String get workflowFieldDescPaymentId;
+
+  /// No description provided for @workflowFieldAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get workflowFieldAmount;
+
+  /// No description provided for @workflowFieldDescAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get workflowFieldDescAmount;
+
+  /// No description provided for @workflowFieldPaymentAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment amount'**
+  String get workflowFieldPaymentAmount;
+
+  /// No description provided for @workflowFieldPaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment date'**
+  String get workflowFieldPaymentDate;
+
+  /// No description provided for @workflowFieldDescPaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment date'**
+  String get workflowFieldDescPaymentDate;
+
+  /// No description provided for @workflowFieldPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get workflowFieldPaymentMethod;
+
+  /// No description provided for @workflowFieldDescPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method type'**
+  String get workflowFieldDescPaymentMethod;
+
+  /// No description provided for @workflowFieldPaymentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment status'**
+  String get workflowFieldPaymentStatus;
+
+  /// No description provided for @workflowFieldReferenceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference code'**
+  String get workflowFieldReferenceCode;
+
+  /// No description provided for @workflowFieldDescReferenceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction reference code'**
+  String get workflowFieldDescReferenceCode;
+
+  /// No description provided for @workflowFieldDocumentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Document ID'**
+  String get workflowFieldDocumentId;
+
+  /// No description provided for @workflowFieldDescDocumentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric document ID'**
+  String get workflowFieldDescDocumentId;
+
+  /// No description provided for @workflowFieldDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Document type'**
+  String get workflowFieldDocumentType;
+
+  /// No description provided for @workflowFieldDescDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting document type'**
+  String get workflowFieldDescDocumentType;
+
+  /// No description provided for @workflowFieldDocTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Document total'**
+  String get workflowFieldDocTotalAmount;
+
+  /// No description provided for @workflowFieldDescDocTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Document total amount'**
+  String get workflowFieldDescDocTotalAmount;
+
+  /// No description provided for @workflowFieldDocDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Document description'**
+  String get workflowFieldDocDescription;
+
+  /// No description provided for @workflowFieldDescDocDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Document description'**
+  String get workflowFieldDescDocDescription;
+
+  /// No description provided for @workflowFieldReceiptPaymentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt/Payment ID'**
+  String get workflowFieldReceiptPaymentId;
+
+  /// No description provided for @workflowFieldDescReceiptPaymentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric ID'**
+  String get workflowFieldDescReceiptPaymentId;
+
+  /// No description provided for @workflowFieldType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowFieldType;
+
+  /// No description provided for @workflowFieldDescType.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt or payment'**
+  String get workflowFieldDescType;
+
+  /// No description provided for @workflowFieldPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get workflowFieldPersonId;
+
+  /// No description provided for @workflowFieldDescPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterparty ID'**
+  String get workflowFieldDescPersonId;
+
+  /// No description provided for @workflowFieldPersonName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowFieldPersonName;
+
+  /// No description provided for @workflowFieldDescPersonName.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterparty name'**
+  String get workflowFieldDescPersonName;
+
+  /// No description provided for @workflowFieldEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get workflowFieldEmail;
+
+  /// No description provided for @workflowFieldDescEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get workflowFieldDescEmail;
+
+  /// No description provided for @workflowFieldPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get workflowFieldPhone;
+
+  /// No description provided for @workflowFieldDescPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get workflowFieldDescPhone;
+
+  /// No description provided for @workflowFieldMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get workflowFieldMobile;
+
+  /// No description provided for @workflowFieldDescMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number'**
+  String get workflowFieldDescMobile;
+
+  /// No description provided for @workflowFieldPersonType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get workflowFieldPersonType;
+
+  /// No description provided for @workflowFieldDescPersonType.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterparty type'**
+  String get workflowFieldDescPersonType;
+
+  /// No description provided for @workflowFieldProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get workflowFieldProductId;
+
+  /// No description provided for @workflowFieldDescProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric product ID'**
+  String get workflowFieldDescProductId;
+
+  /// No description provided for @workflowFieldProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name'**
+  String get workflowFieldProductName;
+
+  /// No description provided for @workflowFieldDescProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name'**
+  String get workflowFieldDescProductName;
+
+  /// No description provided for @workflowFieldProductCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Product code'**
+  String get workflowFieldProductCode;
+
+  /// No description provided for @workflowFieldDescProductCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Product code'**
+  String get workflowFieldDescProductCode;
+
+  /// No description provided for @workflowFieldPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get workflowFieldPrice;
+
+  /// No description provided for @workflowFieldDescPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale price'**
+  String get workflowFieldDescPrice;
+
+  /// No description provided for @workflowFieldQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get workflowFieldQuantity;
+
+  /// No description provided for @workflowFieldDescQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock quantity'**
+  String get workflowFieldDescQuantity;
+
+  /// No description provided for @workflowFieldId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get workflowFieldId;
+
+  /// No description provided for @workflowFieldDescId.
+  ///
+  /// In en, this message translates to:
+  /// **'Record ID'**
+  String get workflowFieldDescId;
+
+  /// No description provided for @workflowFieldName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowFieldName;
+
+  /// No description provided for @workflowFieldDescName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workflowFieldDescName;
+
+  /// No description provided for @workflowFieldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get workflowFieldTitle;
+
+  /// No description provided for @workflowFieldDescTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get workflowFieldDescTitle;
+
+  /// No description provided for @workflowFieldGenDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowFieldGenDescription;
+
+  /// No description provided for @workflowFieldDescGenDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workflowFieldDescGenDescription;
+
+  /// No description provided for @workflowFieldGenStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowFieldGenStatus;
+
+  /// No description provided for @workflowFieldDescGenStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowFieldDescGenStatus;
+
+  /// No description provided for @workflowFieldCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created date'**
+  String get workflowFieldCreatedAt;
+
+  /// No description provided for @workflowFieldDescCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Creation date and time'**
+  String get workflowFieldDescCreatedAt;
+
+  /// No description provided for @workflowTemplateInvoiceSalesName.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice sales notification'**
+  String get workflowTemplateInvoiceSalesName;
+
+  /// No description provided for @workflowTemplateInvoiceSalesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After creating sales invoice, email and Telegram are sent'**
+  String get workflowTemplateInvoiceSalesDesc;
+
+  /// No description provided for @workflowCategoryInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get workflowCategoryInvoice;
+
+  /// No description provided for @workflowTemplateInventoryLowName.
+  ///
+  /// In en, this message translates to:
+  /// **'Low inventory alert'**
+  String get workflowTemplateInventoryLowName;
+
+  /// No description provided for @workflowTemplateInventoryLowDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When product stock is low, notification is sent'**
+  String get workflowTemplateInventoryLowDesc;
+
+  /// No description provided for @workflowCategoryInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory'**
+  String get workflowCategoryInventory;
+
+  /// No description provided for @workflowTemplateReceiptPaymentName.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt/Payment log'**
+  String get workflowTemplateReceiptPaymentName;
+
+  /// No description provided for @workflowTemplateReceiptPaymentDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After recording receipt/payment, log is created'**
+  String get workflowTemplateReceiptPaymentDesc;
+
+  /// No description provided for @workflowCategoryFinancial.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial'**
+  String get workflowCategoryFinancial;
+
+  /// No description provided for @workflowTemplatePersonWelcomeName.
+  ///
+  /// In en, this message translates to:
+  /// **'New person welcome'**
+  String get workflowTemplatePersonWelcomeName;
+
+  /// No description provided for @workflowTemplatePersonWelcomeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After creating new person, welcome message is sent'**
+  String get workflowTemplatePersonWelcomeDesc;
+
+  /// No description provided for @workflowCategoryPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons'**
+  String get workflowCategoryPersons;
 
   /// No description provided for @settingsCategoriesCount.
   ///

@@ -11,23 +11,8 @@ import bcrypt
 
 from app.core.settings import get_settings
 
-# تلاش برای استفاده از passlib برای پشتیبانی از فرمت $2y$
-# استفاده از lazy loading برای جلوگیری از خطا در initialization
-_PASSLIB_AVAILABLE = None
-_pwd_context = None
-
-def _get_passlib_context():
-	"""Lazy loading برای passlib context"""
-	global _PASSLIB_AVAILABLE, _pwd_context
-	if _PASSLIB_AVAILABLE is None:
-		try:
-			from passlib.context import CryptContext
-			_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-			_PASSLIB_AVAILABLE = True
-		except Exception:
-			_PASSLIB_AVAILABLE = False
-			_pwd_context = None
-	return _pwd_context if _PASSLIB_AVAILABLE else None
+# محدودیت طول رمز برای bcrypt (بایت)
+BCRYPT_MAX_PASSWORD_BYTES = 72
 
 _ph = PasswordHasher()
 
@@ -36,11 +21,18 @@ def hash_password(password: str) -> str:
 	return _ph.hash(password)
 
 
+def _truncate_password_for_bcrypt(password: str) -> bytes:
+	"""رمز را برای استفاده در bcrypt به حداکثر ۷۲ بایت محدود می‌کند (محدودیت bcrypt)."""
+	password_bytes = password.encode("utf-8")
+	if len(password_bytes) > BCRYPT_MAX_PASSWORD_BYTES:
+		password_bytes = password_bytes[:BCRYPT_MAX_PASSWORD_BYTES]
+	return password_bytes
+
+
 def verify_password(password: str, password_hash: str) -> bool:
 	"""
-	بررسی رمز عبور با پشتیبانی از Argon2 و bcrypt (شامل فرمت $2y$)
-	ابتدا سعی می‌کند با Argon2 verify کند، سپس با bcrypt
-	برای فرمت $2y$ از passlib استفاده می‌کند (اگر در دسترس باشد)
+	بررسی رمز عبور با پشتیبانی از Argon2 و bcrypt (شامل فرمت $2y$).
+	ابتدا Argon2، سپس bcrypt با نرمال‌سازی $2y$ به $2b$ و محدودیت ۷۲ بایت.
 	"""
 	# ابتدا سعی می‌کنیم با Argon2 verify کنیم
 	try:
@@ -48,50 +40,18 @@ def verify_password(password: str, password_hash: str) -> bool:
 		return True
 	except Exception:
 		pass
-	
-	# اگر Argon2 کار نکرد، سعی می‌کنیم با bcrypt verify کنیم
+
+	# اگر Argon2 کار نکرد، با bcrypt (بدون passlib برای جلوگیری از خطای __about__)
 	try:
-		# بررسی فرمت bcrypt
-		if password_hash.startswith('$2y$') or password_hash.startswith('$2a$') or password_hash.startswith('$2b$'):
-			# برای فرمت $2y$ از passlib استفاده می‌کنیم (اگر در دسترس باشد)
-			if password_hash.startswith('$2y$'):
-				pwd_ctx = _get_passlib_context()
-				if pwd_ctx:
-					try:
-						# استفاده از passlib برای verify کردن $2y$
-						# passlib می‌تواند $2y$ را handle کند
-						return pwd_ctx.verify(password, password_hash)
-					except (ValueError, TypeError) as e:
-						# اگر خطای مربوط به طول رمز یا نوع داده بود، به fallback برویم
-						# اما خطاهای دیگر را ignore می‌کنیم
-						if "longer than 72 bytes" in str(e) or "truncate" in str(e):
-							# اگر رمز خیلی طولانی است، آن را truncate کنیم
-							password_truncated = password[:72]
-							try:
-								return pwd_ctx.verify(password_truncated, password_hash)
-							except Exception:
-								pass
-					except Exception:
-						# اگر passlib کار نکرد، به روش fallback برویم
-						pass
-			
-			# برای $2a$ و $2b$ از bcrypt مستقیم استفاده می‌کنیم
-			# برای $2y$ اگر passlib در دسترس نبود یا کار نکرد، سعی می‌کنیم تبدیل کنیم
+		if password_hash.startswith("$2y$") or password_hash.startswith("$2a$") or password_hash.startswith("$2b$"):
 			normalized_hash = password_hash
-			if password_hash.startswith('$2y$'):
-				# تبدیل $2y$ به $2b$ - این ممکن است کار نکند چون الگوریتم‌ها متفاوت هستند
-				# اما برای fallback امتحان می‌کنیم
-				normalized_hash = '$2b$' + password_hash[4:]
-			
-			# استفاده از bcrypt برای verify
-			password_bytes = password.encode('utf-8')
-			# اگر رمز خیلی طولانی است، آن را truncate کنیم (bcrypt فقط تا 72 بایت پشتیبانی می‌کند)
-			if len(password_bytes) > 72:
-				password_bytes = password_bytes[:72]
-			return bcrypt.checkpw(password_bytes, normalized_hash.encode('utf-8'))
+			if password_hash.startswith("$2y$"):
+				normalized_hash = "$2b$" + password_hash[4:]
+			password_bytes = _truncate_password_for_bcrypt(password)
+			return bcrypt.checkpw(password_bytes, normalized_hash.encode("utf-8"))
 	except Exception:
 		pass
-	
+
 	return False
 
 

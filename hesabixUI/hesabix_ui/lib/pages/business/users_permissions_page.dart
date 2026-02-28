@@ -1084,6 +1084,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete ?? 'حذف'} ${t.warranty ?? 'گارانتی'}',
         'manage': '${t.manage ?? 'مدیریت'} ${t.warranty ?? 'گارانتی'}',
       },
+      'crm': {
+        'view': '${t.view ?? 'مشاهده'} CRM',
+        'write': '${t.edit ?? 'ویرایش'} / ${t.add ?? 'افزودن'} CRM',
+        'reports': '${t.view ?? 'مشاهده'} گزارشات CRM',
+        'reports_team': 'گزارش عملکرد کارمندان (همه تیم)',
+      },
     };
   }
 
@@ -1143,6 +1149,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     }
 
     permissions[section][action] = value;
+
+    // وابستگی CRM: reports_team مستلزم reports است
+    if (section == 'crm' && action == 'reports_team' && value == true) {
+      permissions[section]['reports'] = true;
+    }
+    if (section == 'crm' && action == 'reports' && value == false) {
+      permissions[section]['reports_team'] = false;
+    }
 
     // دیگر mirroring به کلیدهای قدیمی انجام نمی‌شود
     if (section == 'people_transactions') {
@@ -1348,6 +1362,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['reports'],
       },
       {
+        'title': 'CRM',
+        'icon': Icons.handshake_outlined,
+        'sections': ['crm'],
+      },
+      {
         'title': 'تنظیمات',
         'icon': Icons.settings,
         'sections': ['settings', 'storage', 'sms', 'marketplace', 'fiscal_years'],
@@ -1449,6 +1468,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'marketplace': [(AppLocalizations.of(context).marketplace)],
       'reports': ['گزارش', 'گزارش‌ها', 'reports'],
       'fiscal_years': ['سال مالی', 'سال‌های مالی', 'fiscal year', 'fiscal years'],
+      'crm': ['crm', 'CRM'],
     };
 
     final hay = ('$title $description').toLowerCase();
@@ -1493,6 +1513,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'reports': 'گزارش‌ها',
       'fiscal_years': 'سال‌های مالی',
       'warranty': 'گارانتی',
+      'crm': 'CRM',
     };
     
     return titles[sectionKey] ?? sectionKey;

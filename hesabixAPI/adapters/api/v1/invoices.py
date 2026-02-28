@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, cast, Integer
+from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 import io
 import json
@@ -346,12 +347,27 @@ def update_invoice_endpoint(
         # Lazy import to avoid circular
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
-    result = update_invoice(
-        db=db,
-        document_id=invoice_id,
-        user_id=ctx.get_user_id(),
-        data=payload,
-    )
+    try:
+        result = update_invoice(
+            db=db,
+            document_id=invoice_id,
+            user_id=ctx.get_user_id(),
+            data=payload,
+        )
+    except IntegrityError as e:
+        db.rollback()
+        err_msg = str(getattr(e, "orig", e) or e)
+        if "person_id" in err_msg.lower() or "document_lines" in err_msg.lower():
+            raise ApiError(
+                "INVALID_PERSON",
+                "شخص انتخاب‌شده معتبر نیست یا به این کسب‌وکار تعلق ندارد. لطفاً شخص دیگری انتخاب کنید.",
+                http_status=400,
+            )
+        raise ApiError(
+            "UPDATE_FAILED",
+            "خطای یکتایی یا ارجاع در دیتابیس. داده‌های ارسالی را بررسی کنید.",
+            http_status=400,
+        )
     return success_response(data=result, request=request, message="INVOICE_UPDATED")
 
 
@@ -1641,8 +1657,11 @@ async def search_invoices_endpoint(
 	is_fa = locale == "fa"
 
 	# Parse QueryInfo from body_data
-	query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
-	
+	try:
+		query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
+	except Exception as e:
+		raise ApiError("INVALID_QUERY", "پارامترهای جستجو معتبر نیستند.", http_status=400)
+
 	# Extract additional fields for filtering
 	body = body_data
 	
@@ -1840,6 +1859,13 @@ async def search_invoices_endpoint(
 		except (ValueError, TypeError, KeyError):
 			pass
 
+	# فیلتر فاکتورهای اقساطی (فقط اسنادی که طرح اقساط دارند)
+	is_installment_sale = body.get("is_installment_sale")
+	if is_installment_sale is True:
+		# فقط فاکتورهای فروش اقساطی
+		q = q.filter(Document.document_type == "invoice_sales")
+		q = q.filter(Document.extra_info["installment_plan"].isnot(None))
+
 	# Sorting
 	sort_desc = bool(getattr(query_info, 'sort_desc', True))
 	sort_by = getattr(query_info, 'sort_by', None) or 'document_date'
@@ -1859,8 +1885,17 @@ async def search_invoices_endpoint(
 	take = int(getattr(query_info, 'take', 20) or 20)
 	skip = int(getattr(query_info, 'skip', 0) or 0)
 
-	total = q.count()
-	items: List[Document] = q.offset(skip).limit(take).all()
+	try:
+		total = q.count()
+		items = q.offset(skip).limit(take).all()
+	except Exception as e:
+		db.rollback()
+		logging.getLogger(__name__).warning("invoice search query failed: %s", e)
+		raise ApiError(
+			"INVALID_SEARCH_FILTER",
+			"پارامترهای جستجو یا داده‌های فاکتورها معتبر نیستند. در صورت استفاده از فیلتر شخص، آن را حذف کنید و دوباره امتحان کنید.",
+			http_status=400,
+		)
 
 	# Helpers for display fields
 	def _type_name(tp: str) -> str:
@@ -1876,8 +1911,17 @@ async def search_invoices_endpoint(
 		return mapping.get(str(tp), str(tp))
 
 	data_items: List[Dict[str, Any]] = []
+	_log = logging.getLogger(__name__)
 	for d in items:
-		item = invoice_document_to_dict(db, d)
+		try:
+			item = invoice_document_to_dict(db, d)
+		except Exception as e:
+			_log.exception("invoice_document_to_dict failed for document_id=%s business_id=%s", d.id, business_id)
+			raise ApiError(
+				"INVOICE_DATA_ERROR",
+				f"خطا در بارگذاری فاکتور با شناسه {d.id}. داده‌های سند را بررسی کنید.",
+				http_status=500,
+			)
 
 		# Tax workspace fields from extra_info
 		try:
@@ -1937,10 +1981,35 @@ async def search_invoices_endpoint(
 			item["paid_amount"] = None
 			item["remaining_amount"] = None
 
+		# وضعیت اقساط برای فاکتورهای اقساطی: paid | partial | pending | overdue
+		if item.get("is_installment_sale"):
+			paid = float(item.get("paid_amount") or 0)
+			remaining = float(item.get("remaining_amount") or 0)
+			total_amt = float(item.get("total_amount") or 0)
+			if total_amt <= 0 or remaining <= 0:
+				item["installment_status"] = "paid"
+			elif paid > 0:
+				item["installment_status"] = "partial"
+			else:
+				item["installment_status"] = "pending"
+			# remaining_total برای سازگاری با UI
+			item["remaining_total"] = remaining
+		else:
+			item["installment_status"] = None
+			item["remaining_total"] = None
+
 		# افزودن counterparty
 		_add_counterparty_to_invoice_item(db, item)
 
 		data_items.append(format_datetime_fields(item, request))
+
+	# مرتب‌سازی بر اساس مانده: برای فاکتورهای اقساطی اگر sort_by=remaining_amount باشد
+	sort_by_val = getattr(query_info, 'sort_by', None) or body.get('sort_by')
+	if is_installment_sale is True and sort_by_val == 'remaining_amount':
+		data_items.sort(
+			key=lambda x: float(x.get('remaining_amount') or 0),
+			reverse=bool(getattr(query_info, 'sort_desc', True) or body.get('sort_desc', True)),
+		)
 
 	# Build pagination info
 	page = (skip // take) + 1 if take > 0 else 1

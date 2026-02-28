@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -72,7 +73,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingPerformance = false);
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری آمار عملکرد: $e');
+        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadAnalytics}: $e');
       }
     }
   }
@@ -94,7 +95,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingErrors = false);
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری آمار خطاها: $e');
+        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadErrorStats}: $e');
       }
     }
   }
@@ -102,6 +103,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     
     return Dialog(
       child: Container(
@@ -120,7 +122,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'آمار و تحلیل',
+                        t.workflowAnalyticsTitle,
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -146,14 +148,14 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
             // Tabs
             TabBar(
               controller: _tabController,
-              tabs: const [
+              tabs: [
                 Tab(
-                  icon: Icon(Icons.speed),
-                  text: 'عملکرد',
+                  icon: const Icon(Icons.speed),
+                  text: t.workflowPerformance,
                 ),
                 Tab(
-                  icon: Icon(Icons.error_outline),
-                  text: 'خطاها',
+                  icon: const Icon(Icons.error_outline),
+                  text: t.workflowErrors,
                 ),
               ],
             ),
@@ -181,7 +183,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     }
 
     if (_performanceData == null) {
-      return const Center(child: Text('داده‌ای موجود نیست'));
+      return Center(child: Text(AppLocalizations.of(context).workflowNoData));
     }
 
     final workflows = (_performanceData!['workflows'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -194,7 +196,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
             Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              'هنوز اجرایی ثبت نشده است',
+              AppLocalizations.of(context).workflowNoExecutions,
               style: TextStyle(color: Colors.grey[600]),
             ),
           ],
@@ -225,6 +227,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
 
   Widget _buildPerformanceCard(Map<String, dynamic> workflow) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final totalExecutions = workflow['total_executions'] as int? ?? 0;
     final successful = workflow['successful'] as int? ?? 0;
     final failed = workflow['failed'] as int? ?? 0;
@@ -256,7 +259,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                 Expanded(
                   child: _buildMetricItem(
                     icon: Icons.play_circle_outline,
-                    label: 'کل اجراها',
+                    label: t.workflowTotalExecutions,
                     value: totalExecutions.toString(),
                     color: Colors.blue,
                   ),
@@ -264,7 +267,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                 Expanded(
                   child: _buildMetricItem(
                     icon: Icons.check_circle_outline,
-                    label: 'موفق',
+                    label: t.workflowSuccessful,
                     value: successful.toString(),
                     color: Colors.green,
                   ),
@@ -272,7 +275,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                 Expanded(
                   child: _buildMetricItem(
                     icon: Icons.error_outline,
-                    label: 'ناموفق',
+                    label: t.workflowFailed,
                     value: failed.toString(),
                     color: Colors.red,
                   ),
@@ -280,7 +283,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                 Expanded(
                   child: _buildMetricItem(
                     icon: Icons.timer_outlined,
-                    label: 'میانگین زمان',
+                    label: t.workflowAvgTime,
                     value: '${avgDuration.toStringAsFixed(2)}s',
                     color: Colors.orange,
                   ),
@@ -297,7 +300,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'نرخ موفقیت',
+                      t.workflowSuccessRate,
                       style: theme.textTheme.bodyMedium,
                     ),
                     Text(
@@ -328,12 +331,13 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
   }
 
   Widget _buildErrorsTab() {
+    final t = AppLocalizations.of(context);
     if (_loadingErrors) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorsData == null) {
-      return const Center(child: Text('داده‌ای موجود نیست'));
+      return Center(child: Text(AppLocalizations.of(context).workflowNoData));
     }
 
     final totalErrors = _errorsData!['total_errors'] as int? ?? 0;
@@ -348,7 +352,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
             Icon(Icons.check_circle_outline, size: 64, color: Colors.green[400]),
             const SizedBox(height: 16),
             Text(
-              'خطایی ثبت نشده است! 🎉',
+              AppLocalizations.of(context).workflowNoErrorsRecorded,
               style: TextStyle(
                 color: Colors.green[700],
                 fontSize: 18,
@@ -381,7 +385,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
               Expanded(
                 child: _buildSummaryCard(
                   icon: Icons.error,
-                  title: 'کل خطاها',
+                  title: t.workflowTotalErrors,
                   value: totalErrors.toString(),
                   color: Colors.red,
                 ),
@@ -390,7 +394,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
               Expanded(
                 child: _buildSummaryCard(
                   icon: Icons.category,
-                  title: 'انواع خطا',
+                  title: t.workflowErrorTypes,
                   value: uniqueErrorTypes.toString(),
                   color: Colors.orange,
                 ),

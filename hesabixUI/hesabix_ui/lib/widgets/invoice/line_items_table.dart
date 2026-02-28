@@ -9,7 +9,7 @@ import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import './warehouse_combobox_widget.dart';
-import '../../utils/number_normalizer.dart';
+import '../../utils/number_normalizer.dart' show EnglishDigitsFormatter, formatNumberForInput, parseFormattedNumber, parseFormattedDouble, ThousandsSeparatorInputFormatter;
 import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
 import '../../services/product_service.dart';
@@ -1511,28 +1511,53 @@ class _DiscountCell extends StatefulWidget {
 class _DiscountCellState extends State<_DiscountCell> {
   late String _type;
   late TextEditingController _ctrl;
+  num _lastSentValue = 0;
+
+  String _formatDisplayValue(num value, String type) {
+    if (type == 'amount') {
+      return formatNumberForInput(value);
+    }
+    return value.toString();
+  }
 
   @override
   void initState() {
     super.initState();
     _type = widget.type;
-    _ctrl = TextEditingController(text: widget.value.toString());
+    _lastSentValue = widget.value;
+    _ctrl = TextEditingController(text: _formatDisplayValue(widget.value, widget.type));
   }
 
   @override
   void didUpdateWidget(covariant _DiscountCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // فقط اگر مقدار واقعاً تغییر کرده و کاربر در حال تایپ نیست، کنترلر را به‌روزرسانی کن
-    if (oldWidget.value != widget.value && !_ctrl.text.isNotEmpty) {
-      _ctrl.text = widget.value.toString();
-    }
     _type = widget.type;
+    // فقط وقتی مقدار از بیرون عوض شده (نه نتیجهٔ تایپ کاربر) متن فیلد را همگام کن
+    if (widget.value != _lastSentValue) {
+      _lastSentValue = widget.value;
+      _ctrl.text = _formatDisplayValue(widget.value, _type);
+    }
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _onDiscountChanged(String v) {
+    num parsed = parseFormattedNumber(v) ?? 0;
+    if (_type == 'percent') {
+      parsed = parsed.clamp(0, 100);
+      if (parsed != (parseFormattedNumber(v) ?? 0)) {
+        _ctrl.text = _formatDisplayValue(parsed, _type);
+        _lastSentValue = parsed;
+        widget.onChanged(_type, parsed);
+        return;
+      }
+    }
+    _lastSentValue = parsed;
+    widget.onChanged(_type, parsed);
   }
 
   @override
@@ -1557,9 +1582,10 @@ class _DiscountCellState extends State<_DiscountCell> {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
           EnglishDigitsFormatter(),
+          ThousandsSeparatorInputFormatter(allowDecimal: _type != 'percent'),
           FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
         ],
-        onChanged: (v) => widget.onChanged(_type, num.tryParse(v) ?? 0),
+        onChanged: _onDiscountChanged,
         onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
         textInputAction: TextInputAction.next,
         decoration: InputDecoration(
@@ -1592,8 +1618,14 @@ class _DiscountCellState extends State<_DiscountCell> {
                   ),
                 ],
                 onSelected: (nv) {
-                  setState(() => _type = nv);
-                  widget.onChanged(nv, num.tryParse(_ctrl.text) ?? 0);
+                  final parsed = parseFormattedNumber(_ctrl.text) ?? 0;
+                  final value = nv == 'percent' ? parsed.clamp(0, 100) : parsed;
+                  setState(() {
+                    _type = nv;
+                    _lastSentValue = value;
+                    _ctrl.text = _formatDisplayValue(value, nv);
+                  });
+                  widget.onChanged(nv, value);
                 },
                 child: const Icon(Icons.arrow_drop_down, size: 20),
               ),

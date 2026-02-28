@@ -1,18 +1,60 @@
 import 'package:flutter/material.dart';
 import '../../models/workflow_editor_models.dart';
+import '../../l10n/app_localizations.dart';
 
 /// کلاس برای مدیریت Workflow Templates
 class WorkflowTemplates {
-  /// دریافت لیست templateهای موجود
-  static List<WorkflowTemplate> getTemplates() {
+  /// دریافت لیست templateهای موجود (localized)
+  static List<WorkflowTemplate> getLocalizedTemplates(AppLocalizations t) {
+    return _buildTemplates(
+      (id) => _localizedName(id, t),
+      (id) => _localizedDesc(id, t),
+      (id) => _localizedCategory(id, t),
+    );
+  }
+
+  static String _localizedName(String id, AppLocalizations t) {
+    switch (id) {
+      case 'invoice_sales_notification': return t.workflowTemplateInvoiceSalesName;
+      case 'inventory_low_alert': return t.workflowTemplateInventoryLowName;
+      case 'receipt_payment_log': return t.workflowTemplateReceiptPaymentName;
+      case 'person_welcome': return t.workflowTemplatePersonWelcomeName;
+      default: return t.workflowTemplateDefault;
+    }
+  }
+
+  static String _localizedDesc(String id, AppLocalizations t) {
+    switch (id) {
+      case 'invoice_sales_notification': return t.workflowTemplateInvoiceSalesDesc;
+      case 'inventory_low_alert': return t.workflowTemplateInventoryLowDesc;
+      case 'receipt_payment_log': return t.workflowTemplateReceiptPaymentDesc;
+      case 'person_welcome': return t.workflowTemplatePersonWelcomeDesc;
+      default: return '';
+    }
+  }
+
+  static String _localizedCategory(String id, AppLocalizations t) {
+    switch (id) {
+      case 'invoice_sales_notification': return t.workflowCategoryInvoice;
+      case 'inventory_low_alert': return t.workflowCategoryInventory;
+      case 'receipt_payment_log': return t.workflowCategoryFinancial;
+      case 'person_welcome': return t.workflowCategoryPersons;
+      default: return t.workflowTemplateDefault;
+    }
+  }
+
+  static List<WorkflowTemplate> _buildTemplates(
+    String Function(String id) nameFn,
+    String Function(String id) descFn,
+    String Function(String id) categoryFn,
+  ) {
     return [
-      // Template برای فاکتور فروش
       WorkflowTemplate(
         id: 'invoice_sales_notification',
-        name: 'اطلاع‌رسانی فاکتور فروش',
-        description: 'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود',
+        name: nameFn('invoice_sales_notification'),
+        description: descFn('invoice_sales_notification'),
         triggerType: 'invoice.sales.created',
-        category: 'فاکتور',
+        category: categoryFn('invoice_sales_notification'),
         icon: Icons.receipt,
         workflowData: {
           'nodes': [
@@ -61,14 +103,12 @@ class WorkflowTemplates {
           ],
         },
       ),
-      
-      // Template برای موجودی کم
       WorkflowTemplate(
         id: 'inventory_low_alert',
-        name: 'هشدار موجودی کم',
-        description: 'زمانی که موجودی محصول کم شود، notification ارسال می‌شود',
+        name: nameFn('inventory_low_alert'),
+        description: descFn('inventory_low_alert'),
         triggerType: 'inventory.low',
-        category: 'موجودی',
+        category: categoryFn('inventory_low_alert'),
         icon: Icons.inventory_2,
         workflowData: {
           'nodes': [
@@ -106,14 +146,12 @@ class WorkflowTemplates {
           ],
         },
       ),
-      
-      // Template برای دریافت/پرداخت
       WorkflowTemplate(
         id: 'receipt_payment_log',
-        name: 'ثبت لاگ دریافت/پرداخت',
-        description: 'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود',
+        name: nameFn('receipt_payment_log'),
+        description: descFn('receipt_payment_log'),
         triggerType: 'receipt_payment.created',
-        category: 'مالی',
+        category: categoryFn('receipt_payment_log'),
         icon: Icons.payment,
         workflowData: {
           'nodes': [
@@ -148,14 +186,12 @@ class WorkflowTemplates {
           ],
         },
       ),
-      
-      // Template برای شخص جدید
       WorkflowTemplate(
         id: 'person_welcome',
-        name: 'خوش‌آمدگویی شخص جدید',
-        description: 'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود',
+        name: nameFn('person_welcome'),
+        description: descFn('person_welcome'),
         triggerType: 'person.created',
-        category: 'اشخاص',
+        category: categoryFn('person_welcome'),
         icon: Icons.person_add,
         workflowData: {
           'nodes': [
@@ -191,6 +227,34 @@ class WorkflowTemplates {
         },
       ),
     ];
+  }
+
+  static const Map<String, String> _fallbackNames = {
+    'invoice_sales_notification': 'اطلاع‌رسانی فاکتور فروش',
+    'inventory_low_alert': 'هشدار موجودی کم',
+    'receipt_payment_log': 'ثبت لاگ دریافت/پرداخت',
+    'person_welcome': 'خوش‌آمدگویی شخص جدید',
+  };
+  static const Map<String, String> _fallbackDescs = {
+    'invoice_sales_notification': 'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود',
+    'inventory_low_alert': 'زمانی که موجودی محصول کم شود، notification ارسال می‌شود',
+    'receipt_payment_log': 'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود',
+    'person_welcome': 'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود',
+  };
+  static const Map<String, String> _fallbackCategories = {
+    'invoice_sales_notification': 'فاکتور',
+    'inventory_low_alert': 'موجودی',
+    'receipt_payment_log': 'مالی',
+    'person_welcome': 'اشخاص',
+  };
+
+  /// دریافت لیست templateهای موجود (fallback - ترجیحاً getLocalizedTemplates استفاده شود)
+  static List<WorkflowTemplate> getTemplates() {
+    return _buildTemplates(
+      (id) => _fallbackNames[id] ?? 'قالب',
+      (id) => _fallbackDescs[id] ?? '',
+      (id) => _fallbackCategories[id] ?? 'قالب',
+    );
   }
 
   /// دریافت template بر اساس ID

@@ -17,8 +17,11 @@ class CreateDocumentAction(ActionHandler):
             "config_schema": {
                 "document_type": {
                     "type": "string",
-                    "description": "نوع سند",
-                    "required": True
+                    "description": "نوع سند دستی (همیشه manual)",
+                    "required": True,
+                    "default": "manual",
+                    "enum": ["manual"],
+                    "ui_config": {"labels": {"manual": "دستی"}}
                 },
                 "date": {
                     "type": "string",

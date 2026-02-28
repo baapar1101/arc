@@ -75,6 +75,11 @@ class WorkflowNodeModel {
     if (type == WorkflowNodeType.action && key != null) {
       configMap['action_type'] = key;
     }
+    if (type == WorkflowNodeType.loop && configMap['loop_type'] == null && key != null) {
+      if (key == 'loop.for_each') configMap['loop_type'] = 'for_each';
+      else if (key == 'loop.for') configMap['loop_type'] = 'for_range';
+      else if (key == 'loop.while') configMap['loop_type'] = 'while';
+    }
     
     final result = <String, dynamic>{
       'id': id,
@@ -114,6 +119,11 @@ class WorkflowNodeModel {
       key = config['trigger_type']?.toString();
     } else if (type == WorkflowNodeType.action) {
       key = config['action_type']?.toString();
+    } else if (type == WorkflowNodeType.loop) {
+      final lt = config['loop_type']?.toString();
+      if (lt == 'for_each') key = 'loop.for_each';
+      else if (lt == 'for_range') key = 'loop.for';
+      else if (lt == 'while') key = 'loop.while';
     }
 
     // خواندن موقعیت از JSON
@@ -173,17 +183,26 @@ class WorkflowConnectionModel {
 
   /// تبدیل به فرمت backend
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
+    final map = <String, dynamic>{
       'source': sourceNodeId,
       'target': targetNodeId,
     };
+    if (sourceOutputId != null && sourceOutputId!.isNotEmpty) {
+      map['sourceHandle'] = sourceOutputId;
+    }
+    return map;
   }
 
   factory WorkflowConnectionModel.fromJson(Map<String, dynamic> json) {
+    final source = json['source']?.toString() ?? '';
+    final target = json['target']?.toString() ?? '';
+    final sourceHandle = json['sourceHandle'] ?? json['source_output'];
+    final handleStr = sourceHandle?.toString() ?? '';
     return WorkflowConnectionModel(
-      id: '${json['source']}_${json['target']}',
-      sourceNodeId: json['source']?.toString() ?? '',
-      targetNodeId: json['target']?.toString() ?? '',
+      id: json['id']?.toString() ?? '${source}_${target}_$handleStr',
+      sourceNodeId: source,
+      targetNodeId: target,
+      sourceOutputId: handleStr.isNotEmpty ? handleStr : null,
     );
   }
 }

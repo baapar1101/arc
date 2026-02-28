@@ -12,6 +12,8 @@ class WorkflowNodeWidget extends StatelessWidget {
   final VoidCallback? onEndConnection;
   final VoidCallback? onLongPress;
   final ValueChanged<Offset>? onConnectionDragUpdate;
+  /// وقتی کشیدن سیم از output رها می‌شود (canvas روی PanEnd نمی‌گیرد چون gesture را connection point برده)
+  final VoidCallback? onConnectionDragEnd;
   final double zoomLevel;
   final bool highlightConnectionPoints; // برای highlight کردن connection points قابل اتصال
   final ValueChanged<Offset>? onDeltaChanged; // برای ارسال موقعیت global در canvas coordinates
@@ -27,6 +29,7 @@ class WorkflowNodeWidget extends StatelessWidget {
     this.onEndConnection,
     this.onLongPress,
     this.onConnectionDragUpdate,
+    this.onConnectionDragEnd,
     this.zoomLevel = 1.0,
     this.highlightConnectionPoints = false,
     this.onDeltaChanged,
@@ -190,6 +193,7 @@ class WorkflowNodeWidget extends StatelessWidget {
             isHighlighted: false,
             onTap: onStartConnection,
             onConnectionDragUpdate: onConnectionDragUpdate,
+            onConnectionDragEnd: onConnectionDragEnd,
           ),
         ),
       );
@@ -223,6 +227,7 @@ class WorkflowNodeWidget extends StatelessWidget {
               isHighlighted: false,
               onTap: onStartConnection,
               onConnectionDragUpdate: onConnectionDragUpdate,
+              onConnectionDragEnd: onConnectionDragEnd,
             ),
           ),
         );
@@ -389,35 +394,41 @@ class WorkflowNodeWidget extends StatelessWidget {
     bool isHighlighted = false,
     VoidCallback? onTap,
     ValueChanged<Offset>? onConnectionDragUpdate,
+    VoidCallback? onConnectionDragEnd,
   }) {
     try {
       final theme = Theme.of(context);
       
-      // ایجاد widget بدون MouseRegion برای جلوگیری از مشکل type checking
-      Widget connectionWidget = GestureDetector(
-        onPanStart: (details) {
-          if (isOutput && onTap != null) {
-            onTap(); // شروع اتصال از output point
-          }
-        },
-        onPanUpdate: (details) {
-          if (isOutput && onConnectionDragUpdate != null) {
-            final RenderBox? box = context.findRenderObject() as RenderBox?;
-            if (box != null) {
-              final localToGlobal = box.localToGlobal(details.localPosition);
-              onConnectionDragUpdate(localToGlobal);
+      // استفاده از Builder برای گرفتن RenderBox صحیح connection point (نه parent)
+      // بدون این، context.findRenderObject() والد (Stack/Node) را برمی‌گرداند و موقعیت global اشتباه محاسبه می‌شود
+      Widget connectionWidget = Builder(
+        builder: (connectionPointContext) => GestureDetector(
+          onPanStart: (details) {
+            if (isOutput && onTap != null) {
+              onTap(); // شروع اتصال از output point
             }
-          }
-        },
-        onPanEnd: (details) {
-          if (!isOutput && onTap != null) {
-            onTap(); // کامل کردن اتصال در input point
-          }
-        },
-        child: _buildConnectionPointContainer(
-          theme: theme,
-          isHighlighted: isHighlighted,
-          isOutput: isOutput,
+          },
+          onPanUpdate: (details) {
+            if (isOutput && onConnectionDragUpdate != null) {
+              final RenderBox? box = connectionPointContext.findRenderObject() as RenderBox?;
+              if (box != null) {
+                final globalPos = box.localToGlobal(details.localPosition);
+                onConnectionDragUpdate!(globalPos);
+              }
+            }
+          },
+          onPanEnd: (details) {
+            if (isOutput) {
+              onConnectionDragEnd?.call(); // رها کردن سیم از output؛ canvas روی PanEnd نمی‌گیرد
+            } else if (onTap != null) {
+              onTap(); // کامل کردن اتصال در input point
+            }
+          },
+          child: _buildConnectionPointContainer(
+            theme: theme,
+            isHighlighted: isHighlighted,
+            isOutput: isOutput,
+          ),
         ),
       );
       

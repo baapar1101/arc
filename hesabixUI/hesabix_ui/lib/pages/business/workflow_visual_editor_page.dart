@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
 import '../../services/workflow_service.dart';
+import '../../services/workflow_translation_service.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../utils/workflow_validator.dart';
@@ -44,6 +45,7 @@ class WorkflowVisualEditorPage extends StatefulWidget {
 
 class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   final WorkflowService _workflowService = WorkflowService();
+  final WorkflowTranslationService _translationService = WorkflowTranslationService();
   final WorkflowEditorState _editorState = WorkflowEditorState();
   bool _loading = true;
   bool _saving = false;
@@ -72,12 +74,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
+      final locale = Localizations.localeOf(context);
+      final lang = locale.languageCode;
       final results = await Future.wait([
-        _workflowService.listTriggers(),
-        _workflowService.listActions(),
+        _translationService.getTriggersMetadata(lang: lang),
+        _translationService.getActionsMetadata(lang: lang),
       ]);
 
-      final triggersList = results[0] as List? ?? <dynamic>[];
+      final triggersList = results[0] as List<dynamic>? ?? <dynamic>[];
       final triggers = <WorkflowNodeMetadata>[];
       for (final item in triggersList) {
         if (item is! Map) continue;
@@ -89,7 +93,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             name: itemMap['name']?.toString() ?? itemMap['key']?.toString() ?? '',
             description: itemMap['description']?.toString(),
             type: WorkflowNodeType.trigger,
-            configSchema: configSchema is Map 
+            configSchema: configSchema is Map
                 ? Map<String, dynamic>.from(configSchema.map((k, v) => MapEntry(k.toString(), v)))
                 : null,
           ));
@@ -98,7 +102,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         }
       }
 
-      final actionsList = results[1] as List? ?? <dynamic>[];
+      final actionsList = results[1] as List<dynamic>? ?? <dynamic>[];
       final actions = <WorkflowNodeMetadata>[];
       for (final item in actionsList) {
         if (item is! Map) continue;
@@ -202,14 +206,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: _loading ? null : _editWorkflowInfo,
-              tooltip: 'ویرایش نام و توضیحات',
+              tooltip: t.workflowEditNameDescription,
             ),
             // دکمه تاریخچه اجرا (فقط برای workflowهای ذخیره شده)
             if (_workflow != null && _workflow!['id'] != null)
               IconButton(
                 icon: const Icon(Icons.history),
                 onPressed: () => Scaffold.of(context).openEndDrawer(),
-                tooltip: 'تاریخچه اجرا',
+                tooltip: t.workflowExecutionHistory,
               ),
             // در موبایل فقط آیکون ذخیره نمایش داده شود
             isMobile
@@ -240,7 +244,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 debugPrint('خطا در افزودن نود: $e');
                 debugPrint('StackTrace: $stackTrace');
                 if (mounted) {
-                  SnackBarHelper.showError(context, message: 'خطا در افزودن نود: ${e.toString()}');
+                  SnackBarHelper.showError(context, message: '${t.workflowErrorAddNode}: ${e.toString()}');
                 }
               }
             },
@@ -384,6 +388,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   Future<void> _editWorkflowInfo() async {
+    final t = AppLocalizations.of(context);
     final nameController = TextEditingController(
       text: _workflow?['name'] ?? '',
     );
@@ -394,7 +399,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ویرایش نام و توضیحات'),
+        title: Text(t.workflowEditNameDescription),
         content: SizedBox(
           width: 500,
           child: Column(
@@ -402,22 +407,22 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'نام ورکفلو *',
-                  hintText: 'مثال: فرآیند تایید فاکتور',
-                  prefixIcon: Icon(Icons.label),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.workflowNameRequired,
+                  hintText: t.workflowNameHint,
+                  prefixIcon: const Icon(Icons.label),
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'توضیحات',
-                  hintText: 'توضیحات اختیاری در مورد این ورکفلو...',
-                  prefixIcon: Icon(Icons.description),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.workflowDescription,
+                  hintText: t.workflowDescriptionHint,
+                  prefixIcon: const Icon(Icons.description),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 3,
               ),
@@ -427,11 +432,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('تایید'),
+            child: Text(t.confirm),
           ),
         ],
       ),
@@ -442,7 +447,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final workflowName = nameController.text.trim();
     if (workflowName.isEmpty) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'لطفاً نام ورکفلو را وارد کنید');
+      SnackBarHelper.showError(context, message: t.workflowEnterName);
       return;
     }
 
@@ -463,11 +468,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     });
 
     if (!mounted) return;
-    SnackBarHelper.show(context, message: 'اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.');
+    SnackBarHelper.show(context, message: t.workflowInfoUpdated);
   }
 
   Future<void> _saveWorkflow() async {
     if (_saving) return;
+    final t = AppLocalizations.of(context);
 
     // Validation
     final errors = WorkflowValidator.validateWorkflow(
@@ -524,7 +530,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ذخیره ورکفلو'),
+        title: Text(t.workflowSaveWorkflow),
         content: SizedBox(
           width: 500,
           child: Column(
@@ -532,22 +538,22 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'نام ورکفلو *',
-                  hintText: 'مثال: فرآیند تایید فاکتور',
-                  prefixIcon: Icon(Icons.label),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.workflowNameRequired,
+                  hintText: t.workflowNameHint,
+                  prefixIcon: const Icon(Icons.label),
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'توضیحات',
-                  hintText: 'توضیحات اختیاری در مورد این ورکفلو...',
-                  prefixIcon: Icon(Icons.description),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.workflowDescription,
+                  hintText: t.workflowDescriptionHint,
+                  prefixIcon: const Icon(Icons.description),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 3,
               ),
@@ -557,11 +563,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ذخیره'),
+            child: Text(t.save),
           ),
         ],
       ),
@@ -572,7 +578,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final workflowName = nameController.text.trim();
     if (workflowName.isEmpty) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'لطفاً نام ورکفلو را وارد کنید');
+      SnackBarHelper.showError(context, message: t.workflowEnterName);
       return;
     }
 
@@ -827,24 +833,25 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   void _editNodeComment(WorkflowNodeModel node) {
+    final t = AppLocalizations.of(context);
     final commentController = TextEditingController(text: node.comment ?? '');
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('یادداشت/توضیح'),
+        title: Text(t.workflowNoteComment),
         content: TextField(
           controller: commentController,
           maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'یادداشت یا توضیح برای این نود...',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: t.workflowNoteHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           if (node.comment != null && node.comment!.isNotEmpty)
             TextButton(
@@ -858,9 +865,9 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                   _editorState.addNodeWithPosition(updatedNode);
                 }
                 Navigator.pop(context);
-                SnackBarHelper.show(context, message: 'یادداشت حذف شد');
+                SnackBarHelper.show(context, message: t.workflowNoteDeleted);
               },
-              child: const Text('حذف', style: TextStyle(color: Colors.red)),
+              child: Text(t.delete, style: const TextStyle(color: Colors.red)),
             ),
           FilledButton(
             onPressed: () {
@@ -875,10 +882,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
               }
               Navigator.pop(context);
               SnackBarHelper.show(context, message: newComment.isEmpty 
-                      ? 'یادداشت پاک شد' 
-                      : 'یادداشت ذخیره شد');
+                      ? t.workflowNoteCleared 
+                      : t.workflowNoteSaved);
             },
-            child: const Text('ذخیره'),
+            child: Text(t.save),
           ),
         ],
       ),
@@ -886,29 +893,30 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   Future<void> _saveAsTemplate() async {
+    final t = AppLocalizations.of(context);
     final nameController = TextEditingController();
     
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ذخیره به عنوان قالب'),
+        title: Text(t.workflowSaveAsTemplate),
         content: TextField(
           controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'نام قالب',
-            hintText: 'مثال: فرآیند فاکتور',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: t.workflowTemplateName,
+            hintText: t.workflowTemplateNameHint,
+            border: const OutlineInputBorder(),
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ذخیره'),
+            child: Text(t.save),
           ),
         ],
       ),
@@ -946,18 +954,19 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       
       if (mounted) {
         Navigator.pop(context); // بستن loading indicator
-        SnackBarHelper.show(context, message: 'قالب "$templateName" ذخیره شد');
+        SnackBarHelper.show(context, message: t.workflowTemplateSaved(templateName));
       }
     } catch (e) {
       debugPrint('خطا در ذخیره template: $e');
       if (mounted) {
         Navigator.pop(context); // بستن loading indicator
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره قالب: ${e.toString()}');
+        SnackBarHelper.showError(context, message: '${t.workflowErrorSaveTemplate}: ${e.toString()}');
       }
     }
   }
 
   Future<void> _loadTemplate() async {
+    final t = AppLocalizations.of(context);
     // نمایش loading indicator
     if (!mounted) return;
     showDialog(
@@ -967,8 +976,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     );
     
     try {
-      // دریافت قالب‌های آماده
-      final builtInTemplates = WorkflowTemplates.getTemplates();
+      final t = AppLocalizations.of(context);
+      final builtInTemplates = WorkflowTemplates.getLocalizedTemplates(t);
       
       // دریافت قالب‌های ذخیره شده کاربر
       final prefs = await SharedPreferences.getInstance();
@@ -1007,14 +1016,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         if (workflowData != null) {
           _editorState.loadWorkflow(workflowData);
           if (mounted) {
-            SnackBarHelper.show(context, message: 'قالب "${selectedTemplate['name'] ?? 'قالب'}" بارگذاری شد');
+            SnackBarHelper.show(context, message: t.workflowTemplateLoaded(selectedTemplate['name']?.toString() ?? t.workflowTemplateDefault));
           }
         }
       }
     } catch (e) {
       debugPrint('خطا در بارگذاری template: $e');
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری قالب: $e');
+        SnackBarHelper.show(context, message: '${t.workflowErrorLoadTemplate}: $e');
       }
     }
   }
@@ -1036,9 +1045,10 @@ class _TemplateSelectorDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     
     return AlertDialog(
-      title: const Text('انتخاب قالب'),
+      title: Text(t.workflowSelectTemplate),
       content: SizedBox(
         width: 500,
         child: DefaultTabController(
@@ -1047,9 +1057,9 @@ class _TemplateSelectorDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               TabBar(
-                tabs: const [
-                  Tab(text: 'قالب‌های آماده'),
-                  Tab(text: 'قالب‌های ذخیره شده'),
+                tabs: [
+                  Tab(text: t.workflowBuiltinTemplates),
+                  Tab(text: t.workflowSavedTemplates),
                 ],
               ),
               SizedBox(
@@ -1107,7 +1117,7 @@ class _TemplateSelectorDialog extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'هیچ قالب ذخیره شده‌ای وجود ندارد',
+                                  t.workflowNoSavedTemplates,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
@@ -1121,9 +1131,9 @@ class _TemplateSelectorDialog extends StatelessWidget {
                               final template = savedTemplates[index];
                               return ListTile(
                                 leading: const Icon(Icons.insert_drive_file),
-                                title: Text(template['name'] ?? 'قالب ${index + 1}'),
+                                title: Text(template['name'] ?? t.workflowTemplateN(index + 1)),
                                 subtitle: Text(template['created_at'] != null
-                                    ? 'ایجاد شده: ${template['created_at']}'
+                                    ? t.workflowCreatedAt(template['created_at'].toString())
                                     : ''),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete, color: Colors.red),
@@ -1147,7 +1157,7 @@ class _TemplateSelectorDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('لغو'),
+          child: Text(t.cancel),
         ),
       ],
     );

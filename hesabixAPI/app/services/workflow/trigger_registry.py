@@ -52,6 +52,15 @@ class TriggerRegistry:
             else:
                 result[trigger_type] = {"name": trigger_type}
         return result
+
+    def get_all_metadata(self) -> list:
+        """لیست metadata تمام triggerها به فرمت لیست برای API"""
+        result = []
+        for trigger_type, metadata in self.list_triggers().items():
+            item = dict(metadata)
+            item["key"] = trigger_type
+            result.append(item)
+        return result
     
     def _register_default_triggers(self):
         """ثبت triggerهای پیش‌فرض"""

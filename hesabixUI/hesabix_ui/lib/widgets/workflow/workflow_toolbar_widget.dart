@@ -43,10 +43,10 @@ class WorkflowToolbarWidget extends StatelessWidget {
             children: [
               Icon(Icons.check_circle, color: Colors.green),
               const SizedBox(width: 8),
-              Text('اعتبارسنجی موفق'),
+              Text(t.workflowValidationSuccess),
             ],
           ),
-          content: Text('همه نودها معتبر هستند!'),
+          content: Text(t.workflowAllNodesValid),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -65,7 +65,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           children: [
             Icon(Icons.error, color: Colors.red),
             const SizedBox(width: 8),
-            Text('${errors.length} نود دارای خطا'),
+            Text(t.workflowNodesWithErrors(errors.length)),
           ],
         ),
         content: SizedBox(
@@ -89,7 +89,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                node?.label ?? 'نود ناشناس',
+                                node?.label ?? AppLocalizations.of(context).workflowNodeUnknown,
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
@@ -129,10 +129,6 @@ class WorkflowToolbarWidget extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    String _localizedText(String faText, String enText) {
-      return t.localeName.startsWith('fa') ? faText : enText;
-    }
-
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -145,7 +141,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
       child: Row(
         children: [
           Tooltip(
-            message: _localizedText('باز کردن پالت node ها', 'Open node palette'),
+            message: t.workflowToolbarOpenPalette,
             child: IconButton(
               icon: const Icon(Icons.menu),
               onPressed: () => Scaffold.of(context).openDrawer(),
@@ -154,7 +150,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           const SizedBox(width: 8),
           // Zoom Controls
           Tooltip(
-            message: _localizedText('بزرگنمایی کمتر', 'Zoom out'),
+            message: t.workflowToolbarZoomOut,
             child: IconButton(
               icon: const Icon(Icons.zoom_out),
               onPressed: () {
@@ -177,7 +173,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
             ),
           ),
           Tooltip(
-            message: _localizedText('بزرگنمایی بیشتر', 'Zoom in'),
+            message: t.workflowToolbarZoomIn,
             child: IconButton(
               icon: const Icon(Icons.zoom_in),
               onPressed: () {
@@ -187,7 +183,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
             ),
           ),
           Tooltip(
-            message: _localizedText('تنظیم مجدد بزرگنمایی', 'Reset zoom'),
+            message: t.workflowToolbarResetZoom,
             child: IconButton(
               icon: const Icon(Icons.fit_screen),
               onPressed: () {
@@ -197,7 +193,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const VerticalDivider(),
           Tooltip(
-            message: _localizedText('راهنمای اتصال نودها', 'Connection help'),
+            message: t.workflowToolbarConnectionHelp,
             child: IconButton(
               icon: const Icon(Icons.help_outline),
               onPressed: () {
@@ -207,10 +203,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const VerticalDivider(),
           Tooltip(
-            message: _localizedText(
-              state.showGrid ? 'مخفی کردن Grid' : 'نمایش Grid',
-              state.showGrid ? 'Hide Grid' : 'Show Grid',
-            ),
+            message: state.showGrid ? t.workflowToolbarHideGrid : t.workflowToolbarShowGrid,
             child: IconButton(
               icon: Icon(state.showGrid ? Icons.grid_4x4 : Icons.grid_off),
               color: state.showGrid ? theme.colorScheme.primary : null,
@@ -220,10 +213,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
             ),
           ),
           Tooltip(
-            message: _localizedText(
-              state.snapToGrid ? 'غیرفعال کردن Snap to Grid' : 'فعال کردن Snap to Grid',
-              state.snapToGrid ? 'Disable Snap to Grid' : 'Enable Snap to Grid',
-            ),
+            message: state.snapToGrid ? t.workflowToolbarDisableSnapToGrid : t.workflowToolbarEnableSnapToGrid,
             child: IconButton(
               icon: Icon(state.snapToGrid ? Icons.grid_on : Icons.grid_3x3),
               color: state.snapToGrid ? theme.colorScheme.primary : null,
@@ -236,7 +226,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           // Alignment Tools (فقط وقتی چند نود انتخاب شده باشد)
           if (state.selectedNodeIds.length >= 2)
             PopupMenuButton(
-              tooltip: _localizedText('ابزارهای تراز', 'Alignment tools'),
+              tooltip: t.workflowToolbarAlignmentTools,
               icon: const Icon(Icons.align_horizontal_left),
               itemBuilder: (context) {
                 final items = <PopupMenuEntry<dynamic>>[
@@ -245,7 +235,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         const Icon(Icons.align_horizontal_left, size: 20),
                         const SizedBox(width: 8),
-                        Text(_localizedText('تراز به چپ', 'Align left')),
+                        Text(t.workflowToolbarAlignLeft),
                       ],
                     ),
                     onTap: () => state.alignNodesLeft(),
@@ -255,7 +245,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         const Icon(Icons.align_horizontal_right, size: 20),
                         const SizedBox(width: 8),
-                        Text(_localizedText('تراز به راست', 'Align right')),
+                        Text(t.workflowToolbarAlignRight),
                       ],
                     ),
                     onTap: () => state.alignNodesRight(),
@@ -265,7 +255,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         const Icon(Icons.align_vertical_top, size: 20),
                         const SizedBox(width: 8),
-                        Text(_localizedText('تراز به بالا', 'Align top')),
+                        Text(t.workflowToolbarAlignTop),
                       ],
                     ),
                     onTap: () => state.alignNodesTop(),
@@ -275,7 +265,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         const Icon(Icons.align_vertical_bottom, size: 20),
                         const SizedBox(width: 8),
-                        Text(_localizedText('تراز به پایین', 'Align bottom')),
+                        Text(t.workflowToolbarAlignBottom),
                       ],
                     ),
                     onTap: () => state.alignNodesBottom(),
@@ -290,7 +280,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                         children: [
                           const Icon(Icons.horizontal_distribute, size: 20),
                           const SizedBox(width: 8),
-                          Text(_localizedText('توزیع افقی', 'Distribute horizontally')),
+                          Text(t.workflowToolbarDistributeHorizontally),
                         ],
                       ),
                       onTap: () => state.distributeNodesHorizontally(),
@@ -302,7 +292,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                         children: [
                           const Icon(Icons.vertical_distribute, size: 20),
                           const SizedBox(width: 8),
-                          Text(_localizedText('توزیع عمودی', 'Distribute vertically')),
+                          Text(t.workflowToolbarDistributeVertically),
                         ],
                       ),
                       onTap: () => state.distributeNodesVertically(),
@@ -317,7 +307,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         const Icon(Icons.grid_on, size: 20),
                         const SizedBox(width: 8),
-                        Text(_localizedText('تراز به Grid', 'Align to grid')),
+                        Text(t.workflowToolbarAlignToGrid),
                       ],
                     ),
                     onTap: () => state.alignSelectedNodesToGrid(),
@@ -331,7 +321,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
             const SizedBox(width: 8),
           const VerticalDivider(),
           Tooltip(
-            message: _localizedText('پاکسازی همه', 'Clear all'),
+            message: t.workflowToolbarClearAll,
             child: IconButton(
               icon: const Icon(Icons.cleaning_services),
               onPressed: onClear,
@@ -339,7 +329,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Tooltip(
-            message: _localizedText('چیدمان خودکار', 'Auto layout'),
+            message: t.workflowToolbarAutoLayout,
             child: IconButton(
               icon: const Icon(Icons.auto_awesome),
               onPressed: onAutoLayout,
@@ -348,7 +338,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           const SizedBox(width: 8),
           // Templates Menu
           PopupMenuButton(
-            tooltip: _localizedText('قالب‌ها', 'Templates'),
+            tooltip: t.workflowToolbarTemplates,
             icon: const Icon(Icons.save_alt),
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -356,7 +346,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                   children: [
                     const Icon(Icons.save, size: 20),
                     const SizedBox(width: 8),
-                    Text(_localizedText('ذخیره به عنوان قالب', 'Save as template')),
+                    Text(t.workflowSaveAsTemplate),
                   ],
                 ),
                 onTap: onSaveAsTemplate,
@@ -366,7 +356,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                   children: [
                     const Icon(Icons.folder_open, size: 20),
                     const SizedBox(width: 8),
-                    Text(_localizedText('بارگذاری قالب', 'Load template')),
+                    Text(t.workflowToolbarLoadTemplate),
                   ],
                 ),
                 onTap: onLoadTemplate,
@@ -375,7 +365,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           PopupMenuButton<WorkflowAutoLayoutType>(
-            tooltip: _localizedText('انتخاب نوع چیدمان', 'Select layout type'),
+            tooltip: t.workflowToolbarSelectLayoutType,
             onSelected: onLayoutTypeChanged,
             itemBuilder: (_) => WorkflowAutoLayoutType.values
                 .map(
@@ -383,8 +373,8 @@ class WorkflowToolbarWidget extends StatelessWidget {
                     value: type,
                     child: Text(
                       type == WorkflowAutoLayoutType.hierarchical
-                          ? _localizedText('لایه‌ای (Hierarchical)', 'Hierarchical')
-                          : _localizedText('نیرویی (Force-directed)', 'Force directed'),
+                          ? t.workflowToolbarHierarchical
+                          : t.workflowToolbarForceDirected,
                     ),
                   ),
                 )
@@ -392,15 +382,15 @@ class WorkflowToolbarWidget extends StatelessWidget {
             child: Chip(
               label: Text(
                 layoutType == WorkflowAutoLayoutType.hierarchical
-                    ? _localizedText('Hierarchical', 'Hierarchical')
-                    : _localizedText('Force-directed', 'Force-directed'),
+                    ? t.workflowToolbarHierarchical
+                    : t.workflowToolbarForceDirected,
               ),
               avatar: const Icon(Icons.view_quilt, size: 16),
             ),
           ),
           const VerticalDivider(),
           Tooltip(
-            message: _localizedText('نمایش خطاهای اعتبارسنجی', 'Show validation errors'),
+            message: t.workflowToolbarShowValidationErrors,
             child: IconButton(
               icon: Badge(
                 label: Text('${state.getAllValidationErrors().length}'),
@@ -415,14 +405,14 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const VerticalDivider(),
           Tooltip(
-            message: _localizedText('بازگردانی', 'Undo'),
+            message: t.workflowToolbarUndo,
             child: IconButton(
               icon: const Icon(Icons.undo),
               onPressed: state.canUndo ? onUndo : null,
             ),
           ),
           Tooltip(
-            message: _localizedText('انجام مجدد', 'Redo'),
+            message: t.workflowToolbarRedo,
             child: IconButton(
               icon: const Icon(Icons.redo),
               onPressed: state.canRedo ? onRedo : null,
@@ -430,7 +420,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            _localizedText('Nodeها', 'Nodes'),
+            t.workflowToolbarNodes,
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(width: 4),
@@ -450,7 +440,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Text(
-            _localizedText('اتصالات', 'Connections'),
+            t.workflowToolbarConnections,
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(width: 4),

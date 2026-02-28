@@ -32,6 +32,9 @@ class _DocumentNumberingSettingsPageState
     'income': 'درآمد',
     'manual': 'سند دستی',
     'opening_balance': 'تراز افتتاحیه',
+    'crm_lead': 'کد سرنخ',
+    'crm_deal': 'کد فرصت فروش',
+    'crm_activity': 'کد فعالیت',
   };
 
   @override
@@ -90,6 +93,9 @@ class _DocumentNumberingSettingsPageState
       'income': 'INC',
       'manual': 'DOC',
       'opening_balance': 'OB',
+      'crm_lead': 'L',
+      'crm_deal': 'D',
+      'crm_activity': 'A',
     };
     return prefixes[documentType] ?? 'DOC';
   }

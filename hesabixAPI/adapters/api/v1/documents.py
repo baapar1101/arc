@@ -5007,6 +5007,565 @@ async def accounts_review_report_endpoint(
     )
 
 
+def _flatten_accounts_review_tree(accounts: list) -> list:
+    """تبدیل درخت حساب‌های گزارش مرور به لیست تخت برای export."""
+    rows = []
+    for acc in accounts:
+        row = {k: v for k, v in acc.items() if k != "children"}
+        rows.append(row)
+        if acc.get("children"):
+            rows.extend(_flatten_accounts_review_tree(acc["children"]))
+    return rows
+
+
+@router.post(
+    "/businesses/{business_id}/reports/accounts-review/export/excel",
+    summary="خروجی Excel گزارش مرور حساب‌ها",
+    description="خروجی Excel گزارش مرور حساب‌ها با ساختار درختی و مانده‌ها",
+)
+@require_business_access("business_id")
+async def export_accounts_review_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی Excel گزارش مرور حساب‌ها"""
+    import io
+    import re
+    import datetime
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from adapters.db.models.business import Business
+
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    account_type = body.get("account_type")
+    include_zero_balance = bool(body.get("include_zero_balance", False))
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    result = get_accounts_review_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        account_type=account_type,
+        include_zero_balance=include_zero_balance,
+        account_id=None,
+        skip=0,
+        take=50,
+    )
+    accounts_tree = result.get("accounts", [])
+    items = _flatten_accounts_review_tree(accounts_tree)
+    items = [format_datetime_fields(item, request) for item in items]
+
+    keys = [
+        "account_code",
+        "account_name",
+        "account_type",
+        "opening_debit",
+        "opening_credit",
+        "period_debit",
+        "period_credit",
+        "closing_debit",
+        "closing_credit",
+    ]
+    headers_fa = [
+        "کد حساب",
+        "نام حساب",
+        "نوع حساب",
+        "مانده ابتدای دوره (بدهکار)",
+        "مانده ابتدای دوره (بستانکار)",
+        "جمع بدهکار دوره",
+        "جمع بستانکار دوره",
+        "مانده انتهای دوره (بدهکار)",
+        "مانده انتهای دوره (بستانکار)",
+    ]
+    headers_en = [
+        "Account Code",
+        "Account Name",
+        "Account Type",
+        "Opening Debit",
+        "Opening Credit",
+        "Period Debit",
+        "Period Credit",
+        "Closing Debit",
+        "Closing Credit",
+    ]
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    headers = headers_fa if is_fa else headers_en
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Accounts Review"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    thin = Side(border_style="thin", color="D9D9D9")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    mapping_fa = {
+        "accounting_document": "حسابداری",
+        "bank": "بانک",
+        "cash_register": "صندوق",
+        "cashdesk": "صندوق",
+        "cash": "نقد",
+        "petty_cash": "تنخواه",
+        "check": "چک",
+        "person": "شخص",
+        "product": "کالا",
+    }
+    mapping_en = {
+        "accounting_document": "Accounting",
+        "bank": "Bank",
+        "cash_register": "Cash Register",
+        "cashdesk": "Cash Register",
+        "cash": "Cash",
+        "petty_cash": "Petty Cash",
+        "check": "Check",
+        "person": "Person",
+        "product": "Product",
+    }
+    for k in [str(i) for i in range(44)]:
+        mapping_fa.setdefault(k, k)
+        mapping_en.setdefault(k, k)
+
+    def map_account_type(v):
+        if v is None:
+            return ""
+        key = str(v).strip()
+        return (mapping_fa if is_fa else mapping_en).get(key, key)
+
+    numeric_keys = {"opening_debit", "opening_credit", "period_debit", "period_credit", "closing_debit", "closing_credit"}
+
+    ws.append(headers)
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    for item in items:
+        row = []
+        for key in keys:
+            value = item.get(key, "")
+            if key == "account_type":
+                value = map_account_type(value)
+            if key in numeric_keys and value != "":
+                try:
+                    if isinstance(value, float) and value == int(value):
+                        value = int(value)
+                except Exception:
+                    pass
+            row.append(value)
+        ws.append(row)
+
+    for r in range(2, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None:
+                    max_length = max(max_length, len(str(cell.value)))
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 60)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
+
+    filename = f"accounts_review_{slugify(biz_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content = buffer.getvalue()
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/accounts-review/export/pdf",
+    summary="خروجی PDF گزارش مرور حساب‌ها",
+    description="خروجی PDF گزارش مرور حساب‌ها با ساختار درختی و مانده‌ها",
+)
+@require_business_access("business_id")
+async def export_accounts_review_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی PDF گزارش مرور حساب‌ها"""
+    import datetime
+    import re
+    from html import escape
+    from fastapi.responses import Response
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from adapters.db.models.business import Business
+    from adapters.db.models.fiscal_year import FiscalYear
+    from adapters.db.models.currency import Currency
+
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    account_type = body.get("account_type")
+    include_zero_balance = bool(body.get("include_zero_balance", False))
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    result = get_accounts_review_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        account_type=account_type,
+        include_zero_balance=include_zero_balance,
+        account_id=None,
+        skip=0,
+        take=50,
+    )
+    accounts_tree = result.get("accounts", [])
+    items = _flatten_accounts_review_tree(accounts_tree)
+    items = [format_datetime_fields(item, request) for item in items]
+
+    keys = [
+        "account_code",
+        "account_name",
+        "account_type",
+        "opening_debit",
+        "opening_credit",
+        "period_debit",
+        "period_credit",
+        "closing_debit",
+        "closing_credit",
+    ]
+    headers_fa = [
+        "کد حساب",
+        "نام حساب",
+        "نوع حساب",
+        "مانده ابتدای دوره (بدهکار)",
+        "مانده ابتدای دوره (بستانکار)",
+        "جمع بدهکار دوره",
+        "جمع بستانکار دوره",
+        "مانده انتهای دوره (بدهکار)",
+        "مانده انتهای دوره (بستانکار)",
+    ]
+    headers_en = [
+        "Account Code",
+        "Account Name",
+        "Account Type",
+        "Opening Debit",
+        "Opening Credit",
+        "Period Debit",
+        "Period Credit",
+        "Closing Debit",
+        "Closing Credit",
+    ]
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    headers = headers_fa if is_fa else headers_en
+
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    mapping_fa = {
+        "accounting_document": "حسابداری",
+        "bank": "بانک",
+        "cash_register": "صندوق",
+        "cashdesk": "صندوق",
+        "cash": "نقد",
+        "petty_cash": "تنخواه",
+        "check": "چک",
+        "person": "شخص",
+        "product": "کالا",
+    }
+    mapping_en = {
+        "accounting_document": "Accounting",
+        "bank": "Bank",
+        "cash_register": "Cash Register",
+        "cashdesk": "Cash Register",
+        "cash": "Cash",
+        "petty_cash": "Petty Cash",
+        "check": "Check",
+        "person": "Person",
+        "product": "Product",
+    }
+    for k in [str(i) for i in range(44)]:
+        mapping_fa.setdefault(k, k)
+        mapping_en.setdefault(k, k)
+
+    def map_account_type_label(raw_value):
+        if raw_value is None:
+            return ""
+        key = str(raw_value).strip()
+        return (mapping_fa if is_fa else mapping_en).get(key, key)
+
+    numeric_keys = {"opening_debit", "opening_credit", "period_debit", "period_credit", "closing_debit", "closing_credit"}
+
+    def format_number_for_export(raw_value):
+        if raw_value is None:
+            return ""
+        if isinstance(raw_value, bool):
+            return "1" if raw_value else "0"
+        s = (str(raw_value) or "").strip()
+        if not s:
+            return ""
+        try:
+            f = float(s)
+            if f == int(f):
+                s = str(int(f))
+        except Exception:
+            pass
+        if is_fa and "," in s:
+            s = s.replace(",", "٬")
+        return s
+
+    def esc(v):
+        return escape("" if v is None else str(v))
+
+    rows_html = []
+    for item in items:
+        tds = []
+        for key in keys:
+            value = item.get(key, "")
+            if key == "account_type":
+                value = map_account_type_label(value)
+            if key in numeric_keys:
+                value = format_number_for_export(value)
+            tds.append(f"<td>{esc(value)}</td>")
+        rows_html.append(f"<tr>{''.join(tds)}</tr>")
+
+    headers_html = "".join(f"<th>{esc(h)}</th>" for h in headers)
+
+    calendar_type = None
+    try:
+        if hasattr(request.state, "calendar_type") and request.state.calendar_type:
+            calendar_type = request.state.calendar_type
+    except Exception:
+        calendar_type = None
+    if not calendar_type:
+        cal_header = (request.headers.get("X-Calendar-Type", "jalali") or "jalali").lower()
+        calendar_type = "jalali" if cal_header in ["jalali", "persian", "shamsi"] else "gregorian"
+    try:
+        from app.core.calendar import CalendarConverter
+        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
+        now = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    except Exception:
+        now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+
+    filters = []
+    fy_obj = None
+    if fiscal_year_id:
+        try:
+            fy_obj = db.query(FiscalYear).filter(
+                FiscalYear.id == int(fiscal_year_id),
+                FiscalYear.business_id == int(business_id),
+            ).first()
+        except Exception:
+            fy_obj = None
+        fy_title = (fy_obj.title if fy_obj else str(fiscal_year_id))
+        filters.append(("سال مالی" if is_fa else "Fiscal Year", str(fy_title)))
+    if date_from or date_to:
+        if date_from:
+            filters.append(("از تاریخ" if is_fa else "From", date_from))
+        if date_to:
+            filters.append(("تا تاریخ" if is_fa else "To", date_to))
+    if currency_id:
+        cur_label = ""
+        try:
+            cur = db.query(Currency).filter(Currency.id == int(currency_id)).first()
+            if cur is not None:
+                cur_label = (cur.title or cur.name or "") if is_fa else (cur.code or cur.name or cur.title or "")
+                if cur.symbol:
+                    cur_label = f"{cur_label} ({cur.symbol})" if cur_label else cur.symbol
+        except Exception:
+            cur_label = ""
+        filters.append(("ارز" if is_fa else "Currency", cur_label or str(currency_id)))
+    if account_type:
+        filters.append(("نوع حساب" if is_fa else "Account Type", map_account_type_label(account_type)))
+    filters.append((
+        "شامل مانده صفر" if is_fa else "Include Zero Balance",
+        ("بله" if include_zero_balance else "خیر") if is_fa else ("Yes" if include_zero_balance else "No"),
+    ))
+
+    filters_html = ""
+    if filters:
+        parts = [f"<span class='filter-item'><strong>{esc(k)}:</strong> {esc(v)}</span>" for k, v in filters if v]
+        if parts:
+            filters_html = f"<div class='filters'>{''.join(parts)}</div>"
+
+    title_text = "گزارش مرور حساب‌ها" if is_fa else "Accounts Review Report"
+    label_biz = "نام کسب‌وکار" if is_fa else "Business Name"
+    label_date = "تاریخ گزارش" if is_fa else "Report Date"
+    html_lang = "fa" if is_fa else "en"
+    html_dir = "rtl" if is_fa else "ltr"
+    page_label_left = "صفحه " if is_fa else "Page "
+    page_label_of = " از " if is_fa else " of "
+
+    fa_font_url_regular = None
+    fa_font_url_bold = None
+    try:
+        if is_fa:
+            from app.services.pdf.template_renderer import load_farsi_font_data_uris
+            fa_font_url_regular, fa_font_url_bold = load_farsi_font_data_uris()
+    except Exception:
+        pass
+
+    table_html = f"""
+    <html lang="{html_lang}" dir="{html_dir}">
+      <head><meta charset="utf-8"></head>
+      <body>
+        <div class="header">
+          <div class="title">{esc(title_text)}</div>
+          <div class="meta">
+            <div><strong>{esc(label_biz)}:</strong> {esc(business_name)}</div>
+            <div><strong>{esc(label_date)}:</strong> {esc(now)}</div>
+          </div>
+        </div>
+        {filters_html}
+        <div class="table-wrapper">
+          <table class="report-table">
+            <thead><tr>{headers_html}</tr></thead>
+            <tbody>{''.join(rows_html)}</tbody>
+          </table>
+        </div>
+      </body>
+    </html>
+    """
+
+    font_face_css = ""
+    if fa_font_url_regular:
+        font_face_css += f'@font-face {{ font-family: \'YekanBakhFaNum\'; src: url("{fa_font_url_regular}") format(\'truetype\'); font-weight: 400; font-style: normal; }}\n'
+    if fa_font_url_bold:
+        font_face_css += f'@font-face {{ font-family: \'YekanBakhFaNum\'; src: url("{fa_font_url_bold}") format(\'truetype\'); font-weight: 700; font-style: normal; }}\n'
+    try:
+        force_fa = is_fa or ('dir="rtl"' in table_html) or ("dir='rtl'" in table_html)
+        preferred_stack = "YekanBakhFaNum, Vazirmatn, Tahoma, Arial, sans-serif" if force_fa else "Arial, sans-serif"
+        injected = "<style id=\"hesabix-font-inject\">" + (font_face_css or "") + f"\nhtml, body, body * {{ font-family: {preferred_stack} !important; }}\n</style>"
+        if "</head>" in table_html:
+            table_html = table_html.replace("</head>", injected + "</head>")
+        else:
+            table_html = injected + table_html
+    except Exception:
+        pass
+
+    force_font_css = "\nhtml, body, body * { font-family: YekanBakhFaNum, Vazirmatn, Tahoma, Arial, sans-serif !important; }\n" if is_fa else "\nhtml, body, body * { font-family: Arial, sans-serif !important; }\n"
+    css = CSS(string=(font_face_css or "") + force_font_css + f"""
+      @page {{ size: A4 landscape; margin: 12mm;
+        @bottom-{'left' if is_fa else 'right'} {{ content: "{page_label_left}" counter(page) "{page_label_of}" counter(pages); font-size: 10px; color: #666; font-family: {'YekanBakhFaNum, Vazirmatn, Tahoma, Arial, sans-serif' if is_fa else 'Arial, sans-serif'} !important; }}
+      }}
+      body {{ font-size: 11px; color: #222; }}
+      .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; border-bottom: 2px solid #444; padding-bottom: 6px; gap: 12px; }}
+      .title {{ font-size: 16px; font-weight: 700; }}
+      .meta {{ font-size: 11px; color: #555; text-align: {'right' if is_fa else 'left'}; }}
+      .filters {{ margin: 8px 0 10px; font-size: 10.5px; color: #444; display: flex; flex-wrap: wrap; gap: 6px 10px; }}
+      .filters .filter-item {{ background: #f7f9fc; border: 1px solid #e2e8f0; padding: 3px 6px; border-radius: 6px; white-space: nowrap; }}
+      table.report-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+      thead th {{ background: #f0f3f7; border: 1px solid #c7cdd6; padding: 5px 4px; text-align: center; font-weight: 700; white-space: normal; font-size: 10px; }}
+      tbody td {{ border: 1px solid #d7dde6; padding: 5px 4px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; text-align: center; }}
+    """)
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=table_html).write_pdf(stylesheets=[css], font_config=font_config)
+
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
+
+    filename = f"accounts_review_{slugify(business_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
 @router.post(
     "/businesses/{business_id}/reports/journal-ledger",
     summary="گزارش دفتر روزنامه",

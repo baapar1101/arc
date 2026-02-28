@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/utils/password_validator.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -108,6 +109,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     if (value.length < 8) {
       return t.passwordMinLength;
     }
+    if (passwordExceedsMaxBytes(value)) {
+      return t.passwordMaxLength;
+    }
     return null;
   }
 
@@ -118,6 +122,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
     if (value.length < 8) {
       return t.passwordMinLength;
+    }
+    if (passwordExceedsMaxBytes(value)) {
+      return t.passwordMaxLength;
     }
     if (value == _currentPasswordController.text) {
       return t.samePassword;

@@ -138,6 +138,82 @@ def get_telegram_connected_users(
     )
 
 
+@router.get("/{business_id}/users/bale-connected",
+    summary="لیست کاربران متصل به بله",
+    description="دریافت لیست کاربران عضو کسب و کار که به ربات بله متصل هستند",
+    responses={
+        200: {"description": "لیست کاربران متصل به بله"},
+        401: {"description": "کاربر احراز هویت نشده است"},
+        403: {"description": "دسترسی غیرمجاز به کسب و کار"}
+    }
+)
+@require_business_access("business_id")
+def get_bale_connected_users(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """دریافت لیست کاربران عضو کسب و کار که به ربات بله متصل هستند"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Getting bale-connected users for business {business_id}, current user: {current_user_id}")
+
+    business = db.get(Business, business_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    permission_repo = BusinessPermissionRepository(db)
+    business_permissions = permission_repo.get_business_users(business_id)
+
+    user_ids = {business.owner_id}
+    for perm in business_permissions:
+        if perm.user_id:
+            user_ids.add(perm.user_id)
+
+    bale_chat_id_col = getattr(User, "bale_chat_id", None)
+    if bale_chat_id_col is None:
+        return success_response(
+            data={"users": [], "total": 0},
+            request=request,
+            message="لیست کاربران متصل به بله دریافت شد"
+        )
+
+    stmt = select(User).where(
+        and_(
+            User.id.in_(list(user_ids)),
+            User.bale_chat_id.isnot(None)
+        )
+    )
+    connected_users = db.execute(stmt).scalars().all()
+
+    formatted_users = []
+    for user in connected_users:
+        role = "owner" if user.id == business.owner_id else "member"
+        user_data = {
+            "user_id": user.id,
+            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر",
+            "email": user.email or "",
+            "mobile": user.mobile or "",
+            "bale_chat_id": getattr(user, "bale_chat_id", None),
+            "role": role,
+        }
+        formatted_users.append(user_data)
+
+    logger.info(f"Found {len(formatted_users)} bale-connected users for business {business_id}")
+
+    return success_response(
+        data={
+            "users": formatted_users,
+            "total": len(formatted_users)
+        },
+        request=request,
+        message="لیست کاربران متصل به بله دریافت شد"
+    )
+
+
 @router.get("/{business_id}/users/{user_id}", 
     summary="دریافت جزئیات کاربر", 
     description="دریافت جزئیات کاربر و دسترسی‌هایش در کسب و کار",

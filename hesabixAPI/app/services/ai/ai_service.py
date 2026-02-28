@@ -604,7 +604,9 @@ class AIService:
         tools: Optional[List[Dict[str, Any]]] = None,
         use_function_calling: bool = True,
         max_tokens_override: Optional[int] = None,
-        session_business_id: Optional[int] = None
+        temperature_override: Optional[float] = None,
+        session_business_id: Optional[int] = None,
+        max_iterations: int = 10
     ) -> Dict[str, Any]:
         """
         ارسال درخواست به AI (async version برای جلوگیری از blocking)
@@ -661,7 +663,7 @@ class AIService:
                 messages=full_messages,
                 model=self.config.model_name,
                 max_tokens=max_tokens_override or self.config.max_tokens,
-                temperature=float(self.config.temperature),
+                temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
                 tools=tools if tools else None
                 )
             )
@@ -677,9 +679,14 @@ class AIService:
                 http_status=500
             )
         
-        # پردازش function calls اگر وجود دارد
-        if response["message"].get("function_calls"):
-            function_results = await self.handle_function_calls_async(response["message"]["function_calls"], session_business_id=session_business_id)
+        # پردازش function calls در یک حلقه (multi-round agent)
+        iteration = 0
+        while response["message"].get("function_calls") and iteration < max_iterations:
+            iteration += 1
+            function_results = await self.handle_function_calls_async(
+                response["message"]["function_calls"],
+                session_business_id=session_business_id
+            )
             
             # ایجاد assistant message با tool_calls برای OpenAI API
             assistant_msg = {
@@ -691,8 +698,7 @@ class AIService:
             # ساخت tool_calls به فرمت OpenAI
             tool_call_ids = {}
             for idx, call in enumerate(response["message"]["function_calls"]):
-                # استفاده از id از call اگر موجود باشد، در غیر این صورت ساخت id
-                tool_call_id = call.get("id") or f"call_{idx}_{call.get('name', 'unknown')}"
+                tool_call_id = call.get("id") or f"call_{iteration}_{idx}_{call.get('name', 'unknown')}"
                 tool_call_ids[call.get("name")] = tool_call_id
                 assistant_msg["tool_calls"].append({
                     "id": tool_call_id,
@@ -703,18 +709,15 @@ class AIService:
                     }
                 })
             
-            # حذف content اگر None باشد
             if assistant_msg["content"] is None:
                 del assistant_msg["content"]
             
             full_messages.append(assistant_msg)
             
-            # اضافه کردن نتایج function calls به messages
             function_messages = []
             for call in response["message"]["function_calls"]:
                 function_name = call.get("name")
                 result = function_results.get(function_name, {})
-                # تبدیل datetime objects به string برای JSON serialization
                 serialized_result = self._serialize_for_json(result)
                 tool_call_id = call.get("id") or tool_call_ids.get(function_name, f"call_{function_name}")
                 function_messages.append({
@@ -723,24 +726,23 @@ class AIService:
                     "content": json.dumps(serialized_result, ensure_ascii=False) if isinstance(serialized_result, (dict, list)) else str(serialized_result)
                 })
             
-            # ارسال مجدد با نتایج function calls
             full_messages.extend(function_messages)
             try:
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
                     _executor,
                     lambda: provider.chat_completion(
-                    messages=full_messages,
-                    model=self.config.model_name,
-                    max_tokens=max_tokens_override or self.config.max_tokens,
-                    temperature=float(self.config.temperature),
-                    tools=None  # دیگر نیازی به tools نیست
+                        messages=full_messages,
+                        model=self.config.model_name,
+                        max_tokens=max_tokens_override or self.config.max_tokens,
+                        temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
+                        tools=None
                     )
                 )
             except ApiError:
                 raise
             except Exception as e:
-                logger.error(f"Unexpected error in AI service (function call retry): {e}", exc_info=True)
+                logger.error(f"Unexpected error in AI service (function call iteration {iteration}): {e}", exc_info=True)
                 raise ApiError(
                     "AI_SERVICE_ERROR",
                     f"خطا در سرویس AI: {str(e)}",
@@ -748,6 +750,42 @@ class AIService:
                 )
         
         return response
+    
+    def chat_completion_sync(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        use_function_calling: bool = True,
+        max_tokens_override: Optional[int] = None,
+        temperature_override: Optional[float] = None,
+        session_business_id: Optional[int] = None,
+        max_iterations: int = 10
+    ) -> Dict[str, Any]:
+        """
+        نسخه sync برای استفاده در workflow engine
+        از asyncio.run برای اجرای chat_completion استفاده می‌کند
+        """
+        def _run():
+            return asyncio.run(
+                self.chat_completion(
+                    messages=messages,
+                    tools=tools,
+                    use_function_calling=use_function_calling,
+                    max_tokens_override=max_tokens_override,
+                    temperature_override=temperature_override,
+                    session_business_id=session_business_id,
+                    max_iterations=max_iterations
+                )
+            )
+
+        try:
+            asyncio.get_running_loop()
+            # در context async هستیم - اجرا در thread جدید
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(_run).result()
+        except RuntimeError:
+            return _run()
     
     async def chat_completion_stream(
         self,

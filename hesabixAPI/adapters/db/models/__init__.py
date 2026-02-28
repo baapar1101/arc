@@ -103,3 +103,11 @@ from .warranty import (  # noqa: F401
 from .project import Project  # noqa: F401
 # Bale messenger linking
 from .bale import BaleLinkToken  # noqa: F401
+# CRM
+from .crm import (  # noqa: F401
+    CrmProcessDefinition,
+    CrmProcessStage,
+    Lead,
+    Deal,
+    CrmActivity,
+)

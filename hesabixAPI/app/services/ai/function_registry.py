@@ -57,6 +57,7 @@ class AIFunctionRegistry:
         self._register_product_functions()
         self._register_person_functions()
         self._register_financial_functions()
+        self._register_crm_functions()
         # Operator functions
         self._register_operator_functions()
         # Admin functions
@@ -1192,6 +1193,335 @@ class AIFunctionRegistry:
             category="financial"
         ))
     
+    def _register_crm_functions(self):
+        """ثبت function های مربوط به CRM"""
+        from sqlalchemy import func as sql_func, and_, or_
+        from adapters.db.models.crm import Lead, Deal, CrmActivity, CrmProcessDefinition, CrmProcessStage
+        from adapters.db.models.person import Person
+
+        def _lead_to_dict_simple(lead: Lead) -> Dict[str, Any]:
+            d = {
+                "id": lead.id,
+                "stage_name": lead.stage.name if lead.stage else None,
+                "source_code": lead.source_code,
+                "name": lead.name,
+                "company_name": lead.company_name,
+                "mobile": lead.mobile,
+                "email": lead.email,
+                "description": lead.description,
+                "person_id": lead.person_id,
+                "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
+                "created_at": lead.created_at.isoformat() if lead.created_at else None,
+            }
+            return d
+
+        def _deal_to_dict_simple(deal: Deal) -> Dict[str, Any]:
+            d = {
+                "id": deal.id,
+                "person_name": deal.person.alias_name if deal.person else None,
+                "stage_name": deal.stage.name if deal.stage else None,
+                "title": deal.title,
+                "amount": float(deal.amount),
+                "probability_percent": deal.probability_percent,
+                "expected_close_date": deal.expected_close_date.isoformat() if deal.expected_close_date else None,
+                "closed_at": deal.closed_at.isoformat() if deal.closed_at else None,
+                "created_at": deal.created_at.isoformat() if deal.created_at else None,
+            }
+            return d
+
+        def _activity_to_dict_simple(a: CrmActivity) -> Dict[str, Any]:
+            d = {
+                "id": a.id,
+                "activity_type": a.activity_type,
+                "subject": a.subject,
+                "description": a.description,
+                "activity_date": a.activity_date.isoformat() if a.activity_date else None,
+                "deal_id": a.deal_id,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            return d
+
+        def search_leads_wrapper(db, business_id, user_id, **kwargs):
+            q = db.query(Lead).filter(Lead.business_id == business_id)
+            if kwargs.get("process_definition_id"):
+                q = q.filter(Lead.process_definition_id == kwargs["process_definition_id"])
+            if kwargs.get("stage_id"):
+                q = q.filter(Lead.stage_id == kwargs["stage_id"])
+            if kwargs.get("assigned_to_user_id") is not None:
+                q = q.filter(Lead.assigned_to_user_id == kwargs["assigned_to_user_id"])
+            search = kwargs.get("search", "").strip()
+            if search:
+                term = f"%{search}%"
+                q = q.filter(
+                    or_(
+                        Lead.name.ilike(term),
+                        Lead.company_name.ilike(term),
+                        Lead.mobile.ilike(term),
+                        Lead.email.ilike(term),
+                    )
+                )
+            limit = kwargs.get("limit", 20)
+            skip = kwargs.get("skip", 0)
+            total = q.count()
+            items = q.order_by(Lead.created_at.desc()).offset(skip).limit(limit).all()
+            return {"items": [_lead_to_dict_simple(lead) for lead in items], "total": total}
+
+        def get_lead_details_wrapper(db, business_id, user_id, lead_id, **kwargs):
+            lead = db.query(Lead).filter(
+                and_(Lead.id == lead_id, Lead.business_id == business_id)
+            ).first()
+            if not lead:
+                raise ValueError(f"Lead {lead_id} not found")
+            return _lead_to_dict_simple(lead)
+
+        def search_deals_wrapper(db, business_id, user_id, **kwargs):
+            q = db.query(Deal).filter(Deal.business_id == business_id)
+            if kwargs.get("process_definition_id"):
+                q = q.filter(Deal.process_definition_id == kwargs["process_definition_id"])
+            if kwargs.get("stage_id"):
+                q = q.filter(Deal.stage_id == kwargs["stage_id"])
+            if kwargs.get("person_id"):
+                q = q.filter(Deal.person_id == kwargs["person_id"])
+            if kwargs.get("assigned_to_user_id") is not None:
+                q = q.filter(Deal.assigned_to_user_id == kwargs["assigned_to_user_id"])
+            search = kwargs.get("search", "").strip()
+            if search:
+                term = f"%{search}%"
+                q = q.join(Deal.person).filter(
+                    or_(Deal.title.ilike(term), Person.alias_name.ilike(term))
+                )
+            limit = kwargs.get("limit", 20)
+            skip = kwargs.get("skip", 0)
+            total = q.count()
+            items = q.order_by(Deal.updated_at.desc()).offset(skip).limit(limit).all()
+            return {"items": [_deal_to_dict_simple(dl) for dl in items], "total": total}
+
+        def get_deal_details_wrapper(db, business_id, user_id, deal_id, **kwargs):
+            deal = db.query(Deal).filter(
+                and_(Deal.id == deal_id, Deal.business_id == business_id)
+            ).first()
+            if not deal:
+                raise ValueError(f"Deal {deal_id} not found")
+            return _deal_to_dict_simple(deal)
+
+        def search_activities_wrapper(db, business_id, user_id, **kwargs):
+            q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+            if kwargs.get("person_id"):
+                q = q.filter(CrmActivity.person_id == kwargs["person_id"])
+            if kwargs.get("deal_id"):
+                q = q.filter(CrmActivity.deal_id == kwargs["deal_id"])
+            if kwargs.get("activity_type"):
+                q = q.filter(CrmActivity.activity_type == kwargs["activity_type"])
+            limit = kwargs.get("limit", 20)
+            skip = kwargs.get("skip", 0)
+            total = q.count()
+            items = q.order_by(CrmActivity.activity_date.desc()).offset(skip).limit(limit).all()
+            return {"items": [_activity_to_dict_simple(a) for a in items], "total": total}
+
+        def get_crm_summary_wrapper(db, business_id, user_id, **kwargs):
+            total_leads = db.query(Lead).filter(Lead.business_id == business_id).count()
+            converted_leads = db.query(Lead).filter(
+                Lead.business_id == business_id, Lead.person_id.isnot(None)
+            ).count()
+            total_deals = db.query(Deal).filter(Deal.business_id == business_id).count()
+            deals_amount = (
+                db.query(sql_func.coalesce(sql_func.sum(Deal.amount), 0))
+                .filter(Deal.business_id == business_id)
+                .scalar() or 0
+            )
+            closed_deals = db.query(Deal).filter(
+                Deal.business_id == business_id, Deal.closed_at.isnot(None)
+            ).count()
+            conversion_rate = (converted_leads / total_leads * 100) if total_leads else 0
+            return {
+                "total_leads": total_leads,
+                "converted_leads": converted_leads,
+                "conversion_rate": round(conversion_rate, 1),
+                "total_deals": total_deals,
+                "closed_deals": closed_deals,
+                "total_deals_amount": float(deals_amount),
+            }
+
+        def get_pipeline_report_wrapper(db, business_id, user_id, **kwargs):
+            process_def_id = kwargs.get("process_definition_id")
+            q = db.query(
+                CrmProcessStage.id,
+                CrmProcessStage.name,
+                CrmProcessStage.order_index,
+                sql_func.count(Deal.id).label("deal_count"),
+                sql_func.coalesce(sql_func.sum(Deal.amount), 0).label("total_amount"),
+            ).outerjoin(
+                Deal, and_(Deal.stage_id == CrmProcessStage.id, Deal.business_id == business_id)
+            )
+            q = q.join(CrmProcessDefinition, CrmProcessDefinition.id == CrmProcessStage.process_definition_id)
+            q = q.filter(
+                CrmProcessDefinition.business_id == business_id,
+                CrmProcessDefinition.process_type == "sales_pipeline",
+            )
+            if process_def_id:
+                q = q.filter(CrmProcessDefinition.id == process_def_id)
+            q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
+            q = q.order_by(CrmProcessStage.order_index)
+            rows = q.all()
+            return [
+                {"stage_id": r.id, "stage_name": r.name, "order_index": r.order_index, "deal_count": r.deal_count, "total_amount": float(r.total_amount or 0)}
+                for r in rows
+            ]
+
+        def get_lead_funnel_report_wrapper(db, business_id, user_id, **kwargs):
+            process_def_id = kwargs.get("process_definition_id")
+            q = db.query(
+                CrmProcessStage.id,
+                CrmProcessStage.name,
+                CrmProcessStage.order_index,
+                sql_func.count(Lead.id).label("lead_count"),
+            ).outerjoin(
+                Lead, and_(Lead.stage_id == CrmProcessStage.id, Lead.business_id == business_id)
+            )
+            q = q.join(CrmProcessDefinition, CrmProcessDefinition.id == CrmProcessStage.process_definition_id)
+            q = q.filter(
+                CrmProcessDefinition.business_id == business_id,
+                CrmProcessDefinition.process_type == "lead_funnel",
+            )
+            if process_def_id:
+                q = q.filter(CrmProcessDefinition.id == process_def_id)
+            q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
+            q = q.order_by(CrmProcessStage.order_index)
+            rows = q.all()
+            return [
+                {"stage_id": r.id, "stage_name": r.name, "order_index": r.order_index, "lead_count": r.lead_count}
+                for r in rows
+            ]
+
+        self.register(AIFunction(
+            name="search_leads",
+            description="جستجو در سرنخ‌های CRM بر اساس مرحله، منبع، مسئول و متن جستجو. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "process_definition_id": {"type": "integer", "description": "شناسه فرایند (اختیاری)"},
+                    "stage_id": {"type": "integer", "description": "شناسه مرحله (اختیاری)"},
+                    "assigned_to_user_id": {"type": "integer", "description": "شناسه مسئول (اختیاری)"},
+                    "search": {"type": "string", "description": "جستجو در نام، شرکت، موبایل، ایمیل (اختیاری)"},
+                    "limit": {"type": "integer", "description": "تعداد نتایج (پیش‌فرض: 20)"},
+                    "skip": {"type": "integer", "description": "ردیف شروع (پیش‌فرض: 0)"},
+                },
+                "required": [],
+            },
+            handler=self._create_handler(search_leads_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="get_lead_details",
+            description="دریافت جزئیات کامل یک سرنخ. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {"lead_id": {"type": "integer", "description": "شناسه سرنخ"}},
+                "required": ["lead_id"],
+            },
+            handler=self._create_handler(get_lead_details_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="search_deals",
+            description="جستجو در فرصت‌های فروش CRM بر اساس مرحله، مشتری، مسئول و متن جستجو. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "process_definition_id": {"type": "integer", "description": "شناسه فرایند (اختیاری)"},
+                    "stage_id": {"type": "integer", "description": "شناسه مرحله (اختیاری)"},
+                    "person_id": {"type": "integer", "description": "شناسه مشتری (اختیاری)"},
+                    "assigned_to_user_id": {"type": "integer", "description": "شناسه مسئول (اختیاری)"},
+                    "search": {"type": "string", "description": "جستجو در عنوان یا نام مشتری (اختیاری)"},
+                    "limit": {"type": "integer", "description": "تعداد نتایج (پیش‌فرض: 20)"},
+                    "skip": {"type": "integer", "description": "ردیف شروع (پیش‌فرض: 0)"},
+                },
+                "required": [],
+            },
+            handler=self._create_handler(search_deals_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="get_deal_details",
+            description="دریافت جزئیات کامل یک فرصت فروش. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {"deal_id": {"type": "integer", "description": "شناسه فرصت فروش"}},
+                "required": ["deal_id"],
+            },
+            handler=self._create_handler(get_deal_details_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="search_activities",
+            description="جستجو در فعالیت‌های CRM (تماس، ایمیل، جلسه، یادداشت) بر اساس شخص، فرصت و نوع. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
+                    "deal_id": {"type": "integer", "description": "شناسه فرصت فروش (اختیاری)"},
+                    "activity_type": {"type": "string", "enum": ["call", "email", "meeting", "note"], "description": "نوع فعالیت (اختیاری)"},
+                    "limit": {"type": "integer", "description": "تعداد نتایج (پیش‌فرض: 20)"},
+                    "skip": {"type": "integer", "description": "ردیف شروع (پیش‌فرض: 0)"},
+                },
+                "required": [],
+            },
+            handler=self._create_handler(search_activities_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="get_crm_summary",
+            description="دریافت خلاصه CRM شامل تعداد سرنخ‌ها، فرصت‌های فروش، نرخ تبدیل و مبلغ کل. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={"type": "object", "properties": {}, "required": []},
+            handler=self._create_handler(get_crm_summary_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="get_pipeline_report",
+            description="گزارش پایپلاین فروش: تعداد و مبلغ فرصت‌ها به تفکیک مرحله. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {"process_definition_id": {"type": "integer", "description": "شناسه فرایند پایپلاین (اختیاری)"}},
+                "required": [],
+            },
+            handler=self._create_handler(get_pipeline_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
+        self.register(AIFunction(
+            name="get_lead_funnel_report",
+            description="گزارش قیف سرنخ: تعداد سرنخ‌ها به تفکیک مرحله. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {"process_definition_id": {"type": "integer", "description": "شناسه فرایند (اختیاری)"}},
+                "required": [],
+            },
+            handler=self._create_handler(get_lead_funnel_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["crm.view"],
+            category="crm",
+        ))
+
     def _register_operator_functions(self):
         """ثبت function های مخصوص اپراتورهای پشتیبانی"""
         # این function ها بعداً اضافه می‌شوند

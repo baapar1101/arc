@@ -77,6 +77,8 @@ class Person(Base):
     # Relationships
     business: Mapped["Business"] = relationship("Business", back_populates="persons")
     bank_accounts: Mapped[list["PersonBankAccount"]] = relationship("PersonBankAccount", back_populates="person", cascade="all, delete-orphan")
+    crm_deals: Mapped[list["Deal"]] = relationship("Deal", back_populates="person", foreign_keys="[Deal.person_id]")
+    crm_activities: Mapped[list["CrmActivity"]] = relationship("CrmActivity", back_populates="person", cascade="all, delete-orphan")
 
 
 class PersonBankAccount(Base):

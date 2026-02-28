@@ -87,6 +87,24 @@ def _get_default_setting(document_type: str) -> dict:
             "calendar_type": "gregorian",
             "date_format": "YYYYMMDD",
         },
+        "crm_lead": {
+            "prefix": "L",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+        },
+        "crm_deal": {
+            "prefix": "D",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+        },
+        "crm_activity": {
+            "prefix": "A",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+        },
     }
 
     default = defaults.get(

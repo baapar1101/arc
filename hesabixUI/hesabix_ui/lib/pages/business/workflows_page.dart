@@ -486,8 +486,8 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف ورک‌فلو'),
-        content: Text('آیا از حذف ورک‌فلو "${workflow['name']}" اطمینان دارید؟'),
+        title: Text(t.workflowDeleteWorkflow),
+        content: Text(t.workflowDeleteConfirm(workflow['name']?.toString() ?? '')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -498,7 +498,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
             ),
-            child: const Text('حذف'),
+            child: Text(t.delete),
           ),
         ],
       ),
@@ -512,13 +512,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         workflowId: workflow['id'] as int,
       );
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: 'ورک‌فلو با موفقیت حذف شد');
+      SnackBarHelper.showSuccess(context, message: t.workflowDeletedSuccess);
       _loadAll(showSpinner: false);
     } catch (e, stackTrace) {
       debugPrint('خطا در حذف workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در حذف ورک‌فلو');
+      SnackBarHelper.showError(context, message: t.workflowErrorDelete);
     }
   }
 
@@ -592,7 +592,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
               if (snapshot.hasError) {
                 return SizedBox(
                   height: 220,
-                  child: Center(child: Text('خطا: ${snapshot.error}')),
+                  child: Center(child: Text('${t.error}: ${snapshot.error}')),
                 );
               }
               final data = snapshot.data ?? const <String, dynamic>{};
@@ -899,7 +899,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     
     // اگر هیچ نودی تعریف نشده باشد
     if (nodes.isEmpty) {
-      return 'هیچ گره‌ای تعریف نشده است';
+      return t.workflowNoNodesDefined;
     }
     
     // شمارش انواع مختلف نودها
@@ -919,7 +919,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       parts.add('$conditionCount شرط');
     }
     
-    return parts.isEmpty ? 'این ورک‌فلو خالی است' : parts.join(' • ');
+    return parts.isEmpty ? t.workflowEmpty : parts.join(' • ');
   }
 
   static Map<String, dynamic> _defaultWorkflowTemplate() {

@@ -23,8 +23,15 @@ class ReceiptPaymentCreatedTrigger(BaseTrigger):
                 },
                 "type": {
                     "type": "string",
-                    "description": "نوع (receipt/payment)",
-                    "required": False
+                    "description": "نوع (دریافت/پرداخت)",
+                    "required": False,
+                    "enum": ["receipt", "payment"],
+                    "ui_config": {
+                        "labels": {
+                            "receipt": "دریافت",
+                            "payment": "پرداخت"
+                        }
+                    }
                 },
                 "min_amount": {
                     "type": "number",
@@ -39,13 +46,19 @@ class ReceiptPaymentCreatedTrigger(BaseTrigger):
                 "payment_method_filter": {
                     "type": "array",
                     "description": "فیلتر بر اساس روش پرداخت",
-                    "items": {"type": "string"},
+                    "items": {"type": "string", "enum": ["cash", "bank", "check", "card"]},
+                    "ui_type": "multi_select",
+                    "ui_config": {
+                        "labels": {"cash": "نقد", "bank": "بانک", "check": "چک", "card": "کارت"}
+                    },
                     "required": False
                 },
                 "account_id_filter": {
                     "type": "integer",
-                    "description": "فیلتر بر اساس حساب بانکی",
-                    "required": False
+                    "description": "فیلتر بر اساس حساب بانکی/صندوق",
+                    "required": False,
+                    "ui_type": "account_selector",
+                    "ui_config": {"business_scoped": True}
                 },
                 "include_balance": {
                     "type": "boolean",
@@ -122,8 +135,15 @@ class CheckDueDateTrigger(BaseTrigger):
             "config_schema": {
                 "check_type": {
                     "type": "string",
-                    "description": "نوع چک (received/paid)",
-                    "required": False
+                    "description": "نوع چک",
+                    "required": False,
+                    "enum": ["received", "paid"],
+                    "ui_config": {
+                        "labels": {
+                            "received": "دریافتی",
+                            "paid": "پرداختی"
+                        }
+                    }
                 },
                 "days_before": {
                     "type": "number",

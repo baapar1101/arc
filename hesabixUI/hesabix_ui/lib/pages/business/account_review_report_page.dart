@@ -628,6 +628,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                         width: 280,
                         child: DropdownButtonFormField<int>(
                           value: _selectedFiscalYearId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'سال مالی',
                             border: const OutlineInputBorder(),
@@ -687,6 +688,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                         width: 200,
                         child: DropdownButtonFormField<int>(
                           value: _selectedCurrencyId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'ارز',
                             border: const OutlineInputBorder(),
@@ -695,7 +697,11 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                           items: [
                             const DropdownMenuItem<int>(
                               value: null,
-                              child: Text('همه ارزها'),
+                              child: Text(
+                                'همه ارزها',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                             ),
                             ..._currencies.map<DropdownMenuItem<int>>((c) {
                               final id = c['id'] as int?;
@@ -727,6 +733,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                         width: 200,
                         child: DropdownButtonFormField<String>(
                           value: _selectedAccountType,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'نوع حساب',
                             border: const OutlineInputBorder(),
@@ -741,7 +748,11 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                               final t = AppLocalizations.of(context);
                               return DropdownMenuItem<String>(
                                 value: type,
-                                child: Text(_localizedAccountType(t, type)),
+                                child: Text(
+                                  _localizedAccountType(t, type),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
                             }),
                           ],

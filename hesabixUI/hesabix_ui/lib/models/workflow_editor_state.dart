@@ -241,6 +241,31 @@ class WorkflowEditorState extends ChangeNotifier {
           : const Offset(200, 200);
       
       final config = <String, dynamic>{};
+      // مقداردهی اولیه config برای loop
+      if (type == WorkflowNodeType.loop) {
+        if (key == 'loop.for_each') {
+          config['loop_type'] = 'for_each';
+          config['items_source'] = '';
+          config['item_variable'] = 'item';
+          config['index_variable'] = 'index';
+          config['max_iterations'] = 1000;
+        } else if (key == 'loop.for') {
+          config['loop_type'] = 'for_range';
+          config['start'] = 0;
+          config['end'] = 10;
+          config['step'] = 1;
+          config['index_variable'] = 'index';
+          config['max_iterations'] = 1000;
+        } else if (key == 'loop.while') {
+          config['loop_type'] = 'while';
+          config['condition'] = {
+            'left_value': '',
+            'operator': '==',
+            'right_value': '',
+          };
+          config['max_iterations'] = 1000;
+        }
+      }
       
       // ایجاد ID جدید و بررسی duplicate
       String nodeId;
@@ -804,20 +829,25 @@ class WorkflowEditorState extends ChangeNotifier {
   }
 
   /// پایان اتصال (رها کردن)
-  void endConnection(String? toNodeId) {
+  /// [sourceOutputId] برای نود شرط: "true" یا "false" برای شاخه‌بندی
+  void endConnection(String? toNodeId, {String? sourceOutputId}) {
     if (_isConnecting && 
         _connectingFromNodeId != null && 
         toNodeId != null &&
         _connectingFromNodeId != toNodeId) {
-      // بررسی که قبلاً این connection وجود نداشته باشد
+      // برای نود شرط: بررسی duplicate با توجه به sourceOutputId
       final exists = _connections.any(
-        (c) => c.sourceNodeId == _connectingFromNodeId && c.targetNodeId == toNodeId,
+        (c) =>
+            c.sourceNodeId == _connectingFromNodeId &&
+            c.targetNodeId == toNodeId &&
+            (c.sourceOutputId ?? '') == (sourceOutputId ?? ''),
       );
       if (!exists) {
         final connection = WorkflowConnectionModel(
           id: _uuid.v4(),
           sourceNodeId: _connectingFromNodeId!,
           targetNodeId: toNodeId,
+          sourceOutputId: sourceOutputId,
         );
         _connections.add(connection);
       }

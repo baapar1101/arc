@@ -447,6 +447,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get passwordMinLength => 'کلمه عبور باید حداقل 8 کاراکتر باشد';
 
   @override
+  String get passwordMaxLength =>
+      'رمز عبور نباید از حد مجاز (۷۲ کاراکتر) بیشتر باشد';
+
+  @override
   String get calendar => 'تقویم';
 
   @override
@@ -559,10 +563,19 @@ class AppLocalizationsFa extends AppLocalizations {
       'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود';
 
   @override
-  String get installmentsInvoicePickerTitle => 'انتخاب فاکتور';
+  String get installmentsInvoicePickerTitle => 'انتخاب فاکتور اقساطی';
 
   @override
-  String get installmentsInvoicePickerSearchLabel => 'جستجوی فاکتور';
+  String get installmentsInvoicePickerSearchLabel =>
+      'جستجو بر اساس کد، شرح و...';
+
+  @override
+  String get installmentInvoicesLoadMore => 'مشاهدهٔ بیشتر';
+
+  @override
+  String installmentInvoicesCount(Object count) {
+    return '$count فاکتور اقساطی';
+  }
 
   @override
   String get installmentsTableInvoice => 'فاکتور';
@@ -5957,10 +5970,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowSaved => 'Workflow ذخیره شد';
 
   @override
-  String get workflowDeleted => 'Node حذف شد';
+  String get workflowDeleted => 'ورک‌فلو حذف شد';
 
   @override
-  String get workflowDuplicated => 'Node کپی شد';
+  String get workflowDuplicated => 'ورک‌فلو کپی شد';
 
   @override
   String get workflowCopy => 'کپی';
@@ -6073,10 +6086,663 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowNodeFieldRequired => 'این فیلد الزامی است';
 
   @override
-  String get workflowNodeArrayType => 'Array (نیاز به UI پیچیده‌تر)';
+  String get workflowNodeArrayType => 'آرایه';
 
   @override
-  String get workflowNodeObjectType => 'Object (نیاز به UI پیچیده‌تر)';
+  String get workflowNodeObjectType => 'شیء';
+
+  @override
+  String get workflowConfigUsePreviousNode => 'استفاده از نود قبلی';
+
+  @override
+  String get workflowConfigSelectFromNodes => 'انتخاب از نودهای قبلی';
+
+  @override
+  String get workflowConfigValueUsesNode =>
+      'این مقدار از یک نود قبلی استفاده می‌کند';
+
+  @override
+  String get workflowConfigSelectDate => 'انتخاب تاریخ';
+
+  @override
+  String get workflowConfigToday => 'امروز';
+
+  @override
+  String get workflowConfigDateHelper => 'انتخاب تاریخ (ISO: YYYY-MM-DD)';
+
+  @override
+  String get workflowConfigNoNodesToSelect => 'هیچ نودی برای انتخاب وجود ندارد';
+
+  @override
+  String get workflowConfigNoTelegramUsers =>
+      'هیچ کاربری به ربات تلگرام متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
+
+  @override
+  String get workflowConfigNoBaleUsers =>
+      'هیچ کاربری به ربات بله متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
+
+  @override
+  String get workflowConfigOwner => 'مالک';
+
+  @override
+  String get workflowConfigSearchSelectPerson => 'جست‌وجو و انتخاب طرف حساب';
+
+  @override
+  String get workflowConfigPersonIdLabel => 'شناسه طرف حساب';
+
+  @override
+  String get workflowConfigPersonIdHelper =>
+      'می‌توانید شناسه را وارد کنید یا از نود قبلی استفاده کنید: \$node_id.person_id';
+
+  @override
+  String get workflowConfigSearchSelectProduct => 'جست‌وجو و انتخاب کالا/خدمت';
+
+  @override
+  String get workflowConfigProductIdLabel => 'شناسه کالا/خدمت';
+
+  @override
+  String get workflowConfigProductIdHelper => 'شناسه محصول';
+
+  @override
+  String get workflowConfigType => 'نوع';
+
+  @override
+  String get workflowConfigPercent => 'درصد';
+
+  @override
+  String get workflowConfigFixedAmount => 'مبلغ ثابت';
+
+  @override
+  String get workflowConfigDiscountPercent => 'درصد تخفیف';
+
+  @override
+  String get workflowConfigDiscountAmount => 'مبلغ تخفیف';
+
+  @override
+  String workflowConfigItemN(int n) {
+    return 'آیتم $n';
+  }
+
+  @override
+  String get workflowConfigAddItem => 'افزودن مورد';
+
+  @override
+  String get workflowConfigAddLineItem => 'افزودن آیتم';
+
+  @override
+  String get workflowConfigProduct => 'محصول';
+
+  @override
+  String get workflowConfigQuantity => 'تعداد';
+
+  @override
+  String get workflowConfigUnitPrice => 'قیمت واحد';
+
+  @override
+  String get workflowConfigTaxPercent => 'مالیات %';
+
+  @override
+  String get workflowConfigDescription => 'توضیحات';
+
+  @override
+  String get workflowConfigPaymentMethod => 'روش پرداخت';
+
+  @override
+  String get workflowConfigAmount => 'مبلغ';
+
+  @override
+  String get workflowConfigAccountSelect => 'حساب بانکی/صندوق';
+
+  @override
+  String get workflowConfigAddPayment => 'افزودن پرداخت';
+
+  @override
+  String get workflowConfigNoPaymentsYet =>
+      'هنوز پرداختی اضافه نشده است. برای افزودن، از دکمهٔ زیر استفاده کنید.';
+
+  @override
+  String workflowConfigPaymentN(int n) {
+    return 'پرداخت $n';
+  }
+
+  @override
+  String get workflowConfigNotSelected => 'انتخاب نشده';
+
+  @override
+  String get workflowConfigSelectWarehouse => 'انتخاب انبار';
+
+  @override
+  String get workflowConfigSelectAccount => 'انتخاب حساب';
+
+  @override
+  String get workflowConfigSelectFiscalYear => 'انتخاب سال مالی';
+
+  @override
+  String get workflowConfigInvalidJson => 'JSON نامعتبر است';
+
+  @override
+  String get workflowConfigJsonHint => '{\"key\": \"value\"}';
+
+  @override
+  String get workflowConfigCash => 'نقد';
+
+  @override
+  String get workflowConfigBank => 'بانک';
+
+  @override
+  String get workflowConfigCheck => 'چک';
+
+  @override
+  String get workflowConfigCard => 'کارت';
+
+  @override
+  String get workflowConfigSelectTelegramUser =>
+      'انتخاب کاربر عضو کسب و کار که به ربات تلگرام متصل است';
+
+  @override
+  String get workflowConfigSelectBaleUser =>
+      'انتخاب کاربر عضو کسب و کار که به ربات بله متصل است';
+
+  @override
+  String get workflowConfigSelectAtLeastOne => 'حداقل یک مورد را انتخاب کنید';
+
+  @override
+  String get workflowConfigReferenceTitle => 'انتخاب از نودهای قبلی';
+
+  @override
+  String get workflowConfigNoNodesAvailable =>
+      'هیچ نودی برای انتخاب وجود ندارد';
+
+  @override
+  String get workflowConfigStep1Node => 'مرحله 1: انتخاب نود';
+
+  @override
+  String get workflowConfigStep2Data => 'مرحله 2: انتخاب داده';
+
+  @override
+  String workflowConfigSelectDataFrom(String label) {
+    return 'انتخاب داده از \"$label\"';
+  }
+
+  @override
+  String get workflowConfigOrSelectField => 'یا یک فیلد خاص را انتخاب کنید:';
+
+  @override
+  String get workflowConfigUseFullNodeOutput => 'استفاده از کل خروجی نود';
+
+  @override
+  String get workflowConfigFullNodeOutputDesc => 'تمام داده‌های خروجی نود';
+
+  @override
+  String get workflowConfigBack => 'بازگشت';
+
+  @override
+  String get workflowConfigCancel => 'انصراف';
+
+  @override
+  String get workflowConfigGroupFilters => 'فیلترها';
+
+  @override
+  String get workflowConfigGroupScheduling => 'زمان‌بندی';
+
+  @override
+  String get workflowConfigGroupErrorManagement => 'مدیریت خطا';
+
+  @override
+  String get workflowConfigGroupMainSettings => 'تنظیمات اصلی';
+
+  @override
+  String get workflowConfigGroupAdvanced => 'تنظیمات پیشرفته';
+
+  @override
+  String get workflowConfigUserDefault => 'کاربر';
+
+  @override
+  String get workflowConfigFiscalYearDefault => 'سال مالی';
+
+  @override
+  String get workflowConfigJsonLabel => 'JSON';
+
+  @override
+  String get workflowPaletteSearch => 'جستجو...';
+
+  @override
+  String get workflowPaletteAll => 'همه';
+
+  @override
+  String get workflowPaletteTriggers => 'تریگرها';
+
+  @override
+  String get workflowPaletteActions => 'اکشن‌ها';
+
+  @override
+  String get workflowPaletteLoops => 'حلقه‌ها';
+
+  @override
+  String get workflowPaletteConditions => 'شرط‌ها';
+
+  @override
+  String get workflowNodeUnknown => 'نود ناشناس';
+
+  @override
+  String get workflowConfigEnumRequiredForMultiSelect =>
+      'خطا: enum values برای multi-select تعریف نشده است';
+
+  @override
+  String get workflowConfigFieldEnabled => 'فعال';
+
+  @override
+  String get workflowConfigFieldTo => 'به';
+
+  @override
+  String get workflowConfigFieldSubject => 'موضوع';
+
+  @override
+  String get workflowConfigFieldBody => 'متن';
+
+  @override
+  String get workflowConfigFieldMessage => 'پیام';
+
+  @override
+  String get workflowConfigFieldMinAmount => 'حداقل مبلغ';
+
+  @override
+  String get workflowConfigFieldMaxAmount => 'حداکثر مبلغ';
+
+  @override
+  String get workflowConfigFieldStatusFilter => 'فیلتر وضعیت';
+
+  @override
+  String get workflowConfigFieldPersonType => 'نوع طرف حساب';
+
+  @override
+  String get workflowConfigFieldCurrency => 'ارز';
+
+  @override
+  String get workflowConfigFieldPersonId => 'شناسه طرف حساب';
+
+  @override
+  String get workflowConfigFieldProductId => 'شناسه کالا/خدمت';
+
+  @override
+  String get workflowConfigFieldWarehouseId => 'شناسه انبار';
+
+  @override
+  String get workflowConfigFieldAccountId => 'شناسه حساب';
+
+  @override
+  String get workflowConfigFieldRetryCount => 'تعداد تلاش مجدد';
+
+  @override
+  String get workflowConfigFieldRetryDelay => 'تأخیر تلاش مجدد';
+
+  @override
+  String get workflowConfigFieldOnError => 'در صورت خطا';
+
+  @override
+  String get workflowConfigFieldBreakOnError => 'توقف در خطا';
+
+  @override
+  String get workflowConfigFieldContinueOnError => 'ادامه در خطا';
+
+  @override
+  String get workflowConfigFieldTriggerType => 'نوع تریگر';
+
+  @override
+  String get workflowConfigFieldActionType => 'نوع اکشن';
+
+  @override
+  String get workflowConfigFieldLoopType => 'نوع حلقه';
+
+  @override
+  String get workflowConfigFieldItemsSource => 'منبع آیتم‌ها';
+
+  @override
+  String get workflowConfigFieldItemVariable => 'متغیر آیتم';
+
+  @override
+  String get workflowConfigFieldIndexVariable => 'متغیر اندیس';
+
+  @override
+  String get workflowConfigFieldMaxIterations => 'حداکثر تکرار';
+
+  @override
+  String get workflowConfigFieldStart => 'شروع';
+
+  @override
+  String get workflowConfigFieldEnd => 'پایان';
+
+  @override
+  String get workflowConfigFieldStep => 'گام';
+
+  @override
+  String get workflowConfigFieldConditionLeft => 'مقدار چپ';
+
+  @override
+  String get workflowConfigFieldConditionOperator => 'عملگر مقایسه';
+
+  @override
+  String get workflowConfigFieldConditionRight => 'مقدار راست';
+
+  @override
+  String get workflowConfigFieldTimeout => 'مهلت زمانی';
+
+  @override
+  String get workflowConfigFieldCooldown => 'سردی';
+
+  @override
+  String get workflowConfigFieldSchedule => 'زمان‌بندی';
+
+  @override
+  String get workflowConfigFieldDelay => 'تأخیر';
+
+  @override
+  String get workflowConfigFieldDocumentType => 'نوع سند';
+
+  @override
+  String get workflowConfigFieldFiscalYearFilter => 'فیلتر سال مالی';
+
+  @override
+  String get workflowConfigFieldFiscalYearId => 'سال مالی';
+
+  @override
+  String get workflowConfigFieldUserIdFilter => 'فیلتر کاربر';
+
+  @override
+  String get workflowConfigFieldDescriptionContains => 'شرح شامل';
+
+  @override
+  String get workflowConfigFieldCooldownSeconds => 'سردی (ثانیه)';
+
+  @override
+  String get workflowConfigFieldTimeoutSeconds => 'مهلت زمانی (ثانیه)';
+
+  @override
+  String get workflowConfigFieldInvoiceType => 'نوع فاکتور';
+
+  @override
+  String get workflowConfigFieldPersonTypeFilter => 'فیلتر نوع طرف حساب';
+
+  @override
+  String get workflowConfigFieldCurrencyId => 'ارز';
+
+  @override
+  String get workflowConfigFieldIncludeTaxDetails => 'شامل جزئیات مالیات';
+
+  @override
+  String get workflowConfigFieldIncludePaymentStatus => 'شامل وضعیت پرداخت';
+
+  @override
+  String get workflowConfigFieldAccountIdFilter => 'فیلتر حساب';
+
+  @override
+  String get workflowConfigFieldPaymentMethodFilter => 'فیلتر روش پرداخت';
+
+  @override
+  String get workflowConfigFieldIncludeBalance => 'شامل موجودی';
+
+  @override
+  String get workflowConfigFieldCheckDuplicate => 'بررسی تکراری';
+
+  @override
+  String get workflowConfigFieldTypeFilter => 'فیلتر نوع';
+
+  @override
+  String get workflowConfigFieldCheckType => 'نوع چک';
+
+  @override
+  String get workflowConfigFieldDaysBefore => 'روز قبل از سررسید';
+
+  @override
+  String get workflowConfigFieldReferenceCode => 'کد/شماره مرجع';
+
+  @override
+  String get workflowConfigFieldExtraInfo => 'اطلاعات اضافی';
+
+  @override
+  String get workflowConfigFieldIsProforma => 'پیش‌فاکتور';
+
+  @override
+  String get workflowConnectionHelpTitle => 'راهنمای اتصال نودها';
+
+  @override
+  String get workflowConnectionHelpMethod1 => 'روش 1: Drag & Drop (پیشنهادی)';
+
+  @override
+  String get workflowConnectionHelpMethod1Step1 =>
+      '1. روی نقطه خروجی (Output) یک نود کلیک کنید و نگه دارید';
+
+  @override
+  String get workflowConnectionHelpMethod1Step2 =>
+      '2. ماوس را بکشید - یک خط موقت نمایش داده می‌شود';
+
+  @override
+  String get workflowConnectionHelpMethod1Step3 =>
+      '3. ماوس را روی نقطه ورودی (Input) نود دیگر رها کنید';
+
+  @override
+  String get workflowConnectionHelpMethod2 => 'روش 2: Click & Click';
+
+  @override
+  String get workflowConnectionHelpMethod2Step1 =>
+      '1. روی نقطه خروجی (Output) یک نود کلیک کنید';
+
+  @override
+  String get workflowConnectionHelpMethod2Step2 =>
+      '2. روی نقطه ورودی (Input) نود دیگر کلیک کنید';
+
+  @override
+  String get workflowConnectionHelpTips => 'نکات مهم';
+
+  @override
+  String get workflowConnectionHelpTipsText =>
+      '• نودهای Trigger فقط نقطه خروجی دارند\n• نودهای Action هم ورودی و هم خروجی دارند\n• برای حذف اتصال: روی آن کلیک کرده و Delete بزنید';
+
+  @override
+  String get workflowConnectionHelpGotIt => 'متوجه شدم';
+
+  @override
+  String get workflowEditNameDescription => 'ویرایش نام و توضیحات';
+
+  @override
+  String get workflowNameRequired => 'نام ورکفلو *';
+
+  @override
+  String get workflowNameHint => 'مثال: فرآیند تایید فاکتور';
+
+  @override
+  String get workflowDescription => 'توضیحات';
+
+  @override
+  String get workflowDescriptionHint => 'توضیحات اختیاری در مورد این ورکفلو...';
+
+  @override
+  String get workflowSaveWorkflow => 'ذخیره ورکفلو';
+
+  @override
+  String get workflowEnterName => 'لطفاً نام ورکفلو را وارد کنید';
+
+  @override
+  String get workflowInfoUpdated =>
+      'اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.';
+
+  @override
+  String get workflowNoteComment => 'یادداشت / توضیح';
+
+  @override
+  String get workflowNoteHint => 'یادداشت یا توضیح برای این نود...';
+
+  @override
+  String get workflowNoteDeleted => 'یادداشت حذف شد';
+
+  @override
+  String get workflowNoteCleared => 'یادداشت پاک شد';
+
+  @override
+  String get workflowNoteSaved => 'یادداشت ذخیره شد';
+
+  @override
+  String get workflowSaveAsTemplate => 'ذخیره به عنوان قالب';
+
+  @override
+  String get workflowTemplateName => 'نام قالب';
+
+  @override
+  String get workflowTemplateNameHint => 'مثال: فرآیند فاکتور';
+
+  @override
+  String workflowTemplateSaved(String name) {
+    return 'قالب \"$name\" ذخیره شد';
+  }
+
+  @override
+  String workflowTemplateLoaded(String name) {
+    return 'قالب \"$name\" بارگذاری شد';
+  }
+
+  @override
+  String get workflowSelectTemplate => 'انتخاب قالب';
+
+  @override
+  String get workflowBuiltinTemplates => 'قالب‌های آماده';
+
+  @override
+  String get workflowSavedTemplates => 'قالب‌های ذخیره شده';
+
+  @override
+  String get workflowNoSavedTemplates => 'هیچ قالب ذخیره شده‌ای وجود ندارد';
+
+  @override
+  String get workflowTemplateDefault => 'قالب';
+
+  @override
+  String workflowTemplateN(int n) {
+    return 'قالب $n';
+  }
+
+  @override
+  String workflowCreatedAt(String date) {
+    return 'ایجاد شده: $date';
+  }
+
+  @override
+  String get workflowErrorAddNode => 'خطا در افزودن نود';
+
+  @override
+  String get workflowErrorSaveTemplate => 'خطا در ذخیره قالب';
+
+  @override
+  String get workflowErrorLoadTemplate => 'خطا در بارگذاری قالب';
+
+  @override
+  String get workflowTimelineTitle => 'Timeline اجرا';
+
+  @override
+  String get workflowTimelineRefresh => 'بارگذاری مجدد';
+
+  @override
+  String get workflowAnalyticsTitle => 'آمار و تحلیل';
+
+  @override
+  String get workflowPerformance => 'عملکرد';
+
+  @override
+  String get workflowNoData => 'داده‌ای موجود نیست';
+
+  @override
+  String get workflowErrorLoadTimeline => 'خطا در بارگذاری timeline';
+
+  @override
+  String get workflowAllLogs => 'کل لاگ‌ها';
+
+  @override
+  String get workflowAllNodes => 'کل نودها';
+
+  @override
+  String get workflowErrors => 'خطاها';
+
+  @override
+  String get workflowNodeStats => 'آمار نودها';
+
+  @override
+  String get workflowColumnNode => 'نود';
+
+  @override
+  String get workflowColumnType => 'نوع';
+
+  @override
+  String get workflowColumnExecutions => 'اجراها';
+
+  @override
+  String get workflowColumnAvgTime => 'میانگین زمان';
+
+  @override
+  String get workflowErrorLoadAnalytics => 'خطا در بارگذاری آمار عملکرد';
+
+  @override
+  String get workflowErrorLoadErrorStats => 'خطا در بارگذاری آمار خطاها';
+
+  @override
+  String get workflowTotalExecutions => 'کل اجراها';
+
+  @override
+  String get workflowSuccessful => 'موفق';
+
+  @override
+  String get workflowFailed => 'ناموفق';
+
+  @override
+  String get workflowAvgTime => 'میانگین زمان';
+
+  @override
+  String get workflowSuccessRate => 'نرخ موفقیت';
+
+  @override
+  String get workflowNoErrorsRecorded => 'خطایی ثبت نشده است!';
+
+  @override
+  String get workflowTotalErrors => 'کل خطاها';
+
+  @override
+  String get workflowErrorTypes => 'انواع خطا';
+
+  @override
+  String get workflowErrorLoadHistory => 'خطا در بارگذاری تاریخچه';
+
+  @override
+  String get workflowErrorLoadLogs => 'خطا در بارگذاری لاگ‌ها';
+
+  @override
+  String get workflowDeleteWorkflow => 'حذف ورک‌فلو';
+
+  @override
+  String workflowDeleteConfirm(String name) {
+    return 'آیا از حذف ورک‌فلو \"$name\" اطمینان دارید؟';
+  }
+
+  @override
+  String get workflowDeletedSuccess => 'ورک‌فلو با موفقیت حذف شد';
+
+  @override
+  String get workflowErrorDelete => 'خطا در حذف ورک‌فلو';
+
+  @override
+  String get workflowStatusActive => 'فعال';
+
+  @override
+  String get workflowStatusInactive => 'غیرفعال';
+
+  @override
+  String get workflowStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get workflowNoNodesDefined => 'هیچ گره‌ای تعریف نشده است';
+
+  @override
+  String get workflowEmpty => 'این ورک‌فلو خالی است';
+
+  @override
+  String get workflowErrorDisplay => 'خطا در نمایش ورکفلو';
 
   @override
   String get workflowExecutionLogs => 'لاگ اجرا';
@@ -6109,6 +6775,405 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get workflowForceDirectedLayoutApplied =>
       'چیدمان Force-directed اعمال شد';
+
+  @override
+  String get workflowValidationSuccess => 'اعتبارسنجی موفق';
+
+  @override
+  String get workflowAllNodesValid => 'همه نودها معتبر هستند!';
+
+  @override
+  String workflowNodesWithErrors(int count) {
+    return '$count نود دارای خطا';
+  }
+
+  @override
+  String get workflowToolbarOpenPalette => 'باز کردن پالت node ها';
+
+  @override
+  String get workflowToolbarZoomOut => 'بزرگنمایی کمتر';
+
+  @override
+  String get workflowToolbarZoomIn => 'بزرگنمایی بیشتر';
+
+  @override
+  String get workflowToolbarResetZoom => 'تنظیم مجدد بزرگنمایی';
+
+  @override
+  String get workflowToolbarConnectionHelp => 'راهنمای اتصال نودها';
+
+  @override
+  String get workflowToolbarHideGrid => 'مخفی کردن Grid';
+
+  @override
+  String get workflowToolbarShowGrid => 'نمایش Grid';
+
+  @override
+  String get workflowToolbarDisableSnapToGrid => 'غیرفعال کردن Snap to Grid';
+
+  @override
+  String get workflowToolbarEnableSnapToGrid => 'فعال کردن Snap to Grid';
+
+  @override
+  String get workflowToolbarAlignmentTools => 'ابزارهای تراز';
+
+  @override
+  String get workflowToolbarAlignLeft => 'تراز به چپ';
+
+  @override
+  String get workflowToolbarAlignRight => 'تراز به راست';
+
+  @override
+  String get workflowToolbarAlignTop => 'تراز به بالا';
+
+  @override
+  String get workflowToolbarAlignBottom => 'تراز به پایین';
+
+  @override
+  String get workflowToolbarDistributeHorizontally => 'توزیع افقی';
+
+  @override
+  String get workflowToolbarDistributeVertically => 'توزیع عمودی';
+
+  @override
+  String get workflowToolbarAlignToGrid => 'تراز به Grid';
+
+  @override
+  String get workflowToolbarClearAll => 'پاکسازی همه';
+
+  @override
+  String get workflowToolbarAutoLayout => 'چیدمان خودکار';
+
+  @override
+  String get workflowToolbarTemplates => 'قالب‌ها';
+
+  @override
+  String get workflowToolbarLoadTemplate => 'بارگذاری قالب';
+
+  @override
+  String get workflowToolbarSelectLayoutType => 'انتخاب نوع چیدمان';
+
+  @override
+  String get workflowToolbarHierarchical => 'لایه‌ای (Hierarchical)';
+
+  @override
+  String get workflowToolbarForceDirected => 'نیرویی (Force-directed)';
+
+  @override
+  String get workflowToolbarShowValidationErrors => 'نمایش خطاهای اعتبارسنجی';
+
+  @override
+  String get workflowToolbarUndo => 'بازگردانی';
+
+  @override
+  String get workflowToolbarRedo => 'انجام مجدد';
+
+  @override
+  String get workflowToolbarNodes => 'Nodeها';
+
+  @override
+  String get workflowToolbarConnections => 'اتصالات';
+
+  @override
+  String get workflowNoSuggestedFields =>
+      'فیلدهای پیشنهادی برای این نود موجود نیست';
+
+  @override
+  String workflowTypeFieldManually(String nodeId) {
+    return 'می‌توانید به صورت دستی فیلد مورد نظر را تایپ کنید: $nodeId.field_name';
+  }
+
+  @override
+  String get workflowFieldInvoiceId => 'شناسه فاکتور';
+
+  @override
+  String get workflowFieldDescInvoiceId => 'شناسه عددی فاکتور';
+
+  @override
+  String get workflowFieldInvoiceCode => 'کد فاکتور';
+
+  @override
+  String get workflowFieldDescInvoiceCode => 'کد یکتا فاکتور';
+
+  @override
+  String get workflowFieldInvoiceNumber => 'شماره فاکتور';
+
+  @override
+  String get workflowFieldDescInvoiceNumber => 'شماره فاکتور';
+
+  @override
+  String get workflowFieldInvoiceDate => 'تاریخ فاکتور';
+
+  @override
+  String get workflowFieldDescInvoiceDate => 'تاریخ صدور فاکتور';
+
+  @override
+  String get workflowFieldTotalAmount => 'مبلغ کل';
+
+  @override
+  String get workflowFieldDescTotalAmount => 'مبلغ کل';
+
+  @override
+  String get workflowFieldDiscountAmount => 'مبلغ تخفیف';
+
+  @override
+  String get workflowFieldDescDiscountAmount => 'مجموع تخفیفات';
+
+  @override
+  String get workflowFieldTaxAmount => 'مبلغ مالیات';
+
+  @override
+  String get workflowFieldDescTaxAmount => 'مجموع مالیات';
+
+  @override
+  String get workflowFieldFinalAmount => 'مبلغ نهایی';
+
+  @override
+  String get workflowFieldDescFinalAmount => 'مبلغ قابل پرداخت';
+
+  @override
+  String get workflowFieldCustomerName => 'نام مشتری';
+
+  @override
+  String get workflowFieldDescCustomerName => 'نام طرف حساب';
+
+  @override
+  String get workflowFieldCustomerId => 'شناسه مشتری';
+
+  @override
+  String get workflowFieldDescCustomerId => 'شناسه طرف حساب';
+
+  @override
+  String get workflowFieldDescription => 'توضیحات';
+
+  @override
+  String get workflowFieldDescDescription => 'توضیحات';
+
+  @override
+  String get workflowFieldInvoiceDescription => 'توضیحات فاکتور';
+
+  @override
+  String get workflowFieldStatus => 'وضعیت';
+
+  @override
+  String get workflowFieldDescStatus => 'وضعیت';
+
+  @override
+  String get workflowFieldInvoiceStatus => 'وضعیت فاکتور';
+
+  @override
+  String get workflowFieldPaymentId => 'شناسه پرداخت';
+
+  @override
+  String get workflowFieldDescPaymentId => 'شناسه عددی پرداخت';
+
+  @override
+  String get workflowFieldAmount => 'مبلغ';
+
+  @override
+  String get workflowFieldDescAmount => 'مبلغ';
+
+  @override
+  String get workflowFieldPaymentAmount => 'مبلغ پرداخت';
+
+  @override
+  String get workflowFieldPaymentDate => 'تاریخ پرداخت';
+
+  @override
+  String get workflowFieldDescPaymentDate => 'تاریخ پرداخت';
+
+  @override
+  String get workflowFieldPaymentMethod => 'روش پرداخت';
+
+  @override
+  String get workflowFieldDescPaymentMethod => 'نوع روش پرداخت';
+
+  @override
+  String get workflowFieldPaymentStatus => 'وضعیت پرداخت';
+
+  @override
+  String get workflowFieldReferenceCode => 'کد پیگیری';
+
+  @override
+  String get workflowFieldDescReferenceCode => 'کد پیگیری تراکنش';
+
+  @override
+  String get workflowFieldDocumentId => 'شناسه سند';
+
+  @override
+  String get workflowFieldDescDocumentId => 'شناسه عددی سند';
+
+  @override
+  String get workflowFieldDocumentType => 'نوع سند';
+
+  @override
+  String get workflowFieldDescDocumentType => 'نوع سند حسابداری';
+
+  @override
+  String get workflowFieldDocTotalAmount => 'مبلغ کل سند';
+
+  @override
+  String get workflowFieldDescDocTotalAmount => 'مبلغ کل سند';
+
+  @override
+  String get workflowFieldDocDescription => 'شرح';
+
+  @override
+  String get workflowFieldDescDocDescription => 'شرح سند';
+
+  @override
+  String get workflowFieldReceiptPaymentId => 'شناسه دریافت/پرداخت';
+
+  @override
+  String get workflowFieldDescReceiptPaymentId => 'شناسه عددی';
+
+  @override
+  String get workflowFieldType => 'نوع';
+
+  @override
+  String get workflowFieldDescType => 'دریافت یا پرداخت';
+
+  @override
+  String get workflowFieldPersonId => 'شناسه';
+
+  @override
+  String get workflowFieldDescPersonId => 'شناسه طرف حساب';
+
+  @override
+  String get workflowFieldPersonName => 'نام';
+
+  @override
+  String get workflowFieldDescPersonName => 'نام طرف حساب';
+
+  @override
+  String get workflowFieldEmail => 'ایمیل';
+
+  @override
+  String get workflowFieldDescEmail => 'آدرس ایمیل';
+
+  @override
+  String get workflowFieldPhone => 'تلفن';
+
+  @override
+  String get workflowFieldDescPhone => 'شماره تلفن';
+
+  @override
+  String get workflowFieldMobile => 'موبایل';
+
+  @override
+  String get workflowFieldDescMobile => 'شماره موبایل';
+
+  @override
+  String get workflowFieldPersonType => 'نوع';
+
+  @override
+  String get workflowFieldDescPersonType => 'نوع طرف حساب';
+
+  @override
+  String get workflowFieldProductId => 'شناسه محصول';
+
+  @override
+  String get workflowFieldDescProductId => 'شناسه عددی محصول';
+
+  @override
+  String get workflowFieldProductName => 'نام محصول';
+
+  @override
+  String get workflowFieldDescProductName => 'نام محصول';
+
+  @override
+  String get workflowFieldProductCode => 'کد محصول';
+
+  @override
+  String get workflowFieldDescProductCode => 'کد محصول';
+
+  @override
+  String get workflowFieldPrice => 'قیمت';
+
+  @override
+  String get workflowFieldDescPrice => 'قیمت فروش';
+
+  @override
+  String get workflowFieldQuantity => 'تعداد';
+
+  @override
+  String get workflowFieldDescQuantity => 'تعداد موجودی';
+
+  @override
+  String get workflowFieldId => 'شناسه';
+
+  @override
+  String get workflowFieldDescId => 'شناسه رکورد';
+
+  @override
+  String get workflowFieldName => 'نام';
+
+  @override
+  String get workflowFieldDescName => 'نام';
+
+  @override
+  String get workflowFieldTitle => 'عنوان';
+
+  @override
+  String get workflowFieldDescTitle => 'عنوان';
+
+  @override
+  String get workflowFieldGenDescription => 'توضیحات';
+
+  @override
+  String get workflowFieldDescGenDescription => 'توضیحات';
+
+  @override
+  String get workflowFieldGenStatus => 'وضعیت';
+
+  @override
+  String get workflowFieldDescGenStatus => 'وضعیت';
+
+  @override
+  String get workflowFieldCreatedAt => 'تاریخ ایجاد';
+
+  @override
+  String get workflowFieldDescCreatedAt => 'تاریخ و زمان ایجاد';
+
+  @override
+  String get workflowTemplateInvoiceSalesName => 'اطلاع‌رسانی فاکتور فروش';
+
+  @override
+  String get workflowTemplateInvoiceSalesDesc =>
+      'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود';
+
+  @override
+  String get workflowCategoryInvoice => 'فاکتور';
+
+  @override
+  String get workflowTemplateInventoryLowName => 'هشدار موجودی کم';
+
+  @override
+  String get workflowTemplateInventoryLowDesc =>
+      'زمانی که موجودی محصول کم شود، notification ارسال می‌شود';
+
+  @override
+  String get workflowCategoryInventory => 'موجودی';
+
+  @override
+  String get workflowTemplateReceiptPaymentName => 'ثبت لاگ دریافت/پرداخت';
+
+  @override
+  String get workflowTemplateReceiptPaymentDesc =>
+      'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود';
+
+  @override
+  String get workflowCategoryFinancial => 'مالی';
+
+  @override
+  String get workflowTemplatePersonWelcomeName => 'خوش‌آمدگویی شخص جدید';
+
+  @override
+  String get workflowTemplatePersonWelcomeDesc =>
+      'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود';
+
+  @override
+  String get workflowCategoryPersons => 'اشخاص';
 
   @override
   String get settingsCategoriesCount => 'دسته‌بندی';

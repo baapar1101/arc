@@ -281,6 +281,58 @@ CREATE_INVOICE_TRANSLATIONS = {
 
 
 # ترجمه‌های اکشن "ارسال تلگرام"
+SEND_BALE_TRANSLATIONS = {
+    "fa": {
+        "action_name": "ارسال پیام به بله",
+        "action_description": "ارسال پیام به کاربر عضو کسب و کار از طریق پیام‌رسان بله (فقط کاربران متصل به ربات)",
+        # برچسب فیلدها
+        "field_user_id": "کاربر گیرنده",
+        "field_message": "متن پیام",
+        "field_parse_mode": "حالت پارس متن",
+        "field_retry_on_failure": "تلاش مجدد در صورت خطا",
+        "field_retry_attempts": "تعداد تلاش‌های مجدد",
+        "field_retry_delay_seconds": "تاخیر بین تلاش‌ها",
+        # توضیحات فیلدها
+        "field_user_id_desc": "شناسه کاربر عضو کسب و کار که به ربات بله متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
+        "field_message_desc": "متن پیام ارسالی به کاربر",
+        "field_parse_mode_desc": "حالت پارس متن (متن ساده، HTML یا Markdown)",
+        "field_retry_on_failure_desc": "تلاش مجدد در صورت شکست ارسال",
+        "field_retry_attempts_desc": "تعداد تلاش‌های مجدد",
+        "field_retry_delay_seconds_desc": "تاخیر بین تلاش‌ها (ثانیه)",
+        # placeholder
+        "field_message_placeholder": "متن پیام را وارد کنید...",
+        # enum parse_mode
+        "None": "متن ساده",
+        "HTML": "HTML - با فرمت اچ‌تی‌ام‌ال",
+        "Markdown": "Markdown - با فرمت مارک‌داون",
+    },
+    "en": {
+        "action_name": "Send Bale Message",
+        "action_description": "Send message to business member via Bale messenger (only connected users)",
+        # Field labels
+        "field_user_id": "Recipient User",
+        "field_message": "Message Text",
+        "field_parse_mode": "Parse Mode",
+        "field_retry_on_failure": "Retry on Failure",
+        "field_retry_attempts": "Retry Attempts",
+        "field_retry_delay_seconds": "Retry Delay",
+        # Field descriptions
+        "field_user_id_desc": "User ID of business member connected to Bale bot (can use previous nodes: $node_id.user_id)",
+        "field_message_desc": "Message text to send to user",
+        "field_parse_mode_desc": "Parse mode (plain text, HTML or Markdown)",
+        "field_retry_on_failure_desc": "Retry on send failure",
+        "field_retry_attempts_desc": "Number of retry attempts",
+        "field_retry_delay_seconds_desc": "Delay between retries (seconds)",
+        # Placeholder
+        "field_message_placeholder": "Enter your message...",
+        # enum parse_mode
+        "None": "Plain text",
+        "HTML": "HTML",
+        "Markdown": "Markdown",
+    }
+}
+
+
 SEND_TELEGRAM_TRANSLATIONS = {
     "fa": {
         "action_name": "ارسال پیام تلگرام",
@@ -290,17 +342,21 @@ SEND_TELEGRAM_TRANSLATIONS = {
         "field_user_id_desc": "شناسه کاربر عضو کسب و کار که به ربات تلگرام متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
         
         "field_message": "متن پیام",
-        "field_message_desc": "متن پیام",
+        "field_message_desc": "متن پیام ارسالی به کاربر",
         "field_message_placeholder": "متن پیام خود را وارد کنید...",
         
-        "field_parse_mode": "حالت پارس",
-        "field_parse_mode_desc": "حالت پارس (HTML/Markdown/None)",
+        "field_parse_mode": "حالت پارس متن",
+        "field_parse_mode_desc": "حالت پارس متن (متن ساده، HTML یا Markdown)",
+        # enum parse_mode
+        "None": "متن ساده",
+        "HTML": "HTML - با فرمت اچ‌تی‌ام‌ال",
+        "Markdown": "Markdown - با فرمت مارک‌داون",
         
         "field_disable_web_page_preview": "غیرفعال کردن پیش‌نمایش لینک",
         "field_disable_web_page_preview_desc": "غیرفعال کردن پیش‌نمایش لینک",
         
         "field_retry_on_failure": "تلاش مجدد در صورت خطا",
-        "field_retry_on_failure_desc": "تلاش مجدد در صورت خطا",
+        "field_retry_on_failure_desc": "تلاش مجدد در صورت شکست ارسال",
         
         "field_retry_attempts": "تعداد تلاش‌های مجدد",
         "field_retry_attempts_desc": "تعداد تلاش‌های مجدد",
@@ -316,17 +372,21 @@ SEND_TELEGRAM_TRANSLATIONS = {
         "field_user_id_desc": "User ID of business member connected to Telegram bot (can use previous nodes: $node_id.user_id)",
         
         "field_message": "Message Text",
-        "field_message_desc": "Message text",
+        "field_message_desc": "Message text to send to user",
         "field_message_placeholder": "Enter your message...",
         
         "field_parse_mode": "Parse Mode",
-        "field_parse_mode_desc": "Parse mode (HTML/Markdown/None)",
+        "field_parse_mode_desc": "Parse mode (plain text, HTML or Markdown)",
+        # enum parse_mode
+        "None": "Plain text",
+        "HTML": "HTML",
+        "Markdown": "Markdown",
         
         "field_disable_web_page_preview": "Disable Web Page Preview",
         "field_disable_web_page_preview_desc": "Disable web page preview",
         
         "field_retry_on_failure": "Retry on Failure",
-        "field_retry_on_failure_desc": "Retry on failure",
+        "field_retry_on_failure_desc": "Retry on send failure",
         
         "field_retry_attempts": "Retry Attempts",
         "field_retry_attempts_desc": "Number of retry attempts",
@@ -394,6 +454,111 @@ SEND_EMAIL_TRANSLATIONS = {
 }
 
 
+# ترجمه‌های اکشن AI Agent
+AI_AGENT_TRANSLATIONS = {
+    "fa": {
+        "action_name": "AI Agent",
+        "action_description": "عامل هوشمند برای تولید متن، تصمیم‌گیری، فراخوانی توابع و خروجی ساختاریافته. مشابه n8n AI Agent.",
+        # برچسب‌های فیلدها
+        "field_system_prompt": "دستورات سیستم",
+        "field_user_prompt": "دستور/سوال کاربر",
+        "field_tools_mode": "حالت ابزارها",
+        "field_tools_category": "دسته توابع",
+        "field_tools_allowlist": "توابع مجاز",
+        "field_tools_denylist": "توابع غیرمجاز",
+        "field_max_iterations": "حداکثر چرخه",
+        "field_temperature": "دما",
+        "field_max_tokens": "حداکثر توکن",
+        "field_output_mode": "نوع خروجی",
+        "field_inject_trigger_data": "افزودن trigger_data",
+        "field_inject_node_results": "افزودن نتایج نودها",
+        # توضیحات فیلدها
+        "field_system_prompt_desc": "دستورات سیستم برای AI (وظیفه، قوانین، قالب خروجی)",
+        "field_user_prompt_desc": "سوال یا دستور برای AI. می‌توانید از $trigger_1، $node_id و {{ trigger_data.field }} استفاده کنید.",
+        "field_tools_mode_desc": "حالت ابزارها (توابع قابل فراخوانی توسط AI)",
+        "field_tools_category_desc": "دسته توابع (در حالت category)",
+        "field_tools_allowlist_desc": "لیست توابع مجاز جدا شده با کاما (در حالت custom)",
+        "field_tools_denylist_desc": "لیست توابع غیرمجاز جدا شده با کاما",
+        "field_max_iterations_desc": "حداکثر چرخه فراخوانی توابع (برای multi-step reasoning)",
+        "field_temperature_desc": "دما (0 برای تصمیم‌گیری دقیق، بالاتر برای خلاقیت)",
+        "field_max_tokens_desc": "حداکثر توکن خروجی",
+        "field_output_mode_desc": "نوع خروجی",
+        "field_inject_trigger_data_desc": "اضافه کردن trigger_data به context",
+        "field_inject_node_results_desc": "اضافه کردن نتایج نودهای قبلی به context",
+        # placeholders
+        "field_system_prompt_placeholder": "دستورات و قوانین AI را وارد کنید...",
+        "field_user_prompt_placeholder": "سوال یا دستور را وارد کنید. از $trigger_1 استفاده کنید...",
+        "field_tools_allowlist_placeholder": "مثال: search_invoices, get_invoice_details",
+        "field_tools_denylist_placeholder": "مثال: create_invoice",
+        # enum tools_mode
+        "all": "همه توابع",
+        "category": "بر اساس دسته",
+        "custom": "لیست سفارشی",
+        "none": "بدون توابع",
+        # enum output_mode
+        "text": "متن",
+        "json": "JSON",
+        # enum tools_category
+        "invoices": "فاکتورها",
+        "persons": "اشخاص",
+        "products": "محصولات",
+        "financial": "مالی",
+        "crm": "CRM",
+        "business": "کسب‌وکار",
+    },
+    "en": {
+        "action_name": "AI Agent",
+        "action_description": "Intelligent agent for text generation, decision making, function calling and structured output. Similar to n8n AI Agent.",
+        # Field labels
+        "field_system_prompt": "System Instructions",
+        "field_user_prompt": "User Prompt/Question",
+        "field_tools_mode": "Tools Mode",
+        "field_tools_category": "Tools Category",
+        "field_tools_allowlist": "Allowed Functions",
+        "field_tools_denylist": "Denied Functions",
+        "field_max_iterations": "Max Iterations",
+        "field_temperature": "Temperature",
+        "field_max_tokens": "Max Tokens",
+        "field_output_mode": "Output Mode",
+        "field_inject_trigger_data": "Inject Trigger Data",
+        "field_inject_node_results": "Inject Node Results",
+        # Field descriptions
+        "field_system_prompt_desc": "System instructions for AI (task, rules, output format)",
+        "field_user_prompt_desc": "Question or instruction for AI. Use $trigger_1, $node_id and {{ trigger_data.field }}",
+        "field_tools_mode_desc": "Tools mode (functions AI can call)",
+        "field_tools_category_desc": "Tools category (when mode is category)",
+        "field_tools_allowlist_desc": "Comma-separated list of allowed functions (when mode is custom)",
+        "field_tools_denylist_desc": "Comma-separated list of denied functions",
+        "field_max_iterations_desc": "Maximum function call iterations (for multi-step reasoning)",
+        "field_temperature_desc": "Temperature (0 for precise decisions, higher for creativity)",
+        "field_max_tokens_desc": "Maximum output tokens",
+        "field_output_mode_desc": "Output type",
+        "field_inject_trigger_data_desc": "Add trigger_data to context",
+        "field_inject_node_results_desc": "Add previous node results to context",
+        # Placeholders
+        "field_system_prompt_placeholder": "Enter AI instructions and rules...",
+        "field_user_prompt_placeholder": "Enter question or instruction. Use $trigger_1...",
+        "field_tools_allowlist_placeholder": "e.g.: search_invoices, get_invoice_details",
+        "field_tools_denylist_placeholder": "e.g.: create_invoice",
+        # enum tools_mode
+        "all": "All functions",
+        "category": "By category",
+        "custom": "Custom list",
+        "none": "No functions",
+        # enum output_mode
+        "text": "Text",
+        "json": "JSON",
+        # enum tools_category
+        "invoices": "Invoices",
+        "persons": "Persons",
+        "products": "Products",
+        "financial": "Financial",
+        "crm": "CRM",
+        "business": "Business",
+    }
+}
+
+
 # ترجمه‌های سایر اکشن‌ها
 OTHER_ACTIONS_TRANSLATIONS = {
     "fa": {
@@ -420,6 +585,10 @@ OTHER_ACTIONS_TRANSLATIONS = {
         # Update Inventory
         "update_inventory_name": "به‌روزرسانی موجودی",
         "update_inventory_desc": "به‌روزرسانی موجودی یک محصول",
+
+        # AI Agent
+        "ai_agent_name": "AI Agent",
+        "ai_agent_desc": "عامل هوشمند برای تولید متن، تصمیم‌گیری و فراخوانی توابع",
     },
     "en": {
         # Create Notification
@@ -445,6 +614,10 @@ OTHER_ACTIONS_TRANSLATIONS = {
         # Update Inventory
         "update_inventory_name": "Update Inventory",
         "update_inventory_desc": "Update inventory of a product",
+
+        # AI Agent
+        "ai_agent_name": "AI Agent",
+        "ai_agent_desc": "Intelligent agent for text generation, decision making and function calling",
     }
 }
 
@@ -470,7 +643,9 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
         translations_map = {
             "create_invoice": CREATE_INVOICE_TRANSLATIONS,
             "send_telegram": SEND_TELEGRAM_TRANSLATIONS,
+            "send_bale": SEND_BALE_TRANSLATIONS,
             "send_email": SEND_EMAIL_TRANSLATIONS,
+            "ai_agent": AI_AGENT_TRANSLATIONS,
             "others": OTHER_ACTIONS_TRANSLATIONS,
         }
         
@@ -517,7 +692,13 @@ def translate_metadata(metadata: Dict[str, Any], lang: str = "fa", action_key: s
                 # ترجمه description
                 desc_key = f"field_{field_key}_desc"
                 translated_field["description"] = get_translation(desc_key, lang, action_key)
-                
+
+                # ترجمه برچسب فیلد (title)
+                label_key = f"field_{field_key}"
+                label = get_translation(label_key, lang, action_key)
+                if label != label_key:
+                    translated_field["title"] = label
+
                 # ترجمه enum values
                 if "enum" in translated_field:
                     translated_enum_labels = {}
@@ -574,8 +755,12 @@ def get_all_translation_keys(action_key: str = None) -> Dict[str, list]:
         trans = CREATE_INVOICE_TRANSLATIONS
     elif action_key == "send_telegram":
         trans = SEND_TELEGRAM_TRANSLATIONS
+    elif action_key == "send_bale":
+        trans = SEND_BALE_TRANSLATIONS
     elif action_key == "send_email":
         trans = SEND_EMAIL_TRANSLATIONS
+    elif action_key == "ai_agent":
+        trans = AI_AGENT_TRANSLATIONS
     else:
         trans = COMMON_TRANSLATIONS
     

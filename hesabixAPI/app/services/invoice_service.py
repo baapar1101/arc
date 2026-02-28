@@ -779,6 +779,26 @@ def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
         return None
 
 
+def _resolve_and_validate_person_id(db: Session, business_id: int, person_id: Optional[int]) -> Optional[int]:
+    """
+    اگر person_id مقدار داشته باشد، وجود شخص در جدول persons و تعلق به همان business_id را بررسی می‌کند.
+    در صورت نامعتبر بودن (حذف شده یا متعلق به کسب‌وکار دیگر) ApiError با کد 400 پرتاب می‌شود
+    تا از خطای ForeignKeyViolation در document_lines جلوگیری شود.
+    """
+    if person_id is None or person_id <= 0:
+        return None
+    person = db.query(Person).filter(
+        and_(Person.id == person_id, Person.business_id == business_id)
+    ).first()
+    if not person:
+        raise ApiError(
+            "PERSON_NOT_FOUND_OR_WRONG_BUSINESS",
+            "شخص انتخاب‌شده وجود ندارد یا به این کسب‌وکار تعلق ندارد؛ امکان ذخیره فاکتور با این شخص وجود ندارد.",
+            http_status=400,
+        )
+    return int(person_id)
+
+
 def _normalize_document_extra_info_for_storage(extra_info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """نرمال‌سازی extra_info قبل از ذخیره در دیتابیس تا فیلدهای عددی (مثل person_id) به صورت int ذخیره شوند."""
     if not extra_info or not isinstance(extra_info, dict):
@@ -2854,6 +2874,7 @@ def update_invoice(
         tax = Decimal(str(totals.get("tax", 0)))
         total_with_tax = net + tax
         person_id = _person_id_from_header({"extra_info": header_extra})
+        person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
         # inventory/COGS handled in warehouse posting
 
         if inv_type == INVOICE_SALES:

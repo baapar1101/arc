@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 
 /// پالت node های قابل افزودن به workflow
@@ -101,19 +102,19 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
       WorkflowNodeMetadata(
         key: 'loop.for_each',
         name: 'حلقه For Each',
-        description: 'تکرار روی آرایه یا لیست (⚠️ در حال توسعه)',
+        description: 'تکرار روی آرایه یا لیست',
         type: WorkflowNodeType.loop,
       ),
       WorkflowNodeMetadata(
         key: 'loop.while',
         name: 'حلقه While',
-        description: 'تکرار تا زمانی که شرط برقرار است (⚠️ در حال توسعه)',
+        description: 'تکرار تا زمانی که شرط برقرار است',
         type: WorkflowNodeType.loop,
       ),
       WorkflowNodeMetadata(
         key: 'loop.for',
         name: 'حلقه For',
-        description: 'تکرار با تعداد مشخص (⚠️ در حال توسعه)',
+        description: 'تکرار با بازه عددی مشخص',
         type: WorkflowNodeType.loop,
       ),
     ];
@@ -161,7 +162,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'جستجو...',
+                  hintText: AppLocalizations.of(context).workflowPaletteSearch,
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -195,7 +196,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                 child: Row(
                   children: [
                     FilterChip(
-                      label: const Text('همه'),
+                      label: Text(AppLocalizations.of(context).workflowPaletteAll),
                       selected: _filterType == null,
                       onSelected: (selected) {
                         setState(() {
@@ -205,7 +206,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('Triggers'),
+                      label: Text(AppLocalizations.of(context).workflowPaletteTriggers),
                       avatar: const Icon(Icons.bolt, size: 16),
                       selected: _filterType == WorkflowNodeType.trigger,
                       onSelected: (selected) {
@@ -216,7 +217,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('Actions'),
+                      label: Text(AppLocalizations.of(context).workflowPaletteActions),
                       avatar: const Icon(Icons.play_arrow, size: 16),
                       selected: _filterType == WorkflowNodeType.action,
                       onSelected: (selected) {
@@ -227,7 +228,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('Loops'),
+                      label: Text(AppLocalizations.of(context).workflowPaletteLoops),
                       avatar: const Icon(Icons.loop, size: 16),
                       selected: _filterType == WorkflowNodeType.loop,
                       onSelected: (selected) {
@@ -238,7 +239,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('Conditions'),
+                      label: Text(AppLocalizations.of(context).workflowPaletteConditions),
                       avatar: const Icon(Icons.code, size: 16),
                       selected: _filterType == WorkflowNodeType.condition,
                       onSelected: (selected) {
@@ -354,8 +355,6 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
     Color color,
   ) {
     final theme = Theme.of(context);
-    final isLoop = type == WorkflowNodeType.loop;
-    final isInDevelopment = item.description?.contains('⚠️') ?? false;
 
     return ListTile(
       leading: Container(
@@ -371,34 +370,11 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
           size: 20,
         ),
       ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              item.name,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          if (isInDevelopment)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.orange, width: 1),
-              ),
-              child: Text(
-                'در حال توسعه',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.orange.shade700,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
+      title: Text(
+        item.name,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,9 +385,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
               child: Text(
                 item.description!,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isInDevelopment 
-                      ? Colors.orange.shade700 
-                      : theme.colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -443,34 +417,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
         size: 20,
       ),
       onTap: () {
-        if (isInDevelopment) {
-          // نمایش هشدار برای نودهای در حال توسعه
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('⚠️ در حال توسعه'),
-              content: Text(
-                'این نود هنوز به طور کامل پیاده‌سازی نشده است. '
-                'لطفاً فقط برای تست استفاده کنید.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('انصراف'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    widget.onNodeSelected(type, item.key, item.name);
-                  },
-                  child: const Text('ادامه'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          widget.onNodeSelected(type, item.key, item.name);
-        }
+        widget.onNodeSelected(type, item.key, item.name);
       },
     );
   }

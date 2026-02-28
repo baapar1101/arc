@@ -257,10 +257,16 @@ class AuthContext:
 		
 		# اگر بخش خالی است، فقط خواندن
 		if not section_perms:
-			return action == "read"
+			return action in ("read", "view")
 		
-		# بررسی دسترسی خاص
-		return section_perms.get(action, False)
+		# بررسی دسترسی خاص (view و read معادل هم در نظر گرفته می‌شوند)
+		if section_perms.get(action, False):
+			return True
+		if action == "view" and section_perms.get("read", False):
+			return True
+		if action == "read" and section_perms.get("view", False):
+			return True
+		return False
 	
 	def can_read_section(self, section: str) -> bool:
 		"""بررسی دسترسی خواندن بخش در کسب و کار"""

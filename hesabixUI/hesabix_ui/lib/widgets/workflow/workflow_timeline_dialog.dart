@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -53,7 +54,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری timeline: $e');
+        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadTimeline}: $e');
       }
     }
   }
@@ -61,6 +62,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     
     return Dialog(
       child: Container(
@@ -79,7 +81,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Timeline اجرا',
+                        t.workflowTimelineTitle,
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -97,7 +99,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadTimeline,
-                  tooltip: 'بارگذاری مجدد',
+                  tooltip: t.workflowTimelineRefresh,
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -113,8 +115,8 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_timelineData == null)
-              const Expanded(
-                child: Center(child: Text('داده‌ای موجود نیست')),
+              Expanded(
+                child: Center(child: Text(t.workflowNoData)),
               )
             else
               Expanded(child: _buildTimelineContent()),
@@ -145,11 +147,11 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
         const SizedBox(height: 16),
         
         // Summary Cards
-        if (summary != null) _buildSummaryCards(summary),
+        if (summary != null) _buildSummaryCards(context, summary),
         const SizedBox(height: 16),
         
         // Node Statistics
-        if (nodeStats.isNotEmpty) _buildNodeStatistics(nodeStats),
+        if (nodeStats.isNotEmpty) _buildNodeStatistics(context, nodeStats),
         const SizedBox(height: 16),
         
         // Filters
@@ -160,7 +162,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
         Expanded(
           child: Card(
             child: filteredTimeline.isEmpty
-                ? const Center(child: Text('هیچ لاگی یافت نشد'))
+                ? Center(child: Text(AppLocalizations.of(context).workflowNoLogs))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredTimeline.length,
@@ -267,13 +269,14 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     );
   }
 
-  Widget _buildSummaryCards(Map<String, dynamic> summary) {
+  Widget _buildSummaryCards(BuildContext context, Map<String, dynamic> summary) {
+    final t = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
           child: _buildSummaryCard(
             icon: Icons.list,
-            label: 'کل لاگ‌ها',
+            label: t.workflowAllLogs,
             value: (summary['total_logs'] as int? ?? 0).toString(),
             color: Colors.blue,
           ),
@@ -282,7 +285,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
         Expanded(
           child: _buildSummaryCard(
             icon: Icons.account_tree,
-            label: 'کل نودها',
+            label: t.workflowAllNodes,
             value: (summary['total_nodes'] as int? ?? 0).toString(),
             color: Colors.green,
           ),
@@ -291,7 +294,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
         Expanded(
           child: _buildSummaryCard(
             icon: Icons.error,
-            label: 'خطاها',
+            label: t.workflowErrors,
             value: (summary['error_count'] as int? ?? 0).toString(),
             color: Colors.red,
           ),
@@ -335,20 +338,21 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     );
   }
 
-  Widget _buildNodeStatistics(List<Map<String, dynamic>> nodeStats) {
+  Widget _buildNodeStatistics(BuildContext context, List<Map<String, dynamic>> nodeStats) {
+    final t = AppLocalizations.of(context);
     return ExpansionTile(
       leading: const Icon(Icons.bar_chart),
-      title: const Text('آمار نودها'),
+      title: Text(t.workflowNodeStats),
       children: [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            columns: const [
-              DataColumn(label: Text('نود')),
-              DataColumn(label: Text('نوع'), numeric: false),
-              DataColumn(label: Text('اجراها'), numeric: true),
-              DataColumn(label: Text('خطاها'), numeric: true),
-              DataColumn(label: Text('میانگین زمان'), numeric: true),
+            columns: [
+              DataColumn(label: Text(t.workflowColumnNode)),
+              DataColumn(label: Text(t.workflowColumnType), numeric: false),
+              DataColumn(label: Text(t.workflowColumnExecutions), numeric: true),
+              DataColumn(label: Text(t.workflowErrors), numeric: true),
+              DataColumn(label: Text(t.workflowColumnAvgTime), numeric: true),
             ],
             rows: nodeStats.map((stat) {
               final nodeLabel = stat['node_label'] as String? ?? stat['node_id'] as String? ?? 'Unknown';

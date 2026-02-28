@@ -66,9 +66,19 @@ class LogAction(ActionHandler):
             "config_schema": {
                 "level": {
                     "type": "string",
-                    "description": "سطح لاگ (debug/info/warning/error)",
+                    "description": "سطح لاگ",
                     "default": "info",
-                    "required": False
+                    "required": False,
+                    "enum": ["debug", "info", "warning", "error", "critical"],
+                    "ui_config": {
+                        "labels": {
+                            "debug": "Debug",
+                            "info": "Info",
+                            "warning": "هشدار",
+                            "error": "خطا",
+                            "critical": "بحرانی"
+                        }
+                    }
                 },
                 "message": {
                     "type": "string",

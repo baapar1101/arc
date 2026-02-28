@@ -171,6 +171,12 @@ import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
 import 'pages/business/workflows_page.dart';
 import 'pages/business/workflow_visual_editor_page.dart';
+import 'pages/business/crm/crm_dashboard_page.dart';
+import 'pages/business/crm/crm_process_definitions_page.dart';
+import 'pages/business/crm/crm_leads_page.dart';
+import 'pages/business/crm/crm_deals_page.dart';
+import 'pages/business/crm/crm_activities_page.dart';
+import 'pages/business/crm/crm_reports_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -187,6 +193,9 @@ class MyApp extends StatefulWidget {
 
 // Global navigator key for accessing Navigator from anywhere
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Route observer for pages that need to react when they become visible again (e.g. list refresh on return).
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 class _MyAppState extends State<MyApp> {
   LocaleController? _controller;
@@ -753,6 +762,7 @@ class _MyAppState extends State<MyApp> {
 
     final router = GoRouter(
       navigatorKey: navigatorKey,
+      observers: [routeObserver],
       initialLocation: currentInitialLocation,
       redirect: (context, state) async {
         final currentPath = state.uri.path;
@@ -1783,6 +1793,98 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/crm',
+              name: 'business_crm_dashboard',
+              redirect: (context, state) => '/business/${state.pathParameters['business_id']}/crm/dashboard',
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/dashboard',
+              name: 'business_crm_dashboard_page',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmDashboardPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/process-definitions',
+              name: 'business_crm_process_definitions',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmProcessDefinitionsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/leads',
+              name: 'business_crm_leads',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmLeadsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/deals',
+              name: 'business_crm_deals',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmDealsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/activities',
+              name: 'business_crm_activities',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmActivitiesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/reports',
+              name: 'business_crm_reports',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmReportsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/user/profile/system-settings/wallet',
               name: 'system_wallet_settings',
               pageBuilder: (context, state) => const NoTransitionPage(
@@ -1800,6 +1902,7 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
+                    routeObserver: routeObserver,
                   ),
                 );
               },

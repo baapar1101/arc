@@ -1635,157 +1635,337 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   }
 
   Future<void> _pickInvoiceForLine(_PersonLine line) async {
-    final svc = InvoiceService(apiClient: widget.apiClient);
-    final TextEditingController searchCtrl = TextEditingController();
-    List<Map<String, dynamic>> results = <Map<String, dynamic>>[];
-    bool loading = false;
-    await showDialog(
+    final picked = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) {
-        Future<void> doSearch() async {
-          loading = true;
-          (ctx as Element).markNeedsBuild();
-          try {
-            final bodyFilters = <String, dynamic>{};
-            final pid = int.tryParse(line.personId ?? '');
-            if (pid != null) bodyFilters['person_id'] = pid;
-            if (_selectedCurrencyId != null) {
-              bodyFilters['currency_id'] = _selectedCurrencyId;
-            }
-            final data = await svc.searchInvoices(
-              businessId: widget.businessId,
-              page: 1,
-              limit: 20,
-              search: searchCtrl.text.trim().isEmpty ? null : searchCtrl.text.trim(),
-              filters: bodyFilters.isEmpty ? null : bodyFilters,
+      builder: (ctx) => _InstallmentInvoicePickerDialog(
+        businessId: widget.businessId,
+        apiClient: widget.apiClient,
+        personId: int.tryParse(line.personId ?? ''),
+        personName: line.personName,
+        currencyId: _selectedCurrencyId,
+        calendarController: widget.calendarController,
+      ),
+    );
+    if (picked != null) {
+      final id = picked['id'] as int?;
+      final code = (picked['code']?.toString() ?? '').trim();
+      if (id != null) {
+        final idx = _personLines.indexOf(line);
+        if (idx >= 0) {
+          setState(() {
+            _personLines[idx] = _personLines[idx].copyWith(
+              installmentInvoiceId: id,
+              installmentInvoiceCode: code.isNotEmpty ? code : _personLines[idx].installmentInvoiceCode,
             );
-            final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
-            // فقط فاکتورهای اقساطی را نمایش بده
-            results = items.where((it) {
-              final isInstallment = it['is_installment_sale'] == true;
-              return isInstallment;
-            }).toList();
-          } catch (e) {
-            results = <Map<String, dynamic>>[];
-          } finally {
-            loading = false;
-            (ctx).markNeedsBuild();
-          }
+          });
+          await _loadInstallmentPlanForLine(_personLines[idx]);
         }
+      }
+    }
+  }
+}
 
-        return AlertDialog(
-          title: const Text('انتخاب فاکتور'),
-          content: SizedBox(
-            width: 600,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+/// دیالوگ انتخاب فاکتور اقساطی با جستجو، debounce، صفحه‌بندی و نمایش مانده/وضعیت
+class _InstallmentInvoicePickerDialog extends StatefulWidget {
+  final int businessId;
+  final ApiClient apiClient;
+  final int? personId;
+  final String? personName;
+  final int? currencyId;
+  final CalendarController calendarController;
+
+  const _InstallmentInvoicePickerDialog({
+    required this.businessId,
+    required this.apiClient,
+    this.personId,
+    this.personName,
+    this.currencyId,
+    required this.calendarController,
+  });
+
+  @override
+  State<_InstallmentInvoicePickerDialog> createState() => _InstallmentInvoicePickerDialogState();
+}
+
+class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePickerDialog> {
+  final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  late final InvoiceService _invoiceService;
+  List<Map<String, dynamic>> _results = [];
+  int _page = 1;
+  static const _limit = 20;
+  int _total = 0;
+  bool _loading = false;
+  bool _loadingMore = false;
+  Timer? _debounceTimer;
+  static const _debounceDuration = Duration(milliseconds: 400);
+
+  @override
+  void initState() {
+    super.initState();
+    _invoiceService = InvoiceService(apiClient: widget.apiClient);
+    _load(page: 1, reset: true);
+    _searchCtrl.addListener(_onSearchChanged);
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(_debounceDuration, () {
+      if (mounted) _load(page: 1, reset: true);
+    });
+  }
+
+  void _onScroll() {
+    if (_loadingMore || _loading) return;
+    if (_results.length >= _total) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 80) {
+      _load(page: _page + 1, reset: false);
+    }
+  }
+
+  Future<void> _load({required int page, required bool reset}) async {
+    if (_loading && reset) return;
+    if (_loadingMore && !reset) return;
+    if (reset) {
+      setState(() => _loading = true);
+    } else {
+      setState(() => _loadingMore = true);
+    }
+    try {
+      final data = await _invoiceService.searchInstallmentInvoices(
+        businessId: widget.businessId,
+        personId: widget.personId,
+        currencyId: widget.currencyId,
+        page: page,
+        limit: _limit,
+        search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+        sortBy: 'remaining_amount',
+        sortDesc: true,
+      );
+      final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      final total = (data['total'] as num?)?.toInt() ?? 0;
+      if (mounted) {
+        setState(() {
+          if (reset) {
+            _results = items;
+            _page = 1;
+          } else {
+            _results = [..._results, ...items];
+            _page = page;
+          }
+          _total = total;
+        });
+      }
+    } catch (_) {
+      if (mounted && reset) setState(() => _results = []);
+    } finally {
+      if (mounted) setState(() { _loading = false; _loadingMore = false; });
+    }
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'paid': return AppLocalizations.of(context)!.installmentsStatusPaid;
+      case 'partial': return AppLocalizations.of(context)!.installmentsStatusPartial;
+      case 'pending': return AppLocalizations.of(context)!.installmentsStatusPending;
+      case 'overdue': return AppLocalizations.of(context)!.installmentsStatusOverdue;
+      default: return status ?? '-';
+    }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'paid': return Colors.green;
+      case 'partial': return Colors.orange;
+      case 'pending': return Colors.blue;
+      case 'overdue': return Colors.red;
+      default: return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.receipt_long, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(child: Text(t.installmentsInvoicePickerTitle)),
+        ],
+      ),
+      content: SizedBox(
+        width: 680,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                labelText: t.installmentsInvoicePickerSearchLabel,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () { _searchCtrl.clear(); _load(page: 1, reset: true); },
+                ),
+              ),
+              onSubmitted: (_) => _load(page: 1, reset: true),
+            ),
+            if (widget.personName != null) ...[
+              const SizedBox(height: 8),
+              Chip(
+                avatar: const Icon(Icons.person_outline, size: 18),
+                label: Text('مشتری: ${widget.personName!}'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
               children: [
-                TextField(
-                  controller: searchCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'جستجو (کد/شرح/...)',
-                    border: OutlineInputBorder(),
+                Text(
+                  t.installmentInvoicesCount(_total),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  onSubmitted: (_) => doSearch(),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: doSearch,
-                      icon: const Icon(Icons.search),
-                      label: const Text('جستجو'),
-                    ),
-                    const SizedBox(width: 8),
-                    if (line.personName != null)
-                      Chip(label: Text('مشتری: ${line.personName!}')),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (loading) const LinearProgressIndicator(),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 350),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: results.length,
-                    itemBuilder: (c, i) {
-                      final it = results[i];
-                      final code = (it['code']?.toString() ?? '-');
-                      final desc = (it['description']?.toString() ?? '').trim();
-                      final person = (it['counterparty']?.toString() ?? '').trim();
-                      final docDate = (it['document_date']?.toString() ?? '').split('T').first;
-                      final total = (it['total_amount'] is num) ? (it['total_amount'] as num).toDouble() : null;
-                      final currency = (it['currency_code']?.toString() ?? '').trim();
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                        leading: const Icon(Icons.receipt_long),
-                          title: Row(
-                            children: [
-                              Text(code, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              if (currency.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Chip(label: Text(currency), visualDensity: VisualDensity.compact),
-                              ],
-                            ],
-                          ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 4,
-                              children: [
-                                  if (person.isNotEmpty) Text('طرف حساب: $person'),
-                                if (docDate.isNotEmpty) Text('تاریخ: $docDate'),
-                                  if (total != null) Text('مبلغ کل: ${formatWithThousands(total)}'),
-                              ],
-                            ),
-                              if (desc.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis),
-                              ],
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(ctx, it);
-                        },
-                        ),
-                      );
-                    },
-                  ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : () => _load(page: 1, reset: true),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(t.search),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('انصراف'),
-            ),
+            const SizedBox(height: 8),
+            if (_loading && _results.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_results.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Text(t.noDataFound, style: Theme.of(context).textTheme.bodyLarge),
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: ListView.builder(
+                  controller: _scrollCtrl,
+                  shrinkWrap: true,
+                  itemCount: _results.length + (_loadingMore ? 1 : 0),
+                  itemBuilder: (c, i) {
+                    if (i >= _results.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )),
+                      );
+                    }
+                    final it = _results[i];
+                    final code = (it['code']?.toString() ?? '-');
+                    final desc = (it['description']?.toString() ?? '').trim();
+                    final docDate = (it['document_date']?.toString() ?? '').split('T').first;
+                    final total = (it['total_amount'] is num) ? (it['total_amount'] as num).toDouble() : null;
+                    final remaining = (it['remaining_amount'] is num) ? (it['remaining_amount'] as num).toDouble() : null;
+                    final currency = (it['currency_code']?.toString() ?? '').trim();
+                    final status = it['installment_status']?.toString();
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: const Icon(Icons.receipt_long, color: Colors.green),
+                        title: Row(
+                          children: [
+                            Text(code, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            if (currency.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Chip(
+                                label: Text(currency),
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
+                            if (status != null && status.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _statusColor(status).withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  _statusLabel(status),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: _statusColor(status),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                if (docDate.isNotEmpty) Text('تاریخ: $docDate', style: const TextStyle(fontSize: 12)),
+                                if (total != null) Text('مبلغ کل: ${formatWithThousands(total)}', style: const TextStyle(fontSize: 12)),
+                                if (remaining != null && remaining > 0)
+                                  Text(
+                                    '${t.installmentsTableRemaining}: ${formatWithThousands(remaining)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (desc.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                            ],
+                          ],
+                        ),
+                        isThreeLine: true,
+                        onTap: () => Navigator.pop(context, it),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
-        );
-      },
-    ).then((picked) async {
-      if (picked is Map<String, dynamic>) {
-        final id = picked['id'] as int?;
-        final code = (picked['code']?.toString() ?? '').trim();
-        if (id != null) {
-          final idx = _personLines.indexOf(line);
-          if (idx >= 0) {
-          setState(() {
-              _personLines[idx] = _personLines[idx].copyWith(
-                installmentInvoiceId: id,
-                installmentInvoiceCode: code.isNotEmpty ? code : _personLines[idx].installmentInvoiceCode,
-              );
-          });
-            // استفاده از line به‌روز شده
-            await _loadInstallmentPlanForLine(_personLines[idx]);
-          }
-        }
-      }
-    });
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(t.cancel),
+        ),
+      ],
+    );
   }
 }
 
