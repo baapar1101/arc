@@ -83,6 +83,11 @@ class ActionRegistry:
             LogAction,
             AIAgentAction,
         )
+        from app.services.workflow.actions.crm_actions import (
+            CreateLeadAction,
+            CreateDealAction,
+            CreateCrmActivityAction,
+        )
         
         # Communication actions
         self.register("send_email", SendEmailAction())
@@ -97,6 +102,11 @@ class ActionRegistry:
         # Inventory actions
         self.register("update_inventory", UpdateInventoryAction())
         
+        # CRM actions
+        self.register("crm_create_lead", CreateLeadAction())
+        self.register("crm_create_deal", CreateDealAction())
+        self.register("crm_create_activity", CreateCrmActivityAction())
+
         # HTTP actions
         self.register("http_request", HttpRequestAction())
         

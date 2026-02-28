@@ -421,7 +421,9 @@ class BusinessDashboardService {
             final hasWidgetKeys = data.containsKey('latest_sales_invoices') || 
                                  data.containsKey('sales_bar_chart') || 
                                  data.containsKey('checks_today') ||
-                                 data.containsKey('top_selling_products');
+                                 data.containsKey('top_selling_products') ||
+                                 data.containsKey('debtors_summary') ||
+                                 data.containsKey('pnl_summary');
             final hasJobMetadata = data.containsKey('state') || data.containsKey('id');
             
             if (hasWidgetKeys && !hasJobMetadata) {

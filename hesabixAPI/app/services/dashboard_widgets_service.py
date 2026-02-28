@@ -12,7 +12,8 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.check import Check, CheckStatus, CheckType
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
-from app.services.invoice_service import INVOICE_SALES
+from app.services.invoice_service import INVOICE_SALES, INVOICE_PURCHASE
+from sqlalchemy import or_
 from app.core.calendar import CalendarConverter, CalendarType
 import jdatetime
 
@@ -122,6 +123,134 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
             "xl": {"colSpan": 6, "rowSpan": 4},
         },
         "cache_ttl": 30,
+    },
+    # چک‌های سررسید گذشته
+    {
+        "key": "checks_overdue",
+        "title": "چک‌های سررسید گذشته",
+        "icon": "warning_amber",
+        "version": 1,
+        "permissions_required": ["checks.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    # آخرین دریافت و پرداخت‌ها
+    {
+        "key": "latest_receipts_payments",
+        "title": "آخرین دریافت و پرداخت‌ها",
+        "icon": "payments",
+        "version": 1,
+        "permissions_required": ["people_transactions.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 30,
+    },
+    # خلاصه بدهکاران
+    {
+        "key": "debtors_summary",
+        "title": "خلاصه بدهکاران",
+        "icon": "person_search",
+        "version": 1,
+        "permissions_required": ["persons.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    # خلاصه بستانکاران
+    {
+        "key": "creditors_summary",
+        "title": "خلاصه بستانکاران",
+        "icon": "groups",
+        "version": 1,
+        "permissions_required": ["persons.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    # آخرین فاکتورهای خرید
+    {
+        "key": "latest_purchase_invoices",
+        "title": "آخرین فاکتورهای خرید",
+        "icon": "shopping_cart",
+        "version": 1,
+        "permissions_required": ["invoices.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 30,
+    },
+    # بهترین مشتریان
+    {
+        "key": "top_customers",
+        "title": "بهترین مشتریان",
+        "icon": "star",
+        "version": 1,
+        "permissions_required": ["invoices.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    # بهترین تأمین‌کنندگان
+    {
+        "key": "top_suppliers",
+        "title": "بهترین تأمین‌کنندگان",
+        "icon": "local_shipping",
+        "version": 1,
+        "permissions_required": ["invoices.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    # خلاصه سود و زیان
+    {
+        "key": "pnl_summary",
+        "title": "خلاصه سود و زیان",
+        "icon": "show_chart",
+        "version": 1,
+        "permissions_required": ["reports.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 6, "rowSpan": 2},
+            "md": {"colSpan": 4, "rowSpan": 2},
+            "lg": {"colSpan": 4, "rowSpan": 2},
+            "xl": {"colSpan": 4, "rowSpan": 2},
+        },
+        "cache_ttl": 60,
     },
 ]
 
@@ -554,6 +683,214 @@ def _resolve_top_selling_products(
     return result
 
 
+def _resolve_checks_overdue(db: Session, business_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
+    """چک‌های سررسید گذشته (due_date < امروز، وضعیت غیر از CLEARED)."""
+    calendar_type = str(filters.get("calendar_type", "gregorian")).lower()
+    today = _get_date_by_calendar(calendar_type, is_tomorrow=False)
+    limit = int(filters.get("limit", 15))
+    q = (
+        db.query(
+            Check.id,
+            Check.check_number,
+            Check.amount,
+            Check.currency_id,
+            Check.type,
+            Check.status,
+            Check.due_date,
+            Check.person_id,
+            Person.alias_name.label("person_name"),
+            Currency.code.label("currency_code"),
+            Currency.title.label("currency_title"),
+        )
+        .outerjoin(Person, Person.id == Check.person_id)
+        .outerjoin(Currency, Currency.id == Check.currency_id)
+        .filter(
+            and_(
+                Check.business_id == business_id,
+                func.date(Check.due_date) < today,
+                or_(
+                    Check.status != CheckStatus.CLEARED,
+                    Check.status.is_(None),
+                ),
+            )
+        )
+        .order_by(Check.due_date.asc(), Check.amount.desc())
+        .limit(limit)
+    )
+    rows = q.all()
+    items = []
+    totals_by_currency = {}
+    for row in rows:
+        currency_code = row.currency_code or "UNKNOWN"
+        amount = float(row.amount)
+        items.append({
+            "id": int(row.id),
+            "check_number": row.check_number,
+            "amount": amount,
+            "currency_code": currency_code,
+            "type": row.type.name.lower() if row.type else None,
+            "status": row.status.name if row.status else None,
+            "due_date": row.due_date.isoformat() if row.due_date else None,
+            "person_name": row.person_name,
+        })
+        totals_by_currency[currency_code] = totals_by_currency.get(currency_code, 0.0) + amount
+    return {"items": items, "totals_by_currency": totals_by_currency, "count": len(items)}
+
+
+def _resolve_latest_receipts_payments(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """آخرین دریافت و پرداخت‌ها."""
+    from app.services.receipt_payment_service import list_receipts_payments
+    limit = max(1, min(20, int(filters.get("limit", 10))))
+    fiscal_year_id = filters.get("fiscal_year_id")
+    query = {"skip": 0, "take": limit, "sort_by": "document_date", "sort_desc": True}
+    if fiscal_year_id is not None:
+        query["fiscal_year_id"] = int(fiscal_year_id)
+    result = list_receipts_payments(db, business_id, query)
+    return {"items": result.get("items", [])[:limit], "pagination": result.get("pagination", {})}
+
+
+def _resolve_debtors_summary(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """خلاصه بدهکاران (۱۰ نفر اول)."""
+    from app.services.person_service import get_debtors_report
+    fiscal_year_id = filters.get("fiscal_year_id")
+    r = get_debtors_report(
+        db, business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        skip=0, take=10,
+    )
+    return {
+        "items": r.get("items", []),
+        "summary": r.get("summary", {}),
+        "pagination": r.get("pagination", {}),
+    }
+
+
+def _resolve_creditors_summary(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """خلاصه بستانکاران (۱۰ نفر اول)."""
+    from app.services.person_service import get_creditors_report
+    fiscal_year_id = filters.get("fiscal_year_id")
+    r = get_creditors_report(
+        db, business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        skip=0, take=10,
+    )
+    return {
+        "items": r.get("items", []),
+        "summary": r.get("summary", {}),
+        "pagination": r.get("pagination", {}),
+    }
+
+
+def _resolve_latest_purchase_invoices(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """آخرین فاکتورهای خرید (مشابه آخرین فاکتورهای فروش)."""
+    limit_raw = filters.get("limit", 10)
+    try:
+        limit = max(1, min(50, int(limit_raw)))
+    except Exception:
+        limit = 10
+    q = (
+        db.query(
+            Document.id,
+            Document.code,
+            Document.document_date,
+            Document.created_at,
+            Document.currency_id,
+            Currency.code.label("currency_code"),
+            Document.extra_info,
+        )
+        .outerjoin(Currency, Currency.id == Document.currency_id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.document_type == INVOICE_PURCHASE,
+            )
+        )
+        .order_by(Document.created_at.desc())
+        .limit(limit)
+    )
+    rows = q.all()
+    doc_ids = [int(r.id) for r in rows]
+    items_count_by_doc = {}
+    if doc_ids:
+        counts = (
+            db.query(InvoiceItemLine.document_id, func.count(InvoiceItemLine.id))
+            .filter(InvoiceItemLine.document_id.in_(doc_ids))
+            .group_by(InvoiceItemLine.document_id)
+            .all()
+        )
+        for did, cnt in counts:
+            items_count_by_doc[int(did)] = int(cnt or 0)
+    items = []
+    for d in rows:
+        extra = d.extra_info or {}
+        totals = extra.get("totals") or {}
+        items.append({
+            "id": int(d.id),
+            "code": d.code,
+            "document_date": d.document_date.isoformat() if d.document_date else None,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "net_amount": float(totals.get("net", 0) or 0),
+            "currency_id": int(d.currency_id) if d.currency_id is not None else None,
+            "currency_code": d.currency_code,
+            "items_count": items_count_by_doc.get(int(d.id), 0),
+        })
+    return {"items": items}
+
+
+def _resolve_top_customers(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """بهترین مشتریان (۱۰ نفر اول)."""
+    from app.services.invoice_service import get_top_customers_report
+    fiscal_year_id = filters.get("fiscal_year_id")
+    r = get_top_customers_report(
+        db, business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        skip=0, take=10,
+    )
+    return {"items": r.get("items", []), "summary": r.get("summary", {}), "pagination": r.get("pagination", {})}
+
+
+def _resolve_top_suppliers(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """بهترین تأمین‌کنندگان (۱۰ نفر اول)."""
+    from app.services.invoice_service import get_top_suppliers_report
+    fiscal_year_id = filters.get("fiscal_year_id")
+    r = get_top_suppliers_report(
+        db, business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        skip=0, take=10,
+    )
+    return {"items": r.get("items", []), "summary": r.get("summary", {}), "pagination": r.get("pagination", {})}
+
+
+def _resolve_pnl_summary(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """خلاصه سود و زیان دوره (ماه جاری یا سال مالی)."""
+    from app.services.pnl_service import get_pnl_period_report
+    fiscal_year_id = filters.get("fiscal_year_id")
+    date_from = filters.get("date_from")
+    date_to = filters.get("date_to")
+    r = get_pnl_period_report(
+        db, business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        date_from=date_from,
+        date_to=date_to,
+        skip=0, take=1,
+    )
+    return {"summary": r.get("summary", {}), "date_from": date_from, "date_to": date_to}
+
+
 WIDGET_RESOLVERS: Dict[str, WidgetResolver] = {
     "latest_sales_invoices": _resolve_latest_sales_invoices,
     "sales_bar_chart": lambda db, business_id, user_id, filters: _resolve_sales_bar_chart(db, business_id, filters),
@@ -561,6 +898,14 @@ WIDGET_RESOLVERS: Dict[str, WidgetResolver] = {
     "checks_tomorrow": lambda db, business_id, user_id, filters: _resolve_checks_tomorrow(db, business_id, filters),
     "checks_this_month": lambda db, business_id, user_id, filters: _resolve_checks_this_month(db, business_id, filters),
     "top_selling_products": _resolve_top_selling_products,
+    "checks_overdue": lambda db, business_id, user_id, filters: _resolve_checks_overdue(db, business_id, filters),
+    "latest_receipts_payments": _resolve_latest_receipts_payments,
+    "debtors_summary": _resolve_debtors_summary,
+    "creditors_summary": _resolve_creditors_summary,
+    "latest_purchase_invoices": _resolve_latest_purchase_invoices,
+    "top_customers": _resolve_top_customers,
+    "top_suppliers": _resolve_top_suppliers,
+    "pnl_summary": _resolve_pnl_summary,
 }
 
 

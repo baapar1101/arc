@@ -109,6 +109,7 @@ class LeadCreate(BaseModel):
     email: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     assigned_to_user_id: Optional[int] = None
+    next_follow_up_at: Optional[datetime] = None
     extra_info: Optional[dict] = None
 
 
@@ -123,7 +124,26 @@ class LeadUpdate(BaseModel):
     email: Optional[str] = None
     description: Optional[str] = None
     assigned_to_user_id: Optional[int] = None
+    next_follow_up_at: Optional[datetime] = None
     extra_info: Optional[dict] = None
+
+
+class LeadConvertDealOption(BaseModel):
+    """اختیاری: ایجاد فرصت فروش همزمان با تبدیل سرنخ"""
+    process_definition_id: int = Field(..., gt=0)
+    stage_id: int = Field(..., gt=0)
+    title: str = Field(..., min_length=1, max_length=255)
+    amount: Decimal = Field(..., ge=0)
+    currency_id: Optional[int] = None
+    probability_percent: Optional[int] = Field(None, ge=0, le=100)
+    expected_close_date: Optional[date] = None
+    assigned_to_user_id: Optional[int] = None
+    description: Optional[str] = None
+
+
+class LeadConvertRequest(BaseModel):
+    """درخواست تبدیل سرنخ به مشتری (با امکان ایجاد فرصت فروش)"""
+    create_deal: Optional[LeadConvertDealOption] = Field(None, description="در صورت ارسال، همزمان یک فرصت فروش برای مشتری جدید ایجاد می‌شود")
 
 
 class LeadResponse(BaseModel):
@@ -142,6 +162,7 @@ class LeadResponse(BaseModel):
     description: Optional[str] = None
     assigned_to_user_id: Optional[int] = None
     assigned_to_name: Optional[str] = None
+    next_follow_up_at: Optional[str] = None
     person_id: Optional[int] = None
     converted_at: Optional[str] = None
     created_at: str
@@ -167,6 +188,7 @@ class DealCreate(BaseModel):
     currency_id: Optional[int] = None
     probability_percent: Optional[int] = Field(None, ge=0, le=100)
     expected_close_date: Optional[date] = None
+    next_follow_up_at: Optional[datetime] = None
     assigned_to_user_id: Optional[int] = None
     description: Optional[str] = None
     extra_info: Optional[dict] = None
@@ -181,6 +203,7 @@ class DealUpdate(BaseModel):
     currency_id: Optional[int] = None
     probability_percent: Optional[int] = Field(None, ge=0, le=100)
     expected_close_date: Optional[date] = None
+    next_follow_up_at: Optional[datetime] = None
     document_id: Optional[int] = None
     assigned_to_user_id: Optional[int] = None
     description: Optional[str] = None
@@ -203,6 +226,7 @@ class DealResponse(BaseModel):
     currency_id: Optional[int] = None
     probability_percent: Optional[int] = None
     expected_close_date: Optional[str] = None
+    next_follow_up_at: Optional[str] = None
     closed_at: Optional[str] = None
     document_id: Optional[int] = None
     assigned_to_user_id: Optional[int] = None

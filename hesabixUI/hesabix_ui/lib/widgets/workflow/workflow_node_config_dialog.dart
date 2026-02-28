@@ -1022,14 +1022,14 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 
     showDialog(
       context: context,
-      builder: (context) => _ReferenceSelectorDialog(
+      builder: (dialogContext) => _ReferenceSelectorDialog(
         allNodes: widget.allNodes!,
         currentNode: widget.node,
         onSelected: (reference) {
           setState(() {
             _config[fieldKey] = reference;
           });
-          Navigator.of(context).pop();
+          // فقط دیالوگ Reference خودش با pop() بسته می‌شود؛ اینجا pop نزنیم وگرنه دو بار pop می‌شود و دیالوگ تنظیمات نود هم بسته می‌شود
         },
       ),
     );

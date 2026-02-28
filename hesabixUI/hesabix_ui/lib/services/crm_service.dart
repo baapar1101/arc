@@ -20,6 +20,48 @@ class CrmService {
     return [];
   }
 
+  /// پیگیری‌های امروز (سرنخ و فرصت با یادآور در امروز تا N روز آینده)
+  Future<Map<String, dynamic>> getFollowUpsToday({
+    required int businessId,
+    int daysAhead = 7,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/follow-ups-today',
+      query: {'days_ahead': daysAhead},
+    );
+    return _extractData(res.data) is Map
+        ? Map<String, dynamic>.from(_extractData(res.data) as Map)
+        : <String, dynamic>{'leads': [], 'deals': []};
+  }
+
+  /// تاریخچه تغییرات سرنخ
+  Future<List<dynamic>> getLeadHistory({
+    required int businessId,
+    required int leadId,
+    int limit = 50,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/leads/$leadId/history',
+      query: {'limit': limit},
+    );
+    final data = _extractData(res.data);
+    return data is List ? data : [];
+  }
+
+  /// تاریخچه تغییرات فرصت فروش
+  Future<List<dynamic>> getDealHistory({
+    required int businessId,
+    required int dealId,
+    int limit = 50,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/deals/$dealId/history',
+      query: {'limit': limit},
+    );
+    final data = _extractData(res.data);
+    return data is List ? data : [];
+  }
+
   /// خلاصه CRM
   Future<Map<String, dynamic>> getSummary({required int businessId}) async {
     final res = await _apiClient.get<dynamic>(
@@ -29,25 +71,55 @@ class CrmService {
   }
 
   /// گزارش پایپلاین فروش
-  Future<List<dynamic>> getPipelineReport({required int businessId, int? processDefinitionId}) async {
-    final query = processDefinitionId != null ? {'process_definition_id': processDefinitionId} : null;
+  Future<List<dynamic>> getPipelineReport({
+    required int businessId,
+    int? processDefinitionId,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    final query = <String, dynamic>{};
+    if (processDefinitionId != null) query['process_definition_id'] = processDefinitionId;
+    if (fromDate != null && fromDate.isNotEmpty) query['from_date'] = fromDate;
+    if (toDate != null && toDate.isNotEmpty) query['to_date'] = toDate;
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/reports/pipeline',
-      query: query,
+      query: query.isEmpty ? null : query,
     );
     final data = _extractData(res.data);
     return data is List ? data : [];
   }
 
   /// گزارش قیف سرنخ
-  Future<List<dynamic>> getLeadFunnelReport({required int businessId, int? processDefinitionId}) async {
-    final query = processDefinitionId != null ? {'process_definition_id': processDefinitionId} : null;
+  Future<List<dynamic>> getLeadFunnelReport({
+    required int businessId,
+    int? processDefinitionId,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    final query = <String, dynamic>{};
+    if (processDefinitionId != null) query['process_definition_id'] = processDefinitionId;
+    if (fromDate != null && fromDate.isNotEmpty) query['from_date'] = fromDate;
+    if (toDate != null && toDate.isNotEmpty) query['to_date'] = toDate;
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/reports/lead-funnel',
-      query: query,
+      query: query.isEmpty ? null : query,
     );
     final data = _extractData(res.data);
     return data is List ? data : [];
+  }
+
+  /// پیش‌بینی درآمد (مبلغ موزون با احتمال)
+  Future<Map<String, dynamic>> getWeightedForecast({
+    required int businessId,
+    int? processDefinitionId,
+  }) async {
+    final query = processDefinitionId != null ? {'process_definition_id': processDefinitionId} : null;
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/reports/weighted-forecast',
+      query: query,
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
   }
 
   /// گزارش منبع سرنخ
@@ -338,6 +410,7 @@ class CrmService {
     String? email,
     String? description,
     int? assignedToUserId,
+    DateTime? nextFollowUpAt,
   }) async {
     final body = <String, dynamic>{
       'process_definition_id': processDefinitionId,
@@ -351,6 +424,7 @@ class CrmService {
     if (email != null) body['email'] = email;
     if (description != null) body['description'] = description;
     if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
+    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
     final res = await _apiClient.post<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads',
       data: body,
@@ -528,6 +602,7 @@ class CrmService {
     int? currencyId,
     int? probabilityPercent,
     DateTime? expectedCloseDate,
+    DateTime? nextFollowUpAt,
     int? assignedToUserId,
     String? description,
     int? documentId,
@@ -541,6 +616,7 @@ class CrmService {
     if (currencyId != null) body['currency_id'] = currencyId;
     if (probabilityPercent != null) body['probability_percent'] = probabilityPercent;
     if (expectedCloseDate != null) body['expected_close_date'] = expectedCloseDate.toIso8601String().split('T')[0];
+    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
     if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
     if (description != null) body['description'] = description;
     if (documentId != null) body['document_id'] = documentId;
@@ -564,6 +640,7 @@ class CrmService {
     int? currencyId,
     int? probabilityPercent,
     DateTime? expectedCloseDate,
+    DateTime? nextFollowUpAt,
     int? assignedToUserId,
     String? description,
   }) async {
@@ -578,6 +655,7 @@ class CrmService {
     if (currencyId != null) body['currency_id'] = currencyId;
     if (probabilityPercent != null) body['probability_percent'] = probabilityPercent;
     if (expectedCloseDate != null) body['expected_close_date'] = expectedCloseDate.toIso8601String().split('T')[0];
+    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
     if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
     if (description != null) body['description'] = description;
     final res = await _apiClient.post<dynamic>(
@@ -597,13 +675,16 @@ class CrmService {
     );
   }
 
-  /// تبدیل سرنخ به مشتری
+  /// تبدیل سرنخ به مشتری (با امکان ایجاد همزمان فرصت فروش)
   Future<Map<String, dynamic>> convertLeadToCustomer({
     required int businessId,
     required int leadId,
+    Map<String, dynamic>? createDeal,
   }) async {
+    final body = createDeal != null && createDeal.isNotEmpty ? {'create_deal': createDeal} : null;
     final res = await _apiClient.post<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads/$leadId/convert',
+      data: body,
     );
     final data = _extractData(res.data);
     return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
@@ -622,6 +703,7 @@ class CrmService {
     String? email,
     String? description,
     int? assignedToUserId,
+    DateTime? nextFollowUpAt,
   }) async {
     final body = <String, dynamic>{};
     if (stageId != null) body['stage_id'] = stageId;
@@ -633,6 +715,7 @@ class CrmService {
     if (email != null) body['email'] = email;
     if (description != null) body['description'] = description;
     if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
+    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
     final res = await _apiClient.put<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads/$leadId',
       data: body,

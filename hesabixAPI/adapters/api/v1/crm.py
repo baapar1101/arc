@@ -17,6 +17,7 @@ from adapters.db.models.crm import (
     Lead,
     Deal,
     CrmActivity,
+    CrmChangeHistory,
 )
 from adapters.api.v1.schema_models.crm import (
     CrmProcessDefinitionCreate,
@@ -28,6 +29,7 @@ from adapters.api.v1.schema_models.crm import (
     LeadCreate,
     LeadUpdate,
     LeadResponse,
+    LeadConvertRequest,
     DealCreate,
     DealUpdate,
     DealResponse,
@@ -77,27 +79,97 @@ async def get_crm_summary(
 
 
 @router.get(
+    "/businesses/{business_id}/follow-ups-today",
+    summary="پیگیری‌های امروز",
+    description="سرنخ‌ها و فرصت‌های فروش با یادآور پیگیری در امروز یا روزهای آینده (تا ۷ روز)",
+)
+@require_business_access("business_id")
+async def get_follow_ups_today(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    days_ahead: int = Query(7, ge=0, le=30, description="تعداد روزهای آینده"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from datetime import datetime, timedelta
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=days_ahead)
+    q_leads = (
+        db.query(Lead)
+        .filter(
+            Lead.business_id == business_id,
+            Lead.next_follow_up_at.isnot(None),
+            Lead.next_follow_up_at >= start,
+            Lead.next_follow_up_at <= end,
+            Lead.person_id.is_(None),
+        )
+        .order_by(Lead.next_follow_up_at)
+        .limit(50)
+    )
+    q_deals = (
+        db.query(Deal)
+        .filter(
+            Deal.business_id == business_id,
+            Deal.closed_at.is_(None),
+            Deal.next_follow_up_at.isnot(None),
+            Deal.next_follow_up_at >= start,
+            Deal.next_follow_up_at <= end,
+        )
+        .order_by(Deal.next_follow_up_at)
+        .limit(50)
+    )
+    leads = q_leads.all()
+    deals = q_deals.all()
+    current_user_id = ctx.get_user_id()
+    if current_user_id and not (ctx.is_superadmin() or ctx.is_business_owner(business_id)):
+        leads = [l for l in leads if l.assigned_to_user_id in (None, current_user_id)]
+        deals = [d for d in deals if d.assigned_to_user_id in (None, current_user_id)]
+    data = {
+        "leads": [_lead_to_dict(l, request) for l in leads],
+        "deals": [_deal_to_dict(d, request) for d in deals],
+    }
+    return success_response(data=data, request=request)
+
+
+@router.get(
     "/businesses/{business_id}/reports/pipeline",
     summary="گزارش پایپلاین فروش",
-    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله",
+    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله. با from_date و to_date فقط فرصت‌های ایجادشده در این بازه شمرده می‌شوند.",
 )
 @require_business_access("business_id")
 async def get_pipeline_report(
     request: Request,
     business_id: int = Path(..., gt=0),
     process_definition_id: Optional[int] = Query(None, description="شناسه فرایند پایپلاین"),
+    from_date: Optional[str] = Query(None, description="از تاریخ (YYYY-MM-DD) - فیلتر بر اساس created_at"),
+    to_date: Optional[str] = Query(None, description="تا تاریخ (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
     from sqlalchemy import func
+    from datetime import datetime as dt
+    deal_filter = and_(Deal.stage_id == CrmProcessStage.id, Deal.business_id == business_id)
+    if from_date:
+        try:
+            fd = dt.strptime(from_date, "%Y-%m-%d").date()
+            deal_filter = and_(deal_filter, func.date(Deal.created_at) >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = dt.strptime(to_date, "%Y-%m-%d").date()
+            deal_filter = and_(deal_filter, func.date(Deal.created_at) <= td)
+        except ValueError:
+            pass
     q = db.query(
         CrmProcessStage.id,
         CrmProcessStage.name,
         CrmProcessStage.order_index,
         func.count(Deal.id).label("deal_count"),
         func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
-    ).outerjoin(Deal, and_(Deal.stage_id == CrmProcessStage.id, Deal.business_id == business_id))
+    ).outerjoin(Deal, deal_filter)
     q = q.join(CrmProcessDefinition, CrmProcessDefinition.id == CrmProcessStage.process_definition_id)
     q = q.filter(
         CrmProcessDefinition.business_id == business_id,
@@ -124,24 +196,40 @@ async def get_pipeline_report(
 @router.get(
     "/businesses/{business_id}/reports/lead-funnel",
     summary="گزارش قیف سرنخ",
-    description="تعداد سرنخ به تفکیک مرحله",
+    description="تعداد سرنخ به تفکیک مرحله. با from_date و to_date فقط سرنخ‌های ایجادشده در این بازه شمرده می‌شوند.",
 )
 @require_business_access("business_id")
 async def get_lead_funnel_report(
     request: Request,
     business_id: int = Path(..., gt=0),
     process_definition_id: Optional[int] = Query(None),
+    from_date: Optional[str] = Query(None, description="از تاریخ (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="تا تاریخ (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
     from sqlalchemy import func
+    from datetime import datetime as dt
+    lead_filter = and_(Lead.stage_id == CrmProcessStage.id, Lead.business_id == business_id)
+    if from_date:
+        try:
+            fd = dt.strptime(from_date, "%Y-%m-%d").date()
+            lead_filter = and_(lead_filter, func.date(Lead.created_at) >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = dt.strptime(to_date, "%Y-%m-%d").date()
+            lead_filter = and_(lead_filter, func.date(Lead.created_at) <= td)
+        except ValueError:
+            pass
     q = db.query(
         CrmProcessStage.id,
         CrmProcessStage.name,
         CrmProcessStage.order_index,
         func.count(Lead.id).label("lead_count"),
-    ).outerjoin(Lead, and_(Lead.stage_id == CrmProcessStage.id, Lead.business_id == business_id))
+    ).outerjoin(Lead, lead_filter)
     q = q.join(CrmProcessDefinition, CrmProcessDefinition.id == CrmProcessStage.process_definition_id)
     q = q.filter(
         CrmProcessDefinition.business_id == business_id,
@@ -180,6 +268,44 @@ async def get_lead_sources_report(
     )
     rows = q.all()
     data = [{"source_code": r.source_code, "count": r.count} for r in rows]
+    return success_response(data=data, request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/reports/weighted-forecast",
+    summary="پیش‌بینی درآمد (مبلغ موزون)",
+    description="مجموع مبلغ فرصت‌های باز ضرب در احتمال موفقیت (پیش‌بینی درآمد مورد انتظار)",
+)
+@require_business_access("business_id")
+async def get_weighted_forecast_report(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    process_definition_id: Optional[int] = Query(None, description="فیلتر پایپلاین"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from sqlalchemy import func
+    from sqlalchemy.sql import case
+    q = (
+        db.query(
+            func.coalesce(
+                func.sum(Deal.amount * func.coalesce(Deal.probability_percent, 50) / 100),
+                0,
+            ).label("weighted_total"),
+            func.count(Deal.id).label("deal_count"),
+            func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
+        )
+        .filter(Deal.business_id == business_id, Deal.closed_at.is_(None))
+    )
+    if process_definition_id:
+        q = q.filter(Deal.process_definition_id == process_definition_id)
+    row = q.first()
+    data = {
+        "weighted_total": float(row.weighted_total or 0),
+        "total_amount": float(row.total_amount or 0),
+        "deal_count": row.deal_count or 0,
+    }
     return success_response(data=data, request=request)
 
 
@@ -350,6 +476,35 @@ def _process_to_dict(p: CrmProcessDefinition, request: Request = None, include_s
     if request:
         d = format_datetime_fields(d, request)
     return d
+
+
+def _log_crm_change(
+    db: Session,
+    business_id: int,
+    entity_type: str,
+    entity_id: int,
+    field_name: str,
+    old_value: Any,
+    new_value: Any,
+    user_id: int,
+) -> None:
+    """ثبت یک رکورد در تاریخچه تغییرات CRM."""
+    if old_value == new_value:
+        return
+    old_s = str(old_value) if old_value is not None else ""
+    new_s = str(new_value) if new_value is not None else ""
+    if old_s == new_s:
+        return
+    rec = CrmChangeHistory(
+        business_id=business_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        field_name=field_name,
+        old_value=old_s[:4000] if len(old_s) > 4000 else old_s,
+        new_value=new_s[:4000] if len(new_s) > 4000 else new_s,
+        changed_by_user_id=user_id,
+    )
+    db.add(rec)
 
 
 # --- فرایندها (Process Definitions) ---
@@ -753,6 +908,7 @@ def _lead_to_dict(lead: Lead, request: Request = None) -> Dict[str, Any]:
             f"{lead.assigned_to.first_name or ''} {lead.assigned_to.last_name or ''}".strip()
             if lead.assigned_to else None
         ),
+        "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
         "person_id": lead.person_id,
         "person_name": lead.person.alias_name if lead.person else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
@@ -875,12 +1031,25 @@ async def create_lead(
         email=body.email,
         description=body.description,
         assigned_to_user_id=body.assigned_to_user_id,
+        next_follow_up_at=body.next_follow_up_at,
         extra_info=body.extra_info,
         created_by_user_id=ctx.get_user_id(),
     )
     db.add(lead)
     db.commit()
     db.refresh(lead)
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_lead_created
+        trigger_lead_created(
+            db, business_id,
+            lead_id=lead.id,
+            process_definition_id=lead.process_definition_id,
+            stage_id=lead.stage_id,
+            name=lead.name,
+            user_id=ctx.get_user_id(),
+        )
+    except Exception:
+        pass
     return success_response(data=_lead_to_dict(lead, request), request=request, message="CRM_LEAD_CREATED")
 
 
@@ -901,6 +1070,52 @@ async def get_lead(
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
     return success_response(data=_lead_to_dict(lead, request), request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/leads/{lead_id}/history",
+    summary="تاریخچه تغییرات سرنخ",
+)
+@require_business_access("business_id")
+async def get_lead_history(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    lead_id: int = Path(..., gt=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
+    if not lead:
+        raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    rows = (
+        db.query(CrmChangeHistory)
+        .filter(
+            CrmChangeHistory.business_id == business_id,
+            CrmChangeHistory.entity_type == "lead",
+            CrmChangeHistory.entity_id == lead_id,
+        )
+        .order_by(CrmChangeHistory.changed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    data = [
+        {
+            "id": r.id,
+            "field_name": r.field_name,
+            "old_value": r.old_value,
+            "new_value": r.new_value,
+            "changed_at": r.changed_at.isoformat(),
+            "changed_by_user_id": r.changed_by_user_id,
+            "changed_by_name": (
+                f"{r.changed_by.first_name or ''} {r.changed_by.last_name or ''}".strip()
+                if r.changed_by else str(r.changed_by_user_id)
+            ),
+        }
+        for r in rows
+    ]
+    return success_response(data=data, request=request)
 
 
 @router.put(
@@ -929,7 +1144,15 @@ async def update_lead(
         ).first()
         if not stage:
             raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
+        old_stage_name = (lead.stage.name if lead.stage else None) or str(lead.stage_id)
+        old_stage_id = lead.stage_id
         lead.stage_id = body.stage_id
+        _log_crm_change(db, business_id, "lead", lead_id, "stage_id", old_stage_name, stage.name, ctx.get_user_id())
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_lead_stage_changed
+            trigger_lead_stage_changed(db, business_id, lead_id=lead_id, old_stage_id=old_stage_id, new_stage_id=body.stage_id, user_id=ctx.get_user_id())
+        except Exception:
+            pass
     if body.source_code is not None:
         lead.source_code = body.source_code
     if body.code is not None and str(body.code).strip():
@@ -950,6 +1173,8 @@ async def update_lead(
         lead.description = body.description
     if body.assigned_to_user_id is not None:
         lead.assigned_to_user_id = body.assigned_to_user_id
+    if body.next_follow_up_at is not None:
+        lead.next_follow_up_at = body.next_follow_up_at
     if body.extra_info is not None:
         lead.extra_info = body.extra_info
     db.commit()
@@ -960,18 +1185,19 @@ async def update_lead(
 @router.post(
     "/businesses/{business_id}/leads/{lead_id}/convert",
     summary="تبدیل سرنخ به مشتری",
-    description="ایجاد شخص (مشتری) از سرنخ و اتصال آن به سرنخ",
+    description="ایجاد شخص (مشتری) از سرنخ و اتصال آن به سرنخ. با ارسال create_deal می‌توان همزمان یک فرصت فروش ایجاد کرد.",
 )
 @require_business_access("business_id")
 async def convert_lead_to_customer(
     request: Request,
     business_id: int = Path(..., gt=0),
     lead_id: int = Path(..., gt=0),
+    body: LeadConvertRequest = Body(default=None),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
-    from datetime import datetime
+    from datetime import datetime, date
     lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
@@ -995,10 +1221,67 @@ async def convert_lead_to_customer(
     person_id = person["id"]
     lead.person_id = person_id
     lead.converted_at = datetime.utcnow()
+    deal_data = None
+    if body and body.create_deal:
+        opt = body.create_deal
+        proc = (
+            db.query(CrmProcessDefinition)
+            .filter(
+                and_(
+                    CrmProcessDefinition.id == opt.process_definition_id,
+                    CrmProcessDefinition.business_id == business_id,
+                    CrmProcessDefinition.process_type == "sales_pipeline",
+                )
+            )
+            .first()
+        )
+        if not proc:
+            raise ApiError("NOT_FOUND", "فرایند پایپلاین فروش یافت نشد.", http_status=404)
+        stage = (
+            db.query(CrmProcessStage)
+            .filter(
+                and_(
+                    CrmProcessStage.id == opt.stage_id,
+                    CrmProcessStage.process_definition_id == opt.process_definition_id,
+                )
+            )
+            .first()
+        )
+        if not stage:
+            raise ApiError("NOT_FOUND", "مرحله پایپلاین یافت نشد.", http_status=404)
+        from app.services.document_numbering_service import generate_document_code
+        code_val = generate_document_code(db, business_id, "crm_deal", date.today())
+        new_deal = Deal(
+            business_id=business_id,
+            person_id=person_id,
+            code=code_val,
+            process_definition_id=opt.process_definition_id,
+            stage_id=opt.stage_id,
+            title=opt.title,
+            amount=opt.amount,
+            currency_id=opt.currency_id,
+            probability_percent=opt.probability_percent,
+            expected_close_date=opt.expected_close_date,
+            assigned_to_user_id=opt.assigned_to_user_id or lead.assigned_to_user_id,
+            description=opt.description,
+            created_by_user_id=ctx.get_user_id(),
+        )
+        db.add(new_deal)
+        db.flush()
+        db.refresh(new_deal)
+        deal_data = _deal_to_dict(new_deal, request)
     db.commit()
     db.refresh(lead)
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_lead_converted
+        trigger_lead_converted(db, business_id, lead_id=lead_id, person_id=person_id, user_id=ctx.get_user_id())
+    except Exception:
+        pass
+    out = {"lead": _lead_to_dict(lead, request), "person": result["data"]}
+    if deal_data:
+        out["deal"] = deal_data
     return success_response(
-        data={"lead": _lead_to_dict(lead, request), "person": result["data"]},
+        data=out,
         request=request,
         message="CRM_LEAD_CONVERTED",
     )
@@ -1043,6 +1326,7 @@ def _deal_to_dict(deal: Deal, request: Request = None) -> Dict[str, Any]:
         "currency_id": deal.currency_id,
         "probability_percent": deal.probability_percent,
         "expected_close_date": deal.expected_close_date.isoformat() if deal.expected_close_date else None,
+        "next_follow_up_at": deal.next_follow_up_at.isoformat() if deal.next_follow_up_at else None,
         "closed_at": deal.closed_at.isoformat() if deal.closed_at else None,
         "document_id": deal.document_id,
         "assigned_to_user_id": deal.assigned_to_user_id,
@@ -1173,6 +1457,7 @@ async def create_deal(
         currency_id=body.currency_id,
         probability_percent=body.probability_percent,
         expected_close_date=body.expected_close_date,
+        next_follow_up_at=body.next_follow_up_at,
         assigned_to_user_id=body.assigned_to_user_id,
         description=body.description,
         extra_info=body.extra_info,
@@ -1181,6 +1466,20 @@ async def create_deal(
     db.add(deal)
     db.commit()
     db.refresh(deal)
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_deal_created
+        trigger_deal_created(
+            db, business_id,
+            deal_id=deal.id,
+            process_definition_id=deal.process_definition_id,
+            stage_id=deal.stage_id,
+            person_id=deal.person_id,
+            title=deal.title,
+            amount=float(deal.amount),
+            user_id=ctx.get_user_id(),
+        )
+    except Exception:
+        pass
     return success_response(data=_deal_to_dict(deal, request), request=request, message="CRM_DEAL_CREATED")
 
 
@@ -1201,6 +1500,52 @@ async def get_deal(
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
     return success_response(data=_deal_to_dict(deal, request), request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/deals/{deal_id}/history",
+    summary="تاریخچه تغییرات فرصت فروش",
+)
+@require_business_access("business_id")
+async def get_deal_history(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    rows = (
+        db.query(CrmChangeHistory)
+        .filter(
+            CrmChangeHistory.business_id == business_id,
+            CrmChangeHistory.entity_type == "deal",
+            CrmChangeHistory.entity_id == deal_id,
+        )
+        .order_by(CrmChangeHistory.changed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    data = [
+        {
+            "id": r.id,
+            "field_name": r.field_name,
+            "old_value": r.old_value,
+            "new_value": r.new_value,
+            "changed_at": r.changed_at.isoformat(),
+            "changed_by_user_id": r.changed_by_user_id,
+            "changed_by_name": (
+                f"{r.changed_by.first_name or ''} {r.changed_by.last_name or ''}".strip()
+                if r.changed_by else str(r.changed_by_user_id)
+            ),
+        }
+        for r in rows
+    ]
+    return success_response(data=data, request=request)
 
 
 @router.put(
@@ -1229,7 +1574,15 @@ async def update_deal(
         ).first()
         if not stage:
             raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
+        old_stage_name = (deal.stage.name if deal.stage else None) or str(deal.stage_id)
+        old_stage_id = deal.stage_id
         deal.stage_id = body.stage_id
+        _log_crm_change(db, business_id, "deal", deal_id, "stage_id", old_stage_name, stage.name, ctx.get_user_id())
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_deal_stage_changed
+            trigger_deal_stage_changed(db, business_id, deal_id=deal_id, old_stage_id=old_stage_id, new_stage_id=body.stage_id, user_id=ctx.get_user_id())
+        except Exception:
+            pass
     if body.code is not None and str(body.code).strip():
         code_val = str(body.code).strip()
         existing = db.query(Deal).filter(Deal.business_id == business_id, Deal.code == code_val, Deal.id != deal_id).first()
@@ -1239,6 +1592,7 @@ async def update_deal(
     if body.title is not None:
         deal.title = body.title
     if body.amount is not None:
+        _log_crm_change(db, business_id, "deal", deal_id, "amount", str(deal.amount), str(body.amount), ctx.get_user_id())
         deal.amount = body.amount
     if body.currency_id is not None:
         deal.currency_id = body.currency_id
@@ -1246,6 +1600,8 @@ async def update_deal(
         deal.probability_percent = body.probability_percent
     if body.expected_close_date is not None:
         deal.expected_close_date = body.expected_close_date
+    if body.next_follow_up_at is not None:
+        deal.next_follow_up_at = body.next_follow_up_at
     if body.document_id is not None:
         deal.document_id = body.document_id
     if body.assigned_to_user_id is not None:
@@ -1256,6 +1612,19 @@ async def update_deal(
         deal.extra_info = body.extra_info
     if body.closed_at is not None:
         deal.closed_at = body.closed_at
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_deal_closed
+            is_win = deal.stage.is_win if deal.stage else False
+            trigger_deal_closed(
+                db, business_id,
+                deal_id=deal_id,
+                amount=float(deal.amount),
+                is_win=is_win,
+                document_id=deal.document_id,
+                user_id=ctx.get_user_id(),
+            )
+        except Exception:
+            pass
     db.commit()
     db.refresh(deal)
     return success_response(data=_deal_to_dict(deal, request), request=request, message="CRM_DEAL_UPDATED")

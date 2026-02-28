@@ -493,7 +493,14 @@ def post_dashboard_widgets_data(
     from fastapi import Query
     cache = get_cache()
     widget_keys = payload.get("widget_keys") or []
-    filters = payload.get("filters") or {}
+    filters = dict(payload.get("filters") or {})
+    # تزریق سال مالی از هدر درخواست برای ویجت‌هایی که به آن نیاز دارند
+    fiscal_year_id_header = request.headers.get("X-Fiscal-Year-ID")
+    if fiscal_year_id_header and filters.get("fiscal_year_id") is None:
+        try:
+            filters["fiscal_year_id"] = int(fiscal_year_id_header)
+        except (ValueError, TypeError):
+            pass
     calendar_type = ctx.calendar_type if hasattr(ctx, 'calendar_type') else "gregorian"
     use_queue = payload.get("use_queue", False)  # پارامتر اختیاری از payload
 

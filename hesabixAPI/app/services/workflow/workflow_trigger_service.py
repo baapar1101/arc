@@ -166,3 +166,113 @@ def trigger_person_created(
     
     return trigger_workflows(db, business_id, "person.created", trigger_data, user_id)
 
+
+def trigger_lead_created(
+    db: Session,
+    business_id: int,
+    lead_id: int,
+    process_definition_id: int,
+    stage_id: int,
+    name: str,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از ایجاد سرنخ"""
+    trigger_data = {
+        "lead_id": lead_id,
+        "process_definition_id": process_definition_id,
+        "stage_id": stage_id,
+        "name": name,
+    }
+    return trigger_workflows(db, business_id, "crm.lead.created", trigger_data, user_id)
+
+
+def trigger_lead_stage_changed(
+    db: Session,
+    business_id: int,
+    lead_id: int,
+    old_stage_id: int,
+    new_stage_id: int,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از تغییر مرحله سرنخ"""
+    trigger_data = {
+        "lead_id": lead_id,
+        "old_stage_id": old_stage_id,
+        "new_stage_id": new_stage_id,
+    }
+    return trigger_workflows(db, business_id, "crm.lead.stage_changed", trigger_data, user_id)
+
+
+def trigger_lead_converted(
+    db: Session,
+    business_id: int,
+    lead_id: int,
+    person_id: int,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از تبدیل سرنخ به مشتری"""
+    trigger_data = {
+        "lead_id": lead_id,
+        "person_id": person_id,
+    }
+    return trigger_workflows(db, business_id, "crm.lead.converted", trigger_data, user_id)
+
+
+def trigger_deal_created(
+    db: Session,
+    business_id: int,
+    deal_id: int,
+    process_definition_id: int,
+    stage_id: int,
+    person_id: int,
+    title: str,
+    amount: float,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از ایجاد فرصت فروش"""
+    trigger_data = {
+        "deal_id": deal_id,
+        "process_definition_id": process_definition_id,
+        "stage_id": stage_id,
+        "person_id": person_id,
+        "title": title,
+        "amount": amount,
+    }
+    return trigger_workflows(db, business_id, "crm.deal.created", trigger_data, user_id)
+
+
+def trigger_deal_stage_changed(
+    db: Session,
+    business_id: int,
+    deal_id: int,
+    old_stage_id: int,
+    new_stage_id: int,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از تغییر مرحله فرصت فروش"""
+    trigger_data = {
+        "deal_id": deal_id,
+        "old_stage_id": old_stage_id,
+        "new_stage_id": new_stage_id,
+    }
+    return trigger_workflows(db, business_id, "crm.deal.stage_changed", trigger_data, user_id)
+
+
+def trigger_deal_closed(
+    db: Session,
+    business_id: int,
+    deal_id: int,
+    amount: float,
+    is_win: bool,
+    document_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از بستن معامله"""
+    trigger_data = {
+        "deal_id": deal_id,
+        "amount": amount,
+        "is_win": is_win,
+        "document_id": document_id,
+    }
+    return trigger_workflows(db, business_id, "crm.deal.closed", trigger_data, user_id)
+

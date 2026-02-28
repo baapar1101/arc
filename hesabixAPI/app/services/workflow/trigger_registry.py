@@ -74,6 +74,14 @@ class TriggerRegistry:
             ScheduledTrigger,
             WebhookTrigger,
         )
+        from app.services.workflow.triggers.crm_triggers import (
+            LeadCreatedTrigger,
+            LeadStageChangedTrigger,
+            LeadConvertedTrigger,
+            DealCreatedTrigger,
+            DealStageChangedTrigger,
+            DealClosedTrigger,
+        )
         
         # Document triggers
         self.register("document.created", DocumentCreatedTrigger())
@@ -96,4 +104,12 @@ class TriggerRegistry:
         
         # Webhook triggers
         self.register("webhook", WebhookTrigger())
+
+        # CRM triggers
+        self.register("crm.lead.created", LeadCreatedTrigger())
+        self.register("crm.lead.stage_changed", LeadStageChangedTrigger())
+        self.register("crm.lead.converted", LeadConvertedTrigger())
+        self.register("crm.deal.created", DealCreatedTrigger())
+        self.register("crm.deal.stage_changed", DealStageChangedTrigger())
+        self.register("crm.deal.closed", DealClosedTrigger())
 

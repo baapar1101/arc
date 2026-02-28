@@ -27,6 +27,8 @@ class CrmDashboardPage extends StatefulWidget {
 class _CrmDashboardPageState extends State<CrmDashboardPage> {
   final CrmService _crmService = CrmService(apiClient: ApiClient());
   Map<String, dynamic>? _summary;
+  List<dynamic> _followUpLeads = [];
+  List<dynamic> _followUpDeals = [];
   bool _loading = true;
   String? _error;
 
@@ -43,10 +45,13 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
       _error = null;
     });
     try {
-      final data = await _crmService.getSummary(businessId: widget.businessId);
+      final summaryData = await _crmService.getSummary(businessId: widget.businessId);
+      final followData = await _crmService.getFollowUpsToday(businessId: widget.businessId, daysAhead: 7);
       if (!mounted) return;
       setState(() {
-        _summary = data is Map ? Map<String, dynamic>.from(data) : null;
+        _summary = summaryData is Map ? Map<String, dynamic>.from(summaryData) : null;
+        _followUpLeads = followData['leads'] is List ? List<dynamic>.from(followData['leads'] as List) : [];
+        _followUpDeals = followData['deals'] is List ? List<dynamic>.from(followData['deals'] as List) : [];
         _loading = false;
       });
     } catch (e) {
@@ -162,10 +167,123 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 20),
+                        _FollowUpsCard(
+                          businessId: widget.businessId,
+                          leads: _followUpLeads,
+                          deals: _followUpDeals,
+                          onRefresh: _load,
+                        ),
                       ],
                     ),
                   ),
                 ),
+    );
+  }
+}
+
+class _FollowUpsCard extends StatelessWidget {
+  final int businessId;
+  final List<dynamic> leads;
+  final List<dynamic> deals;
+  final VoidCallback onRefresh;
+
+  const _FollowUpsCard({
+    required this.businessId,
+    required this.leads,
+    required this.deals,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = leads.length + deals.length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+                  child: Icon(Icons.notifications_active, color: Theme.of(context).colorScheme.onTertiaryContainer),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'پیگیری‌های پیش‌رو',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '$total مورد',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'سرنخ‌ها و فرصت‌های فروشی که در ۷ روز آینده پیگیری دارند',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (total > 0) ...[
+              const SizedBox(height: 12),
+              ...leads.take(5).map((e) {
+                final m = e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{};
+                final at = m['next_follow_up_at']?.toString();
+                final dateStr = at != null && at.isNotEmpty
+                    ? DateFormat('yyyy/MM/dd HH:mm').format(DateTime.tryParse(at) ?? DateTime.now())
+                    : '';
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.person_outline, size: 20),
+                  title: Text(m['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
+                  subtitle: Text('سرنخ • $dateStr', style: Theme.of(context).textTheme.bodySmall),
+                  onTap: () => context.go('/business/$businessId/crm/leads?leadId=${m['id']}'),
+                );
+              }),
+              ...deals.take(5).map((e) {
+                final m = e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{};
+                final at = m['next_follow_up_at']?.toString();
+                final dateStr = at != null && at.isNotEmpty
+                    ? DateFormat('yyyy/MM/dd HH:mm').format(DateTime.tryParse(at) ?? DateTime.now())
+                    : '';
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.handshake_outlined, size: 20),
+                  title: Text(m['title']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
+                  subtitle: Text('${m['person_name'] ?? ''} • $dateStr', style: Theme.of(context).textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                  onTap: () => context.go('/business/$businessId/crm/deals?dealId=${m['id']}'),
+                );
+              }),
+              if (total > 5)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextButton.icon(
+                    onPressed: () => context.go('/business/$businessId/crm/leads'),
+                    icon: const Icon(Icons.list),
+                    label: const Text('مشاهده همه'),
+                  ),
+                ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'پیگیری‌ای برای ۷ روز آینده ثبت نشده است.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

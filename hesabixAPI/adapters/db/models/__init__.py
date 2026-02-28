@@ -110,4 +110,5 @@ from .crm import (  # noqa: F401
     Lead,
     Deal,
     CrmActivity,
+    CrmChangeHistory,
 )

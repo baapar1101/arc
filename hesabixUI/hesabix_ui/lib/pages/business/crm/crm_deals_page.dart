@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -8,6 +10,7 @@ import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -150,6 +153,54 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
     }
   }
 
+  static String _csvEscape(String? s) {
+    if (s == null) return '';
+    final t = s.replaceAll('"', '""');
+    if (t.contains(',') || t.contains('\n') || t.contains('"')) return '"$t"';
+    return t;
+  }
+
+  Future<void> _exportCsv() async {
+    try {
+      final result = await _crmService.listDeals(
+        businessId: widget.businessId,
+        processDefinitionId: _filterProcessDefinitionId,
+        stageId: _filterStageId,
+        personId: _filterPersonId,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
+        page: 1,
+        limit: 5000,
+      );
+      final data = result is Map<String, dynamic> ? result : <String, dynamic>{};
+      final items = data['items'] is List ? (data['items'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+      final headers = ['عنوان', 'مشتری', 'مرحله', 'مبلغ (ریال)', 'احتمال %', 'تاریخ بستن پیش‌بینیشده', 'تخصیص به', 'تاریخ ایجاد'];
+      final sb = StringBuffer();
+      sb.writeln('\uFEFF${headers.map(_csvEscape).join(',')}');
+      for (final e in items) {
+        final amt = (e['amount'] as num?)?.toInt() ?? 0;
+        final expClose = e['expected_close_date']?.toString();
+        final created = e['created_at']?.toString();
+        sb.writeln([
+          _csvEscape(e['title']?.toString()),
+          _csvEscape(e['person_name']?.toString()),
+          _csvEscape(e['stage_name']?.toString()),
+          _csvEscape(amt.toString()),
+          _csvEscape(e['probability_percent']?.toString()),
+          _csvEscape(expClose),
+          _csvEscape(e['assigned_to_name']?.toString()),
+          _csvEscape(created != null && created.isNotEmpty ? created.substring(0, created.length > 19 ? 19 : created.length) : null),
+        ].join(','));
+      }
+      final bytes = utf8.encode(sb.toString());
+      await web_utils.saveBytesAsFileWeb(bytes, 'deals.csv', mimeType: 'text/csv; charset=utf-8');
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'فایل deals.csv ذخیره شد');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا در صادرات: $e', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.authStore.canReadSection('crm')) {
@@ -180,6 +231,11 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
             },
           ),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: _exportCsv,
+            tooltip: 'صادرات CSV',
+          ),
           if (widget.authStore.hasBusinessPermission('crm', 'write'))
             IconButton(
               icon: const Icon(Icons.add),
@@ -659,9 +715,12 @@ class _DealFormDialogState extends State<_DealFormDialog> {
   bool _loadingProbability = false;
   int? _probabilityPercent;
   DateTime? _expectedCloseDate;
+  DateTime? _nextFollowUpAt;
   bool _saving = false;
   bool _loadingDocuments = false;
   int? _selectedDocumentId;
+  List<dynamic> _changeHistory = [];
+  bool _historyLoading = false;
 
   @override
   void initState() {
@@ -687,6 +746,8 @@ class _DealFormDialogState extends State<_DealFormDialog> {
       _probabilityPercent = (i['probability_percent'] as num?)?.toInt();
       final expDate = i['expected_close_date'];
       _expectedCloseDate = expDate != null ? DateTime.tryParse(expDate.toString()) : null;
+      final nextAt = i['next_follow_up_at']?.toString();
+      _nextFollowUpAt = nextAt != null && nextAt.isNotEmpty ? DateTime.tryParse(nextAt) : null;
       if (_selectedProcessId != null) {
         final proc = widget.processDefs.firstWhere((e) => e['id'] == _selectedProcessId, orElse: () => <String, dynamic>{});
         _stages = (proc['stages'] is List ? (proc['stages'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[]);
@@ -951,6 +1012,47 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                   ),
                 ),
               const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  _nextFollowUpAt == null
+                      ? 'یادآور پیگیری: تعیین نشده'
+                      : 'یادآور پیگیری: ${DateFormat('y/MM/dd HH:mm').format(_nextFollowUpAt!)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: _nextFollowUpAt ?? DateTime.now(),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date == null || !mounted) return;
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: _nextFollowUpAt != null
+                              ? TimeOfDay.fromDateTime(_nextFollowUpAt!)
+                              : TimeOfDay.now(),
+                        );
+                        if (time != null && mounted) {
+                          setState(() => _nextFollowUpAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+                        }
+                      },
+                      child: const Text('انتخاب'),
+                    ),
+                    if (_nextFollowUpAt != null)
+                      TextButton(
+                        onPressed: () => setState(() => _nextFollowUpAt = null),
+                        child: const Text('پاک کردن'),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _descController,
                 decoration: const InputDecoration(labelText: 'توضیحات'),
@@ -1024,9 +1126,76 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                     ],
                   ),
                 ),
+              if (isEdit && (widget.initial!['id'] as int?) != null) ...[
+                const SizedBox(height: 16),
+                ExpansionTile(
+                  title: const Text('تاریخچه تغییرات'),
+                  initiallyExpanded: false,
+                  onExpansionChanged: (exp) {
+                    if (exp && _changeHistory.isEmpty && !_historyLoading) _loadDealHistory();
+                  },
+                  children: [
+                    if (_historyLoading)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+                      )
+                    else if (_changeHistory.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('تغییری ثبت نشده است.', style: TextStyle(fontSize: 13)),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: _changeHistory.map<Widget>((h) {
+                            final m = h is Map ? Map<String, dynamic>.from(h as Map) : <String, dynamic>{};
+                            final changedAt = m['changed_at']?.toString() ?? '';
+                            final fieldName = m['field_name']?.toString() ?? '';
+                            final oldVal = m['old_value']?.toString() ?? '';
+                            final newVal = m['new_value']?.toString() ?? '';
+                            final by = m['changed_by_name']?.toString() ?? '';
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('$fieldName: $oldVal → $newVal', style: Theme.of(context).textTheme.bodySmall),
+                                    const SizedBox(height: 4),
+                                    Text('$changedAt · $by', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
         ),
     );
+  }
+
+  Future<void> _loadDealHistory() async {
+    final id = widget.initial?['id'] as int?;
+    if (id == null) return;
+    setState(() => _historyLoading = true);
+    try {
+      final list = await widget.crmService.getDealHistory(businessId: widget.businessId, dealId: id);
+      if (!mounted) return;
+      setState(() {
+        _changeHistory = list;
+        _historyLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _historyLoading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -1058,6 +1227,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
           currencyId: _selectedCurrencyId,
           probabilityPercent: _probabilityPercent,
           expectedCloseDate: _expectedCloseDate,
+          nextFollowUpAt: _nextFollowUpAt,
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
         );
       } else {
@@ -1072,6 +1242,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
           currencyId: _selectedCurrencyId,
           probabilityPercent: _probabilityPercent,
           expectedCloseDate: _expectedCloseDate,
+          nextFollowUpAt: _nextFollowUpAt,
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
         );
       }

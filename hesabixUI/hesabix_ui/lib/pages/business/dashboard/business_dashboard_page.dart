@@ -797,6 +797,14 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         'checks_tomorrow': _checksTomorrowWidget,
         'checks_this_month': _checksThisMonthWidget,
         'top_selling_products': _topSellingProductsWidget,
+        'checks_overdue': _checksOverdueWidget,
+        'latest_receipts_payments': _latestReceiptsPaymentsWidget,
+        'debtors_summary': _debtorsSummaryWidget,
+        'creditors_summary': _creditorsSummaryWidget,
+        'latest_purchase_invoices': _latestPurchaseInvoicesWidget,
+        'top_customers': _topCustomersWidget,
+        'top_suppliers': _topSuppliersWidget,
+        'pnl_summary': _pnlSummaryWidget,
       };
 
   Widget _buildChecksWidget(BuildContext context, dynamic data, String title, VoidCallback? onRefresh) {
@@ -927,6 +935,370 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   Widget _checksThisMonthWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     return _buildChecksWidget(context, data, 'چک‌های این ماه', onRefresh);
+  }
+
+  Widget _checksOverdueWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return _buildChecksWidget(context, data, 'چک‌های سررسید گذشته', onRefresh);
+  }
+
+  Widget _latestReceiptsPaymentsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final calendarController = widget.calendarController;
+    final isJalali = calendarController?.isJalali ?? true;
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text('داده‌ای یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+      );
+    }
+    return SizedBox(
+      height: 300,
+      child: ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final it = items[index];
+          final code = '${it['code'] ?? '-'}';
+          final docType = it['document_type']?.toString() ?? '';
+          final typeName = it['document_type_name'] ?? (docType == 'receipt' ? 'دریافت' : 'پرداخت');
+          DateTime? dateTime;
+          try {
+            final dateStr = it['document_date']?.toString();
+            if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr.split('T')[0]);
+          } catch (_) {}
+          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final totalAmount = (it['total_amount'] as num?) ?? 0;
+          final currencyCode = (it['currency_code'] ?? '').toString();
+          final personNames = it['person_names_str'] ?? it['person_names'] ?? '';
+          return ListTile(
+            dense: true,
+            leading: Icon(
+              docType == 'receipt' ? Icons.call_received : Icons.call_made,
+              color: docType == 'receipt' ? theme.colorScheme.primary : theme.colorScheme.error,
+            ),
+            title: Text(code),
+            subtitle: Text('$typeName • $date${personNames.toString().isNotEmpty ? ' • $personNames' : ''}'),
+            trailing: Text(
+              currencyCode.isNotEmpty ? '${formatWithThousands(totalAmount)} $currencyCode' : formatWithThousands(totalAmount),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            onTap: () {
+              final docId = it['id'] as int?;
+              if (docId != null && calendarController != null) {
+                showDialog(
+                  context: context,
+                  builder: (_) => DocumentDetailsDialog(
+                    documentId: docId,
+                    calendarController: calendarController,
+                  ),
+                );
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _debtorsSummaryWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final items = (payload['items'] is List) ? List<Map<String, dynamic>>.from(payload['items'] as List) : <Map<String, dynamic>>[];
+    final summary = payload['summary'] is Map ? Map<String, dynamic>.from(payload['summary'] as Map) : <String, dynamic>{};
+    final totalDebt = (summary['total_debt'] as num?) ?? 0.0;
+    final totalCount = (summary['total_count'] as int?) ?? 0;
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('بدهکاری یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              if (totalCount == 0 && totalDebt == 0)
+                Text('جمع بدهکاران: ۰', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (totalCount > 0 || totalDebt != 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'جمع $totalCount بدهکار: ${formatWithThousands(totalDebt)}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final p = items[index];
+              final name = p['alias_name'] ?? '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim();
+              final balance = (p['balance'] as num?) ?? 0;
+              final absBalance = balance < 0 ? -balance : balance;
+              return ListTile(
+                dense: true,
+                leading: Icon(Icons.person_outline, color: theme.colorScheme.error),
+                title: Text(name.isEmpty ? 'نامشخص' : name),
+                trailing: Text(
+                  formatWithThousands(absBalance),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700, color: theme.colorScheme.error),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _creditorsSummaryWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final items = (payload['items'] is List) ? List<Map<String, dynamic>>.from(payload['items'] as List) : <Map<String, dynamic>>[];
+    final summary = payload['summary'] is Map ? Map<String, dynamic>.from(payload['summary'] as Map) : <String, dynamic>{};
+    final totalCredit = (summary['total_credit'] as num?) ?? 0.0;
+    final totalCount = (summary['total_count'] as int?) ?? 0;
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('بستانکاری یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              if (totalCount == 0 && totalCredit == 0)
+                Text('جمع بستانکاران: ۰', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (totalCount > 0 || totalCredit != 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'جمع $totalCount بستانکار: ${formatWithThousands(totalCredit)}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final p = items[index];
+              final name = p['alias_name'] ?? '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim();
+              final balance = (p['balance'] as num?) ?? 0;
+              return ListTile(
+                dense: true,
+                leading: Icon(Icons.group_outlined, color: theme.colorScheme.primary),
+                title: Text(name.isEmpty ? 'نامشخص' : name),
+                trailing: Text(
+                  formatWithThousands(balance),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700, color: theme.colorScheme.primary),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _latestPurchaseInvoicesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final calendarController = widget.calendarController;
+    final isJalali = calendarController?.isJalali ?? true;
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text('داده‌ای یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+      );
+    }
+    return SizedBox(
+      height: 300,
+      child: ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final it = items[index];
+          final code = '${it['code'] ?? '-'}';
+          DateTime? dateTime;
+          try {
+            final dateStr = it['document_date']?.toString();
+            if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr);
+          } catch (_) {}
+          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final net = formatWithThousands(it['net_amount']);
+          final currency = (it['currency_code'] ?? '').toString();
+          final itemsCount = (it['items_count'] ?? 0) as int;
+          final subtitle = '$date • ${currency.isNotEmpty ? currency : '—'} • اقلام: $itemsCount';
+          return ListTile(
+            dense: true,
+            leading: const Icon(Icons.shopping_cart),
+            title: Text(code),
+            subtitle: Text(subtitle),
+            trailing: Text(
+              currency.isNotEmpty ? '$net $currency' : net,
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            onTap: () {
+              final invoiceId = it['id'] as int?;
+              if (invoiceId != null && calendarController != null) {
+                showDialog(
+                  context: context,
+                  builder: (_) => DocumentDetailsDialog(
+                    documentId: invoiceId,
+                    calendarController: calendarController,
+                  ),
+                );
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _topCustomersWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final items = (payload['items'] is List) ? List<Map<String, dynamic>>.from(payload['items'] as List) : const <Map<String, dynamic>>[];
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text('داده‌ای یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+      );
+    }
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final it = items[index];
+        final name = it['alias_name'] ?? it['person_name'] ?? 'نامشخص';
+        final totalSales = (it['total_sales'] as num?) ?? 0;
+        final invoiceCount = (it['invoice_count'] as int?) ?? 0;
+        return ListTile(
+          dense: true,
+          leading: Icon(Icons.star_outline, color: theme.colorScheme.primary),
+          title: Text(name),
+          subtitle: Text('$invoiceCount فاکتور'),
+          trailing: Text(
+            formatWithThousands(totalSales),
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _topSuppliersWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final items = (payload['items'] is List) ? List<Map<String, dynamic>>.from(payload['items'] as List) : const <Map<String, dynamic>>[];
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text('داده‌ای یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+      );
+    }
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final it = items[index];
+        final name = it['alias_name'] ?? it['person_name'] ?? 'نامشخص';
+        final totalPurchases = (it['total_purchases'] as num?) ?? 0;
+        final invoiceCount = (it['invoice_count'] as int?) ?? 0;
+        return ListTile(
+          dense: true,
+          leading: Icon(Icons.local_shipping_outlined, color: theme.colorScheme.primary),
+          title: Text(name),
+          subtitle: Text('$invoiceCount فاکتور'),
+          trailing: Text(
+            formatWithThousands(totalPurchases),
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pnlSummaryWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final theme = Theme.of(context);
+    final payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final summary = payload['summary'] is Map ? Map<String, dynamic>.from(payload['summary'] as Map) : <String, dynamic>{};
+    final totalRevenue = (summary['total_revenue'] as num?) ?? 0.0;
+    final totalExpense = (summary['total_expense'] as num?) ?? 0.0;
+    final netProfitLoss = (summary['net_profit_loss'] as num?) ?? 0.0;
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildPnlRow(theme, 'درآمد', totalRevenue, theme.colorScheme.primary),
+          const SizedBox(height: 8),
+          _buildPnlRow(theme, 'هزینه', totalExpense, theme.colorScheme.error),
+          const Divider(height: 24),
+          _buildPnlRow(theme, netProfitLoss >= 0 ? 'سود خالص' : 'زیان خالص', netProfitLoss, netProfitLoss >= 0 ? theme.colorScheme.primary : theme.colorScheme.error, isBold: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPnlRow(ThemeData theme, String label, num value, Color color, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: isBold ? FontWeight.w700 : FontWeight.w500)),
+        Text(formatWithThousands(value), style: theme.textTheme.bodyLarge?.copyWith(color: color, fontWeight: isBold ? FontWeight.w700 : FontWeight.w500)),
+      ],
+    );
   }
 
   Widget _latestSalesInvoicesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {

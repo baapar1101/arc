@@ -192,6 +192,7 @@ class Lead(Base):
         comment="پس از تبدیل به مشتری",
     )
     converted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_follow_up_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True, comment="یادآور پیگیری بعدی")
     extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -262,6 +263,7 @@ class Deal(Base):
     )
     probability_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     expected_close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    next_follow_up_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True, comment="یادآور پیگیری بعدی")
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     document_id: Mapped[int | None] = mapped_column(
         Integer,
@@ -366,5 +368,37 @@ class CrmActivity(Base):
     person = relationship("Person", back_populates="crm_activities")
     deal = relationship("Deal", back_populates="activities")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
+# --- تاریخچه تغییرات ---
+
+
+class CrmChangeHistory(Base):
+    """تاریخچه تغییرات فیلدهای سرنخ و فرصت فروش"""
+    __tablename__ = "crm_change_history"
+    __table_args__ = (Index("idx_crm_history_entity", "business_id", "entity_type", "entity_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="lead | deal")
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    field_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    changed_by_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+
+    business = relationship("Business")
+    changed_by = relationship("User", foreign_keys=[changed_by_user_id])
 
 
