@@ -12,8 +12,7 @@ TextTheme enTextTheme({required bool isDark}) {
   final base = isDark
       ? Typography.material2021(platform: TargetPlatform.android).white
       : Typography.material2021(platform: TargetPlatform.android).black;
-  // از فونت پیش‌فرض سیستم استفاده می‌کنیم؛ در آینده می‌توانیم فونت انگلیسی سفارشی اضافه کنیم
-  return base;
+  return base.apply(fontFamily: 'Roboto');
 }
 
 

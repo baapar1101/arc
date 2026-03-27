@@ -20,6 +20,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       fontFamily: isFa ? 'YekanBakhFaNum' : null,
+      fontFamilyFallback: isFa ? const ['NotoSansArabic', 'Vazirmatn'] : const ['Roboto'],
       textTheme: textTheme,
       // در حالت تیره، کنتراست متن‌ها را کمی تقویت می‌کنیم
       scaffoldBackgroundColor: isDark ? scheme.surface : null,

@@ -91,6 +91,12 @@ flutter:
   uses-material-design: true
   generate: true
   fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/roboto.woff2
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/nanosansarabic.woff2
     - family: Vazirmatn
       fonts:
         - asset: assets/fonts/Vazirmatn-Regular.ttf
