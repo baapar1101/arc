@@ -22,7 +22,7 @@ USE_OFFLINE_CACHE=false
 
 print_usage() {
   cat <<EOF
-Usage: ./build_web.sh [--project <path>] [--mode <debug|profile|release>] [--build-dir <dir>] [--api-base-url <url>] [--clean] [--install-deps] [--help]
+Usage: ./build_web.sh [--project <path>] [--mode <debug|profile|release>] [--build-dir <dir>] [--api-base-url <url>] [--clean] [--install-deps] [--offline] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
@@ -31,6 +31,7 @@ Options:
   --api-base-url     API base URL (default: $DEFAULT_API_BASE_URL).
   --clean            Clean build directory before building.
   --install-deps     Install dependencies before building.
+  --offline          Use offline cache for pub dependencies (no network access).
   -h, --help         Show help.
 
 Usage examples:
@@ -38,6 +39,7 @@ Usage examples:
   ./build_web.sh --mode debug --clean
   ./build_web.sh --project hesabixUI/hesabix_ui
   ./build_web.sh --api-base-url https://hsxn.hesabix.ir
+  ./build_web.sh --offline
 EOF
 }
 
@@ -132,6 +134,8 @@ while [[ $# -gt 0 ]]; do
       CLEAN_BUILD=true; shift ;;
     --install-deps)
       INSTALL_DEPS=true; shift ;;
+    --offline)
+      USE_OFFLINE_CACHE=true; shift ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
