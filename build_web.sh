@@ -18,6 +18,7 @@ BUILD_DIR=""
 API_BASE_URL="$DEFAULT_API_BASE_URL"
 CLEAN_BUILD=false
 INSTALL_DEPS=false
+USE_OFFLINE_CACHE=false
 
 print_usage() {
   cat <<EOF
@@ -181,6 +182,8 @@ check_url_accessibility() {
 # Priority: Chinese mirrors → Official → Other mirrors
 find_available_mirror() {
   local mirrors=(
+    # Hesabix internal mirror (Iran) — if available, prefer it
+    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
     # Chinese mirrors (for servers inside China or restricted networks)
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
@@ -219,10 +222,9 @@ if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
     export FLUTTER_STORAGE_BASE_URL="$storage_url"
     echo "✓ Available mirror found: $PUB_HOSTED_URL"
   else
-    # If no access, use default
-    # DNS or network problem may exist
-    export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
-    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
+    # If no mirror is reachable, continue with offline cache mode.
+    # Do NOT stop build here; later dependency step will run `flutter pub get --offline`.
+    USE_OFFLINE_CACHE=true
     warn ""
     warn "=========================================="
     warn "⚠ Warning: No accessible mirror found!"
@@ -235,7 +237,7 @@ if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
     warn "  - pub.dev"
     warn "  - mirrors.cloud.tencent.com"
     warn ""
-    warn "Using default: $PUB_HOSTED_URL"
+    warn "No mirror selected. Will try offline cache mode for pub dependencies."
     warn ""
     warn "Suggested solutions:"
     warn "  1. Check internet connection: ping 8.8.8.8"
@@ -253,18 +255,36 @@ fi
 
 echo "Using Pub Hosted URL: $PUB_HOSTED_URL"
 echo "Using Flutter Storage URL: $FLUTTER_STORAGE_BASE_URL"
+if [ "$USE_OFFLINE_CACHE" = true ]; then
+  echo "Dependency strategy: offline cache (flutter pub get --offline)"
+fi
 
 # Install dependencies if requested
 if [ "$INSTALL_DEPS" = true ]; then
   echo "Installing dependencies..."
   if ! flutter pub get; then
-    die "Flutter/Dart step failed. If the process was 'Killed', the server likely ran out of memory (OOM). Add swap or use a machine with more RAM, then re-run."
+    if [ "$USE_OFFLINE_CACHE" = true ]; then
+      warn "Online dependency install failed/no mirror. Trying offline cache..."
+      if ! flutter pub get --offline; then
+        die "Dependency install failed in offline mode too. Populate cache first on a machine with internet (copy PUB_CACHE/.pub-cache), then retry."
+      fi
+    else
+      die "Flutter/Dart step failed. If the process was 'Killed', the server likely ran out of memory (OOM). Add swap or use a machine with more RAM, then re-run."
+    fi
   fi
 elif [ ! -d "$APP_DIR/.dart_tool" ] || [ ! -f "$APP_DIR/pubspec.lock" ]; then
   echo "Dependencies not installed. Installing..."
   if ! flutter pub get; then
-    warn "Flutter/Dart step failed (if 'Killed', increase RAM or add swap). Trying to continue..."
-    warn "  cd $APP_DIR && flutter pub get"
+    if [ "$USE_OFFLINE_CACHE" = true ]; then
+      warn "Online dependency install failed/no mirror. Trying offline cache..."
+      if ! flutter pub get --offline; then
+        warn "Offline cache install failed too. Build may fail unless dependency cache is preloaded."
+        warn "  cd $APP_DIR && flutter pub get --offline"
+      fi
+    else
+      warn "Flutter/Dart step failed (if 'Killed', increase RAM or add swap). Trying to continue..."
+      warn "  cd $APP_DIR && flutter pub get"
+    fi
   fi
 fi
 

@@ -1287,6 +1287,8 @@ get_flutter_mirrors_list() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
     echo "${PUB_HOSTED_URL}|${FLUTTER_STORAGE_BASE_URL}"
   fi
+  # Hesabix internal mirror (if you run a dart-pub proxy + flutter storage mirror here)
+  echo "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
   echo "https://pub.dev|https://storage.googleapis.com"
   echo "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
   echo "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
@@ -1303,6 +1305,7 @@ set_flutter_mirror_env() {
   fi
   log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
   local mirrors=(
+    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
     "https://pub.dev|https://storage.googleapis.com"
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"

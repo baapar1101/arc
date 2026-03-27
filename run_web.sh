@@ -71,6 +71,43 @@ ensure_flutter_in_path() {
   fi
 }
 
+check_url_accessibility() {
+  local url="$1"
+  local timeout="${2:-5}"
+  if curl -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
+    return 0
+  fi
+  if curl -k -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+find_available_mirror() {
+  local mirrors=(
+    # Hesabix internal mirror (Iran) — if available, prefer it
+    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
+    # Chinese mirrors (for restricted networks)
+    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
+    "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
+    "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
+    # Official
+    "https://pub.dev|https://storage.googleapis.com"
+    # Other
+    "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
+  )
+
+  for mirror_pair in "${mirrors[@]}"; do
+    IFS='|' read -r pub_url storage_url <<< "$mirror_pair"
+    if check_url_accessibility "$pub_url" 5; then
+      echo "$pub_url|$storage_url"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 is_flutter_project_dir() {
   local dir="$1"
   [ -f "$dir/pubspec.yaml" ] || return 1
@@ -221,9 +258,17 @@ echo "Command: flutter run -d web-server $MODE_FLAG --web-port $PORT --web-hostn
 
 cd "$APP_DIR"
 
-# Configure mirror to resolve pub.dev access issues
-export PUB_HOSTED_URL="https://pub.flutter-io.cn"
-export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+# Configure mirror to resolve pub.dev access issues (auto-detect; prefer shell.hesabix.ir)
+if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
+  if available_mirror=$(find_available_mirror); then
+    IFS='|' read -r pub_url storage_url <<< "$available_mirror"
+    export PUB_HOSTED_URL="$pub_url"
+    export FLUTTER_STORAGE_BASE_URL="$storage_url"
+  else
+    export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
+    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
+  fi
+fi
 
 # Configure parallel workers for dart2js compiler
 # This significantly speeds up JavaScript compilation
