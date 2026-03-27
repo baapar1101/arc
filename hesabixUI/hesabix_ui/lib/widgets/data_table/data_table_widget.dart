@@ -2729,6 +2729,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         tooltip: column.label,
         icon: const Icon(Icons.more_vert, size: 20),
       onSelected: (index) {
+        // On web, selecting a menu item can still trigger underlying row taps.
+        // Suppress once more for the selection click.
+        _suppressNextRowTap = true;
         final action = column.actions[index];
         if (action.isEnabled(item)) action.onTap(item);
       },
@@ -2739,6 +2742,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           return PopupMenuItem<int>(
             value: index,
             enabled: isActionEnabled,
+            onTap: () {
+              // Extra safety: consume the tap that selected the menu item.
+              _suppressNextRowTap = true;
+            },
             child: Row(
               children: [
                 Icon(
