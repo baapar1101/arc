@@ -117,6 +117,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   final FocusNode _searchFocusNode = FocusNode(debugLabel: 'SearchFieldFocus');
   int _activeRowIndex = -1;
   int? _lastSelectedRowIndex;
+
+  // Prevent row-level onTap from triggering when user clicks
+  // an interactive control inside the row (e.g. actions menu).
+  bool _suppressNextRowTap = false;
   
   @override
   void initState() {
@@ -2573,8 +2577,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             return (index % 2 == 1) ? alt : base;
           }),
           selected: isSelected,
-          onTap: widget.config.onRowTap != null 
-              ? () => widget.config.onRowTap!(item)
+          onTap: widget.config.onRowTap != null
+              ? () {
+                  if (_suppressNextRowTap) {
+                    _suppressNextRowTap = false;
+                    return;
+                  }
+                  widget.config.onRowTap!(item);
+                }
               : null,
           onDoubleTap: widget.config.onRowDoubleTap != null 
               ? () => widget.config.onRowDoubleTap!(item)
@@ -2710,9 +2720,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Widget _buildActionButtons(dynamic item, ActionColumn column) {
     if (column.actions.isEmpty) return const SizedBox.shrink();
     
-    return PopupMenuButton<int>(
-      tooltip: column.label,
-      icon: const Icon(Icons.more_vert, size: 20),
+    return Listener(
+      onPointerDown: (_) {
+        // Clicking the actions menu is inside the row; suppress row onTap once.
+        _suppressNextRowTap = true;
+      },
+      child: PopupMenuButton<int>(
+        tooltip: column.label,
+        icon: const Icon(Icons.more_vert, size: 20),
       onSelected: (index) {
         final action = column.actions[index];
         if (action.isEnabled(item)) action.onTap(item);
@@ -2740,6 +2755,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           );
         });
       },
+      ),
     );
   }
 
