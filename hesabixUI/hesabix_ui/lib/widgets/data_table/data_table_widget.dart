@@ -2728,40 +2728,35 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       child: PopupMenuButton<int>(
         tooltip: column.label,
         icon: const Icon(Icons.more_vert, size: 20),
-      onSelected: (index) {
-        // On web, selecting a menu item can still trigger underlying row taps.
-        // Suppress once more for the selection click.
-        _suppressNextRowTap = true;
-        final action = column.actions[index];
-        if (action.isEnabled(item)) action.onTap(item);
-      },
-      itemBuilder: (context) {
-        return List.generate(column.actions.length, (index) {
-          final action = column.actions[index];
-          final isActionEnabled = action.isEnabled(item);
-          return PopupMenuItem<int>(
-            value: index,
-            enabled: isActionEnabled,
-            onTap: () {
-              // Extra safety: consume the tap that selected the menu item.
-              _suppressNextRowTap = true;
-            },
-            child: Row(
-              children: [
-                Icon(
-                  action.icon,
-                  color: action.isDestructive 
-                      ? Theme.of(context).colorScheme.error
-                      : (action.color ?? Theme.of(context).iconTheme.color),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(action.label),
-              ],
-            ),
-          );
-        });
-      },
+        itemBuilder: (context) {
+          return List.generate(column.actions.length, (index) {
+            final action = column.actions[index];
+            final isActionEnabled = action.isEnabled(item);
+            return PopupMenuItem<int>(
+              value: index,
+              enabled: isActionEnabled,
+              onTap: () {
+                // Extra safety: consume the tap that selected the menu item.
+                _suppressNextRowTap = true;
+                // Call the action here for web compatibility
+                if (action.isEnabled(item)) action.onTap(item);
+              },
+              child: Row(
+                children: [
+                  Icon(
+                    action.icon,
+                    color: action.isDestructive 
+                        ? Theme.of(context).colorScheme.error
+                        : (action.color ?? Theme.of(context).iconTheme.color),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(action.label),
+                ],
+              ),
+            );
+          });
+        },
       ),
     );
   }
