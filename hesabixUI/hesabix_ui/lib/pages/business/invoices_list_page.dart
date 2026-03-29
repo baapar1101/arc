@@ -893,32 +893,62 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
             DataTableAction(
               icon: Icons.visibility,
               label: t.view,
-              onTap: (item) => _onView(item as InvoiceListItem),
+              onTap: (item) async {
+                final invoice = item as InvoiceListItem;
+                await showDialog(
+                  context: context,
+                  builder: (_) => DocumentDetailsDialog(
+                    documentId: invoice.id,
+                    calendarController: widget.calendarController,
+                  ),
+                );
+              },
             ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.edit,
                 label: t.edit,
-                onTap: (item) => _onEdit(item as InvoiceListItem),
+                onTap: (item) async {
+                  final invoice = item as InvoiceListItem;
+                  if (!mounted) return;
+                  await context.pushNamed(
+                    'business_edit_invoice',
+                    pathParameters: {
+                      'business_id': widget.businessId.toString(),
+                      'invoice_id': invoice.id.toString(),
+                    },
+                  );
+                  if (!mounted) return;
+                  _refreshData();
+                },
               ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.delete,
                 label: t.delete,
-                onTap: (item) => _onDelete(item as InvoiceListItem),
+                onTap: (item) async {
+                  final invoice = item as InvoiceListItem;
+                  await _onDelete(invoice);
+                },
                 isDestructive: true,
               ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.drive_folder_upload,
                 label: t.taxAddToWorkspaceSingle,
-                onTap: (item) => _onAddToTaxWorkspace(item as InvoiceListItem),
+                onTap: (item) async {
+                  final invoice = item as InvoiceListItem;
+                  await _onAddToTaxWorkspace(invoice);
+                },
               ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.folder_off,
                 label: t.taxRemoveFromWorkspaceSingle,
-                onTap: (item) => _onRemoveFromTaxWorkspace(item as InvoiceListItem),
+                onTap: (item) async {
+                  final invoice = item as InvoiceListItem;
+                  await _onRemoveFromTaxWorkspace(invoice);
+                },
               ),
           ],
         ),
