@@ -2728,6 +2728,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       child: PopupMenuButton<int>(
         tooltip: column.label,
         icon: const Icon(Icons.more_vert, size: 20),
+        onSelected: (index) {
+          // Selecting an action item is still a tap inside row area.
+          _suppressNextRowTap = true;
+          if (index < 0 || index >= column.actions.length) return;
+          final action = column.actions[index];
+          if (action.isEnabled(item)) {
+            action.onTap(item);
+          }
+        },
         itemBuilder: (context) {
           return List.generate(column.actions.length, (index) {
             final action = column.actions[index];
@@ -2735,12 +2744,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             return PopupMenuItem<int>(
               value: index,
               enabled: isActionEnabled,
-              onTap: () {
-                // Extra safety: consume the tap that selected the menu item.
-                _suppressNextRowTap = true;
-                // Call the action here for web compatibility
-                if (action.isEnabled(item)) action.onTap(item);
-              },
               child: Row(
                 children: [
                   Icon(
