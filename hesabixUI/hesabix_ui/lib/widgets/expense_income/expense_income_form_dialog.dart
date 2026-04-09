@@ -101,6 +101,8 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
             checkNumber: line.checkNumber,
             personId: line.personId?.toString(),
             personName: line.personName,
+            accountId: line.accountId?.toString(),
+            accountName: line.accountName,
           ),
         );
       }
@@ -512,13 +514,18 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
           if (line.pettyCashId != null) 'petty_cash_id': int.parse(line.pettyCashId!),
           if (line.pettyCashName != null) 'petty_cash_name': line.pettyCashName,
         },
-        if (line.transactionType == TransactionType.check) ...{
+        if (line.transactionType == TransactionType.check ||
+            line.transactionType == TransactionType.checkExpense) ...{
           if (line.checkId != null) 'check_id': int.parse(line.checkId!),
           if (line.checkNumber != null) 'check_number': line.checkNumber,
         },
         if (line.transactionType == TransactionType.person) ...{
           if (line.personId != null) 'person_id': int.parse(line.personId!),
           if (line.personName != null) 'person_name': line.personName,
+        },
+        if (line.transactionType == TransactionType.account) ...{
+          if (line.accountId != null) 'account_id': int.parse(line.accountId!),
+          if (line.accountName != null) 'account_name': line.accountName,
         },
       }).toList();
       
@@ -1225,6 +1232,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
           ],
         );
       case TransactionType.check:
+      case TransactionType.checkExpense:
         return Row(
           children: [
             Expanded(
@@ -1239,6 +1247,36 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                 },
                 label: 'چک',
                 hintText: 'انتخاب چک',
+              ),
+            ),
+          ],
+        );
+      case TransactionType.account:
+        return Row(
+          children: [
+            Expanded(
+              child: AccountTreeComboboxWidget(
+                businessId: widget.businessId,
+                selectedAccount: widget.line.accountId != null
+                    ? Account(
+                        id: int.tryParse(widget.line.accountId!),
+                        businessId: widget.businessId,
+                        name: widget.line.accountName ?? '',
+                        code: '',
+                        accountType: '',
+                        createdAt: DateTime.now(),
+                        updatedAt: DateTime.now(),
+                      )
+                    : null,
+                onChanged: (acc) {
+                  widget.onChanged(widget.line.copyWith(
+                    accountId: acc?.id?.toString(),
+                    accountName: acc?.displayName ?? acc?.name,
+                  ));
+                },
+                label: 'حساب',
+                hintText: 'انتخاب حساب',
+                isRequired: true,
               ),
             ),
           ],
@@ -1272,9 +1310,6 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             ),
           ],
         );
-        
-      default:
-        return const SizedBox.shrink();
     }
   }
 }
@@ -1339,6 +1374,8 @@ class _CounterpartyLine {
   final String? checkNumber;
   final String? personId;
   final String? personName;
+  final String? accountId;
+  final String? accountName;
 
   const _CounterpartyLine({
     required this.transactionType,
@@ -1356,6 +1393,8 @@ class _CounterpartyLine {
     this.checkNumber,
     this.personId,
     this.personName,
+    this.accountId,
+    this.accountName,
   });
 
   factory _CounterpartyLine.empty() => _CounterpartyLine(
@@ -1380,6 +1419,8 @@ class _CounterpartyLine {
     String? checkNumber,
     String? personId,
     String? personName,
+    String? accountId,
+    String? accountName,
   }) {
     return _CounterpartyLine(
       transactionType: transactionType ?? this.transactionType,
@@ -1397,6 +1438,8 @@ class _CounterpartyLine {
       checkNumber: checkNumber ?? this.checkNumber,
       personId: personId ?? this.personId,
       personName: personName ?? this.personName,
+      accountId: accountId ?? this.accountId,
+      accountName: accountName ?? this.accountName,
     );
   }
 }

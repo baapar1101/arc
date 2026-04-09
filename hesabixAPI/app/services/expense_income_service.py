@@ -301,38 +301,49 @@ def create_expense_income(
             if bank_account_id:
                 try:
                     from adapters.db.models.bank_account import BankAccount
-                    bank_account = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
-                    if bank_account and bank_account.account:
-                        account = bank_account.account
+                    bank_account = db.query(BankAccount).filter(
+                        and_(
+                            BankAccount.id == int(bank_account_id),
+                            BankAccount.business_id == business_id,
+                        )
+                    ).first()
+                    if bank_account:
                         resolved_bank_account_id = int(bank_account_id)
                 except Exception:
                     resolved_bank_account_id = None
-            if account is None:
-                # fallback به حساب ثابت بانک
-                account = _get_fixed_account_by_code(db, "10203")
+            # حساب دفترکل بانک همیشه حساب ثابت بانک است
+            account = _get_fixed_account_by_code(db, "10203")
         elif transaction_type == "cash_register":
             if cash_register_id_val:
                 try:
                     from adapters.db.models.cash_register import CashRegister
-                    cash_register = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id_val)).first()
-                    if cash_register and cash_register.account:
-                        account = cash_register.account
+                    cash_register = db.query(CashRegister).filter(
+                        and_(
+                            CashRegister.id == int(cash_register_id_val),
+                            CashRegister.business_id == business_id,
+                        )
+                    ).first()
+                    if not cash_register:
+                        cash_register_id_val = None
                 except Exception:
-                    pass
-            if account is None:
-                account = _get_fixed_account_by_code(db, "10202")
+                    cash_register_id_val = None
+            account = _get_fixed_account_by_code(db, "10202")
         elif transaction_type == "petty_cash":
             if petty_cash_id_val:
                 try:
                     from adapters.db.models.petty_cash import PettyCash
-                    petty_cash = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id_val)).first()
-                    if petty_cash and petty_cash.account:
-                        account = petty_cash.account
+                    petty_cash = db.query(PettyCash).filter(
+                        and_(
+                            PettyCash.id == int(petty_cash_id_val),
+                            PettyCash.business_id == business_id,
+                        )
+                    ).first()
+                    if not petty_cash:
+                        petty_cash_id_val = None
                 except Exception:
-                    pass
-            if account is None:
-                account = _get_fixed_account_by_code(db, "10201")
-        elif transaction_type == "check":
+                    petty_cash_id_val = None
+            account = _get_fixed_account_by_code(db, "10201")
+        elif transaction_type in ("check", "check_expense"):
             # برای چک‌ها از کدهای اسناد دریافتنی/پرداختنی استفاده شود
             account = _get_fixed_account_by_code(db, "10403" if is_income else "20202")
         elif transaction_type == "person":
@@ -363,10 +374,10 @@ def create_expense_income(
             extra_info["commission"] = float(commission)
         if transaction_type == "bank":
             # همواره هر دو کلید را برای سازگاری نگه داریم
-            if line.get("bank_id"):
-                extra_info["bank_id"] = line.get("bank_id")
-            if line.get("bank_account_id"):
-                extra_info["bank_account_id"] = line.get("bank_account_id")
+            bank_id_val = line.get("bank_account_id") or line.get("bank_id") or resolved_bank_account_id
+            if bank_id_val:
+                extra_info["bank_id"] = bank_id_val
+                extra_info["bank_account_id"] = bank_id_val
             if line.get("bank_name"):
                 extra_info["bank_name"] = line.get("bank_name")
             if line.get("bank_account_name"):
@@ -381,7 +392,7 @@ def create_expense_income(
                 extra_info["petty_cash_id"] = line.get("petty_cash_id")
             if line.get("petty_cash_name"):
                 extra_info["petty_cash_name"] = line.get("petty_cash_name")
-        elif transaction_type == "check":
+        elif transaction_type in ("check", "check_expense"):
             if line.get("check_id"):
                 extra_info["check_id"] = line.get("check_id")
             if line.get("check_number"):
@@ -396,7 +407,7 @@ def create_expense_income(
         # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
         # در اسناد هزینه با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
         # در اسناد درآمد: اگر چک قبلاً ثبت شده، نباید دوباره حساب 10403 را بدهکار کرد
-        if transaction_type == "check" and check_id_val:
+        if transaction_type in ("check", "check_expense") and check_id_val:
             try:
                 check_obj_for_debit_credit = db.query(Check).filter(
                     and_(
@@ -813,38 +824,49 @@ def update_expense_income(
             if bank_account_id:
                 try:
                     from adapters.db.models.bank_account import BankAccount
-                    bank_account = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
-                    if bank_account and bank_account.account:
-                        account = bank_account.account
+                    bank_account = db.query(BankAccount).filter(
+                        and_(
+                            BankAccount.id == int(bank_account_id),
+                            BankAccount.business_id == document.business_id,
+                        )
+                    ).first()
+                    if bank_account:
                         resolved_bank_account_id = int(bank_account_id)
                 except Exception:
                     resolved_bank_account_id = None
-            if account is None:
-                # fallback به حساب ثابت بانک
-                account = _get_fixed_account_by_code(db, "10203")
+            # حساب دفترکل بانک همیشه حساب ثابت بانک است
+            account = _get_fixed_account_by_code(db, "10203")
         elif transaction_type == "cash_register":
             if cash_register_id_val:
                 try:
                     from adapters.db.models.cash_register import CashRegister
-                    cash_register = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id_val)).first()
-                    if cash_register and cash_register.account:
-                        account = cash_register.account
+                    cash_register = db.query(CashRegister).filter(
+                        and_(
+                            CashRegister.id == int(cash_register_id_val),
+                            CashRegister.business_id == document.business_id,
+                        )
+                    ).first()
+                    if not cash_register:
+                        cash_register_id_val = None
                 except Exception:
-                    pass
-            if account is None:
-                account = _get_fixed_account_by_code(db, "10202")
+                    cash_register_id_val = None
+            account = _get_fixed_account_by_code(db, "10202")
         elif transaction_type == "petty_cash":
             if petty_cash_id_val:
                 try:
                     from adapters.db.models.petty_cash import PettyCash
-                    petty_cash = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id_val)).first()
-                    if petty_cash and petty_cash.account:
-                        account = petty_cash.account
+                    petty_cash = db.query(PettyCash).filter(
+                        and_(
+                            PettyCash.id == int(petty_cash_id_val),
+                            PettyCash.business_id == document.business_id,
+                        )
+                    ).first()
+                    if not petty_cash:
+                        petty_cash_id_val = None
                 except Exception:
-                    pass
-            if account is None:
-                account = _get_fixed_account_by_code(db, "10201")
-        elif transaction_type == "check":
+                    petty_cash_id_val = None
+            account = _get_fixed_account_by_code(db, "10201")
+        elif transaction_type in ("check", "check_expense"):
             # برای چک‌ها باید نوع چک را بررسی کنیم تا حساب مناسب را انتخاب کنیم
             check_obj = None
             if check_id_val:
@@ -897,10 +919,10 @@ def update_expense_income(
             extra_info["commission"] = float(commission)
         if transaction_type == "bank":
             # همواره هر دو کلید را برای سازگاری نگه داریم
-            if line.get("bank_id"):
-                extra_info["bank_id"] = line.get("bank_id")
-            if line.get("bank_account_id"):
-                extra_info["bank_account_id"] = line.get("bank_account_id")
+            bank_id_val = line.get("bank_account_id") or line.get("bank_id") or resolved_bank_account_id
+            if bank_id_val:
+                extra_info["bank_id"] = bank_id_val
+                extra_info["bank_account_id"] = bank_id_val
             if line.get("bank_name"):
                 extra_info["bank_name"] = line.get("bank_name")
             if line.get("bank_account_name"):
@@ -915,7 +937,7 @@ def update_expense_income(
                 extra_info["petty_cash_id"] = line.get("petty_cash_id")
             if line.get("petty_cash_name"):
                 extra_info["petty_cash_name"] = line.get("petty_cash_name")
-        elif transaction_type == "check":
+        elif transaction_type in ("check", "check_expense"):
             if line.get("check_id"):
                 extra_info["check_id"] = line.get("check_id")
             if line.get("check_number"):
@@ -929,7 +951,7 @@ def update_expense_income(
         # برای چک: منطق حسابداری متفاوت است
         # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
         # در اسناد هزینه با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
-        if transaction_type == "check" and check_id_val:
+        if transaction_type in ("check", "check_expense") and check_id_val:
             try:
                 check_obj_for_debit_credit = db.query(Check).filter(
                     and_(
