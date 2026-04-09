@@ -77,6 +77,7 @@ from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401
 from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
 # Activity Log models
 from .activity_log import ActivityLog  # noqa: F401
+from .admin_script_run import AdminScriptRun, AdminScriptRunLog  # noqa: F401
 # Workflow models
 from .workflow import (  # noqa: F401
     Workflow,

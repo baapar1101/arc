@@ -393,6 +393,17 @@ class SettingsCategorizationService {
             order: 4,
             requiresSuperAdmin: true,
           ),
+          SettingsItem(
+            id: 'system_scripts',
+            title: 'اسکریپت‌های سیستمی',
+            description: 'اجرای عملیات اصلاحی سراسری برای همه کسب‌وکارها',
+            icon: Icons.playlist_play_outlined,
+            color: const Color(0xFF6A1B9A),
+            route: '/user/profile/system-settings/scripts',
+            categoryId: 'monitoring_logs',
+            order: 5,
+            requiresSuperAdmin: true,
+          ),
         ],
       ),
     ];

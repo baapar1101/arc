@@ -56,6 +56,7 @@ from adapters.api.v1.admin.document_monetization import router as admin_document
 from adapters.api.v1.admin.zohal import router as admin_zohal_router
 from adapters.api.v1.admin.marketplace import router as admin_marketplace_router
 from adapters.api.v1.admin.users_permissions import router as admin_users_permissions_router
+from adapters.api.v1.admin.scripts import router as admin_scripts_router
 from adapters.api.v1.announcements import router as announcements_router
 from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
@@ -1075,6 +1076,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_businesses_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_users_permissions_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_scripts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
