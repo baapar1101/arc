@@ -5291,6 +5291,12 @@ abstract class AppLocalizations {
   /// **'Alias name is required'**
   String get personAliasNameRequired;
 
+  /// No description provided for @personAliasPickFromNamesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill alias from name fields…'**
+  String get personAliasPickFromNamesHint;
+
   /// No description provided for @personTypeRequired.
   ///
   /// In en, this message translates to:

@@ -2695,6 +2695,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personAliasNameRequired => 'نام مستعار الزامی است';
 
   @override
+  String get personAliasPickFromNamesHint =>
+      'پر کردن نام مستعار از نام / نام خانوادگی…';
+
+  @override
   String get personTypeRequired => 'نوع شخص الزامی است';
 
   @override

@@ -2706,6 +2706,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personAliasNameRequired => 'Alias name is required';
 
   @override
+  String get personAliasPickFromNamesHint => 'Fill alias from name fields…';
+
+  @override
   String get personTypeRequired => 'Person type is required';
 
   @override

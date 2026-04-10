@@ -1032,6 +1032,7 @@
   "personDeletedSuccessfully": "شخص با موفقیت حذف شد",
   "personNotFound": "شخص یافت نشد",
   "personAliasNameRequired": "نام مستعار الزامی است",
+  "personAliasPickFromNamesHint": "پر کردن نام مستعار از نام / نام خانوادگی…",
   "personTypeRequired": "نوع شخص الزامی است",
   "bankAccountAddedSuccessfully": "حساب بانکی با موفقیت اضافه شد",
   "bankAccountUpdatedSuccessfully": "حساب بانکی با موفقیت ویرایش شد",

@@ -987,6 +987,7 @@
   "personDeletedSuccessfully": "Person deleted successfully",
   "personNotFound": "Person not found",
   "personAliasNameRequired": "Alias name is required",
+  "personAliasPickFromNamesHint": "Fill alias from name fields…",
   "personTypeRequired": "Person type is required",
   "bankAccountAddedSuccessfully": "Bank account added successfully",
   "bankAccountUpdatedSuccessfully": "Bank account updated successfully",

@@ -86,10 +86,18 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
   String? _creditCurrencyLabel;
 
+  late final VoidCallback _aliasAndNameFieldsListener;
+
   @override
   void initState() {
     super.initState();
     _initializeForm();
+    _aliasAndNameFieldsListener = () {
+      if (mounted) setState(() {});
+    };
+    _aliasNameController.addListener(_aliasAndNameFieldsListener);
+    _firstNameController.addListener(_aliasAndNameFieldsListener);
+    _lastNameController.addListener(_aliasAndNameFieldsListener);
     _loadBusinessCurrencyLabel();
   }
 
@@ -203,6 +211,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
 
   @override
   void dispose() {
+    _aliasNameController.removeListener(_aliasAndNameFieldsListener);
+    _firstNameController.removeListener(_aliasAndNameFieldsListener);
+    _lastNameController.removeListener(_aliasAndNameFieldsListener);
     _codeController.dispose();
     _aliasNameController.dispose();
     _firstNameController.dispose();
@@ -931,6 +942,92 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     return null;
   }
 
+  /// وقتی نام مستعار خالی است، از نام / نام خانوادگی (یا ترکیب هر دو) پیشنهاد برای انتخاب سریع.
+  List<String> _aliasNameCombinationOptions() {
+    if (_aliasNameController.text.trim().isNotEmpty) return [];
+    final first = _firstNameController.text.trim();
+    final last = _lastNameController.text.trim();
+    if (first.isEmpty && last.isEmpty) return [];
+    if (first.isNotEmpty && last.isEmpty) return [first];
+    if (first.isEmpty && last.isNotEmpty) return [last];
+    final withSpace = '$first $last';
+    final withSpaceReversed = '$last $first';
+    final withComma = '$first، $last';
+    final seen = <String>{};
+    final out = <String>[];
+    for (final s in [first, last, withSpace, withSpaceReversed, withComma]) {
+      if (s.isEmpty) continue;
+      if (seen.add(s)) out.add(s);
+    }
+    return out;
+  }
+
+  Widget _buildAliasNameTextField(AppLocalizations t) {
+    return TextFormField(
+      controller: _aliasNameController,
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            text: t.personAliasName,
+            style: Theme.of(context).inputDecorationTheme.labelStyle ??
+                Theme.of(context).textTheme.bodyMedium,
+            children: [
+              TextSpan(
+                text: ' *',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        hintText: t.personAliasName,
+        helperText: t.required,
+        helperMaxLines: 1,
+      ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return t.personAliasNameRequired;
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildAliasNameSuggestionCombo(AppLocalizations t) {
+    final options = _aliasNameCombinationOptions();
+    if (options.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: DropdownButtonFormField<String>(
+        isExpanded: true,
+        hint: Text(
+          t.personAliasPickFromNamesHint,
+          overflow: TextOverflow.ellipsis,
+        ),
+        items: options
+            .map(
+              (s) => DropdownMenuItem<String>(
+                value: s,
+                child: Text(s, overflow: TextOverflow.ellipsis, maxLines: 1),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() {
+            _aliasNameController.value = TextEditingValue(
+              text: value,
+              selection: TextSelection.collapsed(offset: value.length),
+            );
+          });
+        },
+      ),
+    );
+  }
 
   Widget _buildBasicInfoFields(AppLocalizations t, bool isMobile) {
     final spacing = ResponsiveHelper.getGridSpacing(context);
@@ -991,74 +1088,25 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         SizedBox(height: spacing),
         if (isMobile)
           Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _aliasNameController,
-                decoration: InputDecoration(
-                  label: RichText(
-                    text: TextSpan(
-                      text: t.personAliasName,
-                      style: Theme.of(context).inputDecorationTheme.labelStyle ?? 
-                             Theme.of(context).textTheme.bodyMedium,
-                      children: [
-                        TextSpan(
-                          text: ' *',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  hintText: t.personAliasName,
-                  helperText: t.required,
-                  helperMaxLines: 1,
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return t.personAliasNameRequired;
-                  }
-                  return null;
-                },
-              ),
+              _buildAliasNameTextField(t),
+              _buildAliasNameSuggestionCombo(t),
               SizedBox(height: spacing),
               _buildPersonTypesMultiSelect(t),
             ],
           )
         else
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: _aliasNameController,
-                  decoration: InputDecoration(
-                    label: RichText(
-                      text: TextSpan(
-                        text: t.personAliasName,
-                        style: Theme.of(context).inputDecorationTheme.labelStyle ?? 
-                               Theme.of(context).textTheme.bodyMedium,
-                        children: [
-                          TextSpan(
-                            text: ' *',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    hintText: t.personAliasName,
-                    helperText: t.required,
-                    helperMaxLines: 1,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return t.personAliasNameRequired;
-                    }
-                    return null;
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildAliasNameTextField(t),
+                    _buildAliasNameSuggestionCombo(t),
+                  ],
                 ),
               ),
               SizedBox(width: spacing),
