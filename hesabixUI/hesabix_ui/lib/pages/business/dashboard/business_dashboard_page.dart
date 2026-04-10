@@ -594,7 +594,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
       );
     }
-    final builder = _widgetFactory[item.key];
+    final builder = _getWidgetBuilder(item.key);
     if (builder == null) {
       return _buildCard(
         title: 'ویجت ناشناخته: ${item.key}',
@@ -790,6 +790,41 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   }
 
   // ====== Widget Registry ======
+  DashboardWidgetBuilder? _getWidgetBuilder(String key) {
+    switch (key) {
+      case 'latest_sales_invoices':
+        return _latestSalesInvoicesWidget;
+      case 'sales_bar_chart':
+        return _salesBarChartWidget;
+      case 'checks_today':
+        return _checksTodayWidget;
+      case 'checks_tomorrow':
+        return _checksTomorrowWidget;
+      case 'checks_this_month':
+        return _checksThisMonthWidget;
+      case 'top_selling_products':
+        return _topSellingProductsWidget;
+      case 'checks_overdue':
+        return _checksOverdueWidget;
+      case 'latest_receipts_payments':
+        return _latestReceiptsPaymentsWidget;
+      case 'debtors_summary':
+        return _debtorsSummaryWidget;
+      case 'creditors_summary':
+        return _creditorsSummaryWidget;
+      case 'latest_purchase_invoices':
+        return _latestPurchaseInvoicesWidget;
+      case 'top_customers':
+        return _topCustomersWidget;
+      case 'top_suppliers':
+        return _topSuppliersWidget;
+      case 'pnl_summary':
+        return _pnlSummaryWidget;
+      default:
+        return null;
+    }
+  }
+
   Map<String, DashboardWidgetBuilder> get _widgetFactory => <String, DashboardWidgetBuilder>{
         'latest_sales_invoices': _latestSalesInvoicesWidget,
         'sales_bar_chart': _salesBarChartWidget,
@@ -2134,6 +2169,22 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'چک‌های این ماه';
       case 'top_selling_products':
         return 'کالاهای پرفروش';
+      case 'checks_overdue':
+        return 'چک‌های سررسید گذشته';
+      case 'latest_receipts_payments':
+        return 'آخرین دریافت و پرداخت‌ها';
+      case 'debtors_summary':
+        return 'خلاصه بدهکاران';
+      case 'creditors_summary':
+        return 'خلاصه بستانکاران';
+      case 'latest_purchase_invoices':
+        return 'آخرین فاکتورهای خرید';
+      case 'top_customers':
+        return 'بهترین مشتریان';
+      case 'top_suppliers':
+        return 'بهترین تأمین‌کنندگان';
+      case 'pnl_summary':
+        return 'خلاصه سود و زیان';
       default:
         return key;
     }

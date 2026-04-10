@@ -45,6 +45,7 @@ IFS=$'\n\t'
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
+# - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
 #
 # ============================================================================
 
@@ -1326,6 +1327,38 @@ set_flutter_mirror_env() {
   log_warning "No reachable Flutter mirror; using default (may fail if Google is blocked)."
 }
 
+# نصب PATH دائمی برای شِل‌های جدید (ورود به سیستم / bash --login). فایل POSIX-sh برای /etc/profile.d.
+persist_flutter_path_in_profile_d() {
+  local f="/etc/profile.d/hesabix-flutter.sh"
+  if [[ ! -x /opt/flutter/bin/flutter && ! -x /snap/bin/flutter ]]; then
+    return 0
+  fi
+  cat > "${f}" <<'PROFILE'
+# Hesabix: Flutter در PATH برای شِل‌های login (deploy.sh / update.sh) — ترجیحاً دستی ویرایش نشود.
+if [ -x /opt/flutter/bin/flutter ]; then
+  case ":${PATH}:" in
+    *:/opt/flutter/bin:*) ;;
+    *) PATH="/opt/flutter/bin${PATH:+:$PATH}"; export PATH ;;
+  esac
+fi
+if [ -x /snap/bin/flutter ]; then
+  case ":${PATH}:" in
+    *:/snap/bin:*) ;;
+    *) PATH="/snap/bin${PATH:+:$PATH}"; export PATH ;;
+  esac
+fi
+PROFILE
+  chmod 644 "${f}" 2>/dev/null || true
+  log_success "Flutter برای شِل‌های login در PATH: ${f}"
+
+  # ترمینال گرافیکی اوبونتو/دبیان معمولاً login نیست؛ یک خط idempotent در bash.bashrc
+  local marker="# hesabix-flutter-PATH (deploy.sh)"
+  if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
+    printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
+    log_success "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
+  fi
+}
+
 # Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
 # Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
 # Order: 1) Existing 2) مخزن داخلی (دقیقا FLUTTER_SDK_TARBALL_URL_INTERNAL) 3) Snap 4) Git clone.
@@ -1509,6 +1542,7 @@ install_flutter_and_build_frontend() {
     log_error "Flutter not in PATH after ensure_flutter_sdk. PATH=$PATH"
     exit 1
   fi
+  persist_flutter_path_in_profile_d
 
   local app_dir="${APP_ROOT}/app"
   if [[ ! -d "${app_dir}" ]]; then
@@ -2268,6 +2302,7 @@ main() {
     mark_step_completed "frontend"
   else
     echo "$CHECK_MARK Frontend already built and deployed. Skipping..."
+    persist_flutter_path_in_profile_d
   fi
   echo
   

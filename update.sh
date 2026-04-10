@@ -13,6 +13,37 @@ log_info() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 log_ok()   { echo "${CHECK_MARK} $*" | tee -a "${LOG_FILE}"; }
 log_err()  { echo "${CROSS_MARK} $*" >&2; echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "${LOG_FILE}"; }
 
+# همان منطق deploy.sh: PATH فلاتر برای شِل‌های جدید (/etc/profile.d + خط idempotent در bash.bashrc)
+persist_flutter_path_in_profile_d() {
+  local f="/etc/profile.d/hesabix-flutter.sh"
+  if [[ ! -x /opt/flutter/bin/flutter && ! -x /snap/bin/flutter ]]; then
+    return 0
+  fi
+  cat > "${f}" <<'PROFILE'
+# Hesabix: Flutter در PATH برای شِل‌های login (deploy.sh / update.sh) — ترجیحاً دستی ویرایش نشود.
+if [ -x /opt/flutter/bin/flutter ]; then
+  case ":${PATH}:" in
+    *:/opt/flutter/bin:*) ;;
+    *) PATH="/opt/flutter/bin${PATH:+:$PATH}"; export PATH ;;
+  esac
+fi
+if [ -x /snap/bin/flutter ]; then
+  case ":${PATH}:" in
+    *:/snap/bin:*) ;;
+    *) PATH="/snap/bin${PATH:+:$PATH}"; export PATH ;;
+  esac
+fi
+PROFILE
+  chmod 644 "${f}" 2>/dev/null || true
+  log_ok "Flutter برای شِل‌های login در PATH: ${f}"
+
+  local marker="# hesabix-flutter-PATH (deploy.sh)"
+  if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
+    printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
+    log_ok "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
+  fi
+}
+
 if [[ $EUID -ne 0 ]]; then
   log_err "Please run as root (e.g. sudo hesabix -update)"
   exit 1
@@ -108,7 +139,7 @@ for svc in hesabix-api; do
 done
 log_ok "Backend services restarted."
 
-# --- 3. Flutter: update SDK, build web, deploy ---
+# --- 3. Flutter: update SDK, build web, deploy (PATH دائمی: /etc/profile.d/hesabix-flutter.sh) ---
 log_info "Step 3: Flutter – update SDK, build web, deploy..."
 export PATH="/opt/flutter/bin:/snap/bin:${PATH:-}"
 if [[ -d /opt/flutter ]]; then
@@ -118,6 +149,7 @@ if ! command -v flutter >/dev/null 2>&1; then
   log_err "Flutter not in PATH. Ensure Flutter is installed (e.g. run deploy.sh once)."
   exit 1
 fi
+persist_flutter_path_in_profile_d
 # Mirror detection (minimal)
 if [[ -z "${PUB_HOSTED_URL:-}" ]] || [[ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
   for pair in "https://pub.flutter-io.cn|https://storage.flutter-io.cn" "https://pub.dev|https://storage.googleapis.com"; do
