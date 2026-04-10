@@ -598,6 +598,32 @@ class BusinessUpdateRequest(BaseModel):
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد هزینه‌های سربار (0-100) - فقط برای custom_percent")
 	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود: gross (ناخالص), net (خالص), both (هر دو)")
+	# به‌روزرسانی قیمت پایه کالا از فاکتور قطعی
+	invoice_sync_update_sales_price_enabled: Optional[bool] = Field(
+		default=None,
+		description="به‌روزرسانی خودکار قیمت فروش پایه از فاکتور فروش قطعی",
+	)
+	invoice_sync_update_purchase_price_enabled: Optional[bool] = Field(
+		default=None,
+		description="به‌روزرسانی خودکار قیمت خرید پایه از فاکتور خرید قطعی",
+	)
+	invoice_sync_sales_price_basis: Optional[str] = Field(
+		default=None,
+		description="مبنای محاسبه: unit_price | net_after_line_discount | net_with_tax | cost_price",
+	)
+	invoice_sync_purchase_price_basis: Optional[str] = Field(
+		default=None,
+		description="مبنای محاسبه: unit_price | net_after_line_discount | net_with_tax | cost_price",
+	)
+
+	@validator("invoice_sync_sales_price_basis", "invoice_sync_purchase_price_basis")
+	def _validate_invoice_sync_basis(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"unit_price", "net_after_line_discount", "net_with_tax", "cost_price"}
+		if v not in allowed:
+			raise ValueError("مبنای همگام‌سازی قیمت نامعتبر است")
+		return v
 
 
 class BusinessResponse(BaseModel):
@@ -628,6 +654,10 @@ class BusinessResponse(BaseModel):
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, description="درصد هزینه‌های سربار")
 	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود")
+	invoice_sync_update_sales_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت فروش از فاکتور")
+	invoice_sync_update_purchase_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت خرید از فاکتور")
+	invoice_sync_sales_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت فروش")
+	invoice_sync_purchase_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت خرید")
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
 	default_currency: Optional[dict] = Field(default=None, description="ارز پیشفرض")

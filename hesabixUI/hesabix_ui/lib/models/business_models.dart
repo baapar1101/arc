@@ -358,6 +358,10 @@ class BusinessResponse {
   final String? invoiceProfitOverheadType;
   final double? invoiceProfitOverheadPercent;
   final String? invoiceProfitCalculationType;
+  final bool invoiceSyncUpdateSalesPriceEnabled;
+  final bool invoiceSyncUpdatePurchasePriceEnabled;
+  final String? invoiceSyncSalesPriceBasis;
+  final String? invoiceSyncPurchasePriceBasis;
   final Map<String, dynamic>? defaultCurrency;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -394,6 +398,10 @@ class BusinessResponse {
     this.invoiceProfitOverheadType,
     this.invoiceProfitOverheadPercent,
     this.invoiceProfitCalculationType,
+    this.invoiceSyncUpdateSalesPriceEnabled = false,
+    this.invoiceSyncUpdatePurchasePriceEnabled = false,
+    this.invoiceSyncSalesPriceBasis,
+    this.invoiceSyncPurchasePriceBasis,
     this.defaultCurrency,
     required this.createdAt,
     required this.updatedAt,
@@ -431,6 +439,12 @@ class BusinessResponse {
       invoiceProfitOverheadType: json['invoice_profit_overhead_type'] as String?,
       invoiceProfitOverheadPercent: (json['invoice_profit_overhead_percent'] as num?)?.toDouble(),
       invoiceProfitCalculationType: json['invoice_profit_calculation_type'] as String?,
+      invoiceSyncUpdateSalesPriceEnabled:
+          (json['invoice_sync_update_sales_price_enabled'] as bool?) ?? false,
+      invoiceSyncUpdatePurchasePriceEnabled:
+          (json['invoice_sync_update_purchase_price_enabled'] as bool?) ?? false,
+      invoiceSyncSalesPriceBasis: json['invoice_sync_sales_price_basis'] as String?,
+      invoiceSyncPurchasePriceBasis: json['invoice_sync_purchase_price_basis'] as String?,
       defaultCurrency: json['default_currency'] != null ? Map<String, dynamic>.from(json['default_currency'] as Map) : null,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),

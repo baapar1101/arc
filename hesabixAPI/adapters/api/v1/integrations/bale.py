@@ -106,14 +106,22 @@ def bale_webhook(
 ) -> Dict[str, Any]:
 	settings = get_effective_notifications_settings(db)
 	if not settings.get("bale_webhook_secret") or secret != settings.get("bale_webhook_secret"):
-		logger.warning("bale_webhook_forbidden", secret_match=bool(settings.get("bale_webhook_secret")))
+		logger.warning(
+			"bale_webhook_forbidden secret_configured=%s",
+			bool(settings.get("bale_webhook_secret")),
+		)
 		raise HTTPException(status_code=403, detail="Forbidden")
 
 	provider = BaleProvider(bot_token=settings.get("bale_bot_token"))
 	# بله Update می‌فرستد: message یا edited_message
 	message = payload.get("message") or payload.get("edited_message") or {}
 	text: str = (message.get("text") or "").strip()
-	logger.info("bale_webhook_received", update_id=payload.get("update_id"), has_message=bool(message), text_preview=text[:50] if text else None)
+	logger.info(
+		"bale_webhook_received update_id=%s has_message=%s text_preview=%r",
+		payload.get("update_id"),
+		bool(message),
+		(text[:50] if text else None),
+	)
 	chat = message.get("chat") or {}
 	chat_id = chat.get("id")
 

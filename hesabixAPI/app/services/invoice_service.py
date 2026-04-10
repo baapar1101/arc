@@ -2422,6 +2422,16 @@ def create_invoice(
                         description="تعدیل هزینه پورسانت",
                     ))
 
+    # همگام‌سازی قیمت پایه کالا (ارز پیش‌فرض کسب‌وکار) از فاکتور قطعی
+    # Session با autoflush=False است؛ بدون flush، کوئری invoice_item_lines خالی می‌ماند.
+    if not document.is_proforma:
+        db.flush()
+        from adapters.db.models.business import Business as _BizForPriceSync
+        _biz_ps = db.query(_BizForPriceSync).filter(_BizForPriceSync.id == business_id).first()
+        if _biz_ps:
+            from app.services.invoice_product_price_sync_service import apply_invoice_product_price_sync
+            apply_invoice_product_price_sync(db, _biz_ps, document, invoice_type)
+
     # Persist invoice first
     db.commit()
     db.refresh(document)
@@ -3418,6 +3428,14 @@ def update_invoice(
         except Exception as ex:
             logger.exception("could not update receipt/payment for invoice: %s", ex)
             # حتی در صورت خطا، ادامه بده
+
+    if not document.is_proforma:
+        db.flush()
+        from adapters.db.models.business import Business as _BizForPriceSyncU
+        _biz_ps_u = db.query(_BizForPriceSyncU).filter(_BizForPriceSyncU.id == document.business_id).first()
+        if _biz_ps_u:
+            from app.services.invoice_product_price_sync_service import apply_invoice_product_price_sync
+            apply_invoice_product_price_sync(db, _biz_ps_u, document, document.document_type)
 
     db.commit()
     db.refresh(document)

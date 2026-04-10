@@ -280,7 +280,7 @@ CREATE_INVOICE_TRANSLATIONS = {
 }
 
 
-# ترجمه‌های اکشن "ارسال تلگرام"
+# ترجمه‌های اکشن "ارسال بله"
 SEND_BALE_TRANSLATIONS = {
     "fa": {
         "action_name": "ارسال پیام به بله",
@@ -294,7 +294,7 @@ SEND_BALE_TRANSLATIONS = {
         "field_retry_delay_seconds": "تاخیر بین تلاش‌ها",
         # توضیحات فیلدها
         "field_user_id_desc": "شناسه کاربر عضو کسب و کار که به ربات بله متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
-        "field_message_desc": "متن پیام ارسالی به کاربر",
+        "field_message_desc": "متن چندخطی؛ می‌توانید چند متغیر از نود قبلی بگذارید (مثلاً مبلغ: $شناسه_نود.total_amount)",
         "field_parse_mode_desc": "حالت پارس متن (متن ساده، HTML یا Markdown)",
         "field_retry_on_failure_desc": "تلاش مجدد در صورت شکست ارسال",
         "field_retry_attempts_desc": "تعداد تلاش‌های مجدد",
@@ -318,7 +318,7 @@ SEND_BALE_TRANSLATIONS = {
         "field_retry_delay_seconds": "Retry Delay",
         # Field descriptions
         "field_user_id_desc": "User ID of business member connected to Bale bot (can use previous nodes: $node_id.user_id)",
-        "field_message_desc": "Message text to send to user",
+        "field_message_desc": "Multi-line message; embed variables from previous nodes (e.g. amount: $node_id.total_amount)",
         "field_parse_mode_desc": "Parse mode (plain text, HTML or Markdown)",
         "field_retry_on_failure_desc": "Retry on send failure",
         "field_retry_attempts_desc": "Number of retry attempts",

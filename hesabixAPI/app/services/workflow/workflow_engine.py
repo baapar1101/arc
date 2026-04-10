@@ -5,6 +5,7 @@
 
 import json
 import logging
+import re
 import threading
 import time
 import traceback
@@ -739,6 +740,49 @@ class WorkflowEngine:
             logger.error(f"Expression evaluation failed: {e}", exc_info=True)
             raise ValueError(f"Expression evaluation failed: {str(e)}")
     
+    # token: $node_id یا $node_id.field — فقط ASCII برای id/field تا \w یونیکد با متن فارسی قاطی نشود
+    _WORKFLOW_REF_TOKEN_RE = re.compile(
+        r"\$([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_]+)?)",
+        re.ASCII,
+    )
+
+    @staticmethod
+    def _lookup_node_result(node_results: Dict[str, Any], node_id: str) -> Any:
+        """یافتن خروجی نود با سازگاری کلید str/int (JSON گاهی تفاوت ایجاد می‌کند)."""
+        if not node_results or not node_id:
+            return None
+        if node_id in node_results:
+            return node_results[node_id]
+        for k, v in node_results.items():
+            if str(k) == str(node_id):
+                return v
+        return None
+
+    @staticmethod
+    def _resolve_ref_token(
+        ref: str,
+        context: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Any:
+        """حل یک reference بدون پیشوند $ (مثلاً node_id یا node_id.field)."""
+        if ref in context:
+            return context[ref]
+        whole = WorkflowEngine._lookup_node_result(node_results, ref)
+        if whole is not None:
+            return whole
+        parts = ref.split(".")
+        if len(parts) == 2:
+            node_id, field = parts
+            result = WorkflowEngine._lookup_node_result(node_results, node_id)
+            if isinstance(result, dict) and field in result:
+                return result[field]
+            # تریگر گاهی {} برمی‌گرداند (مثلاً cooldown) اما trigger_data در context کامل است
+            if isinstance(result, dict) and not result:
+                td = context.get("trigger_data")
+                if isinstance(td, dict) and field in td:
+                    return td[field]
+        return None
+
     @staticmethod
     def _resolve_value_static(
         value: Any,
@@ -746,34 +790,32 @@ class WorkflowEngine:
         node_results: Dict[str, Any]
     ) -> Any:
         """
-        حل کردن مقدار (ممکن است reference به node دیگر باشد)
+        حل کردن مقدار (reference به نود دیگر یا چند reference داخل یک رشته).
+
+        - اگر کل رشته دقیقاً یک token به شکل $node یا $node.field باشد، همان رفتار قبلی
+          (نوع برگشتی می‌تواند غیر رشته باشد).
+        - اگر رشته شامل متن ثابت و یک یا چند $node.field باشد، هر token با str(resolved)
+          جایگزین می‌شود؛ token حل‌نشده بدون تغییر می‌ماند.
         """
-        if isinstance(value, str) and value.startswith("$"):
-            # Reference به node دیگر یا context
-            ref = value[1:]  # حذف $
-            
-            # بررسی context
-            if ref in context:
-                return context[ref]
-            
-            # بررسی node results
-            if ref in node_results:
-                return node_results[ref]
-            
-            # بررسی nested paths مثل $node_id.field
-            parts = ref.split(".")
-            if len(parts) == 2:
-                node_id, field = parts
-                if node_id in node_results:
-                    result = node_results[node_id]
-                    if isinstance(result, dict) and field in result:
-                        return result[field]
-            
-            # اگر reference پیدا نشد، همان value را برگردان
+        if not isinstance(value, str) or "$" not in value:
             return value
-        
-        # اگر value یک reference نیست، همان value را برگردان
-        return value
+
+        m = WorkflowEngine._WORKFLOW_REF_TOKEN_RE.fullmatch(value)
+        if m is not None:
+            ref = m.group(1)
+            resolved = WorkflowEngine._resolve_ref_token(ref, context, node_results)
+            if resolved is not None:
+                return resolved
+            return value
+
+        def _replace_token(match: re.Match) -> str:
+            ref = match.group(1)
+            resolved = WorkflowEngine._resolve_ref_token(ref, context, node_results)
+            if resolved is None:
+                return match.group(0)
+            return str(resolved)
+
+        return WorkflowEngine._WORKFLOW_REF_TOKEN_RE.sub(_replace_token, value)
     
     def _resolve_value(
         self,

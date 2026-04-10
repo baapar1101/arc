@@ -418,8 +418,10 @@ class SendBaleAction(ActionHandler):
                 },
                 "message": {
                     "type": "string",
-                    "description": "متن پیام",
-                    "required": True
+                    "description": "متن پیام (می‌تواند شامل چند متغیر از نودهای قبلی باشد، مثلاً مبلغ: $node_id.total_amount)",
+                    "required": True,
+                    "ui_type": "textarea",
+                    "maxLength": 8000,
                 },
                 "parse_mode": {
                     "type": "string",
@@ -544,8 +546,17 @@ class SendBaleAction(ActionHandler):
                 "error": "ربات بله پیکربندی نشده است"
             }
 
-        message = WorkflowEngine._resolve_value_static(config.get("message"), context, node_results)
-        if not message:
+        raw_message = config.get("message")
+        if raw_message is None or (isinstance(raw_message, str) and not raw_message.strip()):
+            return {
+                "success": False,
+                "error": "متن پیام مشخص نشده است"
+            }
+        message_template = raw_message if isinstance(raw_message, str) else str(raw_message)
+        message = WorkflowEngine._resolve_value_static(
+            message_template, context, node_results
+        )
+        if message is None or (isinstance(message, str) and not message.strip()):
             return {
                 "success": False,
                 "error": "متن پیام مشخص نشده است"
@@ -558,7 +569,7 @@ class SendBaleAction(ActionHandler):
         def _send_bale():
             return bale.send_text(
                 chat_id=int(bale_chat_id),
-                text=str(message),
+                text=str(message).strip(),
                 parse_mode=parse_mode
             )
 

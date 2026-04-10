@@ -57,6 +57,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   String? _invoiceProfitCalculationType;
   bool _recalculatingProfits = false;
 
+  // همگام‌سازی قیمت پایه کالا از فاکتور قطعی (ارز کالا = ارز پیش‌فرض کسب‌وکار)
+  bool _invoiceSyncUpdateSalesPriceEnabled = false;
+  bool _invoiceSyncUpdatePurchasePriceEnabled = false;
+  String? _invoiceSyncSalesPriceBasis;
+  String? _invoiceSyncPurchasePriceBasis;
+
   // ارز پیش‌فرض
   int? _selectedDefaultCurrencyId;
   List<Map<String, dynamic>> _currencies = [];
@@ -127,6 +133,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceProfitOverheadType = resp.invoiceProfitOverheadType ?? 'none';
       _invoiceProfitOverheadPercentController.text = (resp.invoiceProfitOverheadPercent ?? 0).toStringAsFixed(2);
       _invoiceProfitCalculationType = resp.invoiceProfitCalculationType ?? 'gross';
+      _invoiceSyncUpdateSalesPriceEnabled = resp.invoiceSyncUpdateSalesPriceEnabled;
+      _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
+      _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
+      _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
 
       // بررسی اینکه آیا کسب‌وکار ارز پیش‌فرض دارد یا نه
       if (resp.defaultCurrency == null) {
@@ -241,6 +251,18 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceProfitCalculationType != null && _invoiceProfitCalculationType != orig.invoiceProfitCalculationType) {
       payload['invoice_profit_calculation_type'] = _invoiceProfitCalculationType;
+    }
+    if (_invoiceSyncUpdateSalesPriceEnabled != orig.invoiceSyncUpdateSalesPriceEnabled) {
+      payload['invoice_sync_update_sales_price_enabled'] = _invoiceSyncUpdateSalesPriceEnabled;
+    }
+    if (_invoiceSyncUpdatePurchasePriceEnabled != orig.invoiceSyncUpdatePurchasePriceEnabled) {
+      payload['invoice_sync_update_purchase_price_enabled'] = _invoiceSyncUpdatePurchasePriceEnabled;
+    }
+    if (_invoiceSyncSalesPriceBasis != null && _invoiceSyncSalesPriceBasis != orig.invoiceSyncSalesPriceBasis) {
+      payload['invoice_sync_sales_price_basis'] = _invoiceSyncSalesPriceBasis;
+    }
+    if (_invoiceSyncPurchasePriceBasis != null && _invoiceSyncPurchasePriceBasis != orig.invoiceSyncPurchasePriceBasis) {
+      payload['invoice_sync_purchase_price_basis'] = _invoiceSyncPurchasePriceBasis;
     }
 
     // ارز پیش‌فرض (فقط اگر کسب‌وکار ارز پیش‌فرض ندارد)
@@ -884,6 +906,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildProfitCalculationSettings(cs),
 
+              const SizedBox(height: 24),
+              _buildSectionTitle('به‌روزرسانی قیمت کالا از فاکتور', cs),
+              const SizedBox(height: 8),
+              _buildInvoicePriceSyncSettings(cs),
+
             ],
           ),
         ),
@@ -1133,6 +1160,82 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   ),
                 ),
               ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const _invoiceSyncBasisItems = <DropdownMenuItem<String>>[
+    DropdownMenuItem(
+      value: 'unit_price',
+      child: Text('قیمت واحد فاکتور (قبل از تخفیف خط)'),
+    ),
+    DropdownMenuItem(
+      value: 'net_after_line_discount',
+      child: Text('میانگین پس از تخفیف خط (بدون مالیات)'),
+    ),
+    DropdownMenuItem(
+      value: 'net_with_tax',
+      child: Text('میانگین با مالیات (جمع ردیف ÷ تعداد)'),
+    ),
+    DropdownMenuItem(
+      value: 'cost_price',
+      child: Text('قیمت تمام‌شده ردیف (خرید) / در فروش همان قیمت واحد'),
+    ),
+  ];
+
+  Widget _buildInvoicePriceSyncSettings(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'با ثبت فاکتور قطعی (غیر پیش‌فاکتور)، قیمت فروش یا خرید پایه کالا در کارت کالا به‌روز می‌شود. '
+              'این مقادیر همیشه به ارز پیش‌فرض کسب‌وکار ذخیره می‌شوند؛ اگر ارز فاکتور غیر از ارز پیش‌فرض باشد، '
+              'همگام‌سازی برای آن فاکتور انجام نمی‌شود.',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('به‌روزرسانی قیمت فروش از فاکتور فروش'),
+              subtitle: const Text('فقط فاکتور فروش قطعی'),
+              value: _invoiceSyncUpdateSalesPriceEnabled,
+              onChanged: (v) => setState(() => _invoiceSyncUpdateSalesPriceEnabled = v),
+            ),
+            if (_invoiceSyncUpdateSalesPriceEnabled) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _invoiceSyncSalesPriceBasis,
+                decoration: const InputDecoration(
+                  labelText: 'مبنای محاسبه قیمت فروش',
+                  border: OutlineInputBorder(),
+                ),
+                items: _invoiceSyncBasisItems,
+                onChanged: (value) => setState(() => _invoiceSyncSalesPriceBasis = value),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('به‌روزرسانی قیمت خرید از فاکتور خرید'),
+              subtitle: const Text('فقط فاکتور خرید قطعی'),
+              value: _invoiceSyncUpdatePurchasePriceEnabled,
+              onChanged: (v) => setState(() => _invoiceSyncUpdatePurchasePriceEnabled = v),
+            ),
+            if (_invoiceSyncUpdatePurchasePriceEnabled) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _invoiceSyncPurchasePriceBasis,
+                decoration: const InputDecoration(
+                  labelText: 'مبنای محاسبه قیمت خرید',
+                  border: OutlineInputBorder(),
+                ),
+                items: _invoiceSyncBasisItems,
+                onChanged: (value) => setState(() => _invoiceSyncPurchasePriceBasis = value),
+              ),
             ],
           ],
         ),

@@ -57,6 +57,49 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   List<Map<String, dynamic>> _currencies = [];
   bool _loadingCurrencies = false;
 
+  /// همگام با انتخاب reference از نود قبلی (initialValue به‌تنهایی به‌روز نمی‌شود)
+  final Map<String, TextEditingController> _workflowTextControllers = {};
+
+  @override
+  void dispose() {
+    for (final c in _workflowTextControllers.values) {
+      c.dispose();
+    }
+    _workflowTextControllers.clear();
+    super.dispose();
+  }
+
+  TextEditingController _ensureWorkflowTextController(String key) {
+    return _workflowTextControllers.putIfAbsent(
+      key,
+      () => TextEditingController(text: _config[key]?.toString() ?? ''),
+    );
+  }
+
+  void _syncWorkflowTextControllersToConfig() {
+    for (final e in _workflowTextControllers.entries) {
+      _config[e.key] = e.value.text;
+    }
+  }
+
+  /// فیلدهای متنی که معمولاً چند reference در یک جمله دارند: درج در موقعیت مکان‌نما به‌جای جایگزینی کل مقدار
+  bool _fieldKeyPrefersInsertReference(String key, Map<String, dynamic>? schema) {
+    if (schema != null && schema['ui_type'] == 'textarea') {
+      return true;
+    }
+    final k = key.toLowerCase();
+    const multiRefHints = <String>[
+      'message', 'body', 'text', 'html', 'content', 'template',
+      'caption', 'description', 'subject', 'title',
+    ];
+    for (final p in multiRefHints) {
+      if (k == p || k.contains(p)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -360,6 +403,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         ),
         FilledButton(
           onPressed: () {
+            _syncWorkflowTextControllersToConfig();
             if (_formKey.currentState?.validate() ?? false) {
               _formKey.currentState?.save();
               // برای while loop: ساختن condition از فیلدهای flat
@@ -542,25 +586,26 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         }
         
         // Text field برای string با پشتیبانی از Reference
-        final isReference = value?.toString().startsWith('\$') ?? false;
         final placeholder = _getPlaceholder(key, description);
-        
+
         return Builder(
           builder: (context) {
             final theme = Theme.of(context);
+            final c = _ensureWorkflowTextController(key);
+            final hasRef = c.text.contains(r'$');
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextFormField(
-                    initialValue: value?.toString(),
+                    controller: c,
                     decoration: InputDecoration(
                       labelText: _formatKey(key),
                       border: OutlineInputBorder(),
                       helperText: description,
                       hintText: placeholder,
-                      prefixIcon: isReference 
+                      prefixIcon: hasRef
                           ? Icon(Icons.link, size: 18, color: theme.colorScheme.primary)
                           : null,
                       suffixIcon: Row(
@@ -570,7 +615,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                             IconButton(
                               icon: Icon(Icons.select_all, size: 18),
                               tooltip: AppLocalizations.of(context).workflowConfigSelectFromNodes,
-                              onPressed: () => _showReferenceSelector(key),
+                              onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                             ),
                           if (required)
                             Icon(Icons.star, size: 12, color: Colors.red),
@@ -578,12 +623,17 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       ),
                     ),
                     validator: required
-                        ? (v) => (v == null || v.isEmpty)
+                        ? (_) => c.text.trim().isEmpty
                             ? AppLocalizations.of(context).workflowNodeFieldRequired
                             : null
                         : null,
-                    onSaved: (newValue) {
-                      if (newValue != null && newValue.isNotEmpty) {
+                    onChanged: (v) {
+                      _config[key] = v;
+                      setState(() {});
+                    },
+                    onSaved: (_) {
+                      final newValue = c.text;
+                      if (newValue.isNotEmpty) {
                         _config[key] = newValue;
                       } else if (!required) {
                         _config.remove(key);
@@ -592,7 +642,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       }
                     },
                   ),
-                  if (isReference)
+                  if (hasRef)
                     Padding(
                       padding: const EdgeInsets.only(top: 4, right: 12),
                       child: Text(
@@ -1014,11 +1064,14 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   }
 
   /// نمایش Reference Selector
-  void _showReferenceSelector(String fieldKey) {
+  void _showReferenceSelector(String fieldKey, {Map<String, dynamic>? fieldSchema}) {
     if (widget.allNodes == null || widget.allNodes!.isEmpty) {
       SnackBarHelper.show(context, message: AppLocalizations.of(context).workflowConfigNoNodesToSelect);
       return;
     }
+
+    final insertReference = _fieldKeyPrefersInsertReference(fieldKey, fieldSchema);
+    _ensureWorkflowTextController(fieldKey);
 
     showDialog(
       context: context,
@@ -1027,9 +1080,45 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         currentNode: widget.node,
         onSelected: (reference) {
           setState(() {
-            _config[fieldKey] = reference;
+            final c = _workflowTextControllers[fieldKey]!;
+            if (insertReference) {
+              final text = c.text;
+              final sel = c.selection;
+              int start;
+              int end;
+              if (sel.isValid && sel.start >= 0 && sel.end >= 0) {
+                start = sel.start.clamp(0, text.length);
+                end = sel.end.clamp(0, text.length);
+              } else {
+                start = end = text.length;
+              }
+              final before = text.substring(0, start);
+              final after = text.substring(end);
+              var insert = reference;
+              if (before.isNotEmpty &&
+                  !before.endsWith(' ') &&
+                  !insert.startsWith(' ')) {
+                insert = ' $insert';
+              }
+              if (after.isNotEmpty &&
+                  !after.startsWith(' ') &&
+                  !insert.endsWith(' ')) {
+                insert = '$insert ';
+              }
+              final newText = before + insert + after;
+              c.value = TextEditingValue(
+                text: newText,
+                selection: TextSelection.collapsed(offset: (before + insert).length),
+              );
+              _config[fieldKey] = newText;
+            } else {
+              _config[fieldKey] = reference;
+              c.value = TextEditingValue(
+                text: reference,
+                selection: TextSelection.collapsed(offset: reference.length),
+              );
+            }
           });
-          // فقط دیالوگ Reference خودش با pop() بسته می‌شود؛ اینجا pop نزنیم وگرنه دو بار pop می‌شود و دیالوگ تنظیمات نود هم بسته می‌شود
         },
       ),
     );
@@ -1153,6 +1242,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       : null,
                   onChanged: (newValue) {
                     setState(() {
+                      _disposeWorkflowTextController(key);
                       if (newValue != null) {
                         _config[key] = newValue;
                       } else if (!required) {
@@ -1168,7 +1258,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     child: OutlinedButton.icon(
                       icon: Icon(Icons.link, size: 16),
                       label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   ),
               ],
@@ -1296,6 +1386,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       : null,
                   onChanged: (newValue) {
                     setState(() {
+                      _disposeWorkflowTextController(key);
                       if (newValue != null) {
                         _config[key] = newValue;
                       } else if (!required) {
@@ -1310,7 +1401,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     child: OutlinedButton.icon(
                       icon: Icon(Icons.link, size: 16),
                       label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   ),
               ],
@@ -1352,8 +1443,14 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
       final dt = picked!;
       setState(() {
         _config[key] = date_utils.HesabixDateUtils.formatForApiDate(dt);
+        _disposeWorkflowTextController(key);
       });
     }
+  }
+
+  void _disposeWorkflowTextController(String key) {
+    final c = _workflowTextControllers.remove(key);
+    c?.dispose();
   }
 
   /// ساخت Date Picker
@@ -1423,7 +1520,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -1439,12 +1536,11 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     bool required,
     String? description,
   ) {
-    if (currentValue?.toString().startsWith('\$') ?? false) {
-      return _buildReferenceTextField(key, schema, currentValue, required, description);
-    }
-
     final maxLength = schema['maxLength'] as int?;
     final placeholder = _getPlaceholder(key, description);
+    final theme = Theme.of(context);
+    final c = _ensureWorkflowTextController(key);
+    final hasRef = c.text.contains(r'$');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1452,7 +1548,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextFormField(
-            initialValue: currentValue?.toString(),
+            controller: c,
             maxLines: 4,
             minLines: 3,
             maxLength: maxLength,
@@ -1462,6 +1558,9 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               helperText: description,
               hintText: placeholder,
               alignLabelWithHint: true,
+              prefixIcon: hasRef
+                  ? Icon(Icons.link, size: 18, color: theme.colorScheme.primary)
+                  : null,
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1469,7 +1568,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     IconButton(
                       icon: const Icon(Icons.select_all, size: 18),
                       tooltip: AppLocalizations.of(context).workflowConfigSelectFromNodes,
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
                     const Icon(Icons.star, size: 12, color: Colors.red),
@@ -1477,12 +1576,17 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               ),
             ),
             validator: required
-                ? (v) => (v == null || v.isEmpty)
+                ? (_) => c.text.trim().isEmpty
                     ? AppLocalizations.of(context).workflowNodeFieldRequired
                     : null
                 : null,
-            onSaved: (newValue) {
-              if (newValue != null && newValue.isNotEmpty) {
+            onChanged: (v) {
+              _config[key] = v;
+              setState(() {});
+            },
+            onSaved: (_) {
+              final newValue = c.text;
+              if (newValue.isNotEmpty) {
                 _config[key] = newValue;
               } else if (!required) {
                 _config.remove(key);
@@ -1491,6 +1595,17 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               }
             },
           ),
+          if (hasRef)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 12),
+              child: Text(
+                AppLocalizations.of(context).workflowConfigValueUsesNode,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1534,6 +1649,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               personTypes: types,
               onChanged: (id) {
                 setState(() {
+                  _disposeWorkflowTextController(key);
                   if (id != null) {
                     _config[key] = id;
                   } else if (!required) {
@@ -1548,7 +1664,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.link, size: 16),
                   label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                  onPressed: () => _showReferenceSelector(key),
+                  onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                 ),
               ),
           ],
@@ -1557,6 +1673,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
 
     // Fallback: TextField ساده
+    final c = _ensureWorkflowTextController(key);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -1578,7 +1695,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             ),
           const SizedBox(height: 8),
           TextFormField(
-            initialValue: currentValue?.toString(),
+            controller: c,
             decoration: InputDecoration(
               labelText: AppLocalizations.of(context).workflowConfigPersonIdLabel,
               border: OutlineInputBorder(),
@@ -1590,7 +1707,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     IconButton(
                       icon: Icon(Icons.link, size: 18),
                       tooltip: AppLocalizations.of(context).workflowConfigUsePreviousNode,
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
                     Icon(Icons.star, size: 12, color: Colors.red),
@@ -1598,12 +1715,17 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               ),
             ),
             validator: required
-                ? (v) => (v == null || v.isEmpty)
+                ? (_) => c.text.trim().isEmpty
                     ? AppLocalizations.of(context).workflowNodeFieldRequired
                     : null
                 : null,
-            onSaved: (newValue) {
-              if (newValue != null && newValue.isNotEmpty) {
+            onChanged: (v) {
+              _config[key] = int.tryParse(v) ?? v;
+              setState(() {});
+            },
+            onSaved: (_) {
+              final newValue = c.text;
+              if (newValue.isNotEmpty) {
                 _config[key] = int.tryParse(newValue) ?? newValue;
               } else if (!required) {
                 _config.remove(key);
@@ -1649,6 +1771,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               description: description ?? AppLocalizations.of(context).workflowConfigProductIdLabel,
               onChanged: (id) {
                 setState(() {
+                  _disposeWorkflowTextController(key);
                   if (id != null) {
                     _config[key] = id;
                   } else if (!required) {
@@ -1663,7 +1786,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.link, size: 16),
                   label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                  onPressed: () => _showReferenceSelector(key),
+                  onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                 ),
               ),
           ],
@@ -1904,7 +2027,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       });
                     }
                   : null,
-              onReference: () => _showReferenceSelector(key),
+              onReference: () => _showReferenceSelector(key, fieldSchema: schema),
             );
           }),
           if (items.length < maxItems)
@@ -1935,7 +2058,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -2444,6 +2567,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ],
                 onChanged: (v) {
                   setState(() {
+                    _disposeWorkflowTextController(key);
                     if (v != null) {
                       _config[key] = v;
                     } else if (!required) {
@@ -2460,7 +2584,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -2522,6 +2646,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ],
                 onChanged: (v) {
                   setState(() {
+                    _disposeWorkflowTextController(key);
                     if (v != null) {
                       _config[key] = v;
                     } else if (!required) {
@@ -2538,7 +2663,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -2595,6 +2720,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ],
                 onChanged: (v) {
                   setState(() {
+                    _disposeWorkflowTextController(key);
                     if (v != null) {
                       _config[key] = v;
                     } else if (!required) {
@@ -2611,7 +2737,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -2664,6 +2790,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ],
                 onChanged: (v) {
                   setState(() {
+                    _disposeWorkflowTextController(key);
                     if (v != null) {
                       _config[key] = v;
                     } else if (!required) {
@@ -2680,7 +2807,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -2698,20 +2825,21 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     String fieldType,
   ) {
     final theme = Theme.of(context);
-    final isReference = currentValue?.toString().startsWith('\$') ?? false;
-    
+    final c = _ensureWorkflowTextController(key);
+    final isReference = c.text.trim().startsWith(r'$');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextFormField(
-            initialValue: currentValue?.toString(),
+            controller: c,
             decoration: InputDecoration(
               labelText: _formatKey(key),
               border: OutlineInputBorder(),
               helperText: description,
-              prefixIcon: isReference 
+              prefixIcon: isReference
                   ? Icon(Icons.link, size: 18, color: theme.colorScheme.primary)
                   : null,
               suffixIcon: Row(
@@ -2721,7 +2849,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     IconButton(
                       icon: Icon(Icons.select_all, size: 18),
                       tooltip: AppLocalizations.of(context).workflowConfigSelectFromNodes,
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
                     Icon(Icons.star, size: 12, color: Colors.red),
@@ -2730,17 +2858,29 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             ),
             keyboardType: isReference ? TextInputType.text : TextInputType.number,
             validator: required
-                ? (v) => (v == null || v.isEmpty)
+                ? (_) => c.text.trim().isEmpty
                     ? AppLocalizations.of(context).workflowNodeFieldRequired
                     : null
                 : null,
-            onSaved: (newValue) {
-              if (newValue != null && newValue.isNotEmpty) {
-                // اگر reference است، به صورت string ذخیره می‌شود
-                if (newValue.startsWith('\$')) {
+            onChanged: (v) {
+              if (v.startsWith(r'$')) {
+                _config[key] = v;
+              } else if (v.isNotEmpty) {
+                _config[key] = fieldType == 'integer'
+                    ? int.tryParse(v) ?? v
+                    : double.tryParse(v) ?? v;
+              } else {
+                _config[key] = v;
+              }
+              setState(() {});
+            },
+            onSaved: (_) {
+              final newValue = c.text;
+              if (newValue.isNotEmpty) {
+                if (newValue.startsWith(r'$')) {
                   _config[key] = newValue;
                 } else {
-                  _config[key] = fieldType == 'integer' 
+                  _config[key] = fieldType == 'integer'
                       ? int.tryParse(newValue) ?? currentValue
                       : double.tryParse(newValue) ?? currentValue;
                 }
@@ -2897,7 +3037,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: OutlinedButton.icon(
                 icon: Icon(Icons.link, size: 16),
                 label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
-                onPressed: () => _showReferenceSelector(key),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
               ),
             ),
         ],
@@ -3004,14 +3144,15 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     String? description,
   ) {
     final theme = Theme.of(context);
-    
+    final c = _ensureWorkflowTextController(key);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextFormField(
-            initialValue: currentValue?.toString(),
+            controller: c,
             decoration: InputDecoration(
               labelText: _formatKey(key),
               border: OutlineInputBorder(),
@@ -3024,7 +3165,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     IconButton(
                       icon: Icon(Icons.select_all, size: 18),
                       tooltip: AppLocalizations.of(context).workflowConfigSelectFromNodes,
-                      onPressed: () => _showReferenceSelector(key),
+                      onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
                     Icon(Icons.star, size: 12, color: Colors.red),
@@ -3032,12 +3173,17 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               ),
             ),
             validator: required
-                ? (v) => (v == null || v.isEmpty)
+                ? (_) => c.text.trim().isEmpty
                     ? AppLocalizations.of(context).workflowNodeFieldRequired
                     : null
                 : null,
-            onSaved: (newValue) {
-              if (newValue != null && newValue.isNotEmpty) {
+            onChanged: (v) {
+              _config[key] = v;
+              setState(() {});
+            },
+            onSaved: (_) {
+              final newValue = c.text;
+              if (newValue.isNotEmpty) {
                 _config[key] = newValue;
               } else if (!required) {
                 _config.remove(key);
@@ -3098,8 +3244,8 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
     if (keyLower.contains('message') || keyLower.contains('body')) {
       return isFarsi
-          ? 'مثال: متن پیام یا \$node_id.description'
-          : 'Example: Message text or \$node_id.description';
+          ? 'مثال: فاکتور \$node_id.invoice_code برای \$node_id.customer_name'
+          : 'Example: Invoice \$node_id.invoice_code for \$node_id.customer_name';
     }
     if (keyLower.contains('url')) {
       return isFarsi

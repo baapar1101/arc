@@ -1303,6 +1303,10 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_profit_overhead_type": getattr(business, "invoice_profit_overhead_type", None),
         "invoice_profit_overhead_percent": float(business.invoice_profit_overhead_percent) if getattr(business, "invoice_profit_overhead_percent", None) is not None else None,
         "invoice_profit_calculation_type": getattr(business, "invoice_profit_calculation_type", None),
+        "invoice_sync_update_sales_price_enabled": bool(getattr(business, "invoice_sync_update_sales_price_enabled", False)),
+        "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),
+        "invoice_sync_sales_price_basis": getattr(business, "invoice_sync_sales_price_basis", None),
+        "invoice_sync_purchase_price_basis": getattr(business, "invoice_sync_purchase_price_basis", None),
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at,   # datetime object بماند
         # Soft Delete fields

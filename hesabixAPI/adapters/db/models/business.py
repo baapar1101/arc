@@ -68,6 +68,24 @@ class Business(Base):
     invoice_profit_overhead_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, default=0, server_default="0", comment="درصد هزینه‌های سربار (در صورت انتخاب custom_percent)")
     invoice_profit_calculation_type: Mapped[str | None] = mapped_column(String(20), nullable=True, default="gross", server_default="gross", comment="نوع محاسبه سود: gross, net, both")
     
+    # به‌روزرسانی قیمت پایه کالا از فاکتور قطعی (ارز کالا = ارز پیش‌فرض کسب‌وکار)
+    invoice_sync_update_sales_price_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0",
+        comment="به‌روزرسانی قیمت فروش پایه از فاکتور فروش قطعی",
+    )
+    invoice_sync_update_purchase_price_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0",
+        comment="به‌روزرسانی قیمت خرید پایه از فاکتور خرید قطعی",
+    )
+    invoice_sync_sales_price_basis: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, default="net_after_line_discount", server_default="net_after_line_discount",
+        comment="مبنای قیمت فروش: unit_price, net_after_line_discount, net_with_tax, cost_price",
+    )
+    invoice_sync_purchase_price_basis: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, default="net_after_line_discount", server_default="net_after_line_discount",
+        comment="مبنای قیمت خرید: unit_price, net_after_line_discount, net_with_tax, cost_price",
+    )
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
