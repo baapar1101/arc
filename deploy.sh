@@ -47,6 +47,10 @@ IFS=$'\n\t'
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 # - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
+# - Ubuntu APT mirror (only when ID=ubuntu): UBUNTU_APT_MIRROR=keep|arvan|official (non-interactive);
+#   default keep. arvan uses http://mirror.arvancloud.ir/ubuntu for archive.ubuntu.com and security.ubuntu.com.
+#   official restores those URLs from Arvan (per-stanza: *-security → security.ubuntu.com).
+# - Debian: mirror prompt skipped; sources unchanged.
 #
 # ============================================================================
 
@@ -402,9 +406,188 @@ save_deploy_saved_vars() {
     echo "PGADMIN4_DOMAIN=${PGADMIN4_DOMAIN:-}"
     echo "PGADMIN4_EMAIL=${PGADMIN4_EMAIL:-}"
     echo "PGADMIN4_PASSWORD=${PGADMIN4_PASSWORD:-}"
+    echo "UBUNTU_APT_MIRROR=${UBUNTU_APT_MIRROR:-}"
   } > "${file}"
   chmod 600 "${file}"
   log_info "Saved inputs for next run (${file})"
+}
+
+# Persist UBUNTU_APT_MIRROR into .deploy_saved_vars (after apt mirror step).
+persist_ubuntu_apt_mirror_to_saved_vars() {
+  local f="${APP_ROOT}/.deploy_saved_vars"
+  [[ ! -f "${f}" ]] && return 0
+  local tmp
+  tmp=$(mktemp)
+  grep -v '^UBUNTU_APT_MIRROR=' "${f}" > "${tmp}" 2>/dev/null || true
+  echo "UBUNTU_APT_MIRROR=${UBUNTU_APT_MIRROR:-keep}" >> "${tmp}"
+  mv "${tmp}" "${f}"
+  chmod 600 "${f}"
+}
+
+# Ubuntu only: optional switch to Arvan apt mirror before apt-get update (deb822 + classic deb lines).
+configure_ubuntu_apt_mirror() {
+  local id=""
+  # shellcheck disable=SC1091
+  [[ -f /etc/os-release ]] && source /etc/os-release
+  [[ "${ID:-}" == "ubuntu" ]] || return 0
+
+  local codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+  log_info "Ubuntu apt mirror: detected codename ${codename:-unknown}"
+
+  UBUNTU_APT_MIRROR="${UBUNTU_APT_MIRROR:-}"
+  UBUNTU_APT_MIRROR="${UBUNTU_APT_MIRROR,,}"
+  if [[ -z "${UBUNTU_APT_MIRROR}" ]]; then
+    echo
+    echo "منبع مخازن APT (فقط اوبونتو):"
+    echo "  [1] بدون تغییر — همان فایل‌های فعلی سیستم (پیش‌فرض)"
+    echo "  [2] آینه ابرآروان — mirror.arvancloud.ir (جایگزینی archive.ubuntu.com و security.ubuntu.com)"
+    echo "  [3] بازگشت به رسمی — فقط اگر قبلاً آروان ست شده (archive + security)"
+    read -rp "انتخاب [1/2/3] (پیش‌فرض 1): " _apt_mirror_choice
+    _apt_mirror_choice=${_apt_mirror_choice:-1}
+    case "${_apt_mirror_choice}" in
+      2) UBUNTU_APT_MIRROR=arvan ;;
+      3) UBUNTU_APT_MIRROR=official ;;
+      *) UBUNTU_APT_MIRROR=keep ;;
+    esac
+  fi
+  export UBUNTU_APT_MIRROR
+
+  if [[ "${UBUNTU_APT_MIRROR}" == "keep" ]]; then
+    log_info "APT sources: leaving unchanged (UBUNTU_APT_MIRROR=keep)."
+    persist_ubuntu_apt_mirror_to_saved_vars
+    return 0
+  fi
+
+  if [[ "${UBUNTU_APT_MIRROR}" != "arvan" && "${UBUNTU_APT_MIRROR}" != "official" ]]; then
+    log_warning "Invalid UBUNTU_APT_MIRROR='${UBUNTU_APT_MIRROR}', using keep."
+    UBUNTU_APT_MIRROR=keep
+    export UBUNTU_APT_MIRROR
+    persist_ubuntu_apt_mirror_to_saved_vars
+    return 0
+  fi
+
+  local backup_dir="/etc/apt/hesabix-apt-mirror-backup-$(date +%Y%m%d%H%M%S)"
+  mkdir -p "${backup_dir}"
+
+  local candidates=()
+  local f
+  [[ -f /etc/apt/sources.list ]] && candidates+=("/etc/apt/sources.list")
+  for f in /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
+    [[ -f "${f}" ]] || continue
+    candidates+=("${f}")
+  done
+
+  local files_to_edit=()
+  for f in "${candidates[@]}"; do
+    if grep -qE 'archive\.ubuntu\.com/ubuntu|security\.ubuntu\.com/ubuntu|mirror\.arvancloud\.ir/ubuntu' "${f}" 2>/dev/null; then
+      files_to_edit+=("${f}")
+      local rel="${f#/}"
+      rel="${rel//\//__}"
+      cp -a "${f}" "${backup_dir}/${rel}.bak"
+    fi
+  done
+
+  if [[ ${#files_to_edit[@]} -eq 0 ]]; then
+    log_info "No Ubuntu archive/security/Arvan lines found in apt sources; nothing to change."
+    persist_ubuntu_apt_mirror_to_saved_vars
+    return 0
+  fi
+
+  log_info "APT mirror mode: ${UBUNTU_APT_MIRROR} (backup: ${backup_dir})"
+
+  local apt_file_list
+  apt_file_list=$(printf '%s\n' "${files_to_edit[@]}")
+
+  UBUNTU_APT_MIRROR_MODE="${UBUNTU_APT_MIRROR}" HESABIX_APT_FILE_LIST="${apt_file_list}" python3 <<'PY'
+import os, re, sys
+
+mode = os.environ.get("UBUNTU_APT_MIRROR_MODE", "")
+paths = [p for p in os.environ.get("HESABIX_APT_FILE_LIST", "").splitlines() if p.strip()]
+ARVAN = "http://mirror.arvancloud.ir/ubuntu"
+ARCHIVE = "http://archive.ubuntu.com/ubuntu"
+SECURITY = "http://security.ubuntu.com/ubuntu"
+
+
+def apply_arvan(text: str) -> str:
+    if "archive.ubuntu.com/ubuntu" not in text and "security.ubuntu.com/ubuntu" not in text:
+        return text
+    t = re.sub(r"https?://archive\.ubuntu\.com/ubuntu\b", ARVAN, text)
+    t = re.sub(r"https?://security\.ubuntu\.com/ubuntu\b", ARVAN, t)
+    return t
+
+
+def apply_official(text: str) -> str:
+    if "mirror.arvancloud.ir" not in text:
+        return text
+    if re.search(r"(?m)^Types:\s*deb", text) and re.search(r"(?m)^URIs:", text):
+        blocks = re.split(r"\n{2,}", text)
+        out = []
+        for b in blocks:
+            if not b.strip():
+                continue
+            if re.search(r"(?m)^URIs:\s*https?://mirror\.arvancloud\.ir/ubuntu\b", b):
+                sm = re.search(r"(?m)^Suites:(.*)$", b)
+                suites = sm.group(1) if sm else ""
+                uri = SECURITY if re.search(r"\b[\w.-]+-security\b", suites) else ARCHIVE
+                b = re.sub(r"(?m)^URIs:\s*[^\n]+", "URIs: " + uri, b, count=1)
+            out.append(b)
+        joined = "\n\n".join(out)
+        if text.endswith("\n") and not joined.endswith("\n"):
+            joined += "\n"
+        return joined
+    lines = []
+    for line in text.splitlines(True):
+        if re.match(r"^\s*deb(-src)?\s+", line) and "mirror.arvancloud.ir" in line:
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] in ("deb", "deb-src"):
+                suite = parts[2]
+                parts[1] = SECURITY if "-security" in suite else ARCHIVE
+                line = " ".join(parts) + ("\n" if line.endswith("\n") else "")
+        lines.append(line)
+    return "".join(lines)
+
+
+for path in paths:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            content = fh.read()
+    except OSError as e:
+        print(f"skip read {path}: {e}", file=sys.stderr)
+        continue
+    if mode == "arvan":
+        new = apply_arvan(content)
+    elif mode == "official":
+        new = apply_official(content)
+    else:
+        new = content
+    if new != content:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(new)
+        print(path)
+PY
+
+  if ! apt-get update -y; then
+    log_error "apt-get update failed after mirror change; restoring from ${backup_dir}"
+    for f in "${files_to_edit[@]}"; do
+      local rel="${f#/}"
+      rel="${rel//\//__}"
+      if [[ -f "${backup_dir}/${rel}.bak" ]]; then
+        cp -a "${backup_dir}/${rel}.bak" "${f}"
+      fi
+    done
+    UBUNTU_APT_MIRROR=keep
+    export UBUNTU_APT_MIRROR
+    persist_ubuntu_apt_mirror_to_saved_vars
+    if apt-get update -y; then
+      log_warning "Restored previous apt sources; continuing with prerequisite install."
+      return 0
+    fi
+    return 1
+  fi
+
+  log_success "APT sources updated (${UBUNTU_APT_MIRROR}); apt-get update succeeded."
+  persist_ubuntu_apt_mirror_to_saved_vars
+  return 0
 }
 
 # Save deployment config for hesabix -update and install /usr/local/bin/hesabix
@@ -754,6 +937,8 @@ install_prereqs() {
   log_step "Installing prerequisites..."
   export DEBIAN_FRONTEND=noninteractive
   
+  configure_ubuntu_apt_mirror
+
   # Update package list
   log_info "Updating package list..."
   apt-get update -y
