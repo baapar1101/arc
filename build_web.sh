@@ -183,17 +183,19 @@ check_url_accessibility() {
 }
 
 # Function to find best available mirror
-# Priority: Chinese mirrors → Official → Other mirrors
+# Same order as deploy.sh: Runflare (Iran) → Hesabix internal → official → Chinese / others
 find_available_mirror() {
   local mirrors=(
-    # Hesabix internal mirror (Iran) — if available, prefer it
+    # Runflare mirror (Iran) — aligned with deploy.sh get_flutter_mirrors_list / set_flutter_mirror_env
+    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
+    # Hesabix internal mirror (Iran) — if available, use after Runflare probe
     "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
+    # Official (if DNS works)
+    "https://pub.dev|https://storage.googleapis.com"
     # Chinese mirrors (for servers inside China or restricted networks)
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
     "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-    # Official mirror (if DNS works)
-    "https://pub.dev|https://storage.googleapis.com"
     # Other alternative mirrors
     "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
   )
@@ -235,10 +237,12 @@ if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
     warn "=========================================="
     warn ""
     warn "All mirrors checked and not available:"
+    warn "  - mirror-flutter.runflare.com / mirror-gcs.runflare.com (Runflare)"
+    warn "  - shell.hesabix.ir (dart-pub / flutter)"
+    warn "  - pub.dev / storage.googleapis.com"
     warn "  - mirrors.tuna.tsinghua.edu.cn"
     warn "  - mirror.sjtu.edu.cn"
     warn "  - pub.flutter-io.cn"
-    warn "  - pub.dev"
     warn "  - mirrors.cloud.tencent.com"
     warn ""
     warn "No mirror selected. Will try offline cache mode for pub dependencies."
@@ -247,9 +251,10 @@ if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
     warn "  1. Check internet connection: ping 8.8.8.8"
     warn "  2. Check DNS: nslookup pub.dev"
     warn "  3. Configure DNS: cd /var/www/ark && ./fix_dns.sh"
-    warn "  4. Manually use mirror:"
-    warn "     export PUB_HOSTED_URL='https://mirrors.tuna.tsinghua.edu.cn/dart-pub'"
-    warn "     export FLUTTER_STORAGE_BASE_URL='https://mirrors.tuna.tsinghua.edu.cn/flutter'"
+    warn "  4. Manually use mirror (e.g. Runflare, same as deploy.sh):"
+    warn "     export PUB_HOSTED_URL='https://mirror-flutter.runflare.com'"
+    warn "     export FLUTTER_STORAGE_BASE_URL='https://mirror-gcs.runflare.com'"
+    warn "     # or: mirrors.tuna.tsinghua.edu.cn/dart-pub + .../flutter"
     warn "  5. Check firewall or proxy"
     warn ""
     warn "For complete guide, refer to TROUBLESHOOTING_DNS.md file."
