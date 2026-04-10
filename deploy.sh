@@ -438,11 +438,11 @@ configure_ubuntu_apt_mirror() {
   UBUNTU_APT_MIRROR="${UBUNTU_APT_MIRROR,,}"
   if [[ -z "${UBUNTU_APT_MIRROR}" ]]; then
     echo
-    echo "منبع مخازن APT (فقط اوبونتو):"
-    echo "  [1] بدون تغییر — همان فایل‌های فعلی سیستم (پیش‌فرض)"
-    echo "  [2] آینه ابرآروان — mirror.arvancloud.ir (جایگزینی archive.ubuntu.com و security.ubuntu.com)"
-    echo "  [3] بازگشت به رسمی — فقط اگر قبلاً آروان ست شده (archive + security)"
-    read -rp "انتخاب [1/2/3] (پیش‌فرض 1): " _apt_mirror_choice
+    echo "APT package sources (Ubuntu only):"
+    echo "  [1] Keep current system configuration (default)"
+    echo "  [2] Arvan Cloud mirror — mirror.arvancloud.ir (replaces archive.ubuntu.com and security.ubuntu.com)"
+    echo "  [3] Restore official Ubuntu — only if Arvan was configured (archive + security)"
+    read -rp "Choose [1/2/3] (default 1): " _apt_mirror_choice
     _apt_mirror_choice=${_apt_mirror_choice:-1}
     case "${_apt_mirror_choice}" in
       2) UBUNTU_APT_MIRROR=arvan ;;
@@ -1589,7 +1589,7 @@ persist_flutter_path_in_profile_d() {
     return 0
   fi
   cat > "${f}" <<'PROFILE'
-# Hesabix: Flutter در PATH برای شِل‌های login (deploy.sh / update.sh) — ترجیحاً دستی ویرایش نشود.
+# Hesabix: add Flutter to PATH for login shells (deploy.sh / update.sh); avoid manual edits if possible.
 if [ -x /opt/flutter/bin/flutter ]; then
   case ":${PATH}:" in
     *:/opt/flutter/bin:*) ;;
@@ -1604,13 +1604,13 @@ if [ -x /snap/bin/flutter ]; then
 fi
 PROFILE
   chmod 644 "${f}" 2>/dev/null || true
-  log_success "Flutter برای شِل‌های login در PATH: ${f}"
+  log_success "Flutter added to PATH for login shells: ${f}"
 
   # ترمینال گرافیکی اوبونتو/دبیان معمولاً login نیست؛ یک خط idempotent در bash.bashrc
   local marker="# hesabix-flutter-PATH (deploy.sh)"
   if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
     printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
-    log_success "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
+    log_success "Interactive bash: sourced ${f} from /etc/bash.bashrc."
   fi
 }
 
@@ -2517,8 +2517,8 @@ main() {
   # Load saved inputs from previous run (so re-run after failure doesn't require re-entering)
   load_saved_deploy_vars
   if [[ -f "${APP_ROOT}/.deploy_saved_vars" ]]; then
-    echo "مقادیر قبلی (دامنه، برنچ، pgAdmin4 و ...) بارگذاری شدند و به‌صورت پیش‌فرض استفاده می‌شوند."
-    echo "برای تغییر: متغیرهای محیطی را ست کنید (مثلاً API_DOMAIN=api.example.com) یا در هر سؤال Enter بزنید تا دوباره پرسیده شود."
+    echo "Loaded saved defaults from a previous run (domains, branch, pgAdmin4, etc.)."
+    echo "To override: set environment variables (e.g. API_DOMAIN=api.example.com) or press Enter at each prompt to be asked again."
     echo
   fi
   
