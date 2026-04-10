@@ -1044,13 +1044,14 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
             final profitPercentValue = profitPercent ?? 0;
             
             return Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
                       formatWithThousands(profitValue),
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: profitValue >= 0 ? Colors.green : Colors.red,
                         fontWeight: FontWeight.bold,
@@ -1059,6 +1060,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
                     if (profitPercentValue != 0)
                       Text(
                         '${profitPercentValue.toStringAsFixed(1)}%',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
                           color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
@@ -1082,7 +1084,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
             if (!invoice.isInstallmentSale) {
               return const SizedBox.shrink();
             }
-            return const Icon(Icons.check_circle, color: Colors.green, size: 18);
+            return const Center(
+              child: Icon(Icons.check_circle, color: Colors.green, size: 18),
+            );
           },
           tooltip: t.installmentsTitle,
         ),
