@@ -51,6 +51,9 @@ IFS=$'\n\t'
 #   default keep. arvan uses http://mirror.arvancloud.ir/ubuntu for archive.ubuntu.com and security.ubuntu.com.
 #   official restores those URLs from Arvan (per-stanza: *-security → security.ubuntu.com).
 # - Debian: mirror prompt skipped; sources unchanged.
+# - Apt/needrestart: by default NEEDRESTART_SUSPEND=1 during deploy so post-install service
+#   restarts (e.g. fwupd-refresh) do not run and fail on headless VPS. Set NEEDRESTART_SUSPEND=0
+#   to allow needrestart behavior.
 #
 # ============================================================================
 
@@ -2478,6 +2481,12 @@ main() {
     echo "$CROSS_MARK Please run this script with root privileges (e.g. sudo bash deploy.sh)."
     exit 1
   fi
+
+  # Unattended apt: avoid needrestart restarting services at end of install (fwupd-refresh etc.
+  # often fail or hang on minimal/headless servers; unrelated to Hesabix). Override: NEEDRESTART_SUSPEND=0
+  export DEBIAN_FRONTEND=noninteractive
+  export APT_LISTCHANGES_FRONTEND=none
+  export NEEDRESTART_SUSPEND="${NEEDRESTART_SUSPEND:-1}"
   
   # Initialize log file
   init_log_file
