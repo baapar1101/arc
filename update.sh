@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
+# pip: Runflare mirror via pip config --user (mirror-pypi.runflare.com) before backend pip install.
+# Flutter: Runflare pub/storage (mirror-flutter.runflare.com + mirror-gcs.runflare.com) tried first when env unset.
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 set -euo pipefail
@@ -42,6 +44,16 @@ PROFILE
     printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
     log_ok "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
   fi
+}
+
+configure_pip_runflare_mirror() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+  python3 -m pip config --user set global.index "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.trusted-host "mirror-pypi.runflare.com" 2>/dev/null || true
+  log_info "pip user config: Runflare PyPI (mirror-pypi.runflare.com/simple)"
 }
 
 if [[ $EUID -ne 0 ]]; then
@@ -99,6 +111,7 @@ log_ok "Source updated."
 
 # --- 2. Backend: pip, migrations, restart services ---
 log_info "Step 2: Backend – install deps, migrations, restart services..."
+configure_pip_runflare_mirror
 api_dir="${APP_ROOT}/app/hesabixAPI"
 if [[ ! -d "${api_dir}/.venv" ]]; then
   log_err "Backend venv not found. Run full deploy first."
@@ -152,7 +165,10 @@ fi
 persist_flutter_path_in_profile_d
 # Mirror detection (minimal)
 if [[ -z "${PUB_HOSTED_URL:-}" ]] || [[ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
-  for pair in "https://pub.flutter-io.cn|https://storage.flutter-io.cn" "https://pub.dev|https://storage.googleapis.com"; do
+  for pair in \
+    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com" \
+    "https://pub.flutter-io.cn|https://storage.flutter-io.cn" \
+    "https://pub.dev|https://storage.googleapis.com"; do
     IFS='|' read -r pub_url storage_url <<< "$pair"
     if curl -s --connect-timeout 3 -o /dev/null -w "%{http_code}" "$pub_url" 2>/dev/null | grep -q '^[23]'; then
       export PUB_HOSTED_URL="$pub_url"

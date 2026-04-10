@@ -41,8 +41,9 @@ IFS=$'\n\t'
 #   and used as defaults on next run (override by env vars or leave blank to be prompted again).
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
 # - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
-#   script also auto-detects mirrors (Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
-# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected.
+#   script also auto-detects mirrors (Runflare first, then Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
+# - pip: Runflare mirror via `pip config --user` (mirror-pypi.runflare.com) — see configure_pip_runflare_mirror.
+# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected (Runflare اول: mirror-flutter.runflare.com + mirror-gcs.runflare.com).
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 # - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
@@ -192,10 +193,111 @@ wait_for_db() {
   return 1
 }
 
+# Create or alter PostgreSQL role hesabix with password (any characters; uses dollar-quoting + format %L).
+apply_postgres_hesabix_password() {
+  DB_PASSWORD="${DB_PASSWORD}" python3 <<'PY'
+import os, subprocess, secrets
+pw = os.environ["DB_PASSWORD"]
+for _ in range(32):
+    delim = "h" + secrets.token_hex(16)
+    boundary = f"${delim}$"
+    if boundary not in pw:
+        break
+else:
+    raise SystemExit("Could not pick a safe dollar-quote delimiter for the database password")
+lit = boundary + pw + boundary
+sql = (
+    "DO $do$\n"
+    "BEGIN\n"
+    "  IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'hesabix') THEN\n"
+    "    EXECUTE format('CREATE USER hesabix WITH PASSWORD %L', " + lit + ");\n"
+    "  ELSE\n"
+    "    EXECUTE format('ALTER USER hesabix WITH PASSWORD %L', " + lit + ");\n"
+    "  END IF;\n"
+    "END\n"
+    "$do$;"
+)
+subprocess.run(
+    ["sudo", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql],
+    check=True,
+)
+PY
+}
+
+# Merge production keys into hesabixAPI .env (values with special chars are quoted for dotenv).
+merge_hesabix_api_env_file() {
+  local env_file="$1"
+  export MERGE_ENV_PATH="${env_file}"
+  export MERGE_DB_PASSWORD="${DB_PASSWORD}"
+  export MERGE_DB_POOL_SIZE="${DB_POOL_SIZE}"
+  export MERGE_DB_MAX_OVERFLOW="${DB_MAX_OVERFLOW}"
+  python3 <<'PY'
+import os, re
+path = os.environ["MERGE_ENV_PATH"]
+
+def fmt_val(v: str) -> str:
+    if v is None:
+        return ""
+    if re.search(r'[\s#"\'\\]', v) or v.startswith("#"):
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+    return v
+
+updates = {
+    "ENVIRONMENT": "production",
+    "DEBUG": "false",
+    "DB_USER": "hesabix",
+    "DB_PASSWORD": os.environ["MERGE_DB_PASSWORD"],
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5432",
+    "DB_NAME": "hesabix",
+    "LOG_LEVEL": "INFO",
+    "DB_POOL_SIZE": os.environ["MERGE_DB_POOL_SIZE"],
+    "DB_MAX_OVERFLOW": os.environ["MERGE_DB_MAX_OVERFLOW"],
+    "DB_POOL_TIMEOUT": "30",
+    "DB_POOL_RECYCLE": "300",
+    "CORS_ALLOWED_ORIGINS": '["*"]',
+}
+lines = []
+if os.path.isfile(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+keys_done = set()
+key_re = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=")
+out = []
+for line in lines:
+    m = key_re.match(line)
+    if m and m.group(1) in updates:
+        k = m.group(1)
+        out.append(f"{k}={fmt_val(updates[k])}\n")
+        keys_done.add(k)
+    else:
+        out.append(line)
+for k, v in updates.items():
+    if k not in keys_done:
+        out.append(f"{k}={fmt_val(v)}\n")
+with open(path, "w", encoding="utf-8") as f:
+    f.writelines(out)
+PY
+}
+
 # Check disk space (requires at least 2GB free)
 check_disk_space() {
   local available_space
-  available_space=$(df / | tail -1 | awk '{print $4}')
+  local min_avail=999999999999
+  local space
+  for mnt in / "${APP_ROOT}"; do
+    [[ -d "${mnt}" ]] || continue
+    space=$(df -P "${mnt}" 2>/dev/null | tail -1 | awk '{print $4}')
+    [[ "${space}" =~ ^[0-9]+$ ]] || continue
+    if [ "${space}" -lt "${min_avail}" ]; then
+      min_avail="${space}"
+    fi
+  done
+  available_space="${min_avail}"
+  if [[ ! "${available_space}" =~ ^[0-9]+$ ]]; then
+    log_warning "Could not read free disk space; skipping disk check."
+    return 0
+  fi
   if [ "$available_space" -lt 2097152 ]; then
     log_warning "Low disk space (less than 2GB). This may cause issues."
     read -rp "Continue anyway? (y/N): " continue_anyway
@@ -478,7 +580,8 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  : "${FLUTTER_VERSION:=3.24.0}"
+  # نمایش در خلاصه؛ tarball پیش‌فرض داخلی FLUTTER_SDK_TARBALL_URL_INTERNAL ≈ 3.41.x stable
+  : "${FLUTTER_VERSION:=3.41.1}"
   : "${UVICORN_WORKERS:=}"
   
   # Calculate optimal worker count based on CPU cores if not provided
@@ -833,7 +936,17 @@ setup_db() {
   
   # Configure PostgreSQL to allow local connections (if needed)
   local pg_version
-  pg_version=$(sudo -u postgres psql -tAc "SELECT version();" | grep -oE '[0-9]+' | head -1)
+  local ver_num
+  ver_num=$(sudo -u postgres psql -tAc "SHOW server_version_num;" 2>/dev/null | tr -d '[:space:]')
+  if [[ -n "${ver_num}" ]] && [[ "${ver_num}" =~ ^[0-9]+$ ]]; then
+    pg_version=$((10#${ver_num} / 10000))
+  else
+    pg_version=$(sudo -u postgres psql -tAc "SHOW server_version;" 2>/dev/null | cut -d. -f1 | tr -d '[:space:]')
+  fi
+  if [[ -z "${pg_version}" ]] || [[ ! "${pg_version}" =~ ^[0-9]+$ ]]; then
+    log_error "Could not detect PostgreSQL major version for config paths."
+    exit 1
+  fi
   local pg_hba="/etc/postgresql/${pg_version}/main/pg_hba.conf"
   
   # Allow password authentication for localhost connections
@@ -849,19 +962,11 @@ setup_db() {
     systemctl reload postgresql || true
   fi
   
-  # Create database and user
-  sudo -u postgres psql <<SQL
--- Create user if not exists
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'hesabix') THEN
-    CREATE USER hesabix WITH PASSWORD '${DB_PASSWORD}';
-  ELSE
-    ALTER USER hesabix WITH PASSWORD '${DB_PASSWORD}';
-  END IF;
-END
-\$\$;
-SQL
+  # Create database and user (password may contain quotes/special characters)
+  if ! apply_postgres_hesabix_password; then
+    log_error "Failed to create/update PostgreSQL user hesabix (password apply failed)."
+    exit 1
+  fi
 
   # Create database separately to avoid issues with conditional creation
   if ! sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'hesabix'" | grep -q 1; then
@@ -902,6 +1007,7 @@ deploy_backend() {
   
   cd "${api_dir}"
 
+  configure_pip_runflare_mirror
   set_pip_mirror_env
   # Python venv + install (retry with next mirror if one fails)
   if [[ ! -d ".venv" ]]; then
@@ -925,71 +1031,14 @@ deploy_backend() {
     exit 1
   fi
 
-  # Check if .env.example exists and use it as base
+  # env.example as base, then merge production keys (DB_PASSWORD etc. safe for special chars)
   local env_file=".env"
   if [[ -f "env.example" ]]; then
     cp env.example "${env_file}"
-    # Update production values
-    sed -i "s/^ENVIRONMENT=.*/ENVIRONMENT=production/" "${env_file}"
-    sed -i "s/^DEBUG=.*/DEBUG=false/" "${env_file}"
-    sed -i "s/^DB_USER=.*/DB_USER=hesabix/" "${env_file}"
-    sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" "${env_file}"
-    sed -i "s/^DB_HOST=.*/DB_HOST=127.0.0.1/" "${env_file}"
-    sed -i "s/^DB_PORT=.*/DB_PORT=5432/" "${env_file}"
-    sed -i "s/^DB_NAME=.*/DB_NAME=hesabix/" "${env_file}"
-    sed -i "s/^LOG_LEVEL=.*/LOG_LEVEL=INFO/" "${env_file}"
-    
-    # Update database connection pool settings for optimal performance
-    if ! grep -q "^DB_POOL_SIZE=" "${env_file}"; then
-      echo "DB_POOL_SIZE=${DB_POOL_SIZE}" >> "${env_file}"
-    else
-      sed -i "s/^DB_POOL_SIZE=.*/DB_POOL_SIZE=${DB_POOL_SIZE}/" "${env_file}"
-    fi
-    
-    if ! grep -q "^DB_MAX_OVERFLOW=" "${env_file}"; then
-      echo "DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}" >> "${env_file}"
-    else
-      sed -i "s/^DB_MAX_OVERFLOW=.*/DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}/" "${env_file}"
-    fi
-    
-    # Set optimal pool timeout and recycle for persistent connections
-    if ! grep -q "^DB_POOL_TIMEOUT=" "${env_file}"; then
-      echo "DB_POOL_TIMEOUT=30" >> "${env_file}"
-    else
-      sed -i "s/^DB_POOL_TIMEOUT=.*/DB_POOL_TIMEOUT=30/" "${env_file}"
-    fi
-    
-    if ! grep -q "^DB_POOL_RECYCLE=" "${env_file}"; then
-      echo "DB_POOL_RECYCLE=300" >> "${env_file}"
-    else
-      sed -i "s/^DB_POOL_RECYCLE=.*/DB_POOL_RECYCLE=300/" "${env_file}"
-    fi
-    
-    # Add CORS if not exists (public API - allow all origins)
-    if ! grep -q "CORS_ALLOWED_ORIGINS" "${env_file}"; then
-      echo "CORS_ALLOWED_ORIGINS=[\"*\"]" >> "${env_file}"
-    else
-      sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=[\"*\"]|" "${env_file}"
-    fi
   else
-    # Fallback: create minimal .env with optimized settings
-    cat > "${env_file}" <<ENV
-ENVIRONMENT=production
-DEBUG=false
-DB_USER=hesabix
-DB_PASSWORD=${DB_PASSWORD}
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_NAME=hesabix
-LOG_LEVEL=INFO
-CORS_ALLOWED_ORIGINS=["*"]
-# Database Connection Pool Settings (optimized for performance and persistent connections)
-DB_POOL_SIZE=${DB_POOL_SIZE}
-DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
-DB_POOL_TIMEOUT=30
-DB_POOL_RECYCLE=300
-ENV
+    : > "${env_file}"
   fi
+  merge_hesabix_api_env_file "${env_file}"
   
   log_info "Database connection pool configured: pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, timeout=30s, recycle=300s"
   
@@ -1018,9 +1067,12 @@ print('Connection successful')
   local seed_dump
   seed_dump=$(ls -t "${backup_dir}"/hesabix_seed*.dump 2>/dev/null | head -1)
   local table_count
-  table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null || echo "999")
+  table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
+  if [[ ! "${table_count}" =~ ^[0-9]+$ ]]; then
+    table_count=999
+  fi
 
-  if [[ "${table_count}" -eq "0" ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
+  if [[ "${table_count}" -eq 0 ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
     echo "Importing seed database from: ${seed_dump}"
     if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" 2>/dev/null; then
       log_success "Seed database imported successfully."
@@ -1065,7 +1117,7 @@ print('Connection successful')
 [Unit]
 Description=Hesabix API (FastAPI/Uvicorn)
 After=network.target postgresql.service
-Requires=postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
@@ -1166,7 +1218,7 @@ UNIT
 Description=Hesabix Notification Moderation Worker
 Documentation=https://hesabix.com/docs/notification-moderation
 After=network.target postgresql.service redis-server.service redis.service
-Requires=postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
@@ -1206,7 +1258,7 @@ UNIT
   
   systemctl enable hesabix-notification-moderation
   
-  # Start notification moderation worker
+  # Start notification moderation worker (uses DB; not the same as RQ/Redis)
   systemctl start hesabix-notification-moderation
   sleep 2
   if check_service hesabix-notification-moderation; then
@@ -1214,6 +1266,17 @@ UNIT
   else
     log_warning "Notification Moderation Worker failed to start. Check logs: journalctl -u hesabix-notification-moderation"
   fi
+}
+
+# pip آینه Runflare (ایران) — همان دستوراتی که کاربر برای pip سراسری می‌خواهد
+configure_pip_runflare_mirror() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+  python3 -m pip config --user set global.index "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.trusted-host "mirror-pypi.runflare.com" 2>/dev/null || true
+  log_info "pip user config: Runflare PyPI (mirror-pypi.runflare.com/simple)"
 }
 
 # List of PyPI mirrors to try in order (url only; PIP_TRUSTED_HOST is set for non-pypi.org).
@@ -1224,6 +1287,7 @@ get_pip_mirrors_list() {
     list+=("${PIP_INDEX_URL}")
   fi
   list+=(
+    "https://mirror-pypi.runflare.com/simple"
     "https://pypi.org/simple"
     "https://pypi.tuna.tsinghua.edu.cn/simple"
     "https://mirrors.aliyun.com/pypi/simple/"
@@ -1257,11 +1321,15 @@ set_pip_mirror_env() {
   fi
   log_info "Detecting PyPI mirror (for pip packages)..."
   local index_url=""
-  if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://pypi.org/simple/" 2>/dev/null | grep -q '^[23]'; then
+  if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://mirror-pypi.runflare.com/simple" 2>/dev/null | grep -q '^[23]'; then
+    index_url="https://mirror-pypi.runflare.com/simple"
+  fi
+  if [[ -z "${index_url}" ]] && curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://pypi.org/simple/" 2>/dev/null | grep -q '^[23]'; then
     index_url="https://pypi.org/simple"
   fi
   if [[ -z "${index_url}" ]]; then
     local mirrors=(
+      "https://mirror-pypi.runflare.com/simple"
       "https://pypi.tuna.tsinghua.edu.cn/simple"
       "https://mirrors.aliyun.com/pypi/simple/"
       "https://mirrors.cloud.tencent.com/pypi/simple"
@@ -1288,6 +1356,7 @@ get_flutter_mirrors_list() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
     echo "${PUB_HOSTED_URL}|${FLUTTER_STORAGE_BASE_URL}"
   fi
+  echo "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
   # Hesabix internal mirror (if you run a dart-pub proxy + flutter storage mirror here)
   echo "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
   echo "https://pub.dev|https://storage.googleapis.com"
@@ -1306,6 +1375,7 @@ set_flutter_mirror_env() {
   fi
   log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
   local mirrors=(
+    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
     "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
     "https://pub.dev|https://storage.googleapis.com"
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
@@ -1513,10 +1583,22 @@ ensure_flutter_sdk() {
 
 # On low-RAM servers, add swap so Flutter/dart2js build is not OOM-killed (exit -9).
 ensure_swap_for_flutter_build() {
-  local total_mb avail_mb
-  total_mb=$(free -m | awk '/^Mem:/ {print $2}')
-  avail_mb=$(free -m | awk '/^Mem:/ {print $7}')
-  if [ "${total_mb:-0}" -lt 2500 ] || [ "${avail_mb:-0}" -lt 1000 ]; then
+  local total_mb avail_mb avail_kb
+  if [[ -r /proc/meminfo ]]; then
+    total_mb=$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)
+    avail_kb=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+    if [[ -n "${avail_kb}" ]] && [[ "${avail_kb}" =~ ^[0-9]+$ ]]; then
+      avail_mb=$((avail_kb / 1024))
+    else
+      avail_mb=$(free -m 2>/dev/null | awk '/^Mem:/ {print $7}')
+    fi
+  else
+    total_mb=$(free -m 2>/dev/null | awk '/^Mem:/ {print $2}')
+    avail_mb=$(free -m 2>/dev/null | awk '/^Mem:/ {print $7}')
+  fi
+  total_mb=${total_mb:-0}
+  avail_mb=${avail_mb:-0}
+  if [ "${total_mb}" -lt 2500 ] || [ "${avail_mb}" -lt 1000 ]; then
     local swapfile="${APP_ROOT}/swap.flutter.bin"
     # On <2.5GB RAM use 2.5GB swap so dart compile js can finish
     local swap_mb=2560
@@ -1894,38 +1976,39 @@ configure_api_ssl() {
   if [[ "${ENABLE_API_SSL}" =~ ^[Yy]$ ]]; then
     echo ">> Installing and configuring TLS for API..."
     
-    # Check if certbot is already installed
     if ! command -v certbot >/dev/null 2>&1; then
-      apt-get install -y certbot python3-certbot-nginx
+      if ! apt-get install -y certbot python3-certbot-nginx; then
+        log_error "Failed to install certbot (API SSL)."
+        return 1
+      fi
     fi
     
-    # Get email for certbot
     : "${CERTBOT_EMAIL:=admin@${API_DOMAIN}}"
     if [[ -z "${CERTBOT_EMAIL}" ]] || [[ "${CERTBOT_EMAIL}" == "admin@${API_DOMAIN}" ]]; then
       read -rp "Email for SSL certificate (default: admin@${API_DOMAIN}): " input_email
       CERTBOT_EMAIL=${input_email:-admin@${API_DOMAIN}}
     fi
     
-    # Validate email format (basic)
     if [[ ! "${CERTBOT_EMAIL}" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
       echo "$WARNING_MARK Invalid email format. Using default: admin@${API_DOMAIN}"
       CERTBOT_EMAIL="admin@${API_DOMAIN}"
     fi
     
-    # Configure SSL for API domain only
     if certbot --nginx -d "${API_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
       echo "$CHECK_MARK SSL/TLS enabled for API domain."
-      # Setup auto-renewal
-      systemctl enable certbot.timer
-      systemctl start certbot.timer
+      systemctl enable certbot.timer 2>/dev/null || true
+      systemctl start certbot.timer 2>/dev/null || true
       echo "$CHECK_MARK SSL certificate auto-renewal enabled."
+      return 0
     else
       echo "$WARNING_MARK Error issuing SSL certificate for API domain. You can run manually later:"
       echo "  certbot --nginx -d ${API_DOMAIN}"
+      return 1
     fi
   else
     echo "SSL/TLS skipped for API domain; you can run certbot later:"
     echo "  certbot --nginx -d ${API_DOMAIN}"
+    return 0
   fi
 }
 
@@ -1942,40 +2025,41 @@ configure_ui_ssl() {
   if [[ "${ENABLE_UI_SSL}" =~ ^[Yy]$ ]]; then
     echo ">> Installing and configuring TLS for UI..."
     
-    # Check if certbot is already installed
     if ! command -v certbot >/dev/null 2>&1; then
-      apt-get install -y certbot python3-certbot-nginx
+      if ! apt-get install -y certbot python3-certbot-nginx; then
+        log_error "Failed to install certbot (UI SSL)."
+        return 1
+      fi
     fi
     
-    # Get email for certbot (use same as API if already set)
     : "${CERTBOT_EMAIL:=admin@${UI_DOMAIN}}"
     if [[ -z "${CERTBOT_EMAIL}" ]] || [[ "${CERTBOT_EMAIL}" == "admin@${UI_DOMAIN}" ]]; then
       read -rp "Email for SSL certificate (default: admin@${UI_DOMAIN}): " input_email
       CERTBOT_EMAIL=${input_email:-admin@${UI_DOMAIN}}
     fi
     
-    # Validate email format (basic)
     if [[ ! "${CERTBOT_EMAIL}" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
       echo "$WARNING_MARK Invalid email format. Using default: admin@${UI_DOMAIN}"
       CERTBOT_EMAIL="admin@${UI_DOMAIN}"
     fi
     
-    # Configure SSL for UI domain only
     if certbot --nginx -d "${UI_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
       echo "$CHECK_MARK SSL/TLS enabled for UI domain."
-      # Setup auto-renewal (only if not already enabled)
       if ! systemctl is-enabled certbot.timer >/dev/null 2>&1; then
-        systemctl enable certbot.timer
-        systemctl start certbot.timer
+        systemctl enable certbot.timer 2>/dev/null || true
+        systemctl start certbot.timer 2>/dev/null || true
         echo "$CHECK_MARK SSL certificate auto-renewal enabled."
       fi
+      return 0
     else
       echo "$WARNING_MARK Error issuing SSL certificate for UI domain. You can run manually later:"
       echo "  certbot --nginx -d ${UI_DOMAIN}"
+      return 1
     fi
   else
     echo "SSL/TLS skipped for UI domain; you can run certbot later:"
     echo "  certbot --nginx -d ${UI_DOMAIN}"
+    return 0
   fi
 }
 
@@ -1991,6 +2075,7 @@ install_pgadmin4() {
     return 0
   fi
   
+  configure_pip_runflare_mirror
   set_pip_mirror_env
   export DEBIAN_FRONTEND=noninteractive
   apt-get install -y -qq python3-venv python3-pip libpq-dev >/dev/null 2>&1
@@ -2050,6 +2135,7 @@ CONFIG
 [Unit]
 Description=pgAdmin4 (Gunicorn)
 After=network.target postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
@@ -2151,7 +2237,7 @@ configure_pgadmin4_ssl() {
   
   if [[ -z "${PGADMIN4_DOMAIN}" ]]; then
     echo "$WARNING_MARK pgAdmin4 domain not set. Skipping SSL configuration."
-    return 1
+    return 0
   fi
   
   : "${ENABLE_PGADMIN4_SSL:=}"
@@ -2164,40 +2250,41 @@ configure_pgadmin4_ssl() {
   if [[ "${ENABLE_PGADMIN4_SSL}" =~ ^[Yy]$ ]]; then
     echo ">> Installing and configuring TLS for pgAdmin4..."
     
-    # Check if certbot is already installed
     if ! command -v certbot >/dev/null 2>&1; then
-      apt-get install -y certbot python3-certbot-nginx
+      if ! apt-get install -y certbot python3-certbot-nginx; then
+        log_error "Failed to install certbot (pgAdmin4 SSL)."
+        return 1
+      fi
     fi
     
-    # Get email for certbot (use same as API if already set, or pgAdmin4 email)
     : "${CERTBOT_EMAIL:=${PGADMIN4_EMAIL:-admin@${PGADMIN4_DOMAIN}}}"
     if [[ -z "${CERTBOT_EMAIL}" ]] || [[ "${CERTBOT_EMAIL}" == "admin@${PGADMIN4_DOMAIN}" ]]; then
       read -rp "Email for SSL certificate (default: ${CERTBOT_EMAIL}): " input_email
       CERTBOT_EMAIL=${input_email:-${CERTBOT_EMAIL}}
     fi
     
-    # Validate email format (basic)
     if [[ ! "${CERTBOT_EMAIL}" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
       echo "$WARNING_MARK Invalid email format. Using default: ${PGADMIN4_EMAIL:-admin@${PGADMIN4_DOMAIN}}"
       CERTBOT_EMAIL="${PGADMIN4_EMAIL:-admin@${PGADMIN4_DOMAIN}}"
     fi
     
-    # Configure SSL for pgAdmin4 domain
     if certbot --nginx -d "${PGADMIN4_DOMAIN}" --redirect --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" 2>&1; then
       echo "$CHECK_MARK SSL/TLS enabled for pgAdmin4 domain."
-      # Setup auto-renewal (only if not already enabled)
       if ! systemctl is-enabled certbot.timer >/dev/null 2>&1; then
-        systemctl enable certbot.timer
-        systemctl start certbot.timer
+        systemctl enable certbot.timer 2>/dev/null || true
+        systemctl start certbot.timer 2>/dev/null || true
         echo "$CHECK_MARK SSL certificate auto-renewal enabled."
       fi
+      return 0
     else
       echo "$WARNING_MARK Error issuing SSL certificate for pgAdmin4 domain. You can run manually later:"
       echo "  certbot --nginx -d ${PGADMIN4_DOMAIN}"
+      return 1
     fi
   else
     echo "SSL/TLS skipped for pgAdmin4 domain; you can run certbot later:"
     echo "  certbot --nginx -d ${PGADMIN4_DOMAIN}"
+    return 0
   fi
 }
 
@@ -2231,8 +2318,12 @@ main() {
   # Check disk space
   check_disk_space
   
-  # Check if port 8000 is available
-  if command -v netstat >/dev/null 2>&1; then
+  # Check if port 8000 is in use (ss preferred; netstat optional)
+  if command -v ss >/dev/null 2>&1; then
+    if ss -tuln | grep -qE ':8000(\s|$)'; then
+      log_warning "Port 8000 is in use. You may need to stop the previous service."
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
     if netstat -tuln | grep -q ":8000 "; then
       log_warning "Port 8000 is in use. You may need to stop the previous service."
     fi
@@ -2324,19 +2415,24 @@ main() {
   fi
   echo
   
-  # Configure SSL API (skip if already configured)
+  # Configure SSL API (mark done only on success or explicit skip — not on certbot failure)
   if ! check_step_completed "ssl_api"; then
-    configure_api_ssl
-    mark_step_completed "ssl_api"
+    if configure_api_ssl; then
+      mark_step_completed "ssl_api"
+    else
+      log_warning "API SSL step incomplete; re-run deploy.sh to retry Let's Encrypt for ${API_DOMAIN}."
+    fi
   else
     echo "$CHECK_MARK SSL for API already configured. Skipping..."
   fi
   echo
   
-  # Configure SSL UI (skip if already configured)
   if ! check_step_completed "ssl_ui"; then
-    configure_ui_ssl
-    mark_step_completed "ssl_ui"
+    if configure_ui_ssl; then
+      mark_step_completed "ssl_ui"
+    else
+      log_warning "UI SSL step incomplete; re-run deploy.sh to retry Let's Encrypt for ${UI_DOMAIN}."
+    fi
   else
     echo "$CHECK_MARK SSL for UI already configured. Skipping..."
   fi
@@ -2361,8 +2457,11 @@ main() {
     echo
     
     if ! check_step_completed "ssl_pgadmin4"; then
-      configure_pgadmin4_ssl
-      mark_step_completed "ssl_pgadmin4"
+      if configure_pgadmin4_ssl; then
+        mark_step_completed "ssl_pgadmin4"
+      else
+        log_warning "pgAdmin4 SSL step incomplete; re-run deploy.sh to retry Let's Encrypt for ${PGADMIN4_DOMAIN}."
+      fi
     else
       echo "$CHECK_MARK SSL for pgAdmin4 already configured. Skipping..."
     fi
