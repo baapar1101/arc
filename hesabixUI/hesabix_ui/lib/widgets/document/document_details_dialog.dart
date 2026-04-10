@@ -2662,6 +2662,29 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           const SizedBox(width: 12),
           if (_document != null &&
               _document!.documentType.startsWith('invoice') &&
+              (ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false)) ...[
+            OutlinedButton.icon(
+              onPressed: () {
+                final doc = _document!;
+                final router = GoRouter.of(context);
+                Navigator.of(context).pop();
+                router.pushNamed(
+                  'business_edit_invoice',
+                  pathParameters: {
+                    'business_id': doc.businessId.toString(),
+                    'invoice_id': doc.id.toString(),
+                  },
+                );
+              },
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(
+                '${AppLocalizations.of(context).edit} ${AppLocalizations.of(context).invoice}',
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (_document != null &&
+              _document!.documentType.startsWith('invoice') &&
               !_loadingInvoiceTemplates &&
               _invoiceTemplates.isNotEmpty) ...[
             DropdownButton<int?>(
