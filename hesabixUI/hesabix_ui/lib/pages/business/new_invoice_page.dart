@@ -59,9 +59,12 @@ class NewInvoicePage extends StatefulWidget {
 }
 
 class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProviderStateMixin {
-  // تنظیمات انبار
-  bool _postInventory = true; // ثبت اسناد انبار
+  // تنظیمات انبار / حواله (none | draft | posted)
+  String _invoiceWarehouseReleaseMode = 'draft';
+  bool _warehouseReleaseModeFromLocal = false;
   int? _documentWarehouseId; // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
+
+  bool get _postInventory => _invoiceWarehouseReleaseMode != 'none';
   late TabController _tabController;
   // نادیده گرفتن اعتبار مشتری برای این فاکتور
   bool _ignoreCreditCheck = false;
@@ -334,11 +337,25 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   void _loadLocalSettingsForCurrentType() {
-    if (!kIsWeb) return;
+    _warehouseReleaseModeFromLocal = false;
+    void scheduleBusinessDefault() {
+      if (!_warehouseReleaseModeFromLocal) {
+        Future.microtask(() => _loadBusinessInvoiceWarehouseDefaults());
+      }
+    }
+
+    if (!kIsWeb) {
+      scheduleBusinessDefault();
+      return;
+    }
     final key = _currentSettingsStorageKey();
-    if (key == null) return;
+    if (key == null) {
+      scheduleBusinessDefault();
+      return;
+    }
     final raw = web_utils.getLocalStorageValue(key);
     if (raw == null || raw.isEmpty) {
+      scheduleBusinessDefault();
       return;
     }
     try {
@@ -362,9 +379,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         if (sendTax != null) {
           _sendToTaxFolder = sendTax;
         }
-        final postInventory = _parseBool(data['post_inventory']);
-        if (postInventory != null) {
-          _postInventory = postInventory;
+        final modeRaw = data['invoice_warehouse_release_mode']?.toString().trim().toLowerCase();
+        if (modeRaw != null && (modeRaw == 'none' || modeRaw == 'draft' || modeRaw == 'posted')) {
+          _invoiceWarehouseReleaseMode = modeRaw;
+          _warehouseReleaseModeFromLocal = true;
+        } else {
+          final postInventory = _parseBool(data['post_inventory']);
+          if (postInventory != null) {
+            _warehouseReleaseModeFromLocal = true;
+            _invoiceWarehouseReleaseMode = postInventory ? 'draft' : 'none';
+          }
         }
         final documentWarehouseId = data['document_warehouse_id'];
         if (documentWarehouseId != null) {
@@ -380,7 +404,23 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         }
       });
       _hasUserCustomizedSettings = true;
-    } catch (_) {}
+      scheduleBusinessDefault();
+    } catch (_) {
+      scheduleBusinessDefault();
+    }
+  }
+
+  Future<void> _loadBusinessInvoiceWarehouseDefaults() async {
+    if (_warehouseReleaseModeFromLocal) return;
+    try {
+      final b = await BusinessApiService.getBusiness(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _invoiceWarehouseReleaseMode = b.invoiceWarehouseReleaseMode;
+      });
+    } catch (_) {
+      // نادیده گرفتن؛ پیش‌فرض draft روی UI باقی می‌ماند
+    }
   }
 
   void _saveLocalSettings() {
@@ -394,7 +434,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'orientation': _selectedPaperOrientation,
       'show_stamp': _showStampOnPrint,
       'send_to_tax_folder': _sendToTaxFolder,
-      'post_inventory': _postInventory,
+      'invoice_warehouse_release_mode': _invoiceWarehouseReleaseMode,
       'document_warehouse_id': _documentWarehouseId,
       'ignore_credit_check': _ignoreCreditCheck,
       'use_installments': _useInstallments,
@@ -1123,7 +1163,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
            _selectedInvoiceType != InvoiceType.production;
   }
 
-  @override
   @override
   void dispose() {
     _tabController.dispose();
@@ -2188,8 +2227,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'net': _sumTotal,
       },
     };
-    // سوییچ ثبت اسناد انبار
-    extraInfo['post_inventory'] = _postInventory;
+    extraInfo['post_inventory'] = _invoiceWarehouseReleaseMode != 'none';
+    extraInfo['auto_post_warehouse'] = _invoiceWarehouseReleaseMode == 'posted';
     // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
     if (_documentWarehouseId != null) {
       extraInfo['warehouse_id'] = _documentWarehouseId;
@@ -2715,13 +2754,27 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SwitchListTile(
-                        title: const Text('ثبت اسناد انبار'),
-                        subtitle: const Text('در صورت غیرفعال‌سازی، حرکات موجودی ثبت نمی‌شوند و کنترل کسری انجام نمی‌گردد'),
-                        value: _postInventory,
-                        onChanged: (value) {
+                      Text(
+                        t.invoiceWarehouseReleaseSectionTitle,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        t.invoiceWarehouseReleaseSectionSubtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<String>(
+                        segments: <ButtonSegment<String>>[
+                          ButtonSegment<String>(value: 'none', label: Text(t.invoiceWarehouseReleaseNone)),
+                          ButtonSegment<String>(value: 'draft', label: Text(t.invoiceWarehouseReleaseDraft)),
+                          ButtonSegment<String>(value: 'posted', label: Text(t.invoiceWarehouseReleasePosted)),
+                        ],
+                        selected: <String>{_invoiceWarehouseReleaseMode},
+                        onSelectionChanged: (Set<String> next) {
                           setState(() {
-                            _postInventory = value;
+                            _invoiceWarehouseReleaseMode = next.first;
+                            _warehouseReleaseModeFromLocal = true;
                             _hasUserCustomizedSettings = true;
                           });
                           _saveLocalSettings();

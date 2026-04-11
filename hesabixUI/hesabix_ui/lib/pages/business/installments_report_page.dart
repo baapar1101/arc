@@ -9,7 +9,8 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
-import 'package:hesabix_ui/services/invoice_service.dart';import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/invoice_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 
 class InstallmentsReportPage extends StatefulWidget {
@@ -84,6 +85,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   int _pageSize = 50;
   int _currentPage = 1;
   static const List<int> _pageSizeOptions = <int>[25, 50, 100, 200];
+  /// نمای پرونده (گروه فاکتور) در مقابل جدول تخت اقساط
+  bool _viewPortfolios = true;
+  String? _bucket;
+  final TextEditingController _minOverdueController = TextEditingController();
+  List<Map<String, dynamic>> _groupedItems = <Map<String, dynamic>>[];
 
   String? _extractFilenameFromContentDisposition(String? contentDisposition) {
     if (contentDisposition == null || contentDisposition.trim().isEmpty) return null;
@@ -161,6 +167,12 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (_viewPortfolios) {
+      if (_groupedItems.isEmpty) {
+        return Center(child: Text(t.noDataFound));
+      }
+      return _buildGroupedTable(t);
+    }
     if (_items.isEmpty) {
       return Center(child: Text(t.noDataFound));
     }
@@ -176,9 +188,66 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
+                    showCheckboxColumn: false,
                     columns: _buildTableColumns(t),
                     rows: _items.map((row) => _buildDataRow(row, t, theme)).toList(),
                     columnSpacing: 36,
+                    headingTextStyle: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    dataTextStyle: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ),
+            ),
+            _buildPagination(t),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupedTable(AppLocalizations t) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Card(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    showCheckboxColumn: false,
+                    columns: [
+                      DataColumn(label: Text(t.installmentsTableInvoice)),
+                      DataColumn(label: Text(t.installmentsTablePerson)),
+                      DataColumn(label: Text(t.installmentsTableMobile)),
+                      DataColumn(label: Text(t.installmentsGroupedNextDue)),
+                      DataColumn(label: Text(t.installmentsGroupedWorstStatus)),
+                      DataColumn(numeric: true, label: Text(t.installmentsGroupedInstallments)),
+                      DataColumn(numeric: true, label: Text(t.installmentsGroupedPaidCount)),
+                      DataColumn(numeric: true, label: Text(t.installmentsGroupedOverdueCount)),
+                      DataColumn(numeric: true, label: Text(t.installmentsGroupedRemainingSum)),
+                    ],
+                    rows: _groupedItems.map((row) {
+                      final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
+                      return DataRow(
+                        onSelectChanged: (_) => _openInstallmentDetail(invId),
+                        cells: [
+                          DataCell(Text(row['invoice_code']?.toString() ?? '-')),
+                          DataCell(Text(row['person_name']?.toString() ?? '-')),
+                          DataCell(Text(row['person_mobile']?.toString() ?? '-')),
+                          DataCell(Text(_formatDateValue(row, 'next_due_date'))),
+                          DataCell(_buildStatusChip(row['worst_status']?.toString(), t, theme)),
+                          DataCell(Text(row['installment_count']?.toString() ?? '-')),
+                          DataCell(Text(row['paid_installment_count']?.toString() ?? '-')),
+                          DataCell(Text(row['overdue_installment_count']?.toString() ?? '-')),
+                          DataCell(Text(_formatNumber(row['remaining_sum']))),
+                        ],
+                      );
+                    }).toList(),
+                    columnSpacing: 28,
                     headingTextStyle: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                     dataTextStyle: theme.textTheme.bodyMedium,
                   ),
@@ -197,6 +266,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       DataColumn(label: Text(t.installmentsTableInvoice)),
       DataColumn(label: Text(t.installmentsTableInstallment)),
       DataColumn(label: Text(t.installmentsTablePerson)),
+      DataColumn(label: Text(t.installmentsTableMobile)),
       DataColumn(label: Text(t.installmentsTableDueDate)),
       DataColumn(label: Text(t.installmentsTableStatus)),
       DataColumn(numeric: true, label: Text(t.installmentsTablePrincipal)),
@@ -210,11 +280,14 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   }
 
   DataRow _buildDataRow(Map<String, dynamic> row, AppLocalizations t, ThemeData theme) {
+    final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
     return DataRow(
+      onSelectChanged: (_) => _openInstallmentDetail(invId),
       cells: [
         DataCell(Text(row['invoice_code']?.toString() ?? '-')),
         DataCell(Text(row['seq']?.toString() ?? '-')),
         DataCell(Text(row['person_name']?.toString() ?? '-')),
+        DataCell(Text(row['person_mobile']?.toString() ?? '-')),
         DataCell(Text(_formatDateValue(row, 'due_date'))),
         DataCell(_buildStatusChip(row['status']?.toString(), t, theme)),
         DataCell(Text(_formatNumber(row['principal']))),
@@ -296,7 +369,8 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   }
 
   Widget _buildPagination(AppLocalizations t) {
-    final total = (_pagination?['total'] as num?)?.toInt() ?? _items.length;
+    final total = (_pagination?['total'] as num?)?.toInt() ??
+        (_viewPortfolios ? _groupedItems.length : _items.length);
     final totalPages = total == 0 ? 1 : ((total - 1) ~/ _pageSize) + 1;
     final canGoPrev = _currentPage > 1;
     final hasNext = _pagination?['has_next'] == true;
@@ -403,7 +477,127 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   @override
   void dispose() {
     _invoiceController.dispose();
+    _minOverdueController.dispose();
     super.dispose();
+  }
+
+  Map<String, dynamic> _buildSearchBody({required bool includePaging}) {
+    final body = <String, dynamic>{
+      if (_status != null && _status!.isNotEmpty) 'status': _status,
+      if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
+      if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
+      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
+      if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
+      if (_bucket != null && _bucket!.isNotEmpty) 'bucket': _bucket,
+      if (_viewPortfolios) 'group_by': 'invoice',
+    };
+    final mod = int.tryParse(_minOverdueController.text.trim());
+    if (mod != null && mod > 0) {
+      body['min_overdue_days'] = mod;
+    }
+    if (includePaging) {
+      body['take'] = _pageSize;
+      body['skip'] = (_currentPage - 1) * _pageSize;
+    }
+    return body;
+  }
+
+  Map<String, dynamic> _buildExportBody() {
+    final b = _buildSearchBody(includePaging: false);
+    b.remove('group_by');
+    return b;
+  }
+
+  Future<void> _openInstallmentDetail(int invoiceId) async {
+    if (invoiceId <= 0) return;
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(t.installmentsDetailTitle),
+          content: SizedBox(
+            width: 720,
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: InvoiceService(apiClient: widget.apiClient).getInstallmentPlan(
+                businessId: widget.businessId,
+                invoiceId: invoiceId,
+              ),
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator()));
+                }
+                if (snap.hasError) {
+                  return Text('${snap.error}');
+                }
+                final data = snap.data ?? const <String, dynamic>{};
+                final plan = (data['plan'] is Map<String, dynamic>) ? data['plan'] as Map<String, dynamic> : const <String, dynamic>{};
+                final sched = (plan['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SelectableText('${data['invoice_code'] ?? ''}'),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          showCheckboxColumn: false,
+                          columns: [
+                            DataColumn(label: Text(t.installmentsTableInstallment)),
+                            DataColumn(label: Text(t.installmentsTableDueDate)),
+                            DataColumn(label: Text(t.installmentsTableStatus)),
+                            DataColumn(numeric: true, label: Text(t.installmentsTableTotal)),
+                            DataColumn(numeric: true, label: Text(t.installmentsTablePaid)),
+                            DataColumn(numeric: true, label: Text(t.installmentsTableRemaining)),
+                            DataColumn(label: Text(t.installmentsPaymentsColumn)),
+                          ],
+                          rows: sched.map((it) {
+                            final pays = (it['payments'] as List?) ?? const [];
+                            return DataRow(
+                              cells: [
+                                DataCell(Text(it['seq']?.toString() ?? '-')),
+                                DataCell(Text(_formatDateValue(it, 'due_date'))),
+                                DataCell(_buildStatusChip(it['status']?.toString(), t, theme)),
+                                DataCell(Text(_formatNumber(it['total']))),
+                                DataCell(Text(_formatNumber(it['paid_amount']))),
+                                DataCell(Text(_formatNumber(it['remaining']))),
+                                DataCell(
+                                  pays.isEmpty
+                                      ? Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall)
+                                      : Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: pays.map((p) {
+                                            final pm = p is Map<String, dynamic> ? p : <String, dynamic>{};
+                                            final code = pm['document_code']?.toString() ?? '';
+                                            final d = pm['document_date']?.toString() ?? '';
+                                            final amt = _formatNumber(pm['amount']);
+                                            return Padding(
+                                              padding: const EdgeInsets.only(bottom: 4),
+                                              child: Text('$code • $d • $amt', style: theme.textTheme.bodySmall),
+                                            );
+                                          }).toList(),
+                                        ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _loadFiscalYears() async {
@@ -420,6 +614,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           orElse: () => (items.isNotEmpty ? items.first : const <String, dynamic>{}),
         )['id'] as int?;
       });
+      if (mounted) {
+        await _fetch(resetPage: true);
+      }
     } catch (_) {}
   }
 
@@ -429,16 +626,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     }
     setState(() => _loading = true);
     try {
-      final body = <String, dynamic>{
-        if (_status != null && _status!.isNotEmpty) 'status': _status,
-        if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
-        if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
-        if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
-        'take': _pageSize,
-        'skip': (_currentPage - 1) * _pageSize,
-      };
+      final body = _buildSearchBody(includePaging: true);
 
       final res = await widget.apiClient.post<Map<String, dynamic>>(
         '/api/v1/invoices/business/${widget.businessId}/installments/search',
@@ -446,10 +634,12 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       );
       final data = Map<String, dynamic>.from(res.data?['data'] ?? const {});
       final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+      final grouped = (data['grouped_items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
       final pagination = (data['pagination'] is Map<String, dynamic>) ? Map<String, dynamic>.from(data['pagination'] as Map) : <String, dynamic>{};
       final stats = (data['stats'] is Map<String, dynamic>) ? Map<String, dynamic>.from(data['stats'] as Map) : <String, dynamic>{};
       setState(() {
         _items = items;
+        _groupedItems = grouped;
         _pagination = pagination.isEmpty ? null : pagination;
         _stats = stats.isEmpty ? null : stats;
       });
@@ -498,6 +688,37 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text(t.installmentsViewPortfolios),
+                    selected: _viewPortfolios,
+                    onSelected: (sel) {
+                      if (!sel) return;
+                      setState(() {
+                        _viewPortfolios = true;
+                        _currentPage = 1;
+                      });
+                      _fetch(resetPage: true);
+                    },
+                  ),
+                  ChoiceChip(
+                    label: Text(t.installmentsViewFlat),
+                    selected: !_viewPortfolios,
+                    onSelected: (sel) {
+                      if (!sel) return;
+                      setState(() {
+                        _viewPortfolios = false;
+                        _currentPage = 1;
+                      });
+                      _fetch(resetPage: true);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -532,6 +753,34 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                       onChanged: (v) => setState(() => _status = v),
                       decoration: InputDecoration(
                         labelText: t.installmentsFiltersStatus,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<String?>(
+                      value: _bucket,
+                      items: <DropdownMenuItem<String?>>[
+                        DropdownMenuItem<String?>(value: null, child: Text(t.installmentsBucketAll)),
+                        DropdownMenuItem<String?>(value: 'unpaid', child: Text(t.installmentsBucketUnpaid)),
+                        DropdownMenuItem<String?>(value: 'upcoming', child: Text(t.installmentsBucketUpcoming)),
+                        DropdownMenuItem<String?>(value: 'overdue_only', child: Text(t.installmentsBucketOverdueOnly)),
+                      ],
+                      onChanged: (v) => setState(() => _bucket = v),
+                      decoration: InputDecoration(
+                        labelText: t.installmentsFiltersBucket,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 120,
+                    child: TextFormField(
+                      controller: _minOverdueController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: t.installmentsMinOverdueDaysLabel,
                         border: const OutlineInputBorder(),
                       ),
                     ),
@@ -630,14 +879,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   Future<void> _exportExcel() async {
     setState(() => _loading = true);
     try {
-      final body = <String, dynamic>{
-        if (_status != null && _status!.isNotEmpty) 'status': _status,
-        if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
-        if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
-        if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
-      };
+      final body = _buildExportBody();
 
       final resp = await widget.apiClient.post<List<int>>(
         '/api/v1/invoices/business/${widget.businessId}/installments/export/excel',
@@ -679,14 +921,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   Future<void> _exportPdf() async {
     setState(() => _loading = true);
     try {
-      final body = <String, dynamic>{
-        if (_status != null && _status!.isNotEmpty) 'status': _status,
-        if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
-        if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
-        if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
-      };
+      final body = _buildExportBody();
 
       final resp = await widget.apiClient.post<List<int>>(
         '/api/v1/invoices/business/${widget.businessId}/installments/export/pdf',

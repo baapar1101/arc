@@ -21,6 +21,8 @@ from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from adapters.db.models.warehouse import Warehouse
+from adapters.db.models.user import User
+from adapters.db.models.category import BusinessCategory
 from adapters.db.repositories.warehouse_repository import WarehouseRepository
 from adapters.api.v1.schema_models.warehouse import WarehouseCreateRequest, WarehouseUpdateRequest
 from adapters.api.v1.schemas import QueryInfo, FilterItem
@@ -70,6 +72,29 @@ def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
 	# اگر انبار قبلی نداشت یا فرمت نامعتبر بود
 	max_id = db.execute(select(func.max(Warehouse.id))).scalar() or 0
 	return f"WH-{max_id + 1:05d}"
+
+
+def invoice_lines_have_trackable_inventory_products(
+	db: Session,
+	business_id: int,
+	lines: List[Dict[str, Any]],
+) -> bool:
+	"""آیا حداقل یک ردیف فاکتور وجود دارد که در create_from_invoice به خط حواله انبار تبدیل شود؟
+	(همان فیلتر product معتبر، quantity مثبت، track_inventory=True)
+	"""
+	for ln in lines:
+		pid = ln.get("product_id")
+		try:
+			qty = Decimal(str(ln.get("quantity") or 0))
+		except Exception:
+			qty = Decimal(0)
+		if not pid or qty <= 0:
+			continue
+		product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
+		if not product or not getattr(product, "track_inventory", False):
+			continue
+		return True
+	return False
 
 
 def create_from_invoice(
@@ -1893,19 +1918,111 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		"recipient_phone": extra_info.get("recipient_phone") if isinstance(extra_info, dict) else None,
 		"tracking_number": extra_info.get("tracking_number") if isinstance(extra_info, dict) else None,
 	}
-	
+
+	product_ids = {int(ln.product_id) for ln in lines if ln.product_id}
+	wh_ids: set[int] = set()
+	for ln in lines:
+		if ln.warehouse_id is not None:
+			wh_ids.add(int(ln.warehouse_id))
+	if wh.warehouse_id_from is not None:
+		wh_ids.add(int(wh.warehouse_id_from))
+	if wh.warehouse_id_to is not None:
+		wh_ids.add(int(wh.warehouse_id_to))
+
+	products_map: Dict[int, Product] = {}
+	if product_ids:
+		for p in db.query(Product).filter(
+			and_(Product.business_id == wh.business_id, Product.id.in_(product_ids))
+		).all():
+			products_map[int(p.id)] = p
+
+	category_ids = {int(p.category_id) for p in products_map.values() if getattr(p, "category_id", None)}
+	categories_map: Dict[int, BusinessCategory] = {}
+	if category_ids:
+		for c in db.query(BusinessCategory).filter(
+			and_(BusinessCategory.business_id == wh.business_id, BusinessCategory.id.in_(category_ids))
+		).all():
+			categories_map[int(c.id)] = c
+
+	warehouses_map: Dict[int, Warehouse] = {}
+	if wh_ids:
+		for w in db.query(Warehouse).filter(
+			and_(Warehouse.business_id == wh.business_id, Warehouse.id.in_(wh_ids))
+		).all():
+			warehouses_map[int(w.id)] = w
+
+	source_document_code: Optional[str] = None
+	if wh.source_type == "invoice" and wh.source_document_id:
+		src_doc = db.query(Document).filter(
+			and_(Document.id == int(wh.source_document_id), Document.business_id == wh.business_id)
+		).first()
+		if src_doc is not None:
+			source_document_code = src_doc.code
+
+	fiscal_year_title: Optional[str] = None
+	if wh.fiscal_year_id:
+		fy = db.query(FiscalYear).filter(FiscalYear.id == int(wh.fiscal_year_id)).first()
+		if fy is not None:
+			fiscal_year_title = fy.title
+
+	created_by_name: Optional[str] = None
+	if wh.created_by_user_id:
+		u = db.query(User).filter(User.id == int(wh.created_by_user_id)).first()
+		if u is not None:
+			parts = [x for x in (u.first_name, u.last_name) if x]
+			created_by_name = " ".join(parts).strip() or (u.email or u.mobile or str(u.id))
+
+	def _warehouse_label(wid: Optional[int]) -> Optional[str]:
+		if wid is None:
+			return None
+		obj = warehouses_map.get(int(wid))
+		return obj.name if obj is not None else None
+
+	accounting_document_id = extra_info.get("accounting_document_id") if isinstance(extra_info, dict) else None
+
+	def _category_display_title(cat: Optional[BusinessCategory]) -> Optional[str]:
+		if cat is None:
+			return None
+		trans = cat.title_translations or {}
+		if isinstance(trans, dict):
+			return trans.get("fa") or trans.get("en") or trans.get("default") or None
+		return None
+
+	line_out: List[Dict[str, Any]] = []
+	for ln in lines:
+		d = _get_line_dict_with_instances(db, ln, wh.business_id)
+		p = products_map.get(int(ln.product_id)) if ln.product_id else None
+		if p is not None:
+			d["product_name"] = p.name
+			d["product_code"] = p.code
+			d["product_main_unit"] = p.main_unit
+			if p.category_id:
+				cat = categories_map.get(int(p.category_id))
+				cat_title = _category_display_title(cat)
+				if cat_title:
+					d["product_category_name"] = cat_title
+		if ln.warehouse_id is not None:
+			wobj = warehouses_map.get(int(ln.warehouse_id))
+			if wobj is not None:
+				d["warehouse_name"] = wobj.name
+		line_out.append(d)
+
 	return {
 		"id": wh.id,
 		"code": wh.code,
 		"business_id": wh.business_id,
 		"fiscal_year_id": wh.fiscal_year_id,
+		"fiscal_year_title": fiscal_year_title,
 		"document_date": wh.document_date.isoformat() if wh.document_date else None,
 		"status": wh.status,
 		"doc_type": wh.doc_type,
 		"warehouse_id_from": wh.warehouse_id_from,
 		"warehouse_id_to": wh.warehouse_id_to,
+		"warehouse_name_from": _warehouse_label(wh.warehouse_id_from),
+		"warehouse_name_to": _warehouse_label(wh.warehouse_id_to),
 		"source_type": wh.source_type,
 		"source_document_id": wh.source_document_id,
+		"source_document_code": source_document_code,
 		"extra_info": wh.extra_info,
 		"description": delivery_info["description"],
 		"delivery_method": delivery_info["delivery_method"],
@@ -1914,10 +2031,12 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		"recipient_phone": delivery_info["recipient_phone"],
 		"tracking_number": delivery_info["tracking_number"],
 		"total_quantity": float(total_quantity),
-		"lines": [
-			_get_line_dict_with_instances(db, ln, wh.business_id)
-			for ln in lines
-		],
+		"created_at": wh.created_at.isoformat() if wh.created_at else None,
+		"updated_at": wh.updated_at.isoformat() if wh.updated_at else None,
+		"created_by_user_id": wh.created_by_user_id,
+		"created_by_name": created_by_name,
+		"accounting_document_id": accounting_document_id,
+		"lines": line_out,
 	}
 
 

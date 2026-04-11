@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func, text
 from app.core.query_timeout import query_timeout
@@ -15,7 +15,7 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Product)
 
-    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None, filters: dict[str, Any] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
+    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
         stmt = select(Product).where(Product.business_id == business_id)
 
         if search:
@@ -81,6 +81,9 @@ class ProductRepository(BaseRepository[Product]):
                         except (ValueError, TypeError):
                             pass
                     continue
+
+        if category_ids:
+            stmt = stmt.where(Product.category_id.in_(list(category_ids)))
 
         # استفاده از timeout برای query های طولانی
         with query_timeout(self.db, timeout_seconds=60):

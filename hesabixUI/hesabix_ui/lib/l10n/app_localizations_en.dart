@@ -617,6 +617,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get installmentsRowsPerPage => 'Rows per page';
 
   @override
+  String get installmentsViewPortfolios => 'Installment files';
+
+  @override
+  String get installmentsViewFlat => 'All installments';
+
+  @override
+  String get installmentsFiltersBucket => 'Quick filter';
+
+  @override
+  String get installmentsBucketAll => 'All';
+
+  @override
+  String get installmentsBucketUnpaid => 'Unpaid (open)';
+
+  @override
+  String get installmentsBucketUpcoming => 'Upcoming due dates';
+
+  @override
+  String get installmentsBucketOverdueOnly => 'Overdue only';
+
+  @override
+  String get installmentsMinOverdueDaysLabel => 'Min. overdue days';
+
+  @override
+  String get installmentsTableMobile => 'Mobile';
+
+  @override
+  String get installmentsGroupedNextDue => 'Next due';
+
+  @override
+  String get installmentsGroupedWorstStatus => 'Worst status';
+
+  @override
+  String get installmentsGroupedInstallments => 'Installments (matched)';
+
+  @override
+  String get installmentsGroupedPaidCount => 'Paid';
+
+  @override
+  String get installmentsGroupedOverdueCount => 'Overdue';
+
+  @override
+  String get installmentsGroupedRemainingSum => 'Remaining (sum)';
+
+  @override
+  String get installmentsDetailTitle => 'Installment plan';
+
+  @override
+  String get installmentsPaymentsColumn => 'Receipts';
+
+  @override
+  String get installmentsNoPaymentsYet => 'No receipt allocations yet';
+
+  @override
   String get test => 'Test';
 
   @override
@@ -8454,4 +8508,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String sessionsMonthsAgo(int months) {
     return '$months months ago';
   }
+
+  @override
+  String get invoiceWarehouseReleaseNone => 'No warehouse document';
+
+  @override
+  String get invoiceWarehouseReleaseDraft => 'Warehouse draft';
+
+  @override
+  String get invoiceWarehouseReleasePosted => 'Post warehouse immediately';
+
+  @override
+  String get invoiceWarehouseReleaseSectionTitle =>
+      'Warehouse document after save';
+
+  @override
+  String get invoiceWarehouseReleaseSectionSubtitle =>
+      'Uses your business default; changes are saved per invoice type in this browser.';
+
+  @override
+  String get invoiceWarehouseReleaseBusinessTitle =>
+      'Warehouse document after invoice save';
+
+  @override
+  String get invoiceWarehouseReleaseBusinessSubtitle =>
+      'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.';
 }

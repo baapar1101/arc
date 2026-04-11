@@ -1089,6 +1089,16 @@ def create_receipt_payment(
                 new_item = dict(item)
                 new_item["paid_amount"] = float(paid_after)
                 new_item["status"] = new_status
+                pay_list = list(new_item.get("payments") or [])
+                if alloc_amt > Decimal(0):
+                    pay_list.append({
+                        "document_id": int(document.id),
+                        "document_code": getattr(document, "code", None),
+                        "document_date": document.document_date.isoformat() if getattr(document, "document_date", None) else None,
+                        "seq": seq,
+                        "amount": float(alloc_amt),
+                    })
+                new_item["payments"] = pay_list
                 new_schedule.append(new_item)
             new_plan = dict(plan or {})
             new_plan["schedule"] = new_schedule
@@ -2107,6 +2117,19 @@ def update_receipt_payment(
                     new_status = "pending"
                 logger.info(f"[INSTALLMENT] قسط {seq}: total={total_part}, status={new_status}")
                 new_item = dict(item)
+                pay_list = [
+                    p for p in (item.get("payments") or [])
+                    if not (isinstance(p, dict) and int(p.get("document_id") or 0) == int(document.id))
+                ]
+                if alloc_amt > Decimal(0):
+                    pay_list.append({
+                        "document_id": int(document.id),
+                        "document_code": getattr(document, "code", None),
+                        "document_date": document.document_date.isoformat() if getattr(document, "document_date", None) else None,
+                        "seq": seq,
+                        "amount": float(alloc_amt),
+                    })
+                new_item["payments"] = pay_list
                 new_item["paid_amount"] = float(paid_after)
                 new_item["status"] = new_status
                 new_schedule.append(new_item)

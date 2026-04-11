@@ -403,6 +403,18 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
     filters = query.get("filters")
     include_inventory = bool(query.get("include_inventory", False))
     inventory_as_of_date = query.get("inventory_as_of_date")
+    raw_category_ids = query.get("category_ids")
+    category_ids: Optional[List[int]] = None
+    if isinstance(raw_category_ids, list) and raw_category_ids:
+        category_ids = []
+        for x in raw_category_ids:
+            try:
+                if x is not None:
+                    category_ids.append(int(x))
+            except (TypeError, ValueError):
+                pass
+        if not category_ids:
+            category_ids = None
     return repo.search(
         business_id=business_id,
         take=take,
@@ -411,6 +423,7 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
         sort_desc=sort_desc,
         search=search,
         filters=filters,
+        category_ids=category_ids,
         include_inventory=include_inventory,
         inventory_as_of_date=inventory_as_of_date,
     )

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, cast, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 import io
@@ -112,6 +113,10 @@ def search_installments_endpoint(
       "due_from": "YYYY-MM-DD"?,
       "due_to": "YYYY-MM-DD"?,
       "status": "pending|partial|paid|overdue"?,
+      "status_in": ["pending","overdue"] | "pending,overdue"?,
+      "bucket": "unpaid"|"upcoming"|"overdue_only"?,
+      "min_overdue_days": int?,
+      "group_by": "invoice"?,
       "person_id": int?,
       "invoice_id": int?,
       "take": 200,
@@ -174,7 +179,8 @@ def export_installments_pdf_endpoint(
     is_fa = locale == "fa"
     calendar_type = ctx.get_calendar_type()
 
-    body = payload or {}
+    body = dict(payload or {})
+    body.pop("group_by", None)
     data = search_installments(db=db, business_id=business_id, query=body, disable_pagination=True)
     items = (data.get("items") or [])
 
@@ -1763,6 +1769,9 @@ async def search_invoices_endpoint(
 			Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
 		)
 	)
+	# extra_info نوع JSON عمومی SQLAlchemy است؛ astext فقط روی JSONB است — برای PG ابتدا cast به JSONB
+	_extra_info_jb = cast(Document.extra_info, JSONB)
+	extra_info_person_id_int = cast(_extra_info_jb["person_id"].astext, Integer)
 
 	# Simple search on code/description
 	search: Optional[str] = getattr(query_info, 'search', None)
@@ -1827,8 +1836,8 @@ async def search_invoices_endpoint(
 					# فیلتر بر اساس person_id در extra_info
 					try:
 						person_id_val = int(val)
-						# استفاده از JSON operator برای فیلتر کردن person_id در extra_info
-						q = q.filter(cast(Document.extra_info['person_id'], Integer) == person_id_val)
+						# فیلتر person_id از extra_info با ->> (معادل astext روی JSONB)
+						q = q.filter(extra_info_person_id_int == person_id_val)
 					except (ValueError, TypeError, KeyError):
 						pass
 				elif prop == 'document_date' and isinstance(val, str) and val:
@@ -1862,7 +1871,7 @@ async def search_invoices_endpoint(
 		try:
 			person_id_val = int(person_id)
 			# فیلتر بر اساس person_id در extra_info
-			q = q.filter(cast(Document.extra_info['person_id'], Integer) == person_id_val)
+			q = q.filter(extra_info_person_id_int == person_id_val)
 		except (ValueError, TypeError, KeyError):
 			pass
 

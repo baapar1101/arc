@@ -497,16 +497,47 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  _buildInfoRow(theme, 'کد', doc['code'] ?? '-'),
+                  _buildInfoRow(theme, 'کد', doc['code']?.toString() ?? '-'),
                   _buildInfoRow(theme, t.warehouseDocumentType, _getDocTypeName(doc['doc_type'], t)),
                   _buildInfoRow(theme, t.warehouseDocumentStatus, _getStatusName(status, t)),
                   if (doc['document_date'] != null && _calendarController != null)
                     _buildInfoRow(
                       theme,
                       t.warehouseDocumentDate,
-                      HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date']), _calendarController!.isJalali),
+                      HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date'] as String), _calendarController!.isJalali),
                     ),
-                  if (doc['source_type'] == 'invoice' && doc['source_document_id'] != null)
+                  if (doc['fiscal_year_title'] != null)
+                    _buildInfoRow(theme, 'سال مالی', doc['fiscal_year_title'].toString()),
+                  if (doc['total_quantity'] != null)
+                    _buildInfoRow(theme, 'جمع تعداد (طبق نوع حواله)', _formatQuantity(doc['total_quantity'] as num?)),
+                  if (doc['doc_type'] == 'transfer') ...[
+                    if (doc['warehouse_name_from'] != null || doc['warehouse_id_from'] != null)
+                      _buildInfoRow(
+                        theme,
+                        'انبار مبدأ',
+                        doc['warehouse_name_from']?.toString() ??
+                            (doc['warehouse_id_from'] != null ? 'شناسه ${doc['warehouse_id_from']}' : '-'),
+                      ),
+                    if (doc['warehouse_name_to'] != null || doc['warehouse_id_to'] != null)
+                      _buildInfoRow(
+                        theme,
+                        'انبار مقصد',
+                        doc['warehouse_name_to']?.toString() ??
+                            (doc['warehouse_id_to'] != null ? 'شناسه ${doc['warehouse_id_to']}' : '-'),
+                      ),
+                  ],
+                  if (doc['created_by_name'] != null || doc['created_by_user_id'] != null)
+                    _buildInfoRow(
+                      theme,
+                      'ایجادکننده',
+                      doc['created_by_name']?.toString() ??
+                          (doc['created_by_user_id'] != null ? 'کاربر ${doc['created_by_user_id']}' : '-'),
+                    ),
+                  if (doc['created_at'] != null)
+                    _buildInfoRow(theme, 'زمان ایجاد', _formatDocDateTime(doc['created_at'] as String?)),
+                  if (doc['updated_at'] != null)
+                    _buildInfoRow(theme, 'آخرین به‌روزرسانی', _formatDocDateTime(doc['updated_at'] as String?)),
+                  if (doc['accounting_document_id'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: InkWell(
@@ -516,16 +547,20 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                             if (_calendarController == null || !mounted) return;
                           }
                           if (!mounted) return;
+                          final aid = doc['accounting_document_id'] is int
+                              ? doc['accounting_document_id'] as int
+                              : int.tryParse('${doc['accounting_document_id']}');
+                          if (aid == null) return;
                           showDialog(
                             context: context,
                             builder: (_) => DocumentDetailsDialog(
-                              documentId: doc['source_document_id'] as int,
+                              documentId: aid,
                               calendarController: _calendarController!,
                             ),
                           );
                         },
                         child: Text(
-                          'فاکتور منبع: ${doc['source_document_id']}',
+                          'سند حسابداری مرتبط: ${doc['accounting_document_id']}',
                           style: TextStyle(
                             color: theme.colorScheme.primary,
                             decoration: TextDecoration.underline,
@@ -632,26 +667,69 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
+                      columnSpacing: 20,
                       columns: const [
-                        DataColumn(label: Text('محصول')),
+                        DataColumn(label: Text('کالا / دسته')),
+                        DataColumn(label: Text('واحد')),
                         DataColumn(label: Text('انبار')),
                         DataColumn(label: Text('نوع حرکت')),
                         DataColumn(label: Text('تعداد')),
+                        DataColumn(label: Text('یونیک / سریال')),
+                        DataColumn(label: Text('سایر')),
                       ],
                       rows: lines.map<DataRow>((line) {
-                        final lineId = line['id'] as int?;
-                        final productId = line['product_id'] as int?;
-                        final warehouseId = line['warehouse_id'] as int?;
-                        final movement = line['movement'] as String?;
-                        final quantity = line['quantity'] as num?;
+                        final lineMap = Map<String, dynamic>.from(line as Map);
+                        final lineId = lineMap['id'] as int?;
+                        final productId = lineMap['product_id'] as int?;
+                        final warehouseId = lineMap['warehouse_id'] as int?;
+                        final warehouseName = lineMap['warehouse_name'] as String?;
+                        final movement = lineMap['movement'] as String?;
+                        final quantity = lineMap['quantity'] as num?;
+                        final productName = lineMap['product_name'] as String?;
+                        final productCode = lineMap['product_code'] as String?;
+                        final productCategoryName = lineMap['product_category_name'] as String?;
+                        final unit = lineMap['product_main_unit'] as String?;
+                        final instanceSummary = _instanceSummaryText(lineMap['instance_data']);
 
                         return DataRow(
                           cells: [
-                            DataCell(Text('${productId ?? '-'}')),
+                            DataCell(
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 220),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      productName ?? (productId != null ? 'شناسه $productId' : '-'),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (productCode != null && productCode.isNotEmpty)
+                                      Text(
+                                        'کد: $productCode',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    if (productCategoryName != null && productCategoryName.isNotEmpty)
+                                      Text(
+                                        'دسته: $productCategoryName',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            DataCell(Text(unit?.isNotEmpty == true ? unit! : '-')),
                             DataCell(
                               isDraft && lineId != null
                                   ? SizedBox(
-                                      width: 150,
+                                      width: 160,
                                       child: WarehouseComboboxWidget(
                                         businessId: widget.businessId,
                                         selectedWarehouseId: warehouseId,
@@ -660,10 +738,36 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                                         },
                                       ),
                                     )
-                                  : Text(warehouseId?.toString() ?? '-'),
+                                  : ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 160),
+                                      child: Text(
+                                        warehouseName ??
+                                            (warehouseId != null ? 'شناسه $warehouseId' : '-'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                             ),
                             DataCell(Text(movement == 'in' ? 'ورود' : 'خروج')),
-                            DataCell(Text(quantity?.toString() ?? '-')),
+                            DataCell(Text(_formatQuantity(quantity))),
+                            DataCell(
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 200),
+                                child: Text(
+                                  instanceSummary,
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              _lineExtraSnippet(lineMap['extra_info']) == null
+                                  ? const Text('—')
+                                  : Tooltip(
+                                      message: _lineExtraSnippet(lineMap['extra_info'])!,
+                                      child: const Icon(Icons.info_outline, size: 20),
+                                    ),
+                            ),
                           ],
                         );
                       }).toList(),
@@ -684,6 +788,64 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
            (doc['recipient_name'] != null && (doc['recipient_name'] as String).isNotEmpty) ||
            (doc['recipient_phone'] != null && (doc['recipient_phone'] as String).isNotEmpty) ||
            (doc['tracking_number'] != null && (doc['tracking_number'] as String).isNotEmpty);
+  }
+
+  String _formatQuantity(num? q) {
+    if (q == null) return '-';
+    if (q == q.roundToDouble()) return '${q.toInt()}';
+    return q.toString();
+  }
+
+  String _formatDocDateTime(String? iso) {
+    if (iso == null) return '-';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final cal = _calendarController;
+    if (cal != null) {
+      return HesabixDateUtils.formatForDisplay(dt, cal.isJalali);
+    }
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    return '${dt.year}/${dt.month}/${dt.day} $hh:$mm';
+  }
+
+  String _instanceSummaryText(dynamic raw) {
+    if (raw is! List || raw.isEmpty) return '—';
+    final parts = <String>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      final serial = m['serial_number']?.toString();
+      final barcode = m['barcode']?.toString();
+      if (serial != null && serial.isNotEmpty) {
+        parts.add(serial);
+      } else if (barcode != null && barcode.isNotEmpty) {
+        parts.add(barcode);
+      } else {
+        parts.add('شناسه ${m['id'] ?? ''}');
+      }
+      if (parts.length >= 10) break;
+    }
+    if (parts.isEmpty) return '—';
+    return parts.join('، ');
+  }
+
+  String? _lineExtraSnippet(dynamic extra) {
+    if (extra is! Map || extra.isEmpty) return null;
+    final m = Map<String, dynamic>.from(extra);
+    final keys = m.keys.map((k) => k.toString()).toList()..sort();
+    final buf = StringBuffer();
+    var n = 0;
+    for (final k in keys) {
+      buf.write('$k: ${m[k]}');
+      n++;
+      if (n >= 8) {
+        buf.write(' …');
+        break;
+      }
+      buf.write('\n');
+    }
+    return buf.toString().trim();
   }
 
   String _getDeliveryMethodName(String? method) {

@@ -1,5 +1,5 @@
 from typing import Any, List, Optional, Union, Generic, TypeVar
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, validator
 from enum import Enum
 from datetime import datetime, date
 
@@ -145,6 +145,26 @@ class QueryInfo(BaseModel):
 	}
 	```
 	"""
+	model_config = ConfigDict(
+		populate_by_name=True,
+		json_schema_extra={
+			"example": {
+				"take": 20,
+				"skip": 0,
+				"sort_by": "created_at",
+				"sort_desc": True,
+				"search": "احمد",
+				"search_fields": ["first_name", "last_name"],
+				"filters": [
+					{
+						"property": "is_active",
+						"operator": "=",
+						"value": True,
+					}
+				],
+			}
+		},
+	)
 	sort_by: Optional[str] = Field(
 		default=None, 
 		description="نام فیلد مورد نظر برای مرتب‌سازی (مثال: created_at, name, total_amount)",
@@ -174,9 +194,16 @@ class QueryInfo(BaseModel):
 		example="احمد"
 	)
 	search_fields: Optional[List[str]] = Field(
-		default=None, 
+		default=None,
+		alias="searchFields",
 		description="فیلدهای مورد نظر برای جستجو. اگر ارسال نشود، فیلدهای پیش‌فرض استفاده می‌شود",
 		example=["first_name", "last_name", "email"]
+	)
+	category_ids: Optional[List[int]] = Field(
+		default=None,
+		alias="categoryIds",
+		description="فیلتر بر اساس شناسه دسته‌بندی کالا/خدمت (چند انتخاب با OR)",
+		example=[1, 2],
 	)
 	filters: Optional[List[FilterItem]] = Field(
 		default=None, 
@@ -204,25 +231,6 @@ class QueryInfo(BaseModel):
 		if v > 1000:
 			raise ValueError('take نمی‌تواند بیشتر از 1000 باشد')
 		return v
-	
-	class Config:
-		json_schema_extra = {
-			"example": {
-				"take": 20,
-				"skip": 0,
-				"sort_by": "created_at",
-				"sort_desc": True,
-				"search": "احمد",
-				"search_fields": ["first_name", "last_name"],
-				"filters": [
-					{
-						"property": "is_active",
-						"operator": "=",
-						"value": True
-					}
-				]
-			}
-		}
 
 
 class CaptchaSolve(BaseModel):
@@ -615,6 +623,23 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="مبنای محاسبه: unit_price | net_after_line_discount | net_with_tax | cost_price",
 	)
+	invoice_warehouse_release_mode: Optional[str] = Field(
+		default=None,
+		description="حواله پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)",
+	)
+
+	@validator("invoice_warehouse_release_mode")
+	def _validate_invoice_warehouse_release_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s in ("none", "off", "no", "disabled"):
+			return "none"
+		if s in ("posted", "final", "confirmed"):
+			return "posted"
+		if s in ("draft",):
+			return "draft"
+		raise ValueError("invoice_warehouse_release_mode نامعتبر است (none، draft یا posted)")
 
 	@validator("invoice_sync_sales_price_basis", "invoice_sync_purchase_price_basis")
 	def _validate_invoice_sync_basis(cls, v):  # noqa: N805
@@ -658,6 +683,10 @@ class BusinessResponse(BaseModel):
 	invoice_sync_update_purchase_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت خرید از فاکتور")
 	invoice_sync_sales_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت فروش")
 	invoice_sync_purchase_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت خرید")
+	invoice_warehouse_release_mode: str = Field(
+		default="draft",
+		description="حواله پس از ثبت فاکتور: none، draft، posted",
+	)
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
 	default_currency: Optional[dict] = Field(default=None, description="ارز پیشفرض")

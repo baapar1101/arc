@@ -62,6 +62,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _invoiceSyncUpdatePurchasePriceEnabled = false;
   String? _invoiceSyncSalesPriceBasis;
   String? _invoiceSyncPurchasePriceBasis;
+  /// none | draft | posted
+  String _invoiceWarehouseReleaseMode = 'draft';
 
   // ارز پیش‌فرض
   int? _selectedDefaultCurrencyId;
@@ -137,6 +139,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
+      _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
 
       // بررسی اینکه آیا کسب‌وکار ارز پیش‌فرض دارد یا نه
       if (resp.defaultCurrency == null) {
@@ -263,6 +266,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceSyncPurchasePriceBasis != null && _invoiceSyncPurchasePriceBasis != orig.invoiceSyncPurchasePriceBasis) {
       payload['invoice_sync_purchase_price_basis'] = _invoiceSyncPurchasePriceBasis;
+    }
+    if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
+      payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
     }
 
     // ارز پیش‌فرض (فقط اگر کسب‌وکار ارز پیش‌فرض ندارد)
@@ -911,6 +917,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildInvoicePriceSyncSettings(cs),
 
+              const SizedBox(height: 24),
+              _buildSectionTitle(AppLocalizations.of(context).invoiceWarehouseReleaseBusinessTitle, cs),
+              const SizedBox(height: 8),
+              _buildInvoiceWarehouseReleaseSettings(cs),
+
             ],
           ),
         ),
@@ -1185,6 +1196,47 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       child: Text('قیمت تمام‌شده ردیف (خرید) / در فروش همان قیمت واحد'),
     ),
   ];
+
+  Widget _buildInvoiceWarehouseReleaseSettings(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.invoiceWarehouseReleaseBusinessSubtitle,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            SegmentedButton<String>(
+              segments: <ButtonSegment<String>>[
+                ButtonSegment<String>(
+                  value: 'none',
+                  label: Text(t.invoiceWarehouseReleaseNone),
+                ),
+                ButtonSegment<String>(
+                  value: 'draft',
+                  label: Text(t.invoiceWarehouseReleaseDraft),
+                ),
+                ButtonSegment<String>(
+                  value: 'posted',
+                  label: Text(t.invoiceWarehouseReleasePosted),
+                ),
+              ],
+              selected: <String>{_invoiceWarehouseReleaseMode},
+              onSelectionChanged: (Set<String> next) {
+                setState(() {
+                  _invoiceWarehouseReleaseMode = next.first;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildInvoicePriceSyncSettings(ColorScheme cs) {
     return Card(

@@ -1730,6 +1730,24 @@
   "installmentsTableLateFee": "جریمه دیرکرد",
   "installmentsTableOverdueDays": "روزهای تاخیر",
   "installmentsRowsPerPage": "تعداد سطر در هر صفحه",
+  "installmentsViewPortfolios": "پرونده‌های اقساط",
+  "installmentsViewFlat": "ریز اقساط",
+  "installmentsFiltersBucket": "فیلتر سریع",
+  "installmentsBucketAll": "همه",
+  "installmentsBucketUnpaid": "پرداخت‌نشده",
+  "installmentsBucketUpcoming": "سررسید آتی",
+  "installmentsBucketOverdueOnly": "فقط معوق",
+  "installmentsMinOverdueDaysLabel": "حداقل روز تأخیر",
+  "installmentsTableMobile": "موبایل",
+  "installmentsGroupedNextDue": "نزدیک‌ترین سررسید",
+  "installmentsGroupedWorstStatus": "بدترین وضعیت",
+  "installmentsGroupedInstallments": "تعداد قسط (فیلترشده)",
+  "installmentsGroupedPaidCount": "تسویه‌شده",
+  "installmentsGroupedOverdueCount": "معوق",
+  "installmentsGroupedRemainingSum": "جمع مانده",
+  "installmentsDetailTitle": "جزئیات طرح اقساط",
+  "installmentsPaymentsColumn": "پرداخت‌ها",
+  "installmentsNoPaymentsYet": "هنوز تخصیص دریافتی ثبت نشده",
   "installmentsTitle": "فروش اقساطی",
   "installmentsSubtitle": "در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود",
   "installmentsSettingsSubtitle": "مدیریت پلن‌های اقساط و شرایط فروش",
@@ -3298,6 +3316,13 @@
     "placeholders": {
       "months": {"type": "int"}
     }
-  }
+  },
+  "invoiceWarehouseReleaseNone": "بدون حواله",
+  "invoiceWarehouseReleaseDraft": "پیش‌نویس حواله",
+  "invoiceWarehouseReleasePosted": "حواله قطعی",
+  "invoiceWarehouseReleaseSectionTitle": "حواله انبار پس از ثبت",
+  "invoiceWarehouseReleaseSectionSubtitle": "بر اساس پیش‌فرض کسب‌وکار؛ در صورت تغییر، برای همین نوع فاکتور در این مرورگر ذخیره می‌شود.",
+  "invoiceWarehouseReleaseBusinessTitle": "حواله انبار پس از ثبت فاکتور",
+  "invoiceWarehouseReleaseBusinessSubtitle": "اگر در API یا ایمپورت، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود."
 }
 

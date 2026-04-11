@@ -362,6 +362,8 @@ class BusinessResponse {
   final bool invoiceSyncUpdatePurchasePriceEnabled;
   final String? invoiceSyncSalesPriceBasis;
   final String? invoiceSyncPurchasePriceBasis;
+  /// none | draft | posted
+  final String invoiceWarehouseReleaseMode;
   final Map<String, dynamic>? defaultCurrency;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -402,6 +404,7 @@ class BusinessResponse {
     this.invoiceSyncUpdatePurchasePriceEnabled = false,
     this.invoiceSyncSalesPriceBasis,
     this.invoiceSyncPurchasePriceBasis,
+    this.invoiceWarehouseReleaseMode = 'draft',
     this.defaultCurrency,
     required this.createdAt,
     required this.updatedAt,
@@ -411,6 +414,12 @@ class BusinessResponse {
     this.isDeleted = false,
     this.isDeletionPending = false,
   });
+
+  static String _normalizeInvoiceWarehouseReleaseMode(String? raw) {
+    final s = (raw ?? 'draft').toString().trim().toLowerCase();
+    if (s == 'none' || s == 'posted' || s == 'draft') return s;
+    return 'draft';
+  }
 
   factory BusinessResponse.fromJson(Map<String, dynamic> json) {
     return BusinessResponse(
@@ -445,6 +454,9 @@ class BusinessResponse {
           (json['invoice_sync_update_purchase_price_enabled'] as bool?) ?? false,
       invoiceSyncSalesPriceBasis: json['invoice_sync_sales_price_basis'] as String?,
       invoiceSyncPurchasePriceBasis: json['invoice_sync_purchase_price_basis'] as String?,
+      invoiceWarehouseReleaseMode: _normalizeInvoiceWarehouseReleaseMode(
+        json['invoice_warehouse_release_mode'] as String?,
+      ),
       defaultCurrency: json['default_currency'] != null ? Map<String, dynamic>.from(json['default_currency'] as Map) : null,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),

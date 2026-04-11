@@ -204,6 +204,24 @@
   "installmentsTableLateFee": "Late fee",
   "installmentsTableOverdueDays": "Overdue days",
   "installmentsRowsPerPage": "Rows per page",
+  "installmentsViewPortfolios": "Installment files",
+  "installmentsViewFlat": "All installments",
+  "installmentsFiltersBucket": "Quick filter",
+  "installmentsBucketAll": "All",
+  "installmentsBucketUnpaid": "Unpaid (open)",
+  "installmentsBucketUpcoming": "Upcoming due dates",
+  "installmentsBucketOverdueOnly": "Overdue only",
+  "installmentsMinOverdueDaysLabel": "Min. overdue days",
+  "installmentsTableMobile": "Mobile",
+  "installmentsGroupedNextDue": "Next due",
+  "installmentsGroupedWorstStatus": "Worst status",
+  "installmentsGroupedInstallments": "Installments (matched)",
+  "installmentsGroupedPaidCount": "Paid",
+  "installmentsGroupedOverdueCount": "Overdue",
+  "installmentsGroupedRemainingSum": "Remaining (sum)",
+  "installmentsDetailTitle": "Installment plan",
+  "installmentsPaymentsColumn": "Receipts",
+  "installmentsNoPaymentsYet": "No receipt allocations yet",
   "test": "Test",
   "user": "User",
   "showingRecords": "Showing {start} to {end} of {total} records",
@@ -3256,6 +3274,13 @@
     "placeholders": {
       "months": {"type": "int"}
     }
-  }
+  },
+  "invoiceWarehouseReleaseNone": "No warehouse document",
+  "invoiceWarehouseReleaseDraft": "Warehouse draft",
+  "invoiceWarehouseReleasePosted": "Post warehouse immediately",
+  "invoiceWarehouseReleaseSectionTitle": "Warehouse document after save",
+  "invoiceWarehouseReleaseSectionSubtitle": "Uses your business default; changes are saved per invoice type in this browser.",
+  "invoiceWarehouseReleaseBusinessTitle": "Warehouse document after invoice save",
+  "invoiceWarehouseReleaseBusinessSubtitle": "When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies."
 }
 

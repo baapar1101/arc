@@ -1,6 +1,6 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from typing import Dict, Any
+from typing import Annotated, Dict, Any
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -62,10 +62,13 @@ async def _get_products_search_query_info(request: Request) -> QueryInfo:
 		try:
 			data = json.loads(body_bytes)
 			if isinstance(data, dict) and data:
-				return QueryInfo(**{k: v for k, v in data.items() if k in (
-					"take", "skip", "sort_by", "sort_desc", "search", "search_fields",
-					"filters", "include_inventory", "inventory_as_of_date"
-				)})
+				_allowed = (
+					"take", "skip", "sort_by", "sort_desc", "search",
+					"search_fields", "searchFields",
+					"category_ids", "categoryIds",
+					"filters", "include_inventory", "inventory_as_of_date",
+				)
+				return QueryInfo(**{k: v for k, v in data.items() if k in _allowed})
 		except (json.JSONDecodeError, TypeError, ValueError):
 			pass
 	q = request.query_params
@@ -296,7 +299,7 @@ async def create_product_endpoint(
 def search_products_endpoint(
 	request: Request,
 	business_id: int,
-	query_info: QueryInfo,
+	query_info: Annotated[QueryInfo, Depends(_get_products_search_query_info)],
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 	_: None = Depends(require_business_permission_dep("products", "view")),
@@ -364,6 +367,14 @@ def search_products_endpoint(
 								pass
 						break
 		
+		if category_id is None and getattr(query_info, "category_ids", None):
+			for cid in query_info.category_ids:
+				try:
+					category_id = int(cid)
+					break
+				except (ValueError, TypeError):
+					pass
+		
 		# Convert filters to serializable format
 		serializable_filters = None
 		if query_info.filters:
@@ -377,6 +388,7 @@ def search_products_endpoint(
 			"sort_desc": query_info.sort_desc,
 			"search": query_info.search,
 			"filters": serializable_filters,
+			"category_ids": to_serializable(query_info.category_ids) if query_info.category_ids else None,
 			"include_inventory": query_info.include_inventory,
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		}
@@ -397,6 +409,7 @@ def search_products_endpoint(
 			"sort_desc": query_info.sort_desc,
 			"search": query_info.search,
 			"filters": query_info.filters,
+			"category_ids": query_info.category_ids,
 			"include_inventory": query_info.include_inventory,
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		})
@@ -1117,8 +1130,9 @@ async def export_products_excel(
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "search": body.get("search"),
-        "search_fields": body.get("search_fields"),
+        "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
+        "category_ids": body.get("category_ids") or body.get("categoryIds"),
     }
     result = list_products(db, business_id, query_dict)
     items = result.get("items", []) if isinstance(result, dict) else result.get("items", [])
@@ -2327,8 +2341,9 @@ async def export_products_pdf(
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "search": body.get("search"),
-        "search_fields": body.get("search_fields"),
+        "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
+        "category_ids": body.get("category_ids") or body.get("categoryIds"),
     }
     result = list_products(db, business_id, query_dict)
     items = result.get("items", [])

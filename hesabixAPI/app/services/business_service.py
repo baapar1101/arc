@@ -26,6 +26,19 @@ from app.services.system_settings_service import get_wallet_settings
 logger = logging.getLogger(__name__)
 
 
+def _normalize_invoice_warehouse_release_mode(value) -> str:
+    if value is None:
+        return "draft"
+    s = str(value).strip().lower()
+    if s in ("none", "off", "no", "disabled"):
+        return "none"
+    if s in ("posted", "final", "confirmed"):
+        return "posted"
+    if s == "draft":
+        return "draft"
+    return "draft"
+
+
 def ensure_wallet_currency_in_business(db: Session, business_id: int) -> bool:
     """
     بررسی و اضافه کردن ارز کیف پول به لیست ارزهای کسب و کار در صورت عدم وجود
@@ -1307,6 +1320,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),
         "invoice_sync_sales_price_basis": getattr(business, "invoice_sync_sales_price_basis", None),
         "invoice_sync_purchase_price_basis": getattr(business, "invoice_sync_purchase_price_basis", None),
+        "invoice_warehouse_release_mode": _normalize_invoice_warehouse_release_mode(
+            getattr(business, "invoice_warehouse_release_mode", None),
+        ),
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at,   # datetime object بماند
         # Soft Delete fields

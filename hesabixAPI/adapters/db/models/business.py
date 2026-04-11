@@ -85,6 +85,14 @@ class Business(Base):
         String(40), nullable=True, default="net_after_line_discount", server_default="net_after_line_discount",
         comment="مبنای قیمت خرید: unit_price, net_after_line_discount, net_with_tax, cost_price",
     )
+    # حواله انبار پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)
+    invoice_warehouse_release_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="draft",
+        server_default="draft",
+        comment="none | draft | posted",
+    )
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

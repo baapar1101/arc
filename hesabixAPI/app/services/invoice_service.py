@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import re
+from collections import defaultdict
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -150,6 +151,45 @@ def _is_inventory_posting_enabled(data: Dict[str, Any]) -> bool:
         return s not in ("false", "0", "no", "off")
     except Exception:
         return True
+
+
+def _normalize_invoice_warehouse_release_mode(value: Any) -> str:
+    """none | draft | posted"""
+    if value is None:
+        return "draft"
+    s = str(value).strip().lower()
+    if s in ("none", "off", "no", "disabled"):
+        return "none"
+    if s in ("posted", "final", "confirmed"):
+        return "posted"
+    if s == "draft":
+        return "draft"
+    return "draft"
+
+
+def _extra_invoice_flag_unset(extra: Dict[str, Any], key: str) -> bool:
+    """کلید ارسال نشده یا مقدارش null باشد → از تنظیم کسب‌وکار پر شود."""
+    return key not in extra or extra.get(key) is None
+
+
+def _apply_business_defaults_invoice_warehouse(db: Session, business_id: int, data: Dict[str, Any]) -> None:
+    """
+    اگر کلاینت post_inventory یا auto_post_warehouse را نفرستد (یا null)،
+    از فیلد invoice_warehouse_release_mode روی کسب‌وکار استفاده می‌شود.
+    """
+    from adapters.db.models.business import Business
+
+    biz = db.query(Business).filter(Business.id == int(business_id)).first()
+    mode = _normalize_invoice_warehouse_release_mode(
+        getattr(biz, "invoice_warehouse_release_mode", None) if biz else "draft"
+    )
+    raw = data.get("extra_info")
+    extra: Dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
+    if _extra_invoice_flag_unset(extra, "post_inventory"):
+        extra["post_inventory"] = mode != "none"
+    if _extra_invoice_flag_unset(extra, "auto_post_warehouse"):
+        extra["auto_post_warehouse"] = mode == "posted"
+    data["extra_info"] = extra
 
 
 def _build_product_tax_snapshot_map(
@@ -1614,6 +1654,7 @@ def create_invoice(
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
 
     fiscal_year = _get_current_fiscal_year(db, business_id)
+    _apply_business_defaults_invoice_warehouse(db, business_id, data)
 
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
@@ -2625,7 +2666,11 @@ def create_invoice(
     # auto_post_warehouse: تعیین می‌کند که آیا حواله بلافاصله قطعی شود (posted) یا به صورت پیش‌نویس (draft) بماند
     try:
         if bool(data.get("extra_info", {}).get("post_inventory", True)):
-            from app.services.warehouse_service import create_from_invoice, post_warehouse_document
+            from app.services.warehouse_service import (
+                create_from_invoice,
+                invoice_lines_have_trackable_inventory_products,
+                post_warehouse_document,
+            )
             from adapters.db.models.product_instance import ProductInstance
             from adapters.db.models.warehouse_document import WarehouseDocument
             
@@ -2635,17 +2680,17 @@ def create_invoice(
             if invoice_type == INVOICE_PRODUCTION:
                 out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
                 in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
-                if out_lines:
+                if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
                     wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
                     created_wh_ids.append(int(wh_issue.id))
                     if auto_post_warehouse:
                         post_warehouse_document(db, int(wh_issue.id))
-                if in_lines:
+                if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
                     wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
                     created_wh_ids.append(int(wh_receipt.id))
                     if auto_post_warehouse:
                         post_warehouse_document(db, int(wh_receipt.id))
-            else:
+            elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_input):
                 if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
                     wh_type = "issue"
                 elif invoice_type in {INVOICE_PURCHASE, INVOICE_SALES_RETURN}:
@@ -4054,6 +4099,98 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     return result
 
 
+def _parse_installment_status_in(raw: Any) -> set[str] | None:
+    if raw is None:
+        return None
+    parts: list[str] = []
+    if isinstance(raw, str):
+        parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    elif isinstance(raw, (list, tuple)):
+        for p in raw:
+            s = str(p).strip().lower()
+            if s:
+                parts.append(s)
+    else:
+        return None
+    allowed = {"pending", "partial", "paid", "overdue"}
+    out = {p for p in parts if p in allowed}
+    return out or None
+
+
+def _installment_row_passes_filters(
+    st: str,
+    due: date,
+    today: date,
+    overdue_days: int,
+    *,
+    status_filter: str,
+    status_in: set[str] | None,
+    bucket: str | None,
+    min_overdue_days: int | None,
+) -> bool:
+    b = (bucket or "").strip().lower() if bucket else None
+    if b == "unpaid":
+        if st not in ("pending", "partial", "overdue"):
+            return False
+    elif b == "upcoming":
+        if due < today or st == "paid":
+            return False
+    elif b == "overdue_only":
+        if st != "overdue":
+            return False
+        if min_overdue_days is not None and overdue_days < int(min_overdue_days):
+            return False
+    if status_in:
+        return st in status_in
+    if status_filter:
+        return st == status_filter
+    return True
+
+
+def _worst_installment_status(statuses: set[str]) -> str:
+    for s in ("overdue", "partial", "pending", "paid"):
+        if s in statuses:
+            return s
+    return "paid"
+
+
+def _build_grouped_installment_invoices(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_inv: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    for row in items:
+        by_inv[int(row["invoice_id"])].append(row)
+    grouped: List[Dict[str, Any]] = []
+    for inv_id, rows in by_inv.items():
+        rows = sorted(rows, key=lambda r: (r["due_date"], r["seq"]))
+        first = rows[0]
+        statuses = {str(r.get("status")) for r in rows if r.get("status")}
+        next_due = min(r["due_date"] for r in rows)
+        max_od = max(int(r.get("overdue_days") or 0) for r in rows)
+        sum_rem = sum(float(r.get("remaining") or 0) for r in rows)
+        sum_paid = sum(float(r.get("paid_amount") or 0) for r in rows)
+        sum_total = sum(float(r.get("total") or 0) for r in rows)
+        od_count = sum(1 for r in rows if r.get("status") == "overdue")
+        paid_count = sum(1 for r in rows if r.get("status") == "paid")
+        grouped.append({
+            "invoice_id": inv_id,
+            "invoice_code": first.get("invoice_code"),
+            "person_id": first.get("person_id"),
+            "person_name": first.get("person_name"),
+            "person_mobile": first.get("person_mobile"),
+            "document_date": first.get("document_date"),
+            "installment_count": len(rows),
+            "paid_installment_count": paid_count,
+            "overdue_installment_count": od_count,
+            "next_due_date": next_due,
+            "remaining_sum": sum_rem,
+            "paid_sum": sum_paid,
+            "total_sum": sum_total,
+            "worst_status": _worst_installment_status(statuses),
+            "max_overdue_days": max_od,
+        })
+    grouped.sort(key=lambda g: (g["next_due_date"], g["invoice_id"]))
+    return grouped
+
+
 def get_invoice_installment_plan(
     db: Session,
     business_id: int,
@@ -4093,6 +4230,8 @@ def get_invoice_installment_plan(
         sum_remaining += remaining
         new_item = dict(item)
         new_item["remaining"] = float(remaining)
+        pays = new_item.get("payments")
+        new_item["payments"] = list(pays) if isinstance(pays, list) else []
         # اطمینان از وجود status - اگر موجود نباشد، محاسبه کن
         if "status" not in new_item or not new_item.get("status"):
             if total > 0 and paid >= total:
@@ -4131,10 +4270,14 @@ def search_installments(
     فیلترها:
       - fiscal_year_id (اختیاری): بازه سررسید در سال مالی انتخابی
       - due_from, due_to (اختیاری): بازه تاریخ سررسید
-      - status: pending|partial|paid|overdue
+      - status: pending|partial|paid|overdue (تک‌انتخاب، سازگار با قبل)
+      - status_in: آرایه یا رشتهٔ comma-separated از همان وضعیت‌ها (چندانتخاب)
+      - bucket: unpaid | upcoming | overdue_only (فیلتر از پیش‌تعریف‌شده)
+      - min_overdue_days: حداقل روز تأخیر (همراه bucket=overdue_only)
+      - group_by: invoice برای صفحه‌بندی و خروجی خلاصه به ازای هر فاکتور
       - person_id: فیلتر بر اساس شخص
       - invoice_id: فاکتور خاص
-      - take/skip: صفحه‌بندی ساده
+      - take/skip: صفحه‌بندی روی ردیف اقساط یا روی فاکتورها وقتی group_by=invoice
     """
     # تاریخ امروز برای تشخیص overdue
     today = datetime.utcnow().date()
@@ -4144,6 +4287,17 @@ def search_installments(
     due_from = query.get("due_from")
     due_to = query.get("due_to")
     status_filter = (query.get("status") or "").strip().lower()
+    status_in = _parse_installment_status_in(query.get("status_in"))
+    bucket_raw = query.get("bucket")
+    bucket = str(bucket_raw).strip().lower() if bucket_raw else None
+    if bucket not in ("unpaid", "upcoming", "overdue_only"):
+        bucket = None
+    try:
+        _mod = query.get("min_overdue_days")
+        min_overdue_days_val: int | None = int(_mod) if _mod is not None and str(_mod).strip() != "" else None
+    except Exception:
+        min_overdue_days_val = None
+    group_by_invoice = (query.get("group_by") or "").strip().lower() == "invoice"
     person_id_filter = query.get("person_id")
     invoice_id_filter = query.get("invoice_id")
     try:
@@ -4233,8 +4387,9 @@ def search_installments(
                     continue
             except Exception:
                 continue
-        # تلاش برای استخراج نام شخص برای نمایش در گزارش
+        # تلاش برای استخراج نام و موبایل شخص برای نمایش در گزارش
         person_name = (extra.get("person_name") or extra.get("person_title")) if isinstance(extra, dict) else None
+        person_mobile: str | None = None
         try:
             if extra.get("person_id") is not None:
                 pid = int(extra.get("person_id"))
@@ -4242,9 +4397,10 @@ def search_installments(
                     and_(Person.id == pid, Person.business_id == int(business_id))
                 ).first()
                 if person is not None:
-                    person_name = getattr(person, "name", None)
+                    person_name = getattr(person, "name", None) or getattr(person, "alias_name", None) or person_name
+                    person_mobile = getattr(person, "mobile", None)
         except Exception:
-            person_name = None
+            person_mobile = None
         schedule = plan.get("schedule") or []
         for it in schedule:
             # استخراج تاریخ سررسید
@@ -4277,15 +4433,23 @@ def search_installments(
                 st = "pending"
             if due < today and st != "paid":
                 st = "overdue"
-            # فیلتر وضعیت
-            if status_filter and st != status_filter:
-                continue
             overdue_days = 0
             if st == "overdue":
                 try:
                     overdue_days = max((today - due).days, 0)
                 except Exception:
                     overdue_days = 0
+            if not _installment_row_passes_filters(
+                st,
+                due,
+                today,
+                overdue_days,
+                status_filter=status_filter,
+                status_in=status_in,
+                bucket=bucket,
+                min_overdue_days=min_overdue_days_val,
+            ):
+                continue
             # جریمه دیرکرد ساده بر اساس تنظیمات کسب‌وکار (بدون اعشار)
             late_fee_amount = Decimal(0)
             if (
@@ -4317,6 +4481,7 @@ def search_installments(
                 "invoice_code": doc.code,
                 "person_id": extra.get("person_id"),
                 "person_name": person_name,
+                "person_mobile": person_mobile,
                 "document_date": doc.document_date,
                 "seq": int(it.get("seq") or 0),
                 "due_date": due,
@@ -4331,21 +4496,34 @@ def search_installments(
             })
 
     items.sort(key=lambda row: (row["due_date"], row["invoice_id"], row["seq"]))
-    total_count = len(items)
+    total_flat = len(items)
+    grouped_full = _build_grouped_installment_invoices(items) if group_by_invoice else []
+    total_groups = len(grouped_full)
 
     if disable_pagination:
         page_items = items
-        effective_take = total_count or take
+        grouped_page = grouped_full if group_by_invoice else []
+        pagination_total = total_groups if group_by_invoice else total_flat
+        effective_take = pagination_total or take
         effective_skip = 0
         has_next = False
-    else:
-        page_items = items[skip: skip + take]
+    elif group_by_invoice:
+        page_items = []
+        grouped_page = grouped_full[skip: skip + take]
+        pagination_total = total_groups
         effective_take = take
         effective_skip = skip
-        has_next = skip + take < total_count
+        has_next = skip + take < total_groups
+    else:
+        page_items = items[skip: skip + take]
+        grouped_page = []
+        pagination_total = total_flat
+        effective_take = take
+        effective_skip = skip
+        has_next = skip + take < total_flat
 
     stats = {
-        "total_count": total_count,
+        "total_count": total_flat,
         "principal_total": float(sum_principal),
         "interest_total": float(sum_interest),
         "amount_total": float(sum_total),
@@ -4357,8 +4535,9 @@ def search_installments(
 
     return {
         "items": page_items,
+        "grouped_items": grouped_page,
         "pagination": {
-            "total": total_count,
+            "total": pagination_total,
             "take": effective_take,
             "skip": effective_skip,
             "page": (effective_skip // effective_take) + 1 if effective_take else 1,
@@ -4370,6 +4549,10 @@ def search_installments(
             "due_from": due_from,
             "due_to": due_to,
             "status": status_filter,
+            "status_in": sorted(status_in) if status_in else None,
+            "bucket": bucket,
+            "min_overdue_days": min_overdue_days_val,
+            "group_by": "invoice" if group_by_invoice else None,
             "person_id": person_id_filter,
             "invoice_id": invoice_id_filter,
         },
@@ -4392,6 +4575,12 @@ def _format_date_for_calendar(value: Any, calendar_type: CalendarType) -> str | 
     return formatted.get("date_only") or formatted.get("formatted")
 
 
+def _installments_query_for_flat_export(query: Dict[str, Any]) -> Dict[str, Any]:
+    q = dict(query or {})
+    q.pop("group_by", None)
+    return q
+
+
 def export_installments_csv(
     db: Session,
     business_id: int,
@@ -4401,7 +4590,7 @@ def export_installments_csv(
     """
     خروجی CSV اقساط بر اساس همان فیلترهای search_installments.
     """
-    data = search_installments(db, business_id, query, disable_pagination=True)
+    data = search_installments(db, business_id, _installments_query_for_flat_export(query), disable_pagination=True)
     items = data.get("items") or []
     output = io.StringIO()
     writer = csv.writer(output)
@@ -4411,6 +4600,7 @@ def export_installments_csv(
         "invoice_code",
         "person_id",
         "person_name",
+        "person_mobile",
         "document_date",
         "seq",
         "due_date",
@@ -4429,6 +4619,7 @@ def export_installments_csv(
             it.get("invoice_code"),
             it.get("person_id"),
             it.get("person_name"),
+            it.get("person_mobile"),
             _format_date_for_calendar(it.get("document_date"), calendar_type),
             it.get("seq"),
             _format_date_for_calendar(it.get("due_date"), calendar_type),
@@ -4464,6 +4655,7 @@ def export_installments_xlsx(
             "invoice_code",
             "person_id",
             "person_name",
+            "person_mobile",
             "document_date",
             "seq",
             "due_date",
@@ -4477,13 +4669,14 @@ def export_installments_xlsx(
             "late_fee_amount",
         ]
         ws.append(headers)
-        data = search_installments(db, business_id, query, disable_pagination=True)
+        data = search_installments(db, business_id, _installments_query_for_flat_export(query), disable_pagination=True)
         for it in data.get("items", []):
             ws.append([
                 it.get("invoice_id"),
                 it.get("invoice_code"),
                 it.get("person_id"),
                 it.get("person_name"),
+                it.get("person_mobile"),
                 _format_date_for_calendar(it.get("document_date"), calendar_type),
                 it.get("seq"),
                 _format_date_for_calendar(it.get("due_date"), calendar_type),

@@ -60,7 +60,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   int? _selectedProjectId;
   String? _invoiceTitle;
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
-  bool _postInventory = true;
+  /// none | draft | posted
+  String _invoiceWarehouseReleaseMode = 'draft';
 
   // Party selections (اختیاری برای نمایش؛ هنگام ذخیره از extra_info اصلی نگهداری می‌شود)
   Customer? _selectedCustomer;
@@ -144,7 +145,17 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
-      _postInventory = (_originalExtraInfo['post_inventory'] is bool) ? _originalExtraInfo['post_inventory'] as bool : true;
+      final pi = _originalExtraInfo['post_inventory'];
+      final ap = _originalExtraInfo['auto_post_warehouse'];
+      final postOn = (pi is bool) ? pi : true;
+      final autoPost = (ap is bool) ? ap : false;
+      if (!postOn) {
+        _invoiceWarehouseReleaseMode = 'none';
+      } else if (autoPost) {
+        _invoiceWarehouseReleaseMode = 'posted';
+      } else {
+        _invoiceWarehouseReleaseMode = 'draft';
+      }
       _dueDate = _parseDueDateFromExtra(_originalExtraInfo['due_date']);
       
       // بارگذاری تراکنش‌های پرداخت موجود
@@ -716,7 +727,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
-                postInventory: _postInventory,
+                postInventory: _invoiceWarehouseReleaseMode != 'none',
                 initialRows: _lineItems,
                 calendarController: widget.calendarController,
                 onChanged: (rows) {
@@ -791,11 +802,37 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SwitchListTile(
-                        title: const Text('ثبت اسناد انبار'),
-                        subtitle: const Text('در صورت غیرفعال‌سازی، حرکات موجودی ثبت نمی‌شوند و کنترل کسری انجام نمی‌گردد'),
-                        value: _postInventory,
-                        onChanged: (v) => setState(() => _postInventory = v),
+                      Text(
+                        AppLocalizations.of(context).invoiceWarehouseReleaseSectionTitle,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppLocalizations.of(context).invoiceWarehouseReleaseSectionSubtitle,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<String>(
+                        segments: <ButtonSegment<String>>[
+                          ButtonSegment<String>(
+                            value: 'none',
+                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleaseNone),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'draft',
+                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleaseDraft),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'posted',
+                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleasePosted),
+                          ),
+                        ],
+                        selected: <String>{_invoiceWarehouseReleaseMode},
+                        onSelectionChanged: (Set<String> next) {
+                          setState(() {
+                            _invoiceWarehouseReleaseMode = next.first;
+                          });
+                        },
                       ),
                       const SizedBox(height: 8),
                       const Text('توجه: در ویرایش فاکتور، حواله‌های انبار به صورت خودکار بازسازی نمی‌شوند. لطفاً پس از ذخیره تغییرات، حواله‌های مرتبط را بررسی کنید.'),
@@ -914,7 +951,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
     // ساخت extra_info با حفظ اطلاعات قبلی
     final mergedExtra = <String, dynamic>{..._originalExtraInfo};
-    mergedExtra['post_inventory'] = _postInventory;
+    mergedExtra['post_inventory'] = _invoiceWarehouseReleaseMode != 'none';
+    mergedExtra['auto_post_warehouse'] = _invoiceWarehouseReleaseMode == 'posted';
     mergedExtra['totals'] = {
       'gross': _sumSubtotal,
       'discount': _sumDiscount,

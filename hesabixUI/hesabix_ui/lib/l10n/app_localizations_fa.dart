@@ -617,6 +617,60 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentsRowsPerPage => 'تعداد سطر در هر صفحه';
 
   @override
+  String get installmentsViewPortfolios => 'پرونده‌های اقساط';
+
+  @override
+  String get installmentsViewFlat => 'ریز اقساط';
+
+  @override
+  String get installmentsFiltersBucket => 'فیلتر سریع';
+
+  @override
+  String get installmentsBucketAll => 'همه';
+
+  @override
+  String get installmentsBucketUnpaid => 'پرداخت‌نشده';
+
+  @override
+  String get installmentsBucketUpcoming => 'سررسید آتی';
+
+  @override
+  String get installmentsBucketOverdueOnly => 'فقط معوق';
+
+  @override
+  String get installmentsMinOverdueDaysLabel => 'حداقل روز تأخیر';
+
+  @override
+  String get installmentsTableMobile => 'موبایل';
+
+  @override
+  String get installmentsGroupedNextDue => 'نزدیک‌ترین سررسید';
+
+  @override
+  String get installmentsGroupedWorstStatus => 'بدترین وضعیت';
+
+  @override
+  String get installmentsGroupedInstallments => 'تعداد قسط (فیلترشده)';
+
+  @override
+  String get installmentsGroupedPaidCount => 'تسویه‌شده';
+
+  @override
+  String get installmentsGroupedOverdueCount => 'معوق';
+
+  @override
+  String get installmentsGroupedRemainingSum => 'جمع مانده';
+
+  @override
+  String get installmentsDetailTitle => 'جزئیات طرح اقساط';
+
+  @override
+  String get installmentsPaymentsColumn => 'پرداخت‌ها';
+
+  @override
+  String get installmentsNoPaymentsYet => 'هنوز تخصیص دریافتی ثبت نشده';
+
+  @override
   String get test => 'تست';
 
   @override
@@ -8415,4 +8469,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String sessionsMonthsAgo(int months) {
     return '$months ماه پیش';
   }
+
+  @override
+  String get invoiceWarehouseReleaseNone => 'بدون حواله';
+
+  @override
+  String get invoiceWarehouseReleaseDraft => 'پیش‌نویس حواله';
+
+  @override
+  String get invoiceWarehouseReleasePosted => 'حواله قطعی';
+
+  @override
+  String get invoiceWarehouseReleaseSectionTitle => 'حواله انبار پس از ثبت';
+
+  @override
+  String get invoiceWarehouseReleaseSectionSubtitle =>
+      'بر اساس پیش‌فرض کسب‌وکار؛ در صورت تغییر، برای همین نوع فاکتور در این مرورگر ذخیره می‌شود.';
+
+  @override
+  String get invoiceWarehouseReleaseBusinessTitle =>
+      'حواله انبار پس از ثبت فاکتور';
+
+  @override
+  String get invoiceWarehouseReleaseBusinessSubtitle =>
+      'اگر در API یا ایمپورت، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
 }

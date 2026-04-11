@@ -6,7 +6,7 @@ import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
-import '../../utils/snackbar_helper.dart';
+import '../../core/date_utils.dart' show HesabixDateUtils;
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
   final int businessId;
@@ -27,11 +27,18 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   String? _error;
   Map<String, dynamic>? _doc;
   Map<String, dynamic>? _relatedDoc; // حواله مرتبط (اصلی یا کنسلی)
+  CalendarController? _calendarController;
 
   @override
   void initState() {
     super.initState();
+    _loadCalendarController();
     _load();
+  }
+
+  Future<void> _loadCalendarController() async {
+    final c = await CalendarController.load();
+    if (mounted) setState(() => _calendarController = c);
   }
 
   Future<void> _load() async {
@@ -138,6 +145,77 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
       case 'cancelled': return Colors.red;
       default: return Colors.grey;
     }
+  }
+
+  String _formatQuantity(num? q) {
+    if (q == null) return '-';
+    if (q == q.roundToDouble()) return '${q.toInt()}';
+    return q.toString();
+  }
+
+  String _formatDocDateTime(String? iso) {
+    if (iso == null) return '-';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final cal = _calendarController;
+    if (cal != null) {
+      return HesabixDateUtils.formatForDisplay(dt, cal.isJalali);
+    }
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    return '${dt.year}/${dt.month}/${dt.day} $hh:$mm';
+  }
+
+  bool _hasDeliveryInfo(Map<String, dynamic> doc) {
+    return (doc['description'] != null && (doc['description'] as String).isNotEmpty) ||
+        doc['delivery_method'] != null ||
+        (doc['carrier_name'] != null && (doc['carrier_name'] as String).isNotEmpty) ||
+        (doc['recipient_name'] != null && (doc['recipient_name'] as String).isNotEmpty) ||
+        (doc['recipient_phone'] != null && (doc['recipient_phone'] as String).isNotEmpty) ||
+        (doc['tracking_number'] != null && (doc['tracking_number'] as String).isNotEmpty);
+  }
+
+  String _getDeliveryMethodName(String? method) {
+    switch (method) {
+      case 'warehouse_door':
+        return 'تحویل درب انبار';
+      case 'post_regular':
+        return 'پست عادی';
+      case 'post_express':
+        return 'پست پیشتاز';
+      case 'freight':
+        return 'باربری';
+      case 'bus':
+        return 'اتوبوس';
+      case 'tipax':
+        return 'تیپاکس';
+      case 'courier':
+        return 'پیک';
+      default:
+        return method ?? '-';
+    }
+  }
+
+  Widget _buildInfoRow(ThemeData theme, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
+        ],
+      ),
+    );
   }
 
   Future<void> _updateLineWarehouse(int lineId, int? warehouseId) async {
@@ -277,6 +355,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
     final isDraft = status == 'draft';
     final isPosted = status == 'posted';
     final lines = List<dynamic>.from(doc['lines'] ?? const []);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -290,7 +369,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                 final bytes = await api.downloadPdf(
                   '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
                 );
-                if (!mounted) return;
+                if (!mounted || !context.mounted) return;
                 if (kIsWeb) {
                   await web_utils.saveBytesAsFileWeb(
                     bytes,
@@ -303,7 +382,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                   );
                 }
               } catch (e) {
-                if (!mounted) return;
+                if (!mounted || !context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('خطا در دانلود PDF: $e')),
                 );
@@ -350,46 +429,90 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                           Expanded(
                             child: Text(
                               'کد: ${doc['code'] ?? '-'}',
-                              style: Theme.of(context).textTheme.titleLarge,
+                              style: theme.textTheme.titleLarge,
                             ),
                           ),
                           Chip(
                             label: Text(_getStatusName(status)),
-                            backgroundColor: _getStatusColor(status).withOpacity(0.2),
+                            backgroundColor: _getStatusColor(status).withValues(alpha: 0.2),
                             labelStyle: TextStyle(color: _getStatusColor(status)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text('نوع: ${_getDocTypeName(doc['doc_type'])}'),
-                      const SizedBox(height: 4),
-                      Text('تاریخ: ${doc['document_date'] ?? '-'}'),
-                      if (doc['source_type'] == 'invoice' && doc['source_document_id'] != null)
+                      const SizedBox(height: 12),
+                      _buildInfoRow(theme, 'نوع حواله', _getDocTypeName(doc['doc_type'] as String?)),
+                      if (doc['document_date'] != null && _calendarController != null)
+                        _buildInfoRow(
+                          theme,
+                          'تاریخ حواله',
+                          HesabixDateUtils.formatForDisplay(
+                            DateTime.tryParse(doc['document_date'] as String),
+                            _calendarController!.isJalali,
+                          ),
+                        )
+                      else
+                        _buildInfoRow(theme, 'تاریخ حواله', doc['document_date']?.toString() ?? '-'),
+                      if (doc['fiscal_year_title'] != null)
+                        _buildInfoRow(theme, 'سال مالی', doc['fiscal_year_title'].toString()),
+                      if (doc['total_quantity'] != null)
+                        _buildInfoRow(theme, 'جمع تعداد (طبق نوع حواله)', _formatQuantity(doc['total_quantity'] as num?)),
+                      if (doc['doc_type'] == 'transfer') ...[
+                        if (doc['warehouse_name_from'] != null || doc['warehouse_id_from'] != null)
+                          _buildInfoRow(
+                            theme,
+                            'انبار مبدأ',
+                            doc['warehouse_name_from']?.toString() ??
+                                (doc['warehouse_id_from'] != null ? 'شناسه ${doc['warehouse_id_from']}' : '-'),
+                          ),
+                        if (doc['warehouse_name_to'] != null || doc['warehouse_id_to'] != null)
+                          _buildInfoRow(
+                            theme,
+                            'انبار مقصد',
+                            doc['warehouse_name_to']?.toString() ??
+                                (doc['warehouse_id_to'] != null ? 'شناسه ${doc['warehouse_id_to']}' : '-'),
+                          ),
+                      ],
+                      if (doc['created_by_name'] != null || doc['created_by_user_id'] != null)
+                        _buildInfoRow(
+                          theme,
+                          'ایجادکننده',
+                          doc['created_by_name']?.toString() ??
+                              (doc['created_by_user_id'] != null ? 'کاربر ${doc['created_by_user_id']}' : '-'),
+                        ),
+                      if (doc['created_at'] != null)
+                        _buildInfoRow(theme, 'زمان ایجاد', _formatDocDateTime(doc['created_at'] as String?)),
+                      if (doc['updated_at'] != null)
+                        _buildInfoRow(theme, 'آخرین به‌روزرسانی', _formatDocDateTime(doc['updated_at'] as String?)),
+                      if (doc['accounting_document_id'] != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: InkWell(
                             onTap: () async {
-                              final calendarController = await CalendarController.load();
-                              if (!mounted) return;
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => DocumentDetailsDialog(
-                                    documentId: doc['source_document_id'] as int,
-                                    calendarController: calendarController,
-                                  ),
+                              if (_calendarController == null) {
+                                await _loadCalendarController();
+                              }
+                              if (!context.mounted || _calendarController == null) return;
+                              final aid = doc['accounting_document_id'] is int
+                                  ? doc['accounting_document_id'] as int
+                                  : int.tryParse('${doc['accounting_document_id']}');
+                              if (aid == null) return;
+                              showDialog(
+                                context: context,
+                                builder: (_) => DocumentDetailsDialog(
+                                  documentId: aid,
+                                  calendarController: _calendarController!,
                                 ),
                               );
                             },
                             child: Text(
-                              'فاکتور منبع: ${doc['source_document_id']}',
+                              'سند حسابداری مرتبط: ${doc['accounting_document_id']}',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: theme.colorScheme.primary,
                                 decoration: TextDecoration.underline,
                               ),
                             ),
                           ),
                         ),
-                      // نمایش حواله مرتبط (اصلی یا کنسلی)
                       if (_relatedDoc != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -406,16 +529,12 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                             },
                             child: Row(
                               children: [
-                                Icon(
-                                  Icons.link,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                                Icon(Icons.link, size: 16, color: theme.colorScheme.primary),
                                 const SizedBox(width: 4),
                                 Text(
                                   'حواله مرتبط: ${_relatedDoc!['code'] ?? _relatedDoc!['id']} (${_getStatusName(_relatedDoc!['status'])})',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color: theme.colorScheme.primary,
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
@@ -427,18 +546,47 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                   ),
                 ),
               ),
+              if (_hasDeliveryInfo(doc)) ...[
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.local_shipping, size: 20, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('اطلاعات ارسال', style: theme.textTheme.titleMedium),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (doc['description'] != null && (doc['description'] as String).isNotEmpty)
+                          _buildInfoRow(theme, 'شرح/توضیحات', doc['description'] as String),
+                        if (doc['delivery_method'] != null)
+                          _buildInfoRow(theme, 'روش ارسال', _getDeliveryMethodName(doc['delivery_method'] as String?)),
+                        if (doc['carrier_name'] != null && (doc['carrier_name'] as String).isNotEmpty)
+                          _buildInfoRow(theme, 'نام باربری/حمل و نقل', doc['carrier_name'] as String),
+                        if (doc['recipient_name'] != null && (doc['recipient_name'] as String).isNotEmpty)
+                          _buildInfoRow(theme, 'تحویل گیرنده', doc['recipient_name'] as String),
+                        if (doc['recipient_phone'] != null && (doc['recipient_phone'] as String).isNotEmpty)
+                          _buildInfoRow(theme, 'تلفن تحویل گیرنده', doc['recipient_phone'] as String),
+                        if (doc['tracking_number'] != null && (doc['tracking_number'] as String).isNotEmpty)
+                          _buildInfoRow(theme, 'شماره پیگیری/بارنامه/قبض', doc['tracking_number'] as String),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
-              // خطوط حواله
               Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'خطوط حواله',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      child: Text('خطوط حواله', style: theme.textTheme.titleMedium),
                     ),
                     if (lines.isEmpty)
                       const Padding(
@@ -454,11 +602,12 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                           DataColumn(label: Text('تعداد')),
                         ],
                         rows: lines.map<DataRow>((line) {
-                          final lineId = line['id'] as int?;
-                          final productId = line['product_id'] as int?;
-                          final warehouseId = line['warehouse_id'] as int?;
-                          final movement = line['movement'] as String?;
-                          final quantity = line['quantity'] as num?;
+                          final lineMap = Map<String, dynamic>.from(line as Map);
+                          final lineId = lineMap['id'] as int?;
+                          final productId = lineMap['product_id'] as int?;
+                          final warehouseId = lineMap['warehouse_id'] as int?;
+                          final movement = lineMap['movement'] as String?;
+                          final quantity = lineMap['quantity'] as num?;
 
                           return DataRow(
                             cells: [

@@ -1241,6 +1241,114 @@ abstract class AppLocalizations {
   /// **'Rows per page'**
   String get installmentsRowsPerPage;
 
+  /// No description provided for @installmentsViewPortfolios.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment files'**
+  String get installmentsViewPortfolios;
+
+  /// No description provided for @installmentsViewFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'All installments'**
+  String get installmentsViewFlat;
+
+  /// No description provided for @installmentsFiltersBucket.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick filter'**
+  String get installmentsFiltersBucket;
+
+  /// No description provided for @installmentsBucketAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get installmentsBucketAll;
+
+  /// No description provided for @installmentsBucketUnpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpaid (open)'**
+  String get installmentsBucketUnpaid;
+
+  /// No description provided for @installmentsBucketUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming due dates'**
+  String get installmentsBucketUpcoming;
+
+  /// No description provided for @installmentsBucketOverdueOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue only'**
+  String get installmentsBucketOverdueOnly;
+
+  /// No description provided for @installmentsMinOverdueDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. overdue days'**
+  String get installmentsMinOverdueDaysLabel;
+
+  /// No description provided for @installmentsTableMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get installmentsTableMobile;
+
+  /// No description provided for @installmentsGroupedNextDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Next due'**
+  String get installmentsGroupedNextDue;
+
+  /// No description provided for @installmentsGroupedWorstStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Worst status'**
+  String get installmentsGroupedWorstStatus;
+
+  /// No description provided for @installmentsGroupedInstallments.
+  ///
+  /// In en, this message translates to:
+  /// **'Installments (matched)'**
+  String get installmentsGroupedInstallments;
+
+  /// No description provided for @installmentsGroupedPaidCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get installmentsGroupedPaidCount;
+
+  /// No description provided for @installmentsGroupedOverdueCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get installmentsGroupedOverdueCount;
+
+  /// No description provided for @installmentsGroupedRemainingSum.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining (sum)'**
+  String get installmentsGroupedRemainingSum;
+
+  /// No description provided for @installmentsDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment plan'**
+  String get installmentsDetailTitle;
+
+  /// No description provided for @installmentsPaymentsColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts'**
+  String get installmentsPaymentsColumn;
+
+  /// No description provided for @installmentsNoPaymentsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No receipt allocations yet'**
+  String get installmentsNoPaymentsYet;
+
   /// No description provided for @test.
   ///
   /// In en, this message translates to:
@@ -15976,6 +16084,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{months} months ago'**
   String sessionsMonthsAgo(int months);
+
+  /// No description provided for @invoiceWarehouseReleaseNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No warehouse document'**
+  String get invoiceWarehouseReleaseNone;
+
+  /// No description provided for @invoiceWarehouseReleaseDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse draft'**
+  String get invoiceWarehouseReleaseDraft;
+
+  /// No description provided for @invoiceWarehouseReleasePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Post warehouse immediately'**
+  String get invoiceWarehouseReleasePosted;
+
+  /// No description provided for @invoiceWarehouseReleaseSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse document after save'**
+  String get invoiceWarehouseReleaseSectionTitle;
+
+  /// No description provided for @invoiceWarehouseReleaseSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses your business default; changes are saved per invoice type in this browser.'**
+  String get invoiceWarehouseReleaseSectionSubtitle;
+
+  /// No description provided for @invoiceWarehouseReleaseBusinessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse document after invoice save'**
+  String get invoiceWarehouseReleaseBusinessTitle;
+
+  /// No description provided for @invoiceWarehouseReleaseBusinessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.'**
+  String get invoiceWarehouseReleaseBusinessSubtitle;
 }
 
 class _AppLocalizationsDelegate
