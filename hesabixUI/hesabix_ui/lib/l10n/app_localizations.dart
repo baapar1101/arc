@@ -6749,6 +6749,180 @@ abstract class AppLocalizations {
   /// **'Documents/Detail'**
   String get presetDocumentsDetail;
 
+  /// No description provided for @presetTransfersList.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers/List'**
+  String get presetTransfersList;
+
+  /// No description provided for @presetTransfersDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers/Detail'**
+  String get presetTransfersDetail;
+
+  /// No description provided for @reportTemplatesScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All report types'**
+  String get reportTemplatesScopeAll;
+
+  /// No description provided for @reportTemplatesScopeCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom (technical keys)'**
+  String get reportTemplatesScopeCustom;
+
+  /// No description provided for @reportTemplateNewVisual.
+  ///
+  /// In en, this message translates to:
+  /// **'New — visual builder'**
+  String get reportTemplateNewVisual;
+
+  /// No description provided for @reportTemplateNewHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'New — HTML (advanced)'**
+  String get reportTemplateNewHtml;
+
+  /// No description provided for @reportTemplateMoreMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'More tools'**
+  String get reportTemplateMoreMenu;
+
+  /// No description provided for @reportTemplateExportJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Export JSON…'**
+  String get reportTemplateExportJson;
+
+  /// No description provided for @reportTemplateImportJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON…'**
+  String get reportTemplateImportJson;
+
+  /// No description provided for @reportTemplatePickExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a template to export'**
+  String get reportTemplatePickExport;
+
+  /// No description provided for @reportTemplateImportDoneOpenHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'Form filled. Use \"New — HTML\" to review and save.'**
+  String get reportTemplateImportDoneOpenHtml;
+
+  /// No description provided for @reportTemplatesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load templates: {error}'**
+  String reportTemplatesLoadError(String error);
+
+  /// No description provided for @reportTemplatePreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Template preview'**
+  String get reportTemplatePreviewTitle;
+
+  /// No description provided for @reportTemplatePreviewHtmlTab.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML'**
+  String get reportTemplatePreviewHtmlTab;
+
+  /// No description provided for @reportTemplatePreviewPdfTab.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get reportTemplatePreviewPdfTab;
+
+  /// No description provided for @reportTemplatePreviewPdfBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated PDF size: {bytes} bytes'**
+  String reportTemplatePreviewPdfBytes(String bytes);
+
+  /// No description provided for @reportTemplateCopyPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy placeholder'**
+  String get reportTemplateCopyPlaceholder;
+
+  /// No description provided for @reportTemplateCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get reportTemplateCopied;
+
+  /// No description provided for @reportTemplateStatusPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get reportTemplateStatusPublished;
+
+  /// No description provided for @reportTemplateStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get reportTemplateStatusDraft;
+
+  /// No description provided for @reportTemplateDefaultBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get reportTemplateDefaultBadge;
+
+  /// No description provided for @reportTemplateRowActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get reportTemplateRowActions;
+
+  /// No description provided for @reportTemplatePublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get reportTemplatePublish;
+
+  /// No description provided for @reportTemplateUnpublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpublish'**
+  String get reportTemplateUnpublish;
+
+  /// No description provided for @reportTemplatePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get reportTemplatePreview;
+
+  /// No description provided for @reportTemplateEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get reportTemplateEdit;
+
+  /// No description provided for @reportTemplateSetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get reportTemplateSetDefault;
+
+  /// No description provided for @reportTemplateDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get reportTemplateDelete;
+
+  /// No description provided for @reportTemplateExportThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Export JSON'**
+  String get reportTemplateExportThis;
+
   /// No description provided for @printPdf.
   ///
   /// In en, this message translates to:
@@ -13588,6 +13762,366 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Creation date and time'**
   String get workflowFieldDescCreatedAt;
+
+  /// No description provided for @workflowFieldInvoiceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice type'**
+  String get workflowFieldInvoiceType;
+
+  /// No description provided for @workflowFieldDescInvoiceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice document type (e.g. sales/purchase)'**
+  String get workflowFieldDescInvoiceType;
+
+  /// No description provided for @workflowFieldLeadId.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead ID'**
+  String get workflowFieldLeadId;
+
+  /// No description provided for @workflowFieldDescLeadId.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM lead record ID'**
+  String get workflowFieldDescLeadId;
+
+  /// No description provided for @workflowFieldDealId.
+  ///
+  /// In en, this message translates to:
+  /// **'Deal ID'**
+  String get workflowFieldDealId;
+
+  /// No description provided for @workflowFieldDescDealId.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM deal/opportunity record ID'**
+  String get workflowFieldDescDealId;
+
+  /// No description provided for @workflowFieldProcessDefinitionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Process definition ID'**
+  String get workflowFieldProcessDefinitionId;
+
+  /// No description provided for @workflowFieldDescProcessDefinitionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales process definition'**
+  String get workflowFieldDescProcessDefinitionId;
+
+  /// No description provided for @workflowFieldStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage ID'**
+  String get workflowFieldStageId;
+
+  /// No description provided for @workflowFieldDescStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Current stage in the process'**
+  String get workflowFieldDescStageId;
+
+  /// No description provided for @workflowFieldOldStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous stage ID'**
+  String get workflowFieldOldStageId;
+
+  /// No description provided for @workflowFieldDescOldStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage before the change'**
+  String get workflowFieldDescOldStageId;
+
+  /// No description provided for @workflowFieldNewStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'New stage ID'**
+  String get workflowFieldNewStageId;
+
+  /// No description provided for @workflowFieldDescNewStageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage after the change'**
+  String get workflowFieldDescNewStageId;
+
+  /// No description provided for @workflowFieldIsWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Won deal'**
+  String get workflowFieldIsWin;
+
+  /// No description provided for @workflowFieldDescIsWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether the deal was closed as won'**
+  String get workflowFieldDescIsWin;
+
+  /// No description provided for @workflowFieldPersonTypesList.
+  ///
+  /// In en, this message translates to:
+  /// **'Person types'**
+  String get workflowFieldPersonTypesList;
+
+  /// No description provided for @workflowFieldDescPersonTypesList.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned person types list (on create)'**
+  String get workflowFieldDescPersonTypesList;
+
+  /// No description provided for @workflowFieldSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Success'**
+  String get workflowFieldSuccess;
+
+  /// No description provided for @workflowFieldDescSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether the action succeeded'**
+  String get workflowFieldDescSuccess;
+
+  /// No description provided for @workflowFieldWorkflowUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID'**
+  String get workflowFieldWorkflowUserId;
+
+  /// No description provided for @workflowFieldDescWorkflowUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID in action output'**
+  String get workflowFieldDescWorkflowUserId;
+
+  /// No description provided for @workflowFieldSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent message'**
+  String get workflowFieldSentMessage;
+
+  /// No description provided for @workflowFieldDescSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message text after send (e.g. Telegram/Bale)'**
+  String get workflowFieldDescSentMessage;
+
+  /// No description provided for @workflowFieldTelegramChatId.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram chat ID'**
+  String get workflowFieldTelegramChatId;
+
+  /// No description provided for @workflowFieldDescTelegramChatId.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient Telegram chat ID'**
+  String get workflowFieldDescTelegramChatId;
+
+  /// No description provided for @workflowFieldBaleChatId.
+  ///
+  /// In en, this message translates to:
+  /// **'Bale chat ID'**
+  String get workflowFieldBaleChatId;
+
+  /// No description provided for @workflowFieldDescBaleChatId.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient Bale chat ID'**
+  String get workflowFieldDescBaleChatId;
+
+  /// No description provided for @workflowFieldEmailTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get workflowFieldEmailTo;
+
+  /// No description provided for @workflowFieldDescEmailTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient email address (resolved after send)'**
+  String get workflowFieldDescEmailTo;
+
+  /// No description provided for @workflowFieldEmailSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject'**
+  String get workflowFieldEmailSubject;
+
+  /// No description provided for @workflowFieldDescEmailSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Email subject line (resolved after send)'**
+  String get workflowFieldDescEmailSubject;
+
+  /// No description provided for @workflowFieldHttpStatusCode.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP status code'**
+  String get workflowFieldHttpStatusCode;
+
+  /// No description provided for @workflowFieldDescHttpStatusCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Response status code (e.g. 200)'**
+  String get workflowFieldDescHttpStatusCode;
+
+  /// No description provided for @workflowFieldHttpResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP response'**
+  String get workflowFieldHttpResponse;
+
+  /// No description provided for @workflowFieldDescHttpResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Response body or payload'**
+  String get workflowFieldDescHttpResponse;
+
+  /// No description provided for @workflowFieldVariableName.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable name'**
+  String get workflowFieldVariableName;
+
+  /// No description provided for @workflowFieldDescVariableName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name of variable stored in context'**
+  String get workflowFieldDescVariableName;
+
+  /// No description provided for @workflowFieldVariableValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable value'**
+  String get workflowFieldVariableValue;
+
+  /// No description provided for @workflowFieldDescVariableValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored value for the variable'**
+  String get workflowFieldDescVariableValue;
+
+  /// No description provided for @workflowFieldWebhookPayload.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook payload'**
+  String get workflowFieldWebhookPayload;
+
+  /// No description provided for @workflowFieldDescWebhookPayload.
+  ///
+  /// In en, this message translates to:
+  /// **'Parsed webhook payload data'**
+  String get workflowFieldDescWebhookPayload;
+
+  /// No description provided for @workflowFieldWebhookBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Request body'**
+  String get workflowFieldWebhookBody;
+
+  /// No description provided for @workflowFieldDescWebhookBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw HTTP request body'**
+  String get workflowFieldDescWebhookBody;
+
+  /// No description provided for @workflowFieldScheduledAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled run time'**
+  String get workflowFieldScheduledAt;
+
+  /// No description provided for @workflowFieldDescScheduledAt.
+  ///
+  /// In en, this message translates to:
+  /// **'When the scheduled trigger ran'**
+  String get workflowFieldDescScheduledAt;
+
+  /// No description provided for @workflowFieldWarehouseId.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse ID'**
+  String get workflowFieldWarehouseId;
+
+  /// No description provided for @workflowFieldDescWarehouseId.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse related to inventory event'**
+  String get workflowFieldDescWarehouseId;
+
+  /// No description provided for @workflowFieldCurrentQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Current quantity'**
+  String get workflowFieldCurrentQuantity;
+
+  /// No description provided for @workflowFieldDescCurrentQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Current stock quantity'**
+  String get workflowFieldDescCurrentQuantity;
+
+  /// No description provided for @workflowFieldMinQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum quantity'**
+  String get workflowFieldMinQuantity;
+
+  /// No description provided for @workflowFieldDescMinQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Low-stock threshold'**
+  String get workflowFieldDescMinQuantity;
+
+  /// No description provided for @workflowFieldCheckId.
+  ///
+  /// In en, this message translates to:
+  /// **'Check ID'**
+  String get workflowFieldCheckId;
+
+  /// No description provided for @workflowFieldDescCheckId.
+  ///
+  /// In en, this message translates to:
+  /// **'Check record ID'**
+  String get workflowFieldDescCheckId;
+
+  /// No description provided for @workflowFieldCheckNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Check number'**
+  String get workflowFieldCheckNumber;
+
+  /// No description provided for @workflowFieldDescCheckNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Printed check number'**
+  String get workflowFieldDescCheckNumber;
+
+  /// No description provided for @workflowFieldDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get workflowFieldDueDate;
+
+  /// No description provided for @workflowFieldDescDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Maturity/due date'**
+  String get workflowFieldDescDueDate;
+
+  /// No description provided for @workflowFieldLogLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Log level'**
+  String get workflowFieldLogLevel;
+
+  /// No description provided for @workflowFieldDescLogLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level recorded in workflow log'**
+  String get workflowFieldDescLogLevel;
 
   /// No description provided for @workflowTemplateInvoiceSalesName.
   ///

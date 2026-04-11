@@ -3439,6 +3439,98 @@ class AppLocalizationsFa extends AppLocalizations {
   String get presetDocumentsDetail => 'Documents/Detail';
 
   @override
+  String get presetTransfersList => 'انتقال وجه / لیست';
+
+  @override
+  String get presetTransfersDetail => 'انتقال وجه / جزئیات';
+
+  @override
+  String get reportTemplatesScopeAll => 'همهٔ انواع گزارش';
+
+  @override
+  String get reportTemplatesScopeCustom => 'سفارشی (کلیدهای فنی)';
+
+  @override
+  String get reportTemplateNewVisual => 'قالب جدید — سازندهٔ بصری';
+
+  @override
+  String get reportTemplateNewHtml => 'قالب جدید — HTML (پیشرفته)';
+
+  @override
+  String get reportTemplateMoreMenu => 'ابزارهای بیشتر';
+
+  @override
+  String get reportTemplateExportJson => 'خروجی JSON…';
+
+  @override
+  String get reportTemplateImportJson => 'ورود JSON…';
+
+  @override
+  String get reportTemplatePickExport => 'قالب را برای خروجی انتخاب کنید';
+
+  @override
+  String get reportTemplateImportDoneOpenHtml =>
+      'فرم پر شد. با «قالب جدید — HTML» بررسی و ذخیره کنید.';
+
+  @override
+  String reportTemplatesLoadError(String error) {
+    return 'بارگذاری قالب‌ها ناموفق: $error';
+  }
+
+  @override
+  String get reportTemplatePreviewTitle => 'پیش‌نمایش قالب';
+
+  @override
+  String get reportTemplatePreviewHtmlTab => 'HTML';
+
+  @override
+  String get reportTemplatePreviewPdfTab => 'PDF';
+
+  @override
+  String reportTemplatePreviewPdfBytes(String bytes) {
+    return 'حجم PDF تولیدشده: $bytes بایت';
+  }
+
+  @override
+  String get reportTemplateCopyPlaceholder => 'کپی متغیر';
+
+  @override
+  String get reportTemplateCopied => 'در کلیپ‌بورد کپی شد';
+
+  @override
+  String get reportTemplateStatusPublished => 'منتشر شده';
+
+  @override
+  String get reportTemplateStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get reportTemplateDefaultBadge => 'پیش‌فرض';
+
+  @override
+  String get reportTemplateRowActions => 'عملیات';
+
+  @override
+  String get reportTemplatePublish => 'انتشار';
+
+  @override
+  String get reportTemplateUnpublish => 'لغو انتشار';
+
+  @override
+  String get reportTemplatePreview => 'پیش‌نمایش';
+
+  @override
+  String get reportTemplateEdit => 'ویرایش';
+
+  @override
+  String get reportTemplateSetDefault => 'پیش‌فرض';
+
+  @override
+  String get reportTemplateDelete => 'حذف';
+
+  @override
+  String get reportTemplateExportThis => 'خروجی JSON';
+
+  @override
   String get printPdf => 'چاپ PDF';
 
   @override
@@ -7138,6 +7230,188 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get workflowFieldDescCreatedAt => 'تاریخ و زمان ایجاد';
+
+  @override
+  String get workflowFieldInvoiceType => 'نوع فاکتور';
+
+  @override
+  String get workflowFieldDescInvoiceType => 'نوع سند فاکتور (مثلاً فروش/خرید)';
+
+  @override
+  String get workflowFieldLeadId => 'شناسه سرنخ';
+
+  @override
+  String get workflowFieldDescLeadId => 'شناسه رکورد سرنخ CRM';
+
+  @override
+  String get workflowFieldDealId => 'شناسه فرصت فروش';
+
+  @override
+  String get workflowFieldDescDealId => 'شناسه رکورد معامله CRM';
+
+  @override
+  String get workflowFieldProcessDefinitionId => 'شناسه فرایند';
+
+  @override
+  String get workflowFieldDescProcessDefinitionId => 'تعریف فرایند فروش';
+
+  @override
+  String get workflowFieldStageId => 'شناسه مرحله';
+
+  @override
+  String get workflowFieldDescStageId => 'مرحله فعلی در فرایند';
+
+  @override
+  String get workflowFieldOldStageId => 'شناسه مرحله قبلی';
+
+  @override
+  String get workflowFieldDescOldStageId => 'مرحله قبل از تغییر';
+
+  @override
+  String get workflowFieldNewStageId => 'شناسه مرحله جدید';
+
+  @override
+  String get workflowFieldDescNewStageId => 'مرحله بعد از تغییر';
+
+  @override
+  String get workflowFieldIsWin => 'موفقیت معامله';
+
+  @override
+  String get workflowFieldDescIsWin => 'آیا معامله با برد بسته شده است';
+
+  @override
+  String get workflowFieldPersonTypesList => 'انواع شخص';
+
+  @override
+  String get workflowFieldDescPersonTypesList =>
+      'لیست انواع تخصیص‌یافته به شخص (هنگام ایجاد)';
+
+  @override
+  String get workflowFieldSuccess => 'موفقیت';
+
+  @override
+  String get workflowFieldDescSuccess => 'نتیجه موفق یا ناموفق بودن عملیات';
+
+  @override
+  String get workflowFieldWorkflowUserId => 'شناسه کاربر';
+
+  @override
+  String get workflowFieldDescWorkflowUserId => 'شناسه کاربر در خروجی اکشن';
+
+  @override
+  String get workflowFieldSentMessage => 'متن ارسال‌شده';
+
+  @override
+  String get workflowFieldDescSentMessage =>
+      'متن پیام پس از ارسال (مثلاً تلگرام/بله)';
+
+  @override
+  String get workflowFieldTelegramChatId => 'شناسه چت تلگرام';
+
+  @override
+  String get workflowFieldDescTelegramChatId => 'Chat ID تلگرام گیرنده';
+
+  @override
+  String get workflowFieldBaleChatId => 'شناسه چت بله';
+
+  @override
+  String get workflowFieldDescBaleChatId => 'Chat ID بله گیرنده';
+
+  @override
+  String get workflowFieldEmailTo => 'گیرنده';
+
+  @override
+  String get workflowFieldDescEmailTo => 'آدرس ایمیل گیرنده (پس از حل متغیرها)';
+
+  @override
+  String get workflowFieldEmailSubject => 'موضوع';
+
+  @override
+  String get workflowFieldDescEmailSubject => 'موضوع ایمیل (پس از حل متغیرها)';
+
+  @override
+  String get workflowFieldHttpStatusCode => 'کد وضعیت HTTP';
+
+  @override
+  String get workflowFieldDescHttpStatusCode => 'کد پاسخ سرور (مثلاً ۲۰۰)';
+
+  @override
+  String get workflowFieldHttpResponse => 'پاسخ HTTP';
+
+  @override
+  String get workflowFieldDescHttpResponse => 'بدنه یا دادهٔ پاسخ درخواست';
+
+  @override
+  String get workflowFieldVariableName => 'نام متغیر';
+
+  @override
+  String get workflowFieldDescVariableName => 'نام متغیر ذخیره‌شده در context';
+
+  @override
+  String get workflowFieldVariableValue => 'مقدار متغیر';
+
+  @override
+  String get workflowFieldDescVariableValue => 'مقدار ذخیره‌شده برای متغیر';
+
+  @override
+  String get workflowFieldWebhookPayload => 'داده وب‌هوک';
+
+  @override
+  String get workflowFieldDescWebhookPayload => 'محتوای دریافتی وب‌هوک';
+
+  @override
+  String get workflowFieldWebhookBody => 'بدنه درخواست';
+
+  @override
+  String get workflowFieldDescWebhookBody => 'بدنه خام درخواست HTTP';
+
+  @override
+  String get workflowFieldScheduledAt => 'زمان اجرای زمان‌بندی';
+
+  @override
+  String get workflowFieldDescScheduledAt => 'زمان اجرای برنامهٔ زمان‌بندی‌شده';
+
+  @override
+  String get workflowFieldWarehouseId => 'شناسه انبار';
+
+  @override
+  String get workflowFieldDescWarehouseId => 'انبار مرتبط با رویداد موجودی';
+
+  @override
+  String get workflowFieldCurrentQuantity => 'موجودی فعلی';
+
+  @override
+  String get workflowFieldDescCurrentQuantity => 'مقدار فعلی موجودی';
+
+  @override
+  String get workflowFieldMinQuantity => 'حداقل مجاز';
+
+  @override
+  String get workflowFieldDescMinQuantity => 'آستانهٔ هشدار موجودی کم';
+
+  @override
+  String get workflowFieldCheckId => 'شناسه چک';
+
+  @override
+  String get workflowFieldDescCheckId => 'شناسه رکورد چک';
+
+  @override
+  String get workflowFieldCheckNumber => 'شماره چک';
+
+  @override
+  String get workflowFieldDescCheckNumber => 'شمارهٔ چک';
+
+  @override
+  String get workflowFieldDueDate => 'تاریخ سررسید';
+
+  @override
+  String get workflowFieldDescDueDate => 'تاریخ سررسید چک یا تعهد';
+
+  @override
+  String get workflowFieldLogLevel => 'سطح لاگ';
+
+  @override
+  String get workflowFieldDescLogLevel => 'سطح ثبت‌شده در لاگ ورک‌فلو';
 
   @override
   String get workflowTemplateInvoiceSalesName => 'اطلاع‌رسانی فاکتور فروش';

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
-import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+import '../../constants/report_template_constants.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/web/web_utils.dart' as web_utils;
+import '../../widgets/data_table/helpers/file_saver.dart';
+import '../../widgets/report_template/embedded_pdf_iframe.dart';
 import 'report_template_visual_editor_page.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
@@ -43,1003 +49,294 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   final _marginRightCtrl = TextEditingController(text: '10');
   final _marginBottomCtrl = TextEditingController(text: '10');
   final _marginLeftCtrl = TextEditingController(text: '10');
+  /// اگر پر باشد، به‌جای مقدار کشوی «سایز صفحه» برای API استفاده می‌شود.
+  final _paperCustomCtrl = TextEditingController();
 
   bool get _canWrite => widget.authStore.hasBusinessPermission('report_templates', 'write');
 
-  Future<void> _openBuilderDialogAdvanced({Map<String, dynamic>? initialDesign, Map<String, dynamic>? initialAssets, int? existingTemplateId}) async {
-    Map<String, dynamic> design = {
-      'css': (initialDesign?['css'] ?? '').toString(),
-      'header': List<Map<String, dynamic>>.from((initialDesign?['header'] as List?) ?? const []),
-      'blocks': List<Map<String, dynamic>>.from((initialDesign?['blocks'] as List?) ?? const []),
-      'footer': List<Map<String, dynamic>>.from((initialDesign?['footer'] as List?) ?? const []),
+  /// فیلتر از پیش: all، انواع گزارش، یا custom برای ورود دستی module/subtype
+  String _filterPresetId = 'invoices_list';
+
+  void _applyScopePreset(String presetId) {
+    setState(() {
+      _filterPresetId = presetId;
+      switch (presetId) {
+        case 'all':
+          _moduleCtrl.clear();
+          _subtypeCtrl.clear();
+          break;
+        case 'invoices_list':
+          _moduleCtrl.text = 'invoices';
+          _subtypeCtrl.text = 'list';
+          break;
+        case 'invoices_detail':
+          _moduleCtrl.text = 'invoices';
+          _subtypeCtrl.text = 'detail';
+          break;
+        case 'receipts_payments_list':
+          _moduleCtrl.text = 'receipts_payments';
+          _subtypeCtrl.text = 'list';
+          break;
+        case 'receipts_payments_detail':
+          _moduleCtrl.text = 'receipts_payments';
+          _subtypeCtrl.text = 'detail';
+          break;
+        case 'expense_income_list':
+          _moduleCtrl.text = 'expense_income';
+          _subtypeCtrl.text = 'list';
+          break;
+        case 'documents_list':
+          _moduleCtrl.text = 'documents';
+          _subtypeCtrl.text = 'list';
+          break;
+        case 'documents_detail':
+          _moduleCtrl.text = 'documents';
+          _subtypeCtrl.text = 'detail';
+          break;
+        case 'transfers_list':
+          _moduleCtrl.text = 'transfers';
+          _subtypeCtrl.text = 'list';
+          break;
+        case 'transfers_detail':
+          _moduleCtrl.text = 'transfers';
+          _subtypeCtrl.text = 'detail';
+          break;
+        case 'custom':
+          break;
+      }
+    });
+    _fetch();
+  }
+
+  List<DropdownMenuItem<String>> _scopeDropdownItems(AppLocalizations t) {
+    return [
+      DropdownMenuItem(value: 'all', child: Text(t.reportTemplatesScopeAll)),
+      DropdownMenuItem(value: 'invoices_list', child: Text(t.presetInvoicesList)),
+      DropdownMenuItem(value: 'invoices_detail', child: Text(t.presetInvoicesDetail)),
+      DropdownMenuItem(value: 'receipts_payments_list', child: Text(t.presetReceiptsPaymentsList)),
+      DropdownMenuItem(value: 'receipts_payments_detail', child: Text(t.presetReceiptsPaymentsDetail)),
+      DropdownMenuItem(value: 'expense_income_list', child: Text(t.presetExpenseIncomeList)),
+      DropdownMenuItem(value: 'documents_list', child: Text(t.presetDocumentsList)),
+      DropdownMenuItem(value: 'documents_detail', child: Text(t.presetDocumentsDetail)),
+      DropdownMenuItem(value: 'transfers_list', child: Text(t.presetTransfersList)),
+      DropdownMenuItem(value: 'transfers_detail', child: Text(t.presetTransfersDetail)),
+      DropdownMenuItem(value: 'custom', child: Text(t.reportTemplatesScopeCustom)),
+    ];
+  }
+
+  String _statusLabel(AppLocalizations t, String status) {
+    if (status == 'published') return t.reportTemplateStatusPublished;
+    if (status == 'draft') return t.reportTemplateStatusDraft;
+    return status;
+  }
+
+  Map<String, dynamic>? _marginsFromFull(Map<String, dynamic> full) {
+    final m = (full['margins'] as Map?)?.cast<String, dynamic>();
+    if (m == null || m.isEmpty) return null;
+    double? p(String k) {
+      final v = m[k];
+      if (v == null) return null;
+      return double.tryParse(v.toString());
+    }
+    final map = <String, dynamic>{
+      if (p('top') != null) 'top': p('top'),
+      if (p('right') != null) 'right': p('right'),
+      if (p('bottom') != null) 'bottom': p('bottom'),
+      if (p('left') != null) 'left': p('left'),
     };
-    Map<String, dynamic> assets = {
-      'images': Map<String, String>.from(((initialAssets?['images']) as Map? ?? const <String, String>{})),
-    };
-    // history stacks
-    final List<String> _history = <String>[];
-    final List<String> _future = <String>[];
-    String _snap() => jsonEncode(design);
-    void _pushHistory() {
-      _history.add(_snap());
-      _future.clear();
+    return map.isEmpty ? null : map;
+  }
+
+  List<DropdownMenuItem<String>> _paperSizeDropdownItems(String? current) {
+    return [
+      ...kReportTemplatePaperSizeOptions.map(
+        (e) => DropdownMenuItem<String>(value: e, child: Text(e)),
+      ),
+      if (current != null &&
+          current.isNotEmpty &&
+          !kReportTemplatePaperSizeOptions.contains(current))
+        DropdownMenuItem<String>(value: current, child: Text(current)),
+    ];
+  }
+
+  String _effectivePaperSize() {
+    final c = _paperCustomCtrl.text.trim();
+    if (c.isEmpty) return _paperSize ?? 'A4';
+    return c.length > kReportTemplatePaperSizeMaxLength
+        ? c.substring(0, kReportTemplatePaperSizeMaxLength)
+        : c;
+  }
+
+  Future<void> _showExportPicker(AppLocalizations t) async {
+    if (_items.isEmpty) {
+      SnackBarHelper.show(context, message: t.reportTemplatePickExport);
+      return;
     }
-    void _undo(void Function(void Function()) setSt) {
-      if (_history.isEmpty) return;
-      _future.add(_snap());
-      final last = _history.removeLast();
-      final m = jsonDecode(last) as Map<String, dynamic>;
-      design = {
-        'css': (m['css'] ?? '').toString(),
-        'header': List<Map<String, dynamic>>.from((m['header'] as List?) ?? const []),
-        'blocks': List<Map<String, dynamic>>.from((m['blocks'] as List?) ?? const []),
-        'footer': List<Map<String, dynamic>>.from((m['footer'] as List?) ?? const []),
-      };
-      setSt(() {});
-    }
-    void _redo(void Function(void Function()) setSt) {
-      if (_future.isEmpty) return;
-      _history.add(_snap());
-      final next = _future.removeLast();
-      final m = jsonDecode(next) as Map<String, dynamic>;
-      design = {
-        'css': (m['css'] ?? '').toString(),
-        'header': List<Map<String, dynamic>>.from((m['header'] as List?) ?? const []),
-        'blocks': List<Map<String, dynamic>>.from((m['blocks'] as List?) ?? const []),
-        'footer': List<Map<String, dynamic>>.from((m['footer'] as List?) ?? const []),
-      };
-    }
-    final cssCtrl = TextEditingController(text: (design['css'] ?? '').toString());
-    await showDialog(
+    int? selectedId = (_items.first['id'] as num?)?.toInt();
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSt) {
-          List<Map<String, dynamic>> hdr = List<Map<String, dynamic>>.from(design['header'] as List);
-          List<Map<String, dynamic>> body = List<Map<String, dynamic>>.from(design['blocks'] as List);
-          List<Map<String, dynamic>> ftr = List<Map<String, dynamic>>.from(design['footer'] as List);
-          final t = AppLocalizations.of(context);
-          return AlertDialog(
-            title: Text(existingTemplateId == null ? t.templateBuilderNew : t.templateBuilderEdit),
-            content: SizedBox(
-              width: 860,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _undo(setSt),
-                          icon: const Icon(Icons.undo),
-                          label: Text(t.undo),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            _redo(setSt);
-                            setSt(() {});
-                          },
-                          icon: const Icon(Icons.redo),
-                          label: Text(t.redo),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    DefaultTabController(
-                      length: 3,
-                      child: Column(
-                        children: [
-                          TabBar(tabs: [
-                            Tab(text: t.header),
-                            Tab(text: t.body),
-                            Tab(text: t.footer),
-                          ]),
-                          SizedBox(
-                            height: 420,
-                            child: TabBarView(
-                              children: [
-                                _builderBlocksTab(ctx, setSt, hdr, onChanged: () {
-                                  design['header'] = hdr;
-                                  _pushHistory();
-                                }),
-                                _builderBlocksTab(ctx, setSt, body, onChanged: () {
-                                  design['blocks'] = body;
-                                  _pushHistory();
-                                }),
-                                _builderBlocksTab(ctx, setSt, ftr, onChanged: () {
-                                  design['footer'] = ftr;
-                                  _pushHistory();
-                                }),
-                              ],
-                            ),
-                          ),
-                        ],
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(t.reportTemplateExportJson),
+          content: StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return DropdownButtonFormField<int>(
+                value: selectedId,
+                decoration: InputDecoration(labelText: t.reportTemplatePickExport),
+                items: _items
+                    .map(
+                      (it) => DropdownMenuItem<int>(
+                        value: (it['id'] as num).toInt(),
+                        child: Text(it['name']?.toString() ?? '-'),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(t.globalCssOptional, style: Theme.of(context).textTheme.titleSmall),
-                    TextField(
-                      controller: cssCtrl,
-                      maxLines: 4,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'styles...'),
-                      onChanged: (v) => design['css'] = v,
-                    ),
-                    const SizedBox(height: 12),
-                    // برای ثبت تصاویر می‌توانید نام asset را در بلوک Image تنظیم کنید
-                    // و Data URI را مستقیماً در همان بلوک وارد کنید.
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        try {
-                          final res = await _service.preview(
-                            businessId: widget.businessId,
-                            engine: 'builder',
-                            design: design,
-                            assets: assets,
-                            context: const <String, dynamic>{},
-                          );
-                          if (!mounted) return;
-                          final html = (res['html'] ?? '').toString();
-                          await showDialog(
-                            context: context,
-                            builder: (pvCtx) {
-                              final t2 = AppLocalizations.of(context);
-                              return AlertDialog(
-                                title: Text(t2.previewHtmlOutput),
-                                content: SizedBox(
-                                  width: 800,
-                                  child: SingleChildScrollView(
-                                    child: SelectableText(html.isEmpty ? t2.empty : html),
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(pvCtx), child: Text(t2.close)),
-                                ],
-                              );
-                            },
-                          );
-                        } catch (e) {
-                          if (!mounted) return;
-                          SnackBarHelper.showError(context, message: t.previewError(e.toString()));
-                        }
-                      },
-                      icon: const Icon(Icons.visibility),
-                      label: Text(t.previewPdf),
-                    ),
-                  ],
+                    )
+                    .toList(),
+                onChanged: (v) => setLocal(() => selectedId = v),
+              );
+            },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.reportTemplateExportJson)),
+          ],
+        );
+      },
+    );
+    if (ok != true || selectedId == null || !mounted) return;
+    Map<String, dynamic>? found;
+    for (final e in _items) {
+      if ((e['id'] as num).toInt() == selectedId) {
+        found = e;
+        break;
+      }
+    }
+    if (found == null) return;
+    await _exportTemplateJson(found, t);
+  }
+
+  Future<void> _exportTemplateJson(Map<String, dynamic> item, AppLocalizations t) async {
+    try {
+      final full = await _service.getTemplate(
+        businessId: widget.businessId,
+        templateId: (item['id'] as num).toInt(),
+      );
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: Text(t.reportTemplateExportThis),
+            content: SizedBox(
+              width: 700,
+              height: 400,
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  JsonEncoder.withIndent('  ').convert({
+                    'module_key': full['module_key'],
+                    'subtype': full['subtype'],
+                    'engine': full['engine'],
+                    'name': full['name'],
+                    'description': full['description'],
+                    'content_html': full['content_html'],
+                    'content_css': full['content_css'],
+                    'header_html': full['header_html'],
+                    'footer_html': full['footer_html'],
+                    'paper_size': full['paper_size'],
+                    'orientation': full['orientation'],
+                    'margins': full['margins'],
+                    'assets': full['assets'],
+                  }),
                 ),
               ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    if (existingTemplateId == null) {
-                      final id = await _service.createTemplate(
-                        businessId: widget.businessId,
-                        moduleKey: _moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim(),
-                        subtype: _subtypeCtrl.text.trim().isEmpty ? 'detail' : _subtypeCtrl.text.trim(),
-                        name: _nameCtrl.text.trim().isEmpty ? 'Template (Builder)' : _nameCtrl.text.trim(),
-                        description: _descCtrl.text.trim().isEmpty ? 'Created by visual builder' : _descCtrl.text.trim(),
-                        contentHtml: '<html><body></body></html>',
-                        assets: {'builder_design': design, ...assets},
-                        engine: 'builder',
-                        paperSize: _paperSize,
-                        orientation: _orientation,
-                      );
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      SnackBarHelper.showSuccess(ctx, message: t.createdWithId(id));
-                    } else {
-                      await _service.updateTemplate(
-                        businessId: widget.businessId,
-                        templateId: existingTemplateId,
-                        changes: {'assets': {'builder_design': design, ...assets}, 'engine': 'builder'},
-                      );
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      SnackBarHelper.show(ctx, message: t.updated);
-                    }
-                    await _fetch();
-                  } catch (e) {
-                    if (!mounted) return;
-                    SnackBarHelper.showError(context, message: '${t.error}: $e');
-                  }
-                },
-                child: Text(existingTemplateId == null ? t.createTemplateBuilder : t.saveChanges),
-              ),
             ],
           );
         },
-      ),
-    );
-
+      );
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: '$e');
+    }
   }
 
-  Widget _builderBlocksTab(BuildContext context, void Function(void Function()) setSt, List<Map<String, dynamic>> blocks, {required VoidCallback onChanged}) {
-    final t = AppLocalizations.of(context);
-    return Column(
-      children: [
-        Row(
-          children: [
-            FilledButton.icon(
-              onPressed: () {
-                blocks.add({'type': 'text', 'props': {'text': 'متن {{ title_text }}', 'align': 'right', 'showIf': ''}});
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.text_fields, size: 18),
-              label: Text(t.addText),
+  Future<void> _importJsonFlow(AppLocalizations t) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.reportTemplateImportJson),
+        content: SizedBox(
+          width: 700,
+          child: TextField(
+            controller: ctrl,
+            minLines: 10,
+            maxLines: 18,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: t.reportTemplateImportJson,
             ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({'type': 'divider', 'props': {'thickness': 1.0, 'showIf': ''}});
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.horizontal_rule, size: 18),
-              label: Text(t.divider),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({'type': 'spacer', 'props': {'height': 12.0, 'showIf': ''}});
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.space_bar, size: 18),
-              label: Text(t.spacer),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({'type': 'image', 'props': {'src': 'https://example.com/logo.png', 'width': 120, 'height': null, 'alt': 'Logo', 'showIf': ''}});
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.image_outlined, size: 18),
-              label: Text(t.addImage),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({'type': 'qr', 'props': {'src': 'asset:qr', 'size': 120, 'showIf': ''}});
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.qr_code, size: 18),
-              label: Text(t.addQr),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                // اطلاعات طرفین
-                blocks.addAll([
-                  {'type': 'text', 'props': {'text': '<b>فروشنده:</b> {{ business.name }} — {{ business.address|default(\'\') }}', 'align': 'right', 'showIf': ''}},
-                  {'type': 'text', 'props': {'text': '<b>خریدار:</b> {{ invoice.customer.name }} — {{ invoice.customer.address|default(\'\') }}', 'align': 'right', 'showIf': ''}},
-                ]);
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.people_alt_outlined, size: 18),
-              label: Text(t.partyInfo),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({
-                  'type': 'totals',
-                  'props': {
-                    'items': [
-                      {'title': 'جمع اقلام', 'expr': "items|sum(attribute='amount')", 'format': 'money'},
-                      {'title': 'مالیات', 'expr': "tax_total", 'format': 'money'},
-                      {'title': 'جمع کل', 'expr': "grand_total", 'format': 'money'},
-                    ],
-                    'showIf': '',
-                  },
-                });
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.summarize, size: 18),
-              label: Text(t.addTotals),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                // مهر/امضا به‌صورت تصاویر asset
-                blocks.addAll([
-                  {'type': 'image', 'props': {'src': 'asset:stamp', 'width': 140, 'height': null, 'alt': 'Stamp', 'showIf': ''}},
-                  {'type': 'image', 'props': {'src': 'asset:sign', 'width': 140, 'height': null, 'alt': 'Signature', 'showIf': ''}},
-                ]);
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.edit, size: 18),
-              label: Text(t.stampSignature),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                // واترمارک متنی ساده
-                blocks.add({
-                  'type': 'text',
-                  'props': {
-                    'text': '<div style="position:relative;"><span style="opacity:0.15; font-size:64px; transform:rotate(-30deg); display:inline-block;">WATERMARK</span></div>',
-                    'align': 'center',
-                    'showIf': ''
-                  },
-                });
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.water_damage_outlined, size: 18),
-              label: Text(t.watermark),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {
-                blocks.add({
-                  'type': 'table',
-                  'props': {
-                    'items': 'items',
-                    'columns': [
-                      {'key': 'name', 'title': 'نام', 'format': ''},
-                      {'key': 'qty', 'title': 'تعداد', 'format': ''},
-                      {'key': 'price', 'title': 'قیمت', 'format': 'money'},
-                      {'key': 'amount', 'title': 'مبلغ', 'format': 'money'},
-                    ],
-                    'showIf': '',
-                  },
-                });
-                onChanged();
-                setSt(() {});
-              },
-              icon: const Icon(Icons.table_chart, size: 18),
-              label: Text(t.addTable),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: ReorderableListView.builder(
-            itemCount: blocks.length,
-            onReorder: (oldIndex, newIndex) {
-              if (newIndex > oldIndex) newIndex -= 1;
-              final item = blocks.removeAt(oldIndex);
-              blocks.insert(newIndex, item);
-              onChanged();
-              setSt(() {});
-            },
-            itemBuilder: (c, i) {
-              final b = blocks[i];
-              final type = (b['type'] ?? '').toString();
-              if (type == 'text') {
-                final textCtrl = TextEditingController(text: (b['props']?['text'] ?? '').toString());
-                final showIfCtrl = TextEditingController(text: (b['props']?['showIf'] ?? '').toString());
-                String align = (b['props']?['align'] ?? '').toString();
-                return Card(
-                  key: ValueKey('text_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.text_fields),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: TextField(
-                                controller: textCtrl,
-                                decoration: InputDecoration(labelText: t.textWithVariable),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['text'] = v;
-                                },
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Duplicate',
-                              onPressed: () {
-                                blocks.insert(i + 1, Map<String, dynamic>.from(b));
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.copy),
-                            ),
-                            IconButton(
-                              tooltip: 'Up',
-                              onPressed: i == 0 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i - 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_upward),
-                            ),
-                            IconButton(
-                              tooltip: 'Down',
-                              onPressed: i >= blocks.length - 1 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i + 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_downward),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                blocks.removeAt(i);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 160,
-                              child: DropdownButtonFormField<String>(
-                                value: (align.isEmpty ? null : align),
-                                items: [
-                                  DropdownMenuItem(value: 'left', child: Text(t.left)),
-                                  DropdownMenuItem(value: 'center', child: Text(t.center)),
-                                  DropdownMenuItem(value: 'right', child: Text(t.right)),
-                                ],
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['align'] = v ?? '';
-                                },
-                                decoration: InputDecoration(labelText: t.alignment),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: showIfCtrl,
-                                decoration: InputDecoration(labelText: t.showIfCondition),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['showIf'] = v;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else if (type == 'image') {
-                final srcCtrl = TextEditingController(text: (b['props']?['src'] ?? '').toString());
-                final altCtrl = TextEditingController(text: (b['props']?['alt'] ?? '').toString());
-                final showIfCtrl = TextEditingController(text: (b['props']?['showIf'] ?? '').toString());
-                final widthCtrl = TextEditingController(text: (b['props']?['width']?.toString() ?? ''));
-                final heightCtrl = TextEditingController(text: (b['props']?['height']?.toString() ?? ''));
-                return Card(
-                  key: ValueKey('img_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.image_outlined),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: srcCtrl,
-                                decoration: const InputDecoration(labelText: 'src (URL یا {{ var }})'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['src'] = v;
-                                },
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                blocks.removeAt(i);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: widthCtrl,
-                                decoration: const InputDecoration(labelText: 'width (px)'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  if (v.trim().isEmpty) {
-                                    b['props']['width'] = null;
-                                  } else {
-                                    final n = int.tryParse(v.trim());
-                                    if (n == null) {
-                                      b['props']['width'] = null;
-                                    } else {
-                                      final step = 4;
-                                      b['props']['width'] = ((n / step).round() * step);
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: TextField(
-                                controller: heightCtrl,
-                                decoration: const InputDecoration(labelText: 'height (px)'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  if (v.trim().isEmpty) {
-                                    b['props']['height'] = null;
-                                  } else {
-                                    final n = int.tryParse(v.trim());
-                                    if (n == null) {
-                                      b['props']['height'] = null;
-                                    } else {
-                                      final step = 4;
-                                      b['props']['height'] = ((n / step).round() * step);
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: TextField(
-                                controller: altCtrl,
-                                decoration: const InputDecoration(labelText: 'alt'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['alt'] = v;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                decoration: const InputDecoration(labelText: 'asset name (assets.images[name])'),
-                                onSubmitted: (v) {
-                                  if (v.trim().isEmpty) return;
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['src'] = 'asset:${v.trim()}';
-                                  srcCtrl.text = b['props']['src'];
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                decoration: const InputDecoration(labelText: 'data URI (paste)'),
-                                onSubmitted: (v) {
-                                  if (v.trim().isEmpty) return;
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['src'] = v.trim();
-                                  srcCtrl.text = b['props']['src'];
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              try {
-                                final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-                                final f = res?.files.isNotEmpty == true ? res!.files.first : null;
-                                if (f == null) return;
-                                final bytes = f.bytes;
-                                if (bytes == null) return;
-                                String ext = '';
-                                if (f.extension != null && f.extension!.isNotEmpty) {
-                                  ext = f.extension!.toLowerCase();
-                                } else if (f.name.contains('.')) {
-                                  ext = f.name.split('.').last.toLowerCase();
-                                }
-                                String mime = 'image/png';
-                                if (ext == 'jpg' || ext == 'jpeg') mime = 'image/jpeg';
-                                if (ext == 'gif') mime = 'image/gif';
-                                final dataUri = 'data:$mime;base64,${base64Encode(bytes)}';
-                                b['props'] ??= <String, dynamic>{};
-                                b['props']['src'] = dataUri;
-                                srcCtrl.text = dataUri;
-                                (context as Element).markNeedsBuild();
-                              } catch (_) {}
-                            },
-                            icon: const Icon(Icons.file_upload, size: 18),
-                            label: const Text('انتخاب فایل و درج Data URI'),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: showIfCtrl,
-                          decoration: const InputDecoration(labelText: 'showIf (اختیاری، Jinja condition)'),
-                          onChanged: (v) {
-                            b['props'] ??= <String, dynamic>{};
-                            b['props']['showIf'] = v;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else if (type == 'table') {
-                final itemsVarCtrl = TextEditingController(text: (b['props']?['items'] ?? 'items').toString());
-                final cols = List<Map<String, dynamic>>.from((b['props']?['columns'] as List?) ?? const []);
-                final showIfCtrl = TextEditingController(text: (b['props']?['showIf'] ?? '').toString());
-                return Card(
-                  key: ValueKey('table_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.table_chart),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: itemsVarCtrl,
-                                decoration: const InputDecoration(labelText: 'نام آرایه (مثلاً items)'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['items'] = v;
-                                },
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                blocks.removeAt(i);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            ...cols.asMap().entries.map((e) {
-                              final col = e.value;
-                              final keyCtrl = TextEditingController(text: (col['key'] ?? '').toString());
-                              final titleCtrl = TextEditingController(text: (col['title'] ?? '').toString());
-                              return SizedBox(
-                                width: 280,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: keyCtrl,
-                                        decoration: const InputDecoration(labelText: 'key'),
-                                        onChanged: (v) {
-                                          col['key'] = v;
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: titleCtrl,
-                                        decoration: const InputDecoration(labelText: 'title'),
-                                        onChanged: (v) {
-                                          col['title'] = v;
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          children: cols.asMap().entries.map((e) {
-                            final col = e.value;
-                            String fmt = (col['format'] ?? '').toString();
-                            return DropdownButton<String>(
-                              value: fmt.isEmpty ? null : fmt,
-                              hint: const Text('format'),
-                              items: const [
-                                DropdownMenuItem(value: 'money', child: Text('money')),
-                                DropdownMenuItem(value: 'date', child: Text('date')),
-                                DropdownMenuItem(value: '', child: Text('none')),
-                              ],
-                              onChanged: (v) {
-                                col['format'] = v ?? '';
-                                setSt(() {});
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: showIfCtrl,
-                          decoration: const InputDecoration(labelText: 'showIf (اختیاری، Jinja condition)'),
-                          onChanged: (v) {
-                            b['props'] ??= <String, dynamic>{};
-                            b['props']['showIf'] = v;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else if (type == 'totals') {
-                final items = List<Map<String, dynamic>>.from((b['props']?['items'] as List?) ?? const []);
-                final showIfCtrl = TextEditingController(text: (b['props']?['showIf'] ?? '').toString());
-                return Card(
-                  key: ValueKey('totals_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.summarize),
-                            const SizedBox(width: 8),
-                            Text('Totals', style: Theme.of(context).textTheme.titleMedium),
-                            const Spacer(),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                items.add({'title': 'آیتم', 'expr': '0', 'format': ''});
-                                b['props'] ??= <String, dynamic>{};
-                                b['props']['items'] = items;
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('افزودن ردیف'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...items.asMap().entries.map((e) {
-                          final idx = e.key;
-                          final it = e.value;
-                          final titleCtrl = TextEditingController(text: (it['title'] ?? '').toString());
-                          final exprCtrl = TextEditingController(text: (it['expr'] ?? '').toString());
-                          String fmt = (it['format'] ?? '').toString();
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 6.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: titleCtrl,
-                                    decoration: const InputDecoration(labelText: 'عنوان'),
-                                    onChanged: (v) => it['title'] = v,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: TextField(
-                                    controller: exprCtrl,
-                                    decoration: const InputDecoration(labelText: 'expr (مثلاً items|sum(attribute=\"amount\"))'),
-                                    onChanged: (v) => it['expr'] = v,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                DropdownButton<String>(
-                                  value: fmt.isEmpty ? null : fmt,
-                                  hint: const Text('format'),
-                                  items: const [
-                                    DropdownMenuItem(value: 'money', child: Text('money')),
-                                    DropdownMenuItem(value: 'date', child: Text('date')),
-                                    DropdownMenuItem(value: '', child: Text('none')),
-                                  ],
-                                  onChanged: (v) {
-                                    it['format'] = v ?? '';
-                                    setSt(() {});
-                                  },
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    items.removeAt(idx);
-                                    b['props'] ??= <String, dynamic>{};
-                                    b['props']['items'] = items;
-                                    setSt(() {});
-                                  },
-                                  icon: const Icon(Icons.delete_outline),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: showIfCtrl,
-                          decoration: const InputDecoration(labelText: 'showIf (اختیاری، Jinja condition)'),
-                          onChanged: (v) {
-                            b['props'] ??= <String, dynamic>{};
-                            b['props']['showIf'] = v;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else if (type == 'divider') {
-                final thicknessCtrl = TextEditingController(text: (b['props']?['thickness']?.toString() ?? '1'));
-                return Card(
-                  key: ValueKey('divider_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.horizontal_rule),
-                            const SizedBox(width: 8),
-                            const Text('Divider'),
-                            const Spacer(),
-                            IconButton(
-                              tooltip: 'Duplicate',
-                              onPressed: () {
-                                blocks.insert(i + 1, Map<String, dynamic>.from(b));
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.copy),
-                            ),
-                            IconButton(
-                              tooltip: 'Up',
-                              onPressed: i == 0 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i - 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_upward),
-                            ),
-                            IconButton(
-                              tooltip: 'Down',
-                              onPressed: i >= blocks.length - 1 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i + 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_downward),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                blocks.removeAt(i);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: thicknessCtrl,
-                                decoration: const InputDecoration(labelText: 'thickness (px)'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['thickness'] = double.tryParse(v.trim()) ?? 1.0;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else if (type == 'spacer') {
-                final heightCtrl = TextEditingController(text: (b['props']?['height']?.toString() ?? '12'));
-                return Card(
-                  key: ValueKey('spacer_$i'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.space_bar),
-                            const SizedBox(width: 8),
-                            const Text('Spacer'),
-                            const Spacer(),
-                            IconButton(
-                              tooltip: 'Duplicate',
-                              onPressed: () {
-                                blocks.insert(i + 1, Map<String, dynamic>.from(b));
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.copy),
-                            ),
-                            IconButton(
-                              tooltip: 'Up',
-                              onPressed: i == 0 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i - 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_upward),
-                            ),
-                            IconButton(
-                              tooltip: 'Down',
-                              onPressed: i >= blocks.length - 1 ? null : () {
-                                final cur = blocks.removeAt(i);
-                                blocks.insert(i + 1, cur);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.arrow_downward),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                blocks.removeAt(i);
-                                onChanged();
-                                setSt(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: heightCtrl,
-                                decoration: const InputDecoration(labelText: 'height (px)'),
-                                onChanged: (v) {
-                                  b['props'] ??= <String, dynamic>{};
-                                  b['props']['height'] = double.tryParse(v.trim()) ?? 12.0;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return ListTile(key: ValueKey('blk_$i'), title: Text(t.blockType(type)));
-            },
           ),
         ),
-      ],
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.create)),
+        ],
+      ),
     );
+    if (ok != true || !mounted) return;
+    try {
+      final data = jsonDecode(ctrl.text) as Map<String, dynamic>;
+      setState(() {
+        _filterPresetId = 'custom';
+        _moduleCtrl.text = (data['module_key'] ?? _moduleCtrl.text).toString();
+        _subtypeCtrl.text = (data['subtype'] ?? _subtypeCtrl.text).toString();
+        _nameCtrl.text = (data['name'] ?? _nameCtrl.text).toString();
+        _descCtrl.text = (data['description'] ?? _descCtrl.text).toString();
+        _htmlCtrl.text = (data['content_html'] ?? _htmlCtrl.text).toString();
+        _cssCtrl.text = (data['content_css'] ?? _cssCtrl.text).toString();
+        _headerCtrl.text = (data['header_html'] ?? _headerCtrl.text).toString();
+        _footerCtrl.text = (data['footer_html'] ?? _footerCtrl.text).toString();
+        _paperSize = (data['paper_size'] ?? _paperSize)?.toString();
+        _paperCustomCtrl.clear();
+        _orientation = (data['orientation'] ?? _orientation)?.toString();
+        final margins = (data['margins'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+        _marginTopCtrl.text = (margins['top']?.toString() ?? _marginTopCtrl.text);
+        _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
+        _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
+        _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
+      });
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.reportTemplateImportDoneOpenHtml);
+      await _createDialog();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: 'JSON نامعتبر: $e');
+    }
   }
+
   @override
   void initState() {
     super.initState();
     _service = ReportTemplateService(ApiClient());
     _fetch();
+  }
+
+  @override
+  void dispose() {
+    _moduleCtrl.dispose();
+    _subtypeCtrl.dispose();
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _htmlCtrl.dispose();
+    _cssCtrl.dispose();
+    _headerCtrl.dispose();
+    _footerCtrl.dispose();
+    _marginTopCtrl.dispose();
+    _marginRightCtrl.dispose();
+    _marginBottomCtrl.dispose();
+    _marginLeftCtrl.dispose();
+    _paperCustomCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _fetch() async {
@@ -1051,11 +348,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
         status: _statusFilter,
       );
-      setState(() {
-        _items = items;
-      });
+      if (mounted) {
+        setState(() => _items = items);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: AppLocalizations.of(context).reportTemplatesLoadError('$e'),
+        );
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -1065,7 +369,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(t.templates),
+          title: Text(t.reportTemplateNewHtml),
           content: SizedBox(
             width: 700,
             child: SingleChildScrollView(
@@ -1094,10 +398,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                             isDense: true,
                             border: const OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'A4', child: Text('A4')),
-                            DropdownMenuItem(value: 'Letter', child: Text('Letter')),
-                          ],
+                          items: _paperSizeDropdownItems(_paperSize),
                           onChanged: (v) => setState(() => _paperSize = v),
                         ),
                       ),
@@ -1193,6 +494,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _paperCustomCtrl,
+                    maxLength: kReportTemplatePaperSizeMaxLength,
+                    decoration: const InputDecoration(
+                      labelText: 'سایز سفارشی کاغذ (اختیاری)',
+                      helperText:
+                          'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   DefaultTabController(
@@ -1290,7 +603,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     contentCss: _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
                     headerHtml: _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
                     footerHtml: _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                    paperSize: _paperSize,
+                    paperSize: _effectivePaperSize(),
                     orientation: _orientation,
                     margins: margins,
                   );
@@ -1323,26 +636,230 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
   Future<void> _previewTemplate(Map<String, dynamic> item) async {
+    final t = AppLocalizations.of(context);
+    var loadingOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const AlertDialog(
+        content: SizedBox(
+          width: 72,
+          height: 72,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    );
+    Map<String, dynamic>? builderDesign;
+    Map<String, dynamic>? builderAssets;
     try {
       final full = await _service.getTemplate(
         businessId: widget.businessId,
         templateId: (item['id'] as num).toInt(),
       );
-      final res = await _service.preview(
-        businessId: widget.businessId,
-        contentHtml: (full['content_html'] ?? '').toString(),
-        contentCss: (full['content_css'] ?? '').toString().isEmpty ? null : (full['content_css'] ?? '').toString(),
-        headerHtml: (full['header_html'] ?? '').toString().isEmpty ? null : (full['header_html'] ?? '').toString(),
-        footerHtml: (full['footer_html'] ?? '').toString().isEmpty ? null : (full['footer_html'] ?? '').toString(),
-        context: const <String, dynamic>{},
+      final engine = (full['engine'] ?? 'jinja2').toString().toLowerCase();
+      final Map<String, dynamic> res;
+      if (engine == 'builder') {
+        builderAssets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? {};
+        builderDesign = (builderAssets['builder_design'] as Map?)?.cast<String, dynamic>();
+        if (builderDesign == null) {
+          throw StateError('طرح سازندهٔ بصری خالی است');
+        }
+        res = await _service.preview(
+          businessId: widget.businessId,
+          engine: 'builder',
+          design: builderDesign,
+          assets: builderAssets,
+          context: const <String, dynamic>{},
+        );
+      } else {
+        res = await _service.preview(
+          businessId: widget.businessId,
+          contentHtml: (full['content_html'] ?? '').toString(),
+          contentCss: (full['content_css'] ?? '').toString().isEmpty ? null : (full['content_css'] ?? '').toString(),
+          headerHtml: (full['header_html'] ?? '').toString().isEmpty ? null : (full['header_html'] ?? '').toString(),
+          footerHtml: (full['footer_html'] ?? '').toString().isEmpty ? null : (full['footer_html'] ?? '').toString(),
+          context: const <String, dynamic>{},
+        );
+      }
+
+      List<int>? pdfBytes;
+      var pdfFetchFailed = false;
+      try {
+        final marginsMap = _marginsFromFull(full);
+        if (engine == 'builder' && builderDesign != null) {
+          pdfBytes = await _service.previewPdf(
+            businessId: widget.businessId,
+            engine: 'builder',
+            design: builderDesign,
+            assets: builderAssets,
+            context: const <String, dynamic>{},
+            paperSize: full['paper_size']?.toString(),
+            orientation: full['orientation']?.toString(),
+            margins: marginsMap,
+          );
+        } else {
+          pdfBytes = await _service.previewPdf(
+            businessId: widget.businessId,
+            contentHtml: (full['content_html'] ?? '').toString(),
+            contentCss: (full['content_css'] ?? '').toString().isEmpty ? null : (full['content_css'] ?? '').toString(),
+            headerHtml: (full['header_html'] ?? '').toString().isEmpty ? null : (full['header_html'] ?? '').toString(),
+            footerHtml: (full['footer_html'] ?? '').toString().isEmpty ? null : (full['footer_html'] ?? '').toString(),
+            paperSize: full['paper_size']?.toString(),
+            orientation: full['orientation']?.toString(),
+            margins: marginsMap,
+          );
+        }
+      } catch (_) {
+        pdfFetchFailed = true;
+        pdfBytes = null;
+      }
+
+      if (mounted && loadingOpen) {
+        Navigator.of(context).pop();
+        loadingOpen = false;
+      }
+      final html = (res['html'] ?? '').toString();
+      final lenFromPreview = res['content_length'] ?? 0;
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return DefaultTabController(
+            length: 2,
+            child: AlertDialog(
+              title: Text(t.reportTemplatePreviewTitle),
+              content: SizedBox(
+                width: 720,
+                height: 480,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TabBar(
+                      tabs: [
+                        Tab(text: t.reportTemplatePreviewHtmlTab),
+                        Tab(text: t.reportTemplatePreviewPdfTab),
+                      ],
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          SingleChildScrollView(
+                            child: SelectableText(html.isEmpty ? '—' : html),
+                          ),
+                          _listPreviewPdfPane(
+                            t,
+                            pdfBytes,
+                            lenFromPreview,
+                            pdfFetchFailed,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+              ],
+            ),
+          );
+        },
       );
-      if (!mounted) return;
-      final len = res['content_length'] ?? 0;
-      SnackBarHelper.show(context, message: 'پیش‌نمایش موفق (طول PDF: $len بایت)');
     } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
+      if (mounted) {
+        if (loadingOpen) {
+          Navigator.of(context).pop();
+          loadingOpen = false;
+        }
+        SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
+      }
     }
+  }
+
+  Widget _listPreviewPdfPane(
+    AppLocalizations t,
+    List<int>? pdfBytes,
+    int fallbackLen,
+    bool pdfFetchFailed,
+  ) {
+    if (pdfBytes != null && pdfBytes.isNotEmpty) {
+      final u8 = Uint8List.fromList(pdfBytes);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.reportTemplatePreviewPdfBytes('${pdfBytes.length}'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    try {
+                      if (kIsWeb) {
+                        await web_utils.saveBytesAsFileWeb(
+                          pdfBytes,
+                          'report_preview.pdf',
+                          mimeType: 'application/pdf',
+                        );
+                        if (mounted) {
+                          SnackBarHelper.show(context, message: 'دانلود PDF آغاز شد');
+                        }
+                      } else {
+                        final path = await FileSaver.saveBytes(pdfBytes, 'report_preview.pdf');
+                        if (mounted) {
+                          SnackBarHelper.show(
+                            context,
+                            message: path != null ? 'ذخیره شد: $path' : 'فایل ذخیره شد',
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        SnackBarHelper.showError(context, message: '$e');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('دانلود'),
+                ),
+                if (kIsWeb)
+                  TextButton.icon(
+                    onPressed: () {
+                      final url = web_utils.createObjectUrlFromBytes(
+                        pdfBytes,
+                        mimeType: 'application/pdf',
+                      );
+                      web_utils.openUrlInNewTabWeb(url);
+                    },
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('تب جدید'),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SizedBox.expand(
+              child: ReportTemplateEmbeddedPdf(bytes: u8),
+            ),
+          ),
+        ],
+      );
+    }
+    final msg = pdfFetchFailed
+        ? '${t.reportTemplatePreviewPdfBytes('$fallbackLen')}\n'
+            'تولید PDF برای پیش‌نمایش درون‌صفحه ناموفق بود؛ می‌توانید از پیش‌نمایش HTML استفاده کنید.'
+        : t.reportTemplatePreviewPdfBytes('$fallbackLen');
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(msg, textAlign: TextAlign.center),
+      ),
+    );
   }
 
   Future<void> _editDialog(Map<String, dynamic> item) async {
@@ -1362,6 +879,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       _footerCtrl.text = (full['footer_html'] ?? '').toString();
       _paperSize = (full['paper_size'] ?? _paperSize)?.toString();
       _orientation = (full['orientation'] ?? _orientation)?.toString();
+      _paperCustomCtrl.clear();
       final margins = (full['margins'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
       _marginTopCtrl.text = (margins['top']?.toString() ?? _marginTopCtrl.text);
       _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
@@ -1369,7 +887,23 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
     } catch (_) {}
 
-    if (!context.mounted) return;
+    if (!mounted) return;
+    if (isBuilder) {
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (context) => ReportTemplateVisualEditorPage(
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+            template: item,
+            moduleKey: full['module_key']?.toString(),
+            subtype: full['subtype']?.toString(),
+          ),
+        ),
+      );
+      if (result == true && mounted) await _fetch();
+      return;
+    }
+
     final ctx = context;
     await showDialog(
       context: ctx,
@@ -1382,31 +916,6 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (isBuilder)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(ctx); // Close current dialog
-                          final result = await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => ReportTemplateVisualEditorPage(
-                                businessId: widget.businessId,
-                                authStore: widget.authStore,
-                                template: item,
-                                moduleKey: _moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim(),
-                                subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
-                              ),
-                            ),
-                          );
-                          if (result == true) {
-                            await _fetch();
-                          }
-                        },
-                        icon: const Icon(Icons.view_quilt),
-                        label: const Text('ویرایش در سازنده بصری'),
-                      ),
-                    ),
                   TextField(
                     controller: _nameCtrl,
                     decoration: const InputDecoration(labelText: 'نام قالب'),
@@ -1425,10 +934,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         child: DropdownButtonFormField<String>(
                           value: _paperSize,
                           decoration: const InputDecoration(labelText: 'سایز صفحه', isDense: true, border: OutlineInputBorder()),
-                          items: const [
-                            DropdownMenuItem(value: 'A4', child: Text('A4')),
-                            DropdownMenuItem(value: 'Letter', child: Text('Letter')),
-                          ],
+                          items: _paperSizeDropdownItems(_paperSize),
                           onChanged: (v) => setState(() => _paperSize = v),
                         ),
                       ),
@@ -1520,6 +1026,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _paperCustomCtrl,
+                    maxLength: kReportTemplatePaperSizeMaxLength,
+                    decoration: const InputDecoration(
+                      labelText: 'سایز سفارشی کاغذ (اختیاری)',
+                      helperText:
+                          'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   DefaultTabController(
@@ -1620,7 +1138,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     'content_css': _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
                     'header_html': _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
                     'footer_html': _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                    'paper_size': _paperSize,
+                    'paper_size': _effectivePaperSize(),
                     'orientation': _orientation,
                     if (margins != null) 'margins': margins,
                   };
@@ -1658,10 +1176,13 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       ),
     );
     if (ok != true) return;
+    final mk = (item['module_key'] ?? '').toString().trim();
+    final stRaw = item['subtype'];
+    final String? st = stRaw == null ? null : stRaw.toString().trim().isEmpty ? null : stRaw.toString().trim();
     await _service.setDefault(
       businessId: widget.businessId,
-      moduleKey: (_moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim()),
-      subtype: (_subtypeCtrl.text.trim().isEmpty ? 'list' : _subtypeCtrl.text.trim()),
+      moduleKey: mk.isEmpty ? 'invoices' : mk,
+      subtype: st,
       templateId: (item['id'] as num).toInt(),
     );
     await _fetch();
@@ -1692,23 +1213,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text('${t.templates} (${_moduleCtrl.text}${_subtypeCtrl.text.isNotEmpty ? '/${_subtypeCtrl.text}' : ''})'),
+        title: Text(t.templates),
         actions: [
-          if (_canWrite)
+          if (_canWrite) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: FilledButton.icon(
-                onPressed: _createDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('قالب جدید'),
-              ),
-            ),
-          if (_canWrite)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: OutlinedButton.icon(
                 onPressed: () async {
-                  final result = await Navigator.of(context).push(
+                  final result = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (context) => ReportTemplateVisualEditorPage(
                         businessId: widget.businessId,
@@ -1718,129 +1230,35 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       ),
                     ),
                   );
-                  if (result == true) {
-                    await _fetch();
-                  }
+                  if (result == true && mounted) await _fetch();
                 },
                 icon: const Icon(Icons.view_quilt),
-                label: const Text('سازنده بصری'),
+                label: Text(t.reportTemplateNewVisual),
               ),
             ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              // Export: از آیتم انتخاب‌شده‌ای وجود ندارد؛ ساده‌ترین حالت: اگر تنها یک آیتم انتخاب نیست، پیغام
-              if (_items.isEmpty) {
-                SnackBarHelper.show(context, message: 'موردی برای خروجی وجود ندارد');
-                return;
-              }
-              try {
-                // فعلاً اولین مورد را به‌عنوان نمونه خروجی می‌گیریم؛ در آینده selection اضافه می‌شود
-                final item = _items.first;
-                if (!context.mounted) return;
-                final ctx = context;
-                final full = await _service.getTemplate(
-                  businessId: widget.businessId,
-                  templateId: (item['id'] as num).toInt(),
-                );
-                if (!ctx.mounted) return;
-                await showDialog(
-                  context: ctx,
-                  builder: (ctx) {
-                    return AlertDialog(
-                      title: const Text('خروجی JSON قالب'),
-                      content: SizedBox(
-                        width: 700,
-                          child: SingleChildScrollView(
-                          child: SelectableText(
-                            JsonEncoder.withIndent('  ').convert({
-                              'module_key': full['module_key'],
-                              'subtype': full['subtype'],
-                              'name': full['name'],
-                              'description': full['description'],
-                              'content_html': full['content_html'],
-                              'content_css': full['content_css'],
-                              'header_html': full['header_html'],
-                              'footer_html': full['footer_html'],
-                              'paper_size': full['paper_size'],
-                              'orientation': full['orientation'],
-                              'margins': full['margins'],
-                              'assets': full['assets'],
-                            }),
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
-                      ],
-                    );
-                  },
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                SnackBarHelper.showError(context, message: 'خطا در خروجی: $e');
-              }
-            },
-            icon: const Icon(Icons.file_download),
-            label: const Text('Export JSON'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final ctrl = TextEditingController();
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Import JSON'),
-                  content: SizedBox(
-                    width: 700,
-                    child: TextField(
-                      controller: ctrl,
-                      minLines: 10,
-                      maxLines: 18,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'JSON قالب را اینجا Paste کنید',
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ورود')),
-                  ],
-                ),
-              );
-              if (ok == true) {
-                if (!context.mounted) return;
-                final ctx = context;
-                try {
-                  final data = jsonDecode(ctrl.text) as Map<String, dynamic>;
-                  _moduleCtrl.text = (data['module_key'] ?? _moduleCtrl.text).toString();
-                  _subtypeCtrl.text = (data['subtype'] ?? _subtypeCtrl.text).toString();
-                  _nameCtrl.text = (data['name'] ?? _nameCtrl.text).toString();
-                  _descCtrl.text = (data['description'] ?? _descCtrl.text).toString();
-                  _htmlCtrl.text = (data['content_html'] ?? _htmlCtrl.text).toString();
-                  _cssCtrl.text = (data['content_css'] ?? _cssCtrl.text).toString();
-                  _headerCtrl.text = (data['header_html'] ?? _headerCtrl.text).toString();
-                  _footerCtrl.text = (data['footer_html'] ?? _footerCtrl.text).toString();
-                  _paperSize = (data['paper_size'] ?? _paperSize)?.toString();
-                  _orientation = (data['orientation'] ?? _orientation)?.toString();
-                  final margins = (data['margins'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-                  _marginTopCtrl.text = (margins['top']?.toString() ?? _marginTopCtrl.text);
-                  _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
-                  _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
-                  _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
-                  if (!ctx.mounted) return;
-                  SnackBarHelper.show(ctx, message: 'وارد شد. می‌توانید ذخیره کنید.');
-                } catch (e) {
-                  if (!ctx.mounted) return;
-                  SnackBarHelper.show(ctx, message: 'JSON نامعتبر: $e');
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: OutlinedButton.icon(
+                onPressed: _createDialog,
+                icon: const Icon(Icons.code),
+                label: Text(t.reportTemplateNewHtml),
+              ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: t.reportTemplateMoreMenu,
+              itemBuilder: (ctx) => [
+                PopupMenuItem(value: 'export', child: Text(t.reportTemplateExportJson)),
+                PopupMenuItem(value: 'import', child: Text(t.reportTemplateImportJson)),
+              ],
+              onSelected: (v) {
+                if (v == 'export') {
+                  _showExportPicker(t);
+                } else if (v == 'import') {
+                  _importJsonFlow(t);
                 }
-              }
-            },
-            icon: const Icon(Icons.file_upload),
-            label: const Text('Import JSON'),
-          ),
+              },
+            ),
+          ],
         ],
       ),
       body: Padding(
@@ -1848,24 +1266,52 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         child: Column(
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 200,
-                  child: TextField(
-                    controller: _moduleCtrl,
-                    decoration: const InputDecoration(labelText: 'module_key (مثلاً: invoices)'),
-                    onSubmitted: (_) => _fetch(),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _filterPresetId,
+                    decoration: InputDecoration(
+                      labelText: t.templates,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    isExpanded: true,
+                    items: _scopeDropdownItems(t),
+                    onChanged: (v) {
+                      if (v != null) _applyScopePreset(v);
+                    },
                   ),
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 160,
-                  child: TextField(
-                    controller: _subtypeCtrl,
-                    decoration: const InputDecoration(labelText: 'subtype (مثلاً: list یا detail)'),
-                    onSubmitted: (_) => _fetch(),
+                if (_filterPresetId == 'custom') ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 130,
+                    child: TextField(
+                      controller: _moduleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'module_key',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _fetch(),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 110,
+                    child: TextField(
+                      controller: _subtypeCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'subtype',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _fetch(),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () async {
@@ -1881,7 +1327,8 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       final keys = (data['keys'] as List? ?? const []).cast<Map>();
                       await showDialog(
                         context: ctx,
-                        builder: (ctx) {
+                        builder: (dctx) {
+                          final loc = AppLocalizations.of(dctx);
                           return AlertDialog(
                             title: const Text('متغیرهای قابل استفاده'),
                             content: SizedBox(
@@ -1897,11 +1344,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                       title: Text(name),
                                       subtitle: desc.isNotEmpty ? Text(desc) : null,
                                       trailing: IconButton(
-                                        tooltip: 'درج در HTML',
-                                        icon: const Icon(Icons.input),
-                                        onPressed: () {
+                                        tooltip: loc.reportTemplateCopyPlaceholder,
+                                        icon: const Icon(Icons.copy),
+                                        onPressed: () async {
+                                          await Clipboard.setData(ClipboardData(text: '{{ $name }}'));
                                           _htmlCtrl.text += '{{ $name }}';
-                                          (ctx as Element).markNeedsBuild();
+                                          if (dctx.mounted) {
+                                            SnackBarHelper.show(dctx, message: loc.reportTemplateCopied);
+                                          }
                                         },
                                       ),
                                     );
@@ -1910,7 +1360,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               ),
                             ),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
+                              TextButton(onPressed: () => Navigator.pop(dctx), child: Text(loc.close)),
                             ],
                           );
                         },
@@ -1950,59 +1400,39 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 children: [
                   ActionChip(
                     label: Text(t.presetInvoicesList),
-                    onPressed: () {
-                      _moduleCtrl.text = 'invoices';
-                      _subtypeCtrl.text = 'list';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('invoices_list'),
                   ),
                   ActionChip(
                     label: Text(t.presetInvoicesDetail),
-                    onPressed: () {
-                      _moduleCtrl.text = 'invoices';
-                      _subtypeCtrl.text = 'detail';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('invoices_detail'),
                   ),
                   ActionChip(
                     label: Text(t.presetReceiptsPaymentsList),
-                    onPressed: () {
-                      _moduleCtrl.text = 'receipts_payments';
-                      _subtypeCtrl.text = 'list';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('receipts_payments_list'),
                   ),
                   ActionChip(
                     label: Text(t.presetReceiptsPaymentsDetail),
-                    onPressed: () {
-                      _moduleCtrl.text = 'receipts_payments';
-                      _subtypeCtrl.text = 'detail';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('receipts_payments_detail'),
                   ),
                   ActionChip(
                     label: Text(t.presetExpenseIncomeList),
-                    onPressed: () {
-                      _moduleCtrl.text = 'expense_income';
-                      _subtypeCtrl.text = 'list';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('expense_income_list'),
                   ),
                   ActionChip(
                     label: Text(t.presetDocumentsList),
-                    onPressed: () {
-                      _moduleCtrl.text = 'documents';
-                      _subtypeCtrl.text = 'list';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('documents_list'),
                   ),
                   ActionChip(
                     label: Text(t.presetDocumentsDetail),
-                    onPressed: () {
-                      _moduleCtrl.text = 'documents';
-                      _subtypeCtrl.text = 'detail';
-                      _fetch();
-                    },
+                    onPressed: () => _applyScopePreset('documents_detail'),
+                  ),
+                  ActionChip(
+                    label: Text(t.presetTransfersList),
+                    onPressed: () => _applyScopePreset('transfers_list'),
+                  ),
+                  ActionChip(
+                    label: Text(t.presetTransfersDetail),
+                    onPressed: () => _applyScopePreset('transfers_detail'),
                   ),
                 ],
               ),
@@ -2017,54 +1447,132 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           clipBehavior: Clip.antiAlias,
                           child: ListView.separated(
                             itemCount: _items.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            separatorBuilder: (_, _) => const Divider(height: 1),
                             itemBuilder: (ctx, idx) {
                               final it = _items[idx];
                               final isDefault = it['is_default'] == true;
                               final status = (it['status'] ?? '').toString();
+                              final updated = it['updated_at']?.toString() ?? '';
                               return ListTile(
                                 title: Text(it['name']?.toString() ?? '-'),
-                                subtitle: Text(
-                                  'status: $status   module: ${it['module_key']}   subtype: ${it['subtype'] ?? '-'}   version: ${it['version'] ?? '-'}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                leading: Icon(isDefault ? Icons.star : Icons.description),
-                                trailing: Row(
+                                isThreeLine: true,
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (_canWrite)
-                                      IconButton(
-                                        tooltip: status == 'published' ? 'به پیش‌نویس برگردان' : 'انتشار',
-                                        onPressed: () => _togglePublish(it),
-                                        icon: Icon(status == 'published' ? Icons.visibility_off : Icons.publish),
-                                      ),
-                                    if (_canWrite)
-                                      IconButton(
-                                        tooltip: 'پیش‌نمایش',
-                                        onPressed: () => _previewTemplate(it),
-                                        icon: const Icon(Icons.visibility),
-                                      ),
-                                    if (_canWrite)
-                                      IconButton(
-                                        tooltip: 'ویرایش',
-                                        onPressed: () => _editDialog(it),
-                                        icon: const Icon(Icons.edit),
-                                      ),
-                                    if (_canWrite)
-                                      IconButton(
-                                        tooltip: 'تنظیم به‌عنوان پیش‌فرض',
-                                        onPressed: () => _setDefault(it),
-                                        icon: const Icon(Icons.star),
-                                      ),
-                                    if (_canWrite)
-                                      IconButton(
-                                        tooltip: 'حذف',
-                                        onPressed: () => _delete(it),
-                                        icon: const Icon(Icons.delete_outline),
-                                      ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        Chip(
+                                          visualDensity: VisualDensity.compact,
+                                          label: Text(_statusLabel(t, status)),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        if (isDefault)
+                                          Chip(
+                                            visualDensity: VisualDensity.compact,
+                                            avatar: const Icon(Icons.star, size: 16),
+                                            label: Text(t.reportTemplateDefaultBadge),
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${it['module_key'] ?? '-'} / ${it['subtype'] ?? '—'} · v${it['version'] ?? '-'}'
+                                      '${updated.isNotEmpty ? ' · $updated' : ''}',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ],
                                 ),
+                                leading: Icon(isDefault ? Icons.star : Icons.description),
+                                trailing: _canWrite
+                                    ? PopupMenuButton<String>(
+                                        tooltip: t.reportTemplateRowActions,
+                                        itemBuilder: (pmCtx) => [
+                                          PopupMenuItem(
+                                            value: 'preview',
+                                            child: ListTile(
+                                              leading: const Icon(Icons.visibility),
+                                              title: Text(t.reportTemplatePreview),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: ListTile(
+                                              leading: const Icon(Icons.edit),
+                                              title: Text(t.reportTemplateEdit),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'publish',
+                                            child: ListTile(
+                                              leading: Icon(status == 'published' ? Icons.visibility_off : Icons.publish),
+                                              title: Text(status == 'published' ? t.reportTemplateUnpublish : t.reportTemplatePublish),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'default',
+                                            child: ListTile(
+                                              leading: const Icon(Icons.star_outline),
+                                              title: Text(t.reportTemplateSetDefault),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'export',
+                                            child: ListTile(
+                                              leading: const Icon(Icons.file_download_outlined),
+                                              title: Text(t.reportTemplateExportThis),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: ListTile(
+                                              leading: const Icon(Icons.delete_outline),
+                                              title: Text(t.reportTemplateDelete),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                        ],
+                                        onSelected: (v) {
+                                          switch (v) {
+                                            case 'preview':
+                                              _previewTemplate(it);
+                                              break;
+                                            case 'edit':
+                                              _editDialog(it);
+                                              break;
+                                            case 'publish':
+                                              _togglePublish(it);
+                                              break;
+                                            case 'default':
+                                              _setDefault(it);
+                                              break;
+                                            case 'export':
+                                              _exportTemplateJson(it, t);
+                                              break;
+                                            case 'delete':
+                                              _delete(it);
+                                              break;
+                                          }
+                                        },
+                                      )
+                                    : null,
                               );
                             },
                           ),

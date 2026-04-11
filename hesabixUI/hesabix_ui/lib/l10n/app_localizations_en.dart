@@ -3456,6 +3456,98 @@ class AppLocalizationsEn extends AppLocalizations {
   String get presetDocumentsDetail => 'Documents/Detail';
 
   @override
+  String get presetTransfersList => 'Transfers/List';
+
+  @override
+  String get presetTransfersDetail => 'Transfers/Detail';
+
+  @override
+  String get reportTemplatesScopeAll => 'All report types';
+
+  @override
+  String get reportTemplatesScopeCustom => 'Custom (technical keys)';
+
+  @override
+  String get reportTemplateNewVisual => 'New — visual builder';
+
+  @override
+  String get reportTemplateNewHtml => 'New — HTML (advanced)';
+
+  @override
+  String get reportTemplateMoreMenu => 'More tools';
+
+  @override
+  String get reportTemplateExportJson => 'Export JSON…';
+
+  @override
+  String get reportTemplateImportJson => 'Import JSON…';
+
+  @override
+  String get reportTemplatePickExport => 'Choose a template to export';
+
+  @override
+  String get reportTemplateImportDoneOpenHtml =>
+      'Form filled. Use \"New — HTML\" to review and save.';
+
+  @override
+  String reportTemplatesLoadError(String error) {
+    return 'Failed to load templates: $error';
+  }
+
+  @override
+  String get reportTemplatePreviewTitle => 'Template preview';
+
+  @override
+  String get reportTemplatePreviewHtmlTab => 'HTML';
+
+  @override
+  String get reportTemplatePreviewPdfTab => 'PDF';
+
+  @override
+  String reportTemplatePreviewPdfBytes(String bytes) {
+    return 'Generated PDF size: $bytes bytes';
+  }
+
+  @override
+  String get reportTemplateCopyPlaceholder => 'Copy placeholder';
+
+  @override
+  String get reportTemplateCopied => 'Copied to clipboard';
+
+  @override
+  String get reportTemplateStatusPublished => 'Published';
+
+  @override
+  String get reportTemplateStatusDraft => 'Draft';
+
+  @override
+  String get reportTemplateDefaultBadge => 'Default';
+
+  @override
+  String get reportTemplateRowActions => 'Actions';
+
+  @override
+  String get reportTemplatePublish => 'Publish';
+
+  @override
+  String get reportTemplateUnpublish => 'Unpublish';
+
+  @override
+  String get reportTemplatePreview => 'Preview';
+
+  @override
+  String get reportTemplateEdit => 'Edit';
+
+  @override
+  String get reportTemplateSetDefault => 'Set as default';
+
+  @override
+  String get reportTemplateDelete => 'Delete';
+
+  @override
+  String get reportTemplateExportThis => 'Export JSON';
+
+  @override
   String get printPdf => 'Print PDF';
 
   @override
@@ -7169,6 +7261,194 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowFieldDescCreatedAt => 'Creation date and time';
+
+  @override
+  String get workflowFieldInvoiceType => 'Invoice type';
+
+  @override
+  String get workflowFieldDescInvoiceType =>
+      'Invoice document type (e.g. sales/purchase)';
+
+  @override
+  String get workflowFieldLeadId => 'Lead ID';
+
+  @override
+  String get workflowFieldDescLeadId => 'CRM lead record ID';
+
+  @override
+  String get workflowFieldDealId => 'Deal ID';
+
+  @override
+  String get workflowFieldDescDealId => 'CRM deal/opportunity record ID';
+
+  @override
+  String get workflowFieldProcessDefinitionId => 'Process definition ID';
+
+  @override
+  String get workflowFieldDescProcessDefinitionId => 'Sales process definition';
+
+  @override
+  String get workflowFieldStageId => 'Stage ID';
+
+  @override
+  String get workflowFieldDescStageId => 'Current stage in the process';
+
+  @override
+  String get workflowFieldOldStageId => 'Previous stage ID';
+
+  @override
+  String get workflowFieldDescOldStageId => 'Stage before the change';
+
+  @override
+  String get workflowFieldNewStageId => 'New stage ID';
+
+  @override
+  String get workflowFieldDescNewStageId => 'Stage after the change';
+
+  @override
+  String get workflowFieldIsWin => 'Won deal';
+
+  @override
+  String get workflowFieldDescIsWin => 'Whether the deal was closed as won';
+
+  @override
+  String get workflowFieldPersonTypesList => 'Person types';
+
+  @override
+  String get workflowFieldDescPersonTypesList =>
+      'Assigned person types list (on create)';
+
+  @override
+  String get workflowFieldSuccess => 'Success';
+
+  @override
+  String get workflowFieldDescSuccess => 'Whether the action succeeded';
+
+  @override
+  String get workflowFieldWorkflowUserId => 'User ID';
+
+  @override
+  String get workflowFieldDescWorkflowUserId => 'User ID in action output';
+
+  @override
+  String get workflowFieldSentMessage => 'Sent message';
+
+  @override
+  String get workflowFieldDescSentMessage =>
+      'Message text after send (e.g. Telegram/Bale)';
+
+  @override
+  String get workflowFieldTelegramChatId => 'Telegram chat ID';
+
+  @override
+  String get workflowFieldDescTelegramChatId => 'Recipient Telegram chat ID';
+
+  @override
+  String get workflowFieldBaleChatId => 'Bale chat ID';
+
+  @override
+  String get workflowFieldDescBaleChatId => 'Recipient Bale chat ID';
+
+  @override
+  String get workflowFieldEmailTo => 'To';
+
+  @override
+  String get workflowFieldDescEmailTo =>
+      'Recipient email address (resolved after send)';
+
+  @override
+  String get workflowFieldEmailSubject => 'Subject';
+
+  @override
+  String get workflowFieldDescEmailSubject =>
+      'Email subject line (resolved after send)';
+
+  @override
+  String get workflowFieldHttpStatusCode => 'HTTP status code';
+
+  @override
+  String get workflowFieldDescHttpStatusCode =>
+      'Response status code (e.g. 200)';
+
+  @override
+  String get workflowFieldHttpResponse => 'HTTP response';
+
+  @override
+  String get workflowFieldDescHttpResponse => 'Response body or payload';
+
+  @override
+  String get workflowFieldVariableName => 'Variable name';
+
+  @override
+  String get workflowFieldDescVariableName =>
+      'Name of variable stored in context';
+
+  @override
+  String get workflowFieldVariableValue => 'Variable value';
+
+  @override
+  String get workflowFieldDescVariableValue => 'Stored value for the variable';
+
+  @override
+  String get workflowFieldWebhookPayload => 'Webhook payload';
+
+  @override
+  String get workflowFieldDescWebhookPayload => 'Parsed webhook payload data';
+
+  @override
+  String get workflowFieldWebhookBody => 'Request body';
+
+  @override
+  String get workflowFieldDescWebhookBody => 'Raw HTTP request body';
+
+  @override
+  String get workflowFieldScheduledAt => 'Scheduled run time';
+
+  @override
+  String get workflowFieldDescScheduledAt => 'When the scheduled trigger ran';
+
+  @override
+  String get workflowFieldWarehouseId => 'Warehouse ID';
+
+  @override
+  String get workflowFieldDescWarehouseId =>
+      'Warehouse related to inventory event';
+
+  @override
+  String get workflowFieldCurrentQuantity => 'Current quantity';
+
+  @override
+  String get workflowFieldDescCurrentQuantity => 'Current stock quantity';
+
+  @override
+  String get workflowFieldMinQuantity => 'Minimum quantity';
+
+  @override
+  String get workflowFieldDescMinQuantity => 'Low-stock threshold';
+
+  @override
+  String get workflowFieldCheckId => 'Check ID';
+
+  @override
+  String get workflowFieldDescCheckId => 'Check record ID';
+
+  @override
+  String get workflowFieldCheckNumber => 'Check number';
+
+  @override
+  String get workflowFieldDescCheckNumber => 'Printed check number';
+
+  @override
+  String get workflowFieldDueDate => 'Due date';
+
+  @override
+  String get workflowFieldDescDueDate => 'Maturity/due date';
+
+  @override
+  String get workflowFieldLogLevel => 'Log level';
+
+  @override
+  String get workflowFieldDescLogLevel => 'Level recorded in workflow log';
 
   @override
   String get workflowTemplateInvoiceSalesName => 'Invoice sales notification';

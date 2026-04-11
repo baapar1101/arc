@@ -556,12 +556,16 @@ def create_manual_document(
         try:
             from app.services.workflow.workflow_trigger_service import trigger_document_created
             manual_document_type = document_data.get("document_type", "manual")
+            _doc_extra = {}
+            if document_data.get("description"):
+                _doc_extra["description"] = document_data.get("description")
             trigger_document_created(
                 db=db,
                 business_id=business_id,
                 document_id=document.id,
                 document_type=manual_document_type,
-                user_id=user_id
+                user_id=user_id,
+                extra_fields=_doc_extra or None,
             )
         except Exception as e:
             # عدم موفقیت در trigger نباید مانع بازگشت سند شود

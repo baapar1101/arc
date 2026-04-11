@@ -24,6 +24,7 @@ import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
+import '../../widgets/date_input_field.dart';
 import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 
@@ -87,6 +88,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   bool _showPurchasePrice = false;
   int? _printTemplateId;
   
+  // تاریخ و شرح سند فاکتور
+  DateTime _documentDate = DateTime.now();
+  final TextEditingController _documentDescriptionController = TextEditingController();
+
   // جستجوی محصول
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocus = FocusNode();
@@ -208,6 +213,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _barcodeController.dispose();
+    _documentDescriptionController.dispose();
     _barcodeFocus.dispose();
     _keyboardListenerFocus.dispose();
     super.dispose();
@@ -1042,14 +1048,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         extraInfo['warehouse_id'] = _defaultWarehouseId;
       }
       
+      final desc = _documentDescriptionController.text.trim();
       final payload = <String, dynamic>{
         'invoice_type': 'invoice_sales',
-        'document_date': DateTime.now().toIso8601String().split('T')[0],
+        'document_date': _documentDate.toIso8601String().split('T')[0],
         'currency_id': _defaultCurrencyId,
         'is_proforma': false,
         'extra_info': extraInfo,
         'lines': lines,
         if (payments.isNotEmpty) 'payments': payments,
+        if (desc.isNotEmpty) 'description': desc,
       };
       
       final result = await _invoiceService.createInvoice(
@@ -1081,6 +1089,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _cartItems.clear();
         _payment = null;
         _productStocks.clear();
+        _documentDate = DateTime.now();
+        _documentDescriptionController.clear();
       });
       
       _barcodeFocus.requestFocus();
@@ -1286,6 +1296,63 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     return false;
   }
 
+  /// تاریخ فاکتور (شمسی/میلادی طبق تنظیم کاربر) و شرح سند — چیدمان فشرده
+  Widget _buildDocumentDateAndDescription({required bool isMobile}) {
+    final dateWidget = DateInputField(
+      value: _documentDate,
+      labelText: 'تاریخ فاکتور',
+      hintText: 'انتخاب تاریخ',
+      calendarController: widget.calendarController,
+      isDense: true,
+      onChanged: (d) {
+        if (d != null) {
+          setState(() => _documentDate = d);
+        }
+      },
+    );
+
+    // همان padding و فضای suffixIcon مثل DateInputField(isDense: true) برای یکسان بودن ارتفاع
+    final descWidget = TextField(
+      controller: _documentDescriptionController,
+      maxLines: 1,
+      maxLength: 1000,
+      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+      decoration: InputDecoration(
+        labelText: 'شرح',
+        hintText: 'اختیاری',
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        suffixIcon: IgnorePointer(
+          child: IconButton(
+            icon: const Icon(Icons.calendar_today, color: Colors.transparent),
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          dateWidget,
+          const SizedBox(height: 8),
+          descWidget,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: 200, child: dateWidget),
+        const SizedBox(width: 12),
+        Expanded(child: descWidget),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1417,42 +1484,52 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                             label: 'مشتری',
                             hintText: 'مشتری ناشناس',
                           ),
+                          const SizedBox(height: 8),
+                          _buildDocumentDateAndDescription(isMobile: true),
                         ],
                       )
-                    : Row(
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
-                          if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
-                            IconButton(
-                              icon: _loadingStocks
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.refresh),
-                              onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
-                              tooltip: 'به‌روزرسانی موجودی',
-                            ),
-                          Expanded(child: _buildBarcodeSearchField()),
-                          const SizedBox(width: 8),
-                          // جستجوی مشتری
-                          SizedBox(
-                            width: 200,
-                            child: CustomerComboboxWidget(
-                              selectedCustomer: _selectedCustomer,
-                              onCustomerChanged: (customer) {
-                                setState(() {
-                                  _selectedCustomer = customer ?? _anonymousCustomer;
-                                });
-                              },
-                              businessId: widget.businessId,
-                              authStore: widget.authStore,
-                              isRequired: false,
-                              label: 'مشتری',
-                              hintText: 'مشتری ناشناس',
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
+                              if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
+                                IconButton(
+                                  icon: _loadingStocks
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.refresh),
+                                  onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                                  tooltip: 'به‌روزرسانی موجودی',
+                                ),
+                              Expanded(child: _buildBarcodeSearchField()),
+                              const SizedBox(width: 8),
+                              // جستجوی مشتری
+                              SizedBox(
+                                width: 200,
+                                child: CustomerComboboxWidget(
+                                  selectedCustomer: _selectedCustomer,
+                                  onCustomerChanged: (customer) {
+                                    setState(() {
+                                      _selectedCustomer = customer ?? _anonymousCustomer;
+                                    });
+                                  },
+                                  businessId: widget.businessId,
+                                  authStore: widget.authStore,
+                                  isRequired: false,
+                                  label: 'مشتری',
+                                  hintText: 'مشتری ناشناس',
+                                ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 8),
+                          _buildDocumentDateAndDescription(isMobile: false),
                         ],
                       ),
               ),

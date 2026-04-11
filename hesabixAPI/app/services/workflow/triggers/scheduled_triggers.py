@@ -90,7 +90,9 @@ class ScheduledTrigger(TriggerHandler):
         """
         from datetime import datetime
         import pytz
-        
+
+        trigger_data = context.get("trigger_data") or {}
+
         # بررسی business hours
         business_hours_only = config.get("business_hours_only", False)
         if business_hours_only:
@@ -116,10 +118,11 @@ class ScheduledTrigger(TriggerHandler):
             except Exception as e:
                 logger.warning(f"Error checking business hours: {e}")
         
+        triggered_at = trigger_data.get("scheduled_at") or datetime.utcnow().isoformat()
         return {
-            "triggered_at": datetime.utcnow().isoformat(),
+            "triggered_at": triggered_at,
             "schedule": config.get("schedule"),
             "business_id": context.get("business_id"),
-            "timezone": config.get("timezone", "Asia/Tehran")
+            "timezone": config.get("timezone", "Asia/Tehran"),
         }
 

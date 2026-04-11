@@ -1781,7 +1781,38 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 	
 	# توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود
 	# بخش انبارداری فقط مسئولیت مدیریت موجودی فیزیکی را دارد
-	
+
+	# ورک‌فلو: موجودی کم (reorder_point)
+	try:
+		from app.services.workflow.workflow_trigger_service import maybe_fire_inventory_low_triggers
+
+		seen_pairs: set[tuple[int, Optional[int]]] = set()
+		for ln in lines:
+			if not ln.product_id:
+				continue
+			prod = db.query(Product).filter(Product.id == int(ln.product_id)).first()
+			if not prod or not getattr(prod, "track_inventory", False):
+				continue
+			wid = int(ln.warehouse_id) if ln.warehouse_id else None
+			key = (int(ln.product_id), wid)
+			if key in seen_pairs:
+				continue
+			seen_pairs.add(key)
+			maybe_fire_inventory_low_triggers(
+				db,
+				int(business_id),
+				int(ln.product_id),
+				wid,
+				user_id=getattr(wh, "created_by_user_id", None),
+			)
+	except Exception as inv_wf_err:
+		logger.warning(
+			"warehouse_workflow_inventory_low_failed wh_id=%s err=%s",
+			wh.id,
+			inv_wf_err,
+			exc_info=True,
+		)
+
 	return {"id": wh.id, "status": wh.status}
 
 

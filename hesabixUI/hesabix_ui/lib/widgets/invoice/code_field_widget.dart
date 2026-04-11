@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class CodeFieldWidget extends StatefulWidget {
   final String? initialValue;
@@ -8,6 +10,8 @@ class CodeFieldWidget extends StatefulWidget {
   final String? hintText;
   final bool isRequired;
   final bool autoGenerateCode;
+  /// شماره سند فاکتور: حروف انگلیسی، اعداد، خط تیره و زیرخط (مثل INV-20240410-0001)
+  final bool invoiceDocumentCode;
 
   const CodeFieldWidget({
     super.key,
@@ -17,6 +21,7 @@ class CodeFieldWidget extends StatefulWidget {
     this.hintText,
     this.isRequired = false,
     this.autoGenerateCode = true,
+    this.invoiceDocumentCode = false,
   });
 
   @override
@@ -44,9 +49,17 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     
+    final List<TextInputFormatter> formatters = widget.invoiceDocumentCode
+        ? <TextInputFormatter>[
+            const EnglishDigitsFormatter(),
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_]')),
+          ]
+        : const <TextInputFormatter>[];
+
     return TextFormField(
       controller: _controller,
       readOnly: _autoGenerateCode,
+      inputFormatters: formatters.isEmpty ? null : formatters,
       decoration: InputDecoration(
         labelText: widget.label ?? t.code,
         hintText: widget.hintText ?? t.uniqueCodeNumeric,
@@ -83,13 +96,20 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
       validator: (value) {
         if (widget.isRequired && !_autoGenerateCode) {
           if (value == null || value.trim().isEmpty) {
-            return t.personCodeRequired;
+            return widget.invoiceDocumentCode ? 'شماره فاکتور الزامی است' : t.personCodeRequired;
           }
-          if (value.trim().length < 3) {
-            return t.passwordMinLength;
-          }
-          if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
-            return t.codeMustBeNumeric;
+          final trimmed = value.trim();
+          if (widget.invoiceDocumentCode) {
+            if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed)) {
+              return 'فقط حروف انگلیسی، اعداد، خط تیره و زیرخط مجاز است';
+            }
+          } else {
+            if (trimmed.length < 3) {
+              return t.passwordMinLength;
+            }
+            if (!RegExp(r'^\d+$').hasMatch(trimmed)) {
+              return t.codeMustBeNumeric;
+            }
           }
         }
         return null;

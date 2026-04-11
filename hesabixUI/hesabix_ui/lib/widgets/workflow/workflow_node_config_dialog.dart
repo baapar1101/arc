@@ -21,6 +21,12 @@ import '../invoice/person_combobox_widget.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../jalali_date_picker.dart';
 
+/// عملگرهای شرط ساده (هم‌خوان با workflow_engine)
+const _kWorkflowConditionOperators = <String>[
+  '==', '!=', '>', '<', '>=', '<=',
+  'contains', 'not_contains', 'starts_with', 'ends_with',
+  'in', 'not_in', 'is_null', 'is_not_null',
+];
 
 /// Dialog برای تنظیمات یک node
 class WorkflowNodeConfigDialog extends StatefulWidget {
@@ -121,6 +127,20 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
           _configSchema = metadata.configSchema;
         } catch (_) {}
       }
+    }
+    if (widget.node.type == WorkflowNodeType.condition) {
+      _configSchema = _getConditionConfigSchema(widget.node.key?.toString());
+      if (_configSchema != null) {
+        _configSchema!.forEach((key, schema) {
+          if (schema is Map<String, dynamic> &&
+              !_config.containsKey(key) &&
+              schema['default'] != null) {
+            _config[key] = schema['default'];
+          }
+        });
+      }
+      _migrateConditionConfigDefaults();
+      _ensureConditionsListIfComplex();
     }
     if (widget.node.type == WorkflowNodeType.loop) {
       final loopKey = widget.node.key ?? (
@@ -298,6 +318,340 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
   }
 
+  Map<String, dynamic>? _getConditionConfigSchema(String? conditionKey) {
+    switch (conditionKey) {
+      case 'condition.switch':
+        return {
+          'condition_type': {
+            'type': 'string',
+            'default': 'complex',
+            'enum': ['complex', 'expression'],
+            'description': 'چند شرط (AND/OR) یا یک عبارت بولی',
+          },
+          'logical_operator': {
+            'type': 'string',
+            'enum': ['AND', 'OR'],
+            'default': 'OR',
+            'description': 'ترکیب چند شرط ساده',
+          },
+          'expression': {
+            'type': 'string',
+            'description':
+                'عبارت بولی (SimpleEval). مثال: resolve("\$n1.amount") > 100 یا context["trigger_data"]["invoice_id"]',
+            'ui_type': 'textarea',
+            'required': false,
+          },
+          'on_error': {
+            'type': 'string',
+            'enum': ['fail', 'false', 'true'],
+            'default': 'fail',
+            'description': 'رفتار در خطای ارزیابی',
+          },
+        };
+      case 'condition.if':
+      case 'condition.compare':
+      default:
+        return {
+          'condition_type': {
+            'type': 'string',
+            'default': 'simple',
+            'enum': ['simple', 'complex', 'expression'],
+            'description': 'نوع شرط',
+          },
+          'left_value': {
+            'type': 'string',
+            'description': 'مقدار چپ یا \$node_id.field',
+          },
+          'operator': {
+            'type': 'string',
+            'enum': _kWorkflowConditionOperators,
+            'default': '==',
+            'description': 'عملگر',
+          },
+          'right_value': {
+            'type': 'string',
+            'description': 'مقدار راست',
+          },
+          'logical_operator': {
+            'type': 'string',
+            'enum': ['AND', 'OR'],
+            'default': 'AND',
+            'description': 'ترکیب چند شرط (فقط حالت complex)',
+          },
+          'expression': {
+            'type': 'string',
+            'description': 'فقط در حالت expression',
+            'ui_type': 'textarea',
+            'required': false,
+          },
+          'on_error': {
+            'type': 'string',
+            'enum': ['fail', 'false', 'true'],
+            'default': 'fail',
+            'description': 'رفتار در خطا',
+          },
+        };
+    }
+  }
+
+  void _migrateConditionConfigDefaults() {
+    if (widget.node.type != WorkflowNodeType.condition) return;
+    if (widget.node.key != 'condition.switch') return;
+
+    final ct = _config['condition_type']?.toString();
+    final expr = _config['expression']?.toString().trim() ?? '';
+    final conds = _config['conditions'];
+    final hasComplex = conds is List && conds.isNotEmpty;
+
+    if (ct == null || ct.isEmpty) {
+      if (expr.isNotEmpty && !hasComplex) {
+        _config['condition_type'] = 'expression';
+      } else {
+        _config['condition_type'] = 'complex';
+      }
+    }
+  }
+
+  bool _showComplexConditionsUI() {
+    if (widget.node.type != WorkflowNodeType.condition) return false;
+    final nk = widget.node.key;
+    final ct = _config['condition_type']?.toString() ?? '';
+    if (nk == 'condition.switch') {
+      return ct != 'expression';
+    }
+    return ct == 'complex';
+  }
+
+  void _ensureConditionsListIfComplex() {
+    if (!_showComplexConditionsUI()) return;
+    _ensureConditionsList();
+  }
+
+  void _ensureConditionsList() {
+    final c = _config['conditions'];
+    if (c is! List || c.isEmpty) {
+      _config['conditions'] = [
+        <String, dynamic>{'left_value': '', 'operator': '==', 'right_value': ''},
+      ];
+      return;
+    }
+    final out = <Map<String, dynamic>>[];
+    for (final e in c) {
+      if (e is Map) {
+        out.add({
+          'left_value': '${e['left_value'] ?? ''}',
+          'operator': '${e['operator'] ?? '=='}',
+          'right_value': '${e['right_value'] ?? ''}',
+        });
+      }
+    }
+    if (out.isEmpty) {
+      out.add({'left_value': '', 'operator': '==', 'right_value': ''});
+    }
+    _config['conditions'] = out;
+  }
+
+  bool _shouldShowConditionSchemaField(String fieldKey) {
+    if (widget.node.type != WorkflowNodeType.condition) return true;
+    final nk = widget.node.key;
+    var ct = _config['condition_type']?.toString() ?? 'simple';
+    if (nk == 'condition.switch') {
+      ct = _config['condition_type']?.toString() ?? 'complex';
+      if (fieldKey == 'expression') {
+        return ct == 'expression';
+      }
+      if (fieldKey == 'logical_operator') {
+        return ct != 'expression';
+      }
+      return true;
+    }
+    if (fieldKey == 'left_value' || fieldKey == 'operator' || fieldKey == 'right_value') {
+      return ct == 'simple';
+    }
+    if (fieldKey == 'logical_operator') {
+      return ct == 'complex';
+    }
+    if (fieldKey == 'expression') {
+      return ct == 'expression';
+    }
+    return true;
+  }
+
+  void _onConditionTypeChanged(String newType) {
+    if (widget.node.type != WorkflowNodeType.condition) return;
+    final nk = widget.node.key;
+    final needList = (nk == 'condition.switch' && newType != 'expression') ||
+        (nk != 'condition.switch' && newType == 'complex');
+    if (needList) {
+      _ensureConditionsList();
+    }
+  }
+
+  void _finalizeConditionConfigForSave() {
+    if (widget.node.type != WorkflowNodeType.condition) return;
+    final nk = widget.node.key;
+    var ct = _config['condition_type']?.toString() ?? '';
+    if (nk == 'condition.switch') {
+      if (ct == 'expression') {
+        _config.remove('conditions');
+        _config.remove('logical_operator');
+      } else {
+        _config['condition_type'] = 'complex';
+        _ensureConditionsList();
+        _config.remove('expression');
+      }
+      return;
+    }
+    if (ct == 'expression') {
+      _config.remove('left_value');
+      _config.remove('operator');
+      _config.remove('right_value');
+      _config.remove('logical_operator');
+      _config.remove('conditions');
+    } else if (ct == 'complex') {
+      _ensureConditionsList();
+      _config.remove('left_value');
+      _config.remove('operator');
+      _config.remove('right_value');
+      _config.remove('expression');
+    } else {
+      _config.remove('expression');
+      _config.remove('logical_operator');
+      _config.remove('conditions');
+    }
+  }
+
+  bool _validateConditionExpressionIfNeeded() {
+    if (widget.node.type != WorkflowNodeType.condition) return true;
+    final ct = _config['condition_type']?.toString() ?? '';
+    if (ct != 'expression') return true;
+    _syncWorkflowTextControllersToConfig();
+    final ex = _config['expression']?.toString().trim() ?? '';
+    if (ex.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'عبارت شرط (expression) را وارد کنید',
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Widget _buildComplexConditionsEditor() {
+    _ensureConditionsList();
+    final theme = Theme.of(context);
+    final fromConfig = _config['conditions'];
+    final rows = <Map<String, dynamic>>[];
+    if (fromConfig is List) {
+      for (final e in fromConfig) {
+        if (e is Map) {
+          rows.add(Map<String, dynamic>.from(e.map((k, v) => MapEntry(k.toString(), v))));
+        }
+      }
+    }
+    if (rows.isEmpty) {
+      rows.add({'left_value': '', 'operator': '==', 'right_value': ''});
+    }
+    _config['conditions'] = rows;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'شرط‌های ترکیبی (هر ردیف یک مقایسهٔ ساده؛ با AND/OR در بالا ترکیب می‌شود)',
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        ...List.generate(rows.length, (i) {
+          final row = rows[i];
+          final op = row['operator']?.toString() ?? '==';
+          final safeOp = _kWorkflowConditionOperators.contains(op) ? op : '==';
+          if (safeOp != op) {
+            row['operator'] = safeOp;
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('شرط ${i + 1}', style: theme.textTheme.labelLarge),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'حذف',
+                          onPressed: rows.length <= 1
+                              ? null
+                              : () {
+                                  setState(() {
+                                    rows.removeAt(i);
+                                    _config['conditions'] = rows;
+                                  });
+                                },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      key: ValueKey('cond_l_${widget.node.id}_${identityHashCode(row)}'),
+                      initialValue: row['left_value']?.toString() ?? '',
+                      decoration: const InputDecoration(
+                        labelText: 'مقدار چپ',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => row['left_value'] = v,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: safeOp,
+                      decoration: const InputDecoration(
+                        labelText: 'عملگر',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _kWorkflowConditionOperators
+                          .map((o) => DropdownMenuItem<String>(value: o, child: Text(o)))
+                          .toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          row['operator'] = v ?? '==';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      key: ValueKey('cond_r_${widget.node.id}_${identityHashCode(row)}'),
+                      initialValue: row['right_value']?.toString() ?? '',
+                      decoration: const InputDecoration(
+                        labelText: 'مقدار راست',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => row['right_value'] = v,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              rows.add({'left_value': '', 'operator': '==', 'right_value': ''});
+              _config['conditions'] = rows;
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('افزودن شرط'),
+        ),
+      ],
+    );
+  }
+
   Map<String, dynamic>? _getLoopConfigSchema(String loopKey) {
     if (loopKey == 'loop.for_each') {
       return {
@@ -390,6 +744,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     }).toList()
                 else
                   ..._buildGroupedFields(),
+                if (_showComplexConditionsUI()) ...[
+                  const SizedBox(height: 8),
+                  _buildComplexConditionsEditor(),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
@@ -404,8 +762,14 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         FilledButton(
           onPressed: () {
             _syncWorkflowTextControllersToConfig();
+            if (!_validateConditionExpressionIfNeeded()) {
+              return;
+            }
             if (_formKey.currentState?.validate() ?? false) {
               _formKey.currentState?.save();
+              if (widget.node.type == WorkflowNodeType.condition) {
+                _finalizeConditionConfigForSave();
+              }
               // برای while loop: ساختن condition از فیلدهای flat
               if (widget.node.type == WorkflowNodeType.loop &&
                   (_config['loop_type'] == 'while' || widget.node.key == 'loop.while')) {
@@ -559,6 +923,9 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 setState(() {
                   if (newValue != null) {
                     _config[key] = newValue;
+                    if (widget.node.type == WorkflowNodeType.condition && key == 'condition_type') {
+                      _onConditionTypeChanged(newValue);
+                    }
                   } else if (!required) {
                     _config.remove(key);
                   }
@@ -782,6 +1149,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 
     for (final entry in _configSchema!.entries) {
       final fieldKey = entry.key;
+      if (widget.node.type == WorkflowNodeType.condition &&
+          !_shouldShowConditionSchemaField(fieldKey)) {
+        continue;
+      }
       final fieldSchema = entry.value as Map<String, dynamic>?;
       final group = _getFieldGroup(fieldKey, fieldSchema);
       
@@ -3641,6 +4012,21 @@ class _WorkflowProductSelectorFieldState extends State<_WorkflowProductSelectorF
   }
 }
 
+/// فیلد پیشنهادی در دیالوگ «انتخاب از نود» — برچسب‌ها از [AppLocalizations]
+Map<String, String> _workflowSuggestedField(
+  String key,
+  String name,
+  String desc,
+  String type,
+) {
+  return {
+    'key': key,
+    'name': name,
+    'description': desc,
+    'type': type,
+  };
+}
+
 class _ReferenceSelectorDialog extends StatefulWidget {
   final List<WorkflowNodeModel> allNodes;
   final WorkflowNodeModel currentNode;
@@ -3856,79 +4242,231 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
   List<Map<String, String>> _getSuggestedFields(WorkflowNodeModel node, AppLocalizations t) {
     final key = node.key ?? '';
 
-    if (key.contains('invoice')) {
+    // قبل از هر چیزی: receipt_payment شامل زیررشتهٔ «payment» است — نباید با payment عمومی قاطی شود
+    if (key.contains('receipt_payment')) {
       return [
-        {'key': 'invoice_id', 'name': t.workflowFieldInvoiceId, 'description': t.workflowFieldDescInvoiceId, 'type': 'number'},
-        {'key': 'invoice_code', 'name': t.workflowFieldInvoiceCode, 'description': t.workflowFieldDescInvoiceCode, 'type': 'string'},
-        {'key': 'invoice_number', 'name': t.workflowFieldInvoiceNumber, 'description': t.workflowFieldDescInvoiceNumber, 'type': 'string'},
-        {'key': 'invoice_date', 'name': t.workflowFieldInvoiceDate, 'description': t.workflowFieldDescInvoiceDate, 'type': 'date'},
-        {'key': 'total_amount', 'name': t.workflowFieldTotalAmount, 'description': t.workflowFieldDescTotalAmount, 'type': 'number'},
-        {'key': 'discount_amount', 'name': t.workflowFieldDiscountAmount, 'description': t.workflowFieldDescDiscountAmount, 'type': 'number'},
-        {'key': 'tax_amount', 'name': t.workflowFieldTaxAmount, 'description': t.workflowFieldDescTaxAmount, 'type': 'number'},
-        {'key': 'final_amount', 'name': t.workflowFieldFinalAmount, 'description': t.workflowFieldDescFinalAmount, 'type': 'number'},
-        {'key': 'customer_name', 'name': t.workflowFieldCustomerName, 'description': t.workflowFieldDescCustomerName, 'type': 'string'},
-        {'key': 'customer_id', 'name': t.workflowFieldCustomerId, 'description': t.workflowFieldDescCustomerId, 'type': 'number'},
-        {'key': 'description', 'name': t.workflowFieldDescription, 'description': t.workflowFieldInvoiceDescription, 'type': 'string'},
-        {'key': 'status', 'name': t.workflowFieldStatus, 'description': t.workflowFieldInvoiceStatus, 'type': 'string'},
+        _workflowSuggestedField('receipt_payment_id', t.workflowFieldReceiptPaymentId,
+            t.workflowFieldDescReceiptPaymentId, 'number'),
+        _workflowSuggestedField('type', t.workflowFieldType, t.workflowFieldDescType, 'string'),
+        _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
       ];
     }
 
-    if (key.contains('payment')) {
+    if (key.contains('invoice')) {
       return [
-        {'key': 'payment_id', 'name': t.workflowFieldPaymentId, 'description': t.workflowFieldDescPaymentId, 'type': 'number'},
-        {'key': 'amount', 'name': t.workflowFieldAmount, 'description': t.workflowFieldPaymentAmount, 'type': 'number'},
-        {'key': 'payment_date', 'name': t.workflowFieldPaymentDate, 'description': t.workflowFieldDescPaymentDate, 'type': 'date'},
-        {'key': 'payment_method', 'name': t.workflowFieldPaymentMethod, 'description': t.workflowFieldDescPaymentMethod, 'type': 'string'},
-        {'key': 'status', 'name': t.workflowFieldStatus, 'description': t.workflowFieldPaymentStatus, 'type': 'string'},
-        {'key': 'reference_code', 'name': t.workflowFieldReferenceCode, 'description': t.workflowFieldDescReferenceCode, 'type': 'string'},
+        _workflowSuggestedField('invoice_id', t.workflowFieldInvoiceId, t.workflowFieldDescInvoiceId, 'number'),
+        _workflowSuggestedField('document_id', t.workflowFieldDocumentId, t.workflowFieldDescDocumentId, 'number'),
+        _workflowSuggestedField('invoice_type', t.workflowFieldInvoiceType, t.workflowFieldDescInvoiceType, 'string'),
+        _workflowSuggestedField('invoice_code', t.workflowFieldInvoiceCode, t.workflowFieldDescInvoiceCode, 'string'),
+        _workflowSuggestedField(
+            'invoice_number', t.workflowFieldInvoiceNumber, t.workflowFieldDescInvoiceNumber, 'string'),
+        _workflowSuggestedField('invoice_date', t.workflowFieldInvoiceDate, t.workflowFieldDescInvoiceDate, 'date'),
+        _workflowSuggestedField('total_amount', t.workflowFieldTotalAmount, t.workflowFieldDescTotalAmount, 'number'),
+        _workflowSuggestedField(
+            'discount_amount', t.workflowFieldDiscountAmount, t.workflowFieldDescDiscountAmount, 'number'),
+        _workflowSuggestedField('tax_amount', t.workflowFieldTaxAmount, t.workflowFieldDescTaxAmount, 'number'),
+        _workflowSuggestedField('final_amount', t.workflowFieldFinalAmount, t.workflowFieldDescFinalAmount, 'number'),
+        _workflowSuggestedField(
+            'customer_name', t.workflowFieldCustomerName, t.workflowFieldDescCustomerName, 'string'),
+        _workflowSuggestedField('customer_id', t.workflowFieldCustomerId, t.workflowFieldDescCustomerId, 'number'),
+        _workflowSuggestedField(
+            'description', t.workflowFieldDescription, t.workflowFieldInvoiceDescription, 'string'),
+        _workflowSuggestedField('status', t.workflowFieldStatus, t.workflowFieldInvoiceStatus, 'string'),
       ];
     }
 
     if (key.contains('document')) {
       return [
-        {'key': 'document_id', 'name': t.workflowFieldDocumentId, 'description': t.workflowFieldDescDocumentId, 'type': 'number'},
-        {'key': 'document_type', 'name': t.workflowFieldDocumentType, 'description': t.workflowFieldDescDocumentType, 'type': 'string'},
-        {'key': 'total_amount', 'name': t.workflowFieldTotalAmount, 'description': t.workflowFieldDocTotalAmount, 'type': 'number'},
-        {'key': 'description', 'name': t.workflowFieldDocDescription, 'description': t.workflowFieldDescDocDescription, 'type': 'string'},
+        _workflowSuggestedField('document_id', t.workflowFieldDocumentId, t.workflowFieldDescDocumentId, 'number'),
+        _workflowSuggestedField(
+            'document_type', t.workflowFieldDocumentType, t.workflowFieldDescDocumentType, 'string'),
+        _workflowSuggestedField(
+            'description', t.workflowFieldDocDescription, t.workflowFieldDescDocDescription, 'string'),
       ];
     }
 
-    if (key.contains('receipt') || key.contains('receipt_payment')) {
+    if (key.startsWith('crm.lead.')) {
+      if (key.contains('stage_changed')) {
+        return [
+          _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+          _workflowSuggestedField(
+              'old_stage_id', t.workflowFieldOldStageId, t.workflowFieldDescOldStageId, 'number'),
+          _workflowSuggestedField(
+              'new_stage_id', t.workflowFieldNewStageId, t.workflowFieldDescNewStageId, 'number'),
+        ];
+      }
+      if (key.contains('converted')) {
+        return [
+          _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+          _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        ];
+      }
       return [
-        {'key': 'receipt_payment_id', 'name': t.workflowFieldReceiptPaymentId, 'description': t.workflowFieldDescReceiptPaymentId, 'type': 'number'},
-        {'key': 'type', 'name': t.workflowFieldType, 'description': t.workflowFieldDescType, 'type': 'string'},
-        {'key': 'amount', 'name': t.workflowFieldAmount, 'description': t.workflowFieldDescAmount, 'type': 'number'},
+        _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+        _workflowSuggestedField('process_definition_id', t.workflowFieldProcessDefinitionId,
+            t.workflowFieldDescProcessDefinitionId, 'number'),
+        _workflowSuggestedField('stage_id', t.workflowFieldStageId, t.workflowFieldDescStageId, 'number'),
+        _workflowSuggestedField('name', t.workflowFieldName, t.workflowFieldDescName, 'string'),
       ];
     }
 
-    if (key.contains('person') || key.contains('customer')) {
+    if (key.startsWith('crm.deal.')) {
+      if (key.contains('closed')) {
+        return [
+          _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
+          _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
+          _workflowSuggestedField('is_win', t.workflowFieldIsWin, t.workflowFieldDescIsWin, 'boolean'),
+          _workflowSuggestedField('document_id', t.workflowFieldDocumentId, t.workflowFieldDescDocumentId, 'number'),
+        ];
+      }
+      if (key.contains('stage_changed')) {
+        return [
+          _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
+          _workflowSuggestedField(
+              'old_stage_id', t.workflowFieldOldStageId, t.workflowFieldDescOldStageId, 'number'),
+          _workflowSuggestedField(
+              'new_stage_id', t.workflowFieldNewStageId, t.workflowFieldDescNewStageId, 'number'),
+        ];
+      }
       return [
-        {'key': 'person_id', 'name': t.workflowFieldPersonId, 'description': t.workflowFieldDescPersonId, 'type': 'number'},
-        {'key': 'name', 'name': t.workflowFieldPersonName, 'description': t.workflowFieldDescPersonName, 'type': 'string'},
-        {'key': 'email', 'name': t.workflowFieldEmail, 'description': t.workflowFieldDescEmail, 'type': 'string'},
-        {'key': 'phone', 'name': t.workflowFieldPhone, 'description': t.workflowFieldDescPhone, 'type': 'string'},
-        {'key': 'mobile', 'name': t.workflowFieldMobile, 'description': t.workflowFieldDescMobile, 'type': 'string'},
-        {'key': 'person_type', 'name': t.workflowFieldPersonType, 'description': t.workflowFieldDescPersonType, 'type': 'string'},
+        _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
+        _workflowSuggestedField('process_definition_id', t.workflowFieldProcessDefinitionId,
+            t.workflowFieldDescProcessDefinitionId, 'number'),
+        _workflowSuggestedField('stage_id', t.workflowFieldStageId, t.workflowFieldDescStageId, 'number'),
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        _workflowSuggestedField('title', t.workflowFieldTitle, t.workflowFieldDescTitle, 'string'),
+        _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
+      ];
+    }
+
+    if (key == 'person.created') {
+      return [
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        _workflowSuggestedField(
+            'person_types', t.workflowFieldPersonTypesList, t.workflowFieldDescPersonTypesList, 'string'),
+      ];
+    }
+
+    if (key.contains('inventory.low')) {
+      return [
+        _workflowSuggestedField('product_id', t.workflowFieldProductId, t.workflowFieldDescProductId, 'number'),
+        _workflowSuggestedField('warehouse_id', t.workflowFieldWarehouseId, t.workflowFieldDescWarehouseId, 'number'),
+        _workflowSuggestedField(
+            'current_quantity', t.workflowFieldCurrentQuantity, t.workflowFieldDescCurrentQuantity, 'number'),
+        _workflowSuggestedField('min_quantity', t.workflowFieldMinQuantity, t.workflowFieldDescMinQuantity, 'number'),
+      ];
+    }
+
+    if (key.contains('check.due')) {
+      return [
+        _workflowSuggestedField('check_id', t.workflowFieldCheckId, t.workflowFieldDescCheckId, 'number'),
+        _workflowSuggestedField('check_number', t.workflowFieldCheckNumber, t.workflowFieldDescCheckNumber, 'string'),
+        _workflowSuggestedField('due_date', t.workflowFieldDueDate, t.workflowFieldDescDueDate, 'date'),
+        _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
+      ];
+    }
+
+    if (key == 'webhook') {
+      return [
+        _workflowSuggestedField('payload', t.workflowFieldWebhookPayload, t.workflowFieldDescWebhookPayload, 'string'),
+        _workflowSuggestedField('body', t.workflowFieldWebhookBody, t.workflowFieldDescWebhookBody, 'string'),
+      ];
+    }
+
+    if (key == 'scheduled') {
+      return [
+        _workflowSuggestedField(
+            'scheduled_at', t.workflowFieldScheduledAt, t.workflowFieldDescScheduledAt, 'date'),
+      ];
+    }
+
+    if (key == 'send_telegram') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField(
+            'user_id', t.workflowFieldWorkflowUserId, t.workflowFieldDescWorkflowUserId, 'number'),
+        _workflowSuggestedField(
+            'telegram_chat_id', t.workflowFieldTelegramChatId, t.workflowFieldDescTelegramChatId, 'string'),
+        _workflowSuggestedField('message', t.workflowFieldSentMessage, t.workflowFieldDescSentMessage, 'string'),
+      ];
+    }
+    if (key == 'send_bale') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField(
+            'user_id', t.workflowFieldWorkflowUserId, t.workflowFieldDescWorkflowUserId, 'number'),
+        _workflowSuggestedField('bale_chat_id', t.workflowFieldBaleChatId, t.workflowFieldDescBaleChatId, 'string'),
+        _workflowSuggestedField('message', t.workflowFieldSentMessage, t.workflowFieldDescSentMessage, 'string'),
+      ];
+    }
+    if (key == 'send_email') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField('to', t.workflowFieldEmailTo, t.workflowFieldDescEmailTo, 'string'),
+        _workflowSuggestedField(
+            'subject', t.workflowFieldEmailSubject, t.workflowFieldDescEmailSubject, 'string'),
+      ];
+    }
+    if (key == 'http_request') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField(
+            'status_code', t.workflowFieldHttpStatusCode, t.workflowFieldDescHttpStatusCode, 'number'),
+        _workflowSuggestedField('response', t.workflowFieldHttpResponse, t.workflowFieldDescHttpResponse, 'string'),
+      ];
+    }
+    if (key == 'set_variable') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField(
+            'variable_name', t.workflowFieldVariableName, t.workflowFieldDescVariableName, 'string'),
+        _workflowSuggestedField('value', t.workflowFieldVariableValue, t.workflowFieldDescVariableValue, 'string'),
+      ];
+    }
+    if (key == 'log') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField('level', t.workflowFieldLogLevel, t.workflowFieldDescLogLevel, 'string'),
+        _workflowSuggestedField('message', t.workflowFieldSentMessage, t.workflowFieldDescSentMessage, 'string'),
+      ];
+    }
+    if (key == 'create_notification') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+      ];
+    }
+
+    if (key.contains('payment')) {
+      return [
+        _workflowSuggestedField('payment_id', t.workflowFieldPaymentId, t.workflowFieldDescPaymentId, 'number'),
+        _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldPaymentAmount, 'number'),
+        _workflowSuggestedField('payment_date', t.workflowFieldPaymentDate, t.workflowFieldDescPaymentDate, 'date'),
+        _workflowSuggestedField(
+            'payment_method', t.workflowFieldPaymentMethod, t.workflowFieldDescPaymentMethod, 'string'),
+        _workflowSuggestedField('status', t.workflowFieldStatus, t.workflowFieldPaymentStatus, 'string'),
+        _workflowSuggestedField(
+            'reference_code', t.workflowFieldReferenceCode, t.workflowFieldDescReferenceCode, 'string'),
       ];
     }
 
     if (key.contains('product')) {
       return [
-        {'key': 'product_id', 'name': t.workflowFieldProductId, 'description': t.workflowFieldDescProductId, 'type': 'number'},
-        {'key': 'name', 'name': t.workflowFieldProductName, 'description': t.workflowFieldDescProductName, 'type': 'string'},
-        {'key': 'code', 'name': t.workflowFieldProductCode, 'description': t.workflowFieldDescProductCode, 'type': 'string'},
-        {'key': 'price', 'name': t.workflowFieldPrice, 'description': t.workflowFieldDescPrice, 'type': 'number'},
-        {'key': 'quantity', 'name': t.workflowFieldQuantity, 'description': t.workflowFieldDescQuantity, 'type': 'number'},
+        _workflowSuggestedField('product_id', t.workflowFieldProductId, t.workflowFieldDescProductId, 'number'),
+        _workflowSuggestedField('name', t.workflowFieldProductName, t.workflowFieldDescProductName, 'string'),
+        _workflowSuggestedField('code', t.workflowFieldProductCode, t.workflowFieldDescProductCode, 'string'),
+        _workflowSuggestedField('price', t.workflowFieldPrice, t.workflowFieldDescPrice, 'number'),
+        _workflowSuggestedField('quantity', t.workflowFieldQuantity, t.workflowFieldDescQuantity, 'number'),
       ];
     }
 
     return [
-      {'key': 'id', 'name': t.workflowFieldId, 'description': t.workflowFieldDescId, 'type': 'number'},
-      {'key': 'name', 'name': t.workflowFieldName, 'description': t.workflowFieldDescName, 'type': 'string'},
-      {'key': 'title', 'name': t.workflowFieldTitle, 'description': t.workflowFieldDescTitle, 'type': 'string'},
-      {'key': 'description', 'name': t.workflowFieldGenDescription, 'description': t.workflowFieldDescGenDescription, 'type': 'string'},
-      {'key': 'status', 'name': t.workflowFieldGenStatus, 'description': t.workflowFieldDescGenStatus, 'type': 'string'},
-      {'key': 'created_at', 'name': t.workflowFieldCreatedAt, 'description': t.workflowFieldDescCreatedAt, 'type': 'date'},
+      _workflowSuggestedField('id', t.workflowFieldId, t.workflowFieldDescId, 'number'),
+      _workflowSuggestedField('name', t.workflowFieldName, t.workflowFieldDescName, 'string'),
+      _workflowSuggestedField('title', t.workflowFieldTitle, t.workflowFieldDescTitle, 'string'),
+      _workflowSuggestedField(
+          'description', t.workflowFieldGenDescription, t.workflowFieldDescGenDescription, 'string'),
+      _workflowSuggestedField('status', t.workflowFieldGenStatus, t.workflowFieldDescGenStatus, 'string'),
+      _workflowSuggestedField('created_at', t.workflowFieldCreatedAt, t.workflowFieldDescCreatedAt, 'date'),
     ];
   }
 

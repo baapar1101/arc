@@ -76,21 +76,31 @@ class _ProductsPageState extends State<ProductsPage> {
     return value.toString();
   }
   
-  String _formatNumber(dynamic value, {int decimalPlaces = 0}) {
-    if (value is num) {
-      return formatWithThousands(value, decimalPlaces: decimalPlaces);
+  /// پارس عدد از پاسخ API (ممکن است به‌صورت رشته از سریالایز Decimal پایدانت برسد).
+  num? _parseNumForDisplay(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    if (value is String) {
+      final t = value.trim();
+      if (t.isEmpty) return null;
+      return num.tryParse(t);
     }
-    return '-';
+    return num.tryParse(value.toString());
   }
-  
+
+  String _formatNumber(dynamic value, {int decimalPlaces = 0}) {
+    final n = _parseNumForDisplay(value);
+    if (n == null) return '-';
+    return formatWithThousands(n, decimalPlaces: decimalPlaces);
+  }
+
   String _formatPercent(dynamic value) {
-    if (value is num) {
-      final doubleValue = value.toDouble();
-      final isInt = doubleValue.truncateToDouble() == doubleValue;
-      final formatted = isInt ? doubleValue.toStringAsFixed(0) : doubleValue.toStringAsFixed(2);
-      return '$formatted%';
-    }
-    return '-';
+    final n = _parseNumForDisplay(value);
+    if (n == null) return '-';
+    final doubleValue = n.toDouble();
+    final isInt = doubleValue.truncateToDouble() == doubleValue;
+    final formatted = isInt ? doubleValue.toStringAsFixed(0) : doubleValue.toStringAsFixed(2);
+    return '$formatted%';
   }
   
   String _resolveDateField(Map<String, dynamic> product, String key) {

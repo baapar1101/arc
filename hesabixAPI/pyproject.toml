@@ -36,7 +36,9 @@ dependencies = [
     "hiredis>=2.2.0",
     "rq>=1.15.0",
     "psutil>=5.9.0",
-    "simpleeval>=0.9.14"
+    "simpleeval>=0.9.14",
+    "croniter>=2.0.0",
+    "pytz>=2024.1"
 ]
 
 [project.optional-dependencies]

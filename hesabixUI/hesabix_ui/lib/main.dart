@@ -1917,7 +1917,6 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
-                    routeObserver: routeObserver,
                   ),
                 );
               },

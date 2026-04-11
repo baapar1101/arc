@@ -10,7 +10,7 @@ import threading
 import time
 import traceback
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -241,6 +241,8 @@ class WorkflowEngine:
             "workflow_id": workflow.id,
             "correlation_id": self.correlation_id,  # اضافه کردن correlation_id
             "db": self.db,  # اضافه کردن db برای استفاده در actions
+            "_workflow": workflow,
+            "_execution": execution,
         }
         
         # اجرای nodeها به ترتیب
@@ -291,6 +293,10 @@ class WorkflowEngine:
                 next_nodes = self._get_next_nodes(
                     node_id, connections, condition_result=condition_result
                 )
+                if node.get("type") == "loop":
+                    extra_follow = context.pop("_loop_queue_extension", None)
+                    if extra_follow is not None:
+                        next_nodes = list(extra_follow)
                 queue.extend(next_nodes)
                 
             except Exception as e:
@@ -343,6 +349,10 @@ class WorkflowEngine:
                     next_nodes = self._get_next_nodes(
                         node_id, connections, condition_result=condition_result
                     )
+                    if node.get("type") == "loop":
+                        extra_follow = context.pop("_loop_queue_extension", None)
+                        if extra_follow is not None:
+                            next_nodes = list(extra_follow)
                     queue.extend(next_nodes)
                 elif strategy == "retry":
                     # تلاش مجدد
@@ -388,6 +398,10 @@ class WorkflowEngine:
                             node_results[node_id] = {"success": False, "error": str(last_exception)}
                             executed_nodes.add(node_id)
                             next_nodes = self._get_next_nodes(node_id, connections)
+                            if node.get("type") == "loop":
+                                extra_follow = context.pop("_loop_queue_extension", None)
+                                if extra_follow is not None:
+                                    next_nodes = list(extra_follow)
                             queue.extend(next_nodes)
                         else:
                             raise last_exception
@@ -397,9 +411,15 @@ class WorkflowEngine:
                         next_nodes = self._get_next_nodes(
                             node_id, connections, condition_result=condition_result
                         )
+                        if node.get("type") == "loop":
+                            extra_follow = context.pop("_loop_queue_extension", None)
+                            if extra_follow is not None:
+                                next_nodes = list(extra_follow)
                         queue.extend(next_nodes)
         
-        # حذف db از context قبل از ذخیره‌سازی (چون قابل serialize نیست)
+        # حذف db و ارجاعات داخلی از context قبل از ذخیره‌سازی
+        context.pop("_workflow", None)
+        context.pop("_execution", None)
         context_for_storage = {k: v for k, v in context.items() if k != "db"}
         
         return {
@@ -454,8 +474,12 @@ class WorkflowEngine:
             result = self._execute_condition(node, context, node_results)
         
         elif node_type == "loop":
-            # اجرای حلقه
-            result = self._execute_loop(node, context, node_results)
+            wf = context.get("_workflow")
+            ex = context.get("_execution")
+            if wf is not None and ex is not None:
+                result = self._run_loop_node_with_body(node, context, node_results, wf, ex)
+            else:
+                result = self._execute_loop(node, context, node_results)
         
         else:
             raise ValueError(f"Unknown node type: {node_type}")
@@ -825,6 +849,202 @@ class WorkflowEngine:
     ) -> Any:
         """Wrapper برای استفاده instance method"""
         return WorkflowEngine._resolve_value_static(value, context, node_results)
+
+    def _split_loop_targets(
+        self, loop_id: str, connections: List[Dict[str, Any]]
+    ) -> tuple:
+        each_t: List[str] = []
+        done_t: List[str] = []
+        for c in connections:
+            if c.get("source") != loop_id:
+                continue
+            t = c.get("target")
+            if not t:
+                continue
+            h = c.get("sourceHandle") or c.get("source_output")
+            if h == "done":
+                done_t.append(str(t))
+            else:
+                each_t.append(str(t))
+        if not each_t and not done_t:
+            for c in connections:
+                if c.get("source") == loop_id and c.get("target"):
+                    each_t.append(str(c["target"]))
+        return each_t, done_t
+
+    def _loop_body_region_ids(
+        self,
+        each_starts: List[str],
+        done_set: Set[str],
+        nodes: List[Dict[str, Any]],
+        connections: List[Dict[str, Any]],
+    ) -> Set[str]:
+        node_ids = {str(n["id"]) for n in nodes if isinstance(n, dict) and n.get("id")}
+        reach: Set[str] = {str(s) for s in each_starts if str(s) in node_ids}
+        changed = True
+        while changed:
+            changed = False
+            for nid in list(node_ids):
+                if nid in reach or nid in done_set:
+                    continue
+                preds = [
+                    str(c.get("source"))
+                    for c in connections
+                    if c.get("target") == nid and c.get("source")
+                ]
+                if not preds:
+                    continue
+                if all(p in reach for p in preds):
+                    reach.add(nid)
+                    changed = True
+        return reach
+
+    def _loop_merge_entry_nodes(
+        self,
+        body_ids: Set[str],
+        connections: List[Dict[str, Any]],
+        nodes: List[Dict[str, Any]],
+    ) -> List[str]:
+        ids = [str(n["id"]) for n in nodes if isinstance(n, dict) and n.get("id")]
+        out: List[str] = []
+        for nid in ids:
+            if nid in body_ids:
+                continue
+            preds = [
+                str(c.get("source"))
+                for c in connections
+                if c.get("target") == nid and c.get("source")
+            ]
+            if not preds:
+                continue
+            in_b = [p for p in preds if p in body_ids]
+            out_b = [p for p in preds if p not in body_ids]
+            if in_b and out_b and nid not in out:
+                out.append(nid)
+        return out
+
+    def _execute_subgraph_bounded(
+        self,
+        execution: WorkflowExecution,
+        workflow: Workflow,
+        start_ids: List[str],
+        allowed: Set[str],
+        nodes: List[Dict[str, Any]],
+        connections: List[Dict[str, Any]],
+        context: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> None:
+        local_q = [str(x) for x in start_ids if str(x) in allowed]
+        local_exec: Set[str] = set()
+        while local_q:
+            nid = local_q.pop(0)
+            if nid not in allowed or nid in local_exec:
+                continue
+            node = next((n for n in nodes if str(n.get("id")) == nid), None)
+            if not node:
+                continue
+            local_exec.add(nid)
+            node_start_time = time.time()
+            try:
+                result = self._execute_node(node, context, node_results)
+                node_results[nid] = result
+                node_duration_ms = (time.time() - node_start_time) * 1000
+                self._log(
+                    execution,
+                    WorkflowLogLevel.INFO,
+                    f"Node '{node.get('label', nid)}' (loop body) executed successfully",
+                    {
+                        "node_id": nid,
+                        "node_type": node.get("type"),
+                        "duration_ms": round(node_duration_ms, 2),
+                        "correlation_id": self.correlation_id,
+                        "success": True,
+                    },
+                )
+                extra_follow = context.pop("_loop_queue_extension", None)
+                cond = result if node.get("type") == "condition" else None
+                nexts = self._get_next_nodes(nid, connections, condition_result=cond)
+                if extra_follow:
+                    for x in extra_follow:
+                        xs = str(x)
+                        if xs in allowed and xs not in nexts:
+                            nexts.append(xs)
+                for nx in nexts:
+                    nxs = str(nx)
+                    if nxs in allowed:
+                        local_q.append(nxs)
+            except Exception as e:
+                node_duration_ms = (time.time() - node_start_time) * 1000
+                logger.error("Loop body node failed %s: %s", nid, e, exc_info=True)
+                self._log(
+                    execution,
+                    WorkflowLogLevel.ERROR,
+                    f"Loop body node '{node.get('label', nid)}' failed: {e}",
+                    {
+                        "node_id": nid,
+                        "duration_ms": round(node_duration_ms, 2),
+                        "correlation_id": self.correlation_id,
+                        "error": str(e),
+                        "success": False,
+                    },
+                )
+                raise
+
+    def _run_loop_node_with_body(
+        self,
+        loop_node: Dict[str, Any],
+        context: Dict[str, Any],
+        node_results: Dict[str, Any],
+        workflow: Workflow,
+        execution: WorkflowExecution,
+    ) -> Dict[str, Any]:
+        raw_items = self._execute_loop(loop_node, context, node_results)
+        if raw_items is None:
+            raw_items = []
+        if not isinstance(raw_items, list):
+            raw_items = [raw_items]
+
+        loop_id = str(loop_node.get("id"))
+        wd = workflow.workflow_data or {}
+        connections = wd.get("connections") or []
+        nodes = wd.get("nodes") or []
+        each_t, done_t = self._split_loop_targets(loop_id, connections)
+        done_set = {str(x) for x in done_t}
+        body_ids = self._loop_body_region_ids(each_t, done_set, nodes, connections)
+        cfg = loop_node.get("config") or {}
+        item_var = cfg.get("item_variable", "item")
+        idx_var = cfg.get("index_variable", "index")
+
+        merge_nodes = self._loop_merge_entry_nodes(body_ids, connections, nodes)
+        follow: List[str] = list(done_set)
+        for m in merge_nodes:
+            if m not in follow:
+                follow.append(m)
+
+        for i, item in enumerate(raw_items):
+            context[item_var] = item
+            context[idx_var] = i
+            self._execute_subgraph_bounded(
+                execution,
+                workflow,
+                list(each_t),
+                body_ids,
+                nodes,
+                connections,
+                context,
+                node_results,
+            )
+
+        for k in (item_var, idx_var):
+            context.pop(k, None)
+
+        context["_loop_queue_extension"] = follow
+        return {
+            "success": True,
+            "items": raw_items,
+            "count": len(raw_items),
+            "iterations": len(raw_items),
+        }
     
     def _execute_loop(
         self,

@@ -357,10 +357,17 @@ def update_invoice_endpoint(
     except IntegrityError as e:
         db.rollback()
         err_msg = str(getattr(e, "orig", e) or e)
-        if "person_id" in err_msg.lower() or "document_lines" in err_msg.lower():
+        err_lower = err_msg.lower()
+        if "person_id" in err_lower or "document_lines" in err_lower:
             raise ApiError(
                 "INVALID_PERSON",
                 "شخص انتخاب‌شده معتبر نیست یا به این کسب‌وکار تعلق ندارد. لطفاً شخص دیگری انتخاب کنید.",
+                http_status=400,
+            )
+        if "uq_documents_business_code" in err_lower:
+            raise ApiError(
+                "DUPLICATE_DOCUMENT_CODE",
+                "این شماره فاکتور برای این کسب‌وکار قبلاً ثبت شده است",
                 http_status=400,
             )
         raise ApiError(

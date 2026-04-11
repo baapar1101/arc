@@ -172,6 +172,36 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                   _connectingToPosition = null;
                   return;
                 }
+              } else if (fromNode?.type == WorkflowNodeType.loop) {
+                sourceOutputId = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('خروجی حلقه'),
+                    content: const Text(
+                      '«هر تکرار»: نودهای داخل حلقه (برای هر آیتم اجرا می‌شوند).\n'
+                      '«پس از پایان»: نودهایی که بعد از اتمام همهٔ تکرارها اجرا شوند (مثلاً گزارش نهایی).',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('انصراف'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(ctx).pop('each'),
+                        child: const Text('هر تکرار'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(ctx).pop('done'),
+                        child: const Text('پس از پایان'),
+                      ),
+                    ],
+                  ),
+                );
+                if (sourceOutputId == null && mounted) {
+                  widget.state.cancelConnection();
+                  _connectingToPosition = null;
+                  return;
+                }
               }
             }
             widget.state.endConnection(droppedNode?.id, sourceOutputId: sourceOutputId);

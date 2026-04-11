@@ -21,10 +21,12 @@ class BaseTrigger(TriggerHandler):
         # بررسی enabled
         if config.get("enabled", True) is False:
             return {}
-        
-        # بررسی cooldown
+
+        is_preview = bool(context.get("__workflow_trigger_preview__"))
         workflow_id = context.get("workflow_id")
-        if workflow_id and not self._check_cooldown(str(workflow_id), config):
+
+        # بررسی cooldown (در پیش‌نمایش trigger_workflows مصرف نشود)
+        if workflow_id and not is_preview and not self._check_cooldown(str(workflow_id), config):
             return {}
         
         trigger_data = context.get("trigger_data", {})
@@ -39,7 +41,7 @@ class BaseTrigger(TriggerHandler):
             return {}
         
         # ثبت زمان آخرین trigger برای cooldown
-        if workflow_id:
+        if workflow_id and not is_preview:
             self._update_cooldown(str(workflow_id))
         
         return trigger_data

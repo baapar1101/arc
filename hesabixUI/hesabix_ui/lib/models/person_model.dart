@@ -515,38 +515,40 @@ class PersonUpdateRequest {
   });
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> json = {};
-    
-    if (code != null) json['code'] = code;
-    if (aliasName != null) json['alias_name'] = aliasName;
-    if (firstName != null) json['first_name'] = firstName;
-    if (lastName != null) json['last_name'] = lastName;
-    if (personTypes != null) json['person_types'] = personTypes!.map((t) => t.persianName).toList();
-    if (companyName != null) json['company_name'] = companyName;
-    if (paymentId != null) json['payment_id'] = paymentId;
-    if (nationalId != null) json['national_id'] = nationalId;
-    if (registrationNumber != null) json['registration_number'] = registrationNumber;
-    if (economicId != null) json['economic_id'] = economicId;
-    if (country != null) json['country'] = country;
-    if (province != null) json['province'] = province;
-    if (city != null) json['city'] = city;
-    if (address != null) json['address'] = address;
-    if (postalCode != null) json['postal_code'] = postalCode;
-    if (phone != null) json['phone'] = phone;
-    if (mobile != null) json['mobile'] = mobile;
-    if (fax != null) json['fax'] = fax;
-    if (email != null) json['email'] = email;
-    if (website != null) json['website'] = website;
-    if (isActive != null) json['is_active'] = isActive;
-    if (shareCount != null) json['share_count'] = shareCount;
-    if (commissionSalePercent != null) json['commission_sale_percent'] = commissionSalePercent;
-    if (commissionSalesReturnPercent != null) json['commission_sales_return_percent'] = commissionSalesReturnPercent;
-    if (commissionSalesAmount != null) json['commission_sales_amount'] = commissionSalesAmount;
-    if (commissionSalesReturnAmount != null) json['commission_sales_return_amount'] = commissionSalesReturnAmount;
-    if (commissionExcludeDiscounts != null) json['commission_exclude_discounts'] = commissionExcludeDiscounts;
-    if (commissionExcludeAdditionsDeductions != null) json['commission_exclude_additions_deductions'] = commissionExcludeAdditionsDeductions;
-    if (commissionPostInInvoiceDocument != null) json['commission_post_in_invoice_document'] = commissionPostInInvoiceDocument;
-    
-    return json;
+    return <String, dynamic>{
+      'code': code,
+      if (aliasName != null) 'alias_name': aliasName,
+      'first_name': firstName,
+      'last_name': lastName,
+      if (personTypes != null)
+        'person_types': personTypes!.map((t) => t.persianName).toList(),
+      'company_name': companyName,
+      'payment_id': paymentId,
+      'national_id': nationalId,
+      'registration_number': registrationNumber,
+      'economic_id': economicId,
+      'country': country,
+      'province': province,
+      'city': city,
+      'address': address,
+      'postal_code': postalCode,
+      'phone': phone,
+      'mobile': mobile,
+      'fax': fax,
+      'email': email,
+      'website': website,
+      if (isActive != null) 'is_active': isActive,
+      'share_count': shareCount,
+      'commission_sale_percent': commissionSalePercent,
+      'commission_sales_return_percent': commissionSalesReturnPercent,
+      'commission_sales_amount': commissionSalesAmount,
+      'commission_sales_return_amount': commissionSalesReturnAmount,
+      if (commissionExcludeDiscounts != null)
+        'commission_exclude_discounts': commissionExcludeDiscounts,
+      if (commissionExcludeAdditionsDeductions != null)
+        'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
+      if (commissionPostInInvoiceDocument != null)
+        'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
+    };
   }
 }

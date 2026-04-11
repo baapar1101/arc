@@ -161,6 +161,22 @@ class CheckDueDateTrigger(BaseTrigger):
         if check_type:
             if data.get("check_type") != check_type:
                 return {}
-        
+
+        days_before = config.get("days_before")
+        if days_before is not None and data:
+            try:
+                max_days_before = int(float(days_before))
+            except (TypeError, ValueError):
+                max_days_before = None
+            if max_days_before is not None:
+                dud = data.get("days_until_due")
+                if dud is not None:
+                    try:
+                        dud_i = int(dud)
+                    except (TypeError, ValueError):
+                        dud_i = None
+                    if dud_i is not None and dud_i > max_days_before:
+                        return {}
+
         return data
 

@@ -6,13 +6,17 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData, FilteringTextInputFormatter, HardwareKeyboard, KeyDownEvent, KeyEvent, LogicalKeyboardKey, TextInputFormatter;
 
+import '../../constants/report_template_constants.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/web/web_utils.dart' as web_utils;
+import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/loading_indicator.dart';
+import '../../widgets/report_template/embedded_pdf_iframe.dart';
 import '../../widgets/permission/permission_widgets.dart';
 
 class ReportTemplateVisualEditorPage extends StatefulWidget {
@@ -68,7 +72,8 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   final _marginRightCtrl = TextEditingController(text: '10');
   final _marginBottomCtrl = TextEditingController(text: '10');
   final _marginLeftCtrl = TextEditingController(text: '10');
-  
+  final _paperCustomCtrl = TextEditingController();
+
   // Preview
   String? _previewHtml;
   Uint8List? _previewPdfBytes;
@@ -110,6 +115,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     _marginRightCtrl.dispose();
     _marginBottomCtrl.dispose();
     _marginLeftCtrl.dispose();
+    _paperCustomCtrl.dispose();
     super.dispose();
   }
 
@@ -132,7 +138,8 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       _subtype = full['subtype']?.toString();
       _paperSize = full['paper_size']?.toString() ?? 'A4';
       _orientation = full['orientation']?.toString() ?? 'portrait';
-      
+      _paperCustomCtrl.clear();
+
       final margins = (full['margins'] as Map?)?.cast<String, dynamic>() ?? {};
       _marginTopCtrl.text = (margins['top']?.toString() ?? '10');
       _marginRightCtrl.text = (margins['right']?.toString() ?? '10');
@@ -279,7 +286,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           contentHtml: '<html><body></body></html>',
           assets: {'builder_design': _design, ..._assets},
           engine: 'builder',
-          paperSize: _paperSize,
+          paperSize: _effectivePaperSize(),
           orientation: _orientation,
           margins: margins,
         );
@@ -297,7 +304,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
             'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
             'assets': {'builder_design': _design, ..._assets},
             'engine': 'builder',
-            'paper_size': _paperSize,
+            'paper_size': _effectivePaperSize(),
             'orientation': _orientation,
             if (margins != null) 'margins': margins,
           },
@@ -368,7 +375,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           design: _design,
           assets: _assets,
           context: const <String, dynamic>{},
-          paperSize: _paperSize,
+          paperSize: _effectivePaperSize(),
           orientation: _orientation,
           margins: margins,
         );
@@ -417,6 +424,25 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     }
   }
 
+  String _effectivePaperSize() {
+    final c = _paperCustomCtrl.text.trim();
+    if (c.isEmpty) return _paperSize ?? 'A4';
+    return c.length > kReportTemplatePaperSizeMaxLength
+        ? c.substring(0, kReportTemplatePaperSizeMaxLength)
+        : c;
+  }
+
+  List<DropdownMenuItem<String>> _paperSizeDropdownItems() {
+    final cur = _paperSize;
+    return [
+      ...kReportTemplatePaperSizeOptions.map(
+        (e) => DropdownMenuItem<String>(value: e, child: Text(e)),
+      ),
+      if (cur != null && cur.isNotEmpty && !kReportTemplatePaperSizeOptions.contains(cur))
+        DropdownMenuItem<String>(value: cur, child: Text(cur)),
+    ];
+  }
+
   void _showPageSettingsDialog() {
     showDialog(
       context: context,
@@ -438,12 +464,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                           labelText: 'سایز صفحه',
                           border: OutlineInputBorder(),
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 'A4', child: Text('A4')),
-                          DropdownMenuItem(value: 'Letter', child: Text('Letter')),
-                          DropdownMenuItem(value: 'A3', child: Text('A3')),
-                          DropdownMenuItem(value: 'A5', child: Text('A5')),
-                        ],
+                        items: _paperSizeDropdownItems(),
                         onChanged: (v) {
                           setState(() => _paperSize = v);
                           setSt(() {});
@@ -469,6 +490,19 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _paperCustomCtrl,
+                  maxLength: kReportTemplatePaperSizeMaxLength,
+                  decoration: const InputDecoration(
+                    labelText: 'سایز سفارشی کاغذ (اختیاری)',
+                    helperText:
+                        'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست استفاده می‌شود (حداکثر ۳۲ نویسه)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setSt(() {}),
                 ),
                 const SizedBox(height: 16),
                 const Text('حاشیه‌ها (mm):', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -2181,31 +2215,59 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
               const Spacer(),
               TextButton.icon(
                 onPressed: () async {
-                  // Download PDF
                   try {
                     if (kIsWeb) {
-                      // For web - download PDF
-                      // TODO: Implement PDF download for web
-                      SnackBarHelper.show(context, message: 'PDF آماده دانلود است');
+                      await web_utils.saveBytesAsFileWeb(
+                        pdfBytes,
+                        'report_preview.pdf',
+                        mimeType: 'application/pdf',
+                      );
+                      if (mounted) {
+                        SnackBarHelper.show(context, message: 'دانلود PDF آغاز شد');
+                      }
                     } else {
-                      SnackBarHelper.show(context, message: 'دانلود PDF (در حال توسعه)');
+                      final path = await FileSaver.saveBytes(pdfBytes, 'report_preview.pdf');
+                      if (mounted) {
+                        SnackBarHelper.show(
+                          context,
+                          message: path != null ? 'ذخیره شد: $path' : 'فایل ذخیره شد',
+                        );
+                      }
                     }
                   } catch (e) {
-                    SnackBarHelper.showError(context, message: 'خطا در دانلود: $e');
+                    if (mounted) {
+                      SnackBarHelper.showError(context, message: 'خطا در دانلود: $e');
+                    }
                   }
                 },
                 icon: const Icon(Icons.download, size: 18),
                 label: const Text('دانلود PDF'),
               ),
+              if (kIsWeb) ...[
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    final url = web_utils.createObjectUrlFromBytes(
+                      pdfBytes,
+                      mimeType: 'application/pdf',
+                    );
+                    web_utils.openUrlInNewTabWeb(url);
+                  },
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('تب جدید'),
+                ),
+              ],
             ],
           ),
         ),
         Expanded(
           child: Container(
+            width: double.infinity,
             decoration: BoxDecoration(
               border: Border.all(color: Theme.of(context).dividerColor),
               color: Colors.white,
             ),
+            clipBehavior: Clip.hardEdge,
             child: _buildPdfViewer(pdfBytes),
           ),
         ),
@@ -2214,53 +2276,9 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   }
   
   Widget _buildPdfViewer(Uint8List pdfBytes) {
-    // For web, show PDF info
-    if (kIsWeb) {
-      // For web, show a message with download option
-      // Note: HtmlElementView requires platform view registration
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.picture_as_pdf, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'PDF با موفقیت تولید شد (${(pdfBytes.length / 1024).toStringAsFixed(1)} KB)',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'برای مشاهده PDF، از دکمه دانلود استفاده کنید',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      );
-    } else {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.picture_as_pdf, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            const Text(
-              'پیش‌نمایش PDF در نسخه وب در دسترس است',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () async {
-                SnackBarHelper.show(context, message: 'PDF آماده دانلود است');
-              },
-              icon: const Icon(Icons.download),
-              label: const Text('دانلود PDF'),
-            ),
-          ],
-        ),
-      );
-    }
+    return SizedBox.expand(
+      child: ReportTemplateEmbeddedPdf(bytes: pdfBytes),
+    );
   }
 
   Widget _buildCanvasView(String section) {

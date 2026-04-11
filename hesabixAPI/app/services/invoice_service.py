@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+import re
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -812,6 +813,15 @@ def _normalize_document_extra_info_for_storage(extra_info: Optional[Dict[str, An
                 out[key] = int(val)
             except (TypeError, ValueError):
                 pass
+    dd_raw = out.get("due_date")
+    if dd_raw is not None and str(dd_raw).strip():
+        try:
+            dd_s = str(dd_raw).replace("Z", "+00:00")
+            if "T" in dd_s:
+                dd_s = dd_s.split("T")[0]
+            out["due_date"] = _parse_iso_date(dd_s).isoformat()
+        except Exception:
+            out.pop("due_date", None)
     links = out.get("links")
     if isinstance(links, dict):
         links = dict(links)
@@ -1722,7 +1732,17 @@ def create_invoice(
         raise ApiError("PERSON_REQUIRED", "person_id is required for this invoice type", http_status=400)
 
     # Compute totals from lines if not provided
-    header_extra = data.get("extra_info") or {}
+    raw_extra = data.get("extra_info")
+    header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
+    dd_top = data.get("due_date")
+    if dd_top is not None and str(dd_top).strip():
+        try:
+            ds = str(dd_top).replace("Z", "+00:00")
+            if "T" in ds:
+                ds = ds.split("T")[0]
+            header_extra["due_date"] = _parse_iso_date(ds).isoformat()
+        except Exception:
+            pass
     totals = (header_extra.get("totals") or {}) if isinstance(header_extra, dict) else {}
     totals_missing = not all(k in totals for k in ("gross", "discount", "tax", "net"))
     if totals_missing:
@@ -2676,14 +2696,19 @@ def create_invoice(
 
     # فراخوانی workflow triggers برای فاکتور ایجاد شده
     try:
-        from app.services.workflow.workflow_trigger_service import trigger_invoice_created
+        from app.services.workflow.workflow_trigger_service import (
+            build_invoice_trigger_enrichment,
+            trigger_invoice_created,
+        )
+        _inv_extra = build_invoice_trigger_enrichment(db, document)
         trigger_invoice_created(
             db=db,
             business_id=business_id,
             invoice_id=document.id,
             invoice_type=invoice_type,
             total_amount=float(total_with_tax),
-            user_id=user_id
+            user_id=user_id,
+            extra_fields=_inv_extra,
         )
     except Exception as e:
         # عدم موفقیت در trigger نباید مانع بازگشت فاکتور شود
@@ -2770,12 +2795,49 @@ def update_invoice(
         # merge extra_info: ابتدا old_extra را کپی کن، سپس new_extra را merge کن
         old_extra = dict(document.extra_info) if document.extra_info else {}
         new_extra = dict(data.get("extra_info") or {})
+        dd_top = data.get("due_date")
+        if dd_top is not None and str(dd_top).strip():
+            try:
+                ds = str(dd_top).replace("Z", "+00:00")
+                if "T" in ds:
+                    ds = ds.split("T")[0]
+                new_extra["due_date"] = _parse_iso_date(ds).isoformat()
+            except Exception:
+                pass
         # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
         merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
         document.extra_info = merged_extra
     if isinstance(data.get("description"), str) or data.get("description") is None:
         if data.get("description") is not None:
             document.description = data.get("description")
+
+    if "code" in data:
+        new_code = str(data.get("code") or "").strip()
+        if not new_code:
+            raise ApiError("CODE_REQUIRED", "شماره فاکتور الزامی است", http_status=400)
+        if not re.match(r"^[A-Za-z0-9_-]+$", new_code):
+            raise ApiError(
+                "INVALID_DOCUMENT_CODE",
+                "شماره فاکتور فقط می‌تواند شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد",
+                http_status=400,
+            )
+        if new_code != (document.code or ""):
+            dup = (
+                db.query(Document)
+                .filter(
+                    Document.business_id == document.business_id,
+                    Document.code == new_code,
+                    Document.id != document.id,
+                )
+                .first()
+            )
+            if dup:
+                raise ApiError(
+                    "DUPLICATE_DOCUMENT_CODE",
+                    "این شماره فاکتور برای این کسب‌وکار قبلاً ثبت شده است",
+                    http_status=400,
+                )
+            document.code = new_code
 
     # آزادسازی instance های قبلی این فاکتور (برای کالاهای یونیک)
     # قبل از حذف سطرها، instance های sold شده توسط این فاکتور را به حالت available برمی‌گردانیم

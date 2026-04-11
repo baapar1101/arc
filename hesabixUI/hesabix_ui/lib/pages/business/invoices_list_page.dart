@@ -24,8 +24,6 @@ class InvoicesListPage extends StatefulWidget {
   final CalendarController calendarController;
   final AuthStore authStore;
   final ApiClient apiClient;
-  /// برای رفرش خودکار هنگام بازگشت از صفحه افزودن/ویرایش فاکتور
-  final RouteObserver<ModalRoute<void>>? routeObserver;
 
   const InvoicesListPage({
     super.key,
@@ -33,7 +31,6 @@ class InvoicesListPage extends StatefulWidget {
     required this.calendarController,
     required this.authStore,
     required this.apiClient,
-    this.routeObserver,
   });
 
   @override
@@ -53,7 +50,7 @@ class InvoicesListPage extends StatefulWidget {
   }
 }
 
-class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
+class _InvoicesListPageState extends State<InvoicesListPage> {
   final GlobalKey _tableKey = GlobalKey();
   final InvoiceService _invoiceService = InvoiceService();
   late final BusinessDashboardService _dashboardService = BusinessDashboardService(widget.apiClient);
@@ -62,7 +59,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
   static const double _mobileInvoiceCardVPadding = 6; // inside row height budget
 
   String? _selectedInvoiceType;
-  bool _isInitialized = false;
   DateTime? _fromDate;
   DateTime? _toDate;
   bool? _isProforma; // null=همه، true=پیشفاکتور، false=قطعی
@@ -104,18 +100,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
     InvoicesListPage._pageStates[widget.businessId] = this;
     _loadFiscalYears();
     _loadProjects();
-    // بعد از اولین build، flag را set کن
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _isInitialized = true;
-      }
-    });
   }
   
   @override
   void dispose() {
-    widget.routeObserver?.unsubscribe(this);
-    // Clean up the page state when disposed
     InvoicesListPage._pageStates.remove(widget.businessId);
     super.dispose();
   }
@@ -172,32 +160,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
     } catch (_) {
       // ignore errors
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // ثبت در RouteObserver برای رفرش هنگام بازگشت از صفحه افزودن/ویرایش فاکتور
-    final route = ModalRoute.of(context);
-    if (widget.routeObserver != null && route is ModalRoute<void>) {
-      widget.routeObserver!.unsubscribe(this);
-      widget.routeObserver!.subscribe(this, route);
-    }
-    // اگر صفحه قبلاً initialize شده بود، داده‌ها را refresh کن
-    // این برای زمانی است که از صفحه دیگری (مثل ثبت فاکتور) به این صفحه برمی‌گردیم
-    if (_isInitialized) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _refreshData();
-        }
-      });
-    }
-  }
-
-  @override
-  void didPopNext() {
-    // هنگام بازگشت از صفحه رویی (مثل افزودن/ویرایش فاکتور)، جدول را رفرش کن
-    if (mounted) _refreshData();
   }
 
   @override
@@ -854,7 +816,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
           if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         },
-        onRowTap: (item) => _onView(item as InvoiceListItem),
+        // موبایل: منوی عملیات داخل کارت است؛ onRowTap سطر با PopupMenu تداخل دارد (مثل لیست کالاها که ActionColumn جدا دارد).
+        onRowTap: null,
         emptyStateMessage: t.noInvoicesFound,
         loadingMessage: t.loadingInvoices,
         errorMessage: t.errorLoadingInvoices,
@@ -1292,81 +1255,90 @@ class _InvoicesListPageState extends State<InvoicesListPage> with RouteAware {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.15)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        invoice.code,
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      amount,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(width: 6),
-                    PopupMenuButton<int>(
-                      tooltip: t.actions,
-                      icon: const Icon(Icons.more_vert, size: 20),
-                      onSelected: (idx) {
-                        final actions = buildActions();
-                        if (idx >= 0 && idx < actions.length) actions[idx].onTap();
-                      },
-                      itemBuilder: (context) {
-                        final actions = buildActions();
-                        return List.generate(actions.length, (i) {
-                          final a = actions[i];
-                          return PopupMenuItem<int>(
-                            value: i,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  a.icon,
-                                  size: 18,
-                                  color: a.isDestructive ? theme.colorScheme.error : null,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(a.label, overflow: TextOverflow.ellipsis)),
-                              ],
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _onView(invoice),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                invoice.code,
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          );
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  typeText,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  counterparty,
-                  style: theme.textTheme.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const Spacer(),
-                // Badges: single-line with horizontal scroll to avoid wrapping/overflow.
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (int i = 0; i < badges.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 6),
-                        badges[i],
+                            const SizedBox(width: 8),
+                            Text(
+                              amount,
+                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          typeText,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          counterparty,
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Spacer(),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (int i = 0; i < badges.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 6),
+                                badges[i],
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
-                    ],
+                    ),
                   ),
+                ),
+                PopupMenuButton<int>(
+                  tooltip: t.actions,
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (idx) {
+                    final actions = buildActions();
+                    if (idx >= 0 && idx < actions.length) actions[idx].onTap();
+                  },
+                  itemBuilder: (context) {
+                    final actions = buildActions();
+                    return List.generate(actions.length, (i) {
+                      final a = actions[i];
+                      return PopupMenuItem<int>(
+                        value: i,
+                        child: Row(
+                          children: [
+                            Icon(
+                              a.icon,
+                              size: 18,
+                              color: a.isDestructive ? theme.colorScheme.error : null,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(a.label, overflow: TextOverflow.ellipsis)),
+                          ],
+                        ),
+                      );
+                    });
+                  },
                 ),
               ],
             ),

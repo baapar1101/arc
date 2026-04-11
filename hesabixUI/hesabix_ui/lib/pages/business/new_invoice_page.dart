@@ -1288,6 +1288,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           label: 'شماره فاکتور',
                           hintText: 'مثال: INV-2024-001',
                           autoGenerateCode: _autoGenerateInvoiceNumber,
+                          invoiceDocumentCode: true,
                         ),
                         const SizedBox(height: 16),
                         
@@ -1576,6 +1577,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 label: 'شماره فاکتور',
                                 hintText: 'مثال: INV-2024-001',
                                 autoGenerateCode: _autoGenerateInvoiceNumber,
+                                invoiceDocumentCode: true,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -2194,7 +2196,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     // نادیده گرفتن اعتبار مشتری (فقط در فروش معنادار است؛ اما در payload همیشه ارسال می‌شود)
     extraInfo['ignore_credit_check'] = _ignoreCreditCheck;
-    
+    // تاریخ سررسید سند (YYYY-MM-DD در extra_info)
+    final dueForDoc = _dueDate ?? _invoiceDate;
+    if (dueForDoc != null) {
+      extraInfo['due_date'] = dueForDoc.toIso8601String().split('T').first;
+    }
+
     // افزودن person_id بر اساس نوع فاکتور
     if (isSalesOrReturn && _selectedCustomer != null) {
       extraInfo['person_id'] = _selectedCustomer!.id;

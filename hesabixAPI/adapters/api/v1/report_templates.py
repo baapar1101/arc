@@ -412,6 +412,12 @@ async def report_template_schema(
 			{"name": "table_headers_html", "desc": "HTML هدر جدول"},
 			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
 		]
+	elif module_key == "transfers" and (subtype or "") == "list":
+		data["keys"] += [
+			{"name": "items", "desc": "لیست اسناد انتقال"},
+			{"name": "table_headers_html", "desc": "HTML هدر جدول"},
+			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
+		]
 	return data
 
 

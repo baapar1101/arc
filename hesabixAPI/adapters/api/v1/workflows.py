@@ -3,6 +3,9 @@ API endpoints برای مدیریت Workflow
 """
 
 from collections import defaultdict
+import asyncio
+import json
+import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Body, HTTPException, Query
@@ -24,9 +27,45 @@ from app.core.responses import success_response, format_datetime_fields, ApiErro
 from app.services.workflow.workflow_engine import WorkflowEngine
 from app.services.workflow.trigger_registry import TriggerRegistry
 from app.services.workflow.action_registry import ActionRegistry
+from app.services.workflow.workflow_trigger_service import ensure_workflow_webhook_settings
+from app.core.settings import get_settings as get_app_settings
 from adapters.api.v1.schemas import QueryInfo
 
 router = APIRouter(tags=["workflows"])
+_logger = logging.getLogger(__name__)
+
+
+def _webhook_trigger_timeout_seconds(workflow: Workflow) -> float:
+    """timeout_seconds از نود تریگر webhook (۵…۶۰۰ ثانیه)."""
+    nodes = (workflow.workflow_data or {}).get("nodes") or []
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        if n.get("type") != "trigger":
+            continue
+        cfg = n.get("config") or {}
+        if cfg.get("trigger_type") != "webhook":
+            continue
+        raw = cfg.get("timeout_seconds", 30)
+        try:
+            t = float(raw)
+        except (TypeError, ValueError):
+            t = 30.0
+        return max(5.0, min(t, 600.0))
+    return 30.0
+
+
+def _attach_workflow_webhook_url(data: Dict[str, Any], request: Request) -> None:
+    settings_row = data.get("settings")
+    secret = (settings_row or {}).get("webhook_secret") if isinstance(settings_row, dict) else None
+    if not secret:
+        return
+    try:
+        root = str(request.base_url).rstrip("/")
+        prefix = get_app_settings().api_v1_prefix.rstrip("/")
+        data["webhook_inbound_url"] = f"{root}{prefix}/workflow-hooks/{secret}"
+    except Exception:
+        pass
 
 
 def validate_workflow_data(workflow_data: Dict[str, Any]) -> List[str]:
@@ -149,22 +188,29 @@ async def create_workflow(
             f"ساختار workflow_data نامعتبر است: {'; '.join(validation_errors)}"
         )
     
+    merged_settings = ensure_workflow_webhook_settings(
+        workflow_data, dict(body.get("settings") or {})
+    )
+
     workflow = Workflow(
         business_id=business_id,
         name=name,
         description=body.get("description"),
         status=WorkflowStatus(body.get("status", WorkflowStatus.DRAFT.value)),
         workflow_data=workflow_data,
-        settings=body.get("settings"),
+        settings=merged_settings if merged_settings else None,
         created_by_user_id=ctx.get_user_id(),
     )
     
     db.add(workflow)
     db.commit()
     db.refresh(workflow)
-    
+
+    created = format_datetime_fields(workflow.__dict__, request)
+    _attach_workflow_webhook_url(created, request)
+
     return success_response(
-        data=format_datetime_fields(workflow.__dict__, request),
+        data=created,
         request=request,
         message="WORKFLOW_CREATED",
     )
@@ -247,9 +293,12 @@ async def get_workflow(
     workflow = db.get(Workflow, workflow_id)
     if not workflow or workflow.business_id != business_id:
         raise ApiError("WORKFLOW_NOT_FOUND", "Workflow یافت نشد")
-    
+
+    payload = format_datetime_fields(workflow.__dict__, request)
+    _attach_workflow_webhook_url(payload, request)
+
     return success_response(
-        data=format_datetime_fields(workflow.__dict__, request),
+        data=payload,
         request=request,
         message="WORKFLOW_RETRIEVED",
     )
@@ -290,14 +339,24 @@ async def update_workflow(
                 f"ساختار workflow_data نامعتبر است: {'; '.join(validation_errors)}"
             )
         workflow.workflow_data = body["workflow_data"]
+        workflow.settings = ensure_workflow_webhook_settings(
+            body["workflow_data"], dict(workflow.settings or {})
+        )
     if "settings" in body:
-        workflow.settings = body["settings"]
+        merged = dict(workflow.settings or {})
+        merged.update(body["settings"] or {})
+        workflow.settings = ensure_workflow_webhook_settings(
+            workflow.workflow_data or {}, merged
+        )
     
     db.commit()
     db.refresh(workflow)
-    
+
+    updated = format_datetime_fields(workflow.__dict__, request)
+    _attach_workflow_webhook_url(updated, request)
+
     return success_response(
-        data=format_datetime_fields(workflow.__dict__, request),
+        data=updated,
         request=request,
         message="WORKFLOW_UPDATED",
     )
@@ -784,15 +843,17 @@ async def get_triggers_metadata(
 ):
     """دریافت metadata triggerها"""
     from app.services.workflow.i18n import translate_metadata
-    
+
     trigger_registry = TriggerRegistry()
     all_triggers = trigger_registry.get_all_metadata()
     
     # ترجمه metadata
     translated_triggers = []
     for trigger in all_triggers:
-        # فعلاً ترجمه ساده (بعداً کامل می‌شود)
-        translated_triggers.append(trigger)
+        tk = trigger.get("key")
+        translated_triggers.append(
+            translate_metadata(trigger, lang, action_key=tk) if tk else trigger
+        )
     
     return success_response(
         data=translated_triggers,
@@ -943,5 +1004,88 @@ async def export_workflow_translations(
         },
         request=request,
         message="TRANSLATIONS_EXPORTED",
+    )
+
+
+@router.api_route(
+    "/workflow-hooks/{webhook_secret}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+    summary="اجرای ورک‌فلو از طریق Webhook",
+    description="بدون احراز هویت کاربر؛ فقط با webhook_secret ذخیره‌شده در تنظیمات ورک‌فلو.",
+)
+async def workflow_webhook_inbound(
+    request: Request,
+    webhook_secret: str,
+    db: Session = Depends(get_db),
+):
+    secret = (webhook_secret or "").strip()
+    if len(secret) < 16:
+        raise ApiError("WORKFLOW_WEBHOOK_NOT_FOUND", "نشانی webhook نامعتبر است", http_status=404)
+
+    stmt = select(Workflow).where(Workflow.status == WorkflowStatus.ACTIVE)
+    candidates = list(db.execute(stmt).scalars().all())
+    wf = next(
+        (w for w in candidates if (w.settings or {}).get("webhook_secret") == secret),
+        None,
+    )
+    if wf is None:
+        raise ApiError("WORKFLOW_WEBHOOK_NOT_FOUND", "ورک‌فلو فعال با این نشانی یافت نشد", http_status=404)
+
+    nodes = (wf.workflow_data or {}).get("nodes") or []
+    has_webhook_trigger = any(
+        isinstance(n, dict)
+        and n.get("type") == "trigger"
+        and (n.get("config") or {}).get("trigger_type") == "webhook"
+        for n in nodes
+    )
+    if not has_webhook_trigger:
+        raise ApiError(
+            "WORKFLOW_WEBHOOK_DISABLED",
+            "این ورک‌فلو تریگر webhook ندارد",
+            http_status=400,
+        )
+
+    raw_body = await request.body()
+    body_obj: Any = {}
+    if raw_body:
+        try:
+            body_obj = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            body_obj = {"_raw_text": raw_body.decode("utf-8", errors="replace")}
+
+    trigger_data: Dict[str, Any] = {
+        "method": request.method,
+        "headers": {k: v for k, v in request.headers.items()},
+        "query_params": dict(request.query_params),
+        "body": body_obj,
+    }
+
+    timeout_sec = _webhook_trigger_timeout_seconds(wf)
+
+    def _run_workflow_sync():
+        engine = WorkflowEngine(db, wf.business_id, user_id=None)
+        return engine.execute_workflow(wf, trigger_data)
+
+    try:
+        execution = await asyncio.wait_for(
+            asyncio.to_thread(_run_workflow_sync),
+            timeout=timeout_sec,
+        )
+    except asyncio.TimeoutError:
+        raise ApiError(
+            "WORKFLOW_WEBHOOK_TIMEOUT",
+            f"اجرای ورک‌فلو بیش از {int(timeout_sec)} ثانیه طول کشید",
+            http_status=504,
+        )
+    except ApiError:
+        raise
+    except Exception as e:
+        _logger.error("workflow webhook execute failed: %s", e, exc_info=True)
+        raise ApiError("WORKFLOW_WEBHOOK_EXEC_FAILED", str(e), http_status=500)
+
+    return success_response(
+        data=format_datetime_fields(execution.__dict__, request),
+        request=request,
+        message="WORKFLOW_WEBHOOK_EXECUTED",
     )
 

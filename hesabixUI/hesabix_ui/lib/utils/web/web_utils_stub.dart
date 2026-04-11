@@ -1,3 +1,12 @@
+String createObjectUrlFromBytes(
+  List<int> bytes, {
+  String mimeType = 'application/octet-stream',
+}) {
+  throw UnsupportedError('Blob URLs are only supported on web.');
+}
+
+void revokeBlobUrl(String url) {}
+
 Future<void> saveBytesAsFileWeb(
   List<int> bytes,
   String filename, {

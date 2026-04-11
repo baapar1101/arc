@@ -55,6 +55,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   InvoiceType? _selectedInvoiceType;
   String? _invoiceNumber;
   DateTime? _invoiceDate;
+  DateTime? _dueDate;
   int? _selectedCurrencyId;
   int? _selectedProjectId;
   String? _invoiceTitle;
@@ -112,6 +113,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     super.dispose();
   }
 
+  DateTime? _parseDueDateFromExtra(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString();
+    if (s.isEmpty) return null;
+    final head = s.length >= 10 ? s.substring(0, 10) : s;
+    return DateTime.tryParse(head);
+  }
+
   Future<void> _loadInvoice() async {
     setState(() {
       _loading = true;
@@ -136,6 +145,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
       _postInventory = (_originalExtraInfo['post_inventory'] is bool) ? _originalExtraInfo['post_inventory'] as bool : true;
+      _dueDate = _parseDueDateFromExtra(_originalExtraInfo['due_date']);
       
       // بارگذاری تراکنش‌های پرداخت موجود
       await _loadPaymentTransactions();
@@ -494,11 +504,40 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         const SizedBox(height: 12),
                         CodeFieldWidget(
                           initialValue: _invoiceNumber,
-                          onChanged: (_) {},
+                          onChanged: (number) {
+                            setState(() {
+                              _invoiceNumber = number;
+                            });
+                          },
                           isRequired: true,
                           label: 'شماره فاکتور',
-                          hintText: 'کد فاکتور',
-                          autoGenerateCode: true,
+                          hintText: 'مثال: INV-20240410-0001',
+                          autoGenerateCode: false,
+                          invoiceDocumentCode: true,
+                        ),
+                        const SizedBox(height: 12),
+                        DateInputField(
+                          value: _invoiceDate,
+                          labelText: 'تاریخ فاکتور *',
+                          hintText: 'انتخاب تاریخ فاکتور',
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() {
+                              _invoiceDate = date;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DateInputField(
+                          value: _dueDate ?? _invoiceDate,
+                          labelText: 'تاریخ سررسید',
+                          hintText: 'انتخاب تاریخ سررسید',
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() {
+                              _dueDate = date;
+                            });
+                          },
                         ),
                       ],
                     );
@@ -543,11 +582,16 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             Expanded(
                               child: CodeFieldWidget(
                                 initialValue: _invoiceNumber,
-                                onChanged: (_) {},
+                                onChanged: (number) {
+                                  setState(() {
+                                    _invoiceNumber = number;
+                                  });
+                                },
                                 isRequired: true,
                                 label: 'شماره فاکتور',
-                                hintText: 'کد فاکتور',
-                                autoGenerateCode: true, // فقط نمایشی در ویرایش
+                                hintText: 'مثال: INV-20240410-0001',
+                                autoGenerateCode: false,
+                                invoiceDocumentCode: true,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -594,6 +638,18 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 16),
+                        DateInputField(
+                          value: _dueDate ?? _invoiceDate,
+                          labelText: 'تاریخ سررسید',
+                          hintText: 'انتخاب تاریخ سررسید',
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() {
+                              _dueDate = date;
+                            });
+                          },
                         ),
                         const SizedBox(height: 16),
                         // طرف حساب فقط نمایشی در صورت امکان
@@ -848,6 +904,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       return 'حداقل یک ردیف کالا/خدمت وارد کنید';
     }
 
+    final codeTrimmed = (_invoiceNumber ?? '').trim();
+    if (codeTrimmed.isEmpty) {
+      return 'شماره فاکتور الزامی است';
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(codeTrimmed)) {
+      return 'شماره فاکتور فقط می‌تواند شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد';
+    }
+
     // ساخت extra_info با حفظ اطلاعات قبلی
     final mergedExtra = <String, dynamic>{..._originalExtraInfo};
     mergedExtra['post_inventory'] = _postInventory;
@@ -857,11 +921,16 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'tax': _sumTax,
       'net': _sumTotal,
     };
+    final dueForSave = _dueDate ?? _invoiceDate;
+    if (dueForSave != null) {
+      mergedExtra['due_date'] = dueForSave.toIso8601String().split('T').first;
+    }
 
     String _convertInvoiceTypeToApi(InvoiceType type) => 'invoice_${type.value}';
 
     final payload = <String, dynamic>{
       'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!), // جهت سازگاری حساب‌ها
+      'code': codeTrimmed,
       'document_date': _invoiceDate!.toIso8601String().split('T')[0],
       'currency_id': _selectedCurrencyId,
       'is_proforma': _isProforma, // ارسال وضعیت پیش‌فاکتور

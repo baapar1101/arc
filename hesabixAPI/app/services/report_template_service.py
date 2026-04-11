@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
+import json
+import re
 import time
 import logging
 
@@ -15,12 +17,24 @@ from app.services.template_builder_compiler import compile_design_to_jinja_html
 
 logger = logging.getLogger(__name__)
 
+_MODULE_SUBTYPE_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_MAX_HTML_LEN = 1_000_000
+_MAX_FRAGMENT_LEN = 500_000
+_MAX_NAME_LEN = 160
+_MAX_DESC_LEN = 512
+_MAX_MODULE_LEN = 64
+_MAX_ASSETS_JSON_LEN = 2_000_000
+_ALLOWED_ENGINES = frozenset({"jinja2", "builder"})
+_ALLOWED_STATUS = frozenset({"draft", "published"})
+_ALLOWED_ORIENTATION = frozenset({"portrait", "landscape"})
+_MAX_PAPER_LEN = 32
+
 
 class ReportTemplateService:
 	"""سرویس مدیریت قالب‌های گزارش"""
 	
-	# سیستم کش برای قالب‌ها
-	_template_cache: Dict[int, Tuple[ReportTemplate, float]] = {}
+	# سیستم کش برای قالب‌ها — کلید (template_id, business_id)
+	_template_cache: Dict[Tuple[int, Optional[int]], Tuple[ReportTemplate, float]] = {}
 	CACHE_TTL = 300  # 5 دقیقه
 
 	@staticmethod
@@ -32,21 +46,17 @@ class ReportTemplateService:
 		status: Optional[str] = None,
 		only_published: bool = False,
 	) -> List[ReportTemplate]:
-		try:
-			q = db.query(ReportTemplate).filter(ReportTemplate.business_id == int(business_id))
-			if module_key:
-				q = q.filter(ReportTemplate.module_key == str(module_key))
-			if subtype:
-				q = q.filter(ReportTemplate.subtype == str(subtype))
-			if status:
-				q = q.filter(ReportTemplate.status == str(status))
-			if only_published:
-				q = q.filter(ReportTemplate.status == "published")
-			q = q.order_by(ReportTemplate.updated_at.desc())
-			return q.all()
-		except Exception:
-			# اگر جدول موجود نباشد، شکست نخوریم
-			return []
+		q = db.query(ReportTemplate).filter(ReportTemplate.business_id == int(business_id))
+		if module_key:
+			q = q.filter(ReportTemplate.module_key == str(module_key))
+		if subtype:
+			q = q.filter(ReportTemplate.subtype == str(subtype))
+		if status:
+			q = q.filter(ReportTemplate.status == str(status))
+		if only_published:
+			q = q.filter(ReportTemplate.status == "published")
+		q = q.order_by(ReportTemplate.updated_at.desc())
+		return q.all()
 
 	@staticmethod
 	def get_template(db: Session, template_id: int, business_id: Optional[int] = None) -> Optional[ReportTemplate]:
@@ -66,8 +76,7 @@ class ReportTemplateService:
 		business_id: Optional[int] = None
 	) -> Optional[ReportTemplate]:
 		"""دریافت قالب با کش"""
-		cache_key = template_id
-		
+		cache_key = (int(template_id), int(business_id) if business_id is not None else None)
 		if cache_key in ReportTemplateService._template_cache:
 			template, cached_time = ReportTemplateService._template_cache[cache_key]
 			if time.time() - cached_time < ReportTemplateService.CACHE_TTL:
@@ -79,16 +88,135 @@ class ReportTemplateService:
 		return template
 	
 	@staticmethod
-	def invalidate_cache(template_id: int):
-		"""پاک کردن کش یک قالب"""
-		ReportTemplateService._template_cache.pop(template_id, None)
+	def invalidate_cache(template_id: int, business_id: Optional[int] = None):
+		"""پاک کردن کش یک قالب (با business_id برای کلید ترکیبی)"""
+		if business_id is not None:
+			ReportTemplateService._template_cache.pop((int(template_id), int(business_id)), None)
+		else:
+			# حذف هر ورودی با این template_id (سازگاری با کش قدیمی)
+			keys_to_del = [k for k in ReportTemplateService._template_cache if k[0] == int(template_id)]
+			for k in keys_to_del:
+				ReportTemplateService._template_cache.pop(k, None)
+
+	@staticmethod
+	def validate_template_payload(data: Dict[str, Any], *, is_update: bool) -> None:
+		"""اعتبارسنجی ورودی ایجاد/ویرایش قالب (واردات JSON و فرم)."""
+		present = set(data.keys())
+
+		def _str_field(key: str, max_len: int, *, required_on_create: bool) -> None:
+			if is_update and key not in present:
+				return
+			val = data.get(key)
+			if not is_update and required_on_create:
+				if val is None or (isinstance(val, str) and not val.strip()):
+					raise ApiError("VALIDATION_ERROR", f"Missing or empty field: {key}", http_status=400)
+			if key in present and val is not None:
+				if not isinstance(val, str):
+					raise ApiError("VALIDATION_ERROR", f"{key} must be a string", http_status=400)
+				if len(val) > max_len:
+					raise ApiError("VALIDATION_ERROR", f"{key} is too long (max {max_len})", http_status=400)
+
+		def _module_or_subtype(key: str) -> None:
+			if is_update and key not in present:
+				return
+			val = data.get(key)
+			if not is_update and key == "module_key":
+				if val is None or not str(val).strip():
+					raise ApiError("VALIDATION_ERROR", "Missing or empty field: module_key", http_status=400)
+			if key in present and val is not None:
+				s = str(val).strip()
+				if not s:
+					if key == "subtype":
+						return
+					raise ApiError("VALIDATION_ERROR", f"Invalid {key}", http_status=400)
+				if len(s) > _MAX_MODULE_LEN or not _MODULE_SUBTYPE_KEY_RE.match(s):
+					raise ApiError(
+						"VALIDATION_ERROR",
+						f"Invalid {key}: use lowercase letters, digits and underscore (max {_MAX_MODULE_LEN})",
+						http_status=400,
+					)
+
+		_module_or_subtype("module_key")
+		_module_or_subtype("subtype")
+
+		_str_field("name", _MAX_NAME_LEN, required_on_create=True)
+		_str_field("description", _MAX_DESC_LEN, required_on_create=False)
+
+		if not is_update or "content_html" in present:
+			ch = data.get("content_html")
+			if not is_update:
+				if ch is None or not isinstance(ch, str) or not ch.strip():
+					raise ApiError("VALIDATION_ERROR", "Missing or empty field: content_html", http_status=400)
+			if ch is not None:
+				if not isinstance(ch, str):
+					raise ApiError("VALIDATION_ERROR", "content_html must be a string", http_status=400)
+				if len(ch) > _MAX_HTML_LEN:
+					raise ApiError("VALIDATION_ERROR", "content_html is too large", http_status=413)
+
+		for frag in ("content_css", "header_html", "footer_html"):
+			if frag in present and data.get(frag) is not None:
+				v = data[frag]
+				if not isinstance(v, str):
+					raise ApiError("VALIDATION_ERROR", f"{frag} must be a string", http_status=400)
+				if len(v) > _MAX_FRAGMENT_LEN:
+					raise ApiError("VALIDATION_ERROR", f"{frag} is too large", http_status=413)
+
+		if "engine" in present and data.get("engine") is not None:
+			eng = str(data["engine"]).lower()
+			if eng not in _ALLOWED_ENGINES:
+				raise ApiError("VALIDATION_ERROR", "Invalid engine", http_status=400)
+
+		if "status" in present and data.get("status") is not None:
+			st = str(data["status"]).lower()
+			if st not in _ALLOWED_STATUS:
+				raise ApiError("VALIDATION_ERROR", "Invalid status", http_status=400)
+
+		if "paper_size" in present and data.get("paper_size") not in (None, ""):
+			ps = str(data["paper_size"]).strip()
+			if len(ps) > _MAX_PAPER_LEN:
+				raise ApiError("VALIDATION_ERROR", "paper_size is too long", http_status=400)
+
+		if "orientation" in present and data.get("orientation") not in (None, ""):
+			ori = str(data["orientation"]).lower()
+			if ori not in _ALLOWED_ORIENTATION:
+				raise ApiError("VALIDATION_ERROR", "Invalid orientation", http_status=400)
+
+		if "margins" in present and data.get("margins") is not None:
+			mg = data["margins"]
+			if not isinstance(mg, dict):
+				raise ApiError("VALIDATION_ERROR", "margins must be an object", http_status=400)
+			for k, v in mg.items():
+				if k not in ("top", "right", "bottom", "left"):
+					raise ApiError("VALIDATION_ERROR", f"Invalid margin key: {k}", http_status=400)
+				if v is not None and not isinstance(v, (int, float)):
+					try:
+						float(v)
+					except (TypeError, ValueError):
+						raise ApiError("VALIDATION_ERROR", "Margin values must be numbers", http_status=400)
+
+		if "assets" in present and data.get("assets") is not None:
+			ass = data["assets"]
+			if not isinstance(ass, dict):
+				raise ApiError("VALIDATION_ERROR", "assets must be an object", http_status=400)
+			try:
+				encoded = json.dumps(ass, ensure_ascii=False)
+			except (TypeError, ValueError) as e:
+				raise ApiError("VALIDATION_ERROR", f"assets is not JSON-serializable: {e}", http_status=400)
+			if len(encoded) > _MAX_ASSETS_JSON_LEN:
+				raise ApiError("VALIDATION_ERROR", "assets payload is too large", http_status=413)
+
+		if "version" in present and data.get("version") is not None:
+			try:
+				vn = int(data["version"])
+				if vn < 1:
+					raise ValueError
+			except (TypeError, ValueError):
+				raise ApiError("VALIDATION_ERROR", "Invalid version", http_status=400)
 
 	@staticmethod
 	def create_template(db: Session, data: Dict[str, Any], user_id: int) -> ReportTemplate:
-		required = ["business_id", "module_key", "name", "content_html"]
-		for k in required:
-			if not data.get(k):
-				raise ApiError("VALIDATION_ERROR", f"Missing field: {k}", http_status=400)
+		data = dict(data or {})
+		ReportTemplateService.validate_template_payload(data, is_update=False)
 		entity = ReportTemplate(
 			business_id=int(data["business_id"]),
 			module_key=str(data["module_key"]),
@@ -119,6 +247,9 @@ class ReportTemplateService:
 		entity = ReportTemplateService.get_template(db, template_id, business_id)
 		if not entity:
 			raise ApiError("NOT_FOUND", "Template not found", http_status=404)
+		data = dict(data or {})
+		if data:
+			ReportTemplateService.validate_template_payload(data, is_update=True)
 		for field in [
 			"module_key", "subtype", "name", "description", "engine", "status",
 			"content_html", "content_css", "header_html", "footer_html",
@@ -126,13 +257,23 @@ class ReportTemplateService:
 		]:
 			if field in data:
 				setattr(entity, field, data.get(field))
-		# bump version on content changes
-		if any(k in data for k in ("content_html", "content_css", "header_html", "footer_html")):
+		# bump version on content / builder / engine changes
+		if any(
+			k in data
+			for k in (
+				"content_html",
+				"content_css",
+				"header_html",
+				"footer_html",
+				"assets",
+				"engine",
+			)
+		):
 			entity.version = int((entity.version or 1) + 1)
 		db.commit()
 		db.refresh(entity)
 		# پاک کردن کش
-		ReportTemplateService.invalidate_cache(template_id)
+		ReportTemplateService.invalidate_cache(template_id, business_id)
 		return entity
 
 	@staticmethod
@@ -143,7 +284,7 @@ class ReportTemplateService:
 		db.delete(entity)
 		db.commit()
 		# پاک کردن کش
-		ReportTemplateService.invalidate_cache(template_id)
+		ReportTemplateService.invalidate_cache(template_id, business_id)
 
 	@staticmethod
 	def publish_template(db: Session, template_id: int, business_id: int, is_published: bool = True) -> ReportTemplate:

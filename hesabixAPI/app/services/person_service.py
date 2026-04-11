@@ -526,15 +526,18 @@ def update_person(
     # به‌روزرسانی فیلدها
     update_data = person_data.dict(exclude_unset=True)
 
-    # مدیریت کد یکتا
-    if 'code' in update_data and update_data['code'] is not None:
+    # مدیریت کد یکتا (شامل پاک کردن صریح با null)
+    if 'code' in update_data:
         desired_code = update_data['code']
-        exists = db.query(Person).filter(
-            and_(Person.business_id == business_id, Person.code == desired_code, Person.id != person_id)
-        ).first()
-        if exists:
-            raise ValueError("کد شخص تکراری است")
-        person.code = desired_code
+        if desired_code is not None:
+            exists = db.query(Person).filter(
+                and_(Person.business_id == business_id, Person.code == desired_code, Person.id != person_id)
+            ).first()
+            if exists:
+                raise ValueError("کد شخص تکراری است")
+            person.code = desired_code
+        else:
+            person.code = None
 
     # مدیریت انواع شخص چندگانه
     types_list: Optional[List[str]] = None
