@@ -24,7 +24,9 @@ import '../../services/invoice_service.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
-import '../../utils/responsive_helper.dart';import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/invoice/invoice_installments_editor.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -80,24 +82,50 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   // For preserving and merging extra_info
   Map<String, dynamic> _originalExtraInfo = <String, dynamic>{};
 
+  /// در زمان بارگذاری سند، آیا طرح اقساط داشت (برای نمایش تب ویرایش اقساط)
+  bool _documentHadInstallmentPlanAtLoad = false;
+  Map<String, dynamic>? _initialInstallmentPlanCopy;
+  final GlobalKey<InvoiceInstallmentsEditorState> _installmentsEditorKey =
+      GlobalKey<InvoiceInstallmentsEditorState>();
+
   @override
   void initState() {
     super.initState();
-    // تعداد تب‌ها: اطلاعات، کالاها، تراکنش‌ها (اگر پیش‌فاکتور نباشد)، تنظیمات
-    final tabCount = _isProforma ? 3 : 4;
-    _tabController = TabController(length: tabCount, vsync: this);
+    _tabController = TabController(length: _getTabCount(), vsync: this);
     _loadInvoice();
+  }
+
+  bool _extraInfoHasInstallmentPlan(Map<String, dynamic> extra) {
+    final p = extra['installment_plan'];
+    if (p is! Map) return false;
+    final sch = p['schedule'];
+    if (sch is List && sch.isNotEmpty) return true;
+    final n = p['num_installments'];
+    if (n is int && n > 0) return true;
+    if (n is num && n.toInt() > 0) return true;
+    return false;
+  }
+
+  /// تب اقساط: فقط فاکتورهای فروش/برگشت از فروش قطعی که در زمان بارگذاری طرح اقساط داشتند
+  bool get _shouldShowInstallmentsTab {
+    if (_isProforma) return false;
+    if (_selectedInvoiceType != InvoiceType.sales && _selectedInvoiceType != InvoiceType.salesReturn) {
+      return false;
+    }
+    return _documentHadInstallmentPlanAtLoad;
   }
 
   // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
   int _getTabCount() {
     if (_isProforma) return 3; // اطلاعات، کالاها، تنظیمات
-    if (_selectedInvoiceType == InvoiceType.waste || 
-        _selectedInvoiceType == InvoiceType.directConsumption || 
+    if (_selectedInvoiceType == InvoiceType.waste ||
+        _selectedInvoiceType == InvoiceType.directConsumption ||
         _selectedInvoiceType == InvoiceType.production) {
       return 3; // اطلاعات، کالاها، تنظیمات (بدون تراکنش)
     }
-    return 4; // اطلاعات، کالاها، تراکنش‌ها، تنظیمات
+    var n = 4; // اطلاعات، کالاها، تراکنش‌ها، تنظیمات
+    if (_shouldShowInstallmentsTab) n += 1; // اقساط بین تراکنش‌ها و تنظیمات
+    return n;
   }
 
   // بررسی اینکه آیا تب تراکنش‌ها باید نمایش داده شود
@@ -145,6 +173,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
+      _documentHadInstallmentPlanAtLoad = _extraInfoHasInstallmentPlan(_originalExtraInfo);
+      if (_documentHadInstallmentPlanAtLoad && _originalExtraInfo['installment_plan'] is Map) {
+        _initialInstallmentPlanCopy =
+            Map<String, dynamic>.from(_originalExtraInfo['installment_plan'] as Map);
+      } else {
+        _initialInstallmentPlanCopy = null;
+      }
       final pi = _originalExtraInfo['post_inventory'];
       final ap = _originalExtraInfo['auto_post_warehouse'];
       final postOn = (pi is bool) ? pi : true;
@@ -451,6 +486,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'کالاها و خدمات'),
             if (_shouldShowTransactionsTab)
               const Tab(icon: Icon(Icons.receipt_long_outlined), text: 'تراکنش‌ها'),
+            if (_shouldShowInstallmentsTab)
+              const Tab(icon: Icon(Icons.payments_outlined), text: 'اقساط'),
             const Tab(icon: Icon(Icons.settings_outlined), text: 'تنظیمات'),
           ],
         ),
@@ -465,6 +502,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     _buildInvoiceInfoTab(),
                     _buildProductsTab(),
                     if (_shouldShowTransactionsTab) _buildTransactionsTab(),
+                    if (_shouldShowInstallmentsTab)
+                      InvoiceInstallmentsEditor(
+                        key: _installmentsEditorKey,
+                        businessId: widget.businessId,
+                        calendarController: widget.calendarController,
+                        sumTotal: _sumTotal,
+                        invoiceDate: _invoiceDate,
+                        initialInstallmentPlan: _initialInstallmentPlanCopy,
+                      ),
                     _buildSettingsTab(),
                   ],
                 ),
@@ -492,6 +538,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                           onTypeChanged: (type) {
                             setState(() {
                               _selectedInvoiceType = type;
+                              final newTabCount = _getTabCount();
+                              if (newTabCount != _tabController.length) {
+                                _tabController.dispose();
+                                _tabController = TabController(length: newTabCount, vsync: this);
+                              }
                             });
                           },
                           isDraft: _isProforma,
@@ -566,6 +617,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                                 onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    final newTabCount = _getTabCount();
+                                    if (newTabCount != _tabController.length) {
+                                      _tabController.dispose();
+                                      _tabController = TabController(length: newTabCount, vsync: this);
+                                    }
                                   });
                                 },
                                 isDraft: _isProforma,
@@ -962,6 +1018,23 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final dueForSave = _dueDate ?? _invoiceDate;
     if (dueForSave != null) {
       mergedExtra['due_date'] = dueForSave.toIso8601String().split('T').first;
+    }
+
+    final canKeepInstallments = !_isProforma &&
+        (_selectedInvoiceType == InvoiceType.sales ||
+            _selectedInvoiceType == InvoiceType.salesReturn) &&
+        _documentHadInstallmentPlanAtLoad;
+    if (!canKeepInstallments) {
+      mergedExtra.remove('installment_plan');
+    } else {
+      final st = _installmentsEditorKey.currentState;
+      if (st != null) {
+        final instErr = st.validate();
+        if (instErr != null) {
+          return instErr;
+        }
+        mergedExtra['installment_plan'] = st.buildPlanMap();
+      }
     }
 
     String _convertInvoiceTypeToApi(InvoiceType type) => 'invoice_${type.value}';

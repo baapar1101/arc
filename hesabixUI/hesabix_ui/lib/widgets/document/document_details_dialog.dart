@@ -32,9 +32,42 @@ import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
-import 'package:hesabix_ui/utils/number_normalizer.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart'
+    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, parseJsonDoubleOrNull;
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+
+int? _parseInstallmentSeq(dynamic v) {
+  if (v == null) return null;
+  if (v is bool) return null;
+  if (v is int) return v;
+  if (v is double) return v.round();
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v.trim().replaceAll(',', ''));
+  return null;
+}
+
+double? _parseInstallmentAmount(dynamic v) {
+  if (v == null) return null;
+  if (v is bool) return null;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    final t = v.trim().replaceAll(',', '');
+    if (t.isEmpty) return null;
+    return double.tryParse(t);
+  }
+  return null;
+}
+
+double _scheduleMoney(dynamic v, [double fallback = 0.0]) {
+  return _parseInstallmentAmount(v) ?? fallback;
+}
+
+int _scheduleSeq(dynamic v, [int fallback = 0]) {
+  return _parseInstallmentSeq(v) ?? fallback;
+}
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -1469,15 +1502,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
     String fmtNum(dynamic v) {
       if (v == null) return '-';
-      final n = v is num ? v.toDouble() : double.tryParse(v.toString());
+      if (v is bool) return '-';
+      final n = v is num ? v.toDouble() : parseJsonDoubleOrNull(v);
       if (n == null) return '-';
       return formatWithThousands(n, decimalPlaces: (n % 1 == 0) ? 0 : 2);
     }
 
     double? planDouble(Map<String, dynamic> p, String k) {
-      final v = p[k];
-      if (v is num) return v.toDouble();
-      return double.tryParse(v?.toString() ?? '');
+      return _parseInstallmentAmount(p[k]);
     }
 
     String fmtDue(dynamic v) {
@@ -1540,16 +1572,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     double rowRemaining(Map<String, dynamic> r) {
       final rem = r['remaining'];
       if (rem is num) return rem.toDouble().clamp(0, 1e18);
-      final total = (r['total'] as num?)?.toDouble() ?? 0;
-      final paid = (r['paid_amount'] as num?)?.toDouble() ?? 0;
+      final remParsed = _parseInstallmentAmount(rem);
+      if (remParsed != null) return remParsed.clamp(0, 1e18);
+      final total = _scheduleMoney(r['total']);
+      final paid = _scheduleMoney(r['paid_amount']);
       return (total - paid).clamp(0, 1e18);
     }
 
     double paidSum = 0;
     for (final r in rows) {
       if (r is Map<String, dynamic>) {
-        final p = r['paid_amount'];
-        if (p is num) paidSum += p.toDouble();
+        final pd = _parseInstallmentAmount(r['paid_amount']);
+        if (pd != null) paidSum += pd;
       }
     }
 
@@ -1685,10 +1719,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         final raw = rows[index];
                         final r = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
                         final st = r['status']?.toString();
-                        final seq = (r['seq'] as num?)?.toInt() ?? 0;
+                        final seq = _scheduleSeq(r['seq']);
                         final remaining = rowRemaining(r);
                         final pays = (r['payments'] as List?) ?? const <dynamic>[];
-                        final paidAmt = (r['paid_amount'] as num?)?.toDouble() ?? 0;
+                        final paidAmt = _scheduleMoney(r['paid_amount']);
                         final installmentPaidEvidence =
                             paidAmt > 0.009 || st == 'partial' || st == 'paid';
                         final overdue = st == 'overdue';
@@ -1855,33 +1889,41 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                           _tableHeaderCell(theme, t.installmentsTablePaid, alignEnd: true),
                                         ],
                                       ),
-                                      ...pays.whereType<Map<String, dynamic>>().map((pm) {
-                                        final codeRaw = pm['document_code'];
-                                        final code = (codeRaw is String && codeRaw.trim().isNotEmpty)
-                                            ? codeRaw.trim()
-                                            : (pm['document_id']?.toString() ?? '-');
-                                        return TableRow(
-                                          children: [
-                                            _tableDataCell(
-                                              theme,
-                                              SelectableText(code, style: theme.textTheme.bodySmall),
+                                      ...() {
+                                        final paymentRows = <TableRow>[];
+                                        for (final raw in pays) {
+                                          if (raw is! Map) continue;
+                                          final pm = Map<String, dynamic>.from(raw);
+                                          final codeRaw = pm['document_code'];
+                                          final code = (codeRaw is String && codeRaw.trim().isNotEmpty)
+                                              ? codeRaw.trim()
+                                              : (pm['document_id']?.toString() ?? '-');
+                                          paymentRows.add(
+                                            TableRow(
+                                              children: [
+                                                _tableDataCell(
+                                                  theme,
+                                                  Text(code, style: theme.textTheme.bodySmall),
+                                                ),
+                                                _tableDataCell(
+                                                  theme,
+                                                  Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
+                                                ),
+                                                _tableDataCell(
+                                                  theme,
+                                                  Text(
+                                                    fmtNum(pm['amount']),
+                                                    textAlign: TextAlign.end,
+                                                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                                                  ),
+                                                  alignEnd: true,
+                                                ),
+                                              ],
                                             ),
-                                            _tableDataCell(
-                                              theme,
-                                              Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
-                                            ),
-                                            _tableDataCell(
-                                              theme,
-                                              Text(
-                                                fmtNum(pm['amount']),
-                                                textAlign: TextAlign.end,
-                                                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                                              ),
-                                              alignEnd: true,
-                                            ),
-                                          ],
-                                        );
-                                      }),
+                                          );
+                                        }
+                                        return paymentRows;
+                                      }(),
                                     ],
                                   ),
                                 ),
@@ -3458,9 +3500,11 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
           final allocations = settlement['allocations'] as List<dynamic>?;
           if (allocations != null) {
             for (final alloc in allocations) {
-              final seq = (alloc['seq'] as num?)?.toInt();
-              final amount = (alloc['amount'] as num?)?.toDouble();
-              if (seq != null && amount != null) {
+              if (alloc is! Map) continue;
+              final am = Map<String, dynamic>.from(alloc);
+              final seq = _parseInstallmentSeq(am['seq']);
+              final amount = _parseInstallmentAmount(am['amount']);
+              if (seq != null && amount != null && amount > 0) {
                 _installmentAllocations[seq] = amount;
               }
             }
@@ -3881,9 +3925,11 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
             ),
             const SizedBox(height: 16),
             ...schedule.map((item) {
-              final seq = (item['seq'] as num?)?.toInt() ?? 0;
-              final total = (item['total'] as num?)?.toDouble() ?? 0.0;
-              final paid = (item['paid_amount'] as num?)?.toDouble() ?? 0.0;
+              if (item is! Map) return const SizedBox.shrink();
+              final im = Map<String, dynamic>.from(item);
+              final seq = _scheduleSeq(im['seq']);
+              final total = _scheduleMoney(im['total']);
+              final paid = _scheduleMoney(im['paid_amount']);
               final remaining = total - paid;
               final allocated = _installmentAllocations[seq] ?? 0.0;
               

@@ -1,3 +1,30 @@
+double _jsonAmountToDouble(dynamic v, [double fallback = 0.0]) {
+  if (v == null) return fallback;
+  if (v is bool) return fallback;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    final t = v.trim().replaceAll(',', '');
+    if (t.isEmpty) return fallback;
+    return double.tryParse(t) ?? fallback;
+  }
+  return fallback;
+}
+
+double? _jsonAmountToDoubleNullable(dynamic v) {
+  if (v == null) return null;
+  if (v is bool) return null;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    final t = v.trim().replaceAll(',', '');
+    if (t.isEmpty) return null;
+    return double.tryParse(t);
+  }
+  return null;
+}
 
 /// مدل خط شخص در سند دریافت/پرداخت
 class PersonLine {
@@ -17,14 +44,15 @@ class PersonLine {
     this.extraInfo,
   });
 
-  factory PersonLine.fromJson(Map<String, dynamic> json) {
+  factory PersonLine.fromJson(dynamic json) {
+    final m = json is Map ? Map<String, dynamic>.from(json) : <String, dynamic>{};
     return PersonLine(
-      id: json['id'] ?? 0,
-      personId: json['person_id'],
-      personName: json['person_name'],
-      amount: (json['amount'] ?? 0).toDouble(),
-      description: json['description'],
-      extraInfo: json['extra_info'],
+      id: (m['id'] as num?)?.toInt() ?? 0,
+      personId: (m['person_id'] as num?)?.toInt(),
+      personName: m['person_name'] as String?,
+      amount: _jsonAmountToDouble(m['amount']),
+      description: m['description'] as String?,
+      extraInfo: m['extra_info'] is Map ? Map<String, dynamic>.from(m['extra_info'] as Map) : null,
     );
   }
 
@@ -68,21 +96,22 @@ class AccountLine {
     this.extraInfo,
   });
 
-  factory AccountLine.fromJson(Map<String, dynamic> json) {
+  factory AccountLine.fromJson(dynamic json) {
+    final m = json is Map ? Map<String, dynamic>.from(json) : <String, dynamic>{};
     return AccountLine(
-      id: json['id'] ?? 0,
-      accountId: json['account_id'] ?? 0,
-      accountName: json['account_name'] ?? '',
-      accountCode: json['account_code'] ?? '',
-      accountType: json['account_type'],
-      amount: (json['amount'] ?? 0).toDouble(),
-      description: json['description'],
-      transactionType: json['transaction_type'],
-      transactionDate: json['transaction_date'] != null 
-          ? DateTime.tryParse(json['transaction_date']) 
+      id: (m['id'] as num?)?.toInt() ?? 0,
+      accountId: (m['account_id'] as num?)?.toInt() ?? 0,
+      accountName: m['account_name'] as String? ?? '',
+      accountCode: m['account_code'] as String? ?? '',
+      accountType: m['account_type'] as String?,
+      amount: _jsonAmountToDouble(m['amount']),
+      description: m['description'] as String?,
+      transactionType: m['transaction_type'] as String?,
+      transactionDate: m['transaction_date'] != null
+          ? DateTime.tryParse(m['transaction_date'].toString())
           : null,
-      commission: json['commission']?.toDouble(),
-      extraInfo: json['extra_info'],
+      commission: _jsonAmountToDoubleNullable(m['commission']),
+      extraInfo: m['extra_info'] is Map ? Map<String, dynamic>.from(m['extra_info'] as Map) : null,
     );
   }
 
@@ -167,11 +196,13 @@ class ReceiptPaymentDocument {
       projectName: json['project_name'],
       extraInfo: json['extra_info'],
       personLines: (json['person_lines'] as List<dynamic>?)
-          ?.map((item) => PersonLine.fromJson(item))
-          .toList() ?? [],
+              ?.map((dynamic item) => PersonLine.fromJson(item))
+              .toList() ??
+          [],
       accountLines: (json['account_lines'] as List<dynamic>?)
-          ?.map((item) => AccountLine.fromJson(item))
-          .toList() ?? [],
+              ?.map((dynamic item) => AccountLine.fromJson(item))
+              .toList() ??
+          [],
       personNames: json['person_names'],
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),

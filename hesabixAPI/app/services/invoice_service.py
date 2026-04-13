@@ -934,6 +934,13 @@ def _compute_installment_plan(
                 principal = Decimal(str(it.get("principal", 0) or 0))
                 interest = Decimal(str(it.get("interest", 0) or 0))
                 total = Decimal(str(it.get("total", 0) or (principal + interest)))
+                paid_dec = Decimal(str(it.get("paid_amount", 0) or 0))
+                if paid_dec - total > Decimal("0.05"):
+                    raise ApiError(
+                        "INVALID_INSTALLMENT_PLAN",
+                        "مبلغ قسط نمی‌تواند کمتر از مبلغ پرداخت‌شده ثبت‌شده برای آن قسط باشد",
+                        http_status=422,
+                    )
                 principal_total += principal
                 total_interest += interest
                 schedule.append({
@@ -943,7 +950,7 @@ def _compute_installment_plan(
                     "interest": float(interest),
                     "total": float(total),
                     "status": it.get("status") or "pending",
-                    "paid_amount": float(Decimal(str(it.get("paid_amount", 0) or 0))),
+                    "paid_amount": float(paid_dec),
                 })
             down_payment = Decimal(str(plan_input.get("down_payment", 0) or 0))
             # ولیدیشن پایه: جمع اصل اقساط + پیش‌پرداخت با مبلغ فاکتور (با مالیات) هم‌خوان باشد
@@ -1024,8 +1031,10 @@ def _compute_installment_plan(
             "schedule": schedule,
         }
         return (plan_dict, total_interest)
+    except ApiError:
+        raise
     except Exception:
-        # در صورت خطا، طرح نادیده گرفته می‌شود تا فاکتور قابل ثبت باشد
+        # در صورت خطای غیرمنتظره، طرح نادیده گرفته می‌شود تا فاکتور قابل ثبت باشد
         return (None, Decimal(0))
 
 

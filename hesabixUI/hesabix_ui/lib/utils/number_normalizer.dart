@@ -242,6 +242,31 @@ String _addThousandsSeparator(String text) {
   return formattedInteger + decimalPart;
 }
 
+/// تبدیل مقادیر JSON (عدد، رشته) به [double] بدون پرتاب در web وقتی نوع غیرمنتظره
+/// (مثلاً [bool]) از سمت API/ذخیرهٔ قدیمی برسد.
+double parseJsonDouble(dynamic value, [double fallback = 0.0]) {
+  if (value == null) return fallback;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final t = value.trim();
+    if (t.isEmpty) return fallback;
+    return double.tryParse(t.replaceAll(',', '')) ?? fallback;
+  }
+  return fallback;
+}
+
+/// نسخهٔ nullable برای فیلدهای اختیاری مثل کارمزد.
+double? parseJsonDoubleOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final t = value.trim();
+    if (t.isEmpty) return null;
+    return double.tryParse(t.replaceAll(',', ''));
+  }
+  return null;
+}
+
 /// TextInputFormatter برای افزودن جداکننده هزارگان به اعداد
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   final bool allowDecimal;

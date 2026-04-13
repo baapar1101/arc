@@ -2308,7 +2308,20 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             if "transaction_date" in line.extra_info:
                 line_dict["transaction_date"] = line.extra_info["transaction_date"]
             if "commission" in line.extra_info:
-                line_dict["commission"] = line.extra_info["commission"]
+                c_raw = line.extra_info.get("commission")
+                # فقط مقدار عددی برگردان؛ بول/رشتهٔ غیرعددی باعث خطای نوع در کلاینت (double?) می‌شود
+                if isinstance(c_raw, bool):
+                    pass
+                elif isinstance(c_raw, (int, float)):
+                    try:
+                        line_dict["commission"] = float(c_raw)
+                    except (TypeError, ValueError):
+                        pass
+                elif isinstance(c_raw, str) and c_raw.strip():
+                    try:
+                        line_dict["commission"] = float(c_raw.replace(",", ""))
+                    except (TypeError, ValueError):
+                        pass
             if "bank_id" in line.extra_info:
                 line_dict["bank_id"] = line.extra_info["bank_id"]
             if "bank_name" in line.extra_info:
