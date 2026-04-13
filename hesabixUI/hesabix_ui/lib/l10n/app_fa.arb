@@ -1748,6 +1748,7 @@
   "installmentsDetailTitle": "جزئیات طرح اقساط",
   "installmentsPaymentsColumn": "پرداخت‌ها",
   "installmentsNoPaymentsYet": "هنوز تخصیص دریافتی ثبت نشده",
+  "installmentsPaymentsDetailMissing": "مبلغ پرداخت برای این قسط ثبت شده اما فهرست اسناد دریافت قابل نمایش نیست. در صورت ثبت دریافت با تخصیص قسط، یک‌بار دیگر این پنجره را باز کنید.",
   "installmentsTitle": "فروش اقساطی",
   "installmentsSubtitle": "در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود",
   "installmentsSettingsSubtitle": "مدیریت پلن‌های اقساط و شرایط فروش",
@@ -2067,6 +2068,20 @@
   "taxStatusFinalized": "نهایی شده",
   "taxStatusFailed": "ارسال ناموفق",
   "installmentColumn": "اقساطی",
+  "documentDetailsInstallmentsTab": "اقساط",
+  "documentDetailsInstallmentsEmptySchedule": "ردیفی برای طرح اقساط این فاکتور ثبت نشده است.",
+  "documentDetailsInstallmentsAmountsNote": "همهٔ مبالغ به {currency}.",
+  "@documentDetailsInstallmentsAmountsNote": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "documentDetailsInstallmentReceive": "ثبت دریافت",
+  "documentDetailsInstallmentReceiptTypeOnly": "تخصیص قسط برای این نوع فاکتور فقط همراه سند دریافت امکان‌پذیر است.",
+  "documentDetailsInstallmentDocCodeColumn": "سند",
+  "documentDetailsInstallmentPaymentDateColumn": "تاریخ سند",
   "taxStatusNotSent": "ارسال نشده",
 
   "taxAddToWorkspaceNotAllowed": "این فاکتور قابل افزودن به کارپوشه مالیاتی نیست.",
@@ -3210,6 +3225,17 @@
   "accountSettingsVerificationDescription": "تایید شماره موبایل و ایمیل برای امنیت بیشتر",
   "accountSettingsNotificationHistoryTitle": "تاریخچه ناتیفیکیشن‌ها",
   "accountSettingsNotificationHistoryDescription": "مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)",
+  "notificationCenterLevelInfo": "اطلاعات",
+  "notificationCenterLevelWarning": "هشدار",
+  "notificationCenterLevelCritical": "بحرانی",
+  "notificationCenterLevelUnknown": "{level}",
+  "@notificationCenterLevelUnknown": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
   
   "apiKeysPageTitle": "مدیریت کلیدهای API",
   "apiKeyErrorLoadingKeys": "خطا در بارگذاری کلیدها",

@@ -671,6 +671,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentsNoPaymentsYet => 'هنوز تخصیص دریافتی ثبت نشده';
 
   @override
+  String get installmentsPaymentsDetailMissing =>
+      'مبلغ پرداخت برای این قسط ثبت شده اما فهرست اسناد دریافت قابل نمایش نیست. در صورت ثبت دریافت با تخصیص قسط، یک‌بار دیگر این پنجره را باز کنید.';
+
+  @override
   String get test => 'تست';
 
   @override
@@ -5449,6 +5453,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentColumn => 'اقساطی';
 
   @override
+  String get documentDetailsInstallmentsTab => 'اقساط';
+
+  @override
+  String get documentDetailsInstallmentsEmptySchedule =>
+      'ردیفی برای طرح اقساط این فاکتور ثبت نشده است.';
+
+  @override
+  String documentDetailsInstallmentsAmountsNote(String currency) {
+    return 'همهٔ مبالغ به $currency.';
+  }
+
+  @override
+  String get documentDetailsInstallmentReceive => 'ثبت دریافت';
+
+  @override
+  String get documentDetailsInstallmentReceiptTypeOnly =>
+      'تخصیص قسط برای این نوع فاکتور فقط همراه سند دریافت امکان‌پذیر است.';
+
+  @override
+  String get documentDetailsInstallmentDocCodeColumn => 'سند';
+
+  @override
+  String get documentDetailsInstallmentPaymentDateColumn => 'تاریخ سند';
+
+  @override
   String get taxStatusNotSent => 'ارسال نشده';
 
   @override
@@ -8240,6 +8269,20 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get accountSettingsNotificationHistoryDescription =>
       'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
+
+  @override
+  String get notificationCenterLevelInfo => 'اطلاعات';
+
+  @override
+  String get notificationCenterLevelWarning => 'هشدار';
+
+  @override
+  String get notificationCenterLevelCritical => 'بحرانی';
+
+  @override
+  String notificationCenterLevelUnknown(String level) {
+    return '$level';
+  }
 
   @override
   String get apiKeysPageTitle => 'مدیریت کلیدهای API';

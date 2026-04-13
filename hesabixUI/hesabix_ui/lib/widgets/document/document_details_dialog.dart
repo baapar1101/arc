@@ -34,6 +34,7 @@ import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/services/invoice_service.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -75,13 +76,20 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   bool _uploadingFile = false;
   final AttachedFilesWidgetKey _attachedFilesKey = AttachedFilesWidgetKey();
 
+  final InvoiceService _invoiceService = InvoiceService();
+  /// فقط وقتی روی فاکتور `extra_info.installment_plan` وجود دارد.
+  bool _showInstallmentsTab = false;
+  Map<String, dynamic>? _installmentPlanPayload;
+  bool _loadingInstallmentPlan = false;
+  String? _installmentPlanError;
+
   @override
   void initState() {
     super.initState();
     _service = DocumentService(ApiClient());
     _storageService = BusinessStorageService(ApiClient());
-    // تعداد تب‌ها: اطلاعات، محصولات (فقط برای فاکتور)، حساب‌ها، تراکنش‌ها (فقط برای فاکتور)، فایل‌ها
-    _tabController = TabController(length: 4, vsync: this);
+    // قبل از بارگذاری سند فقط سه تب پایه نمایش داده می‌شود (هم‌خوان با TabBar حالت loading)
+    _tabController = TabController(length: 3, vsync: this);
     _loadDocument();
   }
   
@@ -353,19 +361,40 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           rawData = rawResponse.data['data'] as Map<String, dynamic>?;
         }
       }
+      final isInvoice = doc.documentType.startsWith('invoice');
+      Map<String, dynamic>? mergedExtra;
+      if (rawData != null && rawData['extra_info'] is Map<String, dynamic>) {
+        mergedExtra = rawData['extra_info'] as Map<String, dynamic>;
+      } else {
+        mergedExtra = doc.extraInfo;
+      }
+      final hasInstallmentPlan =
+          isInvoice && mergedExtra != null && mergedExtra['installment_plan'] is Map<String, dynamic>;
+
       if (mounted) {
         setState(() {
           _document = doc;
           _rawDocumentData = rawData;
           _isLoading = false;
+          _showInstallmentsTab = hasInstallmentPlan;
+          if (hasInstallmentPlan) {
+            _loadingInstallmentPlan = true;
+            _installmentPlanPayload = null;
+            _installmentPlanError = null;
+          } else {
+            _loadingInstallmentPlan = false;
+            _installmentPlanPayload = null;
+            _installmentPlanError = null;
+          }
         });
-        // تنظیم مجدد TabController بر اساس نوع سند
-        final isInvoice = doc.documentType.startsWith('invoice');
-        final tabCount = isInvoice ? 5 : 3; // اگر فاکتور است 5 تب (اطلاعات، محصولات، حساب‌ها، تراکنش‌ها، فایل‌ها)، وگرنه 3 تب
+        final tabCount = isInvoice ? (hasInstallmentPlan ? 6 : 5) : 3;
         if (_tabController.length != tabCount) {
           _tabController.dispose();
           _tabController = TabController(length: tabCount, vsync: this);
         }
+      }
+      if (hasInstallmentPlan && mounted) {
+        await _loadInstallmentPlan(doc);
       }
       // اگر سند از نوع فاکتور باشد، قالب‌های چاپ فاکتور را بارگذاری کن
       try {
@@ -401,8 +430,33 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         setState(() {
           _errorMessage = e.toString();
           _isLoading = false;
+          _showInstallmentsTab = false;
+          _loadingInstallmentPlan = false;
+          _installmentPlanPayload = null;
+          _installmentPlanError = null;
         });
       }
+    }
+  }
+
+  Future<void> _loadInstallmentPlan(DocumentModel doc) async {
+    try {
+      final data = await _invoiceService.getInstallmentPlan(
+        businessId: doc.businessId,
+        invoiceId: doc.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _installmentPlanPayload = data;
+        _loadingInstallmentPlan = false;
+        _installmentPlanError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingInstallmentPlan = false;
+        _installmentPlanError = e.toString();
+      });
     }
   }
 
@@ -485,6 +539,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context)!;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -505,6 +560,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   const Tab(icon: Icon(Icons.account_balance), text: 'حساب‌ها'),
                   if (_document != null && _document!.documentType.startsWith('invoice'))
                     const Tab(icon: Icon(Icons.payment), text: 'تراکنش‌ها'),
+                  if (_document != null &&
+                      _document!.documentType.startsWith('invoice') &&
+                      _showInstallmentsTab)
+                    Tab(icon: const Icon(Icons.calendar_view_month), text: t.documentDetailsInstallmentsTab),
                   const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
                 ],
               ),
@@ -518,11 +577,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           controller: _tabController,
                           children: _document != null && _document!.documentType.startsWith('invoice')
                               ? [
-                                  // برای فاکتورها: 5 تب
+                                  // برای فاکتورها: 5 یا 6 تب (با اقساط)
                                   _buildInfoTab(theme),
                                   _buildProductsTab(theme),
                                   _buildAccountsTab(theme),
                                   _buildTransactionsTab(theme),
+                                  if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
                                   _buildAttachmentsTab(theme),
                                 ]
                               : [
@@ -1370,6 +1430,488 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _buildPaymentTransactions(theme),
         ],
       ),
+    );
+  }
+
+  Widget _buildInstallmentsTab(ThemeData theme, AppLocalizations t) {
+    if (_loadingInstallmentPlan) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_installmentPlanError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SelectableText(
+            _installmentPlanError!,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.error),
+          ),
+        ),
+      );
+    }
+    final payload = _installmentPlanPayload;
+    if (payload == null) {
+      return Center(child: Text(t.installmentsFetchError));
+    }
+    final planRaw = payload['plan'];
+    if (planRaw is! Map<String, dynamic>) {
+      return Center(child: Text(t.documentDetailsInstallmentsEmptySchedule));
+    }
+    final plan = planRaw;
+    final scheduleRaw = plan['schedule'];
+    final List<dynamic> rows = scheduleRaw is List<dynamic> ? scheduleRaw : const <dynamic>[];
+    final currencySuffix = (_document?.currencySymbol ?? _document?.currencyCode ?? '').trim();
+
+    String suffixAmount(String s) {
+      if (currencySuffix.isEmpty) return s;
+      return '$s $currencySuffix';
+    }
+
+    String fmtNum(dynamic v) {
+      if (v == null) return '-';
+      final n = v is num ? v.toDouble() : double.tryParse(v.toString());
+      if (n == null) return '-';
+      return formatWithThousands(n, decimalPlaces: (n % 1 == 0) ? 0 : 2);
+    }
+
+    double? planDouble(Map<String, dynamic> p, String k) {
+      final v = p[k];
+      if (v is num) return v.toDouble();
+      return double.tryParse(v?.toString() ?? '');
+    }
+
+    String fmtDue(dynamic v) {
+      if (v == null) return '-';
+      if (v is Map<String, dynamic>) {
+        final dateOnly = v['date_only'] ?? v['formatted'] ?? v['date_time'];
+        if (dateOnly != null) return dateOnly.toString();
+        return '-';
+      }
+      final s = v.toString();
+      if (s.isEmpty) return '-';
+      try {
+        final d = DateTime.parse(s.split('T').first);
+        return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
+      } catch (_) {
+        return s;
+      }
+    }
+
+    Color statusColor(String? status) {
+      switch (status) {
+        case 'paid':
+          return theme.colorScheme.primary;
+        case 'partial':
+          return theme.colorScheme.tertiary;
+        case 'overdue':
+          return theme.colorScheme.error;
+        default:
+          return theme.colorScheme.outline;
+      }
+    }
+
+    IconData statusIcon(String? status) {
+      switch (status) {
+        case 'paid':
+          return Icons.check_circle_outline_rounded;
+        case 'partial':
+          return Icons.pie_chart_outline_rounded;
+        case 'overdue':
+          return Icons.warning_amber_rounded;
+        default:
+          return Icons.schedule_rounded;
+      }
+    }
+
+    String statusLabel(String? status) {
+      switch (status) {
+        case 'paid':
+          return t.installmentsStatusPaid;
+        case 'partial':
+          return t.installmentsStatusPartial;
+        case 'overdue':
+          return t.installmentsStatusOverdue;
+        case 'pending':
+        default:
+          return t.installmentsStatusPending;
+      }
+    }
+
+    double rowRemaining(Map<String, dynamic> r) {
+      final rem = r['remaining'];
+      if (rem is num) return rem.toDouble().clamp(0, 1e18);
+      final total = (r['total'] as num?)?.toDouble() ?? 0;
+      final paid = (r['paid_amount'] as num?)?.toDouble() ?? 0;
+      return (total - paid).clamp(0, 1e18);
+    }
+
+    double paidSum = 0;
+    for (final r in rows) {
+      if (r is Map<String, dynamic>) {
+        final p = r['paid_amount'];
+        if (p is num) paidSum += p.toDouble();
+      }
+    }
+
+    final principalT = planDouble(plan, 'principal_total');
+    final interestT = planDouble(plan, 'interest_total');
+    final remainingT = planDouble(plan, 'remaining_total');
+    final down = planDouble(plan, 'down_payment');
+    final numInst = plan['num_installments'];
+
+    int firstUnpaidIndex = -1;
+    for (var i = 0; i < rows.length; i++) {
+      final raw = rows[i];
+      if (raw is! Map<String, dynamic>) continue;
+      final rr = raw;
+      final st = rr['status']?.toString();
+      if (st == 'paid') continue;
+      if (rowRemaining(rr) > 0.009) {
+        firstUnpaidIndex = i;
+        break;
+      }
+    }
+
+    Widget summaryGridTile(String title, String value) {
+      return SizedBox(
+        width: 168,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.outline),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget kvLine(String k, String v) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 88,
+              child: Text(
+                k,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                v,
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final canReceiveForInstallment =
+        _canAddTransaction() && _determineTransactionType() == 'receipt';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.installmentsDetailTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if (_document?.code != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${t.installmentsTableInvoice}: ${_document!.code}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
+                  ],
+                  if (currencySuffix.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      t.documentDetailsInstallmentsAmountsNote(currencySuffix),
+                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
+                  ],
+                  const Divider(height: 20),
+                  Wrap(
+                    children: [
+                      if (numInst != null) summaryGridTile(t.installmentsCount, numInst.toString()),
+                      if (down != null && down > 0) summaryGridTile(t.downPayment, fmtNum(down)),
+                      if (principalT != null) summaryGridTile(t.installmentsSummaryPrincipal, fmtNum(principalT)),
+                      if (interestT != null) summaryGridTile(t.installmentsSummaryInterest, fmtNum(interestT)),
+                      summaryGridTile(t.installmentsSummaryPaid, fmtNum(paidSum)),
+                      if (remainingT != null) summaryGridTile(t.installmentsSummaryRemaining, fmtNum(remainingT)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: rows.isEmpty
+                ? Center(child: Text(t.documentDetailsInstallmentsEmptySchedule))
+                : Scrollbar(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final raw = rows[index];
+                        final r = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+                        final st = r['status']?.toString();
+                        final seq = (r['seq'] as num?)?.toInt() ?? 0;
+                        final remaining = rowRemaining(r);
+                        final pays = (r['payments'] as List?) ?? const <dynamic>[];
+                        final paidAmt = (r['paid_amount'] as num?)?.toDouble() ?? 0;
+                        final installmentPaidEvidence =
+                            paidAmt > 0.009 || st == 'partial' || st == 'paid';
+                        final overdue = st == 'overdue';
+                        final showReceive = canReceiveForInstallment &&
+                            st != 'paid' &&
+                            remaining > 0.009;
+
+                        return Card(
+                          elevation: 0,
+                          color: overdue
+                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.22)
+                              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: overdue
+                                  ? theme.colorScheme.error.withValues(alpha: 0.35)
+                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: ExpansionTile(
+                            key: PageStorageKey('inst_row_$seq'),
+                            initiallyExpanded: index == firstUnpaidIndex,
+                            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.9),
+                              child: Text(
+                                '$seq',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${t.installmentsTableDueDate}: ${fmtDue(r['due_date'])}',
+                                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: statusColor(st).withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(statusIcon(st), size: 16, color: statusColor(st)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        statusLabel(st),
+                                        style: theme.textTheme.labelMedium?.copyWith(
+                                          color: statusColor(st),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  kvLine(t.installmentsTablePrincipal, fmtNum(r['principal'])),
+                                  kvLine(t.installmentsTableInterest, fmtNum(r['interest'])),
+                                  kvLine(t.installmentsTableTotal, fmtNum(r['total'])),
+                                  kvLine(t.installmentsTablePaid, fmtNum(r['paid_amount'])),
+                                  kvLine(t.installmentsTableRemaining, fmtNum(remaining)),
+                                ],
+                              ),
+                            ),
+                            children: [
+                              if (showReceive)
+                                Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: FilledButton.icon(
+                                    onPressed: () {
+                                      _openReceiptDialogForInstallment(
+                                        seq: seq,
+                                        remainingAmount: remaining,
+                                      );
+                                    },
+                                    icon: const Icon(Icons.add_card_rounded, size: 20),
+                                    label: Text(t.documentDetailsInstallmentReceive),
+                                  ),
+                                ),
+                              if (showReceive) const SizedBox(height: 12),
+                              Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  t.installmentsPaymentsColumn,
+                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (pays.isEmpty && installmentPaidEvidence)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.info_outline_rounded, color: theme.colorScheme.outline, size: 28),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          t.installmentsPaymentsDetailMissing,
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.outline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (pays.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.payments_outlined, color: theme.colorScheme.outline, size: 28),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          t.installmentsNoPaymentsYet,
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.outline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: theme.dividerColor),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Table(
+                                    columnWidths: const {
+                                      0: FlexColumnWidth(2.2),
+                                      1: FlexColumnWidth(2),
+                                      2: FlexColumnWidth(2),
+                                    },
+                                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                                    children: [
+                                      TableRow(
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                                        ),
+                                        children: [
+                                          _tableHeaderCell(theme, t.documentDetailsInstallmentDocCodeColumn),
+                                          _tableHeaderCell(theme, t.documentDetailsInstallmentPaymentDateColumn),
+                                          _tableHeaderCell(theme, t.installmentsTablePaid, alignEnd: true),
+                                        ],
+                                      ),
+                                      ...pays.whereType<Map<String, dynamic>>().map((pm) {
+                                        final codeRaw = pm['document_code'];
+                                        final code = (codeRaw is String && codeRaw.trim().isNotEmpty)
+                                            ? codeRaw.trim()
+                                            : (pm['document_id']?.toString() ?? '-');
+                                        return TableRow(
+                                          children: [
+                                            _tableDataCell(
+                                              theme,
+                                              SelectableText(code, style: theme.textTheme.bodySmall),
+                                            ),
+                                            _tableDataCell(
+                                              theme,
+                                              Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
+                                            ),
+                                            _tableDataCell(
+                                              theme,
+                                              Text(
+                                                fmtNum(pm['amount']),
+                                                textAlign: TextAlign.end,
+                                                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                                              ),
+                                              alignEnd: true,
+                                            ),
+                                          ],
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableHeaderCell(ThemeData theme, String text, {bool alignEnd = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Text(
+        text,
+        textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+        style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _tableDataCell(ThemeData theme, Widget child, {bool alignEnd = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: alignEnd ? Align(alignment: AlignmentDirectional.centerEnd, child: child) : child,
     );
   }
 
@@ -2376,6 +2918,33 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
+  /// ایجاد سند دریافت/پرداخت از خروجی دیالوگ تراکنش و به‌روزرسانی لینک فاکتور
+  Future<Map<String, dynamic>> _createReceiptPaymentFromFormData(
+    Map<String, dynamic> data,
+    String documentType,
+  ) async {
+    final created = await _receiptPaymentService.createReceiptPayment(
+      businessId: _document!.businessId,
+      documentType: documentType,
+      documentDate: data['document_date'] as DateTime,
+      currencyId: _document!.currencyId,
+      personLines: data['person_lines'] as List<Map<String, dynamic>>,
+      accountLines: data['account_lines'] as List<Map<String, dynamic>>,
+      description: data['description'] as String?,
+      extraInfo: data['extra_info'] as Map<String, dynamic>?,
+    );
+
+    final currentLinks = _document!.extraInfo?['links'] as Map<String, dynamic>? ?? {};
+    final currentIds = List<int>.from(currentLinks['receipt_payment_document_ids'] as List<dynamic>? ?? []);
+    currentIds.add(created['id'] as int);
+    await _updateInvoiceLinks(currentIds);
+
+    if (mounted) {
+      SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت اضافه شد');
+    }
+    return created;
+  }
+
   /// افزودن تراکنش جدید
   Future<void> _addTransaction() async {
     if (!_canAddTransaction()) return;
@@ -2389,8 +2958,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       return;
     }
 
-    // باز کردن دیالوگ افزودن تراکنش
-    final result = await showDialog<Map<String, dynamic>>(
+    await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _ReceiptPaymentTransactionDialog(
         document: _document!,
@@ -2400,31 +2968,55 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         calendarController: widget.calendarController,
         existingDocuments: _paymentDocuments,
         onSave: (data) async {
-          // ایجاد سند دریافت/پرداخت
           try {
-            final created = await _receiptPaymentService.createReceiptPayment(
-              businessId: _document!.businessId,
-              documentType: transactionType,
-              documentDate: data['document_date'] as DateTime,
-              currencyId: _document!.currencyId,
-              personLines: data['person_lines'] as List<Map<String, dynamic>>,
-              accountLines: data['account_lines'] as List<Map<String, dynamic>>,
-              description: data['description'] as String?,
-              extraInfo: data['extra_info'] as Map<String, dynamic>?,
-            );
-            
-            // به‌روزرسانی لینک‌های فاکتور
-            final currentLinks = _document!.extraInfo?['links'] as Map<String, dynamic>? ?? {};
-            final currentIds = List<int>.from(currentLinks['receipt_payment_document_ids'] as List<dynamic>? ?? []);
-            currentIds.add(created['id'] as int);
-            await _updateInvoiceLinks(currentIds);
-            // توجه: _updateInvoiceLinks خودش _loadDocument را فراخوانی می‌کند که _loadPaymentDocuments را هم فراخوانی می‌کند
-            
+            return await _createReceiptPaymentFromFormData(data, transactionType);
+          } catch (e) {
             if (mounted) {
-              SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت اضافه شد');
+              SnackBarHelper.showError(context, message: 'خطا در افزودن تراکنش: $e');
             }
-            
-            return created;
+            rethrow;
+          }
+        },
+      ),
+    );
+  }
+
+  /// باز کردن دیالوگ دریافت با تخصیص از پیش برای یک قسط (از تب اقساط)
+  Future<void> _openReceiptDialogForInstallment({
+    required int seq,
+    required double remainingAmount,
+  }) async {
+    if (!_canAddTransaction()) return;
+    final t = AppLocalizations.of(context)!;
+    final transactionType = _determineTransactionType();
+    if (transactionType != 'receipt') {
+      SnackBarHelper.showError(context, message: t.documentDetailsInstallmentReceiptTypeOnly);
+      return;
+    }
+    final personId = _document!.extraInfo?['person_id'] as int?;
+    final personName = _document!.extraInfo?['person_name'] as String?;
+    if (personId == null) {
+      SnackBarHelper.showError(context, message: 'فاکتور باید دارای شخص باشد');
+      return;
+    }
+    final code = _document!.code;
+    final desc = 'قسط $seq فاکتور $code';
+
+    await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ReceiptPaymentTransactionDialog(
+        document: _document!,
+        transactionType: transactionType,
+        personId: personId,
+        personName: personName,
+        calendarController: widget.calendarController,
+        existingDocuments: _paymentDocuments,
+        initialInstallmentSeq: seq,
+        initialInstallmentAllocationAmount: remainingAmount,
+        initialDescription: desc,
+        onSave: (data) async {
+          try {
+            return await _createReceiptPaymentFromFormData(data, transactionType);
           } catch (e) {
             if (mounted) {
               SnackBarHelper.showError(context, message: 'خطا در افزودن تراکنش: $e');
@@ -2783,8 +3375,14 @@ class _ReceiptPaymentTransactionDialog extends StatefulWidget {
   final List<ReceiptPaymentDocument> existingDocuments;
   final ReceiptPaymentDocument? existingDocument;
   final Future<Map<String, dynamic>> Function(Map<String, dynamic> data) onSave;
+  /// در حالت تراکنش جدید: پیش‌تخصیص به این شماره قسط
+  final int? initialInstallmentSeq;
+  /// مبلغ پیش‌فرض تخصیص (معمولاً ماندهٔ همان قسط)
+  final double? initialInstallmentAllocationAmount;
+  /// توضیح پیش‌فرض (مثلاً «قسط N فاکتور CODE»)
+  final String? initialDescription;
 
-  const _ReceiptPaymentTransactionDialog({
+  _ReceiptPaymentTransactionDialog({
     required this.document,
     required this.transactionType,
     this.personId,
@@ -2793,6 +3391,9 @@ class _ReceiptPaymentTransactionDialog extends StatefulWidget {
     required this.existingDocuments,
     this.existingDocument,
     required this.onSave,
+    this.initialInstallmentSeq,
+    this.initialInstallmentAllocationAmount,
+    this.initialDescription,
   });
 
   @override
@@ -2869,6 +3470,16 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
     } else {
       // برای تراکنش جدید، پیش‌فرض person
       _selectedTransactionMethod = 'person';
+      final seq = widget.initialInstallmentSeq;
+      final alloc = widget.initialInstallmentAllocationAmount;
+      if (seq != null && alloc != null && alloc > 0) {
+        _installmentAllocations[seq] = alloc;
+        _amountController.text = formatWithThousands(alloc, decimalPlaces: (alloc % 1 == 0) ? 0 : 2);
+      }
+      final presetDesc = widget.initialDescription;
+      if (presetDesc != null && presetDesc.trim().isNotEmpty) {
+        _descriptionController.text = presetDesc.trim();
+      }
     }
   }
 

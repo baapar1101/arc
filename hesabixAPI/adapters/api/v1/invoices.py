@@ -1473,7 +1473,7 @@ async def export_single_invoice_pdf(
         installment_plan = None
 
     # غنی‌سازی دیکشنری فاکتور برای استفاده راحت‌تر در قالب و لیست‌ها
-    item["title"] = item.get("title") or item.get("description") or ("فاکتور" if is_fa else "Invoice")
+    item["title"] = item.get("title") or ("فاکتور" if is_fa else "Invoice")
     item["issue_date"] = invoice_date_display
     item["invoice_type_name"] = invoice_type_name
     item["is_proforma"] = is_proforma
@@ -1653,6 +1653,62 @@ async def export_single_invoice_pdf(
         },
     )
 
+
+def _apply_invoice_list_text_search(
+    q,
+    *,
+    business_id: int,
+    search: Optional[str],
+    search_fields: Optional[List[Any]] = None,
+    extra_info_person_id_expr=None,
+):
+    """
+    جستجوی متنی لیست فاکتورها بر اساس search_fields.
+    اگر search_fields ارسال نشود: کد سند، توضیح، و نام طرف‌حساب (شخص).
+    فیلد counterparty با join به جدول persons روی extra_info.person_id اعمال می‌شود.
+    """
+    if not isinstance(search, str) or not search.strip():
+        return q
+    s = f"%{search.strip()}%"
+    if search_fields:
+        sf_set = {str(x).lower() for x in search_fields}
+    else:
+        sf_set = {"code", "description", "counterparty"}
+
+    parts: List[Any] = []
+    if "code" in sf_set:
+        parts.append(Document.code.ilike(s))
+    if "description" in sf_set:
+        parts.append(Document.description.ilike(s))
+
+    if "counterparty" in sf_set:
+        pid_expr = extra_info_person_id_expr
+        if pid_expr is None:
+            _jb = cast(Document.extra_info, JSONB)
+            pid_expr = cast(_jb["person_id"].astext, Integer)
+        q = q.outerjoin(
+            Person,
+            and_(
+                Person.id == pid_expr,
+                Person.business_id == business_id,
+            ),
+        )
+        full_name = func.nullif(func.trim(func.concat_ws(" ", Person.first_name, Person.last_name)), "")
+        parts.append(
+            or_(
+                Person.alias_name.ilike(s),
+                Person.first_name.ilike(s),
+                Person.last_name.ilike(s),
+                Person.company_name.ilike(s),
+                full_name.ilike(s),
+            )
+        )
+
+    if not parts:
+        parts = [Document.code.ilike(s), Document.description.ilike(s)]
+    return q.filter(or_(*parts))
+
+
 @router.post("/business/{business_id}/search")
 @require_business_access("business_id")
 async def search_invoices_endpoint(
@@ -1773,11 +1829,15 @@ async def search_invoices_endpoint(
 	_extra_info_jb = cast(Document.extra_info, JSONB)
 	extra_info_person_id_int = cast(_extra_info_jb["person_id"].astext, Integer)
 
-	# Simple search on code/description
 	search: Optional[str] = getattr(query_info, 'search', None)
-	if isinstance(search, str) and search.strip():
-		s = f"%{search.strip()}%"
-		q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
+	search_fields: Optional[List[Any]] = getattr(query_info, 'search_fields', None)
+	q = _apply_invoice_list_text_search(
+		q,
+		business_id=business_id,
+		search=search,
+		search_fields=search_fields,
+		extra_info_person_id_expr=extra_info_person_id_int,
+	)
 
 	# Extra filters
 	doc_type = body.get("document_type")
@@ -2130,11 +2190,15 @@ async def search_tax_workspace_endpoint(
     except Exception:
         body = {}
 
-    # Search on code/description
     search: Optional[str] = getattr(query_info, "search", None)
-    if isinstance(search, str) and search.strip():
-        s = f"%{search.strip()}%"
-        q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
+    search_fields: Optional[List[Any]] = getattr(query_info, "search_fields", None)
+    q = _apply_invoice_list_text_search(
+        q,
+        business_id=business_id,
+        search=search,
+        search_fields=search_fields,
+        extra_info_person_id_expr=None,
+    )
 
     # Document type filter
     doc_type = body.get("document_type")
@@ -2930,11 +2994,16 @@ async def export_invoices_excel(
         )
     )
 
-    # Search
     search = body.get("search")
-    if isinstance(search, str) and search.strip():
-        s = f"%{search.strip()}%"
-        q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
+    search_fields = body.get("search_fields")
+    sf_list = search_fields if isinstance(search_fields, list) else None
+    q = _apply_invoice_list_text_search(
+        q,
+        business_id=business_id,
+        search=search if isinstance(search, str) else None,
+        search_fields=sf_list,
+        extra_info_person_id_expr=None,
+    )
 
     # Filters
     doc_type = body.get("document_type")
@@ -3307,9 +3376,15 @@ async def export_invoices_pdf(
     )
 
     search = body.get("search")
-    if isinstance(search, str) and search.strip():
-        s = f"%{search.strip()}%"
-        q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
+    search_fields = body.get("search_fields")
+    sf_list = search_fields if isinstance(search_fields, list) else None
+    q = _apply_invoice_list_text_search(
+        q,
+        business_id=business_id,
+        search=search if isinstance(search, str) else None,
+        search_fields=sf_list,
+        extra_info_person_id_expr=None,
+    )
 
     doc_type = body.get("document_type")
     if isinstance(doc_type, str) and doc_type in SUPPORTED_INVOICE_TYPES:

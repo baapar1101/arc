@@ -258,6 +258,13 @@ echo "Command: flutter run -d web-server $MODE_FLAG --web-port $PORT --web-hostn
 
 cd "$APP_DIR"
 
+# آینهٔ مسیر gstatic برای Roboto تا flutter run بدون CDN قابل سرو باشد
+SYNC_FONT_MIRROR="$APP_DIR/scripts/sync_font_fallback_mirror.sh"
+if [ -f "$SYNC_FONT_MIRROR" ]; then
+  chmod +x "$SYNC_FONT_MIRROR" 2>/dev/null || true
+  "$SYNC_FONT_MIRROR" "$APP_DIR/web" || warn "Font fallback mirror sync failed"
+fi
+
 # Configure mirror to resolve pub.dev access issues (auto-detect; prefer shell.hesabix.ir)
 if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
   if available_mirror=$(find_available_mirror); then

@@ -671,6 +671,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get installmentsNoPaymentsYet => 'No receipt allocations yet';
 
   @override
+  String get installmentsPaymentsDetailMissing =>
+      'Payment is recorded on this installment, but linked receipt rows could not be listed. Try reopening the dialog after saving receipts with installment allocation.';
+
+  @override
   String get test => 'Test';
 
   @override
@@ -5479,6 +5483,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get installmentColumn => 'Installment';
 
   @override
+  String get documentDetailsInstallmentsTab => 'Installments';
+
+  @override
+  String get documentDetailsInstallmentsEmptySchedule =>
+      'No installment rows were found for this invoice.';
+
+  @override
+  String documentDetailsInstallmentsAmountsNote(String currency) {
+    return 'All amounts are in $currency.';
+  }
+
+  @override
+  String get documentDetailsInstallmentReceive => 'Record receipt';
+
+  @override
+  String get documentDetailsInstallmentReceiptTypeOnly =>
+      'Installment allocation is only available with a receipt for this invoice type.';
+
+  @override
+  String get documentDetailsInstallmentDocCodeColumn => 'Document';
+
+  @override
+  String get documentDetailsInstallmentPaymentDateColumn => 'Document date';
+
+  @override
   String get taxStatusNotSent => 'Not sent';
 
   @override
@@ -8280,6 +8309,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountSettingsNotificationHistoryDescription =>
       'View all sent notifications (OTP, password reset, tickets, etc.)';
+
+  @override
+  String get notificationCenterLevelInfo => 'Info';
+
+  @override
+  String get notificationCenterLevelWarning => 'Warning';
+
+  @override
+  String get notificationCenterLevelCritical => 'Critical';
+
+  @override
+  String notificationCenterLevelUnknown(String level) {
+    return '$level';
+  }
 
   @override
   String get apiKeysPageTitle => 'Manage API Keys';

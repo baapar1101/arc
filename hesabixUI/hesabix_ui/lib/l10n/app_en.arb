@@ -222,6 +222,7 @@
   "installmentsDetailTitle": "Installment plan",
   "installmentsPaymentsColumn": "Receipts",
   "installmentsNoPaymentsYet": "No receipt allocations yet",
+  "installmentsPaymentsDetailMissing": "Payment is recorded on this installment, but linked receipt rows could not be listed. Try reopening the dialog after saving receipts with installment allocation.",
   "test": "Test",
   "user": "User",
   "showingRecords": "Showing {start} to {end} of {total} records",
@@ -2023,6 +2024,20 @@
   "taxStatusFinalized": "Finalized",
   "taxStatusFailed": "Failed",
   "installmentColumn": "Installment",
+  "documentDetailsInstallmentsTab": "Installments",
+  "documentDetailsInstallmentsEmptySchedule": "No installment rows were found for this invoice.",
+  "documentDetailsInstallmentsAmountsNote": "All amounts are in {currency}.",
+  "@documentDetailsInstallmentsAmountsNote": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "documentDetailsInstallmentReceive": "Record receipt",
+  "documentDetailsInstallmentReceiptTypeOnly": "Installment allocation is only available with a receipt for this invoice type.",
+  "documentDetailsInstallmentDocCodeColumn": "Document",
+  "documentDetailsInstallmentPaymentDateColumn": "Document date",
   "taxStatusNotSent": "Not sent",
 
   "taxAddToWorkspaceNotAllowed": "This invoice cannot be added to the tax workspace.",
@@ -3168,6 +3183,17 @@
   "accountSettingsVerificationDescription": "Verify mobile number and email for enhanced security",
   "accountSettingsNotificationHistoryTitle": "Notification History",
   "accountSettingsNotificationHistoryDescription": "View all sent notifications (OTP, password reset, tickets, etc.)",
+  "notificationCenterLevelInfo": "Info",
+  "notificationCenterLevelWarning": "Warning",
+  "notificationCenterLevelCritical": "Critical",
+  "notificationCenterLevelUnknown": "{level}",
+  "@notificationCenterLevelUnknown": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
   
   "apiKeysPageTitle": "Manage API Keys",
   "apiKeyErrorLoadingKeys": "Error loading keys",

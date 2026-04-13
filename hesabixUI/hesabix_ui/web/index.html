@@ -224,8 +224,16 @@
     // ذخیره تابع اصلی load برای override کردن بعداً
     window._flutterConfig = {
       canvasKitBaseUrl: "canvaskit/",
-      renderer: "canvaskit", 
-      useLocalCanvasKit: true
+      renderer: "canvaskit",
+      useLocalCanvasKit: true,
+      // فونت‌های fallback موتور (و Roboto اضطراری) از همین مبدأ؛ نه fonts.gstatic.com
+      fontFallbackBaseUrl: (function () {
+        try {
+          return new URL("fonts/gstatic/s/", document.baseURI).href;
+        } catch (e) {
+          return "fonts/gstatic/s/";
+        }
+      })()
     };
     
     // Intercept loader.load() برای اضافه کردن configuration
@@ -243,7 +251,7 @@
             // اعمال configuration محلی
             Object.assign(options.config, window._flutterConfig);
             
-            console.log('[Flutter] Using local CanvasKit from: canvaskit/');
+            console.log('[Flutter] Local CanvasKit + local fontFallbackBaseUrl (no fonts.gstatic.com)');
             return originalLoad.call(loader, options);
           };
         }

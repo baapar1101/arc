@@ -1349,6 +1349,12 @@ abstract class AppLocalizations {
   /// **'No receipt allocations yet'**
   String get installmentsNoPaymentsYet;
 
+  /// No description provided for @installmentsPaymentsDetailMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment is recorded on this installment, but linked receipt rows could not be listed. Try reopening the dialog after saving receipts with installment allocation.'**
+  String get installmentsPaymentsDetailMissing;
+
   /// No description provided for @test.
   ///
   /// In en, this message translates to:
@@ -10427,6 +10433,48 @@ abstract class AppLocalizations {
   /// **'Installment'**
   String get installmentColumn;
 
+  /// No description provided for @documentDetailsInstallmentsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Installments'**
+  String get documentDetailsInstallmentsTab;
+
+  /// No description provided for @documentDetailsInstallmentsEmptySchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'No installment rows were found for this invoice.'**
+  String get documentDetailsInstallmentsEmptySchedule;
+
+  /// No description provided for @documentDetailsInstallmentsAmountsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'All amounts are in {currency}.'**
+  String documentDetailsInstallmentsAmountsNote(String currency);
+
+  /// No description provided for @documentDetailsInstallmentReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'Record receipt'**
+  String get documentDetailsInstallmentReceive;
+
+  /// No description provided for @documentDetailsInstallmentReceiptTypeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment allocation is only available with a receipt for this invoice type.'**
+  String get documentDetailsInstallmentReceiptTypeOnly;
+
+  /// No description provided for @documentDetailsInstallmentDocCodeColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get documentDetailsInstallmentDocCodeColumn;
+
+  /// No description provided for @documentDetailsInstallmentPaymentDateColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get documentDetailsInstallmentPaymentDateColumn;
+
   /// No description provided for @taxStatusNotSent.
   ///
   /// In en, this message translates to:
@@ -15664,6 +15712,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View all sent notifications (OTP, password reset, tickets, etc.)'**
   String get accountSettingsNotificationHistoryDescription;
+
+  /// No description provided for @notificationCenterLevelInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get notificationCenterLevelInfo;
+
+  /// No description provided for @notificationCenterLevelWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get notificationCenterLevelWarning;
+
+  /// No description provided for @notificationCenterLevelCritical.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical'**
+  String get notificationCenterLevelCritical;
+
+  /// No description provided for @notificationCenterLevelUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{level}'**
+  String notificationCenterLevelUnknown(String level);
 
   /// No description provided for @apiKeysPageTitle.
   ///

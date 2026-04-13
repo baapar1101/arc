@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../core/auth_store.dart';
 import '../core/api_client.dart';
 import '../services/announcements_service.dart';
 import '../services/notifications_ws_client.dart';
 import '../utils/snackbar_helper.dart';
+
+String _localizedAnnouncementLevel(BuildContext context, String raw) {
+  final t = AppLocalizations.of(context);
+  final level = raw.toLowerCase().trim();
+  switch (level) {
+    case 'info':
+      return t.notificationCenterLevelInfo;
+    case 'warning':
+      return t.notificationCenterLevelWarning;
+    case 'critical':
+      return t.notificationCenterLevelCritical;
+    default:
+      return t.notificationCenterLevelUnknown(raw);
+  }
+}
 
 /// دکمهٔ زنگولهٔ اعلانات با badge و دیالوگ مرکز اعلان.
 /// در پنل کاربر و پنل کسب‌وکار قابل استفاده است.
@@ -109,126 +125,137 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
           builder: (context, dialogSetState) {
             final items = _notifications.take(10).toList();
             final ColorScheme cs = Theme.of(context).colorScheme;
+            final bool isDark = Theme.of(context).brightness == Brightness.dark;
+            final Color headerOn = isDark ? cs.onSurface : Colors.white;
+            // AlertDialog پیش‌فرض maxWidth≈560 دارد؛ بدون constraints بیرونی، عرض محتوا زیاد نمی‌شود.
+            // فضای کمتر از عرض صفحه برای inset پیش‌فرض دیالوگ (~۴۰px از هر طرف).
+            final double dialogWidth = math.max(
+              280,
+              math.min(MediaQuery.sizeOf(context).width - 88, 1200),
+            );
             return AlertDialog(
+              constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               titlePadding: EdgeInsets.zero,
               title: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
+                  color: isDark ? cs.surfaceContainerHighest : null,
+                  gradient: isDark
+                      ? null
+                      : LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.notifications_active, color: Colors.white),
+                    Icon(Icons.notifications_active, color: headerOn),
                     const SizedBox(width: 8),
-                    const Text('مرکز اعلان‌ها', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('مرکز اعلان‌ها', style: TextStyle(color: headerOn, fontWeight: FontWeight.bold)),
                     const Spacer(),
                     IconButton(
                       tooltip: 'بستن',
-                      icon: const Icon(Icons.close, color: Colors.white),
+                      icon: Icon(Icons.close, color: headerOn),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-              content: LayoutBuilder(
-                builder: (ctx, _) {
-                  final double dialogWidth = math.min(MediaQuery.of(ctx).size.width - 96, 900);
-                  return ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth, maxHeight: 420),
-                    child: items.isEmpty
-                        ? const SizedBox(height: 140, child: Center(child: Text('اعلانی وجود ندارد')))
-                        : ListView.separated(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemBuilder: (_, i) {
-                              final it = items[i];
-                              final level = '${it['level'] ?? 'info'}';
-                              IconData icon;
-                              Color levelColor;
-                              switch (level) {
-                                case 'warning':
-                                  icon = Icons.warning_amber_rounded;
-                                  levelColor = Colors.orange;
-                                  break;
-                                case 'critical':
-                                  icon = Icons.error_outline;
-                                  levelColor = Colors.red;
-                                  break;
-                                default:
-                                  icon = Icons.notifications_none;
-                                  levelColor = cs.primary;
-                              }
-                              final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
-                              final bool busy = annId != null && _busyAnnIds.contains(annId);
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: cs.surface,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
-                                  border: Border(left: BorderSide(color: levelColor, width: 3)),
+              content: SizedBox(
+                width: double.infinity,
+                height: 420,
+                child: items.isEmpty
+                    ? const Center(child: Text('اعلانی وجود ندارد'))
+                    : ListView.separated(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemBuilder: (_, i) {
+                          final it = items[i];
+                          final level = '${it['level'] ?? 'info'}'.toLowerCase().trim();
+                          IconData icon;
+                          Color levelColor;
+                          switch (level) {
+                            case 'warning':
+                              icon = Icons.warning_amber_rounded;
+                              levelColor = Colors.orange;
+                              break;
+                            case 'critical':
+                              icon = Icons.error_outline;
+                              levelColor = Colors.red;
+                              break;
+                            default:
+                              icon = Icons.notifications_none;
+                              levelColor = cs.primary;
+                          }
+                          final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
+                          final bool busy = annId != null && _busyAnnIds.contains(annId);
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
+                              border: Border(left: BorderSide(color: levelColor, width: 3)),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(color: levelColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                                  child: Icon(icon, color: levelColor),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(color: levelColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-                                      child: Icon(icon, color: levelColor),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 4),
+                                      Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
+                                      const SizedBox(height: 6),
+                                      Row(
                                         children: [
-                                          Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                          const SizedBox(height: 4),
-                                          Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
-                                          const SizedBox(height: 6),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: levelColor.withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(level, style: TextStyle(color: levelColor, fontSize: 11)),
-                                              ),
-                                              const Spacer(),
-                                              TextButton.icon(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                  context.go('/user/profile/announcements');
-                                                },
-                                                icon: const Icon(Icons.open_in_new, size: 16),
-                                                label: const Text('جزئیات'),
-                                              ),
-                                            ],
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: levelColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              _localizedAnnouncementLevel(context, level),
+                                              style: TextStyle(color: levelColor, fontSize: 11),
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                              context.go('/user/profile/announcements');
+                                            },
+                                            icon: const Icon(Icons.open_in_new, size: 16),
+                                            label: const Text('جزئیات'),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    if (annId != null)
-                                      IconButton(
-                                        tooltip: 'خوانده شد',
-                                        icon: busy
-                                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                            : const Icon(Icons.done_all, size: 20),
-                                        onPressed: busy ? null : () async => _markNotificationRead(annId, dialogSetState: dialogSetState),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
-                            itemCount: items.length,
-                          ),
-                  );
-                },
+                                if (annId != null)
+                                  IconButton(
+                                    tooltip: 'خوانده شد',
+                                    icon: busy
+                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.done_all, size: 20),
+                                    onPressed: busy ? null : () async => _markNotificationRead(annId, dialogSetState: dialogSetState),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemCount: items.length,
+                      ),
               ),
               actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               actions: [

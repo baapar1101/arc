@@ -126,21 +126,30 @@ class AccountSettingsPage extends StatelessWidget {
     ColorScheme colorScheme,
     AppLocalizations t,
   ) {
+    final bool isDark = theme.brightness == Brightness.dark;
+    final Color onHeader = isDark ? colorScheme.onSurface : Colors.white;
+    final Color subtitleOnHeader =
+        isDark ? colorScheme.onSurfaceVariant : Colors.white.withValues(alpha: 0.9);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDark ? colorScheme.surfaceContainerHighest : null,
+        gradient: isDark
+            ? null
+            : LinearGradient(
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.primary.withValues(alpha: 0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.3),
+            color: isDark
+                ? colorScheme.shadow.withValues(alpha: 0.12)
+                : colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -151,12 +160,14 @@ class AccountSettingsPage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: isDark
+                  ? colorScheme.onSurface.withValues(alpha: 0.08)
+                  : Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.settings,
-              color: Colors.white,
+              color: onHeader,
               size: 32,
             ),
           ),
@@ -168,7 +179,7 @@ class AccountSettingsPage extends StatelessWidget {
                 Text(
                   t.accountSettingsTitle,
                   style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
+                    color: onHeader,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -176,7 +187,7 @@ class AccountSettingsPage extends StatelessWidget {
                 Text(
                   t.accountSettingsSubtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: subtitleOnHeader,
                   ),
                 ),
               ],

@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# تولیدی: آینهٔ مسیر gstatic برای Roboto (از assets در بیلد/اسکریپت کپی می‌شود)
+/web/fonts/gstatic/
+
 # Symbolication related
 app.*.symbols
 

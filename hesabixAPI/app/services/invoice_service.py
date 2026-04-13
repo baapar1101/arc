@@ -9,7 +9,8 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
@@ -4191,6 +4192,103 @@ def _build_grouped_installment_invoices(items: List[Dict[str, Any]]) -> List[Dic
     return grouped
 
 
+def _backfill_installment_payments_from_receipts(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    invoice_extra: Dict[str, Any],
+) -> Dict[int, List[Dict[str, Any]]]:
+    """
+    اگر در JSON طرح اقساط، paid_amount پر باشد ولی آرایه payments خالی مانده باشد،
+    از extra_info.settlements اسناد دریافت مرتبط، ردیف‌های payments را بازسازی می‌کند.
+    """
+    out: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    doc_ids: set[int] = set()
+    links = (invoice_extra or {}).get("links") or {}
+    for raw in links.get("receipt_payment_document_ids") or []:
+        try:
+            doc_ids.add(int(raw))
+        except (TypeError, ValueError):
+            continue
+    try:
+        ex_col = cast(DocumentLine.extra_info, JSONB)
+        rows = (
+            db.query(DocumentLine.document_id)
+            .join(Document, DocumentLine.document_id == Document.id)
+            .filter(
+                Document.business_id == int(business_id),
+                Document.document_type == "receipt",
+                DocumentLine.person_id.isnot(None),
+                DocumentLine.extra_info.isnot(None),
+                ex_col["invoice_id"].astext == str(int(invoice_id)),
+            )
+            .distinct()
+            .all()
+        )
+        for (did,) in rows:
+            if did is not None:
+                doc_ids.add(int(did))
+    except Exception:
+        logger.exception(
+            "backfill_installment_payments: query receipt lines failed invoice_id=%s business_id=%s",
+            invoice_id,
+            business_id,
+        )
+    if not doc_ids:
+        return out
+    inv_id = int(invoice_id)
+    docs = (
+        db.query(Document)
+        .filter(
+            Document.id.in_(list(doc_ids)),
+            Document.business_id == int(business_id),
+            Document.document_type == "receipt",
+        )
+        .all()
+    )
+    for doc in docs:
+        ex = doc.extra_info or {}
+        settlements = ex.get("settlements") or []
+        if not isinstance(settlements, list):
+            continue
+        for st in settlements:
+            if not isinstance(st, dict):
+                continue
+            try:
+                st_inv = int(st.get("invoice_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if st_inv != inv_id:
+                continue
+            allocs = st.get("allocations") or []
+            if not isinstance(allocs, list):
+                continue
+            for al in allocs:
+                if not isinstance(al, dict):
+                    continue
+                try:
+                    seq = int(al.get("seq") or 0)
+                    amt = float(al.get("amount") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if seq <= 0 or amt <= 0:
+                    continue
+                out[seq].append(
+                    {
+                        "document_id": int(doc.id),
+                        "document_code": getattr(doc, "code", None),
+                        "document_date": doc.document_date.isoformat()
+                        if getattr(doc, "document_date", None)
+                        else None,
+                        "seq": seq,
+                        "amount": amt,
+                    }
+                )
+    for lst in out.values():
+        lst.sort(key=lambda x: ((x.get("document_date") or ""), int(x.get("document_id") or 0)))
+    return out
+
+
 def get_invoice_installment_plan(
     db: Session,
     business_id: int,
@@ -4215,6 +4313,9 @@ def get_invoice_installment_plan(
     if not isinstance(plan, dict):
         raise ApiError("INSTALLMENT_PLAN_NOT_FOUND", "Installment plan not found on document", http_status=404)
     schedule = plan.get("schedule") or []
+    backfill_by_seq = _backfill_installment_payments_from_receipts(
+        db, int(business_id), int(invoice_id), extra
+    )
     # محاسبات مانده هر قسط
     enriched_schedule: List[Dict[str, Any]] = []
     total_principal = Decimal(str(plan.get("principal_total", 0) or 0))
@@ -4232,6 +4333,14 @@ def get_invoice_installment_plan(
         new_item["remaining"] = float(remaining)
         pays = new_item.get("payments")
         new_item["payments"] = list(pays) if isinstance(pays, list) else []
+        if not new_item["payments"] and paid > Decimal("0.009"):
+            try:
+                seq_i = int(new_item.get("seq") or 0)
+            except (TypeError, ValueError):
+                seq_i = 0
+            bf = backfill_by_seq.get(seq_i) if seq_i > 0 else None
+            if bf:
+                new_item["payments"] = list(bf)
         # اطمینان از وجود status - اگر موجود نباشد، محاسبه کن
         if "status" not in new_item or not new_item.get("status"):
             if total > 0 and paid >= total:

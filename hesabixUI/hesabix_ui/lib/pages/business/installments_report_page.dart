@@ -556,6 +556,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                           ],
                           rows: sched.map((it) {
                             final pays = (it['payments'] as List?) ?? const [];
+                            final stRow = it['status']?.toString();
+                            final paidRow = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+                            final paidEvidence =
+                                paidRow > 0.009 || stRow == 'partial' || stRow == 'paid';
                             return DataRow(
                               cells: [
                                 DataCell(Text(it['seq']?.toString() ?? '-')),
@@ -565,8 +569,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                                 DataCell(Text(_formatNumber(it['paid_amount']))),
                                 DataCell(Text(_formatNumber(it['remaining']))),
                                 DataCell(
-                                  pays.isEmpty
-                                      ? Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall)
+                                  pays.isEmpty && paidEvidence
+                                      ? Text(
+                                          t.installmentsPaymentsDetailMissing,
+                                          style: theme.textTheme.bodySmall,
+                                        )
+                                      : pays.isEmpty
+                                          ? Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall)
                                       : Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: pays.map((p) {

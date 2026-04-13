@@ -377,6 +377,16 @@ echo "System Memory Status:"
 free -h | head -2
 echo ""
 
+# آینهٔ Roboto برای fontFallbackBaseUrl موتور وب (بدون fonts.gstatic.com)
+SYNC_FONT_MIRROR="$APP_DIR/scripts/sync_font_fallback_mirror.sh"
+if [ -f "$SYNC_FONT_MIRROR" ]; then
+  chmod +x "$SYNC_FONT_MIRROR" 2>/dev/null || true
+  echo "Syncing local font fallback mirror (Roboto) into web/ ..."
+  "$SYNC_FONT_MIRROR" "$APP_DIR/web" || warn "Font fallback mirror sync failed; engine may fall back to CDN for Roboto"
+else
+  warn "sync_font_fallback_mirror.sh not found; skipping local Roboto mirror for web engine"
+fi
+
 # Run build with memory settings and parallel compilation
 # Flutter always outputs to build/web inside the project; copy to BUILD_DIR if different
 FLUTTER_OUTPUT="$APP_DIR/build/web"
