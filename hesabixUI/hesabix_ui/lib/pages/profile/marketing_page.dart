@@ -339,7 +339,8 @@ class _MarketingPageState extends State<MarketingPage> {
                   });
                   _fetchStats();
                 },
-              ),
+              
+        expandBodyHeightToFitRows: true,),
               fromJson: (json) => json,
               calendarController: widget.calendarController,
             ),

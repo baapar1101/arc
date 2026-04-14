@@ -282,7 +282,8 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
       showSearch: true,
       showClearFiltersButton: true,
       customHeaderActions: const [],
-    );
+    
+        expandBodyHeightToFitRows: true,);
 
     return DataTableWidget<Map<String, dynamic>>(
       key: ValueKey(_tableRefreshToken),

@@ -36,6 +36,8 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final CheckPickerMode checkPickerMode;
   final AuthStore? authStore;
   final num? invoiceTotal; // مبلغ کل فاکتور
+  /// داخل [SingleChildScrollView] یا محور عمودی بدون ارتفاع محدود؛ لیست به‌اندازهٔ محتوا بلند می‌شود و اسکرول به والد سپرده می‌شود.
+  final bool shrinkWrapBody;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -48,6 +50,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     this.checkPickerMode = CheckPickerMode.any,
     this.authStore,
     this.invoiceTotal,
+    this.shrinkWrapBody = false,
   });
 
   @override
@@ -150,61 +153,111 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     return widget.invoiceTotal! > 0;
   }
 
+  /// ماندهٔ مثبت برای پر کردن ردیف خالی (مبلغ صفر) یا باز کردن دیالوگ تراکنش جدید.
+  bool get _canFillRemainingBalance {
+    if (widget.invoiceTotal == null || widget.invoiceTotal! <= 0) return false;
+    return _remainingBalance > 0;
+  }
+
+  void _fillRemainingBalance() {
+    final total = widget.invoiceTotal;
+    if (total == null || total <= 0) return;
+
+    final remainder = total - _totalPaid;
+    if (remainder <= 0) {
+      if (remainder < 0) {
+        SnackBarHelper.showError(
+          context,
+          message: 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است؛ ابتدا مبالغ را اصلاح کنید.',
+        );
+      } else {
+        SnackBarHelper.showError(context, message: 'مانده‌ای برای پر کردن وجود ندارد.');
+      }
+      return;
+    }
+
+    final zeroIdx = widget.transactions.indexWhere((t) => t.amount == 0);
+    if (zeroIdx >= 0) {
+      final t = widget.transactions[zeroIdx];
+      final newList = List<InvoiceTransaction>.from(widget.transactions);
+      newList[zeroIdx] = t.copyWith(amount: remainder);
+      widget.onChanged(newList);
+      return;
+    }
+
+    _showTransactionDialog(initialAmount: remainder);
+  }
+
+  Widget _buildHeaderRow(ThemeData theme) {
+    final isDesktop = _isDesktop(context);
+    return Row(
+      children: [
+        Icon(
+          Icons.receipt_long_outlined,
+          color: theme.colorScheme.primary,
+          size: 24,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'تراکنش‌ها',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const Spacer(),
+        if (isDesktop)
+          ElevatedButton.icon(
+            onPressed: _canAddTransaction ? _addTransaction : null,
+            icon: const Icon(Icons.add),
+            label: const Text('افزودن تراکنش'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+            ),
+          )
+        else
+          IconButton(
+            onPressed: _canAddTransaction ? _addTransaction : null,
+            icon: const Icon(Icons.add),
+            tooltip: _canAddTransaction
+                ? 'افزودن تراکنش'
+                : 'ابتدا باید ردیف‌های کالا را اضافه کنید',
+            style: IconButton.styleFrom(
+              backgroundColor: _canAddTransaction
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              foregroundColor: _canAddTransaction
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDesktop = _isDesktop(context);
-    
+
+    if (widget.shrinkWrapBody) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeaderRow(theme),
+          const SizedBox(height: 16),
+          _buildMobileLayout(theme, shrinkWrap: true),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // هدر
-        Row(
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              color: theme.colorScheme.primary,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'تراکنش‌ها',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            // در موبایل فقط آیکون نمایش داده می‌شود
-            if (isDesktop)
-              ElevatedButton.icon(
-                onPressed: _canAddTransaction ? _addTransaction : null,
-                icon: const Icon(Icons.add),
-                label: const Text('افزودن تراکنش'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                ),
-              )
-            else
-              IconButton(
-                onPressed: _canAddTransaction ? _addTransaction : null,
-                icon: const Icon(Icons.add),
-                tooltip: _canAddTransaction 
-                    ? 'افزودن تراکنش'
-                    : 'ابتدا باید ردیف‌های کالا را اضافه کنید',
-                style: IconButton.styleFrom(
-                  backgroundColor: _canAddTransaction 
-                      ? theme.colorScheme.primary 
-                      : theme.colorScheme.surfaceContainerHighest,
-                  foregroundColor: _canAddTransaction 
-                      ? theme.colorScheme.onPrimary 
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-          ],
-        ),
+        _buildHeaderRow(theme),
         const SizedBox(height: 16),
-        
+
         // محتوای اصلی: دو ستونه در دسکتاپ، یک ستونه در موبایل
         Expanded(
           child: isDesktop
@@ -216,8 +269,22 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
   
   // چیدمان موبایل: یک ستون
-  Widget _buildMobileLayout(ThemeData theme) {
+  Widget _buildMobileLayout(ThemeData theme, {bool shrinkWrap = false}) {
+    final listSection = widget.transactions.isEmpty
+        ? _buildEmptyState(theme)
+        : ListView.separated(
+            shrinkWrap: shrinkWrap,
+            physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+            itemCount: widget.transactions.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final transaction = widget.transactions[index];
+              return _buildTransactionCard(transaction, index);
+            },
+          );
+
     return Column(
+      mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // نمایش مانده فاکتور یا پیام عدم وجود ردیف کالا
@@ -228,20 +295,12 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           _buildNoItemsMessage(theme),
           const SizedBox(height: 16),
         ],
-        
+
         // لیست تراکنش‌ها
-        Expanded(
-          child: widget.transactions.isEmpty
-              ? _buildEmptyState(theme)
-              : ListView.separated(
-                  itemCount: widget.transactions.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final transaction = widget.transactions[index];
-                    return _buildTransactionCard(transaction, index);
-                  },
-                ),
-        ),
+        if (shrinkWrap)
+          listSection
+        else
+          Expanded(child: listSection),
       ],
     );
   }
@@ -579,11 +638,16 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     widget.onChanged(newTransactions);
   }
 
-  void _showTransactionDialog({InvoiceTransaction? transaction, int? index}) {
+  void _showTransactionDialog({
+    InvoiceTransaction? transaction,
+    int? index,
+    num? initialAmount,
+  }) {
     showDialog(
       context: context,
       builder: (context) => TransactionDialog(
         transaction: transaction,
+        initialAmount: initialAmount,
         businessId: widget.businessId,
         calendarController: widget.calendarController,
         invoiceType: widget.invoiceType,
@@ -860,6 +924,17 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ),
               ),
             ],
+            if (widget.invoiceTotal != null && widget.invoiceTotal! > 0) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _canFillRemainingBalance ? _fillRemainingBalance : null,
+                  icon: const Icon(Icons.price_change_outlined, size: 20),
+                  label: const Text('پر کردن مانده در تراکنش'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -987,6 +1062,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
 
 class TransactionDialog extends StatefulWidget {
   final InvoiceTransaction? transaction;
+  /// هنگام افزودن تراکنش جدید، مقدار اولیهٔ فیلد مبلغ (مثلاً ماندهٔ فاکتور).
+  final num? initialAmount;
   final int businessId;
   final CalendarController calendarController;
   final ValueChanged<InvoiceTransaction> onSave;
@@ -998,6 +1075,7 @@ class TransactionDialog extends StatefulWidget {
   const TransactionDialog({
     super.key,
     this.transaction,
+    this.initialAmount,
     required this.businessId,
     required this.calendarController,
     required this.invoiceType,
@@ -1051,9 +1129,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
     super.initState();
     _selectedType = widget.transaction?.type ?? TransactionType.person;
     _transactionDate = widget.transaction?.transactionDate ?? DateTime.now();
-    _amountController.text = widget.transaction?.amount != null 
-        ? formatWithThousands(widget.transaction!.amount, decimalPlaces: 0)
-        : '';
+    if (widget.transaction != null) {
+      _amountController.text =
+          formatWithThousands(widget.transaction!.amount, decimalPlaces: 0);
+    } else if (widget.initialAmount != null) {
+      _amountController.text =
+          formatWithThousands(widget.initialAmount!, decimalPlaces: 0);
+    } else {
+      _amountController.text = '';
+    }
     _commissionController.text = widget.transaction?.commission != null
         ? formatWithThousands(widget.transaction!.commission!, decimalPlaces: 0)
         : '';

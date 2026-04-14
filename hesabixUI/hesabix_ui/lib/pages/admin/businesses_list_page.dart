@@ -278,7 +278,8 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             }
             _showBusinessDetailsDialog(context, item);
           },
-        ),
+        
+        expandBodyHeightToFitRows: true,),
         fromJson: (json) => Map<String, dynamic>.from(json),
         calendarController: _calendarController,
       ),

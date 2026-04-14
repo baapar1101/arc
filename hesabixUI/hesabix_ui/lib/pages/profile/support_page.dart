@@ -1647,7 +1647,8 @@ class _SupportPageState extends State<SupportPage> {
                             ),
                           ),
                         ],
-                      ),
+                      
+        expandBodyHeightToFitRows: true,),
                       fromJson: (json) => json,
                       calendarController: widget.calendarController,
                     )

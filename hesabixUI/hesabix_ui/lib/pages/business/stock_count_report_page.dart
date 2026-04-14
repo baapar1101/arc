@@ -215,7 +215,8 @@ class _StockCountReportPageState extends State<StockCountReportPage> {
               width: ColumnWidth.large,
             ),
           ],
-        ),
+        
+        expandBodyHeightToFitRows: true,),
       ),
     );
   }

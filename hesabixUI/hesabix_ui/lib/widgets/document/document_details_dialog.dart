@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'dart:ui' as ui;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
@@ -36,6 +37,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, parseJsonDoubleOrNull;
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/utils/responsive_helper.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
   if (v == null) return null;
@@ -3540,23 +3542,26 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
     final theme = Theme.of(context);
     final isEdit = widget.existingDocument != null;
     final hasInstallmentPlan = _hasInstallmentPlan();
-    
-    return Dialog(
-      child: Container(
-        width: 700,
-        constraints: const BoxConstraints(maxHeight: 800),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    final media = MediaQuery.sizeOf(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final maxDialogHeight = min(800.0, media.height * 0.9);
+    final headerRadius = isMobile
+        ? BorderRadius.zero
+        : const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+          );
+
+    final shell = Column(
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             // هدر
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
+                borderRadius: headerRadius,
               ),
               child: Row(
                 children: [
@@ -3582,7 +3587,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                 ],
               ),
             ),
-            
+
             // فرم
             Expanded(
               child: SingleChildScrollView(
@@ -3848,15 +3853,15 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                 ),
               ),
             ),
-            
+
             // دکمه‌ها
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(isMobile ? 0 : 12),
+                  bottomRight: Radius.circular(isMobile ? 0 : 12),
                 ),
               ),
               child: Row(
@@ -3881,7 +3886,21 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
               ),
             ),
           ],
+        );
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Material(
+          color: theme.colorScheme.surface,
+          child: SafeArea(child: shell),
         ),
+      );
+    }
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 700, maxHeight: maxDialogHeight),
+        child: shell,
       ),
     );
   }

@@ -994,101 +994,96 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // هدر موبایل
-                Padding(
-                  padding: EdgeInsets.all(padding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.initialDocument == null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: SegmentedButton<bool>(
-                            segments: [
-                              ButtonSegment<bool>(value: true, label: Text(t.receipts)),
-                              ButtonSegment<bool>(value: false, label: Text(t.payments)),
-                            ],
-                            selected: {_isReceipt},
-                            onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
-                          ),
-                        ),
-                      DateInputField(
-                        value: _docDate,
-                        calendarController: widget.calendarController,
-                        onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                        labelText: 'تاریخ سند',
-                        hintText: 'انتخاب تاریخ',
-                      ),
-                      const SizedBox(height: 12),
-                      CurrencyPickerWidget(
-                        businessId: widget.businessId,
-                        selectedCurrencyId: _selectedCurrencyId,
-                        onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
-                        label: 'ارز',
-                        hintText: 'انتخاب ارز',
-                      ),
-                      const SizedBox(height: 12),
-                      ProjectSelectorWidget(
-                        businessId: widget.businessId,
-                        apiClient: widget.apiClient,
-                        selectedProjectId: _selectedProjectId,
-                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
-                        allowNull: true,
-                        labelText: 'پروژه',
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'توضیحات کلی سند',
-                          hintText: 'توضیحات اختیاری...',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                // پنل‌ها با TabBar
                 Expanded(
-                  child: DefaultTabController(
-                    length: 2,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(padding),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        TabBar(
-                          tabs: [
-                            Tab(text: t.people),
-                            Tab(text: t.accounts),
-                          ],
+                        if (widget.initialDocument == null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: SegmentedButton<bool>(
+                              segments: [
+                                ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                                ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                              ],
+                              selected: {_isReceipt},
+                              onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                            ),
+                          ),
+                        DateInputField(
+                          value: _docDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                          labelText: 'تاریخ سند',
+                          hintText: 'انتخاب تاریخ',
                         ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _PersonsPanel(
-                                businessId: widget.businessId,
-                                lines: _personLines,
-                                onChanged: (ls) {
-                                  debugPrint('⚫ [BulkSettlementDialog] onChanged - old lines count: ${_personLines.length}, new lines count: ${ls.length}');
-                                  for (int i = 0; i < ls.length && i < _personLines.length; i++) {
-                                    if (_personLines[i].amount != ls[i].amount) {
-                                      debugPrint('⚫ [BulkSettlementDialog] line $i amount changed: ${_personLines[i].amount} -> ${ls[i].amount}');
-                                    }
-                                  }
-                                  setState(() {
-                                    _personLines.clear();
-                                    _personLines.addAll(ls);
-                                  });
-                                  debugPrint('⚫ [BulkSettlementDialog] after setState - _personLines[0].amount: ${_personLines.isNotEmpty ? _personLines[0].amount : "N/A"}');
-                                },
-                                calendarController: widget.calendarController,
-                                apiClient: widget.apiClient,
-                                selectedCurrencyId: _selectedCurrencyId,
-                                isReceipt: _isReceipt,
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(padding),
-                                child: InvoiceTransactionsWidget(
+                        const SizedBox(height: 12),
+                        CurrencyPickerWidget(
+                          businessId: widget.businessId,
+                          selectedCurrencyId: _selectedCurrencyId,
+                          onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                          label: 'ارز',
+                          hintText: 'انتخاب ارز',
+                        ),
+                        const SizedBox(height: 12),
+                        ProjectSelectorWidget(
+                          businessId: widget.businessId,
+                          apiClient: widget.apiClient,
+                          selectedProjectId: _selectedProjectId,
+                          onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                          allowNull: true,
+                          labelText: 'پروژه',
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _descriptionController,
+                          decoration: const InputDecoration(
+                            labelText: 'توضیحات کلی سند',
+                            hintText: 'توضیحات اختیاری...',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const Divider(height: 32),
+                        _PersonsPanel(
+                          businessId: widget.businessId,
+                          lines: _personLines,
+                          onChanged: (ls) {
+                            debugPrint('⚫ [BulkSettlementDialog] onChanged - old lines count: ${_personLines.length}, new lines count: ${ls.length}');
+                            for (int i = 0; i < ls.length && i < _personLines.length; i++) {
+                              if (_personLines[i].amount != ls[i].amount) {
+                                debugPrint('⚫ [BulkSettlementDialog] line $i amount changed: ${_personLines[i].amount} -> ${ls[i].amount}');
+                              }
+                            }
+                            setState(() {
+                              _personLines.clear();
+                              _personLines.addAll(ls);
+                            });
+                            debugPrint('⚫ [BulkSettlementDialog] after setState - _personLines[0].amount: ${_personLines.isNotEmpty ? _personLines[0].amount : "N/A"}');
+                          },
+                          calendarController: widget.calendarController,
+                          apiClient: widget.apiClient,
+                          selectedCurrencyId: _selectedCurrencyId,
+                          isReceipt: _isReceipt,
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 0,
+                          clipBehavior: Clip.antiAlias,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  t.accounts,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                InvoiceTransactionsWidget(
                                   transactions: _centerTransactions,
                                   onChanged: (txs) => setState(() {
                                     _centerTransactions.clear();
@@ -1099,9 +1094,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                                   invoiceType: InvoiceType.sales,
                                   checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
                                   authStore: widget.authStore,
+                                  shrinkWrapBody: true,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],

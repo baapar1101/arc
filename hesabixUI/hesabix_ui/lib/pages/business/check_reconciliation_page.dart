@@ -312,7 +312,8 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
               }
             });
           },
-        ),
+        
+        expandBodyHeightToFitRows: true,),
         fromJson: (json) => json,
         calendarController: widget.calendarController,
       ),

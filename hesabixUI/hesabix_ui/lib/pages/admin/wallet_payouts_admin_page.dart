@@ -787,7 +787,8 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                       return null;
                     },
                     onRefresh: () => _loadStats(),
-                  ),
+                  
+        expandBodyHeightToFitRows: true,),
                   fromJson: (json) => Map<String, dynamic>.from(json),
                   calendarController: _calendarCtrl,
                 ),

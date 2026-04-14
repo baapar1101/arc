@@ -1543,7 +1543,8 @@ class _ProductsPageState extends State<ProductsPage> {
             'include_inventory': true,
           },
           onRowTap: (item) => _showProductDetailsDialog(item),
-        ),
+        
+        expandBodyHeightToFitRows: true,),
         fromJson: (json) => json,
       ),
     );

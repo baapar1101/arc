@@ -576,7 +576,8 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
               ).then((_) => _refreshTable());
             }
           },
-        ),
+        
+        expandBodyHeightToFitRows: true,),
       ),
     );
   }

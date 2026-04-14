@@ -279,7 +279,8 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
           onRowTap: (item) {
             _showNotificationDetails(context, item);
           },
-        ),
+        
+        expandBodyHeightToFitRows: true,),
         fromJson: (json) => Map<String, dynamic>.from(json),
         calendarController: widget.calendarController,
       ),

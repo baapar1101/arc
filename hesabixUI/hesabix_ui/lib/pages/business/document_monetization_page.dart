@@ -927,7 +927,8 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                   ],
                   defaultSortBy: 'created_at',
                   defaultSortDesc: true,
-                ),
+                
+        expandBodyHeightToFitRows: true,),
                 fromJson: (json) => Map<String, dynamic>.from(json),
                 calendarController: _calendarController,
               ),

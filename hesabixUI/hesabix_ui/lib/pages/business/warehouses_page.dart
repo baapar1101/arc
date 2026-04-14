@@ -107,7 +107,8 @@ class _WarehousesPageState extends State<WarehousesPage> {
                 searchable: false,
                 width: ColumnWidth.small),
           ],
-        ),
+        
+        expandBodyHeightToFitRows: true,),
       ),
     );
   }

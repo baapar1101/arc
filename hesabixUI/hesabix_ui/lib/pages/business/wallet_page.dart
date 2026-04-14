@@ -466,7 +466,8 @@ class _WalletPageState extends State<WalletPage> {
                                 excelEndpoint: '/businesses/${widget.businessId}/wallet/transactions/export'
                                     '${_fromDate != null ? '?from_date=${_fromDate!.toIso8601String()}' : ''}'
                                     '${_toDate != null ? (_fromDate != null ? '&' : '?') + 'to_date=${_toDate!.toIso8601String()}' : ''}',
-                              ),
+                              
+        expandBodyHeightToFitRows: true,),
                               fromJson: (json) => Map<String, dynamic>.from(json),
                               calendarController: _calendarCtrl,
                             ),
