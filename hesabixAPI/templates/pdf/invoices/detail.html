@@ -8,10 +8,65 @@
     .invoice-layout .section-card {
       border: 1px solid #000;
       border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 10px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
       background: #ffffff;
       page-break-inside: avoid;
+    }
+
+    /* جدول کالا و جداول فرعی: اجازهٔ شکست صفحه برای استفاده بهتر از ارتفاع */
+    .invoice-layout .section-card.table-card {
+      page-break-inside: auto;
+    }
+
+    .invoice-layout table tbody tr {
+      page-break-inside: auto;
+      break-inside: auto;
+    }
+
+    .invoice-layout table td {
+      page-break-inside: auto;
+    }
+
+    .invoice-layout table {
+      font-size: 9px;
+      line-height: 1.25;
+      box-shadow: none;
+      border-radius: 0;
+    }
+
+    .invoice-layout table th,
+    .invoice-layout table td {
+      padding: 3px 4px;
+      line-height: 1.25;
+      vertical-align: top;
+    }
+
+    .invoice-layout table thead th {
+      font-size: 8px;
+      padding: 4px 3px;
+      letter-spacing: 0;
+      white-space: normal;
+    }
+
+    html[dir="rtl"] .invoice-layout td.line-item-cell {
+      text-align: right;
+    }
+
+    html[dir="ltr"] .invoice-layout td.line-item-cell {
+      text-align: left;
+    }
+
+    .invoice-layout .line-item-name {
+      font-weight: 600;
+    }
+
+    .invoice-layout .line-item-desc {
+      font-size: 8.5px;
+      font-weight: normal;
+      color: #333;
+      margin-top: 2px;
+      white-space: normal;
     }
 
     .invoice-layout .section-card h3 {
@@ -62,9 +117,9 @@
     }
 
     .invoice-layout .header .title {
-      font-size: 18px;
+      font-size: 16px;
       color: #000;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .invoice-layout .header .meta {
@@ -80,7 +135,7 @@
     }
 
     .invoice-layout .table-card .table-inner {
-      padding: 8px 8px 4px 8px;
+      padding: 4px 6px 2px 6px;
     }
 
     .invoice-layout .table-wrapper {
@@ -89,11 +144,6 @@
       border: 1px solid #000;
       overflow: hidden;
       background: #ffffff;
-    }
-
-    .invoice-layout table {
-      box-shadow: none;
-      border-radius: 0;
     }
 
     .invoice-layout thead {
@@ -142,8 +192,8 @@
     }
 
     .invoice-layout .signature-frame {
-      height: 70px;
-      margin: 0 16px 4px 16px;
+      height: 56px;
+      margin: 0 12px 3px 12px;
       border: 1px solid #000;
       border-radius: 8px;
       display: flex;
@@ -202,7 +252,7 @@
         <div class="header-bottom">
           {% if business_logo_data_uri %}
             <div class="header-logo" style="flex:0 0 auto;">
-              <img src="{{ business_logo_data_uri }}" alt="Logo" style="max-height: 60px; max-width: 120px; object-fit: contain;">
+              <img src="{{ business_logo_data_uri }}" alt="Logo" style="max-height: 50px; max-width: 110px; object-fit: contain;">
             </div>
           {% endif %}
           <div class="header-main">
@@ -310,8 +360,7 @@
             <thead>
               <tr>
                 <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
-                <th>{{ 'شرح کالا/خدمت' if is_fa else 'Item' }}</th>
-                <th>{{ 'شرح' if is_fa else 'Description' }}</th>
+                <th>{{ 'کالا / خدمت و توضیحات' if is_fa else 'Item & description' }}</th>
                 <th>{{ 'تعداد' if is_fa else 'Qty' }}</th>
                 <th>{{ 'فی' if is_fa else 'Price' }}</th>
                 {% if has_line_discount %}
@@ -329,14 +378,18 @@
               {% for line in lines or [] %}
                 <tr>
                   <td>{{ loop.index }}</td>
-                  <td>
-                    {% if line.product_code %}
-                      {{ line.product_code }} - {{ line.product_name or '-' }}
-                    {% else %}
-                      {{ line.product_name or '-' }}
+                  <td class="line-item-cell">
+                    <div class="line-item-name">
+                      {% if line.product_code %}
+                        {{ line.product_code }} - {{ line.product_name or '-' }}
+                      {% else %}
+                        {{ line.product_name or '-' }}
+                      {% endif %}
+                    </div>
+                    {% if line.description %}
+                      <div class="line-item-desc">{{ line.description }}</div>
                     {% endif %}
                   </td>
-                  <td>{{ line.description or '' }}</td>
                   <td>{{ line.quantity_display | default('') | ltr | safe }}</td>
                   <td class="amount">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}</td>
                   {% if has_line_discount %}
@@ -510,42 +563,6 @@
         </div>
       </div>
     </div>
-
-    {% if payments and payments|length > 0 %}
-      <div class="section-card table-card">
-        <div class="table-inner">
-          <div class="meta" style="margin-bottom: 6px; font-weight: bold;">
-            {{ 'تراکنش‌های پرداخت مرتبط' if is_fa else 'Related payments' }}
-          </div>
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
-                  <th>{{ 'تاریخ' if is_fa else 'Date' }}</th>
-                  <th>{{ 'نوع' if is_fa else 'Type' }}</th>
-                  <th>{{ 'شماره سند' if is_fa else 'Code' }}</th>
-                  <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
-                  <th>{{ 'روش پرداخت' if is_fa else 'Method' }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for p in payments %}
-                  <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ p.date or '-' }}</td>
-                    <td>{{ p.document_type_name or '-' }}</td>
-                    <td>{{ p.code or '-' }}</td>
-                    <td class="amount">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}</td>
-                    <td>{{ p.methods or '-' }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    {% endif %}
 
     {% if installment_plan and installment_plan.data and installment_plan.data.schedule %}
       <div class="section-card table-card" style="page-break-before: always; margin-top: 16px;">
