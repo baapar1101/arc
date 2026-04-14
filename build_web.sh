@@ -183,13 +183,11 @@ check_url_accessibility() {
 }
 
 # Function to find best available mirror
-# Same order as deploy.sh: Runflare (Iran) → Hesabix internal → official → Chinese / others
+# Same order as deploy.sh: Runflare (Iran) → official → Chinese / others (shell.hesabix.ir فقط tarball SDK در deploy، نه pub mirror)
 find_available_mirror() {
   local mirrors=(
     # Runflare mirror (Iran) — aligned with deploy.sh get_flutter_mirrors_list / set_flutter_mirror_env
     "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-    # Hesabix internal mirror (Iran) — if available, use after Runflare probe
-    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
     # Official (if DNS works)
     "https://pub.dev|https://storage.googleapis.com"
     # Chinese mirrors (for servers inside China or restricted networks)
@@ -238,7 +236,6 @@ if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
     warn ""
     warn "All mirrors checked and not available:"
     warn "  - mirror-flutter.runflare.com / mirror-gcs.runflare.com (Runflare)"
-    warn "  - shell.hesabix.ir (dart-pub / flutter)"
     warn "  - pub.dev / storage.googleapis.com"
     warn "  - mirrors.tuna.tsinghua.edu.cn"
     warn "  - mirror.sjtu.edu.cn"

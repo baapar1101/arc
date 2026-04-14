@@ -43,7 +43,7 @@ IFS=$'\n\t'
 # - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
 #   script also auto-detects mirrors (Runflare first, then Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
 # - pip: Runflare mirror via `pip config --user` (mirror-pypi.runflare.com) — see configure_pip_runflare_mirror.
-# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected (Runflare اول: mirror-flutter.runflare.com + mirror-gcs.runflare.com).
+# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected (Runflare اول). shell.hesabix.ir فقط برای tarball SDK است، نه آینهٔ pub.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 # - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
@@ -1545,8 +1545,6 @@ get_flutter_mirrors_list() {
     echo "${PUB_HOSTED_URL}|${FLUTTER_STORAGE_BASE_URL}"
   fi
   echo "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-  # Hesabix internal mirror (if you run a dart-pub proxy + flutter storage mirror here)
-  echo "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
   echo "https://pub.dev|https://storage.googleapis.com"
   echo "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
   echo "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
@@ -1564,7 +1562,6 @@ set_flutter_mirror_env() {
   log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
   local mirrors=(
     "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
     "https://pub.dev|https://storage.googleapis.com"
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"

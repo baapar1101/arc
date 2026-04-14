@@ -85,8 +85,8 @@ check_url_accessibility() {
 
 find_available_mirror() {
   local mirrors=(
-    # Hesabix internal mirror (Iran) — if available, prefer it
-    "https://shell.hesabix.ir/dart-pub|https://shell.hesabix.ir/flutter"
+    # Runflare (Iran) — aligned with deploy.sh; shell.hesabix.ir is not used as pub/storage mirror
+    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
     # Chinese mirrors (for restricted networks)
     "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
     "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
@@ -265,7 +265,7 @@ if [ -f "$SYNC_FONT_MIRROR" ]; then
   "$SYNC_FONT_MIRROR" "$APP_DIR/web" || warn "Font fallback mirror sync failed"
 fi
 
-# Configure mirror to resolve pub.dev access issues (auto-detect; prefer shell.hesabix.ir)
+# Configure mirror to resolve pub.dev access issues (auto-detect; same order as deploy.sh, no shell.hesabix.ir pub mirror)
 if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
   if available_mirror=$(find_available_mirror); then
     IFS='|' read -r pub_url storage_url <<< "$available_mirror"
