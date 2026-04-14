@@ -14,6 +14,7 @@ import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -25,6 +26,7 @@ from adapters.db.models.check import Check, CheckType, CheckStatus
 from app.core.responses import ApiError
 from app.core.cache import get_cache
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
+from app.services.document_numbering_service import generate_document_code
 
 
 logger = logging.getLogger(__name__)
@@ -216,9 +218,6 @@ def create_expense_income(
     if not user:
         raise ApiError("USER_NOT_FOUND", "User not found", http_status=404)
 
-    # کد سند ساده: EI-YYYYMMDD-<rand>
-    code = f"EI-{document_date.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}"
-
     ensure_document_policy_allows_creation(
         db,
         business_id,
@@ -238,21 +237,42 @@ def create_expense_income(
         if not project:
             raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
 
-    document = Document(
-        code=code,
-        business_id=business_id,
-        fiscal_year_id=fiscal_year.id,
-        currency_id=int(currency_id),
-        created_by_user_id=int(user_id),
-        document_date=document_date,
-        document_type=document_type,
-        is_proforma=False,
-        description=(data.get("description") or None),
-        extra_info=(data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None),
-        project_id=project_id,
-    )
-    db.add(document)
-    db.flush()
+    document: Optional[Document] = None
+    max_code_attempts = 5
+    for _attempt in range(max_code_attempts):
+        code = generate_document_code(db, business_id, document_type, document_date)
+        candidate = Document(
+            code=code,
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            currency_id=int(currency_id),
+            created_by_user_id=int(user_id),
+            document_date=document_date,
+            document_type=document_type,
+            is_proforma=False,
+            description=(data.get("description") or None),
+            extra_info=(data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None),
+            project_id=project_id,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate)
+                db.flush()
+        except IntegrityError as exc:
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                continue
+            raise
+        else:
+            document = candidate
+            break
+
+    if not document:
+        raise ApiError(
+            "DOCUMENT_CODE_RACE",
+            "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+            http_status=409,
+        )
 
     # سطرهای حساب‌های هزینه/درآمد
     for line in item_lines:

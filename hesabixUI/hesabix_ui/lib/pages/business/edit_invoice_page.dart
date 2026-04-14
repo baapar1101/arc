@@ -51,6 +51,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   late TabController _tabController;
 
   bool _loading = true;
+  bool _isSaving = false;
   String? _loadError;
 
   // Header state
@@ -475,8 +476,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         actions: [
           IconButton(
             tooltip: 'ذخیره تغییرات',
-            onPressed: _loading ? null : _saveChanges,
-            icon: const Icon(Icons.save),
+            onPressed: (_loading || _isSaving) ? null : _saveChanges,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save),
           ),
         ],
         bottom: TabBar(
@@ -904,44 +911,52 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   }
 
   Future<void> _saveChanges() async {
-    final payloadOrError = _validateAndBuildPayload();
-    if (payloadOrError is String) {
-      if (!mounted) return;
-      SnackBarHelper.show(context, message: payloadOrError);
-      return;
-    }
-    final payload = payloadOrError as Map<String, dynamic>;
-
-    // بررسی مبلغ صفر فاکتور
-    if (_sumTotal == 0) {
-      final confirmed = await _showZeroAmountWarning();
-      if (!confirmed) {
-        return; // کاربر انصراف داد
-      }
-    }
-
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
     try {
-      final service = InvoiceService(apiClient: ApiClient());
-      await service.updateInvoice(
-        businessId: widget.businessId,
-        invoiceId: widget.invoiceId,
-        payload: payload,
-      );
-      if (!mounted) return;
-      SnackBarHelper.show(context, message: 'تغییرات فاکتور با موفقیت ذخیره شد');
-      // بازگشت به لیست فاکتورها بعد از ذخیره موفق
-      if (mounted) {
-        // هدایت به لیست فاکتورها بعد از ویرایش موفق
-        context.goNamed(
-          'business_invoice',
-          pathParameters: {
-            'business_id': widget.businessId.toString(),
-          },
-        );
+      final payloadOrError = _validateAndBuildPayload();
+      if (payloadOrError is String) {
+        if (!mounted) return;
+        SnackBarHelper.show(context, message: payloadOrError);
+        return;
       }
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در ذخیره تغییرات: $e');
+      final payload = payloadOrError as Map<String, dynamic>;
+
+      // بررسی مبلغ صفر فاکتور
+      if (_sumTotal == 0) {
+        final confirmed = await _showZeroAmountWarning();
+        if (!confirmed) {
+          return; // کاربر انصراف داد
+        }
+      }
+
+      try {
+        final service = InvoiceService(apiClient: ApiClient());
+        await service.updateInvoice(
+          businessId: widget.businessId,
+          invoiceId: widget.invoiceId,
+          payload: payload,
+        );
+        if (!mounted) return;
+        SnackBarHelper.show(context, message: 'تغییرات فاکتور با موفقیت ذخیره شد');
+        // بازگشت به لیست فاکتورها بعد از ذخیره موفق
+        if (mounted) {
+          // هدایت به لیست فاکتورها بعد از ویرایش موفق
+          context.goNamed(
+            'business_invoice',
+            pathParameters: {
+              'business_id': widget.businessId.toString(),
+            },
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        SnackBarHelper.show(context, message: 'خطا در ذخیره تغییرات: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

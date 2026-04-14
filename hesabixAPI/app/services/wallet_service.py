@@ -7,6 +7,7 @@ import structlog
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_
+from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting
 from adapters.db.models.bank_account import BankAccount
@@ -951,45 +952,47 @@ def _create_simple_document(
 	description: str | None,
 	accounting_lines: list[dict],
 ) -> Document:
-	fiscal_year = _get_current_fiscal_year(db, business_id)
-	today = _parse_iso_date_only(document_date)
-	prefix = f"{'RC' if document_type == 'receipt' else 'PY'}-{today.strftime('%Y%m%d')}"
-	last_doc = (
-		db.query(Document)
-		.filter(
-			and_(
-				Document.business_id == business_id,
-				Document.code.like(f"{prefix}-%"),
-			)
-		)
-		.order_by(Document.code.desc())
-		.first()
-	)
-	if last_doc:
-		try:
-			last_num = int(str(last_doc.code).split("-")[-1])
-			next_num = last_num + 1
-		except Exception:
-			next_num = 1
-	else:
-		next_num = 1
-	doc_code = f"{prefix}-{next_num:04d}"
+	from app.services.document_numbering_service import generate_document_code
 
-	document = Document(
-		business_id=business_id,
-		fiscal_year_id=fiscal_year.id,
-		code=doc_code,
-		document_type=document_type,
-		document_date=today,
-		currency_id=int(currency_id),
-		created_by_user_id=user_id,
-		registered_at=datetime.utcnow(),
-		is_proforma=False,
-		description=description,
-		extra_info={"source": "wallet"},
-	)
-	db.add(document)
-	db.flush()
+	fiscal_year = _get_current_fiscal_year(db, business_id)
+	doc_day = _parse_iso_date_only(document_date)
+
+	document: Document | None = None
+	max_code_attempts = 5
+	for _attempt in range(max_code_attempts):
+		doc_code = generate_document_code(db, business_id, document_type, doc_day)
+		candidate = Document(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year.id,
+			code=doc_code,
+			document_type=document_type,
+			document_date=doc_day,
+			currency_id=int(currency_id),
+			created_by_user_id=user_id,
+			registered_at=datetime.utcnow(),
+			is_proforma=False,
+			description=description,
+			extra_info={"source": "wallet"},
+		)
+		try:
+			with db.begin_nested():
+				db.add(candidate)
+				db.flush()
+		except IntegrityError as exc:
+			msg = str(getattr(exc.orig, "args", exc))
+			if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+				continue
+			raise
+		else:
+			document = candidate
+			break
+
+	if not document:
+		raise ApiError(
+			"DOCUMENT_CODE_RACE",
+			"تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+			http_status=409,
+		)
 
 	for ln in accounting_lines:
 		db.add(DocumentLine(

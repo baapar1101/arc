@@ -18,6 +18,7 @@ adapters/api/v1/cash_registers.py
 adapters/api/v1/categories.py
 adapters/api/v1/checks.py
 adapters/api/v1/credit.py
+adapters/api/v1/crm.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
 adapters/api/v1/document_numbering.py
@@ -77,6 +78,7 @@ adapters/api/v1/admin/monitoring.py
 adapters/api/v1/admin/notification_moderation.py
 adapters/api/v1/admin/notification_templates.py
 adapters/api/v1/admin/payment_gateways.py
+adapters/api/v1/admin/scripts.py
 adapters/api/v1/admin/storage_plans.py
 adapters/api/v1/admin/system_services.py
 adapters/api/v1/admin/system_settings.py
@@ -84,6 +86,7 @@ adapters/api/v1/admin/users_permissions.py
 adapters/api/v1/admin/wallet_admin.py
 adapters/api/v1/admin/zohal.py
 adapters/api/v1/ai/chat.py
+adapters/api/v1/ai/crm_ai.py
 adapters/api/v1/ai/prompts.py
 adapters/api/v1/ai/subscription.py
 adapters/api/v1/ai/usage.py
@@ -100,6 +103,7 @@ adapters/api/v1/schema_models/bank_account.py
 adapters/api/v1/schema_models/business_notification.py
 adapters/api/v1/schema_models/check.py
 adapters/api/v1/schema_models/common.py
+adapters/api/v1/schema_models/crm.py
 adapters/api/v1/schema_models/document.py
 adapters/api/v1/schema_models/document_line.py
 adapters/api/v1/schema_models/email.py
@@ -130,6 +134,7 @@ adapters/db/session.py
 adapters/db/models/__init__.py
 adapters/db/models/account.py
 adapters/db/models/activity_log.py
+adapters/db/models/admin_script_run.py
 adapters/db/models/ai_chat_message.py
 adapters/db/models/ai_chat_session.py
 adapters/db/models/ai_config.py
@@ -152,6 +157,7 @@ adapters/db/models/cash_register.py
 adapters/db/models/category.py
 adapters/db/models/check.py
 adapters/db/models/credit.py
+adapters/db/models/crm.py
 adapters/db/models/currency.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
@@ -286,6 +292,7 @@ app/integrations/moadian/verhoeff.py
 app/services/account_review_service.py
 app/services/account_service.py
 app/services/activity_log_service.py
+app/services/admin_script_service.py
 app/services/ai_background_jobs.py
 app/services/ai_moderation_service.py
 app/services/ai_plan_service.py
@@ -321,6 +328,7 @@ app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
 app/services/general_ledger_service.py
+app/services/invoice_product_price_sync_service.py
 app/services/invoice_service.py
 app/services/job_manager.py
 app/services/journal_ledger_service.py
@@ -421,16 +429,20 @@ app/services/workflow/__init__.py
 app/services/workflow/action_registry.py
 app/services/workflow/logging_decorators.py
 app/services/workflow/trigger_registry.py
+app/services/workflow/workflow_background_jobs.py
 app/services/workflow/workflow_engine.py
 app/services/workflow/workflow_trigger_service.py
 app/services/workflow/actions/__init__.py
+app/services/workflow/actions/ai_agent_action.py
 app/services/workflow/actions/communication_actions.py
+app/services/workflow/actions/crm_actions.py
 app/services/workflow/actions/document_actions.py
 app/services/workflow/actions/utility_actions.py
 app/services/workflow/i18n/__init__.py
 app/services/workflow/i18n/workflow_translations.py
 app/services/workflow/triggers/__init__.py
 app/services/workflow/triggers/base_trigger.py
+app/services/workflow/triggers/crm_triggers.py
 app/services/workflow/triggers/document_triggers.py
 app/services/workflow/triggers/financial_triggers.py
 app/services/workflow/triggers/inventory_triggers.py
@@ -451,6 +463,13 @@ hesabix_api.egg-info/top_level.txt
 migrations/env.py
 migrations/versions/20250226_000001_backfill_receipt_payment_person_id_extra_info.py
 migrations/versions/20250226_000002_add_bale_messenger_support.py
+migrations/versions/20250227_000001_add_crm_tables.py
+migrations/versions/20250228_000001_add_crm_code_columns.py
+migrations/versions/20250228_000002_add_crm_follow_up_and_history.py
+migrations/versions/20260409_000001_add_admin_script_runs_tables.py
+migrations/versions/20260410_000001_invoice_sync_product_prices.py
+migrations/versions/20260411_000001_add_invoice_warehouse_release_mode.py
+migrations/versions/20260411_000002_seed_notification_templates_all_channels.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py

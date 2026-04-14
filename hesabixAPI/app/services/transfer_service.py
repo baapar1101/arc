@@ -7,6 +7,7 @@ import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -19,6 +20,7 @@ from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
+from app.services.document_numbering_service import generate_document_code
 import jdatetime
 
 
@@ -106,12 +108,6 @@ def _account_code_for_type(account_type: str) -> str:
     raise ApiError("INVALID_ACCOUNT_TYPE", f"Invalid account type: {account_type}", http_status=400)
 
 
-def _build_doc_code(prefix_base: str) -> str:
-    today = datetime.now().date()
-    prefix = f"{prefix_base}-{today.strftime('%Y%m%d')}"
-    return prefix
-
-
 def create_transfer(
     db: Session,
     business_id: int,
@@ -156,24 +152,6 @@ def create_transfer(
     src_account = _get_fixed_account_by_code(db, _account_code_for_type(src_type))
     dst_account = _get_fixed_account_by_code(db, _account_code_for_type(dst_type))
 
-    # Generate document code TR-YYYYMMDD-NNNN
-    prefix = _build_doc_code("TR")
-    last_doc = db.query(Document).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.code.like(f"{prefix}-%"),
-        )
-    ).order_by(Document.code.desc()).first()
-    if last_doc:
-        try:
-            last_num = int(last_doc.code.split("-")[-1])
-            next_num = last_num + 1
-        except Exception:
-            next_num = 1
-    else:
-        next_num = 1
-    doc_code = f"{prefix}-{next_num:04d}"
-
     # Resolve names for auto description if needed
     def _resolve_name(tp: str, _id: Any) -> str | None:
         try:
@@ -207,21 +185,42 @@ def create_transfer(
         amount=amount,
     )
 
-    document = Document(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year.id,
-        code=doc_code,
-        document_type=DOCUMENT_TYPE_TRANSFER,
-        document_date=document_date,
-        currency_id=int(currency_id),
-        created_by_user_id=user_id,
-        registered_at=datetime.utcnow(),
-        is_proforma=False,
-        description=data.get("description") or auto_description,
-        extra_info=data.get("extra_info"),
-    )
-    db.add(document)
-    db.flush()
+    document: Document | None = None
+    max_code_attempts = 5
+    for _attempt in range(max_code_attempts):
+        doc_code = generate_document_code(db, business_id, DOCUMENT_TYPE_TRANSFER, document_date)
+        candidate = Document(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            code=doc_code,
+            document_type=DOCUMENT_TYPE_TRANSFER,
+            document_date=document_date,
+            currency_id=int(currency_id),
+            created_by_user_id=user_id,
+            registered_at=datetime.utcnow(),
+            is_proforma=False,
+            description=data.get("description") or auto_description,
+            extra_info=data.get("extra_info"),
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate)
+                db.flush()
+        except IntegrityError as exc:
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                continue
+            raise
+        else:
+            document = candidate
+            break
+
+    if not document:
+        raise ApiError(
+            "DOCUMENT_CODE_RACE",
+            "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+            http_status=409,
+        )
 
     # Destination line (Debit)
     dest_kwargs: Dict[str, Any] = {}

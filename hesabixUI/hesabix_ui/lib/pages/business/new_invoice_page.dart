@@ -71,6 +71,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   
   InvoiceType? _selectedInvoiceType;
   bool _isDraft = false;
+  bool _isSaving = false;
   String? _invoiceNumber;
   final bool _autoGenerateInvoiceNumber = true;
   Customer? _selectedCustomer;
@@ -1217,8 +1218,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           Tooltip(
             message: t.saveInvoice,
             child: IconButton(
-              onPressed: _saveInvoice,
-              icon: const Icon(Icons.save),
+              onPressed: _isSaving ? null : _saveInvoice,
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save),
               tooltip: t.saveInvoice,
             ),
           ),
@@ -1953,67 +1960,74 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Future<void> _saveInvoice() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
     final t = AppLocalizations.of(context);
-    
-    // اعتبارسنجی BOM outputs (async)
-    if (_selectedInvoiceType == InvoiceType.production) {
-      final bomValidation = await _validateBomOutputs();
-      if (bomValidation != null) {
-        _showError(bomValidation);
-        return;
-      }
-    }
-    
-    final validation = _validateAndBuildPayload(t);
-    if (validation is String) {
-      _showError(validation);
-      return;
-    }
-    final payload = validation as Map<String, dynamic>;
-
-    // بررسی مبلغ صفر فاکتور
-    if (_sumTotal == 0) {
-      final confirmed = await _showZeroAmountWarning();
-      if (!confirmed) {
-        return; // کاربر انصراف داد
-      }
-    }
-
     try {
-      final service = InvoiceService(apiClient: ApiClient());
-      final result = await service.createInvoice(businessId: widget.businessId, payload: payload);
-      final invoiceId = (result['id'] as num?)?.toInt();
-      final invoiceCode = result['code']?.toString();
-
-      if (!mounted) {
-        return;
-      }
-
-      SnackBarHelper.show(context, message: t.invoiceCreatedSuccess);
-
-      if (_printAfterSave) {
-        if (invoiceId == null) {
-          _showError('شناسه فاکتور برای چاپ در دسترس نیست');
-        } else {
-          await _printInvoiceAfterSave(
-            service: service,
-            invoiceId: invoiceId,
-            invoiceCode: invoiceCode,
-          );
+      // اعتبارسنجی BOM outputs (async)
+      if (_selectedInvoiceType == InvoiceType.production) {
+        final bomValidation = await _validateBomOutputs();
+        if (bomValidation != null) {
+          _showError(bomValidation);
+          return;
         }
       }
 
-      // هدایت به لیست فاکتورها بعد از ثبت موفق
-      if (mounted) {
-        context.goNamed(
-          'business_invoice',
-          pathParameters: {
-            'business_id': widget.businessId.toString(),
-          },
-        );
+      final validation = _validateAndBuildPayload(t);
+      if (validation is String) {
+        _showError(validation);
+        return;
       }
-    } catch (e) {
-      _showError(t.saveInvoiceErrorWithMessage(e.toString()));
+      final payload = validation as Map<String, dynamic>;
+
+      // بررسی مبلغ صفر فاکتور
+      if (_sumTotal == 0) {
+        final confirmed = await _showZeroAmountWarning();
+        if (!confirmed) {
+          return; // کاربر انصراف داد
+        }
+      }
+
+      try {
+        final service = InvoiceService(apiClient: ApiClient());
+        final result = await service.createInvoice(businessId: widget.businessId, payload: payload);
+        final invoiceId = (result['id'] as num?)?.toInt();
+        final invoiceCode = result['code']?.toString();
+
+        if (!mounted) {
+          return;
+        }
+
+        SnackBarHelper.show(context, message: t.invoiceCreatedSuccess);
+
+        if (_printAfterSave) {
+          if (invoiceId == null) {
+            _showError('شناسه فاکتور برای چاپ در دسترس نیست');
+          } else {
+            await _printInvoiceAfterSave(
+              service: service,
+              invoiceId: invoiceId,
+              invoiceCode: invoiceCode,
+            );
+          }
+        }
+
+        // هدایت به لیست فاکتورها بعد از ثبت موفق
+        if (mounted) {
+          context.goNamed(
+            'business_invoice',
+            pathParameters: {
+              'business_id': widget.businessId.toString(),
+            },
+          );
+        }
+      } catch (e) {
+        _showError(t.saveInvoiceErrorWithMessage(e.toString()));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

@@ -1,7 +1,11 @@
+const Object _kProductFormCodeUnset = Object();
+
 class ProductFormData {
   // Basic Information
   String itemType;
   String? code;
+  /// اگر true باشد، کد در payload ارسال نمی‌شود و سرور کد یکتا تولید می‌کند.
+  bool autoGenerateCode;
   String name;
   String? description;
   int? categoryId;
@@ -50,6 +54,7 @@ class ProductFormData {
   ProductFormData({
     this.itemType = 'کالا',
     this.code,
+    this.autoGenerateCode = true,
     this.name = '',
     this.description,
     this.categoryId,
@@ -82,7 +87,8 @@ class ProductFormData {
 
   ProductFormData copyWith({
     String? itemType,
-    String? code,
+    Object? code = _kProductFormCodeUnset,
+    bool? autoGenerateCode,
     String? name,
     String? description,
     int? categoryId,
@@ -114,7 +120,8 @@ class ProductFormData {
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
-      code: code ?? this.code,
+      code: identical(code, _kProductFormCodeUnset) ? this.code : code as String?,
+      autoGenerateCode: autoGenerateCode ?? this.autoGenerateCode,
       name: name ?? this.name,
       description: description ?? this.description,
       categoryId: categoryId ?? this.categoryId,
@@ -149,12 +156,12 @@ class ProductFormData {
   Map<String, dynamic> toPayload() {
     // اگر code خالی است یا برابر name باشد، آن را null کن
     // (احتمالاً کاربر به اشتباه نام را در فیلد کد نوشته یا فیلد کد را پاک کرده)
-    final trimmedCode = code?.trim();
+    final trimmedCode = autoGenerateCode ? null : code?.trim();
     final trimmedName = name.trim();
-    final codeValue = (trimmedCode != null && 
-                      trimmedCode.isNotEmpty && 
-                      trimmedCode != trimmedName) 
-        ? trimmedCode 
+    final codeValue = (trimmedCode != null &&
+                      trimmedCode.isNotEmpty &&
+                      trimmedCode != trimmedName)
+        ? trimmedCode
         : null;
     
     final payload = <String, dynamic>{
@@ -200,6 +207,7 @@ class ProductFormData {
     return ProductFormData(
       itemType: (product['item_type'] as String?) ?? 'کالا',
       code: product['code']?.toString(),
+      autoGenerateCode: false,
       name: product['name'] ?? '',
       description: product['description']?.toString(),
       categoryId: product['category_id'] as int?,

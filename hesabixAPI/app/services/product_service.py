@@ -7,6 +7,7 @@ from sqlalchemy import select, and_, or_, func, case
 from sqlalchemy.types import Numeric
 from decimal import Decimal
 import logging
+import re
 
 from app.core.responses import ApiError
 from app.core.cache import get_cache
@@ -175,8 +176,71 @@ def _generate_auto_code(db: Session, business_id: int, category_id: int | None =
                 continue
     if max_num > 0:
         return str(max_num + 1)
-    max_id = db.execute(select(func.max(Product.id))).scalar() or 0
+    max_id = (
+        db.execute(select(func.max(Product.id)).where(Product.business_id == business_id)).scalar()
+        or 0
+    )
     return f"P{max_id + 1:06d}"
+
+
+def _allocate_unique_product_code(db: Session, business_id: int, candidate: str, *, max_len: int = 64) -> str:
+    """
+    تضمین یکتایی کد کالا در سطح کسب‌وکار (پس از تولید خودکار یا هر پیشنهاد اولیه).
+    """
+    raw = (candidate or "").strip() or "1"
+    if len(raw) > max_len:
+        raw = raw[:max_len]
+
+    def _exists(c: str) -> bool:
+        return (
+            db.query(Product.id)
+            .filter(and_(Product.business_id == business_id, Product.code == c))
+            .first()
+            is not None
+        )
+
+    if not _exists(raw):
+        return raw
+
+    if raw.isdigit():
+        n = int(raw)
+        for _ in range(100_000):
+            n += 1
+            cand = str(n)
+            if len(cand) > max_len:
+                cand = cand[:max_len]
+            if not _exists(cand):
+                return cand
+        raise ApiError(
+            "PRODUCT_CODE_ALLOCATION_FAILED",
+            "تخصیص کد یکتا برای کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.",
+            http_status=500,
+        )
+
+    m = re.fullmatch(r"(?i)P(\d+)", raw)
+    if m:
+        n = int(m.group(1))
+        for _ in range(100_000):
+            n += 1
+            cand = f"P{n:06d}"[:max_len]
+            if not _exists(cand):
+                return cand
+        raise ApiError(
+            "PRODUCT_CODE_ALLOCATION_FAILED",
+            "تخصیص کد یکتا برای کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.",
+            http_status=500,
+        )
+
+    base = raw[: max(1, max_len - 10)]
+    for i in range(2, 100_000):
+        cand = f"{base}-{i}"[:max_len]
+        if not _exists(cand):
+            return cand
+    raise ApiError(
+        "PRODUCT_CODE_ALLOCATION_FAILED",
+        "تخصیص کد یکتا برای کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.",
+        http_status=500,
+    )
 
 
 def _validate_tax(payload: ProductCreateRequest | ProductUpdateRequest) -> None:
@@ -258,7 +322,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
     logger.debug(f"[CREATE_PRODUCT] Validation passed - main_unit='{main_unit}', secondary_unit='{secondary_unit}'")
 
     # Retry Logic برای مدیریت Race Condition در تولید کد خودکار
-    max_retries = 2  # حداکثر 2 بار تلاش (با توجه به Row Locking، معمولاً یک بار کافی است)
+    max_retries = 10
     retry_count = 0
     
     while retry_count < max_retries:
@@ -282,8 +346,9 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             if not code:
                 # استفاده از category_id برای تولید کد خودکار بر اساس دسته‌بندی
                 logger.debug(f"[CREATE_PRODUCT] Generating auto code - category_id={payload.category_id}")
-                code = _generate_auto_code(db, business_id, payload.category_id)
-                logger.info(f"[CREATE_PRODUCT] Auto-generated code: '{code}'")
+                suggested = _generate_auto_code(db, business_id, payload.category_id)
+                code = _allocate_unique_product_code(db, business_id, suggested)
+                logger.info(f"[CREATE_PRODUCT] Auto-generated code: '{code}' (suggested='{suggested}')")
             else:
                 logger.info(f"[CREATE_PRODUCT] Using manual code: '{code}'")
 
@@ -369,11 +434,16 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             
             # اگر کد خودکار بود و تکراری شد، دوباره تلاش کن
             if retry_count >= max_retries:
-                # اگر بعد از چند بار تلاش باز هم خطا داد، خطا را برمی‌گردانیم
+                if manual_code:
+                    raise ApiError(
+                        "DUPLICATE_PRODUCT_CODE",
+                        "کد کالا/خدمت تکراری است",
+                        http_status=400,
+                    )
                 raise ApiError(
-                    "DUPLICATE_PRODUCT_CODE", 
-                    "کد کالا/خدمت تکراری است. لطفاً دوباره تلاش کنید.", 
-                    http_status=400
+                    "PRODUCT_CREATE_RETRY_EXHAUSTED",
+                    "ثبت کالا پس از چند تلاش ناموفق بود؛ لطفاً دوباره تلاش کنید.",
+                    http_status=503,
                 )
             
             # Retry: کد خودکار دوباره تولید می‌شود

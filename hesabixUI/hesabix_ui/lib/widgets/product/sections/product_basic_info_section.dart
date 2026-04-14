@@ -42,7 +42,40 @@ class ProductBasicInfoSection extends StatefulWidget {
 
 class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
   final ProductImageCache _imageCache = GlobalImageCache.instance;
-  
+  late final TextEditingController _codeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController = TextEditingController(
+      text: widget.formData.autoGenerateCode ? '' : (widget.formData.code ?? ''),
+    );
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ProductBasicInfoSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.formData.autoGenerateCode) {
+      if (_codeController.text.isNotEmpty) {
+        _codeController.clear();
+      }
+      return;
+    }
+    final next = widget.formData.code ?? '';
+    if (next != _codeController.text) {
+      _codeController.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+    }
+  }
+
   /// دانلود تصویر با استفاده از Dio (با headerهای authentication)
   Future<Uint8List?> _loadImageWithAuth(String url) async {
     // استفاده از cache برای جلوگیری از دانلود مجدد
@@ -137,13 +170,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                   children: [
                     _buildItemTypeSelector(context),
                     SizedBox(height: spacing),
-                    
-                    TextFormField(
-                      initialValue: widget.formData.code,
-                      decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
-                      validator: ProductFormValidator.validateCode,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
-                    ),
+                    _buildProductCodeBlock(context, spacing),
                     SizedBox(height: spacing),
                     
                     TextFormField(
@@ -191,13 +218,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           // یک ستون برای موبایل و تبلت
           _buildItemTypeSelector(context),
           SizedBox(height: spacing),
-          
-          TextFormField(
-            initialValue: widget.formData.code,
-            decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
-            validator: ProductFormValidator.validateCode,
-            onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
-          ),
+          _buildProductCodeBlock(context, spacing),
           SizedBox(height: spacing),
           
           TextFormField(
@@ -267,6 +288,55 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
 
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  Widget _buildProductCodeBlock(BuildContext context, double spacing) {
+    final t = AppLocalizations.of(context);
+    final editing = widget.controller?.isEditingProduct == true;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!editing) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: widget.formData.autoGenerateCode,
+            onChanged: (v) {
+              if (v) {
+                _updateFormData(widget.formData.copyWith(
+                  autoGenerateCode: true,
+                  code: null,
+                ));
+              } else {
+                _updateFormData(widget.formData.copyWith(autoGenerateCode: false));
+              }
+            },
+            title: const Text('تولید خودکار کد'),
+            subtitle: const Text('کد کالا توسط سیستم به‌صورت یکتا تولید می‌شود'),
+          ),
+          SizedBox(height: spacing),
+        ],
+        TextFormField(
+          controller: _codeController,
+          enabled: !widget.formData.autoGenerateCode,
+          decoration: InputDecoration(
+            labelText: '${t.code} (اختیاری)',
+            hintText: widget.formData.autoGenerateCode ? 'کد پس از ثبت به‌صورت خودکار تولید می‌شود' : null,
+            filled: widget.formData.autoGenerateCode,
+          ),
+          validator: (value) {
+            if (widget.formData.autoGenerateCode) return null;
+            return ProductFormValidator.validateCode(value);
+          },
+          onChanged: (value) {
+            if (widget.formData.autoGenerateCode) return;
+            final trimmed = value.trim();
+            _updateFormData(widget.formData.copyWith(
+              code: trimmed.isEmpty ? null : trimmed,
+            ));
+          },
+        ),
+      ],
+    );
   }
 
   Widget _buildUnitsSection(BuildContext context) {

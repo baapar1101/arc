@@ -9,6 +9,7 @@ void main() {
       
       expect(formData.itemType, 'کالا');
       expect(formData.name, '');
+      expect(formData.autoGenerateCode, true);
       expect(formData.trackInventory, false);
       expect(formData.isSalesTaxable, false);
       expect(formData.isPurchaseTaxable, false);
@@ -32,6 +33,7 @@ void main() {
       expect(formData.name, 'کالای تست');
       expect(formData.code, 'TEST001');
       expect(formData.itemType, 'خدمت');
+      expect(formData.autoGenerateCode, false);
       expect(formData.baseSalesPrice, 100000);
       expect(formData.trackInventory, true);
       expect(formData.isSalesTaxable, true);
@@ -54,6 +56,7 @@ void main() {
       final formData = ProductFormData(
         name: 'کالای تست',
         code: 'TEST001',
+        autoGenerateCode: false,
         baseSalesPrice: 100000,
         trackInventory: true,
       );
@@ -65,6 +68,16 @@ void main() {
       expect(payload['base_sales_price'], 100000);
       expect(payload['track_inventory'], true);
       expect(payload.containsKey('description'), false); // null values removed
+    });
+
+    test('auto code mode never sends manual code in payload', () {
+      final formData = ProductFormData(
+        name: 'کالای تست',
+        code: 'SHOULD_NOT_SEND',
+        autoGenerateCode: true,
+      );
+      final payload = formData.toPayload();
+      expect(payload['code'], isNull);
     });
   });
 

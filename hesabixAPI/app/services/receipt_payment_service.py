@@ -16,6 +16,7 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_, func
+from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -27,6 +28,7 @@ from adapters.db.models.user import User
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
+from app.services.document_numbering_service import generate_document_code
 import jdatetime
 
 # تنظیم لاگر
@@ -352,29 +354,6 @@ def create_receipt_payment(
             http_status=400
         )
     
-    # تولید کد سند
-    # فرمت: RP-YYYYMMDD-NNNN (RP = Receipt/Payment)
-    today = datetime.now().date()
-    prefix = f"{'RC' if is_receipt else 'PY'}-{today.strftime('%Y%m%d')}"
-    
-    last_doc = db.query(Document).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.code.like(f"{prefix}-%")
-        )
-    ).order_by(Document.code.desc()).first()
-    
-    if last_doc:
-        try:
-            last_num = int(last_doc.code.split("-")[-1])
-            next_num = last_num + 1
-        except Exception:
-            next_num = 1
-    else:
-        next_num = 1
-    
-    doc_code = f"{prefix}-{next_num:04d}"
-    
     amount_decimal = Decimal(str(person_total))
 
     ensure_document_policy_allows_creation(
@@ -396,23 +375,44 @@ def create_receipt_payment(
         if not project:
             raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
 
-    # ایجاد سند
-    document = Document(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year.id,
-        code=doc_code,
-        document_type=document_type,
-        document_date=document_date,
-        currency_id=int(currency_id),
-        created_by_user_id=user_id,
-        registered_at=datetime.utcnow(),
-        is_proforma=False,
-        description=data.get("description"),
-        extra_info=data.get("extra_info"),
-        project_id=project_id,
-    )
-    db.add(document)
-    db.flush()  # برای دریافت document.id
+    # ایجاد سند (شماره بر اساس تنظیمات شماره‌گذاری کسب‌وکار)
+    document: Optional[Document] = None
+    max_code_attempts = 5
+    for _attempt in range(max_code_attempts):
+        doc_code = generate_document_code(db, business_id, document_type, document_date)
+        candidate = Document(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            code=doc_code,
+            document_type=document_type,
+            document_date=document_date,
+            currency_id=int(currency_id),
+            created_by_user_id=user_id,
+            registered_at=datetime.utcnow(),
+            is_proforma=False,
+            description=data.get("description"),
+            extra_info=data.get("extra_info"),
+            project_id=project_id,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate)
+                db.flush()
+        except IntegrityError as exc:
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                continue
+            raise
+        else:
+            document = candidate
+            break
+
+    if not document:
+        raise ApiError(
+            "DOCUMENT_CODE_RACE",
+            "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+            http_status=409,
+        )
     
     # --- اعتبارسنجی اقساط قبل از اعمال (سختگیرانه) ---
     extra_info_all = data.get("extra_info") or {}

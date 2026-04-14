@@ -73,6 +73,7 @@ class ProductFormController extends ChangeNotifier {
   ProductFormData get formData => _formData;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isEditingProduct => _editingProductId != null;
   int? get lastCreatedProductId => _lastCreatedProductId;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get attributes => _attributes;
@@ -142,6 +143,7 @@ class ProductFormController extends ChangeNotifier {
             baseSalesPrice: 0,
             basePurchasePrice: 0,
             unitConversionFactor: 1,
+            autoGenerateCode: true,
           );
         }
         _originalInventoryMode = 'bulk';
@@ -287,19 +289,21 @@ class ProductFormController extends ChangeNotifier {
     try {
       final payload = _formData.toPayload();
       // Check duplicate code if provided
-      final trimmedCode = _formData.code?.trim();
-      if (trimmedCode != null && trimmedCode.isNotEmpty) {
-        final exists = await _productService.codeExists(
-          businessId: businessId,
-          code: trimmedCode,
-          excludeProductId: _editingProductId,
-        );
-        if (exists) {
-          _setError('کد کالا/خدمت تکراری است. لطفاً کد دیگری انتخاب کنید.');
-          return false;
+      if (!_formData.autoGenerateCode) {
+        final trimmedCode = _formData.code?.trim();
+        if (trimmedCode != null && trimmedCode.isNotEmpty) {
+          final exists = await _productService.codeExists(
+            businessId: businessId,
+            code: trimmedCode,
+            excludeProductId: _editingProductId,
+          );
+          if (exists) {
+            _setError('کد کالا/خدمت تکراری است. لطفاً کد دیگری انتخاب کنید.');
+            return false;
+          }
         }
       }
-      
+
       // Always create in submitForm; editing handled by updateProduct
       final created = await _productService.createProduct(
         businessId: businessId,
@@ -373,16 +377,18 @@ class ProductFormController extends ChangeNotifier {
       
       final payload = _formData.toPayload();
       // Pre-check duplicate code before sending
-      final trimmedCode = _formData.code?.trim();
-      if (trimmedCode != null && trimmedCode.isNotEmpty) {
-        final exists = await _productService.codeExists(
-          businessId: businessId,
-          code: trimmedCode,
-          excludeProductId: productId,
-        );
-        if (exists) {
-          _setError('کد کالا/خدمت تکراری است. لطفاً کد دیگری انتخاب کنید.');
-          return false;
+      if (!_formData.autoGenerateCode) {
+        final trimmedCode = _formData.code?.trim();
+        if (trimmedCode != null && trimmedCode.isNotEmpty) {
+          final exists = await _productService.codeExists(
+            businessId: businessId,
+            code: trimmedCode,
+            excludeProductId: productId,
+          );
+          if (exists) {
+            _setError('کد کالا/خدمت تکراری است. لطفاً کد دیگری انتخاب کنید.');
+            return false;
+          }
         }
       }
       await _productService.updateProduct(

@@ -39,6 +39,7 @@ class ProductFormAutoSave {
       final data = {
         'itemType': formData.itemType,
         'code': formData.code,
+        'autoGenerateCode': formData.autoGenerateCode,
         'name': formData.name,
         'description': formData.description,
         'categoryId': formData.categoryId,
@@ -89,7 +90,9 @@ class ProductFormAutoSave {
       if (jsonString == null) return null;
       
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      
+      final hasCode = (data['code'] as String?)?.trim().isNotEmpty == true;
+      final autoGen = (data['autoGenerateCode'] as bool?) ?? !hasCode;
+
       // بررسی اینکه آیا داده قدیمی است (بیش از 24 ساعت)
       final savedAt = data['savedAt'] as String?;
       if (savedAt != null) {
@@ -103,7 +106,8 @@ class ProductFormAutoSave {
       
       return ProductFormData(
         itemType: data['itemType'] as String? ?? 'کالا',
-        code: data['code'] as String?,
+        code: autoGen ? null : (data['code'] as String?),
+        autoGenerateCode: autoGen,
         name: data['name'] as String? ?? '',
         description: data['description'] as String?,
         categoryId: data['categoryId'] as int?,
