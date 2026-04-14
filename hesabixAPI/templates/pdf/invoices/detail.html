@@ -1,6 +1,11 @@
 {% extends "pdf/base.html" %}
 {% block content %}
   <style>
+    /* حاشیه کمتر از پیش‌فرض base (۱cm) فقط برای فاکتور؛ بقیهٔ @page از همان قالب */
+    @page {
+      margin: 8mm;
+    }
+
     .invoice-layout {
       font-size: 11px;
     }
