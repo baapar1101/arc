@@ -1213,6 +1213,37 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     );
   }
 
+  /// ارتفاع ناحیهٔ بدنهٔ جدول وقتی [DataTableConfig.expandBodyHeightToFitRows] فعال است؛
+  /// هم‌خوان با ارتفاع سطر/سربرگ واقعی و اسکلتون بارگذاری.
+  double _expandModeBodyHeight() {
+    const double bottomFudge = 12;
+    if (_loadingList) {
+      final skeletonRows = math.max(1, math.min(_limit, 20));
+      final skelH = _dense ? 28.0 : 36.0;
+      return skeletonRows * (skelH + 12.0) + 80.0 + bottomFudge;
+    }
+    if (_error != null) {
+      return 320 + bottomFudge;
+    }
+    if (_items.isEmpty) {
+      return 320 + bottomFudge;
+    }
+    final heading = widget.config.headingRowHeight ?? (_dense ? 40.0 : 44.0);
+    final dataH = widget.config.dataRowHeight ?? (_dense ? 38.0 : 48.0);
+    final n = _items.length;
+    return heading + n * dataH + bottomFudge;
+  }
+
+  Widget _wrapTableBody(Widget child) {
+    if (widget.config.expandBodyHeightToFitRows) {
+      return SizedBox(
+        height: _expandModeBodyHeight(),
+        child: child,
+      );
+    }
+    return Expanded(child: child);
+  }
+
   double _getHeaderAffordancePadding(DataTableColumn column) {
     double padding = 0.0;
     // Container padding (left + right) - reduced
@@ -1333,8 +1364,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             ],
             
             // Data Table
-            Expanded(
-              child: Shortcuts(
+            _wrapTableBody(
+              Shortcuts(
                 shortcuts: <LogicalKeySet, Intent>{
                   LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
                   LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),

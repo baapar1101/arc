@@ -312,6 +312,11 @@ class DataTableConfig<T> {
   // HTTP method for data fetching (default: POST)
   final String httpMethod;
 
+  /// اگر true باشد، ناحیهٔ بدنهٔ جدول به‌جای [Expanded] با ارتفاع محاسبه‌شده از تعداد سطرها
+  /// اندازه می‌گیرد تا اسکرول عمودی داخل جدول حذف شود و والد (مثلاً [SingleChildScrollView])
+  /// اسکرول صفحه را بر عهده بگیرد. پیش‌فرض: غیرفعال.
+  final bool expandBodyHeightToFitRows;
+
   const DataTableConfig({
     required this.endpoint,
     required this.columns,
@@ -397,6 +402,7 @@ class DataTableConfig<T> {
     this.autoFitSampleRows = 50,
     this.autoFillAvailableWidth = true,
     this.httpMethod = 'POST',
+    this.expandBodyHeightToFitRows = false,
   });
 
   /// Get column width as double

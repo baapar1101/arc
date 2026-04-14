@@ -171,13 +171,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(t, isMobile),
-            _buildFilters(t, isMobile),
-            Expanded(
-              child: Padding(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(t, isMobile),
+              _buildFilters(t, isMobile),
+              Padding(
                 padding: EdgeInsets.fromLTRB(
                   contentPadding,
                   8,
@@ -192,8 +192,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                   calendarController: widget.calendarController,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: isMobile
@@ -832,6 +832,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           ),
         ],
         footerTotals: { 'total_amount': 'جمع مبلغ این صفحه' },
+        expandBodyHeightToFitRows: true,
       );
     }
 
@@ -1142,6 +1143,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         'paid_amount': t.invoicePaidAmount,
         'remaining_amount': t.invoiceRemainingAmount,
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
