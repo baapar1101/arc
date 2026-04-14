@@ -60,6 +60,23 @@ from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 
+
+def _format_line_custom_attributes_for_pdf(extra_info: Any) -> Optional[str]:
+    if not isinstance(extra_info, dict):
+        return None
+    raw = extra_info.get("line_custom_attributes")
+    if not raw or not isinstance(raw, dict):
+        return None
+    parts: List[str] = []
+    for k, v in raw.items():
+        if v is None:
+            continue
+        parts.append(f"{k}: {v}")
+    if not parts:
+        return None
+    return "؛ ".join(parts)
+
+
 router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد خرید"])
 
 
@@ -1145,6 +1162,10 @@ async def export_single_invoice_pdf(
                     qty_display = f"{qf:,.3f}".rstrip("0").rstrip(".")
             except Exception:
                 qty_display = qty
+            attrs_display = _format_line_custom_attributes_for_pdf(info)
+            lc_attrs = info.get("line_custom_attributes") if isinstance(info, dict) else None
+            if not isinstance(lc_attrs, dict):
+                lc_attrs = {}
             normalized_lines.append(
                 {
                     "product_code": pl.get("product_code"),
@@ -1156,6 +1177,8 @@ async def export_single_invoice_pdf(
                     "discount": line_discount,
                     "tax_amount": tax_amount,
                     "line_total": line_total,
+                    "line_custom_attributes": lc_attrs,
+                    "attributes_display": attrs_display,
                 }
             )
     except Exception:

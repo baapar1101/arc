@@ -41,6 +41,24 @@ import csv
 logger = logging.getLogger(__name__)
 
 
+def _validate_invoice_line_custom_attributes(db: Session, business_id: int, line: Dict[str, Any]) -> None:
+    """اعتبارسنجی extra_info.line_custom_attributes نسبت به ویژگی‌های لینک‌شده به کالا."""
+    from app.services.product_attribute_service import validate_custom_attributes
+
+    product_id = line.get("product_id")
+    if not product_id:
+        return
+    extra_info = line.get("extra_info") or {}
+    attrs = extra_info.get("line_custom_attributes")
+    if not attrs:
+        return
+    if not isinstance(attrs, dict):
+        raise ApiError("INVALID_LINE_ATTRIBUTES", "ساختار ویژگی‌های سطر فاکتور نامعتبر است", http_status=400)
+    ok, err = validate_custom_attributes(db, business_id, int(product_id), attrs)
+    if not ok:
+        raise ApiError("INVALID_LINE_ATTRIBUTES", err or "ویژگی‌های سطر فاکتور معتبر نیستند", http_status=400)
+
+
 def invalidate_invoices_cache(business_id: int, fiscal_year_id: Optional[int] = None, invoice_id: Optional[int] = None, document_type: Optional[str] = None, project_id: Optional[int] = None):
 	"""
 	حذف تمام کش‌های مربوط به لیست فاکتورها یک کسب‌وکار
@@ -2040,7 +2058,9 @@ def create_invoice(
             _validate_selected_instances(
                 db, business_id, int(product_id), selected_instance_ids, int(qty), invoice_type
             )
-        
+
+        _validate_invoice_line_custom_attributes(db, business_id, line)
+
         db.add(InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
@@ -2978,7 +2998,9 @@ def update_invoice(
             _validate_selected_instances(
                 db, document.business_id, int(product_id), selected_instance_ids, int(qty), inv_type
             )
-        
+
+        _validate_invoice_line_custom_attributes(db, document.business_id, line)
+
         db.add(InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),

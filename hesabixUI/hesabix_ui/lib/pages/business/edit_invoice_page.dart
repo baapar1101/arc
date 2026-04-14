@@ -258,6 +258,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           trackInventory: false,
           warehouseId: _toInt(info['warehouse_id']),
           selectedInstanceIds: selectedInstanceIds,
+          extraInfo: info.isNotEmpty ? Map<String, dynamic>.from(info) : null,
         );
       }).toList();
 
@@ -1090,8 +1091,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final taxAmount = e.taxAmount;
     final lineTotal = e.total;
 
-    // اضافه کردن warehouse_id به extra_info اگر وجود دارد
-    final extraInfoMap = <String, dynamic>{
+    final extraInfoMap = <String, dynamic>{};
+    if (e.extraInfo != null) {
+      for (final entry in e.extraInfo!.entries) {
+        final k = entry.key.toString();
+        if (k.startsWith('_local_')) continue;
+        extraInfoMap[k] = entry.value;
+      }
+    }
+    extraInfoMap.addAll({
       'unit_price': e.unitPrice,
       'line_discount': lineDiscount,
       'tax_amount': taxAmount,
@@ -1102,13 +1110,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'discount_type': e.discountType,
       'discount_value': e.discountValue,
       'tax_rate': e.taxRate,
-    };
-    
+    });
+
     if (e.warehouseId != null) {
       extraInfoMap['warehouse_id'] = e.warehouseId;
     }
-    
-    // اضافه کردن selected_instance_ids به extra_info برای کالاهای یونیک
+
     if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
       extraInfoMap['selected_instance_ids'] = e.selectedInstanceIds;
     }

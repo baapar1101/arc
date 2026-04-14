@@ -12,6 +12,7 @@ import './warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart' show EnglishDigitsFormatter, formatNumberForInput, parseFormattedNumber, parseFormattedDouble, ThousandsSeparatorInputFormatter;
 import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
+import './invoice_line_attributes_dialog.dart';
 import '../../services/product_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
@@ -129,6 +130,95 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
   }
   
+  bool _shouldShowLineAttributesButton(InvoiceLineItem item) {
+    if (item.productId == null) return false;
+    final product = _productCache[item.productId];
+    if (product == null) return false;
+    if ((product['inventory_mode']?.toString() ?? '') == 'unique') return false;
+    final ids = product['attribute_ids'];
+    return ids is List && ids.isNotEmpty;
+  }
+
+  Map<String, dynamic>? _lineAttributesMap(InvoiceLineItem item) {
+    final raw = item.extraInfo?['line_custom_attributes'];
+    if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
+    if (raw is Map) return Map<String, dynamic>.from(raw.map((k, v) => MapEntry(k.toString(), v)));
+    return null;
+  }
+
+  String _lineAttributesSummary(InvoiceLineItem item) {
+    final m = _lineAttributesMap(item);
+    if (m == null || m.isEmpty) return '';
+    return m.entries.map((e) => '${e.key}: ${e.value}').join('، ');
+  }
+
+  Future<void> _editLineAttributes(int index, InvoiceLineItem item) async {
+    if (item.productId == null) return;
+    await _loadProductInfo(item.productId!, force: true);
+    if (!mounted) return;
+    final product = _productCache[item.productId];
+    if (product == null || !_shouldShowLineAttributesButton(item)) {
+      SnackBarHelper.show(context, message: 'این کالا ویژگی قابل ویرایش در سطح ردیف ندارد');
+      return;
+    }
+    final result = await showInvoiceLineAttributesEditor(
+      context: context,
+      businessId: widget.businessId,
+      productId: item.productId!,
+      productName: item.productName ?? '',
+      productMap: product,
+      initialLineAttributes: _lineAttributesMap(item),
+      calendarController: widget.calendarController,
+    );
+    if (!mounted || result == null) return;
+    final ei = Map<String, dynamic>.from(item.extraInfo ?? {});
+    if (result.isEmpty) {
+      ei.remove('line_custom_attributes');
+    } else {
+      ei['line_custom_attributes'] = result;
+    }
+    _updateRow(index, item.copyWith(extraInfo: ei.isEmpty ? null : ei));
+  }
+
+  Widget _lineAttributesRow(BuildContext context, int index, InvoiceLineItem item) {
+    final summary = _lineAttributesSummary(item);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal[50],
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.teal[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.tune, size: 20, color: Colors.teal[800]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: summary.isEmpty
+                ? Text(
+                    'ویژگی‌های کالا (اختیاری)',
+                    style: TextStyle(fontSize: 13, color: Colors.teal[900], fontStyle: FontStyle.italic),
+                  )
+                : Text(
+                    summary,
+                    style: TextStyle(fontSize: 13, color: Colors.teal[900], fontWeight: FontWeight.w500),
+                  ),
+          ),
+          TextButton.icon(
+            onPressed: () => _editLineAttributes(index, item),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text(summary.isEmpty ? 'تعیین' : 'ویرایش'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// بررسی اینکه آیا باید قابلیت انتخاب instance نمایش داده شود
   bool _shouldShowInstanceSelector(InvoiceLineItem item) {
     // فقط برای فاکتور فروش و برگشت از خرید
@@ -148,10 +238,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return product['inventory_mode'] == 'unique';
   }
   
-  /// بارگذاری اطلاعات کالا برای بررسی یونیک بودن
-  Future<void> _loadProductInfo(int productId) async {
-    if (_productCache.containsKey(productId)) {
-      return; // قبلاً بارگذاری شده
+  /// بارگذاری اطلاعات کالا برای بررسی یونیک بودن و ویژگی‌ها
+  Future<void> _loadProductInfo(int productId, {bool force = false}) async {
+    if (!force && _productCache.containsKey(productId)) {
+      return;
     }
     
     try {
@@ -1053,6 +1143,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
               ),
             ],
+            if (_shouldShowLineAttributesButton(item)) ...[
+              const SizedBox(height: 12),
+              _lineAttributesRow(context, index, item),
+            ],
           ],
         ),
       ),
@@ -1338,6 +1432,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
               ],
             ),
+            if (_shouldShowLineAttributesButton(item)) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(width: 48),
+                  Expanded(child: _lineAttributesRow(context, index, item)),
+                ],
+              ),
+            ],
           ],
         ],
       ),
@@ -1349,6 +1453,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (p == null) {
       setState(() {
         final cleanedExtra = Map<String, dynamic>.from(item.extraInfo ?? {});
+        cleanedExtra.remove('line_custom_attributes');
         cleanedExtra.removeWhere((key, value) => key.toString().startsWith('_local_'));
         _rows[index] = item.copyWith(
           productId: null,
@@ -1390,11 +1495,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       metadata.remove('_local_auto_description');
     }
     final shouldReplaceDescription = _shouldReplaceDescription(item.description, previousAuto);
-    
-    // ذخیره اطلاعات کالا در cache برای بررسی یونیک بودن
+
     final productId = _toInt(p['id']);
+    if (productId != null && productId != item.productId) {
+      metadata.remove('line_custom_attributes');
+    }
+
+    // ذخیره اطلاعات کالا در cache برای بررسی یونیک بودن
     if (productId != null) {
       _productCache[productId] = Map<String, dynamic>.from(p);
+      await _loadProductInfo(productId, force: true);
     }
     
     final updated = item.copyWith(
