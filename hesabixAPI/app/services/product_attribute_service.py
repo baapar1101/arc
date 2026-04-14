@@ -67,6 +67,8 @@ def list_attributes(db: Session, business_id: int, query: Dict[str, Any]) -> Dic
         search=search,
         filters=filters,
     )
+    for item in result.get("items", []):
+        item["options"] = _options_raw_to_api_list(item.get("options"))
     return result
 
 
@@ -135,15 +137,23 @@ def delete_attribute(db: Session, attribute_id: int, business_id: int) -> bool:
     return repo.delete(attribute_id=attribute_id)
 
 
+def _options_raw_to_api_list(raw: Any) -> Optional[list]:
+    """یکسان‌سازی شکل options برای خروجی API (لیست یا dict ذخیره‌شده در JSON)."""
+    if not raw:
+        return None
+    if isinstance(raw, dict) and "items" in raw:
+        items = raw.get("items")
+        if isinstance(items, list):
+            return items
+        return None
+    if isinstance(raw, list):
+        return raw
+    return None
+
+
 def _to_dict(obj: ProductAttribute) -> Dict[str, Any]:
-    # تبدیل options از dict به list برای API
-    options_list = None
-    if obj.options:
-        if isinstance(obj.options, dict) and "items" in obj.options:
-            options_list = obj.options["items"]
-        elif isinstance(obj.options, list):
-            options_list = obj.options
-    
+    options_list = _options_raw_to_api_list(getattr(obj, "options", None))
+
     return {
         "id": obj.id,
         "business_id": obj.business_id,

@@ -42,11 +42,17 @@ class ProductAttributeItem {
     final String? createdDisplay = _extractDisplay(createdRaw);
     final String? updatedDisplay = _extractDisplay(updatedRaw);
 
-    // تبدیل options از List یا null
+    // تبدیل options: API ممکن است List یا شیء {"items": [...]} برگرداند
     List<String>? optionsList;
-    if (json['options'] != null) {
-      if (json['options'] is List) {
-        optionsList = List<String>.from(json['options'] as List);
+    final dynamic optionsRaw = json['options'];
+    if (optionsRaw != null) {
+      if (optionsRaw is List) {
+        optionsList = optionsRaw.map((e) => e.toString()).toList();
+      } else if (optionsRaw is Map) {
+        final items = optionsRaw['items'];
+        if (items is List) {
+          optionsList = items.map((e) => e.toString()).toList();
+        }
       }
     }
 
@@ -378,23 +384,26 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         ),
       ),
     );
-    
-    // پاکسازی controllers
+
+    // قبل از dispose باید متن گزینه‌ها خوانده شود؛ بعد از dispose به controller نباید دست زد
+    final String dataTypeForSave = selectedDataType ?? 'text';
+    final List<String>? optionsForSave = (result == true && dataTypeForSave == 'select')
+        ? optionControllers
+            .map((c) => c.text.trim())
+            .where((text) => text.isNotEmpty)
+            .toList()
+        : null;
+
     for (final controller in optionControllers) {
       controller.dispose();
     }
-    
+
     if (result == true && mounted) {
       try {
         final title = titleCtrl.text.trim();
         final description = descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim();
-        final dataType = selectedDataType ?? 'text';
-        final List<String>? options = dataType == 'select'
-            ? optionControllers
-                .map((c) => c.text.trim())
-                .where((text) => text.isNotEmpty)
-                .toList()
-            : null;
+        final dataType = dataTypeForSave;
+        final List<String>? options = optionsForSave;
 
         if (editing == null) {
           await _service.create(
