@@ -413,13 +413,13 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     super.dispose();
   }
   
-  /// بارگذاری اطلاعات کالاهای موجود در ردیف‌های اولیه
+  /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط
   Future<void> _loadProductInfosForInitialRows() async {
-    for (var item in _rows) {
-      if (item.productId != null && !_productCache.containsKey(item.productId)) {
-        await _loadProductInfo(item.productId!);
-      }
+    final ids = _rows.map((e) => e.productId).whereType<int>().toSet();
+    for (final pid in ids) {
+      await _loadProductInfo(pid, force: true);
     }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -439,12 +439,20 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         // اگر جدول خالی است، همه ردیف‌ها را اضافه کن
         _rows.clear();
         _rows.addAll(widget.initialRows!);
+        for (int i = 0; i < _rows.length; i++) {
+          _ensureFocusNodes(i);
+        }
+        _loadProductInfosForInitialRows();
         _notify();
       } else if (widget.initialRows!.length > _rows.length) {
         // اگر ردیف‌های جدید اضافه شده، همه ردیف‌ها را جایگزین کن
         // (کاربر می‌تواند بعداً ردیف‌ها را ویرایش کند)
         _rows.clear();
         _rows.addAll(widget.initialRows!);
+        for (int i = 0; i < _rows.length; i++) {
+          _ensureFocusNodes(i);
+        }
+        _loadProductInfosForInitialRows();
         _notify();
       }
     }
