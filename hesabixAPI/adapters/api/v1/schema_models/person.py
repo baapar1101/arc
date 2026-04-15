@@ -1,7 +1,22 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from enum import Enum
 from datetime import datetime
+
+
+# پیشوندهای مجاز برای اشخاص (همسان با UI)
+ALLOWED_PERSON_NAME_PREFIXES = frozenset({
+    "آقای",
+    "خانم",
+    "شرکت",
+    "دکتر",
+    "مهندس",
+    "موسسه",
+    "اداره",
+    "سازمان",
+    "بنیاد",
+    "انجمن",
+})
 
 
 class PersonType(str, Enum):
@@ -48,6 +63,8 @@ class PersonBankAccountResponse(BaseModel):
 
 class PersonCreateRequest(BaseModel):
     """درخواست ایجاد شخص جدید"""
+    model_config = ConfigDict(extra="ignore")
+
     # اطلاعات پایه
     code: Optional[int] = Field(default=None, ge=1, description="کد یکتا در هر کسب و کار (در صورت عدم ارسال، خودکار تولید می‌شود)")
     alias_name: str = Field(..., min_length=1, max_length=255, description="نام مستعار (الزامی)")
@@ -56,7 +73,36 @@ class PersonCreateRequest(BaseModel):
     person_type: Optional[PersonType] = Field(default=None, description="نوع شخص (سازگاری قدیمی)")
     person_types: Optional[List[PersonType]] = Field(default=None, description="انواع شخص (چندانتخابی)")
     company_name: Optional[str] = Field(default=None, max_length=255, description="نام شرکت")
+    name_prefix: Optional[str] = Field(default=None, max_length=64, description="پیشوند (آقای، خانم، شرکت، …)")
+    legal_entity_type: str = Field(
+        default="natural",
+        description="نوع حقوقی: natural=حقیقی، legal=حقوقی",
+    )
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
+
+    @field_validator("name_prefix", mode="before")
+    @classmethod
+    def _validate_name_prefix(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if s not in ALLOWED_PERSON_NAME_PREFIXES:
+            raise ValueError(f"پیشوند نامعتبر است. مقادیر مجاز: {', '.join(sorted(ALLOWED_PERSON_NAME_PREFIXES))}")
+        return s
+
+    @field_validator("legal_entity_type", mode="before")
+    @classmethod
+    def _validate_legal_entity_type(cls, v):
+        if v is None or str(v).strip() == "":
+            return "natural"
+        s = str(v).strip().lower()
+        if s in ("legal", "حقوقی", "حقوقي"):
+            return "legal"
+        if s in ("natural", "حقیقی", "حقیقي"):
+            return "natural"
+        raise ValueError("legal_entity_type باید natural یا legal باشد")
     
     # اطلاعات اقتصادی
     national_id: Optional[str] = Field(default=None, max_length=20, description="شناسه ملی")
@@ -116,6 +162,8 @@ class PersonCreateRequest(BaseModel):
 
 class PersonUpdateRequest(BaseModel):
     """درخواست ویرایش شخص"""
+    model_config = ConfigDict(extra="ignore")
+
     # اطلاعات پایه
     code: Optional[int] = Field(default=None, ge=1, description="کد یکتا در هر کسب و کار")
     alias_name: Optional[str] = Field(default=None, min_length=1, max_length=255, description="نام مستعار")
@@ -124,7 +172,33 @@ class PersonUpdateRequest(BaseModel):
     person_type: Optional[PersonType] = Field(default=None, description="نوع شخص (سازگاری قدیمی)")
     person_types: Optional[List[PersonType]] = Field(default=None, description="انواع شخص (چندانتخابی)")
     company_name: Optional[str] = Field(default=None, max_length=255, description="نام شرکت")
+    name_prefix: Optional[str] = Field(default=None, max_length=64, description="پیشوند")
+    legal_entity_type: Optional[str] = Field(default=None, description="نوع حقوقی: natural یا legal")
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
+
+    @field_validator("name_prefix", mode="before")
+    @classmethod
+    def _validate_name_prefix_upd(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if s not in ALLOWED_PERSON_NAME_PREFIXES:
+            raise ValueError(f"پیشوند نامعتبر است. مقادیر مجاز: {', '.join(sorted(ALLOWED_PERSON_NAME_PREFIXES))}")
+        return s
+
+    @field_validator("legal_entity_type", mode="before")
+    @classmethod
+    def _validate_legal_entity_type_upd(cls, v):
+        if v is None or str(v).strip() == "":
+            return None
+        s = str(v).strip().lower()
+        if s in ("legal", "حقوقی", "حقوقي"):
+            return "legal"
+        if s in ("natural", "حقیقی", "حقیقي"):
+            return "natural"
+        raise ValueError("legal_entity_type باید natural یا legal باشد")
     
     # اطلاعات اقتصادی
     national_id: Optional[str] = Field(default=None, max_length=20, description="شناسه ملی")
@@ -193,6 +267,8 @@ class PersonResponse(BaseModel):
     person_type: str = Field(..., description="نوع شخص")
     person_types: List[str] = Field(default_factory=list, description="انواع شخص")
     company_name: Optional[str] = Field(default=None, description="نام شرکت")
+    name_prefix: Optional[str] = Field(default=None, description="پیشوند نام")
+    legal_entity_type: str = Field(default="natural", description="نوع حقوقی: natural یا legal")
     payment_id: Optional[str] = Field(default=None, description="شناسه پرداخت")
     
     # اطلاعات اقتصادی

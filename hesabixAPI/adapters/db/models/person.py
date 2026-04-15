@@ -36,6 +36,14 @@ class Person(Base):
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام خانوادگی")
     person_types: Mapped[str] = mapped_column(Text, nullable=False, comment="لیست انواع شخص به صورت JSON")
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام شرکت")
+    name_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="پیشوند نام (آقای، خانم، شرکت، …)")
+    legal_entity_type: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="natural",
+        server_default="natural",
+        comment="نوع حقوقی: natural=حقیقی، legal=حقوقی",
+    )
     payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="شناسه پرداخت")
     # سهام
     share_count: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="تعداد سهام (فقط برای سهامدار)")

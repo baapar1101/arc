@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="{% if is_fa %}fa{% else %}en{% endif %}" dir="{% if is_fa %}rtl{% else %}ltr{% endif %}">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ label_title }}</title>
+  <style>
+    {% if fa_font_url_regular %}
+    @font-face {
+      font-family: 'HesabixFa';
+      src: url('{{ fa_font_url_regular }}') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    {% endif %}
+    {% if fa_font_url_bold %}
+    @font-face {
+      font-family: 'HesabixFa';
+      src: url('{{ fa_font_url_bold }}') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+    {% endif %}
+    @page {
+      size: {{ page_size_css }};
+      margin: 3mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: {% if is_fa %}'HesabixFa', {% endif %}Tahoma, Arial, sans-serif;
+      font-size: 9pt;
+      margin: 0;
+      padding: 2mm;
+      color: #111;
+    }
+    h1 {
+      font-size: 11pt;
+      margin: 0 0 2mm 0;
+      text-align: center;
+      font-weight: 700;
+    }
+    .meta {
+      text-align: center;
+      font-size: 8pt;
+      color: #444;
+      margin-bottom: 2mm;
+    }
+    .direction {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid #888;
+      border-radius: 3px;
+      font-size: 8pt;
+    }
+    .block {
+      border: 1px solid #333;
+      border-radius: 2px;
+      padding: 2mm;
+      margin-bottom: 2mm;
+    }
+    .block h2 {
+      font-size: 9pt;
+      margin: 0 0 1mm 0;
+      font-weight: 700;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 1mm;
+    }
+    .row { margin-top: 1mm; }
+    .k { color: #555; font-size: 8pt; }
+    .v { font-weight: 600; }
+    .lines {
+      font-size: 8pt;
+      line-height: 1.35;
+      color: #222;
+    }
+    .footer {
+      margin-top: 2mm;
+      font-size: 7pt;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>{{ label_title }}</h1>
+  <div class="meta">
+    <span class="direction">{{ direction_label }}</span>
+    {% if document.code %}
+      &nbsp;|&nbsp; <span class="k">{% if is_fa %}کد{% else %}Code{% endif %}:</span> <span class="v">{{ document.code | e }}</span>
+    {% endif %}
+    {% if document_date_display %}
+      &nbsp;|&nbsp; <span class="k">{% if is_fa %}تاریخ{% else %}Date{% endif %}:</span> <span class="v">{{ document_date_display | e }}</span>
+    {% endif %}
+  </div>
+
+  {% if show_sender %}
+  <div class="block">
+    <h2>{{ sender_caption | e }}</h2>
+    {% if sender.name %}<div class="row"><span class="k">{% if is_fa %}نام{% else %}Name{% endif %}:</span> <span class="v">{{ sender.name | e }}</span></div>{% endif %}
+    {% if sender.phone %}<div class="row"><span class="k">{% if is_fa %}تماس{% else %}Phone{% endif %}:</span> <span class="v">{{ sender.phone | e }}</span></div>{% endif %}
+    {% if sender.postal_code %}<div class="row"><span class="k">{% if is_fa %}کد پستی{% else %}Postal{% endif %}:</span> <span class="v">{{ sender.postal_code | e }}</span></div>{% endif %}
+    {% if sender.address %}<div class="row"><span class="k">{% if is_fa %}آدرس{% else %}Address{% endif %}:</span> <span class="v">{{ sender.address | e }}</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if show_receiver %}
+  <div class="block">
+    <h2>{{ receiver_caption | e }}</h2>
+    {% if receiver.name %}<div class="row"><span class="k">{% if is_fa %}نام{% else %}Name{% endif %}:</span> <span class="v">{{ receiver.name | e }}</span></div>{% endif %}
+    {% if receiver.phone %}<div class="row"><span class="k">{% if is_fa %}تماس{% else %}Phone{% endif %}:</span> <span class="v">{{ receiver.phone | e }}</span></div>{% endif %}
+    {% if receiver.postal_code %}<div class="row"><span class="k">{% if is_fa %}کد پستی{% else %}Postal{% endif %}:</span> <span class="v">{{ receiver.postal_code | e }}</span></div>{% endif %}
+    {% if receiver.warehouse_name and show_warehouse %}<div class="row"><span class="k">{% if is_fa %}انبار{% else %}Warehouse{% endif %}:</span> <span class="v">{{ receiver.warehouse_name | e }}</span></div>{% endif %}
+    {% if receiver.address %}<div class="row"><span class="k">{% if is_fa %}آدرس{% else %}Address{% endif %}:</span> <span class="v">{{ receiver.address | e }}</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if show_delivery %}
+  {% if document.delivery_method or document.carrier_name or document.description %}
+  <div class="block">
+    <h2>{% if is_fa %}ارسال{% else %}Shipment{% endif %}</h2>
+    {% if document.delivery_method or document.delivery_method_display %}
+    <div class="row"><span class="k">{% if is_fa %}روش{% else %}Method{% endif %}:</span> <span class="v">{{ (document.delivery_method_display or document.delivery_method) | e }}</span></div>
+    {% endif %}
+    {% if document.carrier_name %}
+    <div class="row"><span class="k">{% if is_fa %}حمل{% else %}Carrier{% endif %}:</span> <span class="v">{{ document.carrier_name | e }}</span></div>
+    {% endif %}
+    {% if document.description %}
+    <div class="row"><span class="k">{% if is_fa %}توضیح{% else %}Note{% endif %}:</span> <span class="v">{{ document.description | e }}</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if show_tracking and document.tracking_number %}
+  <div class="block">
+    <h2>{% if is_fa %}پیگیری{% else %}Tracking{% endif %}</h2>
+    <div class="row v" style="font-size:11pt; letter-spacing:0.5px;">{{ document.tracking_number | e }}</div>
+  </div>
+  {% endif %}
+
+  {% if show_source and document.source_document_code %}
+  <div class="row"><span class="k">{% if is_fa %}سند مبدأ{% else %}Source doc.{% endif %}:</span> <span class="v">{{ document.source_document_code | e }}</span></div>
+  {% endif %}
+
+  {% if show_warehouse and (document.warehouse_name_from or document.warehouse_name_to) %}
+  <div class="row" style="margin-top:2mm;">
+    {% if document.warehouse_name_from %}
+      <span class="k">{% if is_fa %}مبدأ{% else %}From{% endif %}:</span> <span class="v">{{ document.warehouse_name_from | e }}</span>
+    {% endif %}
+    {% if document.warehouse_name_to %}
+      &nbsp;—&nbsp;<span class="k">{% if is_fa %}مقصد{% else %}To{% endif %}:</span> <span class="v">{{ document.warehouse_name_to | e }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if show_lines and lines_summary %}
+  <div class="block">
+    <h2>{% if is_fa %}محتوا{% else %}Contents{% endif %}</h2>
+    <div class="lines">{{ lines_summary | e }}</div>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    {{ business.name | e }} — {% if is_fa %}چاپ{% else %}Printed{% endif %}: {{ generated_at.strftime('%Y/%m/%d %H:%M') }}
+  </div>
+</body>
+</html>

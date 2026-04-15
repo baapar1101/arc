@@ -9,3 +9,13 @@ const List<String> kReportTemplatePaperSizeOptions = [
   'A5',
   'Legal',
 ];
+
+/// سایزهای رایج برای برچسب مرسوله پستی (حواله انبار).
+const List<String> kWarehousePostalLabelPaperOptions = [
+  'A6',
+  'A5',
+  'A4',
+  'Letter',
+  '105mm 148mm',
+  '100mm 150mm',
+];

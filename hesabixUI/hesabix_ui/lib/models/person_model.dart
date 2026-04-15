@@ -113,6 +113,8 @@ class Person {
   final String? lastName;
   final List<PersonType> personTypes;
   final String? companyName;
+  final String? namePrefix;
+  final String legalEntityType;
   final String? paymentId;
   final String? nationalId;
   final String? registrationNumber;
@@ -154,6 +156,8 @@ class Person {
     this.lastName,
     required this.personTypes,
     this.companyName,
+    this.namePrefix,
+    this.legalEntityType = 'natural',
     this.paymentId,
     this.nationalId,
     this.registrationNumber,
@@ -198,6 +202,10 @@ class Person {
       lastName: json['last_name'],
       personTypes: types,
       companyName: json['company_name'],
+      namePrefix: json['name_prefix'] as String?,
+      legalEntityType: (json['legal_entity_type'] as String?)?.trim().toLowerCase() == 'legal'
+          ? 'legal'
+          : 'natural',
       paymentId: json['payment_id'],
       nationalId: json['national_id'],
       registrationNumber: json['registration_number'],
@@ -241,6 +249,8 @@ class Person {
       'last_name': lastName,
       'person_types': personTypes.map((t) => t.persianName).toList(),
       'company_name': companyName,
+      'name_prefix': namePrefix,
+      'legal_entity_type': legalEntityType,
       'payment_id': paymentId,
       'national_id': nationalId,
       'registration_number': registrationNumber,
@@ -280,6 +290,8 @@ class Person {
     String? lastName,
     List<PersonType>? personTypes,
     String? companyName,
+    String? namePrefix,
+    String? legalEntityType,
     String? paymentId,
     String? nationalId,
     String? registrationNumber,
@@ -307,6 +319,8 @@ class Person {
       lastName: lastName ?? this.lastName,
       personTypes: personTypes ?? this.personTypes,
       companyName: companyName ?? this.companyName,
+      namePrefix: namePrefix ?? this.namePrefix,
+      legalEntityType: legalEntityType ?? this.legalEntityType,
       paymentId: paymentId ?? this.paymentId,
       nationalId: nationalId ?? this.nationalId,
       registrationNumber: registrationNumber ?? this.registrationNumber,
@@ -325,6 +339,16 @@ class Person {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       bankAccounts: bankAccounts ?? this.bankAccounts,
+      shareCount: shareCount,
+      commissionSalePercent: commissionSalePercent,
+      commissionSalesReturnPercent: commissionSalesReturnPercent,
+      commissionSalesAmount: commissionSalesAmount,
+      commissionSalesReturnAmount: commissionSalesReturnAmount,
+      commissionExcludeDiscounts: commissionExcludeDiscounts,
+      commissionExcludeAdditionsDeductions: commissionExcludeAdditionsDeductions,
+      commissionPostInInvoiceDocument: commissionPostInInvoiceDocument,
+      balance: balance,
+      status: status,
     );
   }
 
@@ -351,6 +375,8 @@ class PersonCreateRequest {
   final String? lastName;
   final List<PersonType> personTypes;
   final String? companyName;
+  final String? namePrefix;
+  final String legalEntityType;
   final String? paymentId;
   final String? nationalId;
   final String? registrationNumber;
@@ -382,6 +408,8 @@ class PersonCreateRequest {
     this.lastName,
     this.personTypes = const [],
     this.companyName,
+    this.namePrefix,
+    this.legalEntityType = 'natural',
     this.paymentId,
     this.nationalId,
     this.registrationNumber,
@@ -415,6 +443,8 @@ class PersonCreateRequest {
       'last_name': lastName,
       if (personTypes.isNotEmpty) 'person_types': personTypes.map((t) => t.persianName).toList(),
       'company_name': companyName,
+      if (namePrefix != null && namePrefix!.trim().isNotEmpty) 'name_prefix': namePrefix!.trim(),
+      'legal_entity_type': legalEntityType,
       'payment_id': paymentId,
       'national_id': nationalId,
       'registration_number': registrationNumber,
@@ -458,6 +488,8 @@ class PersonUpdateRequest {
   final String? lastName;
   final List<PersonType>? personTypes;
   final String? companyName;
+  final String? namePrefix;
+  final String? legalEntityType;
   final String? paymentId;
   final String? nationalId;
   final String? registrationNumber;
@@ -489,6 +521,8 @@ class PersonUpdateRequest {
     this.lastName,
     this.personTypes,
     this.companyName,
+    this.namePrefix,
+    this.legalEntityType,
     this.paymentId,
     this.nationalId,
     this.registrationNumber,
@@ -523,6 +557,13 @@ class PersonUpdateRequest {
       if (personTypes != null)
         'person_types': personTypes!.map((t) => t.persianName).toList(),
       'company_name': companyName,
+      'name_prefix': () {
+        final p = namePrefix;
+        if (p == null) return null;
+        final trimmed = p.trim();
+        return trimmed.isEmpty ? null : trimmed;
+      }(),
+      'legal_entity_type': legalEntityType,
       'payment_id': paymentId,
       'national_id': nationalId,
       'registration_number': registrationNumber,

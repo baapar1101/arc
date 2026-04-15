@@ -11,6 +11,7 @@ import '../../utils/snackbar_helper.dart';
 
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show HesabixDateUtils;
+import 'warehouse_postal_label_print_dialog.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -416,6 +417,15 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
               icon: const Icon(Icons.print),
               onPressed: _exportPdf,
               tooltip: t.printWarehouseDocument,
+            ),
+            IconButton(
+              icon: const Icon(Icons.local_shipping_outlined),
+              onPressed: () => showWarehousePostalLabelPrintDialog(
+                context: context,
+                businessId: widget.businessId,
+                documentId: widget.documentId,
+              ),
+              tooltip: t.warehousePostalLabelTooltip,
             ),
             if (isDraft) ...[
               IconButton(

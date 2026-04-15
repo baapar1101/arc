@@ -418,6 +418,36 @@ async def report_template_schema(
 			{"name": "table_headers_html", "desc": "HTML هدر جدول"},
 			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
 		]
+	elif module_key == "warehouse_documents" and (subtype or "") == "postal_label":
+		from app.services.warehouse_postal_label_service import sample_postal_label_context
+		sc = sample_postal_label_context()
+		data["keys"] += [
+			{"name": "business", "desc": "اطلاعات کسب‌وکار"},
+			{"name": "sender", "desc": "فرستنده (name, phone, address, postal_code, city)"},
+			{"name": "receiver", "desc": "گیرنده (name, phone, address, postal_code, city, warehouse_name)"},
+			{"name": "sender_caption", "desc": "عنوان بلوک فرستنده"},
+			{"name": "receiver_caption", "desc": "عنوان بلوک گیرنده"},
+			{"name": "document", "desc": "شیء حواله انبار (code, doc_type, delivery_method_display, …)"},
+			{"name": "direction", "desc": "in | out | other"},
+			{"name": "direction_label", "desc": "برچسب خوانای جهت حواله"},
+			{"name": "label_title", "desc": "عنوان برگه"},
+			{"name": "document_date_display", "desc": "تاریخ سند (نمایشی)"},
+			{"name": "lines_summary", "desc": "خلاصهٔ خطوط کالا"},
+			{"name": "paper_size", "desc": "سایز کاغذ درخواستی"},
+			{"name": "orientation", "desc": "portrait | landscape"},
+			{"name": "page_size_css", "desc": "مقدار ترکیبی برای CSS @page size"},
+			{"name": "show_sender", "desc": "bool — نمایش فرستنده"},
+			{"name": "show_receiver", "desc": "bool — نمایش گیرنده"},
+			{"name": "show_warehouse", "desc": "bool — نمایش انبار"},
+			{"name": "show_lines", "desc": "bool — نمایش خلاصه کالا"},
+			{"name": "show_delivery", "desc": "bool — روش ارسال و حمل"},
+			{"name": "show_tracking", "desc": "bool — شماره پیگیری"},
+			{"name": "show_source", "desc": "bool — سند مبدأ"},
+			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار (data URI)"},
+			{"name": "fa_font_url_regular", "desc": "فونت فارسی (data URI)"},
+			{"name": "is_fa", "desc": "زبان فارسی"},
+		]
+		data["sample_context"] = {**data["sample_context"], **sc}
 	return data
 
 

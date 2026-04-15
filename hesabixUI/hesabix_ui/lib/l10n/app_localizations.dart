@@ -5393,6 +5393,36 @@ abstract class AppLocalizations {
   /// **'Company Name'**
   String get personCompanyName;
 
+  /// No description provided for @personNamePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Name prefix'**
+  String get personNamePrefix;
+
+  /// No description provided for @personNamePrefixNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get personNamePrefixNone;
+
+  /// No description provided for @personLegalEntityType.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entity type'**
+  String get personLegalEntityType;
+
+  /// No description provided for @personLegalEntityNatural.
+  ///
+  /// In en, this message translates to:
+  /// **'Natural person'**
+  String get personLegalEntityNatural;
+
+  /// No description provided for @personLegalEntityLegal.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entity'**
+  String get personLegalEntityLegal;
+
   /// No description provided for @personPaymentId.
   ///
   /// In en, this message translates to:
@@ -7198,6 +7228,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Transfers/Detail'**
   String get presetTransfersDetail;
+
+  /// No description provided for @presetWarehousePostalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse / postal label'**
+  String get presetWarehousePostalLabel;
 
   /// No description provided for @reportTemplatesScopeAll.
   ///
@@ -11950,6 +11986,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Print PDF'**
   String get printWarehouseDocument;
+
+  /// No description provided for @warehousePostalLabelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Postal consignment label (PDF)'**
+  String get warehousePostalLabelTooltip;
+
+  /// No description provided for @warehousePostalLabelDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Postal consignment label'**
+  String get warehousePostalLabelDialogTitle;
+
+  /// No description provided for @warehousePostalLabelPaperSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper size'**
+  String get warehousePostalLabelPaperSize;
+
+  /// No description provided for @warehousePostalLabelOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get warehousePostalLabelOrientation;
+
+  /// No description provided for @warehousePostalLabelPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get warehousePostalLabelPortrait;
+
+  /// No description provided for @warehousePostalLabelLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get warehousePostalLabelLandscape;
+
+  /// No description provided for @warehousePostalLabelCustomPaperHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom size (max 32 chars, e.g. 120mm 80mm)'**
+  String get warehousePostalLabelCustomPaperHint;
+
+  /// No description provided for @warehousePostalLabelTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print template'**
+  String get warehousePostalLabelTemplate;
+
+  /// No description provided for @warehousePostalLabelNoTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'— System default —'**
+  String get warehousePostalLabelNoTemplate;
+
+  /// No description provided for @warehousePostalLabelFieldsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Fields on label'**
+  String get warehousePostalLabelFieldsSection;
+
+  /// No description provided for @warehousePostalLabelShowSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender'**
+  String get warehousePostalLabelShowSender;
+
+  /// No description provided for @warehousePostalLabelShowReceiver.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient'**
+  String get warehousePostalLabelShowReceiver;
+
+  /// No description provided for @warehousePostalLabelShowWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse names'**
+  String get warehousePostalLabelShowWarehouse;
+
+  /// No description provided for @warehousePostalLabelShowLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Items summary'**
+  String get warehousePostalLabelShowLines;
+
+  /// No description provided for @warehousePostalLabelShowDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipping / notes'**
+  String get warehousePostalLabelShowDelivery;
+
+  /// No description provided for @warehousePostalLabelShowTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking number'**
+  String get warehousePostalLabelShowTracking;
+
+  /// No description provided for @warehousePostalLabelShowSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source document code'**
+  String get warehousePostalLabelShowSource;
+
+  /// No description provided for @warehousePostalLabelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download PDF'**
+  String get warehousePostalLabelDownload;
 
   /// No description provided for @applicationName.
   ///

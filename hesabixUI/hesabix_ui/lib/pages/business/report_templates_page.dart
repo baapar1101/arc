@@ -101,6 +101,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           _moduleCtrl.text = 'transfers';
           _subtypeCtrl.text = 'detail';
           break;
+        case 'warehouse_postal_label':
+          _moduleCtrl.text = 'warehouse_documents';
+          _subtypeCtrl.text = 'postal_label';
+          break;
         case 'custom':
           break;
       }
@@ -120,6 +124,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       DropdownMenuItem(value: 'documents_detail', child: Text(t.presetDocumentsDetail)),
       DropdownMenuItem(value: 'transfers_list', child: Text(t.presetTransfersList)),
       DropdownMenuItem(value: 'transfers_detail', child: Text(t.presetTransfersDetail)),
+      DropdownMenuItem(value: 'warehouse_postal_label', child: Text(t.presetWarehousePostalLabel)),
       DropdownMenuItem(value: 'custom', child: Text(t.reportTemplatesScopeCustom)),
     ];
   }

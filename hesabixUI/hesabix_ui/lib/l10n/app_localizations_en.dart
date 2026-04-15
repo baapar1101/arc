@@ -2766,6 +2766,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personCompanyName => 'Company Name';
 
   @override
+  String get personNamePrefix => 'Name prefix';
+
+  @override
+  String get personNamePrefixNone => 'None';
+
+  @override
+  String get personLegalEntityType => 'Legal entity type';
+
+  @override
+  String get personLegalEntityNatural => 'Natural person';
+
+  @override
+  String get personLegalEntityLegal => 'Legal entity';
+
+  @override
   String get personPaymentId => 'Payment ID';
 
   @override
@@ -3694,6 +3709,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get presetTransfersDetail => 'Transfers/Detail';
+
+  @override
+  String get presetWarehousePostalLabel => 'Warehouse / postal label';
 
   @override
   String get reportTemplatesScopeAll => 'All report types';
@@ -6345,6 +6363,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'Print PDF';
+
+  @override
+  String get warehousePostalLabelTooltip => 'Postal consignment label (PDF)';
+
+  @override
+  String get warehousePostalLabelDialogTitle => 'Postal consignment label';
+
+  @override
+  String get warehousePostalLabelPaperSize => 'Paper size';
+
+  @override
+  String get warehousePostalLabelOrientation => 'Orientation';
+
+  @override
+  String get warehousePostalLabelPortrait => 'Portrait';
+
+  @override
+  String get warehousePostalLabelLandscape => 'Landscape';
+
+  @override
+  String get warehousePostalLabelCustomPaperHint =>
+      'Custom size (max 32 chars, e.g. 120mm 80mm)';
+
+  @override
+  String get warehousePostalLabelTemplate => 'Print template';
+
+  @override
+  String get warehousePostalLabelNoTemplate => '— System default —';
+
+  @override
+  String get warehousePostalLabelFieldsSection => 'Fields on label';
+
+  @override
+  String get warehousePostalLabelShowSender => 'Sender';
+
+  @override
+  String get warehousePostalLabelShowReceiver => 'Recipient';
+
+  @override
+  String get warehousePostalLabelShowWarehouse => 'Warehouse names';
+
+  @override
+  String get warehousePostalLabelShowLines => 'Items summary';
+
+  @override
+  String get warehousePostalLabelShowDelivery => 'Shipping / notes';
+
+  @override
+  String get warehousePostalLabelShowTracking => 'Tracking number';
+
+  @override
+  String get warehousePostalLabelShowSource => 'Source document code';
+
+  @override
+  String get warehousePostalLabelDownload => 'Download PDF';
 
   @override
   String get applicationName => 'Application Name';

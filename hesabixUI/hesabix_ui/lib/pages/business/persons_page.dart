@@ -216,6 +216,20 @@ class _PersonsPageState extends State<PersonsPage> {
           formatter: (person) => person.companyName ?? '-',
         ),
         TextColumn(
+          'name_prefix',
+          t.personNamePrefix,
+          width: ColumnWidth.small,
+          formatter: (person) =>
+              (person.namePrefix != null && person.namePrefix!.trim().isNotEmpty) ? person.namePrefix! : '-',
+        ),
+        TextColumn(
+          'legal_entity_type',
+          t.personLegalEntityType,
+          width: ColumnWidth.small,
+          formatter: (person) =>
+              person.legalEntityType == 'legal' ? t.personLegalEntityLegal : t.personLegalEntityNatural,
+        ),
+        TextColumn(
           'mobile',
           t.personMobile,
           width: ColumnWidth.medium,

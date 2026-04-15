@@ -2754,6 +2754,21 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personCompanyName => 'نام شرکت';
 
   @override
+  String get personNamePrefix => 'پیشوند';
+
+  @override
+  String get personNamePrefixNone => 'بدون پیشوند';
+
+  @override
+  String get personLegalEntityType => 'نوع حقوقی';
+
+  @override
+  String get personLegalEntityNatural => 'حقیقی';
+
+  @override
+  String get personLegalEntityLegal => 'حقوقی';
+
+  @override
   String get personPaymentId => 'شناسه پرداخت';
 
   @override
@@ -3676,6 +3691,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get presetTransfersDetail => 'انتقال وجه / جزئیات';
+
+  @override
+  String get presetWarehousePostalLabel => 'حواله انبار / مرسوله پستی';
 
   @override
   String get reportTemplatesScopeAll => 'همهٔ انواع گزارش';
@@ -6314,6 +6332,61 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'چاپ PDF';
+
+  @override
+  String get warehousePostalLabelTooltip => 'برگه مرسوله پستی (PDF)';
+
+  @override
+  String get warehousePostalLabelDialogTitle => 'برگه مرسوله پستی';
+
+  @override
+  String get warehousePostalLabelPaperSize => 'سایز کاغذ';
+
+  @override
+  String get warehousePostalLabelOrientation => 'جهت صفحه';
+
+  @override
+  String get warehousePostalLabelPortrait => 'عمودی';
+
+  @override
+  String get warehousePostalLabelLandscape => 'افقی';
+
+  @override
+  String get warehousePostalLabelCustomPaperHint =>
+      'سایز سفارشی (حداکثر ۳۲ کاراکتر، مثلاً ۱۲۰mm ۸۰mm)';
+
+  @override
+  String get warehousePostalLabelTemplate => 'قالب چاپ';
+
+  @override
+  String get warehousePostalLabelNoTemplate => '— قالب پیش‌فرض سیستم —';
+
+  @override
+  String get warehousePostalLabelFieldsSection => 'فیلدهای روی برچسب';
+
+  @override
+  String get warehousePostalLabelShowSender => 'فرستنده';
+
+  @override
+  String get warehousePostalLabelShowReceiver => 'گیرنده';
+
+  @override
+  String get warehousePostalLabelShowWarehouse => 'نام انبارها';
+
+  @override
+  String get warehousePostalLabelShowLines => 'خلاصه کالاها';
+
+  @override
+  String get warehousePostalLabelShowDelivery => 'ارسال و توضیحات';
+
+  @override
+  String get warehousePostalLabelShowTracking => 'شماره پیگیری';
+
+  @override
+  String get warehousePostalLabelShowSource => 'کد سند مبدأ';
+
+  @override
+  String get warehousePostalLabelDownload => 'دریافت PDF';
 
   @override
   String get applicationName => 'نام برنامه';

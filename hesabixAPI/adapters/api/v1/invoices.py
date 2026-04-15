@@ -1100,10 +1100,15 @@ async def export_single_invoice_pdf(
         if not person_name:
             person_name = alias_name
 
+        le_type = getattr(person_obj, "legal_entity_type", None) or "natural"
+        name_prefix = getattr(person_obj, "name_prefix", None)
         person_info = {
             "id": getattr(person_obj, "id", None),
             "code": getattr(person_obj, "code", None),
             "name": person_name,
+            "name_prefix": name_prefix,
+            "legal_entity_type": le_type,
+            "legal_entity_type_label": ("حقوقی" if is_fa else "Legal entity") if le_type == "legal" else ("حقیقی" if is_fa else "Natural person"),
             # برای سازگاری با قالب‌های قدیمی، هر دو کلید نگه داشته می‌شوند
             "national_id": national_id or national_code,
             "national_code": national_code or national_id,

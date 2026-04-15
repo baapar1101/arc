@@ -823,7 +823,7 @@ async def download_persons_import_template(
     ws.title = "Template"
 
     headers = [
-        'code','alias_name','first_name','last_name','person_type','person_types','company_name','payment_id',
+        'code','alias_name','first_name','last_name','person_type','person_types','company_name','name_prefix','legal_entity_type','payment_id',
         'national_id','registration_number','economic_id','country','province','city','address','postal_code',
         'phone','mobile','fax','email','website','share_count','commission_sale_percent','commission_sales_return_percent',
         'commission_sales_amount','commission_sales_return_amount'
@@ -835,7 +835,7 @@ async def download_persons_import_template(
 
     # Sample row
     sample = [
-        '', 'نمونه نام مستعار', 'علی', 'احمدی', 'مشتری', 'مشتری, فروشنده', 'نمونه شرکت', 'PID123',
+        '', 'نمونه نام مستعار', 'علی', 'احمدی', 'مشتری', 'مشتری, فروشنده', 'نمونه شرکت', 'آقای', 'natural', 'PID123',
         '0012345678', '12345', 'ECO-1', 'ایران', 'تهران', 'تهران', 'خیابان مثال ۱', '1234567890',
         '02112345678', '09120000000', '', 'test@example.com', 'example.com', '', '5', '0', '0', '0'
     ]
@@ -1222,6 +1222,25 @@ async def import_persons_excel(
                 # split by comma
                 parts = [normalize_person_type(p.strip()) for p in str(item['person_types']).split(',') if str(p).strip()]
                 item['person_types'] = parts
+
+            # پیشوند و نوع حقوقی (اختیاری؛ برای ایمپورت نرم‌گیر)
+            from adapters.api.v1.schema_models.person import ALLOWED_PERSON_NAME_PREFIXES
+
+            raw_prefix = item.get('name_prefix')
+            if raw_prefix is not None and str(raw_prefix).strip():
+                ps = str(raw_prefix).strip()
+                item['name_prefix'] = ps if ps in ALLOWED_PERSON_NAME_PREFIXES else None
+            else:
+                item.pop('name_prefix', None)
+
+            if item.get('legal_entity_type') is not None and str(item.get('legal_entity_type')).strip() != '':
+                v = str(item['legal_entity_type']).strip().lower()
+                if v in ('legal', 'حقوقی', 'حقوقي'):
+                    item['legal_entity_type'] = 'legal'
+                else:
+                    item['legal_entity_type'] = 'natural'
+            else:
+                item.pop('legal_entity_type', None)
 
             # alias_name required
             if not item.get('alias_name'):

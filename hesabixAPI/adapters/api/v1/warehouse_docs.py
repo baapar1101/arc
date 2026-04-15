@@ -1036,6 +1036,157 @@ async def get_warehouse_doc_pdf(
 	)
 
 
+@router.get("/business/{business_id}/{wh_id}/postal-label.pdf")
+@require_business_access("business_id")
+async def get_warehouse_postal_label_pdf(
+	request: Request,
+	business_id: int,
+	wh_id: int,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Response:
+	"""برگه مرسوله پستی (PDF) با قالب گزارش warehouse_documents/postal_label و پارامترهای چاپ."""
+	if not ctx.can_read_section("inventory"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+
+	from weasyprint import HTML
+	from weasyprint.text.fonts import FontConfiguration
+	from app.core.i18n import negotiate_locale
+	from app.core.calendar import get_calendar_type_from_header
+	from app.services.pdf.template_renderer import render_template
+	from app.services.report_template_service import ReportTemplateService
+	from app.services.warehouse_postal_label_service import (
+		WAREHOUSE_POSTAL_LABEL_MODULE_KEY,
+		WAREHOUSE_POSTAL_LABEL_SUBTYPE,
+		build_warehouse_postal_label_context,
+		parse_label_field_flags,
+	)
+	import base64
+	import datetime
+	import logging
+	import re
+	from uuid import UUID
+
+	from adapters.db.models.business import Business
+	from app.services.file_storage_service import FileStorageService
+
+	logger = logging.getLogger(__name__)
+
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
+	if not wh or wh.business_id != business_id:
+		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+
+	qp = request.query_params
+	field_flags = parse_label_field_flags(qp)
+	paper_size = (qp.get("paper_size") or "A6").strip() or "A6"
+	orientation = (qp.get("orientation") or "portrait").strip().lower()
+	if orientation not in ("portrait", "landscape"):
+		orientation = "portrait"
+	disposition = (qp.get("disposition") or "attachment").strip().lower()
+	if disposition not in ("attachment", "inline"):
+		disposition = "attachment"
+
+	template_id_raw = qp.get("template_id")
+	explicit_template_id = None
+	if template_id_raw is not None and str(template_id_raw).strip() != "":
+		try:
+			explicit_template_id = int(template_id_raw)
+		except Exception:
+			explicit_template_id = None
+
+	locale = negotiate_locale(request.headers.get("Accept-Language"))
+	is_fa = locale == "fa"
+	calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
+
+	try:
+		template_context = build_warehouse_postal_label_context(
+			db,
+			business_id=business_id,
+			wh=wh,
+			calendar_type=calendar_type,
+			is_fa=is_fa,
+			field_flags=field_flags,
+			paper_size=paper_size,
+			orientation=orientation,
+		)
+	except Exception as e:
+		logger.exception("postal label context: %s", e)
+		raise ApiError("POSTAL_LABEL_CONTEXT", "خطا در آماده‌سازی دادهٔ برگه مرسوله", http_status=500)
+
+	# لوگوی اختیاری کسب‌وکار (برای قالب‌های سفارشی)
+	business_logo_data_uri = None
+	storage = FileStorageService(db)
+
+	async def _load_image_data_uri(file_id_str):
+		if not file_id_str:
+			return None
+		try:
+			file_data = await storage.download_file(UUID(str(file_id_str)))
+		except Exception:
+			return None
+		try:
+			content = file_data.get("content") or b""
+			if not content:
+				return None
+			mime = file_data.get("mime_type") or "image/png"
+			b64 = base64.b64encode(content).decode("ascii")
+			return f"data:{mime};base64,{b64}"
+		except Exception:
+			return None
+
+	try:
+		b = db.query(Business).filter(Business.id == int(business_id)).first()
+		if b is not None and getattr(b, "logo_file_id", None):
+			business_logo_data_uri = await _load_image_data_uri(getattr(b, "logo_file_id", None))
+	except Exception:
+		business_logo_data_uri = None
+	template_context["business_logo_data_uri"] = business_logo_data_uri
+
+	resolved_html = None
+	try:
+		resolved_html = ReportTemplateService.try_render_resolved(
+			db=db,
+			business_id=business_id,
+			module_key=WAREHOUSE_POSTAL_LABEL_MODULE_KEY,
+			subtype=WAREHOUSE_POSTAL_LABEL_SUBTYPE,
+			context=template_context,
+			explicit_template_id=explicit_template_id,
+			page_paper_size=paper_size,
+			page_orientation=orientation,
+		)
+	except Exception:
+		resolved_html = None
+
+	default_ctx = {**template_context, "paper_size": paper_size, "orientation": orientation}
+	html_content = resolved_html or render_template("pdf/warehouse/postal_label.html", default_ctx)
+
+	try:
+		pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
+	except Exception as e:
+		logger.error("postal label PDF failed: %s", e, exc_info=True)
+		raise ApiError("PDF_GENERATION_ERROR", "خطا در تولید فایل PDF", http_status=500)
+
+	def _slugify(text: str) -> str:
+		return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "postal_label"
+
+	code = ""
+	try:
+		code = str((template_context.get("document") or {}).get("code") or "")
+	except Exception:
+		code = ""
+	filename = f"postal_label_{_slugify(code)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+	return Response(
+		content=pdf_bytes,
+		media_type="application/pdf",
+		headers={
+			"Content-Disposition": f"{disposition}; filename={filename}",
+			"Content-Length": str(len(pdf_bytes)),
+			"Access-Control-Expose-Headers": "Content-Disposition",
+		},
+	)
+
+
 @router.post("/business/{business_id}/stock-count/start")
 @require_business_access("business_id")
 def start_stock_count_endpoint(

@@ -575,68 +575,108 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context)!;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final tabCompact = MediaQuery.sizeOf(context).width < 720;
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 820),
-        child: Column(
-          children: [
-            _buildHeader(theme),
-            Material(
-              color: theme.colorScheme.surface,
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabs: [
-                  const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات سند'),
-                  if (_document != null && _document!.documentType.startsWith('invoice'))
-                    const Tab(icon: Icon(Icons.shopping_cart), text: 'کالاها'),
-                  const Tab(icon: Icon(Icons.account_balance), text: 'حساب‌ها'),
-                  if (_document != null && _document!.documentType.startsWith('invoice'))
-                    const Tab(icon: Icon(Icons.payment), text: 'تراکنش‌ها'),
-                  if (_document != null &&
-                      _document!.documentType.startsWith('invoice') &&
-                      _showInstallmentsTab)
-                    Tab(icon: const Icon(Icons.calendar_view_month), text: t.documentDetailsInstallmentsTab),
-                  const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
-                ],
-              ),
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
+      clipBehavior: Clip.antiAlias,
+      shape: isMobile
+          ? const RoundedRectangleBorder(borderRadius: BorderRadius.zero)
+          : null,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final mq = MediaQuery.sizeOf(context);
+          final boxConstraints = isMobile
+              ? BoxConstraints(
+                  maxWidth: constraints.maxWidth.isFinite ? constraints.maxWidth : mq.width,
+                  maxHeight: constraints.maxHeight.isFinite ? constraints.maxHeight : mq.height,
+                )
+              : const BoxConstraints(maxWidth: 1100, maxHeight: 820);
+          return ConstrainedBox(
+            constraints: boxConstraints,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(theme, dense: isMobile),
+                Material(
+                  color: theme.colorScheme.surface,
+                  child: _buildDocumentTabBar(theme, t, compact: tabCompact),
+                ),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMessage != null
+                          ? _buildError()
+                          : TabBarView(
+                              controller: _tabController,
+                              children: _document != null && _document!.documentType.startsWith('invoice')
+                                  ? [
+                                      _buildInfoTab(theme),
+                                      _buildProductsTab(theme),
+                                      _buildAccountsTab(theme),
+                                      _buildTransactionsTab(theme),
+                                      if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
+                                      _buildAttachmentsTab(theme),
+                                    ]
+                                  : [
+                                      _buildInfoTab(theme),
+                                      _buildAccountsTab(theme),
+                                      _buildAttachmentsTab(theme),
+                                    ],
+                            ),
+                ),
+                _buildFooter(dense: isMobile),
+              ],
             ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? _buildError()
-                      : TabBarView(
-                          controller: _tabController,
-                          children: _document != null && _document!.documentType.startsWith('invoice')
-                              ? [
-                                  // برای فاکتورها: 5 یا 6 تب (با اقساط)
-                                  _buildInfoTab(theme),
-                                  _buildProductsTab(theme),
-                                  _buildAccountsTab(theme),
-                                  _buildTransactionsTab(theme),
-                                  if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
-                                  _buildAttachmentsTab(theme),
-                                ]
-                              : [
-                                  // برای سایر اسناد: 3 تب
-                                  _buildInfoTab(theme),
-                                  _buildAccountsTab(theme),
-                                  _buildAttachmentsTab(theme),
-                                ],
-                        ),
-            ),
-            _buildFooter(),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
+  Tab _detailTab({required bool compact, required IconData icon, required String label}) {
+    if (compact) {
+      return Tab(
+        height: 48,
+        child: Tooltip(
+          message: label,
+          child: Icon(icon, size: 22),
+        ),
+      );
+    }
+    return Tab(icon: Icon(icon), text: label);
+  }
+
+  Widget _buildDocumentTabBar(ThemeData theme, AppLocalizations t, {required bool compact}) {
+    final tabs = <Tab>[
+      _detailTab(compact: compact, icon: Icons.info_outline, label: 'اطلاعات سند'),
+      if (_document != null && _document!.documentType.startsWith('invoice'))
+        _detailTab(compact: compact, icon: Icons.shopping_cart, label: 'کالاها'),
+      _detailTab(compact: compact, icon: Icons.account_balance, label: 'حساب‌ها'),
+      if (_document != null && _document!.documentType.startsWith('invoice'))
+        _detailTab(compact: compact, icon: Icons.payment, label: 'تراکنش‌ها'),
+      if (_document != null &&
+          _document!.documentType.startsWith('invoice') &&
+          _showInstallmentsTab)
+        _detailTab(
+          compact: compact,
+          icon: Icons.calendar_view_month,
+          label: t.documentDetailsInstallmentsTab,
+        ),
+      _detailTab(compact: compact, icon: Icons.attach_file, label: 'فایل‌ها'),
+    ];
+    return TabBar(
+      controller: _tabController,
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      labelPadding: compact ? const EdgeInsets.symmetric(horizontal: 10) : null,
+      tabs: tabs,
+    );
+  }
+
   /// ساخت هدر دیالوگ
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, {bool dense = false}) {
     final formatter = NumberFormat('#,##0');
     final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
     final balance = (_document?.totalCredit ?? 0) - (_document?.totalDebit ?? 0);
@@ -647,7 +687,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             : theme.colorScheme.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: dense ? 12 : 24, vertical: dense ? 10 : 16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         border: Border(
@@ -657,21 +697,27 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       child: Row(
         children: [
           CircleAvatar(
-            radius: 24,
+            radius: dense ? 20 : 24,
             backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
             child: Text(
               (_document?.code ?? '?').isNotEmpty ? (_document?.code ?? '?')[0] : '?',
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontSize: dense ? 14 : null,
+              ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: dense ? 10 : 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _document?.code ?? 'در حال بارگذاری...',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: dense ? 18 : null,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Wrap(
@@ -1608,11 +1654,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     }
 
-    Widget summaryGridTile(String title, String value) {
+    final narrowLayout =
+        ResponsiveHelper.isMobile(context) || MediaQuery.sizeOf(context).width < 560;
+    final stackDueAndStatus = MediaQuery.sizeOf(context).width < 480;
+
+    Widget summaryTile(String title, String value, double width) {
       return SizedBox(
-        width: 168,
+        width: width,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 12, 10),
+          padding: EdgeInsetsDirectional.only(
+            bottom: narrowLayout ? 6 : 10,
+            end: narrowLayout ? 6 : 12,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1632,6 +1685,32 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
 
     Widget kvLine(String k, String v) {
+      if (narrowLayout) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  k,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  v,
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(
@@ -1655,11 +1734,144 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       );
     }
 
+    Widget paymentsTableOrCards(List<dynamic> pays) {
+      if (narrowLayout) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final raw in pays)
+              if (raw is Map) ...[
+                Card(
+                  margin: EdgeInsets.zero,
+                  elevation: 0,
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: theme.dividerColor),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          t.documentDetailsInstallmentDocCodeColumn,
+                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          () {
+                            final pm = Map<String, dynamic>.from(raw);
+                            final codeRaw = pm['document_code'];
+                            if (codeRaw is String && codeRaw.trim().isNotEmpty) {
+                              return codeRaw.trim();
+                            }
+                            return pm['document_id']?.toString() ?? '-';
+                          }(),
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          t.documentDetailsInstallmentPaymentDateColumn,
+                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fmtDue(Map<String, dynamic>.from(raw)['document_date']),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                t.installmentsTablePaid,
+                                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                              ),
+                            ),
+                            Text(
+                              fmtNum(Map<String, dynamic>.from(raw)['amount']),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+          ],
+        );
+      }
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.dividerColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(2.2),
+            1: FlexColumnWidth(2),
+            2: FlexColumnWidth(2),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            TableRow(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+              ),
+              children: [
+                _tableHeaderCell(theme, t.documentDetailsInstallmentDocCodeColumn),
+                _tableHeaderCell(theme, t.documentDetailsInstallmentPaymentDateColumn),
+                _tableHeaderCell(theme, t.installmentsTablePaid, alignEnd: true),
+              ],
+            ),
+            ...() {
+              final paymentRows = <TableRow>[];
+              for (final raw in pays) {
+                if (raw is! Map) continue;
+                final pm = Map<String, dynamic>.from(raw);
+                final codeRaw = pm['document_code'];
+                final code = (codeRaw is String && codeRaw.trim().isNotEmpty)
+                    ? codeRaw.trim()
+                    : (pm['document_id']?.toString() ?? '-');
+                paymentRows.add(
+                  TableRow(
+                    children: [
+                      _tableDataCell(
+                        theme,
+                        Text(code, style: theme.textTheme.bodySmall),
+                      ),
+                      _tableDataCell(
+                        theme,
+                        Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
+                      ),
+                      _tableDataCell(
+                        theme,
+                        Text(
+                          fmtNum(pm['amount']),
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        alignEnd: true,
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return paymentRows;
+            }(),
+          ],
+        ),
+      );
+    }
+
     final canReceiveForInstallment =
         _canAddTransaction() && _determineTransactionType() == 'receipt';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: EdgeInsets.fromLTRB(narrowLayout ? 8 : 12, 8, narrowLayout ? 8 : 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1671,7 +1883,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              padding: EdgeInsets.fromLTRB(
+                narrowLayout ? 12 : 16,
+                narrowLayout ? 12 : 14,
+                narrowLayout ? 12 : 16,
+                narrowLayout ? 12 : 14,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1694,15 +1911,28 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     ),
                   ],
                   const Divider(height: 20),
-                  Wrap(
-                    children: [
-                      if (numInst != null) summaryGridTile(t.installmentsCount, numInst.toString()),
-                      if (down != null && down > 0) summaryGridTile(t.downPayment, fmtNum(down)),
-                      if (principalT != null) summaryGridTile(t.installmentsSummaryPrincipal, fmtNum(principalT)),
-                      if (interestT != null) summaryGridTile(t.installmentsSummaryInterest, fmtNum(interestT)),
-                      summaryGridTile(t.installmentsSummaryPaid, fmtNum(paidSum)),
-                      if (remainingT != null) summaryGridTile(t.installmentsSummaryRemaining, fmtNum(remainingT)),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, c) {
+                      final w = c.maxWidth;
+                      const spacing = 10.0;
+                      final cols = narrowLayout
+                          ? (w >= 400 ? 2 : 1)
+                          : (w >= 900 ? 4 : (w >= 620 ? 3 : 2));
+                      final tileW = (w - spacing * (cols - 1)).clamp(0, double.infinity) / cols;
+                      final tiles = <Widget>[
+                        if (numInst != null) summaryTile(t.installmentsCount, numInst.toString(), tileW),
+                        if (down != null && down > 0) summaryTile(t.downPayment, fmtNum(down), tileW),
+                        if (principalT != null) summaryTile(t.installmentsSummaryPrincipal, fmtNum(principalT), tileW),
+                        if (interestT != null) summaryTile(t.installmentsSummaryInterest, fmtNum(interestT), tileW),
+                        summaryTile(t.installmentsSummaryPaid, fmtNum(paidSum), tileW),
+                        if (remainingT != null) summaryTile(t.installmentsSummaryRemaining, fmtNum(remainingT), tileW),
+                      ];
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: 10,
+                        children: tiles,
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1748,50 +1978,79 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           child: ExpansionTile(
                             key: PageStorageKey('inst_row_$seq'),
                             initiallyExpanded: index == firstUnpaidIndex,
-                            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                            tilePadding: EdgeInsets.symmetric(
+                              horizontal: narrowLayout ? 8 : 12,
+                              vertical: 4,
+                            ),
+                            childrenPadding: EdgeInsets.fromLTRB(
+                              narrowLayout ? 12 : 16,
+                              0,
+                              narrowLayout ? 12 : 16,
+                              14,
+                            ),
                             leading: CircleAvatar(
-                              radius: 18,
+                              radius: narrowLayout ? 16 : 18,
                               backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.9),
                               child: Text(
                                 '$seq',
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.onPrimaryContainer,
+                                  fontSize: narrowLayout ? 13 : null,
                                 ),
                               ),
                             ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${t.installmentsTableDueDate}: ${fmtDue(r['due_date'])}',
-                                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor(st).withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(statusIcon(st), size: 16, color: statusColor(st)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        statusLabel(st),
-                                        style: theme.textTheme.labelMedium?.copyWith(
-                                          color: statusColor(st),
-                                          fontWeight: FontWeight.w600,
+                            title: Builder(
+                              builder: (context) {
+                                Widget statusChip() {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor(st).withValues(alpha: 0.14),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(statusIcon(st), size: 16, color: statusColor(st)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          statusLabel(st),
+                                          style: theme.textTheme.labelMedium?.copyWith(
+                                            color: statusColor(st),
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                final dueText = Text(
+                                  '${t.installmentsTableDueDate}: ${fmtDue(r['due_date'])}',
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: narrowLayout ? 15 : null,
                                   ),
-                                ),
-                              ],
+                                );
+                                if (stackDueAndStatus) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      dueText,
+                                      const SizedBox(height: 8),
+                                      statusChip(),
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  children: [
+                                    Expanded(child: dueText),
+                                    const SizedBox(width: 8),
+                                    statusChip(),
+                                  ],
+                                );
+                              },
                             ),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 8),
@@ -1808,19 +2067,33 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             ),
                             children: [
                               if (showReceive)
-                                Align(
-                                  alignment: AlignmentDirectional.centerStart,
-                                  child: FilledButton.icon(
-                                    onPressed: () {
-                                      _openReceiptDialogForInstallment(
-                                        seq: seq,
-                                        remainingAmount: remaining,
-                                      );
-                                    },
-                                    icon: const Icon(Icons.add_card_rounded, size: 20),
-                                    label: Text(t.documentDetailsInstallmentReceive),
-                                  ),
-                                ),
+                                narrowLayout
+                                    ? SizedBox(
+                                        width: double.infinity,
+                                        child: FilledButton.icon(
+                                          onPressed: () {
+                                            _openReceiptDialogForInstallment(
+                                              seq: seq,
+                                              remainingAmount: remaining,
+                                            );
+                                          },
+                                          icon: const Icon(Icons.add_card_rounded, size: 20),
+                                          label: Text(t.documentDetailsInstallmentReceive),
+                                        ),
+                                      )
+                                    : Align(
+                                        alignment: AlignmentDirectional.centerStart,
+                                        child: FilledButton.icon(
+                                          onPressed: () {
+                                            _openReceiptDialogForInstallment(
+                                              seq: seq,
+                                              remainingAmount: remaining,
+                                            );
+                                          },
+                                          icon: const Icon(Icons.add_card_rounded, size: 20),
+                                          label: Text(t.documentDetailsInstallmentReceive),
+                                        ),
+                                      ),
                               if (showReceive) const SizedBox(height: 12),
                               Align(
                                 alignment: AlignmentDirectional.centerStart,
@@ -1868,67 +2141,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                   ),
                                 )
                               else
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: theme.dividerColor),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Table(
-                                    columnWidths: const {
-                                      0: FlexColumnWidth(2.2),
-                                      1: FlexColumnWidth(2),
-                                      2: FlexColumnWidth(2),
-                                    },
-                                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                                    children: [
-                                      TableRow(
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
-                                        ),
-                                        children: [
-                                          _tableHeaderCell(theme, t.documentDetailsInstallmentDocCodeColumn),
-                                          _tableHeaderCell(theme, t.documentDetailsInstallmentPaymentDateColumn),
-                                          _tableHeaderCell(theme, t.installmentsTablePaid, alignEnd: true),
-                                        ],
-                                      ),
-                                      ...() {
-                                        final paymentRows = <TableRow>[];
-                                        for (final raw in pays) {
-                                          if (raw is! Map) continue;
-                                          final pm = Map<String, dynamic>.from(raw);
-                                          final codeRaw = pm['document_code'];
-                                          final code = (codeRaw is String && codeRaw.trim().isNotEmpty)
-                                              ? codeRaw.trim()
-                                              : (pm['document_id']?.toString() ?? '-');
-                                          paymentRows.add(
-                                            TableRow(
-                                              children: [
-                                                _tableDataCell(
-                                                  theme,
-                                                  Text(code, style: theme.textTheme.bodySmall),
-                                                ),
-                                                _tableDataCell(
-                                                  theme,
-                                                  Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
-                                                ),
-                                                _tableDataCell(
-                                                  theme,
-                                                  Text(
-                                                    fmtNum(pm['amount']),
-                                                    textAlign: TextAlign.end,
-                                                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                                                  ),
-                                                  alignEnd: true,
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }
-                                        return paymentRows;
-                                      }(),
-                                    ],
-                                  ),
-                                ),
+                                paymentsTableOrCards(pays),
                             ],
                           ),
                         );
@@ -3272,9 +3485,93 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت فوتر دیالوگ
-  Widget _buildFooter() {
+  Widget _buildFooter({bool dense = false}) {
+    final t = AppLocalizations.of(context)!;
+    final showEdit = _document != null &&
+        _document!.documentType.startsWith('invoice') &&
+        (ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false);
+    final showTemplateDropdown = _document != null &&
+        _document!.documentType.startsWith('invoice') &&
+        !_loadingInvoiceTemplates &&
+        _invoiceTemplates.isNotEmpty;
+
+    Widget pdfButton() => OutlinedButton.icon(
+          onPressed: _isGeneratingPdf ? null : _generatePdf,
+          icon: _isGeneratingPdf
+              ? const SizedBox(
+                  width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.picture_as_pdf),
+          label: Text(_isGeneratingPdf ? t.generating : t.printPdf),
+        );
+
+    Widget editButton() => OutlinedButton.icon(
+          onPressed: () {
+            final doc = _document!;
+            final router = GoRouter.of(context);
+            Navigator.of(context).pop();
+            router.pushNamed(
+              'business_edit_invoice',
+              pathParameters: {
+                'business_id': doc.businessId.toString(),
+                'invoice_id': doc.id.toString(),
+              },
+            );
+          },
+          icon: const Icon(Icons.edit_outlined),
+          label: Text('${t.edit} ${t.invoice}'),
+        );
+
+    Widget templateDropdown({required bool expanded}) => DropdownButton<int?>(
+          isExpanded: expanded,
+          value: _selectedInvoiceTemplateId,
+          hint: Text(t.printTemplatePublished),
+          items: [
+            DropdownMenuItem<int?>(
+              value: null,
+              child: Text(t.noCustomTemplate),
+            ),
+            ..._invoiceTemplates.map((tpl) {
+              final id = (tpl['id'] as num).toInt();
+              final name = (tpl['name'] ?? 'Template').toString();
+              final isDefault = tpl['is_default'] == true;
+              return DropdownMenuItem<int?>(
+                value: id,
+                child: Row(
+                  children: [
+                    if (isDefault) const Icon(Icons.star, size: 16),
+                    if (isDefault) const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _selectedInvoiceTemplateId = value;
+            });
+          },
+        );
+
+    Widget closeButton() => ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('بستن'),
+        );
+
+    final rowChildren = <Widget>[
+      pdfButton(),
+      if (showEdit) editButton(),
+      if (!dense && showTemplateDropdown) templateDropdown(expanded: false),
+      closeButton(),
+    ];
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(dense ? 10 : 16),
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
@@ -3283,90 +3580,37 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           ),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // دکمه چاپ PDF
-          OutlinedButton.icon(
-            onPressed: _isGeneratingPdf ? null : _generatePdf,
-            icon: _isGeneratingPdf
-                ? const SizedBox(
-                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.picture_as_pdf),
-            label: Text(_isGeneratingPdf ? AppLocalizations.of(context).generating : AppLocalizations.of(context).printPdf),
-          ),
-          const SizedBox(width: 12),
-          if (_document != null &&
-              _document!.documentType.startsWith('invoice') &&
-              (ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false)) ...[
-            OutlinedButton.icon(
-              onPressed: () {
-                final doc = _document!;
-                final router = GoRouter.of(context);
-                Navigator.of(context).pop();
-                router.pushNamed(
-                  'business_edit_invoice',
-                  pathParameters: {
-                    'business_id': doc.businessId.toString(),
-                    'invoice_id': doc.id.toString(),
-                  },
-                );
-              },
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(
-                '${AppLocalizations.of(context).edit} ${AppLocalizations.of(context).invoice}',
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          if (_document != null &&
-              _document!.documentType.startsWith('invoice') &&
-              !_loadingInvoiceTemplates &&
-              _invoiceTemplates.isNotEmpty) ...[
-            DropdownButton<int?>(
-              value: _selectedInvoiceTemplateId,
-              hint: Text(AppLocalizations.of(context).printTemplatePublished),
-              items: [
-                DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text(AppLocalizations.of(context).noCustomTemplate),
+      child: dense
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    pdfButton(),
+                    if (showEdit) editButton(),
+                    closeButton(),
+                  ],
                 ),
-                ..._invoiceTemplates.map((tpl) {
-                  final id = (tpl['id'] as num).toInt();
-                  final name = (tpl['name'] ?? 'Template').toString();
-                  final isDefault = tpl['is_default'] == true;
-                  return DropdownMenuItem<int?>(
-                    value: id,
-                    child: Row(
-                      children: [
-                        if (isDefault) const Icon(Icons.star, size: 16),
-                        if (isDefault) const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                if (showTemplateDropdown) ...[
+                  const SizedBox(height: 8),
+                  templateDropdown(expanded: true),
+                ],
               ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedInvoiceTemplateId = value;
-                });
-              },
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                for (var i = 0; i < rowChildren.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  rowChildren[i],
+                ],
+              ],
             ),
-            const SizedBox(width: 12),
-          ],
-          // دکمه بستن
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('بستن'),
-          ),
-        ],
-      ),
     );
   }
 }

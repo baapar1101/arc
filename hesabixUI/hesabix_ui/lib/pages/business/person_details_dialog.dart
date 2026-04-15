@@ -653,6 +653,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
     }
 
+    final t = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -663,6 +664,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           _buildSectionHeader('مشخصات پایه'),
           _buildInfoGrid([
             _InfoRow('نام مستعار', person.aliasName),
+            _InfoRow(t.personNamePrefix, (person.namePrefix != null && person.namePrefix!.trim().isNotEmpty) ? person.namePrefix! : '—'),
+            _InfoRow(t.personLegalEntityType, person.legalEntityType == 'legal' ? t.personLegalEntityLegal : t.personLegalEntityNatural),
             _InfoRow('نام', person.firstName),
             _InfoRow('نام خانوادگی', person.lastName),
             _InfoRow('انواع شخص', person.personTypes.map((e) => e.persianName).join('، ')),

@@ -146,6 +146,8 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         # person_types نباید None باشد (nullable=False در مدل)
         person_types=json.dumps(types_list, ensure_ascii=False) if types_list else "[]",
         company_name=person_data.company_name,
+        name_prefix=getattr(person_data, "name_prefix", None),
+        legal_entity_type=getattr(person_data, "legal_entity_type", None) or "natural",
         payment_id=person_data.payment_id,
         national_id=person_data.national_id,
         registration_number=person_data.registration_number,
@@ -542,7 +544,11 @@ def update_person(
         return None
     
     # به‌روزرسانی فیلدها
-    update_data = person_data.dict(exclude_unset=True)
+    update_data = (
+        person_data.model_dump(exclude_unset=True)
+        if hasattr(person_data, "model_dump")
+        else person_data.dict(exclude_unset=True)
+    )
 
     # مدیریت کد یکتا (شامل پاک کردن صریح با null)
     if 'code' in update_data:
@@ -582,7 +588,9 @@ def update_person(
 
     # سایر فیلدها
     for field in list(update_data.keys()):
-        if field in {'code', 'person_types'}:
+        if field in {'code', 'person_types', 'person_type'}:
+            continue
+        if field == 'legal_entity_type' and update_data[field] is None:
             continue
         setattr(person, field, update_data[field])
     
@@ -740,6 +748,8 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         'last_name': person.last_name,
         'person_types': types_list,
         'company_name': person.company_name,
+        'name_prefix': getattr(person, "name_prefix", None),
+        'legal_entity_type': getattr(person, "legal_entity_type", None) or "natural",
         'payment_id': person.payment_id,
         'share_count': person.share_count,
         'commission_sale_percent': float(person.commission_sale_percent) if getattr(person, 'commission_sale_percent', None) is not None else None,

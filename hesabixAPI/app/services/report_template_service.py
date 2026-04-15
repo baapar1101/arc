@@ -341,6 +341,9 @@ class ReportTemplateService:
 	def render_with_template(
 		template: ReportTemplate,
 		context: Dict[str, Any],
+		*,
+		page_paper_size: Optional[str] = None,
+		page_orientation: Optional[str] = None,
 	) -> str:
 		# اگر engine=builder باشد، ابتدا از design داخل assets خروجی HTML/CSS/Header/Footer تولید می‌کنیم
 		try:
@@ -488,14 +491,16 @@ class ReportTemplateService:
 			logger.exception(f"Template rendering error for template {getattr(template, 'id', 'unknown')}: {e}")
 			raise ApiError("TEMPLATE_RENDER_ERROR", f"خطا در رندر قالب: {str(e)}", http_status=500)
 
-		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب
+		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب (با امکان override از چاپ/PDF)
 		try:
 			page_css_parts = []
 			size_parts = []
-			if (template.paper_size or "").strip():
-				size_parts.append(str(template.paper_size).strip())
-			if (template.orientation or "").strip() in ("portrait", "landscape"):
-				size_parts.append(str(template.orientation).strip())
+			ps_eff = (page_paper_size or "").strip() or (getattr(template, "paper_size", None) or "").strip()
+			ori_eff = (page_orientation or "").strip().lower() or (getattr(template, "orientation", None) or "").strip().lower()
+			if ps_eff:
+				size_parts.append(str(ps_eff))
+			if ori_eff in ("portrait", "landscape"):
+				size_parts.append(str(ori_eff))
 			if size_parts:
 				page_css_parts.append(f"size: {' '.join(size_parts)};")
 			margins = template.margins or {}
@@ -575,20 +580,31 @@ class ReportTemplateService:
 		subtype: Optional[str],
 		context: Dict[str, Any],
 		explicit_template_id: Optional[int] = None,
+		*,
+		page_paper_size: Optional[str] = None,
+		page_orientation: Optional[str] = None,
 	) -> Optional[str]:
 		"""اگر قالبی مشخص/پیش‌فرض باشد، HTML رندر شده را برمی‌گرداند؛ در غیر این صورت None."""
 		template: Optional[ReportTemplate] = None
 		if explicit_template_id is not None:
 			t = ReportTemplateService.get_template(db, int(explicit_template_id), business_id)
-			# فقط قالب‌های published برای استفاده عمومی
+			# فقط قالب‌های published و هم‌خوان با module/subtype درخواستی
 			if t and t.status == "published":
-				template = t
+				st_req = subtype if subtype is not None else None
+				st_tpl = t.subtype if t.subtype is not None else None
+				if t.module_key == str(module_key) and st_tpl == st_req:
+					template = t
 		if template is None:
 			template = ReportTemplateService.resolve_default(db, business_id, module_key, subtype)
 		if template is None:
 			return None
 		try:
-			return ReportTemplateService.render_with_template(template, context)
+			return ReportTemplateService.render_with_template(
+				template,
+				context,
+				page_paper_size=page_paper_size,
+				page_orientation=page_orientation,
+			)
 		except ApiError:
 			# خطاهای API را propagate کنیم
 			raise

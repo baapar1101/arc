@@ -86,6 +86,23 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
   String? _creditCurrencyLabel;
 
+  /// خالی = بدون پیشوند (هم‌نام با API)
+  static const List<String> _personNamePrefixChoices = [
+    '',
+    'آقای',
+    'خانم',
+    'شرکت',
+    'دکتر',
+    'مهندس',
+    'موسسه',
+    'اداره',
+    'سازمان',
+    'بنیاد',
+    'انجمن',
+  ];
+  String _namePrefixSelection = '';
+  String _legalEntityType = 'natural';
+
   late final VoidCallback _aliasAndNameFieldsListener;
 
   @override
@@ -126,6 +143,11 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _faxController.text = person.fax ?? '';
       _emailController.text = person.email ?? '';
       _websiteController.text = person.website ?? '';
+      final np = person.namePrefix?.trim();
+      _namePrefixSelection = (np == null || np.isEmpty)
+          ? ''
+          : (_personNamePrefixChoices.contains(np) ? np : '');
+      _legalEntityType = person.legalEntityType == 'legal' ? 'legal' : 'natural';
       _selectedPersonType = person.personTypes.isNotEmpty ? person.personTypes.first : PersonType.customer;
       _selectedPersonTypes
         ..clear()
@@ -161,6 +183,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         // اگر مقدار اولیه برای نام مستعار داریم
         _aliasNameController.text = widget.initialAliasName!;
       }
+      _namePrefixSelection = '';
+      _legalEntityType = 'natural';
     }
     // Load person credit override if editing
     if (widget.person?.id != null) {
@@ -273,6 +297,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
           personTypes: _selectedPersonTypes.toList(),
           companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
+          namePrefix: _namePrefixSelection.isEmpty ? null : _namePrefixSelection,
+          legalEntityType: _legalEntityType,
           paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
           nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
           registrationNumber: _registrationNumberController.text.trim().isEmpty ? null : _registrationNumberController.text.trim(),
@@ -342,6 +368,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
           personTypes: _selectedPersonTypes.isNotEmpty ? _selectedPersonTypes.toList() : null,
           companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
+          namePrefix: _namePrefixSelection.isEmpty ? null : _namePrefixSelection,
+          legalEntityType: _legalEntityType,
           paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
           nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
           registrationNumber: _registrationNumberController.text.trim().isEmpty ? null : _registrationNumberController.text.trim(),
@@ -1114,6 +1142,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             ],
           ),
         SizedBox(height: spacing),
+        _buildNamePrefixAndLegalEntityRow(t, spacing, isMobile),
+        SizedBox(height: spacing),
         if (_selectedPersonTypes.contains(PersonType.shareholder))
           TextFormField(
             controller: _shareCountController,
@@ -1229,6 +1259,70 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               ),
             ],
           ),
+      ],
+    );
+  }
+
+  Widget _buildNamePrefixAndLegalEntityRow(AppLocalizations t, double spacing, bool isMobile) {
+    final prefixField = DropdownButtonFormField<String>(
+      value: _personNamePrefixChoices.contains(_namePrefixSelection) ? _namePrefixSelection : '',
+      decoration: InputDecoration(
+        labelText: t.personNamePrefix,
+        border: const OutlineInputBorder(),
+      ),
+      items: _personNamePrefixChoices
+          .map(
+            (e) => DropdownMenuItem<String>(
+              value: e,
+              child: Text(e.isEmpty ? t.personNamePrefixNone : e),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() => _namePrefixSelection = v ?? ''),
+    );
+    final legalField = InputDecorator(
+      decoration: InputDecoration(
+        labelText: t.personLegalEntityType,
+        border: const OutlineInputBorder(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RadioListTile<String>(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.personLegalEntityNatural),
+            value: 'natural',
+            groupValue: _legalEntityType,
+            onChanged: (v) => setState(() => _legalEntityType = v ?? 'natural'),
+          ),
+          RadioListTile<String>(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.personLegalEntityLegal),
+            value: 'legal',
+            groupValue: _legalEntityType,
+            onChanged: (v) => setState(() => _legalEntityType = v ?? 'legal'),
+          ),
+        ],
+      ),
+    );
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          prefixField,
+          SizedBox(height: spacing),
+          legalField,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: prefixField),
+        SizedBox(width: spacing),
+        Expanded(child: legalField),
       ],
     );
   }

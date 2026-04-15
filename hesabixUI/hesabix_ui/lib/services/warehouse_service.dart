@@ -79,6 +79,18 @@ class WarehouseService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  /// PDF برگه مرسوله پستی (قالب `warehouse_documents` / `postal_label`).
+  Future<List<int>> downloadPostalLabelPdf({
+    required int businessId,
+    required int docId,
+    Map<String, dynamic>? query,
+  }) async {
+    return _api.downloadPdf(
+      '/warehouse-docs/business/$businessId/$docId/postal-label.pdf',
+      query: query,
+    );
+  }
+
   Future<Map<String, dynamic>> search({
     required int businessId,
     int page = 1,
