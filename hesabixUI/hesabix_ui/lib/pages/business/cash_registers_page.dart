@@ -98,10 +98,12 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 		}
 
 		return Scaffold(
-			body: DataTableWidget<CashRegister>(
-				key: _tableKey,
-				config: _buildConfig(t),
-				fromJson: CashRegister.fromJson,
+			body: SingleChildScrollView(
+				child: DataTableWidget<CashRegister>(
+					key: _tableKey,
+					config: _buildConfig(t),
+					fromJson: CashRegister.fromJson,
+				),
 			),
 		);
 	}
@@ -264,6 +266,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			searchFields: ['name','code','description','payment_switch_number','payment_terminal_number','merchant_id'],
 			filterFields: ['is_active','is_default','currency_id'],
 			defaultPageSize: 20,
+			expandBodyHeightToFitRows: true,
 			customHeaderActions: [
 				PermissionButton(
 					section: 'cash',

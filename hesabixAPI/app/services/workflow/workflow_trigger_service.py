@@ -3,6 +3,7 @@
 این سرویس باید در نقاط مناسب سیستم فراخوانی شود
 """
 
+import contextvars
 import logging
 import secrets
 from datetime import date, datetime
@@ -18,6 +19,11 @@ from adapters.db.models.workflow import (
 from app.services.workflow.workflow_engine import WorkflowEngine
 
 logger = logging.getLogger(__name__)
+
+_workflow_trigger_stack_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "_workflow_trigger_stack_depth", default=0
+)
+MAX_NESTED_TRIGGER_DEPTH = 8
 
 
 def build_invoice_trigger_enrichment(db: Session, document: Any) -> Dict[str, Any]:
@@ -87,6 +93,29 @@ def trigger_workflows(
     Returns:
         تعداد workflowهای اجرا شده
     """
+    depth = _workflow_trigger_stack_depth.get()
+    if depth >= MAX_NESTED_TRIGGER_DEPTH:
+        logger.warning(
+            "trigger_workflows skipped (max nested depth %s): type=%s business_id=%s",
+            MAX_NESTED_TRIGGER_DEPTH,
+            trigger_type,
+            business_id,
+        )
+        return 0
+    depth_token = _workflow_trigger_stack_depth.set(depth + 1)
+    try:
+        return _trigger_workflows_inner(db, business_id, trigger_type, trigger_data, user_id)
+    finally:
+        _workflow_trigger_stack_depth.reset(depth_token)
+
+
+def _trigger_workflows_inner(
+    db: Session,
+    business_id: int,
+    trigger_type: str,
+    trigger_data: Dict[str, Any],
+    user_id: Optional[int] = None
+) -> int:
     # پیدا کردن workflowهای فعال که با این trigger شروع می‌شوند
     stmt = select(Workflow).where(
         and_(
@@ -238,6 +267,116 @@ def trigger_person_created(
     return trigger_workflows(db, business_id, "person.created", trigger_data, user_id)
 
 
+def build_crm_lead_trigger_enrichment(db: Session, business_id: int, lead_id: int) -> Dict[str, Any]:
+    """فیلدهای تکمیلی برای قالب‌های پیام و شرط‌های ورک‌فلو."""
+    try:
+        from sqlalchemy.orm import joinedload
+        from adapters.db.models.crm import Lead
+
+        lead = (
+            db.query(Lead)
+            .options(
+                joinedload(Lead.stage),
+                joinedload(Lead.assigned_to),
+                joinedload(Lead.person),
+                joinedload(Lead.process_definition),
+            )
+            .filter(Lead.id == int(lead_id), Lead.business_id == int(business_id))
+            .first()
+        )
+        if not lead:
+            return {}
+        extra: Dict[str, Any] = {
+            "lead_code": lead.code,
+            "stage_code": lead.stage.stage_code if lead.stage else None,
+            "stage_name": lead.stage.name if lead.stage else None,
+            "source_code": lead.source_code,
+            "company_name": lead.company_name,
+            "mobile": lead.mobile,
+            "email": lead.email,
+            "assigned_to_user_id": lead.assigned_to_user_id,
+            "person_id": lead.person_id,
+            "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+        }
+        if lead.assigned_to:
+            nm = f"{lead.assigned_to.first_name or ''} {lead.assigned_to.last_name or ''}".strip()
+            if nm:
+                extra["assigned_to_user_name"] = nm
+        if lead.person:
+            extra["person_name"] = (lead.person.alias_name or "").strip() or None
+        if lead.process_definition:
+            extra["process_definition_name"] = lead.process_definition.name
+            extra["process_definition_code"] = lead.process_definition.code
+        return {k: v for k, v in extra.items() if v is not None}
+    except Exception as e:
+        logger.warning("build_crm_lead_trigger_enrichment failed: %s", e)
+        return {}
+
+
+def build_crm_deal_trigger_enrichment(db: Session, business_id: int, deal_id: int) -> Dict[str, Any]:
+    try:
+        from sqlalchemy.orm import joinedload
+        from adapters.db.models.crm import Deal
+
+        deal = (
+            db.query(Deal)
+            .options(
+                joinedload(Deal.stage),
+                joinedload(Deal.assigned_to),
+                joinedload(Deal.person),
+                joinedload(Deal.process_definition),
+            )
+            .filter(Deal.id == int(deal_id), Deal.business_id == int(business_id))
+            .first()
+        )
+        if not deal:
+            return {}
+        extra: Dict[str, Any] = {
+            "deal_code": deal.code,
+            "stage_code": deal.stage.stage_code if deal.stage else None,
+            "stage_name": deal.stage.name if deal.stage else None,
+            "title": deal.title,
+            "amount": float(deal.amount),
+            "probability_percent": deal.probability_percent,
+            "assigned_to_user_id": deal.assigned_to_user_id,
+            "person_id": deal.person_id,
+            "document_id": deal.document_id,
+            "next_follow_up_at": deal.next_follow_up_at.isoformat() if deal.next_follow_up_at else None,
+            "expected_close_date": deal.expected_close_date.isoformat() if deal.expected_close_date else None,
+        }
+        if deal.assigned_to:
+            nm = f"{deal.assigned_to.first_name or ''} {deal.assigned_to.last_name or ''}".strip()
+            if nm:
+                extra["assigned_to_user_name"] = nm
+        if deal.person:
+            extra["person_name"] = (deal.person.alias_name or "").strip() or None
+        if deal.process_definition:
+            extra["process_definition_name"] = deal.process_definition.name
+            extra["process_definition_code"] = deal.process_definition.code
+        return {k: v for k, v in extra.items() if v is not None}
+    except Exception as e:
+        logger.warning("build_crm_deal_trigger_enrichment failed: %s", e)
+        return {}
+
+
+def _crm_stage_pair_labels(db: Session, old_stage_id: Optional[int], new_stage_id: Optional[int]) -> Dict[str, Any]:
+    from adapters.db.models.crm import CrmProcessStage
+
+    ids = [sid for sid in (old_stage_id, new_stage_id) if sid is not None]
+    if not ids:
+        return {}
+    rows = db.query(CrmProcessStage).filter(CrmProcessStage.id.in_(ids)).all()
+    m = {r.id: (r.stage_code, r.name) for r in rows}
+    out: Dict[str, Any] = {}
+    if old_stage_id in m:
+        out["old_stage_code"] = m[old_stage_id][0]
+        out["old_stage_name"] = m[old_stage_id][1]
+    if new_stage_id in m:
+        out["new_stage_code"] = m[new_stage_id][0]
+        out["new_stage_name"] = m[new_stage_id][1]
+    return out
+
+
 def trigger_lead_created(
     db: Session,
     business_id: int,
@@ -248,12 +387,13 @@ def trigger_lead_created(
     user_id: Optional[int] = None,
 ):
     """فراخوانی workflowها بعد از ایجاد سرنخ"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "lead_id": lead_id,
         "process_definition_id": process_definition_id,
         "stage_id": stage_id,
         "name": name,
     }
+    trigger_data.update(build_crm_lead_trigger_enrichment(db, business_id, lead_id))
     return trigger_workflows(db, business_id, "crm.lead.created", trigger_data, user_id)
 
 
@@ -266,11 +406,13 @@ def trigger_lead_stage_changed(
     user_id: Optional[int] = None,
 ):
     """فراخوانی workflowها بعد از تغییر مرحله سرنخ"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "lead_id": lead_id,
         "old_stage_id": old_stage_id,
         "new_stage_id": new_stage_id,
     }
+    trigger_data.update(_crm_stage_pair_labels(db, old_stage_id, new_stage_id))
+    trigger_data.update(build_crm_lead_trigger_enrichment(db, business_id, lead_id))
     return trigger_workflows(db, business_id, "crm.lead.stage_changed", trigger_data, user_id)
 
 
@@ -282,10 +424,19 @@ def trigger_lead_converted(
     user_id: Optional[int] = None,
 ):
     """فراخوانی workflowها بعد از تبدیل سرنخ به مشتری"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "lead_id": lead_id,
         "person_id": person_id,
     }
+    trigger_data.update(build_crm_lead_trigger_enrichment(db, business_id, lead_id))
+    try:
+        from adapters.db.models.person import Person
+
+        person = db.query(Person).filter(Person.id == int(person_id), Person.business_id == int(business_id)).first()
+        if person:
+            trigger_data["person_name"] = (person.alias_name or "").strip() or None
+    except Exception:
+        pass
     return trigger_workflows(db, business_id, "crm.lead.converted", trigger_data, user_id)
 
 
@@ -301,7 +452,7 @@ def trigger_deal_created(
     user_id: Optional[int] = None,
 ):
     """فراخوانی workflowها بعد از ایجاد فرصت فروش"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "deal_id": deal_id,
         "process_definition_id": process_definition_id,
         "stage_id": stage_id,
@@ -309,6 +460,7 @@ def trigger_deal_created(
         "title": title,
         "amount": amount,
     }
+    trigger_data.update(build_crm_deal_trigger_enrichment(db, business_id, deal_id))
     return trigger_workflows(db, business_id, "crm.deal.created", trigger_data, user_id)
 
 
@@ -321,11 +473,13 @@ def trigger_deal_stage_changed(
     user_id: Optional[int] = None,
 ):
     """فراخوانی workflowها بعد از تغییر مرحله فرصت فروش"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "deal_id": deal_id,
         "old_stage_id": old_stage_id,
         "new_stage_id": new_stage_id,
     }
+    trigger_data.update(_crm_stage_pair_labels(db, old_stage_id, new_stage_id))
+    trigger_data.update(build_crm_deal_trigger_enrichment(db, business_id, deal_id))
     return trigger_workflows(db, business_id, "crm.deal.stage_changed", trigger_data, user_id)
 
 
@@ -337,15 +491,84 @@ def trigger_deal_closed(
     is_win: bool,
     document_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    is_lost: bool = False,
 ):
     """فراخوانی workflowها بعد از بستن معامله"""
-    trigger_data = {
+    trigger_data: Dict[str, Any] = {
         "deal_id": deal_id,
         "amount": amount,
         "is_win": is_win,
+        "is_lost": is_lost,
         "document_id": document_id,
     }
+    trigger_data.update(build_crm_deal_trigger_enrichment(db, business_id, deal_id))
     return trigger_workflows(db, business_id, "crm.deal.closed", trigger_data, user_id)
+
+
+def trigger_lead_assigned(
+    db: Session,
+    business_id: int,
+    lead_id: int,
+    old_assigned_to_user_id: Optional[int],
+    new_assigned_to_user_id: Optional[int],
+    user_id: Optional[int] = None,
+) -> int:
+    trigger_data: Dict[str, Any] = {
+        "lead_id": lead_id,
+        "old_assigned_to_user_id": old_assigned_to_user_id,
+        "new_assigned_to_user_id": new_assigned_to_user_id,
+    }
+    trigger_data.update(build_crm_lead_trigger_enrichment(db, business_id, lead_id))
+    return trigger_workflows(db, business_id, "crm.lead.assigned", trigger_data, user_id)
+
+
+def trigger_deal_assigned(
+    db: Session,
+    business_id: int,
+    deal_id: int,
+    old_assigned_to_user_id: Optional[int],
+    new_assigned_to_user_id: Optional[int],
+    user_id: Optional[int] = None,
+) -> int:
+    trigger_data: Dict[str, Any] = {
+        "deal_id": deal_id,
+        "old_assigned_to_user_id": old_assigned_to_user_id,
+        "new_assigned_to_user_id": new_assigned_to_user_id,
+    }
+    trigger_data.update(build_crm_deal_trigger_enrichment(db, business_id, deal_id))
+    return trigger_workflows(db, business_id, "crm.deal.assigned", trigger_data, user_id)
+
+
+def trigger_crm_activity_created(
+    db: Session,
+    business_id: int,
+    activity_id: int,
+    user_id: Optional[int] = None,
+) -> int:
+    try:
+        from adapters.db.models.crm import CrmActivity
+
+        act = (
+            db.query(CrmActivity)
+            .filter(CrmActivity.id == int(activity_id), CrmActivity.business_id == int(business_id))
+            .first()
+        )
+        if not act:
+            return 0
+        td: Dict[str, Any] = {
+            "activity_id": act.id,
+            "activity_code": act.code,
+            "activity_type": act.activity_type,
+            "person_id": act.person_id,
+            "lead_id": act.lead_id,
+            "deal_id": act.deal_id,
+            "subject": act.subject,
+            "activity_date": act.activity_date.isoformat() if act.activity_date else None,
+        }
+        return trigger_workflows(db, business_id, "crm.activity.created", td, user_id)
+    except Exception as e:
+        logger.warning("trigger_crm_activity_created failed: %s", e)
+        return 0
 
 
 def ensure_workflow_webhook_settings(workflow_data: Dict[str, Any], settings: Optional[Dict[str, Any]]) -> Dict[str, Any]:

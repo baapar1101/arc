@@ -52,6 +52,7 @@ from adapters.db.models.person import Person
 from app.services.receipt_payment_service import get_receipt_payment
 from app.services.file_storage_service import FileStorageService
 from app.services.person_service import calculate_person_balance
+from app.services.document_list_sort import apply_invoice_search_ordering, apply_invoice_search_ordering_from_body
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
@@ -1750,7 +1751,7 @@ async def search_invoices_endpoint(
 
 	# Parse QueryInfo from body_data
 	try:
-		query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
+		query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'sort', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
 	except Exception as e:
 		raise ApiError("INVALID_QUERY", "پارامترهای جستجو معتبر نیستند.", http_status=400)
 
@@ -1830,6 +1831,7 @@ async def search_invoices_endpoint(
 			"skip": query_info.skip,
 			"sort_by": query_info.sort_by,
 			"sort_desc": query_info.sort_desc,
+			"sort": to_serializable(query_info.sort) if getattr(query_info, "sort", None) else None,
 			"search": query_info.search,
 			"filters": serializable_filters,
 			"body": serializable_body,  # شامل تمام فیلترها
@@ -1965,20 +1967,7 @@ async def search_invoices_endpoint(
 		q = q.filter(Document.document_type == "invoice_sales")
 		q = q.filter(Document.extra_info["installment_plan"].isnot(None))
 
-	# Sorting
-	sort_desc = bool(getattr(query_info, 'sort_desc', True))
-	sort_by = getattr(query_info, 'sort_by', None) or 'document_date'
-	sort_col = Document.document_date
-	if isinstance(sort_by, str):
-		if sort_by == 'code' and hasattr(Document, 'code'):
-			sort_col = Document.code
-		elif sort_by == 'created_at' and hasattr(Document, 'created_at'):
-			sort_col = Document.created_at
-		elif sort_by == 'registered_at' and hasattr(Document, 'registered_at'):
-			sort_col = Document.registered_at
-		else:
-			sort_col = Document.document_date
-	q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
+	q = apply_invoice_search_ordering(q, query_info)
 
 	# Pagination
 	take = int(getattr(query_info, 'take', 20) or 20)
@@ -2282,20 +2271,7 @@ async def search_tax_workspace_endpoint(
                 pass
 
     # Date range from flat body
-    # Sorting similar to main invoice list
-    sort_desc = bool(getattr(query_info, "sort_desc", True))
-    sort_by = getattr(query_info, "sort_by", None) or "document_date"
-    sort_col = Document.document_date
-    if isinstance(sort_by, str):
-        if sort_by == "code" and hasattr(Document, "code"):
-            sort_col = Document.code
-        elif sort_by == "created_at" and hasattr(Document, "created_at"):
-            sort_col = Document.created_at
-        elif sort_by == "registered_at" and hasattr(Document, "registered_at"):
-            sort_col = Document.registered_at
-        else:
-            sort_col = Document.document_date
-    q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
+    q = apply_invoice_search_ordering(q, query_info)
 
     # Fetch all candidates and filter by workspace/tax_status in Python
     all_docs: List[Document] = q.all()
@@ -3075,17 +3051,7 @@ async def export_invoices_excel(
         except Exception:
             pass
 
-    # Sorting
-    sort_desc = bool(body.get("sort_desc", True))
-    sort_by = body.get("sort_by") or "document_date"
-    sort_col = Document.document_date
-    if sort_by == 'code' and hasattr(Document, 'code'):
-        sort_col = Document.code
-    elif sort_by == 'created_at' and hasattr(Document, 'created_at'):
-        sort_col = Document.created_at
-    elif sort_by == 'registered_at' and hasattr(Document, 'registered_at'):
-        sort_col = Document.registered_at
-    q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
+    q = apply_invoice_search_ordering_from_body(q, body)
 
     total = q.count()
     docs: List[Document] = q.offset(skip_value).limit(take_value).all()
@@ -3453,16 +3419,7 @@ async def export_invoices_pdf(
         except Exception:
             pass
 
-    sort_desc = bool(body.get("sort_desc", True))
-    sort_by = body.get("sort_by") or "document_date"
-    sort_col = Document.document_date
-    if sort_by == 'code' and hasattr(Document, 'code'):
-        sort_col = Document.code
-    elif sort_by == 'created_at' and hasattr(Document, 'created_at'):
-        sort_col = Document.created_at
-    elif sort_by == 'registered_at' and hasattr(Document, 'registered_at'):
-        sort_col = Document.registered_at
-    q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
+    q = apply_invoice_search_ordering_from_body(q, body)
 
     docs: List[Document] = q.offset(skip_value).limit(take_value).all()
 

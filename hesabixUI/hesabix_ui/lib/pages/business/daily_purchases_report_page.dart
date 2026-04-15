@@ -186,6 +186,7 @@ class _DailyPurchasesReportPageState extends State<DailyPurchasesReportPage> {
       defaultSortDesc: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-purchases/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-purchases/export/pdf',
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -340,7 +341,7 @@ class _DailyPurchasesReportPageState extends State<DailyPurchasesReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

@@ -203,8 +203,9 @@ async def get_usage_logs_table(
         filters.extend(query_info.filters)
 
     effective_query = QueryInfo(
+        sort=query_info.sort,
         sort_by=query_info.sort_by or "created_at",
-        sort_desc=query_info.sort_desc if query_info.sort_by else True,
+        sort_desc=query_info.sort_desc,
         take=query_info.take,
         skip=query_info.skip,
         search=query_info.search,
@@ -363,8 +364,9 @@ async def get_daily_usage_table(
         items = [item for item in items if item["_date_obj"] <= filter_end]
 
     effective_query = QueryInfo(
+        sort=query_info.sort,
         sort_by=query_info.sort_by or "date",
-        sort_desc=query_info.sort_desc if query_info.sort_by else True,
+        sort_desc=query_info.sort_desc,
         take=query_info.take,
         skip=query_info.skip,
         search=query_info.search,
@@ -377,9 +379,15 @@ async def get_daily_usage_table(
         search_term = effective_query.search.lower()
         items = [item for item in items if search_term in item["date"].lower()]
 
-    # مرتب‌سازی
+    # مرتب‌سازی (در حافظه؛ چندستونه: فقط اولین سطح)
     sort_key = effective_query.sort_by or "date"
-    reverse = effective_query.sort_desc
+    reverse = bool(effective_query.sort_desc)
+    if query_info.sort:
+        try:
+            sort_key = str(query_info.sort[0].by or sort_key)
+            reverse = bool(query_info.sort[0].desc)
+        except Exception:
+            pass
     if sort_key == "tokens":
         items.sort(key=lambda x: x["tokens"], reverse=reverse)
     elif sort_key == "cost":

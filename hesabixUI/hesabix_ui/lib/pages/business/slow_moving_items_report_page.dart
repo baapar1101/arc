@@ -147,6 +147,7 @@ class _SlowMovingItemsReportPageState extends State<SlowMovingItemsReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'product_code',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -246,7 +247,7 @@ class _SlowMovingItemsReportPageState extends State<SlowMovingItemsReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

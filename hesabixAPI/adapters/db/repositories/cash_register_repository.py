@@ -99,10 +99,16 @@ class CashRegisterRepository:
 				q = q.filter(CashRegister.currency_id == val)
 
 		# sort
-		sort_by = query.get("sort_by") or "created_at"
-		sort_desc = bool(query.get("sort_desc", True))
-		col = getattr(CashRegister, sort_by, CashRegister.created_at)
-		q = q.order_by(col.desc() if sort_desc else col.asc())
+		from app.services.sqlalchemy_sort_from_query import apply_sqlalchemy_order_from_query_dict
+
+		q = apply_sqlalchemy_order_from_query_dict(
+			q,
+			CashRegister,
+			query,
+			allowed_columns=None,
+			fallback_column="created_at",
+			default_sort_desc=bool(query.get("sort_desc", True)),
+		)
 
 		# pagination
 		skip = int(query.get("skip", 0))

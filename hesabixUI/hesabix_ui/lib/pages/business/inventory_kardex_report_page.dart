@@ -249,6 +249,7 @@ class _InventoryKardexReportPageState extends State<InventoryKardexReportPage> {
       excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-kardex/export/excel',
       pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-kardex/export/pdf',
       getExportParams: () => _additionalParams(),
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -427,7 +428,7 @@ class _InventoryKardexReportPageState extends State<InventoryKardexReportPage> {
           ),
           
           // Data Table
-          Expanded(
+          SingleChildScrollView(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(
                 '${_selectedFiscalYearId}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}_${_selectedWarehouseId}_${_selectedCategoryId}_${_selectedProduct?['id']}',

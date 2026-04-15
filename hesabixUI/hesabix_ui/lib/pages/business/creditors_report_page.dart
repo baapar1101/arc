@@ -231,6 +231,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
         'total_debit': t.totalsDebit,
         'total_credit': t.totalsCredit,
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -397,7 +398,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
             ),
           ),
           // Table
-          Expanded(
+          SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTableWidget<Map<String, dynamic>>(

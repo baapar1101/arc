@@ -167,15 +167,12 @@ class _DocumentsPageState extends State<DocumentsPage> {
         return Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,
           body: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // فیلترها
-                _buildFiltersResponsive(t, constraints.maxWidth),
-
-                // جدول داده‌ها
-                Expanded(
-                  child: Padding(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildFiltersResponsive(t, constraints.maxWidth),
+                  Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: DataTableWidget<DocumentModel>(
                       key: _tableKey,
@@ -184,8 +181,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       calendarController: widget.calendarController,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -639,6 +636,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         });
       },
       onRowTap: (item) => _showDocumentDetails(item as DocumentModel),
+      expandBodyHeightToFitRows: true,
     );
   }
 

@@ -204,6 +204,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
         'withdrawal': 'جمع برداشت',
         'balance': 'موجودی فعلی',
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -382,7 +383,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
             ),
           ),
           // Table
-          Expanded(
+          SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTableWidget<Map<String, dynamic>>(

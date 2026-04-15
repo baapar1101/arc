@@ -113,10 +113,12 @@ class _PersonsPageState extends State<PersonsPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<Person>(
-        key: _personsTableKey,
-        config: _buildDataTableConfig(t),
-        fromJson: Person.fromJson,
+      body: SingleChildScrollView(
+        child: DataTableWidget<Person>(
+          key: _personsTableKey,
+          config: _buildDataTableConfig(t),
+          fromJson: Person.fromJson,
+        ),
       ),
     );
   }
@@ -580,6 +582,7 @@ class _PersonsPageState extends State<PersonsPage> {
           );
         }),
       ],
+      expandBodyHeightToFitRows: true,
       onRowTap: (item) {
         if (item is Person) {
           _showPersonDetails(item);

@@ -30,6 +30,46 @@ def _build_group_condition(column, ids: List[int]) -> Any:
     return column.in_(ids)
 
 
+KARDEX_SORT_ALLOWED = frozenset(
+    {"document_date", "document_code", "debit", "credit", "quantity", "created_at"}
+)
+
+
+def _kardex_sort_column(sort_key: str):
+    if sort_key == "document_code":
+        return Document.code
+    if sort_key == "debit":
+        return DocumentLine.debit
+    if sort_key == "credit":
+        return DocumentLine.credit
+    if sort_key == "quantity":
+        return DocumentLine.quantity
+    if sort_key == "created_at":
+        return DocumentLine.created_at
+    return Document.document_date
+
+
+def _apply_kardex_sort(q, query: Dict[str, Any]):
+    from adapters.api.v1.schemas import QueryInfo
+    from app.services.sort_resolution import effective_sort_specs
+
+    qi = QueryInfo.model_validate({
+        "take": int(query.get("take", 20) or 20),
+        "skip": int(query.get("skip", 0) or 0),
+        "sort_by": query.get("sort_by"),
+        "sort_desc": bool(query.get("sort_desc", True)),
+        "sort": query.get("sort") if isinstance(query.get("sort"), list) else None,
+    })
+    specs = effective_sort_specs(qi, allowed=KARDEX_SORT_ALLOWED, default_when_empty=("document_date", True))
+    parts = []
+    for name, desc in specs:
+        col = _kardex_sort_column(name)
+        parts.append(col.desc() if desc else col.asc())
+    if not parts:
+        parts.append(Document.document_date.desc())
+    return q.order_by(*parts)
+
+
 def _collect_ids(query: Dict[str, Any], key: str) -> List[int]:
     vals = query.get(key)
     if not isinstance(vals, (list, tuple)):
@@ -196,24 +236,8 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             # در صورت عدم پشتیبانی از عملگر JSON، از فیلتر نرم‌افزاری بعد از واکشی استفاده خواهد شد
             pass
 
-    # Sorting
-    sort_by = (query.get("sort_by") or "document_date")
-    sort_desc = bool(query.get("sort_desc", True))
-    if sort_by == "document_date":
-        order_col = Document.document_date
-    elif sort_by == "document_code":
-        order_col = Document.code
-    elif sort_by == "debit":
-        order_col = DocumentLine.debit
-    elif sort_by == "credit":
-        order_col = DocumentLine.credit
-    elif sort_by == "quantity":
-        order_col = DocumentLine.quantity
-    elif sort_by == "created_at":
-        order_col = DocumentLine.created_at
-    else:
-        order_col = Document.document_date
-    q = q.order_by(order_col.desc() if sort_desc else order_col.asc())
+    # Sorting (چندستونه / تک‌ستونه)
+    q = _apply_kardex_sort(q, query)
 
     # Pagination
     try:

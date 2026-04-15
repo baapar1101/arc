@@ -1341,16 +1341,10 @@ def list_receipts_payments(
     if search:
         q = q.filter(Document.code.ilike(f"%{search}%"))
     
-    # مرتب‌سازی
-    sort_by = query.get("sort_by", "document_date")
-    sort_desc = query.get("sort_desc", True)
-    
-    # بررسی اینکه sort_by معتبر است
-    if sort_by and isinstance(sort_by, str) and hasattr(Document, sort_by):
-        col = getattr(Document, sort_by)
-        q = q.order_by(col.desc() if sort_desc else col.asc())
-    else:
-        q = q.order_by(Document.document_date.desc())
+    # مرتب‌سازی (sort چندستونه در اولویت، وگرنه sort_by/sort_desc)
+    from app.services.document_list_sort import apply_document_dynamic_ordering_from_dict
+
+    q = apply_document_dynamic_ordering_from_dict(q, query)
     
     # صفحه‌بندی
     skip = int(query.get("skip", 0))

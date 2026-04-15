@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/workflow_editor_models.dart';
 import '../../l10n/app_localizations.dart';
 
 /// کلاس برای مدیریت Workflow Templates
@@ -19,6 +18,8 @@ class WorkflowTemplates {
       case 'inventory_low_alert': return t.workflowTemplateInventoryLowName;
       case 'receipt_payment_log': return t.workflowTemplateReceiptPaymentName;
       case 'person_welcome': return t.workflowTemplatePersonWelcomeName;
+      case 'crm_new_lead_notify': return t.workflowTemplateCrmNewLeadNotifyName;
+      case 'crm_deal_won_log': return t.workflowTemplateCrmDealWonLogName;
       default: return t.workflowTemplateDefault;
     }
   }
@@ -29,6 +30,8 @@ class WorkflowTemplates {
       case 'inventory_low_alert': return t.workflowTemplateInventoryLowDesc;
       case 'receipt_payment_log': return t.workflowTemplateReceiptPaymentDesc;
       case 'person_welcome': return t.workflowTemplatePersonWelcomeDesc;
+      case 'crm_new_lead_notify': return t.workflowTemplateCrmNewLeadNotifyDesc;
+      case 'crm_deal_won_log': return t.workflowTemplateCrmDealWonLogDesc;
       default: return '';
     }
   }
@@ -39,6 +42,9 @@ class WorkflowTemplates {
       case 'inventory_low_alert': return t.workflowCategoryInventory;
       case 'receipt_payment_log': return t.workflowCategoryFinancial;
       case 'person_welcome': return t.workflowCategoryPersons;
+      case 'crm_new_lead_notify':
+      case 'crm_deal_won_log':
+        return t.workflowCategoryCrm;
       default: return t.workflowTemplateDefault;
     }
   }
@@ -226,6 +232,87 @@ class WorkflowTemplates {
           ],
         },
       ),
+      WorkflowTemplate(
+        id: 'crm_new_lead_notify',
+        name: nameFn('crm_new_lead_notify'),
+        description: descFn('crm_new_lead_notify'),
+        triggerType: 'crm.lead.created',
+        category: categoryFn('crm_new_lead_notify'),
+        icon: Icons.campaign,
+        workflowData: {
+          'nodes': [
+            {
+              'id': 'trigger_1',
+              'type': 'trigger',
+              'label': 'سرنخ جدید',
+              'key': 'crm.lead.created',
+              'position': {'x': 100, 'y': 100},
+              'config': {
+                'trigger_type': 'crm.lead.created',
+                'enabled': true,
+              },
+            },
+            {
+              'id': 'action_1',
+              'type': 'action',
+              'label': 'اعلان داخلی',
+              'key': 'create_notification',
+              'position': {'x': 100, 'y': 260},
+              'config': {
+                'action_type': 'create_notification',
+                'event_key': 'crm.lead.created',
+                'title': 'سرنخ جدید: \$trigger_1.name',
+                'message': 'سرنخ \$trigger_1.name ثبت شد. کد: \$trigger_1.lead_code',
+                'channels': ['inapp'],
+                'priority': 'normal',
+              },
+            },
+          ],
+          'connections': [
+            {'source': 'trigger_1', 'target': 'action_1'},
+          ],
+        },
+      ),
+      WorkflowTemplate(
+        id: 'crm_deal_won_log',
+        name: nameFn('crm_deal_won_log'),
+        description: descFn('crm_deal_won_log'),
+        triggerType: 'crm.deal.closed',
+        category: categoryFn('crm_deal_won_log'),
+        icon: Icons.emoji_events_outlined,
+        workflowData: {
+          'nodes': [
+            {
+              'id': 'trigger_1',
+              'type': 'trigger',
+              'label': 'بستن معامله (برنده)',
+              'key': 'crm.deal.closed',
+              'position': {'x': 100, 'y': 100},
+              'config': {
+                'trigger_type': 'crm.deal.closed',
+                'enabled': true,
+                'won_only': true,
+              },
+            },
+            {
+              'id': 'action_1',
+              'type': 'action',
+              'label': 'ثبت لاگ',
+              'key': 'log',
+              'position': {'x': 100, 'y': 260},
+              'config': {
+                'action_type': 'log',
+                'level': 'info',
+                'message': 'معامله برنده بسته شد: \$trigger_1.title مبلغ \$trigger_1.amount',
+                'include_context': true,
+              },
+            },
+          ],
+          'connections': [
+            {'source': 'trigger_1', 'target': 'action_1'},
+          ],
+        },
+      ),
     ];
   }
 
@@ -234,18 +321,24 @@ class WorkflowTemplates {
     'inventory_low_alert': 'هشدار موجودی کم',
     'receipt_payment_log': 'ثبت لاگ دریافت/پرداخت',
     'person_welcome': 'خوش‌آمدگویی شخص جدید',
+    'crm_new_lead_notify': 'اعلان سرنخ جدید',
+    'crm_deal_won_log': 'ثبت لاگ بستن معامله موفق',
   };
   static const Map<String, String> _fallbackDescs = {
     'invoice_sales_notification': 'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود',
     'inventory_low_alert': 'زمانی که موجودی محصول کم شود، notification ارسال می‌شود',
     'receipt_payment_log': 'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود',
     'person_welcome': 'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود',
+    'crm_new_lead_notify': 'با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود',
+    'crm_deal_won_log': 'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود',
   };
   static const Map<String, String> _fallbackCategories = {
     'invoice_sales_notification': 'فاکتور',
     'inventory_low_alert': 'موجودی',
     'receipt_payment_log': 'مالی',
     'person_welcome': 'اشخاص',
+    'crm_new_lead_notify': 'CRM',
+    'crm_deal_won_log': 'CRM',
   };
 
   /// دریافت لیست templateهای موجود (fallback - ترجیحاً getLocalizedTemplates استفاده شود)

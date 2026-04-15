@@ -7,8 +7,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Path, Body, Query, Request
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import and_, or_, text
 
 from adapters.db.session import get_db
 from adapters.db.models.crm import (
@@ -60,12 +60,24 @@ async def get_crm_summary(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    from sqlalchemy import func
-    total_leads = db.query(Lead).filter(Lead.business_id == business_id).count()
-    converted_leads = db.query(Lead).filter(Lead.business_id == business_id, Lead.person_id.isnot(None)).count()
-    total_deals = db.query(Deal).filter(Deal.business_id == business_id).count()
-    deals_amount = db.query(func.coalesce(func.sum(Deal.amount), 0)).filter(Deal.business_id == business_id).scalar() or 0
-    closed_deals = db.query(Deal).filter(Deal.business_id == business_id, Deal.closed_at.isnot(None)).count()
+    row = db.execute(
+        text(
+            """
+            SELECT
+              (SELECT COUNT(*) FROM crm_leads WHERE business_id = :bid) AS total_leads,
+              (SELECT COUNT(*) FROM crm_leads WHERE business_id = :bid AND person_id IS NOT NULL) AS converted_leads,
+              (SELECT COUNT(*) FROM crm_deals WHERE business_id = :bid) AS total_deals,
+              (SELECT COALESCE(SUM(amount), 0) FROM crm_deals WHERE business_id = :bid) AS total_deals_amount,
+              (SELECT COUNT(*) FROM crm_deals WHERE business_id = :bid AND closed_at IS NOT NULL) AS closed_deals
+            """
+        ),
+        {"bid": business_id},
+    ).mappings().first()
+    total_leads = int(row["total_leads"] or 0) if row else 0
+    converted_leads = int(row["converted_leads"] or 0) if row else 0
+    total_deals = int(row["total_deals"] or 0) if row else 0
+    deals_amount = float(row["total_deals_amount"] or 0) if row else 0.0
+    closed_deals = int(row["closed_deals"] or 0) if row else 0
     conversion_rate = (converted_leads / total_leads * 100) if total_leads else 0
     data = {
         "total_leads": total_leads,
@@ -95,8 +107,18 @@ async def get_follow_ups_today(
     from datetime import datetime, timedelta
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=days_ahead)
+    current_user_id = ctx.get_user_id()
+    restrict_assignee = bool(
+        current_user_id and not (ctx.is_superadmin() or ctx.is_business_owner(business_id))
+    )
     q_leads = (
         db.query(Lead)
+        .options(
+            selectinload(Lead.stage),
+            selectinload(Lead.assigned_to),
+            selectinload(Lead.person),
+            selectinload(Lead.created_by),
+        )
         .filter(
             Lead.business_id == business_id,
             Lead.next_follow_up_at.isnot(None),
@@ -104,11 +126,18 @@ async def get_follow_ups_today(
             Lead.next_follow_up_at <= end,
             Lead.person_id.is_(None),
         )
-        .order_by(Lead.next_follow_up_at)
-        .limit(50)
     )
+    if restrict_assignee:
+        q_leads = q_leads.filter(or_(Lead.assigned_to_user_id.is_(None), Lead.assigned_to_user_id == current_user_id))
+    q_leads = q_leads.order_by(Lead.next_follow_up_at).limit(50)
     q_deals = (
         db.query(Deal)
+        .options(
+            selectinload(Deal.stage),
+            selectinload(Deal.assigned_to),
+            selectinload(Deal.person),
+            selectinload(Deal.created_by),
+        )
         .filter(
             Deal.business_id == business_id,
             Deal.closed_at.is_(None),
@@ -116,15 +145,12 @@ async def get_follow_ups_today(
             Deal.next_follow_up_at >= start,
             Deal.next_follow_up_at <= end,
         )
-        .order_by(Deal.next_follow_up_at)
-        .limit(50)
     )
+    if restrict_assignee:
+        q_deals = q_deals.filter(or_(Deal.assigned_to_user_id.is_(None), Deal.assigned_to_user_id == current_user_id))
+    q_deals = q_deals.order_by(Deal.next_follow_up_at).limit(50)
     leads = q_leads.all()
     deals = q_deals.all()
-    current_user_id = ctx.get_user_id()
-    if current_user_id and not (ctx.is_superadmin() or ctx.is_business_owner(business_id)):
-        leads = [l for l in leads if l.assigned_to_user_id in (None, current_user_id)]
-        deals = [d for d in deals if d.assigned_to_user_id in (None, current_user_id)]
     data = {
         "leads": [_lead_to_dict(l, request) for l in leads],
         "deals": [_deal_to_dict(d, request) for d in deals],
@@ -322,60 +348,87 @@ async def get_employee_performance_report(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    from sqlalchemy import func
-    from adapters.db.models.user import User
-
-    user_ids = set()
-    lead_user_ids = db.query(Lead.assigned_to_user_id).filter(Lead.business_id == business_id, Lead.assigned_to_user_id.isnot(None)).distinct().all()
-    deal_user_ids = db.query(Deal.assigned_to_user_id).filter(Deal.business_id == business_id, Deal.assigned_to_user_id.isnot(None)).distinct().all()
-    act_user_ids = db.query(CrmActivity.created_by_user_id).filter(CrmActivity.business_id == business_id).distinct().all()
-    for (uid,) in lead_user_ids:
+    user_ids: set[int] = set()
+    for (uid,) in (
+        db.query(Lead.assigned_to_user_id)
+        .filter(Lead.business_id == business_id, Lead.assigned_to_user_id.isnot(None))
+        .distinct()
+        .all()
+    ):
         if uid:
-            user_ids.add(uid)
-    for (uid,) in deal_user_ids:
+            user_ids.add(int(uid))
+    for (uid,) in (
+        db.query(Deal.assigned_to_user_id)
+        .filter(Deal.business_id == business_id, Deal.assigned_to_user_id.isnot(None))
+        .distinct()
+        .all()
+    ):
         if uid:
-            user_ids.add(uid)
-    for (uid,) in act_user_ids:
-        user_ids.add(uid)
+            user_ids.add(int(uid))
+    for (uid,) in db.query(CrmActivity.created_by_user_id).filter(CrmActivity.business_id == business_id).distinct().all():
+        user_ids.add(int(uid))
 
-    # محدودیت دسترسی: کاربران بدون reports_team فقط عملکرد خود را می‌بینند
     restricted_to_self = False
     current_user_id = ctx.get_user_id()
-    if current_user_id and not (ctx.is_superadmin() or ctx.is_business_owner(business_id) or ctx.has_business_permission("crm", "reports_team")):
+    if current_user_id and not (
+        ctx.is_superadmin()
+        or ctx.is_business_owner(business_id)
+        or ctx.has_business_permission("crm", "reports_team")
+    ):
         restricted_to_self = True
         user_ids = {uid for uid in user_ids if uid == current_user_id}
         if not user_ids:
-            # کاربر در لیست نیست (سرنخ/فرصت/فعالیت ندارد)؛ فقط ردیف خودش با صفر
-            user_ids = {current_user_id}
+            user_ids = {int(current_user_id)}
 
     if not user_ids:
         return success_response(data=[], restricted_to_self=restricted_to_self, request=request)
 
-    users = db.query(User).filter(User.id.in_(user_ids)).all()
-    user_map = {u.id: f"{(u.first_name or '')} {(u.last_name or '')}".strip() or str(u.id) for u in users}
-
+    ids_sql = ",".join(str(int(x)) for x in sorted(user_ids))
+    sql = text(
+        f"""
+        WITH u AS (SELECT unnest(ARRAY[{ids_sql}]::int[]) AS uid)
+        SELECT u.uid AS user_id,
+          usr.first_name AS first_name,
+          usr.last_name AS last_name,
+          (SELECT COUNT(*)::int FROM crm_leads l
+            WHERE l.business_id = :bid AND l.assigned_to_user_id = u.uid) AS leads_count,
+          (SELECT COUNT(*)::int FROM crm_leads l
+            WHERE l.business_id = :bid AND l.assigned_to_user_id = u.uid AND l.person_id IS NOT NULL) AS converted_leads,
+          (SELECT COUNT(*)::int FROM crm_deals d
+            WHERE d.business_id = :bid AND d.assigned_to_user_id = u.uid) AS deals_count,
+          (SELECT COUNT(*)::int FROM crm_deals d
+            WHERE d.business_id = :bid AND d.assigned_to_user_id = u.uid AND d.closed_at IS NOT NULL) AS closed_deals,
+          (SELECT COALESCE(SUM(d.amount), 0)::float FROM crm_deals d
+            WHERE d.business_id = :bid AND d.assigned_to_user_id = u.uid) AS total_amount,
+          (SELECT COUNT(*)::int FROM crm_activities a
+            WHERE a.business_id = :bid AND a.created_by_user_id = u.uid) AS activities_count
+        FROM u
+        JOIN users usr ON usr.id = u.uid
+        ORDER BY total_amount DESC NULLS LAST, deals_count DESC
+        """
+    )
+    rows = db.execute(sql, {"bid": business_id}).mappings().all()
     result = []
-    for uid in user_ids:
-        name = user_map.get(uid, str(uid))
-        leads_cnt = db.query(func.count(Lead.id)).filter(Lead.business_id == business_id, Lead.assigned_to_user_id == uid).scalar() or 0
-        converted_cnt = db.query(func.count(Lead.id)).filter(Lead.business_id == business_id, Lead.assigned_to_user_id == uid, Lead.person_id.isnot(None)).scalar() or 0
-        deals_cnt = db.query(func.count(Deal.id)).filter(Deal.business_id == business_id, Deal.assigned_to_user_id == uid).scalar() or 0
-        closed_cnt = db.query(func.count(Deal.id)).filter(Deal.business_id == business_id, Deal.assigned_to_user_id == uid, Deal.closed_at.isnot(None)).scalar() or 0
-        amount = db.query(func.coalesce(func.sum(Deal.amount), 0)).filter(Deal.business_id == business_id, Deal.assigned_to_user_id == uid).scalar() or 0
-        acts_cnt = db.query(func.count(CrmActivity.id)).filter(CrmActivity.business_id == business_id, CrmActivity.created_by_user_id == uid).scalar() or 0
-        conv_rate = (converted_cnt / leads_cnt * 100) if leads_cnt else 0
-        result.append({
-            "user_id": uid,
-            "user_name": name,
-            "leads_count": leads_cnt,
-            "converted_leads": converted_cnt,
-            "conversion_rate": round(conv_rate, 1),
-            "deals_count": deals_cnt,
-            "closed_deals": closed_cnt,
-            "total_amount": float(amount),
-            "activities_count": acts_cnt,
-        })
-    result.sort(key=lambda x: (-x["total_amount"], -x["deals_count"]))
+    for r in rows:
+        fn = (r.get("first_name") or "").strip()
+        ln = (r.get("last_name") or "").strip()
+        nm = f"{fn} {ln}".strip() or str(r["user_id"])
+        lc = int(r["leads_count"] or 0)
+        cc = int(r["converted_leads"] or 0)
+        conv_rate = (cc / lc * 100) if lc else 0
+        result.append(
+            {
+                "user_id": int(r["user_id"]),
+                "user_name": nm,
+                "leads_count": lc,
+                "converted_leads": cc,
+                "conversion_rate": round(conv_rate, 1),
+                "deals_count": int(r["deals_count"] or 0),
+                "closed_deals": int(r["closed_deals"] or 0),
+                "total_amount": float(r["total_amount"] or 0),
+                "activities_count": int(r["activities_count"] or 0),
+            }
+        )
     return success_response(data=result, restricted_to_self=restricted_to_self, request=request)
 
 
@@ -525,7 +578,11 @@ async def list_process_definitions(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    q = db.query(CrmProcessDefinition).filter(CrmProcessDefinition.business_id == business_id)
+    q = (
+        db.query(CrmProcessDefinition)
+        .options(selectinload(CrmProcessDefinition.stages))
+        .filter(CrmProcessDefinition.business_id == business_id)
+    )
     if process_type:
         q = q.filter(CrmProcessDefinition.process_type == process_type)
     if is_active is not None:
@@ -937,19 +994,48 @@ async def list_leads(
     stage_id: Optional[int] = Query(None),
     assigned_to_user_id: Optional[int] = Query(None),
     search: Optional[str] = Query(None, description="جستجو در نام، شرکت، موبایل، ایمیل"),
+    from_date: Optional[str] = Query(None, description="از تاریخ ایجاد (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="تا تاریخ ایجاد (YYYY-MM-DD)"),
+    open_only: Optional[bool] = Query(None, description="فقط سرنخ تبدیل‌نشده"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    q = db.query(Lead).filter(Lead.business_id == business_id)
+    from datetime import datetime as dt
+    from sqlalchemy import func as sa_func
+
+    q = (
+        db.query(Lead)
+        .options(
+            selectinload(Lead.stage),
+            selectinload(Lead.assigned_to),
+            selectinload(Lead.person),
+            selectinload(Lead.created_by),
+        )
+        .filter(Lead.business_id == business_id)
+    )
     if process_definition_id:
         q = q.filter(Lead.process_definition_id == process_definition_id)
     if stage_id:
         q = q.filter(Lead.stage_id == stage_id)
     if assigned_to_user_id is not None:
         q = q.filter(Lead.assigned_to_user_id == assigned_to_user_id)
+    if open_only is True:
+        q = q.filter(Lead.person_id.is_(None))
+    if from_date:
+        try:
+            fd = dt.strptime(from_date, "%Y-%m-%d").date()
+            q = q.filter(sa_func.date(Lead.created_at) >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = dt.strptime(to_date, "%Y-%m-%d").date()
+            q = q.filter(sa_func.date(Lead.created_at) <= td)
+        except ValueError:
+            pass
     if search and search.strip():
         term = f"%{search.strip()}%"
         q = q.filter(
@@ -1006,6 +1092,26 @@ async def create_lead(
     )
     if not stage:
         raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
+
+    mobile_norm = (str(body.mobile).strip() if body.mobile else "") or None
+    email_norm = (str(body.email).strip().lower() if body.email else "") or None
+    if mobile_norm or email_norm:
+        dup_parts = []
+        if mobile_norm:
+            dup_parts.append(Lead.mobile == mobile_norm)
+        if email_norm:
+            dup_parts.append(Lead.email == email_norm)
+        dup = (
+            db.query(Lead)
+            .filter(Lead.business_id == business_id, Lead.person_id.is_(None), or_(*dup_parts))
+            .first()
+        )
+        if dup:
+            raise ApiError(
+                "CRM_LEAD_DUPLICATE",
+                "سرنخ فعال با همین موبایل یا ایمیل از قبل وجود دارد.",
+                http_status=409,
+            )
 
     from datetime import date
     from app.services.document_numbering_service import generate_document_code
@@ -1066,7 +1172,17 @@ async def get_lead(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
+    lead = (
+        db.query(Lead)
+        .options(
+            selectinload(Lead.stage),
+            selectinload(Lead.assigned_to),
+            selectinload(Lead.person),
+            selectinload(Lead.created_by),
+        )
+        .filter(and_(Lead.id == lead_id, Lead.business_id == business_id))
+        .first()
+    )
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
     return success_response(data=_lead_to_dict(lead, request), request=request)
@@ -1091,6 +1207,7 @@ async def get_lead_history(
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
     rows = (
         db.query(CrmChangeHistory)
+        .options(joinedload(CrmChangeHistory.changed_by))
         .filter(
             CrmChangeHistory.business_id == business_id,
             CrmChangeHistory.entity_type == "lead",
@@ -1132,9 +1249,20 @@ async def update_lead(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
-    lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
+    lead = (
+        db.query(Lead)
+        .options(
+            selectinload(Lead.stage),
+            selectinload(Lead.assigned_to),
+            selectinload(Lead.person),
+            selectinload(Lead.created_by),
+        )
+        .filter(and_(Lead.id == lead_id, Lead.business_id == business_id))
+        .first()
+    )
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    old_assigned_to_user_id = lead.assigned_to_user_id
     if body.stage_id is not None:
         stage = db.query(CrmProcessStage).filter(
             and_(
@@ -1172,7 +1300,22 @@ async def update_lead(
     if body.description is not None:
         lead.description = body.description
     if body.assigned_to_user_id is not None:
-        lead.assigned_to_user_id = body.assigned_to_user_id
+        new_assign = body.assigned_to_user_id
+        if new_assign != old_assigned_to_user_id:
+            lead.assigned_to_user_id = new_assign
+            try:
+                from app.services.workflow.workflow_trigger_service import trigger_lead_assigned
+
+                trigger_lead_assigned(
+                    db,
+                    business_id,
+                    lead_id=lead_id,
+                    old_assigned_to_user_id=old_assigned_to_user_id,
+                    new_assigned_to_user_id=new_assign,
+                    user_id=ctx.get_user_id(),
+                )
+            except Exception:
+                pass
     if body.next_follow_up_at is not None:
         lead.next_follow_up_at = body.next_follow_up_at
     if body.extra_info is not None:
@@ -1360,13 +1503,28 @@ async def list_deals(
     person_id: Optional[int] = Query(None),
     assigned_to_user_id: Optional[int] = Query(None),
     search: Optional[str] = Query(None, description="جستجو در عنوان، نام مشتری"),
+    from_date: Optional[str] = Query(None, description="از تاریخ ایجاد (YYYY-MM-DD)"),
+    to_date: Optional[str] = Query(None, description="تا تاریخ ایجاد (YYYY-MM-DD)"),
+    open_only: Optional[bool] = Query(None, description="فقط فرصت‌های باز (بسته نشده)"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    q = db.query(Deal).filter(Deal.business_id == business_id)
+    from datetime import datetime as dt
+    from sqlalchemy import func as sa_func
+
+    q = (
+        db.query(Deal)
+        .options(
+            selectinload(Deal.person),
+            selectinload(Deal.stage),
+            selectinload(Deal.assigned_to),
+            selectinload(Deal.created_by),
+        )
+        .filter(Deal.business_id == business_id)
+    )
     if process_definition_id:
         q = q.filter(Deal.process_definition_id == process_definition_id)
     if stage_id:
@@ -1375,6 +1533,20 @@ async def list_deals(
         q = q.filter(Deal.person_id == person_id)
     if assigned_to_user_id is not None:
         q = q.filter(Deal.assigned_to_user_id == assigned_to_user_id)
+    if open_only is True:
+        q = q.filter(Deal.closed_at.is_(None))
+    if from_date:
+        try:
+            fd = dt.strptime(from_date, "%Y-%m-%d").date()
+            q = q.filter(sa_func.date(Deal.created_at) >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = dt.strptime(to_date, "%Y-%m-%d").date()
+            q = q.filter(sa_func.date(Deal.created_at) <= td)
+        except ValueError:
+            pass
     if search and search.strip():
         term = f"%{search.strip()}%"
         q = q.join(Deal.person).filter(
@@ -1496,7 +1668,17 @@ async def get_deal(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    deal = (
+        db.query(Deal)
+        .options(
+            selectinload(Deal.stage),
+            selectinload(Deal.assigned_to),
+            selectinload(Deal.person),
+            selectinload(Deal.created_by),
+        )
+        .filter(and_(Deal.id == deal_id, Deal.business_id == business_id))
+        .first()
+    )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
     return success_response(data=_deal_to_dict(deal, request), request=request)
@@ -1521,6 +1703,7 @@ async def get_deal_history(
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
     rows = (
         db.query(CrmChangeHistory)
+        .options(joinedload(CrmChangeHistory.changed_by))
         .filter(
             CrmChangeHistory.business_id == business_id,
             CrmChangeHistory.entity_type == "deal",
@@ -1562,9 +1745,20 @@ async def update_deal(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
-    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    deal = (
+        db.query(Deal)
+        .options(
+            selectinload(Deal.stage),
+            selectinload(Deal.assigned_to),
+            selectinload(Deal.person),
+            selectinload(Deal.created_by),
+        )
+        .filter(and_(Deal.id == deal_id, Deal.business_id == business_id))
+        .first()
+    )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    old_assigned_to_user_id = deal.assigned_to_user_id
     if body.stage_id is not None:
         stage = db.query(CrmProcessStage).filter(
             and_(
@@ -1605,7 +1799,22 @@ async def update_deal(
     if body.document_id is not None:
         deal.document_id = body.document_id
     if body.assigned_to_user_id is not None:
-        deal.assigned_to_user_id = body.assigned_to_user_id
+        new_assign = body.assigned_to_user_id
+        if new_assign != old_assigned_to_user_id:
+            deal.assigned_to_user_id = new_assign
+            try:
+                from app.services.workflow.workflow_trigger_service import trigger_deal_assigned
+
+                trigger_deal_assigned(
+                    db,
+                    business_id,
+                    deal_id=deal_id,
+                    old_assigned_to_user_id=old_assigned_to_user_id,
+                    new_assigned_to_user_id=new_assign,
+                    user_id=ctx.get_user_id(),
+                )
+            except Exception:
+                pass
     if body.description is not None:
         deal.description = body.description
     if body.extra_info is not None:
@@ -1614,14 +1823,19 @@ async def update_deal(
         deal.closed_at = body.closed_at
         try:
             from app.services.workflow.workflow_trigger_service import trigger_deal_closed
-            is_win = deal.stage.is_win if deal.stage else False
+
+            st = deal.stage
+            is_win = bool(st and st.is_win)
+            is_lost = bool(st and st.is_lost)
             trigger_deal_closed(
-                db, business_id,
+                db,
+                business_id,
                 deal_id=deal_id,
                 amount=float(deal.amount),
                 is_win=is_win,
                 document_id=deal.document_id,
                 user_id=ctx.get_user_id(),
+                is_lost=is_lost,
             )
         except Exception:
             pass
@@ -1659,6 +1873,9 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         "id": a.id,
         "business_id": a.business_id,
         "person_id": a.person_id,
+        "person_name": a.person.alias_name if getattr(a, "person", None) else None,
+        "lead_id": a.lead_id,
+        "lead_name": a.lead.name if getattr(a, "lead", None) else None,
         "code": a.code,
         "activity_type": a.activity_type,
         "subject": a.subject,
@@ -1687,6 +1904,7 @@ async def list_activities(
     request: Request,
     business_id: int = Path(..., gt=0),
     person_id: Optional[int] = Query(None),
+    lead_id: Optional[int] = Query(None, description="فیلتر بر اساس سرنخ"),
     deal_id: Optional[int] = Query(None),
     activity_type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -1695,9 +1913,19 @@ async def list_activities(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+    q = (
+        db.query(CrmActivity)
+        .options(
+            selectinload(CrmActivity.created_by),
+            selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.person),
+        )
+        .filter(CrmActivity.business_id == business_id)
+    )
     if person_id:
         q = q.filter(CrmActivity.person_id == person_id)
+    if lead_id is not None:
+        q = q.filter(CrmActivity.lead_id == lead_id)
     if deal_id:
         q = q.filter(CrmActivity.deal_id == deal_id)
     if activity_type:
@@ -1725,9 +1953,21 @@ async def create_activity(
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
     from adapters.db.models.person import Person
-    person = db.query(Person).filter(and_(Person.id == body.person_id, Person.business_id == business_id)).first()
-    if not person:
-        raise ApiError("NOT_FOUND", "شخص یافت نشد.", http_status=404)
+
+    person_id_val: Optional[int] = body.person_id
+    lead_id_val: Optional[int] = body.lead_id
+    if not person_id_val and not lead_id_val:
+        raise ApiError("CRM_ACTIVITY_PERSON_OR_LEAD", "یکی از person_id یا lead_id الزامی است.", http_status=400)
+    if lead_id_val is not None:
+        lead = db.query(Lead).filter(and_(Lead.id == lead_id_val, Lead.business_id == business_id)).first()
+        if not lead:
+            raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+        if lead.person_id and not person_id_val:
+            person_id_val = int(lead.person_id)
+    if person_id_val is not None:
+        person = db.query(Person).filter(and_(Person.id == person_id_val, Person.business_id == business_id)).first()
+        if not person:
+            raise ApiError("NOT_FOUND", "شخص یافت نشد.", http_status=404)
 
     from datetime import date
     from app.services.document_numbering_service import generate_document_code
@@ -1743,7 +1983,8 @@ async def create_activity(
 
     activity = CrmActivity(
         business_id=business_id,
-        person_id=body.person_id,
+        person_id=person_id_val,
+        lead_id=lead_id_val,
         code=code_val,
         activity_type=body.activity_type,
         subject=body.subject,
@@ -1756,6 +1997,18 @@ async def create_activity(
     db.add(activity)
     db.commit()
     db.refresh(activity)
+    activity = (
+        db.query(CrmActivity)
+        .options(selectinload(CrmActivity.lead), selectinload(CrmActivity.created_by), selectinload(CrmActivity.person))
+        .filter(CrmActivity.id == activity.id)
+        .first()
+    )
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_crm_activity_created
+
+        trigger_crm_activity_created(db, business_id, activity.id, user_id=ctx.get_user_id())
+    except Exception:
+        pass
     return success_response(data=_activity_to_dict(activity, request), request=request, message="CRM_ACTIVITY_CREATED")
 
 
@@ -1772,9 +2025,16 @@ async def get_activity(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    activity = db.query(CrmActivity).filter(
-        and_(CrmActivity.id == activity_id, CrmActivity.business_id == business_id)
-    ).first()
+    activity = (
+        db.query(CrmActivity)
+        .options(
+            selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.person),
+            selectinload(CrmActivity.created_by),
+        )
+        .filter(and_(CrmActivity.id == activity_id, CrmActivity.business_id == business_id))
+        .first()
+    )
     if not activity:
         raise ApiError("NOT_FOUND", "فعالیت یافت نشد.", http_status=404)
     return success_response(data=_activity_to_dict(activity, request), request=request)

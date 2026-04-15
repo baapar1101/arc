@@ -143,10 +143,12 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<ProductAttributeItem>(
-        key: _tableKey,
-        config: _buildConfig(t),
-        fromJson: ProductAttributeItem.fromJson,
+      body: SingleChildScrollView(
+        child: DataTableWidget<ProductAttributeItem>(
+          key: _tableKey,
+          config: _buildConfig(t),
+          fromJson: ProductAttributeItem.fromJson,
+        ),
       ),
     );
   }
@@ -190,6 +192,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
       ],
       searchFields: ['title', 'description'],
       defaultPageSize: 20,
+      expandBodyHeightToFitRows: true,
       customHeaderActions: [
         PermissionButton(
           section: 'product_attributes',

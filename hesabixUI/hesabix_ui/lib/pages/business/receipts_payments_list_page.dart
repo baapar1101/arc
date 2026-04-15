@@ -156,23 +156,19 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    
+    final contentPadding = ResponsiveHelper.getPadding(context);
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // هدر صفحه
-            _buildHeader(t),
-            
-            // فیلترها
-            _buildFilters(t),
-            
-            // جدول داده‌ها
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(t),
+              _buildFilters(t),
+              Padding(
+                padding: EdgeInsets.fromLTRB(contentPadding, 8, contentPadding, 8),
                 child: DataTableWidget<ReceiptPaymentDocument>(
                   key: _tableKey,
                   config: _buildTableConfig(t),
@@ -180,8 +176,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
                   calendarController: widget.calendarController,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -308,19 +304,80 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // فیلتر نوع سند
-                typeFilter,
+                SegmentedButton<String?>(
+                  segments: [
+                    ButtonSegment<String?>(
+                      value: null,
+                      label: Text('همه'),
+                      icon: const Icon(Icons.all_inclusive),
+                    ),
+                    ButtonSegment<String?>(
+                      value: 'receipt',
+                      label: Text(t.receipts),
+                      icon: const Icon(Icons.download_done_outlined),
+                    ),
+                    ButtonSegment<String?>(
+                      value: 'payment',
+                      label: Text(t.payments),
+                      icon: const Icon(Icons.upload_outlined),
+                    ),
+                  ],
+                  selected: {_selectedDocumentType},
+                  onSelectionChanged: (set) {
+                    setState(() {
+                      _selectedDocumentType = set.first;
+                    });
+                    _refreshData();
+                  },
+                ),
                 const SizedBox(height: 8),
-                // فیلتر تاریخ
-                dateFilter,
+                Row(
+                  children: [
+                    Expanded(
+                      child: DateInputField(
+                        value: _fromDate,
+                        calendarController: widget.calendarController,
+                        onChanged: (date) {
+                          setState(() => _fromDate = date);
+                          _refreshData();
+                        },
+                        labelText: 'از تاریخ',
+                        hintText: 'انتخاب تاریخ شروع',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DateInputField(
+                        value: _toDate,
+                        calendarController: widget.calendarController,
+                        onChanged: (date) {
+                          setState(() => _toDate = date);
+                          _refreshData();
+                        },
+                        labelText: 'تا تاریخ',
+                        hintText: 'انتخاب تاریخ پایان',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _fromDate = null;
+                          _toDate = null;
+                        });
+                        _refreshData();
+                      },
+                      icon: const Icon(Icons.clear),
+                      tooltip: 'پاک کردن فیلتر تاریخ',
+                    ),
+                  ],
+                ),
               ],
             )
           : Row(
               children: [
-                // فیلتر نوع سند
                 typeFilter,
                 const SizedBox(width: 16),
-                // فیلتر تاریخ
                 dateFilter,
               ],
             ),
@@ -500,6 +557,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       emptyStateMessage: 'هیچ سند دریافت یا پرداختی یافت نشد',
       loadingMessage: 'در حال بارگذاری اسناد...',
       errorMessage: 'خطا در بارگذاری اسناد',
+      expandBodyHeightToFitRows: true,
     );
   }
 

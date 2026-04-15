@@ -163,6 +163,7 @@ class _CriticalStockReportPageState extends State<CriticalStockReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'current_stock',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -251,7 +252,7 @@ class _CriticalStockReportPageState extends State<CriticalStockReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

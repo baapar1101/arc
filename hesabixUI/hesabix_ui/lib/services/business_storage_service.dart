@@ -258,5 +258,101 @@ class BusinessStorageService {
     final body = res.data as Map<String, dynamic>;
     return Map<String, dynamic>.from(body['data'] as Map);
   }
+
+  /// ایجاد لینک اشتراک برای یک فایل (توکن فقط یک‌بار در پاسخ برمی‌گردد).
+  Future<Map<String, dynamic>> createFileShare({
+    required int businessId,
+    required String fileId,
+    String? password,
+    int? expiresInDays,
+    bool unlimitedExpiry = false,
+  }) async {
+    final body = <String, dynamic>{
+      if (password != null && password.isNotEmpty) 'password': password,
+    };
+    if (unlimitedExpiry) {
+      body['expires_in_days'] = null;
+    } else if (expiresInDays != null) {
+      body['expires_in_days'] = expiresInDays;
+    }
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/files/$fileId/shares',
+      data: body,
+    );
+    final resBody = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(resBody['data'] as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> listFileShares({
+    required int businessId,
+    required String fileId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/files/$fileId/shares',
+    );
+    final resBody = res.data as Map<String, dynamic>;
+    final data = resBody['data'] as Map<String, dynamic>?;
+    final items = data?['items'];
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  Future<Map<String, dynamic>> listBusinessShares({
+    required int businessId,
+    int page = 1,
+    int limit = 50,
+    bool onlyActive = false,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/shares',
+      query: {
+        'page': page,
+        'limit': limit,
+        'only_active': onlyActive,
+      },
+    );
+    final resBody = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(resBody['data'] as Map);
+  }
+
+  Future<void> revokeFileShare({
+    required int businessId,
+    required int shareId,
+  }) async {
+    await _api.delete('/api/v1/business/$businessId/storage/shares/$shareId');
+  }
+
+  Future<int> revokeAllFileShares({required int businessId}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/shares/revoke-all',
+      data: <String, dynamic>{},
+    );
+    final resBody = res.data as Map<String, dynamic>;
+    final data = resBody['data'] as Map<String, dynamic>? ?? {};
+    return (data['revoked_count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<Map<String, dynamic>> patchFileShare({
+    required int businessId,
+    required int shareId,
+    String? password,
+    bool clearPassword = false,
+    int? expiresInDays,
+    bool setExpires = false,
+  }) async {
+    final payload = <String, dynamic>{
+      if (clearPassword) 'clear_password': true,
+      if (password != null && password.isNotEmpty) 'password': password,
+      if (setExpires) 'expires_in_days': expiresInDays,
+    };
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/shares/$shareId',
+      data: payload,
+    );
+    final resBody = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(resBody['data'] as Map);
+  }
 }
 

@@ -69,7 +69,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
         limit: 500,
       );
       if (!mounted) return;
-      final data = result is Map ? result : <String, dynamic>{};
+      final data = Map<String, dynamic>.from(result);
       final list = data['items'] ?? [];
       setState(() {
         _filterPersons = list is List
@@ -94,7 +94,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
         limit: 100,
       );
       if (!mounted) return;
-      final data = result is Map<String, dynamic> ? result : <String, dynamic>{};
+      final data = Map<String, dynamic>.from(result as Map);
       final items = data['items'] is List ? (data['items'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
       setState(() {
         _items = items;
@@ -380,6 +380,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   late TextEditingController _subjectController;
   late TextEditingController _descController;
   late TextEditingController _codeController;
+  late TextEditingController _leadIdController;
   bool _codeAuto = true;
   String _activityType = 'call';
   DateTime _activityDate = DateTime.now();
@@ -404,6 +405,8 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _codeController = TextEditingController(text: i['code']?.toString() ?? '');
     _codeAuto = i['id'] == null;
     _descController = TextEditingController(text: i['description']?.toString() ?? '');
+    final lid = (i['lead_id'] as num?)?.toInt();
+    _leadIdController = TextEditingController(text: lid != null ? '$lid' : '');
     _activityType = i['activity_type']?.toString() ?? 'call';
     final pid = (i['person_id'] as num?)?.toInt();
     _personId = pid;
@@ -419,6 +422,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _subjectController.dispose();
     _codeController.dispose();
     _descController.dispose();
+    _leadIdController.dispose();
     super.dispose();
   }
 
@@ -465,9 +469,9 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           ],
           PersonComboboxWidget(
             businessId: widget.businessId,
-            label: 'مشتری',
+            label: 'مشتری (در صورت ثبت برای سرنخ می‌توان خالی بماند)',
             hintText: 'جست‌وجو و انتخاب مشتری',
-            isRequired: true,
+            isRequired: false,
             personTypes: [PersonType.customer.persianName],
             selectedPerson: _selectedPerson,
             onChanged: (p) {
@@ -476,6 +480,16 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
                 _personId = p?.id;
               });
             },
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _leadIdController,
+            enabled: !isEdit,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'شناسه سرنخ (اختیاری)',
+              helperText: 'برای تماس قبل از تبدیل به مشتری؛ در غیر این صورت مشتری را انتخاب کنید',
+            ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -564,7 +578,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
         dealId: _dealId,
       );
       if (!mounted) return;
-      final text = (data is Map && data['suggested_text'] != null) ? data['suggested_text'].toString() : null;
+      final text = data['suggested_text']?.toString();
       setState(() {
         _loadingSuggest = false;
         if (text != null) _descController.text = text;
@@ -579,8 +593,17 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   Future<void> _save() async {
     final isEdit = (widget.initial?['id']) != null;
     final personId = _selectedPerson?.id ?? _personId;
-    if (!isEdit && personId == null) {
-      SnackBarHelper.show(context, message: 'انتخاب مشتری الزامی است', isError: true);
+    final leadRaw = _leadIdController.text.trim();
+    int? leadId;
+    if (leadRaw.isNotEmpty) {
+      leadId = int.tryParse(leadRaw);
+      if (leadId == null || leadId <= 0) {
+        SnackBarHelper.show(context, message: 'شناسه سرنخ نامعتبر است', isError: true);
+        return;
+      }
+    }
+    if (!isEdit && personId == null && leadId == null) {
+      SnackBarHelper.show(context, message: 'یکی از مشتری یا شناسه سرنخ لازم است', isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -600,7 +623,8 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
       } else {
         await widget.crmService.createActivity(
           businessId: widget.businessId,
-          personId: personId!,
+          personId: personId,
+          leadId: leadId,
           activityType: _activityType,
           code: _codeAuto ? null : (_codeController.text.trim().isEmpty ? null : _codeController.text.trim()),
           subject: _subjectController.text.trim().isEmpty ? null : _subjectController.text.trim(),

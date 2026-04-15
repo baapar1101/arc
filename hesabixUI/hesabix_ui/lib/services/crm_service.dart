@@ -382,6 +382,9 @@ class CrmService {
     int? stageId,
     int? assignedToUserId,
     String? search,
+    String? fromDate,
+    String? toDate,
+    bool? openOnly,
     int page = 1,
     int limit = 50,
   }) async {
@@ -390,6 +393,9 @@ class CrmService {
     if (stageId != null) queryParams['stage_id'] = stageId;
     if (assignedToUserId != null) queryParams['assigned_to_user_id'] = assignedToUserId;
     if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+    if (fromDate != null && fromDate.isNotEmpty) queryParams['from_date'] = fromDate;
+    if (toDate != null && toDate.isNotEmpty) queryParams['to_date'] = toDate;
+    if (openOnly != null) queryParams['open_only'] = openOnly;
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads',
       query: queryParams,
@@ -440,6 +446,9 @@ class CrmService {
     int? personId,
     int? assignedToUserId,
     String? search,
+    String? fromDate,
+    String? toDate,
+    bool? openOnly,
     int page = 1,
     int limit = 50,
   }) async {
@@ -449,6 +458,9 @@ class CrmService {
     if (personId != null) queryParams['person_id'] = personId;
     if (assignedToUserId != null) queryParams['assigned_to_user_id'] = assignedToUserId;
     if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+    if (fromDate != null && fromDate.isNotEmpty) queryParams['from_date'] = fromDate;
+    if (toDate != null && toDate.isNotEmpty) queryParams['to_date'] = toDate;
+    if (openOnly != null) queryParams['open_only'] = openOnly;
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/deals',
       query: queryParams,
@@ -460,6 +472,7 @@ class CrmService {
   Future<Map<String, dynamic>> listActivities({
     required int businessId,
     int? personId,
+    int? leadId,
     int? dealId,
     String? activityType,
     int page = 1,
@@ -467,6 +480,7 @@ class CrmService {
   }) async {
     final queryParams = <String, dynamic>{'page': page, 'limit': limit};
     if (personId != null) queryParams['person_id'] = personId;
+    if (leadId != null) queryParams['lead_id'] = leadId;
     if (dealId != null) queryParams['deal_id'] = dealId;
     if (activityType != null) queryParams['activity_type'] = activityType;
     final res = await _apiClient.get<dynamic>(
@@ -514,7 +528,8 @@ class CrmService {
   /// ثبت فعالیت
   Future<Map<String, dynamic>> createActivity({
     required int businessId,
-    required int personId,
+    int? personId,
+    int? leadId,
     required String activityType,
     String? code,
     String? subject,
@@ -523,10 +538,11 @@ class CrmService {
     int? dealId,
   }) async {
     final body = <String, dynamic>{
-      'person_id': personId,
       'activity_type': activityType,
       'activity_date': activityDate.toIso8601String(),
     };
+    if (personId != null) body['person_id'] = personId;
+    if (leadId != null) body['lead_id'] = leadId;
     if (code != null && code.trim().isNotEmpty) body['code'] = code.trim();
     if (subject != null) body['subject'] = subject;
     if (description != null) body['description'] = description;

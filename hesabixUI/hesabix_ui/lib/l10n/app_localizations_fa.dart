@@ -1298,16 +1298,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get basePath => 'مسیر پایه';
 
   @override
-  String get ftpHost => 'میزبان FTP';
+  String get ftpHost => 'میزبان';
 
   @override
-  String get ftpPort => 'پورت FTP';
+  String get ftpPort => 'پورت';
 
   @override
-  String get ftpUsername => 'نام کاربری FTP';
+  String get ftpUsername => 'نام کاربری';
 
   @override
-  String get ftpPassword => 'رمز عبور FTP';
+  String get ftpPassword => 'رمز عبور';
 
   @override
   String get ftpDirectory => 'پوشه FTP';
@@ -1561,7 +1561,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get storageManagementDescription =>
-      'پیکربندی سیستم‌های ذخیره‌سازی فایل و مدیریت فایل‌ها';
+      'پیکربندی سیستم‌های ذخیره‌سازی فایل، آدرس اپ برای لینک‌های عمومی (اشتراک فایل) و مدیریت فایل‌ها';
 
   @override
   String get systemConfiguration => 'پیکربندی سیستم';
@@ -7537,6 +7537,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowCategoryPersons => 'اشخاص';
 
   @override
+  String get workflowCategoryCrm => 'CRM';
+
+  @override
+  String get workflowTemplateCrmNewLeadNotifyName => 'اعلان سرنخ جدید';
+
+  @override
+  String get workflowTemplateCrmNewLeadNotifyDesc =>
+      'با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود';
+
+  @override
+  String get workflowTemplateCrmDealWonLogName => 'ثبت لاگ بستن معامله موفق';
+
+  @override
+  String get workflowTemplateCrmDealWonLogDesc =>
+      'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود';
+
+  @override
   String get settingsCategoriesCount => 'دسته‌بندی';
 
   @override
@@ -8536,4 +8553,99 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get invoiceWarehouseReleaseBusinessSubtitle =>
       'اگر در API یا ایمپورت، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
+
+  @override
+  String get ftpBackupSettingsTitle => 'مقصد FTP بکاپ';
+
+  @override
+  String get ftpBackupSettingsDescription =>
+      'اتصال به سرور FTP برای ارسال خودکار یا دستی فایل‌های پشتیبان.';
+
+  @override
+  String get ftpPasswordLeaveEmptyHint => 'برای حفظ رمز فعلی خالی بگذارید';
+
+  @override
+  String get ftpRemotePath => 'پوشه روی سرور';
+
+  @override
+  String get ftpPassiveMode => 'حالت غیرفعال (PASV)';
+
+  @override
+  String get ftpUseFtps => 'استفاده از FTPS (TLS)';
+
+  @override
+  String get ftpSaveSettings => 'ذخیره';
+
+  @override
+  String get ftpDeleteSettings => 'حذف تنظیمات FTP';
+
+  @override
+  String get ftpTestConnection => 'تست اتصال';
+
+  @override
+  String get ftpScanUsage => 'محاسبه حجم پوشه';
+
+  @override
+  String get ftpUsageTotal => 'حجم کل (این پوشه)';
+
+  @override
+  String get ftpUsageFiles => 'تعداد فایل';
+
+  @override
+  String get ftpUsageTruncated => 'اسکن ناقص (حد فایل)';
+
+  @override
+  String get ftpLastScan => 'آخرین محاسبه';
+
+  @override
+  String get ftpSettingsUpdatedAt => 'آخرین ذخیره تنظیمات';
+
+  @override
+  String get ftpNotConfigured => 'تنظیم نشده';
+
+  @override
+  String get ftpSendAfterBackup => 'ارسال به FTP پس از بکاپ';
+
+  @override
+  String get ftpSendAfterBackupSubtitle =>
+      'نیاز به ذخیره تنظیمات FTP و دسترسی مدیریت FTP';
+
+  @override
+  String get jobUploadingToFtp => 'در حال ارسال به FTP';
+
+  @override
+  String get jobFtpTestStarting => 'شروع تست FTP';
+
+  @override
+  String get jobFtpTestRunning => 'در حال بررسی FTP';
+
+  @override
+  String get jobFtpTestCompleted => 'تست FTP موفق';
+
+  @override
+  String get jobFtpTestFailed => 'تست FTP ناموفق';
+
+  @override
+  String get jobFtpUsageStarting => 'محاسبه حجم FTP';
+
+  @override
+  String get jobFtpUsageConnecting => 'اتصال به FTP';
+
+  @override
+  String get jobFtpUsageScanning => 'اسکن پوشه‌های ریموت';
+
+  @override
+  String get jobFtpUsageCompleted => 'محاسبه حجم تمام شد';
+
+  @override
+  String get jobFtpUsageFailed => 'محاسبه حجم ناموفق';
+
+  @override
+  String get ftpTestResultTitle => 'نتیجه تست اتصال';
+
+  @override
+  String get ftpClose => 'بستن';
+
+  @override
+  String get settingsPermissionManageFtp => 'اتصال FTP بکاپ';
 }

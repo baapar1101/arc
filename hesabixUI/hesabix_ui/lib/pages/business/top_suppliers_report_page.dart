@@ -179,6 +179,7 @@ class _TopSuppliersReportPageState extends State<TopSuppliersReportPage> {
       defaultSortDesc: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-suppliers/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-suppliers/export/pdf',
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -367,7 +368,7 @@ class _TopSuppliersReportPageState extends State<TopSuppliersReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

@@ -56,6 +56,7 @@ def list_attributes(db: Session, business_id: int, query: Dict[str, Any]) -> Dic
     skip = int(query.get("skip", 0) or 0)
     sort_by = query.get("sort_by")
     sort_desc = bool(query.get("sort_desc", True))
+    sort_multi = query.get("sort") if isinstance(query.get("sort"), list) else None
     search = query.get("search")
     filters = query.get("filters")
     result = repo.search(
@@ -64,6 +65,7 @@ def list_attributes(db: Session, business_id: int, query: Dict[str, Any]) -> Dic
         skip=skip,
         sort_by=sort_by,
         sort_desc=sort_desc,
+        sort=sort_multi,
         search=search,
         filters=filters,
     )

@@ -186,6 +186,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'date',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -340,7 +341,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

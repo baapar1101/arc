@@ -144,6 +144,7 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
       defaultPageSize: 50,
       defaultSortBy: 'document_date',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select
 
 from adapters.api.v1.schemas import QueryInfo, FilterItem
+from app.services.sort_resolution import effective_sort_specs
 
 T = TypeVar('T')
 
@@ -58,7 +59,7 @@ class QueryBuilder:
 		return self
 	
 	def apply_sorting(self, sort_by: str | None, sort_desc: bool) -> 'QueryBuilder':
-		"""اعمال مرتب‌سازی بر روی کوئری"""
+		"""اعمال مرتب‌سازی تک‌ستونه (سازگار با نسخهٔ قبلی)."""
 		if not sort_by:
 			return self
 		
@@ -74,6 +75,21 @@ class QueryBuilder:
 		
 		return self
 	
+	def apply_sorting_from_query_info(self, query_info: QueryInfo) -> 'QueryBuilder':
+		"""مرتب‌سازی از QueryInfo: آرایه sort در اولویت، وگرنه sort_by/sort_desc؛ فقط ستون‌های موجود روی مدل."""
+		specs = effective_sort_specs(query_info, allowed=None, default_when_empty=None)
+		if not specs:
+			return self
+		order_parts = []
+		for name, desc in specs:
+			if not hasattr(self.model_class, name):
+				continue
+			column = getattr(self.model_class, name)
+			order_parts.append(column.desc() if desc else column.asc())
+		if order_parts:
+			self.stmt = self.stmt.order_by(*order_parts)
+		return self
+	
 	def apply_pagination(self, skip: int, take: int) -> 'QueryBuilder':
 		"""اعمال صفحه‌بندی بر روی کوئری"""
 		self.stmt = self.stmt.offset(skip).limit(take)
@@ -84,7 +100,7 @@ class QueryBuilder:
 		return (self
 			.apply_filters(query_info.filters)
 			.apply_search(query_info.search, query_info.search_fields)
-			.apply_sorting(query_info.sort_by, query_info.sort_desc)
+			.apply_sorting_from_query_info(query_info)
 			.apply_pagination(query_info.skip, query_info.take))
 	
 	def _build_condition(self, column, operator: str, value: Any):

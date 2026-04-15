@@ -14,13 +14,21 @@ class BackupService {
     return data.cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> createBackup(int businessId) async {
-    final res = await _apiClient.post<Map<String, dynamic>>('/businesses/$businessId/backups', data: {}, query: {'async_mode': false});
+  Future<Map<String, dynamic>> createBackup(int businessId, {bool uploadToFtp = false}) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/backups',
+      data: {'upload_to_ftp': uploadToFtp},
+      query: {'async_mode': false},
+    );
     return (res.data?['data'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
   }
 
-  Future<String> startBackupAsync(int businessId) async {
-    final res = await _apiClient.post<Map<String, dynamic>>('/businesses/$businessId/backups', data: {}, query: {'async_mode': true});
+  Future<String> startBackupAsync(int businessId, {bool uploadToFtp = false}) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/backups',
+      data: {'upload_to_ftp': uploadToFtp},
+      query: {'async_mode': true},
+    );
     final data = (res.data?['data'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
     return (data['job_id'] as String?) ?? '';
   }

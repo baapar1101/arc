@@ -120,18 +120,13 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // هدر صفحه
-            _buildHeader(t, isMobile),
-            
-            // فیلترها
-            _buildFilters(t, isMobile),
-            
-            // جدول داده‌ها
-            Expanded(
-              child: Padding(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(t, isMobile),
+              _buildFilters(t, isMobile),
+              Padding(
                 padding: EdgeInsets.fromLTRB(
                   contentPadding,
                   8,
@@ -146,8 +141,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
                   calendarController: widget.calendarController,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: (isMobile && widget.authStore.canWriteSection('expenses_income'))
@@ -679,6 +674,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         emptyStateMessage: 'هیچ سند هزینه یا درآمدی یافت نشد',
         loadingMessage: 'در حال بارگذاری اسناد...',
         errorMessage: 'خطا در بارگذاری اسناد',
+        expandBodyHeightToFitRows: true,
       );
     }
 
@@ -866,6 +862,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       emptyStateMessage: 'هیچ سند هزینه یا درآمدی یافت نشد',
       loadingMessage: 'در حال بارگذاری اسناد...',
       errorMessage: 'خطا در بارگذاری اسناد',
+      expandBodyHeightToFitRows: true,
     );
   }
 

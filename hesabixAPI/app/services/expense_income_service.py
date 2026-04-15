@@ -691,14 +691,10 @@ def list_expense_income(
     if search:
         q = q.filter(Document.code.ilike(f"%{search}%"))
 
-    # مرتب‌سازی
-    sort_by = query.get("sort_by", "document_date")
-    sort_desc = bool(query.get("sort_desc", True))
-    if isinstance(sort_by, str) and hasattr(Document, sort_by):
-        col = getattr(Document, sort_by)
-        q = q.order_by(col.desc() if sort_desc else col.asc())
-    else:
-        q = q.order_by(Document.document_date.desc())
+    # مرتب‌سازی (sort چندستونه / sort_by)
+    from app.services.document_list_sort import apply_document_dynamic_ordering_from_dict
+
+    q = apply_document_dynamic_ordering_from_dict(q, query)
 
     # صفحه‌بندی
     skip = int(query.get("skip", 0))

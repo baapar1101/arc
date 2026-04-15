@@ -85,7 +85,9 @@ from adapters.api.v1.admin.notification_moderation import router as admin_notifi
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
+from adapters.api.v1.public_storage_file_shares import router as public_storage_file_shares_router
 from adapters.api.v1.business_backups import router as business_backups_router
+from adapters.api.v1.business_ftp_backup import router as business_ftp_backup_router
 from adapters.api.v1.business.document_monetization import router as business_document_monetization_router
 from adapters.api.v1.jobs import router as jobs_router
 from adapters.api.v1.activity_logs import router as activity_logs_router
@@ -1039,6 +1041,7 @@ def create_app() -> FastAPI:
     application.include_router(ai_voice_ws_router)
     # Business backups
     application.include_router(business_backups_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_ftp_backup_router, prefix=settings.api_v1_prefix)
     # Business storage
     from adapters.api.v1.business.storage import router as business_storage_router
     application.include_router(business_storage_router, prefix=settings.api_v1_prefix)
@@ -1056,6 +1059,7 @@ def create_app() -> FastAPI:
     application.include_router(announcements_router, prefix=settings.api_v1_prefix)
     # Public share links (no prefix to allow short /p/{code})
     application.include_router(public_share_links_router)
+    application.include_router(public_storage_file_shares_router)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")

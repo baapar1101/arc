@@ -35,6 +35,14 @@ from app.services.storage_invoice_service import (
 	list_storage_invoices,
 )
 from app.services.storage_export_service import export_business_files_as_zip, get_export_info
+from app.services.file_storage_share_service import (
+	create_share,
+	list_shares_for_business,
+	list_shares_for_file,
+	revoke_all_for_business,
+	revoke_share,
+	update_share,
+)
 from adapters.db.models.wallet import WalletAccount
 from adapters.db.models.storage_plan import StoragePlan
 import io
@@ -783,4 +791,164 @@ async def delete_file_endpoint(
 		"dependencies": [dep.to_dict() for dep in dependencies],
 		"cleaned": [dep.to_dict() for dep in cleared_dependencies],
 	}, request, "فایل با موفقیت حذف شد")
+
+
+@router.post(
+	"/files/{file_id}/shares",
+	summary="ایجاد لینک اشتراک برای فایل",
+)
+def create_file_share_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	user_id = ctx.get_user_id()
+	password = payload.get("password")
+	if password is not None and not isinstance(password, str):
+		password = str(password)
+	expires_in_days: Optional[int] = 30
+	if "expires_in_days" in payload:
+		v = payload.get("expires_in_days")
+		if v is None:
+			expires_in_days = None
+		else:
+			try:
+				expires_in_days = int(v)
+			except (TypeError, ValueError):
+				raise ApiError("VALIDATION_ERROR", "expires_in_days نامعتبر است", http_status=422)
+	try:
+		data = create_share(
+			db,
+			business_id=business_id,
+			file_id=file_id,
+			user_id=user_id,
+			password=password,
+			expires_in_days=expires_in_days,
+		)
+	except ApiError:
+		raise
+	return success_response(data, request, "لینک اشتراک ایجاد شد")
+
+
+@router.get(
+	"/files/{file_id}/shares",
+	summary="لیست لینک‌های اشتراک یک فایل",
+)
+def list_file_shares_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	try:
+		items = list_shares_for_file(db, business_id, file_id)
+	except ApiError:
+		raise
+	return success_response({"items": items}, request)
+
+
+@router.get(
+	"/shares",
+	summary="لیست همه لینک‌های اشتراک کسب‌وکار",
+)
+def list_business_shares_endpoint(
+	business_id: int,
+	request: Request,
+	page: int = Query(1, ge=1),
+	limit: int = Query(50, ge=1, le=100),
+	only_active: bool = Query(False),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	data = list_shares_for_business(db, business_id, page=page, limit=limit, only_active=only_active)
+	return success_response(data, request)
+
+
+@router.delete(
+	"/shares/{share_id}",
+	summary="لغو یک لینک اشتراک",
+)
+def revoke_file_share_endpoint(
+	business_id: int,
+	share_id: int,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	try:
+		revoke_share(db, business_id, share_id)
+	except ApiError:
+		raise
+	return success_response({"ok": True}, request, "لینک اشتراک لغو شد")
+
+
+@router.post(
+	"/shares/revoke-all",
+	summary="لغو همه لینک‌های اشتراک فعال کسب‌وکار",
+)
+def revoke_all_file_shares_endpoint(
+	business_id: int,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	n = revoke_all_for_business(db, business_id)
+	return success_response({"revoked_count": n}, request, f"{n} لینک لغو شد")
+
+
+@router.patch(
+	"/shares/{share_id}",
+	summary="تغییر رمز یا انقضای لینک اشتراک",
+)
+def patch_file_share_endpoint(
+	business_id: int,
+	share_id: int,
+	request: Request,
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	clear_password = bool(payload.get("clear_password"))
+	password = payload.get("password")
+	if password is not None and not isinstance(password, str):
+		password = str(password)
+	expires_in_days = payload.get("expires_in_days")
+	exp_int: Optional[int] = None
+	if "expires_in_days" in payload:
+		if expires_in_days is None:
+			exp_int = None
+		else:
+			try:
+				exp_int = int(expires_in_days)
+			except (TypeError, ValueError):
+				raise ApiError("VALIDATION_ERROR", "expires_in_days نامعتبر است", http_status=422)
+	try:
+		data = update_share(
+			db,
+			business_id,
+			share_id,
+			password=password if not clear_password else None,
+			clear_password=clear_password,
+			expires_in_days=exp_int,
+			set_expires=("expires_in_days" in payload),
+		)
+	except ApiError:
+		raise
+	return success_response(data, request, "لینک به‌روزرسانی شد")
 

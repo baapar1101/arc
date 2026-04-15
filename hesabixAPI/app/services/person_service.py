@@ -233,6 +233,19 @@ def get_person_by_id(db: Session, person_id: int, business_id: int) -> Optional[
     return _person_to_dict(person)
 
 
+def _person_sort_needs_balance_materialization(query_info: Dict[str, Any]) -> bool:
+    if query_info.get("sort_by") in ("balance", "status"):
+        return True
+    raw = query_info.get("sort")
+    if not isinstance(raw, list):
+        return False
+    for it in raw:
+        by = it.get("by") if isinstance(it, dict) else None
+        if by in ("balance", "status"):
+            return True
+    return False
+
+
 def get_persons_by_business(
     db: Session, 
     business_id: int, 
@@ -244,10 +257,8 @@ def get_persons_by_business(
     
     # بررسی نیاز به محاسبه تراز قبل از pagination
     # (برای فیلتر یا مرتب‌سازی بر اساس تراز/وضعیت)
-    needs_balance_before_pagination = False
+    needs_balance_before_pagination = _person_sort_needs_balance_materialization(query_info)
     sort_by = query_info.get('sort_by', 'created_at')
-    if sort_by in ['balance', 'status']:
-        needs_balance_before_pagination = True
     
     # بررسی فیلترها برای balance و status
     if query_info.get('filters'):
@@ -392,23 +403,30 @@ def get_persons_by_business(
     # شمارش کل رکوردها
     total = query.count()
     
-    # اعمال مرتب‌سازی (فقط برای فیلدهای دیتابیس)
+    # اعمال مرتب‌سازی (فقط برای فیلدهای دیتابیس؛ چندستونه sort در اولویت)
     sort_desc = query_info.get('sort_desc', True)
     
-    if sort_by not in ['balance', 'status']:
-        # مرتب‌سازی در دیتابیس
-        if sort_by == 'code':
-            query = query.order_by(Person.code.desc() if sort_desc else Person.code.asc())
-        elif sort_by == 'alias_name':
-            query = query.order_by(Person.alias_name.desc() if sort_desc else Person.alias_name.asc())
-        elif sort_by == 'first_name':
-            query = query.order_by(Person.first_name.desc() if sort_desc else Person.first_name.asc())
-        elif sort_by == 'last_name':
-            query = query.order_by(Person.last_name.desc() if sort_desc else Person.last_name.asc())
-        elif sort_by == 'created_at':
-            query = query.order_by(Person.created_at.desc() if sort_desc else Person.created_at.asc())
-        elif sort_by == 'updated_at':
-            query = query.order_by(Person.updated_at.desc() if sort_desc else Person.updated_at.asc())
+    if not needs_balance_before_pagination:
+        from adapters.api.v1.schemas import QueryInfo as _PersonQI
+        from app.services.sort_resolution import effective_sort_specs as _eff_specs
+
+        _sql_allowed = frozenset({"code", "alias_name", "first_name", "last_name", "created_at", "updated_at"})
+        _qi = _PersonQI.model_validate({
+            "take": int(query_info.get("take", 20) or 20),
+            "skip": int(query_info.get("skip", 0) or 0),
+            "sort_by": query_info.get("sort_by"),
+            "sort_desc": bool(sort_desc),
+            "sort": query_info.get("sort") if isinstance(query_info.get("sort"), list) else None,
+        })
+        _specs = _eff_specs(_qi, allowed=_sql_allowed, default_when_empty=("created_at", True))
+        _parts = []
+        for _n, _d in _specs:
+            if not hasattr(Person, _n):
+                continue
+            _c = getattr(Person, _n)
+            _parts.append(_c.desc() if _d else _c.asc())
+        if _parts:
+            query = query.order_by(*_parts)
         else:
             query = query.order_by(Person.created_at.desc())
     

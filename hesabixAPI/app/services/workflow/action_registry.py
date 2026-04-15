@@ -87,6 +87,9 @@ class ActionRegistry:
             CreateLeadAction,
             CreateDealAction,
             CreateCrmActivityAction,
+            UpdateLeadAction,
+            UpdateDealAction,
+            CrmLinkDealDocumentAction,
         )
         
         # Communication actions
@@ -106,6 +109,9 @@ class ActionRegistry:
         self.register("crm_create_lead", CreateLeadAction())
         self.register("crm_create_deal", CreateDealAction())
         self.register("crm_create_activity", CreateCrmActivityAction())
+        self.register("crm_update_lead", UpdateLeadAction())
+        self.register("crm_update_deal", UpdateDealAction())
+        self.register("crm_link_deal_document", CrmLinkDealDocumentAction())
 
         # HTTP actions
         self.register("http_request", HttpRequestAction())

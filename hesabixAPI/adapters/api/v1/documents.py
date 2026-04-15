@@ -77,6 +77,7 @@ async def list_documents_endpoint(
         "skip": body.get("skip", 0),
         "sort_by": body.get("sort_by", "document_date"),
         "sort_desc": body.get("sort_desc", True),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
     }
 
@@ -177,8 +178,12 @@ async def export_documents_pdf_endpoint(
             filters["fiscal_year_id"] = body["fiscal_year_id"]
     except Exception:
         pass
-    # دریافت داده‌ها
-    result = list_documents(db, business_id, {**filters, "take": body.get("take", 1000), "skip": body.get("skip", 0)})
+    # دریافت داده‌ها (شامل مرتب‌سازی چندستونه اگر ارسال شده باشد)
+    _sort_extra: Dict[str, Any] = {"take": body.get("take", 1000), "skip": body.get("skip", 0)}
+    for _k in ("sort_by", "sort_desc", "sort"):
+        if _k in body:
+            _sort_extra[_k] = body[_k]
+    result = list_documents(db, business_id, {**filters, **_sort_extra})
     items = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
     # ستون‌ها
@@ -486,7 +491,7 @@ async def export_documents_excel_endpoint(
     filters = {}
     
     # فیلترها
-    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma"]:
+    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma", "sort_by", "sort_desc", "sort"]:
         if key in body:
             filters[key] = body[key]
     

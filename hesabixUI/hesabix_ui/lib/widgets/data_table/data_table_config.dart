@@ -215,6 +215,8 @@ class DataTableConfig<T> {
   final bool showColumnSearch;
   final int defaultPageSize;
   final List<int> pageSizeOptions;
+  /// ذخیرهٔ تعداد ردیف در هر صفحه در حافظهٔ محلی، با کلید [effectiveTableId].
+  final bool persistPageSize;
   final bool enableSorting;
   final bool enableGlobalSearch;
   final bool enableDateRangeFilter;
@@ -334,6 +336,7 @@ class DataTableConfig<T> {
     this.showColumnSearch = true,
     this.defaultPageSize = 20,
     this.pageSizeOptions = const [10, 20, 50, 100],
+    this.persistPageSize = true,
     this.enableSorting = true,
     this.enableGlobalSearch = true,
     this.enableDateRangeFilter = false,

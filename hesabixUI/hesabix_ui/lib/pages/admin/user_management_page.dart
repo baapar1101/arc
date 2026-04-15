@@ -50,10 +50,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
           onPressed: () => context.go('/user/profile/system-settings'),
         ),
       ),
-      body: DataTableWidget<Map<String, dynamic>>(
-        config: _buildTableConfig(theme),
-        fromJson: (json) => Map<String, dynamic>.from(json),
-        calendarController: _calendarController,
+      body: SingleChildScrollView(
+        child: DataTableWidget<Map<String, dynamic>>(
+          config: _buildTableConfig(theme),
+          fromJson: (json) => Map<String, dynamic>.from(json),
+          calendarController: _calendarController,
+        ),
       ),
     );
   }
@@ -78,6 +80,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       defaultSortBy: 'created_at',
       defaultSortDesc: true,
       defaultPageSize: 20,
+      expandBodyHeightToFitRows: true,
       pageSizeOptions: const [10, 20, 50, 100],
       searchFields: const ['full_name', 'email', 'mobile'],
       filterFields: const ['status', 'role'],

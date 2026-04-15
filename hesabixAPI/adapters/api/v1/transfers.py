@@ -178,13 +178,14 @@ async def list_transfers_endpoint(
         "skip": query_info.skip,
         "sort_by": query_info.sort_by,
         "sort_desc": query_info.sort_desc,
+        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
         "search": query_info.search,
     }
     try:
         body_json = await request.json()
         if isinstance(body_json, dict):
             # Forward simple date range params
-            for key in ["from_date", "to_date"]:
+            for key in ["from_date", "to_date", "sort", "sort_by", "sort_desc"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
             # Forward advanced filters from DataTable (e.g., document_date range)
@@ -1190,6 +1191,7 @@ async def export_transfers_excel(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
@@ -1423,6 +1425,7 @@ async def export_transfers_pdf(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),

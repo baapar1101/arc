@@ -2113,6 +2113,20 @@ server {
     try_files \$uri \$uri/ /index.html;
   }
 
+  # نسخهٔ build (همیشه تازه؛ پایهٔ تشخیص به‌روزرسانی در کلاینت)
+  location = /version.json {
+    add_header Cache-Control "no-store" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
+  # Service Worker نباید با immutable یک‌ساله قفل شود
+  location = /flutter_service_worker.js {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
   location / {
     try_files \$uri \$uri/ /index.html;
   }

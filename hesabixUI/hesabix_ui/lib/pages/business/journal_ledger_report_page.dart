@@ -281,6 +281,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       },
       defaultSortBy: 'document_date',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 

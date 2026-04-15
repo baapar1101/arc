@@ -218,6 +218,32 @@ class FileStorageService:
             "expires_at": file_storage.expires_at.isoformat() if file_storage.expires_at else None
         }
 
+    async def resolve_local_disk_path_for_file(self, file_id: UUID) -> Optional[str]:
+        """
+        اگر فایل روی دیسک محلی باشد، مسیر قابل خواندن را برمی‌گرداند (برای FileResponse و Range).
+        برای FTP یا فایل ناموجود: None.
+        """
+        file_storage = await self.file_repo.get_file_by_id(file_id)
+        if not file_storage:
+            return None
+        st = (file_storage.storage_type or "").lower()
+        if st != "local":
+            return None
+        path = file_storage.file_path
+        if os.path.exists(path):
+            return path
+        try:
+            default_cfg = await self.config_repo.get_default_config()
+            if default_cfg and isinstance(default_cfg.config_data, dict):
+                base_path = default_cfg.config_data.get("base_path")
+                if base_path:
+                    alt_path = os.path.join(str(base_path), os.path.basename(file_storage.file_path))
+                    if os.path.exists(alt_path):
+                        return alt_path
+        except Exception:
+            pass
+        return None
+
     async def download_file(self, file_id: UUID) -> Dict[str, Any]:
         file_storage = await self.file_repo.get_file_by_id(file_id)
         if not file_storage:

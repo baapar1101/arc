@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_
 
+from adapters.api.v1.schemas import QueryInfo
+from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.price_list import PriceList, PriceItem
 
@@ -12,17 +14,30 @@ class PriceListRepository(BaseRepository[PriceList]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, PriceList)
 
-    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None) -> dict[str, Any]:
+    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, sort: List[Any] | None = None, search: str | None = None) -> dict[str, Any]:
         stmt = select(PriceList).where(PriceList.business_id == business_id)
         if search:
             stmt = stmt.where(PriceList.name.ilike(f"%{search}%"))
 
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
-        if sort_by in {"name", "created_at"}:
-            col = getattr(PriceList, sort_by)
-            stmt = stmt.order_by(col.desc() if sort_desc else col.asc())
-        else:
+        _allowed = frozenset({"name", "created_at", "id"})
+        try:
+            qi = QueryInfo(sort_by=sort_by, sort_desc=sort_desc, sort=sort)  # type: ignore[arg-type]
+            specs = effective_sort_specs(qi, allowed=_allowed, default_when_empty=None)
+        except Exception:
+            specs = []
+        order_parts = []
+        for col_name, desc in specs:
+            if col_name not in _allowed:
+                continue
+            col = getattr(PriceList, col_name)
+            order_parts.append(col.desc() if desc else col.asc())
+        if not order_parts:
             stmt = stmt.order_by(PriceList.id.desc() if sort_desc else PriceList.id.asc())
+        else:
+            if not specs or specs[-1][0] != "id":
+                order_parts.append(PriceList.id.asc())
+            stmt = stmt.order_by(*order_parts)
 
         rows = list(self.db.execute(stmt.offset(skip).limit(take)).scalars().all())
         items = [self._to_dict_list(pl) for pl in rows]

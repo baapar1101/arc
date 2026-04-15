@@ -13,6 +13,7 @@ import '../../widgets/date_input_field.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/transfer/transfer_details_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -122,18 +123,19 @@ class _TransfersPageState extends State<TransfersPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final contentPadding = ResponsiveHelper.getPadding(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(t),
-            _buildFilters(t),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(t),
+              _buildFilters(t),
+              Padding(
+                padding: EdgeInsets.fromLTRB(contentPadding, 8, contentPadding, 8),
                 child: DataTableWidget<TransferDocument>(
                   key: _tableKey,
                   config: _buildTableConfig(t),
@@ -141,8 +143,8 @@ class _TransfersPageState extends State<TransfersPage> {
                   calendarController: widget.calendarController,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -343,6 +345,7 @@ class _TransfersPageState extends State<TransfersPage> {
       emptyStateMessage: 'هیچ سند انتقالی یافت نشد',
       loadingMessage: 'در حال بارگذاری اسناد انتقال...',
       errorMessage: 'خطا در بارگذاری اسناد انتقال',
+      expandBodyHeightToFitRows: true,
     );
   }
 

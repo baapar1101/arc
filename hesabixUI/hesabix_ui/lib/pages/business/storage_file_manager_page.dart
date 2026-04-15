@@ -1,6 +1,6 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
@@ -691,6 +691,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         ),
         actions: [
           IconButton(
+            onPressed: _showBusinessSharesSheet,
+            icon: const Icon(Icons.link),
+            tooltip: 'مدیریت لینک‌های اشتراک',
+          ),
+          IconButton(
             onPressed: _showHelpDialog,
             icon: const Icon(Icons.help_outline),
             tooltip: 'راهنما',
@@ -997,6 +1002,142 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     );
   }
 
+  String _publicFileSharePageUrl(String token) {
+    final origin = Uri.base.origin;
+    return '$origin/public/storage-file/${Uri.encodeComponent(token)}';
+  }
+
+  Future<void> _showCreateShareDialog(Map<String, dynamic> file) async {
+    final fileId = file['id'] as String;
+    final pwdController = TextEditingController();
+    var expiryDays = 30;
+
+    final created = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('لینک اشتراک فایل'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  file['original_name'] as String? ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pwdController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'رمز لینک (اختیاری)',
+                    border: OutlineInputBorder(),
+                    helperText: 'در صورت خالی بودن، هر کسی با لینک دسترسی دارد',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  key: ValueKey(expiryDays),
+                  initialValue: expiryDays,
+                  decoration: const InputDecoration(
+                    labelText: 'مدت اعتبار لینک',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 7, child: Text('۷ روز')),
+                    DropdownMenuItem(value: 30, child: Text('۳۰ روز')),
+                    DropdownMenuItem(value: 90, child: Text('۹۰ روز')),
+                    DropdownMenuItem(value: 365, child: Text('یک سال')),
+                    DropdownMenuItem(value: 0, child: Text('بدون انقضا')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setDialogState(() => expiryDays = v);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('لغو')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  final data = await _storageService.createFileShare(
+                    businessId: widget.businessId,
+                    fileId: fileId,
+                    password: pwdController.text.trim().isEmpty ? null : pwdController.text.trim(),
+                    expiresInDays: expiryDays == 0 ? null : expiryDays,
+                    unlimitedExpiry: expiryDays == 0,
+                  );
+                  if (context.mounted) Navigator.pop(context, data);
+                } catch (e) {
+                  if (context.mounted) {
+                    SnackBarHelper.showError(context, message: 'خطا: $e');
+                  }
+                }
+              },
+              child: const Text('ایجاد لینک'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    pwdController.dispose();
+
+    if (!mounted || created == null) return;
+
+    final token = created['token'] as String?;
+    final publicUrl = (created['public_url'] as String?)?.trim();
+    final pageUrl = token != null ? _publicFileSharePageUrl(token) : '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لینک آماده است'),
+        content: SelectableText(
+          (publicUrl != null && publicUrl.isNotEmpty) ? publicUrl : pageUrl,
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final text = (publicUrl != null && publicUrl.isNotEmpty) ? publicUrl : pageUrl;
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) {
+                Navigator.pop(context);
+                SnackBarHelper.showSuccess(context, message: 'در حافظه کپی شد');
+              }
+            },
+            child: const Text('کپی لینک'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('بستن')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showBusinessSharesSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollCtrl) {
+          return _BusinessSharesSheet(
+            businessId: widget.businessId,
+            storageService: _storageService,
+            scrollController: scrollCtrl,
+          );
+        },
+      ),
+    );
+  }
+
   void _showFileMenu(Map<String, dynamic> file, ThemeData theme) {
     showModalBottomSheet(
       context: context,
@@ -1020,6 +1161,14 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
                 _downloadFile(file);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('اشتراک‌گذاری (لینک عمومی)'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCreateShareDialog(file);
+              },
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
@@ -1036,3 +1185,160 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
   }
 }
 
+class _BusinessSharesSheet extends StatefulWidget {
+  final int businessId;
+  final BusinessStorageService storageService;
+  final ScrollController scrollController;
+
+  const _BusinessSharesSheet({
+    required this.businessId,
+    required this.storageService,
+    required this.scrollController,
+  });
+
+  @override
+  State<_BusinessSharesSheet> createState() => _BusinessSharesSheetState();
+}
+
+class _BusinessSharesSheetState extends State<_BusinessSharesSheet> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await widget.storageService.listBusinessShares(
+        businessId: widget.businessId,
+        page: 1,
+        limit: 100,
+        onlyActive: false,
+      );
+      final raw = data['items'];
+      final items = raw is List
+          ? raw.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList()
+          : <Map<String, dynamic>>[];
+      setState(() {
+        _items = items;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'لینک‌های اشتراک فایل',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'تازه‌سازی'),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FilledButton.tonal(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('لغو همه لینک‌ها'),
+                    content: const Text(
+                      'تمام لینک‌های اشتراک فعال این کسب‌وکار غیرفعال می‌شوند. ادامه می‌دهید؟',
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('خیر')),
+                      FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('بله')),
+                    ],
+                  ),
+                );
+                if (!context.mounted) return;
+                if (ok != true) return;
+                try {
+                  final n = await widget.storageService.revokeAllFileShares(businessId: widget.businessId);
+                  if (!context.mounted) return;
+                  SnackBarHelper.showSuccess(context, message: '$n لینک لغو شد');
+                  _load();
+                } catch (e) {
+                  if (!context.mounted) return;
+                  SnackBarHelper.showError(context, message: '$e');
+                }
+              },
+              child: const Text('لغو همه دسترسی‌های اشتراکی'),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_error!)))
+                    : _items.isEmpty
+                        ? const Center(child: Text('لینک اشتراکی ثبت نشده است'))
+                        : ListView.builder(
+                            controller: widget.scrollController,
+                            itemCount: _items.length,
+                            itemBuilder: (context, i) {
+                              final row = _items[i];
+                              final active = row['is_active'] == true;
+                              final sid = (row['id'] as num?)?.toInt();
+                              return ListTile(
+                                title: Text(row['file_name'] as String? ?? '-'),
+                                subtitle: Text(
+                                  'شناسه لینک: $sid • ${active ? 'فعال' : 'غیرفعال'}',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                trailing: active && sid != null
+                                    ? IconButton(
+                                        icon: const Icon(Icons.link_off),
+                                        tooltip: 'لغو این لینک',
+                                        onPressed: () async {
+                                          try {
+                                            await widget.storageService.revokeFileShare(
+                                              businessId: widget.businessId,
+                                              shareId: sid,
+                                            );
+                                            if (!context.mounted) return;
+                                            SnackBarHelper.showSuccess(context, message: 'لینک لغو شد');
+                                            _load();
+                                          } catch (e) {
+                                            if (!context.mounted) return;
+                                            SnackBarHelper.showError(context, message: '$e');
+                                          }
+                                        },
+                                      )
+                                    : null,
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -119,12 +119,18 @@ class FilterItem(BaseModel):
 		}
 
 
+class SortItem(BaseModel):
+	"""یک سطح مرتب‌سازی در لیست چندستونه (کلید sort در بدنهٔ JSON)."""
+	by: str = Field(..., description="نام فیلد برای مرتب‌سازی", example="document_date")
+	desc: bool = Field(default=False, description="true = نزولی، false = صعودی")
+
+
 class QueryInfo(BaseModel):
 	"""
 	پارامترهای جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی
 	
 	### قابلیت‌ها:
-	- **مرتب‌سازی**: بر اساس هر فیلدی (صعودی یا نزولی)
+	- **مرتب‌سازی**: تک‌ستونه با sort_by / sort_desc (سازگار با کلاینت قدیمی) یا چندستونه با آرایه sort
 	- **صفحه‌بندی**: با take و skip
 	- **جستجو**: در چندین فیلد همزمان
 	- **فیلتر پیشرفته**: با عملگرهای مختلف
@@ -174,6 +180,13 @@ class QueryInfo(BaseModel):
 		default=False, 
 		description="نوع مرتب‌سازی: false = صعودی (A-Z, 1-9), true = نزولی (Z-A, 9-1)",
 		example=True
+	)
+	sort: Optional[List[SortItem]] = Field(
+		default=None,
+		description=(
+			"مرتب‌سازی چندسطحی. اگر ارسال شود و حداقل یک عضو معتبر داشته باشد، "
+			"اولویت با این فهرست است؛ در غیر این صورت از sort_by / sort_desc استفاده می‌شود."
+		),
 	)
 	take: int = Field(
 		default=10, 

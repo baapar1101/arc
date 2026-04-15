@@ -82,11 +82,13 @@ class _ChecksPageState extends State<ChecksPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<Map<String, dynamic>>(
-        key: _tableKey,
-        config: _buildConfig(t, context),
-        fromJson: (json) => json,
-        calendarController: widget.calendarController,
+      body: SingleChildScrollView(
+        child: DataTableWidget<Map<String, dynamic>>(
+          key: _tableKey,
+          config: _buildConfig(t, context),
+          fromJson: (json) => json,
+          calendarController: widget.calendarController,
+        ),
       ),
     );
   }
@@ -379,6 +381,7 @@ class _ChecksPageState extends State<ChecksPage> {
           ),
         ),
       ],
+      expandBodyHeightToFitRows: true,
       onRowTap: (row) {
         _showCheckDetailsDialog(context, row as Map<String, dynamic>);
       },

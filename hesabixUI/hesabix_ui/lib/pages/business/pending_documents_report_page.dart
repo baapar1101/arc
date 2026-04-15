@@ -110,6 +110,7 @@ class _PendingDocumentsReportPageState extends State<PendingDocumentsReportPage>
       defaultPageSize: 50,
       defaultSortBy: 'days_pending',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -169,7 +170,7 @@ class _PendingDocumentsReportPageState extends State<PendingDocumentsReportPage>
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

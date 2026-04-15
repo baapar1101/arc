@@ -121,6 +121,7 @@ class _WarehouseDocumentsSummaryReportPageState extends State<WarehouseDocuments
       defaultPageSize: 50,
       defaultSortBy: 'document_date',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -208,7 +209,7 @@ class _WarehouseDocumentsSummaryReportPageState extends State<WarehouseDocuments
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

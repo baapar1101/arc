@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, List
 from datetime import datetime, date
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- فرایند و مراحل ---
@@ -245,7 +245,8 @@ class DealResponse(BaseModel):
 
 class CrmActivityCreate(BaseModel):
     """ایجاد فعالیت"""
-    person_id: int = Field(..., gt=0)
+    person_id: Optional[int] = Field(None, gt=0, description="مشتری؛ برای سرنخ تبدیل‌نشده می‌توان خالی گذاشت")
+    lead_id: Optional[int] = Field(None, gt=0, description="سرنخ؛ حداقل یکی از person_id یا lead_id لازم است")
     code: Optional[str] = Field(None, max_length=50, description="کد دستی؛ در صورت خالی بودن، کد خودکار تولید می‌شود")
     activity_type: str = Field(..., description="call | email | meeting | note", max_length=50)
     subject: Optional[str] = Field(None, max_length=255)
@@ -253,6 +254,12 @@ class CrmActivityCreate(BaseModel):
     activity_date: datetime
     deal_id: Optional[int] = None
     extra_info: Optional[dict] = None
+
+    @model_validator(mode="after")
+    def require_person_or_lead(self) -> "CrmActivityCreate":
+        if not self.person_id and not self.lead_id:
+            raise ValueError("یکی از person_id یا lead_id الزامی است")
+        return self
 
 
 class CrmActivityUpdate(BaseModel):
@@ -271,7 +278,10 @@ class CrmActivityResponse(BaseModel):
     id: int
     business_id: int
     code: Optional[str] = None
-    person_id: int
+    person_id: Optional[int] = None
+    person_name: Optional[str] = None
+    lead_id: Optional[int] = None
+    lead_name: Optional[str] = None
     activity_type: str
     subject: Optional[str] = None
     description: Optional[str] = None

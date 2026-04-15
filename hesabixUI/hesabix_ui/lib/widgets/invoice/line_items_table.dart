@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -18,6 +19,11 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import 'package:reorderables/reorderables.dart';
 
+void _invoiceLineAttrsLog(String message) {
+  if (kDebugMode) {
+    debugPrint('[InvoiceLineAttrs] $message');
+  }
+}
 
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
@@ -51,6 +57,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final ProductService _productService = ProductService();
   Map<String, dynamic>? _inlinePriceList; // کش لیست قیمت برای آیکون انتخاب قیمت
   final Map<int, Map<String, dynamic>> _productCache = {}; // کش اطلاعات کالاها برای بررسی یونیک بودن
+  /// جلوگیری از اسپم لاگ وقتی کش هنوز برای productId پر نشده
+  final Set<int> _invoiceLineAttrsNoCacheLogged = {};
+  final Set<int> _invoiceLineAttrsLoggedUniquePid = {};
+  final Set<int> _invoiceLineAttrsLoggedNoAttrPid = {};
   final Map<int, Map<String, FocusNode>> _focusNodes = {}; // مدیریت فوکوس برای navigation
 
   void _notify() => widget.onChanged?.call(List<InvoiceLineItem>.from(_rows));
@@ -130,13 +140,42 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
   }
   
-  bool _shouldShowLineAttributesButton(InvoiceLineItem item) {
-    if (item.productId == null) return false;
-    final product = _productCache[item.productId];
-    if (product == null) return false;
-    if ((product['inventory_mode']?.toString() ?? '') == 'unique') return false;
+  bool _shouldShowLineAttributesButton(InvoiceLineItem item, {int? rowIndex}) {
+    final pid = item.productId;
+    if (pid == null) {
+      return false;
+    }
+    final product = _productCache[pid];
+    if (product == null) {
+      if (!_invoiceLineAttrsNoCacheLogged.contains(pid)) {
+        _invoiceLineAttrsNoCacheLogged.add(pid);
+        _invoiceLineAttrsLog(
+          'showLineAttrs=false row=${rowIndex ?? "?"} productId=$pid reason=not_in_cache '
+          'cacheKeys=${_productCache.keys.toList()}',
+        );
+      }
+      return false;
+    }
+    final mode = product['inventory_mode']?.toString() ?? '';
+    if (mode == 'unique') {
+      if (!_invoiceLineAttrsLoggedUniquePid.contains(pid)) {
+        _invoiceLineAttrsLoggedUniquePid.add(pid);
+        _invoiceLineAttrsLog('showLineAttrs=false row=${rowIndex ?? "?"} productId=$pid reason=inventory_unique');
+      }
+      return false;
+    }
     final ids = product['attribute_ids'];
-    return ids is List && ids.isNotEmpty;
+    final ok = ids is List && ids.isNotEmpty;
+    if (!ok) {
+      if (!_invoiceLineAttrsLoggedNoAttrPid.contains(pid)) {
+        _invoiceLineAttrsLoggedNoAttrPid.add(pid);
+        _invoiceLineAttrsLog(
+          'showLineAttrs=false row=${rowIndex ?? "?"} productId=$pid reason=attribute_ids '
+          'raw=$ids (${ids.runtimeType})',
+        );
+      }
+    }
+    return ok;
   }
 
   Map<String, dynamic>? _lineAttributesMap(InvoiceLineItem item) {
@@ -154,10 +193,15 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
   Future<void> _editLineAttributes(int index, InvoiceLineItem item) async {
     if (item.productId == null) return;
+    _invoiceLineAttrsLog('_editLineAttributes row=$index productId=${item.productId}');
     await _loadProductInfo(item.productId!, force: true);
     if (!mounted) return;
     final product = _productCache[item.productId];
-    if (product == null || !_shouldShowLineAttributesButton(item)) {
+    final canShow = _shouldShowLineAttributesButton(item, rowIndex: index);
+    if (product == null || !canShow) {
+      _invoiceLineAttrsLog(
+        '_editLineAttributes aborted row=$index productNull=${product == null} canShow=$canShow',
+      );
       SnackBarHelper.show(context, message: 'این کالا ویژگی قابل ویرایش در سطح ردیف ندارد');
       return;
     }
@@ -241,9 +285,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   /// بارگذاری اطلاعات کالا برای بررسی یونیک بودن و ویژگی‌ها
   Future<void> _loadProductInfo(int productId, {bool force = false}) async {
     if (!force && _productCache.containsKey(productId)) {
+      _invoiceLineAttrsLog('loadProduct skip productId=$productId (cached, force=false)');
       return;
     }
-    
+
+    _invoiceLineAttrsLog('loadProduct start productId=$productId force=$force');
     try {
       final product = await _productService.getProduct(
         businessId: widget.businessId,
@@ -252,10 +298,17 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       if (mounted) {
         setState(() {
           _productCache[productId] = product;
+          _invoiceLineAttrsNoCacheLogged.remove(productId);
+          _invoiceLineAttrsLoggedUniquePid.remove(productId);
+          _invoiceLineAttrsLoggedNoAttrPid.remove(productId);
         });
+        _invoiceLineAttrsLog(
+          'loadProduct ok productId=$productId inventory_mode=${product['inventory_mode']} '
+          'attribute_ids=${product['attribute_ids']}',
+        );
       }
     } catch (e) {
-      // خطا در بارگذاری - نادیده می‌گیریم
+      _invoiceLineAttrsLog('loadProduct FAIL productId=$productId error=$e');
     }
   }
   
@@ -395,6 +448,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   void initState() {
     super.initState();
     if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
+      _invoiceLineAttrsLog('initState: initialRows count=${widget.initialRows!.length}');
       _rows.clear();
       _rows.addAll(widget.initialRows!);
       // ایجاد focus nodes برای ردیف‌های اولیه
@@ -416,10 +470,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط
   Future<void> _loadProductInfosForInitialRows() async {
     final ids = _rows.map((e) => e.productId).whereType<int>().toSet();
+    _invoiceLineAttrsLog('loadProductInfosForInitialRows productIds=$ids rowCount=${_rows.length}');
     for (final pid in ids) {
       await _loadProductInfo(pid, force: true);
     }
     if (mounted) setState(() {});
+    _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
   }
 
   @override
@@ -436,6 +492,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     // یا اگر تعداد ردیف‌های initialRows بیشتر از ردیف‌های فعلی است (ردیف‌های جدید اضافه شده)
     if (widget.initialRows != null && widget.initialRows!.isNotEmpty) {
       if (_rows.isEmpty) {
+        _invoiceLineAttrsLog('didUpdateWidget: merge initialRows (was empty) count=${widget.initialRows!.length}');
         // اگر جدول خالی است، همه ردیف‌ها را اضافه کن
         _rows.clear();
         _rows.addAll(widget.initialRows!);
@@ -445,6 +502,9 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         _loadProductInfosForInitialRows();
         _notify();
       } else if (widget.initialRows!.length > _rows.length) {
+        _invoiceLineAttrsLog(
+          'didUpdateWidget: replace rows initial=${widget.initialRows!.length} current=${_rows.length}',
+        );
         // اگر ردیف‌های جدید اضافه شده، همه ردیف‌ها را جایگزین کن
         // (کاربر می‌تواند بعداً ردیف‌ها را ویرایش کند)
         _rows.clear();
@@ -1151,7 +1211,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
               ),
             ],
-            if (_shouldShowLineAttributesButton(item)) ...[
+            if (_shouldShowLineAttributesButton(item, rowIndex: index)) ...[
               const SizedBox(height: 12),
               _lineAttributesRow(context, index, item),
             ],
@@ -1440,7 +1500,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
               ],
             ),
-            if (_shouldShowLineAttributesButton(item)) ...[
+            if (_shouldShowLineAttributesButton(item, rowIndex: index)) ...[
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1535,6 +1595,13 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final priced = await _resolveUnitPrice(updated, preferManual: false);
     setState(() => _rows[index] = priced);
     _notify();
+    if (productId != null) {
+      final cached = _productCache[productId];
+      _invoiceLineAttrsLog(
+        '_handleProductChange row=$index productId=$productId '
+        'cache_attribute_ids=${cached?['attribute_ids']} inventory_mode=${cached?['inventory_mode']}',
+      );
+    }
   }
 
   Widget _buildQuantityWithUnitField(

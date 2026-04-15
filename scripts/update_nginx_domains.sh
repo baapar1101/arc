@@ -193,6 +193,18 @@ server {
     try_files \$uri \$uri/ /index.html;
   }
 
+  location = /version.json {
+    add_header Cache-Control "no-store" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
+  location = /flutter_service_worker.js {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
   location / {
     try_files \$uri \$uri/ /index.html;
   }

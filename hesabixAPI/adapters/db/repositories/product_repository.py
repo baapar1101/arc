@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func, text
 from app.core.query_timeout import query_timeout
 
+from adapters.api.v1.schemas import QueryInfo
+from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_attribute_link import ProductAttributeLink
@@ -15,7 +17,7 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Product)
 
-    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
+    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, sort: list[Any] | None = None, search: str | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
         stmt = select(Product).where(Product.business_id == business_id)
 
         if search:
@@ -89,10 +91,20 @@ class ProductRepository(BaseRepository[Product]):
         with query_timeout(self.db, timeout_seconds=60):
             total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
 
-            # Sorting
-            if sort_by in {"name", "code", "created_at"}:
-                col = getattr(Product, sort_by)
-                stmt = stmt.order_by(col.desc() if sort_desc else col.asc())
+            # Sorting: آرایه sort در اولویت، وگرنه sort_by/sort_desc (سازگار با کلاینت قدیمی)
+            _allowed_product_sort = frozenset({"name", "code", "created_at"})
+            try:
+                qi = QueryInfo(sort_by=sort_by, sort_desc=sort_desc, sort=sort)  # type: ignore[arg-type]
+                specs = effective_sort_specs(qi, allowed=_allowed_product_sort, default_when_empty=None)
+            except Exception:
+                specs = []
+            if specs:
+                order_parts = []
+                for col_name, desc in specs:
+                    col = getattr(Product, col_name)
+                    order_parts.append(col.desc() if desc else col.asc())
+                order_parts.append(Product.id.asc())
+                stmt = stmt.order_by(*order_parts)
             else:
                 stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
 

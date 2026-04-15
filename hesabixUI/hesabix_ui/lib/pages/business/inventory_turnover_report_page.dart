@@ -161,6 +161,7 @@ class _InventoryTurnoverReportPageState extends State<InventoryTurnoverReportPag
       defaultPageSize: 50,
       defaultSortBy: 'turnover_rate',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -263,7 +264,7 @@ class _InventoryTurnoverReportPageState extends State<InventoryTurnoverReportPag
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

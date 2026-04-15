@@ -469,6 +469,7 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
     skip = int(query.get("skip", 0) or 0)
     sort_by = query.get("sort_by")
     sort_desc = bool(query.get("sort_desc", True))
+    sort_multi = query.get("sort") if isinstance(query.get("sort"), list) else None
     search = query.get("search")
     filters = query.get("filters")
     include_inventory = bool(query.get("include_inventory", False))
@@ -491,6 +492,7 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
         skip=skip,
         sort_by=sort_by,
         sort_desc=sort_desc,
+        sort=sort_multi,
         search=search,
         filters=filters,
         category_ids=category_ids,

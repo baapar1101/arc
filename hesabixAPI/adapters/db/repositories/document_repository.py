@@ -155,25 +155,18 @@ class DocumentRepository:
         # شمارش کل
         total_count = query.count()
 
-        # مرتب‌سازی
-        sort_by = filters.get("sort_by", "document_date")
-        sort_desc = filters.get("sort_desc", True)
+        # مرتب‌سازی (چندستونه sort یا تک‌ستونه sort_by)
+        from adapters.api.v1.schemas import QueryInfo
+        from app.services.document_list_sort import apply_document_accounting_list_ordering
 
-        if sort_by == "document_date":
-            order_col = Document.document_date
-        elif sort_by == "code":
-            order_col = Document.code
-        elif sort_by == "document_type":
-            order_col = Document.document_type
-        elif sort_by == "created_at":
-            order_col = Document.created_at
-        else:
-            order_col = Document.document_date
-
-        if sort_desc:
-            query = query.order_by(desc(order_col), desc(Document.id))
-        else:
-            query = query.order_by(asc(order_col), asc(Document.id))
+        _qi = QueryInfo.model_validate({
+            "take": int(filters.get("take", 50) or 50),
+            "skip": int(filters.get("skip", 0) or 0),
+            "sort_by": filters.get("sort_by"),
+            "sort_desc": bool(filters.get("sort_desc", True)),
+            "sort": filters.get("sort") if isinstance(filters.get("sort"), list) else None,
+        })
+        query = apply_document_accounting_list_ordering(query, _qi)
 
         # صفحه‌بندی
         skip = filters.get("skip", 0)

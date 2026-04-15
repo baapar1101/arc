@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_list_widget.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
-import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/admin/file_storage/storage_share_link_settings_card.dart';
 
 class AdminStorageManagementPage extends StatefulWidget {
   const AdminStorageManagementPage({super.key});
@@ -48,9 +48,20 @@ class _AdminStorageManagementPageState extends State<AdminStorageManagementPage>
             ],
           ),
         ),
-        child: StorageConfigListWidget(
-          key: _listKey,
-          onRefresh: () => _listKey.currentState?.loadStorageConfigs(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: StorageShareLinkSettingsCard(),
+            ),
+            Expanded(
+              child: StorageConfigListWidget(
+                key: _listKey,
+                onRefresh: () => _listKey.currentState?.loadStorageConfigs(),
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(

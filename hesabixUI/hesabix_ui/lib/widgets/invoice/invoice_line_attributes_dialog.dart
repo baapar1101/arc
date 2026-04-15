@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
@@ -5,6 +6,12 @@ import '../date_input_field.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/product_attribute_service.dart';
+
+void _invoiceLineAttrsDialogLog(String message) {
+  if (kDebugMode) {
+    debugPrint('[InvoiceLineAttrs:dialog] $message');
+  }
+}
 
 /// ویرایش ویژگی‌های کالا برای یک ردیف فاکتور (ذخیره در extra_info.line_custom_attributes)
 class InvoiceLineAttributesDialog extends StatefulWidget {
@@ -244,13 +251,18 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
   Map<String, dynamic>? initialLineAttributes,
   CalendarController? calendarController,
 }) async {
+  _invoiceLineAttrsDialogLog(
+    'showEditor enter productId=$productId businessId=$businessId keys=${productMap.keys.toList()}',
+  );
   final ids = productMap['attribute_ids'];
   if (ids is! List || ids.isEmpty) {
+    _invoiceLineAttrsDialogLog('blocked: attribute_ids empty or not list raw=$ids (${ids.runtimeType})');
     SnackBarHelper.show(context, message: 'این کالا ویژگی تعریف‌شده‌ای ندارد');
     return null;
   }
   final mode = productMap['inventory_mode']?.toString() ?? 'bulk';
   if (mode == 'unique') {
+    _invoiceLineAttrsDialogLog('blocked: inventory_mode=unique');
     SnackBarHelper.show(context, message: 'برای کالای یونیک ویژگی‌ها از طریق انتخاب سریال/نمونه ثبت می‌شود');
     return null;
   }
@@ -258,8 +270,10 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
   final attrService = ProductAttributeService();
   List<Map<String, dynamic>> definitions;
   try {
+    _invoiceLineAttrsDialogLog('search product-attributes limit=1000 ...');
     final search = await attrService.search(businessId: businessId, limit: 1000);
     final all = (search['items'] as List<dynamic>?) ?? [];
+    _invoiceLineAttrsDialogLog('search returned items count=${all.length}');
     final idSet = ids.map((e) {
       if (e is int) return e;
       if (e is num) return e.toInt();
@@ -270,7 +284,11 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
         .map((a) => Map<String, dynamic>.from(a as Map))
         .toList();
     definitions.sort((a, b) => ((a['id'] as num?)?.toInt() ?? 0).compareTo((b['id'] as num?)?.toInt() ?? 0));
+    _invoiceLineAttrsDialogLog(
+      'matched definitions count=${definitions.length} idSet=$idSet titles=${definitions.map((a) => a['title']).toList()}',
+    );
   } catch (e) {
+    _invoiceLineAttrsDialogLog('search FAILED error=$e');
     if (context.mounted) {
       SnackBarHelper.showError(context, message: 'خطا در بارگذاری ویژگی‌ها: $e');
     }
@@ -279,10 +297,12 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
 
   if (!context.mounted) return null;
   if (definitions.isEmpty) {
+    _invoiceLineAttrsDialogLog('blocked: definitions empty after filter (permission یا id اشتباه؟)');
     SnackBarHelper.show(context, message: 'تعریف ویژگی‌ها یافت نشد');
     return null;
   }
 
+  _invoiceLineAttrsDialogLog('opening AlertDialog');
   return showDialog<Map<String, dynamic>>(
     context: context,
     builder: (ctx) => InvoiceLineAttributesDialog(

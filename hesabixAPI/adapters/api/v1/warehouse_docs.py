@@ -637,24 +637,37 @@ def search_warehouse_docs(
 		search_term = f"%{search.strip()}%"
 		q = q.filter(WarehouseDocument.code.like(search_term))
 	
-	# مرتب‌سازی
-	sort_by = body.get("sort_by", "document_date")
-	sort_desc = body.get("sort_desc", True)
-	if sort_by == "code":
-		order_col = WarehouseDocument.code
-	elif sort_by == "doc_type":
-		order_col = WarehouseDocument.doc_type
-	elif sort_by == "status":
-		order_col = WarehouseDocument.status
-	elif sort_by == "created_at":
-		order_col = WarehouseDocument.created_at
-	else:
-		order_col = WarehouseDocument.document_date
-	
-	if sort_desc:
-		q = q.order_by(order_col.desc(), WarehouseDocument.id.desc())
-	else:
-		q = q.order_by(order_col.asc(), WarehouseDocument.id.asc())
+	# مرتب‌سازی (چندستونه sort / تک‌ستونه sort_by)
+	from adapters.api.v1.schemas import QueryInfo
+	from app.services.sort_resolution import effective_sort_specs
+
+	_WH_SORT_ALLOWED = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
+
+	def _wh_sort_col(name: str):
+		if name == "code":
+			return WarehouseDocument.code
+		if name == "doc_type":
+			return WarehouseDocument.doc_type
+		if name == "status":
+			return WarehouseDocument.status
+		if name == "created_at":
+			return WarehouseDocument.created_at
+		return WarehouseDocument.document_date
+
+	_qi = QueryInfo.model_validate({
+		"take": int(body.get("take", 20) or 20),
+		"skip": int(body.get("skip", 0) or 0),
+		"sort_by": body.get("sort_by"),
+		"sort_desc": bool(body.get("sort_desc", True)),
+		"sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
+	})
+	_specs = effective_sort_specs(_qi, allowed=_WH_SORT_ALLOWED, default_when_empty=("document_date", True))
+	_order_parts = []
+	for _n, _d in _specs:
+		_c = _wh_sort_col(_n)
+		_order_parts.append(_c.desc() if _d else _c.asc())
+	_order_parts.append(WarehouseDocument.id.desc())
+	q = q.order_by(*_order_parts)
 	
 	# Pagination
 	take = int(body.get("take") or 20)

@@ -60,6 +60,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
+    final contentPadding = ResponsiveHelper.getPadding(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -78,13 +79,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildFilters(t, isMobile),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildFilters(t, isMobile),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  8,
+                  contentPadding,
+                  isMobile ? 88 : 8,
+                ),
                 child: DataTableWidget<ProjectModel>(
                   key: _tableKey,
                   config: _buildTableConfig(t),
@@ -92,8 +98,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   calendarController: widget.calendarController,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: isMobile
@@ -344,6 +350,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       enableRowSelection: true,
       showExportButtons: true,
       httpMethod: 'GET',
+      expandBodyHeightToFitRows: true,
     );
   }
 

@@ -508,6 +508,7 @@ class _StockCountPageState extends State<StockCountPage> {
         if (diff == 0) return null;
         return diff > 0 ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05);
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -896,11 +897,13 @@ class _StockCountPageState extends State<StockCountPage> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 child: Card(
-                  child: DataTableWidget<Map<String, dynamic>>(
-                    config: _buildDesktopTableConfig(),
-                    fromJson: (json) => json,
-                    localRawItems: _rows.map((r) => r.raw).toList(),
-                    localSummary: null,
+                  child: SingleChildScrollView(
+                    child: DataTableWidget<Map<String, dynamic>>(
+                      config: _buildDesktopTableConfig(),
+                      fromJson: (json) => json,
+                      localRawItems: _rows.map((r) => r.raw).toList(),
+                      localSummary: null,
+                    ),
                   ),
                 ),
               ),

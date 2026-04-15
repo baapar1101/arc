@@ -493,6 +493,7 @@ class _NotificationModerationQueuePageState
       showRefreshButton: true,
       enableSorting: true,
       defaultPageSize: 20,
+      expandBodyHeightToFitRows: true,
       pageSizeOptions: const [10, 20, 50, 100],
       searchFields: const ['business.name', 'template.name', 'template.code', 'template.event_type'],
       emptyStateMessage: 'هیچ قالبی در صف نیست',
@@ -679,12 +680,14 @@ class _NotificationModerationQueuePageState
                               ],
                             ),
                           )
-                        : DataTableWidget<Map<String, dynamic>>(
-                            config: _buildTableConfig(theme, cs),
-                            fromJson: (json) => Map<String, dynamic>.from(json),
-                            calendarController: _calendarController,
-                            localRawItems: _cachedFilteredItems,
-                            // onRefresh نگذاریم تا DataTable بعد از _fetchData درخواست پیاپی نفرستد؛ بروزرسانی از دکمهٔ اپ‌بار
+                        : SingleChildScrollView(
+                            child: DataTableWidget<Map<String, dynamic>>(
+                              config: _buildTableConfig(theme, cs),
+                              fromJson: (json) => Map<String, dynamic>.from(json),
+                              calendarController: _calendarController,
+                              localRawItems: _cachedFilteredItems,
+                              // onRefresh نگذاریم تا DataTable بعد از _fetchData درخواست پیاپی نفرستد؛ بروزرسانی از دکمهٔ اپ‌بار
+                            ),
                           ),
           ),
         ],

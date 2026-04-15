@@ -329,6 +329,24 @@ def set_share_link_settings(db: Session, *, public_app_url: str) -> Dict[str, An
 	return get_share_link_settings(db)
 
 
+def resolve_public_app_base_url_for_public_links(db: Session) -> str:
+	"""
+	پایهٔ دامنهٔ اپ وب برای لینک‌های عمومی (کارت حساب، اشتراک فایل و غیره).
+	اولویت با مقدار ذخیره‌شده در DB است؛ در نبود مؤثر، مقدار env استفاده می‌شود.
+	خروجی بدون پسوند /public است (مسیرهایی مثل /public/... هنگام ساخت URL کامل اضافه می‌شوند).
+	"""
+	data = get_share_link_settings(db)
+	base = (data.get("public_app_url") or "").strip().rstrip("/")
+	if base.lower().endswith("/public"):
+		base = base[: -len("/public")].rstrip("/")
+	if base:
+		return base
+	env_base = (get_settings().share_link_public_app_url or "").strip().rstrip("/")
+	if env_base.lower().endswith("/public"):
+		env_base = env_base[: -len("/public")].rstrip("/")
+	return env_base
+
+
 def get_default_document_policies(db: Session) -> List[Dict[str, Any]]:
 	"""
 	خواندن سیاست‌های پیش‌فرض درآمدزایی اسناد برای کسب‌وکارهای جدید

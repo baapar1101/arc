@@ -2570,25 +2570,25 @@ abstract class AppLocalizations {
   /// No description provided for @ftpHost.
   ///
   /// In en, this message translates to:
-  /// **'FTP Host'**
+  /// **'Host'**
   String get ftpHost;
 
   /// No description provided for @ftpPort.
   ///
   /// In en, this message translates to:
-  /// **'FTP Port'**
+  /// **'Port'**
   String get ftpPort;
 
   /// No description provided for @ftpUsername.
   ///
   /// In en, this message translates to:
-  /// **'FTP Username'**
+  /// **'Username'**
   String get ftpUsername;
 
   /// No description provided for @ftpPassword.
   ///
   /// In en, this message translates to:
-  /// **'FTP Password'**
+  /// **'Password'**
   String get ftpPassword;
 
   /// No description provided for @ftpDirectory.
@@ -3080,7 +3080,7 @@ abstract class AppLocalizations {
   /// No description provided for @storageManagementDescription.
   ///
   /// In en, this message translates to:
-  /// **'Configure file storage systems and manage files'**
+  /// **'Configure file storage, public app URL for share links (file sharing), and manage files'**
   String get storageManagementDescription;
 
   /// No description provided for @systemConfiguration.
@@ -14351,6 +14351,36 @@ abstract class AppLocalizations {
   /// **'Persons'**
   String get workflowCategoryPersons;
 
+  /// No description provided for @workflowCategoryCrm.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM'**
+  String get workflowCategoryCrm;
+
+  /// No description provided for @workflowTemplateCrmNewLeadNotifyName.
+  ///
+  /// In en, this message translates to:
+  /// **'New lead in-app notification'**
+  String get workflowTemplateCrmNewLeadNotifyName;
+
+  /// No description provided for @workflowTemplateCrmNewLeadNotifyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When a lead is created, an in-app notification is recorded'**
+  String get workflowTemplateCrmNewLeadNotifyDesc;
+
+  /// No description provided for @workflowTemplateCrmDealWonLogName.
+  ///
+  /// In en, this message translates to:
+  /// **'Log won deal closure'**
+  String get workflowTemplateCrmDealWonLogName;
+
+  /// No description provided for @workflowTemplateCrmDealWonLogDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only won deals; writes an info log entry'**
+  String get workflowTemplateCrmDealWonLogDesc;
+
   /// No description provided for @settingsCategoriesCount.
   ///
   /// In en, this message translates to:
@@ -16198,6 +16228,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.'**
   String get invoiceWarehouseReleaseBusinessSubtitle;
+
+  /// No description provided for @ftpBackupSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP backup destination'**
+  String get ftpBackupSettingsTitle;
+
+  /// No description provided for @ftpBackupSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Store connection details for optional backup upload to your FTP server.'**
+  String get ftpBackupSettingsDescription;
+
+  /// No description provided for @ftpPasswordLeaveEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the current password'**
+  String get ftpPasswordLeaveEmptyHint;
+
+  /// No description provided for @ftpRemotePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote folder'**
+  String get ftpRemotePath;
+
+  /// No description provided for @ftpPassiveMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Passive mode (PASV)'**
+  String get ftpPassiveMode;
+
+  /// No description provided for @ftpUseFtps.
+  ///
+  /// In en, this message translates to:
+  /// **'Use FTPS (FTP over TLS)'**
+  String get ftpUseFtps;
+
+  /// No description provided for @ftpSaveSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get ftpSaveSettings;
+
+  /// No description provided for @ftpDeleteSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove FTP settings'**
+  String get ftpDeleteSettings;
+
+  /// No description provided for @ftpTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get ftpTestConnection;
+
+  /// No description provided for @ftpScanUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan folder usage'**
+  String get ftpScanUsage;
+
+  /// No description provided for @ftpUsageTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total size (this folder)'**
+  String get ftpUsageTotal;
+
+  /// No description provided for @ftpUsageFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files counted'**
+  String get ftpUsageFiles;
+
+  /// No description provided for @ftpUsageTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan stopped early (too many files)'**
+  String get ftpUsageTruncated;
+
+  /// No description provided for @ftpLastScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Last scan'**
+  String get ftpLastScan;
+
+  /// No description provided for @ftpSettingsUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings last saved'**
+  String get ftpSettingsUpdatedAt;
+
+  /// No description provided for @ftpNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get ftpNotConfigured;
+
+  /// No description provided for @ftpSendAfterBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Also upload to FTP after backup'**
+  String get ftpSendAfterBackup;
+
+  /// No description provided for @ftpSendAfterBackupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires saved FTP settings and permission'**
+  String get ftpSendAfterBackupSubtitle;
+
+  /// No description provided for @jobUploadingToFtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading to FTP'**
+  String get jobUploadingToFtp;
+
+  /// No description provided for @jobFtpTestStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP test starting'**
+  String get jobFtpTestStarting;
+
+  /// No description provided for @jobFtpTestRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running FTP checks'**
+  String get jobFtpTestRunning;
+
+  /// No description provided for @jobFtpTestCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP test completed'**
+  String get jobFtpTestCompleted;
+
+  /// No description provided for @jobFtpTestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP test failed'**
+  String get jobFtpTestFailed;
+
+  /// No description provided for @jobFtpUsageStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning FTP usage'**
+  String get jobFtpUsageStarting;
+
+  /// No description provided for @jobFtpUsageConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to FTP'**
+  String get jobFtpUsageConnecting;
+
+  /// No description provided for @jobFtpUsageScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning remote folders'**
+  String get jobFtpUsageScanning;
+
+  /// No description provided for @jobFtpUsageCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP usage scan completed'**
+  String get jobFtpUsageCompleted;
+
+  /// No description provided for @jobFtpUsageFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP usage scan failed'**
+  String get jobFtpUsageFailed;
+
+  /// No description provided for @ftpTestResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test'**
+  String get ftpTestResultTitle;
+
+  /// No description provided for @ftpClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get ftpClose;
+
+  /// No description provided for @settingsPermissionManageFtp.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP backup connection'**
+  String get settingsPermissionManageFtp;
 }
 
 class _AppLocalizationsDelegate

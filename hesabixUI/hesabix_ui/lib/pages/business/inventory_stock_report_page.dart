@@ -523,6 +523,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'product_code',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -1570,7 +1571,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
             _buildSummaryCards(isMobile: isMobile),
             
             // Data Table - با اسکرول عمودی
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.all(isMobile ? 4.0 : 8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

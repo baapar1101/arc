@@ -45,11 +45,15 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
       _error = null;
     });
     try {
-      final summaryData = await _crmService.getSummary(businessId: widget.businessId);
-      final followData = await _crmService.getFollowUpsToday(businessId: widget.businessId, daysAhead: 7);
+      final results = await Future.wait([
+        _crmService.getSummary(businessId: widget.businessId),
+        _crmService.getFollowUpsToday(businessId: widget.businessId, daysAhead: 7),
+      ]);
       if (!mounted) return;
+      final summaryData = Map<String, dynamic>.from(results[0] as Map);
+      final followData = Map<String, dynamic>.from(results[1] as Map);
       setState(() {
-        _summary = summaryData is Map ? Map<String, dynamic>.from(summaryData) : null;
+        _summary = Map<String, dynamic>.from(summaryData);
         _followUpLeads = followData['leads'] is List ? List<dynamic>.from(followData['leads'] as List) : [];
         _followUpDeals = followData['deals'] is List ? List<dynamic>.from(followData['deals'] as List) : [];
         _loading = false;
@@ -235,7 +239,7 @@ class _FollowUpsCard extends StatelessWidget {
             if (total > 0) ...[
               const SizedBox(height: 12),
               ...leads.take(5).map((e) {
-                final m = e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{};
+                final m = Map<String, dynamic>.from(e as Map);
                 final at = m['next_follow_up_at']?.toString();
                 final dateStr = at != null && at.isNotEmpty
                     ? DateFormat('yyyy/MM/dd HH:mm').format(DateTime.tryParse(at) ?? DateTime.now())
@@ -249,7 +253,7 @@ class _FollowUpsCard extends StatelessWidget {
                 );
               }),
               ...deals.take(5).map((e) {
-                final m = e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{};
+                final m = Map<String, dynamic>.from(e as Map);
                 final at = m['next_follow_up_at']?.toString();
                 final dateStr = at != null && at.isNotEmpty
                     ? DateFormat('yyyy/MM/dd HH:mm').format(DateTime.tryParse(at) ?? DateTime.now())

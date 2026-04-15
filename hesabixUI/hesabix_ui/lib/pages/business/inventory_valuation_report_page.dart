@@ -159,6 +159,7 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
       defaultPageSize: 50,
       defaultSortBy: 'value',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -247,7 +248,7 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

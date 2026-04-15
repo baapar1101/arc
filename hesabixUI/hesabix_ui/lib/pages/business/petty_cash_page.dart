@@ -98,10 +98,12 @@ class _PettyCashPageState extends State<PettyCashPage> {
 		}
 
 		return Scaffold(
-			body: DataTableWidget<PettyCash>(
-				key: _tableKey,
-				config: _buildConfig(t),
-				fromJson: PettyCash.fromJson,
+			body: SingleChildScrollView(
+				child: DataTableWidget<PettyCash>(
+					key: _tableKey,
+					config: _buildConfig(t),
+					fromJson: PettyCash.fromJson,
+				),
 			),
 		);
 	}
@@ -246,6 +248,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
 			searchFields: ['name','code','description'],
 			filterFields: ['is_active','is_default','currency_id'],
 			defaultPageSize: 20,
+			expandBodyHeightToFitRows: true,
 			customHeaderActions: [
 				PermissionButton(
 					section: 'petty_cash',

@@ -78,6 +78,7 @@ async def list_receipts_payments_endpoint(
         "skip": query_info.skip,
         "sort_by": query_info.sort_by,
         "sort_desc": query_info.sort_desc,
+        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
         "search": query_info.search,
     }
     
@@ -85,7 +86,7 @@ async def list_receipts_payments_endpoint(
     try:
         body_json = await request.json()
         if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date"]:
+            for key in ["document_type", "from_date", "to_date", "sort", "sort_by", "sort_desc"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
     except Exception:
@@ -371,6 +372,7 @@ async def export_receipts_payments_excel(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "search_fields": body.get("search_fields"),
         "filters": body.get("filters"),
@@ -778,6 +780,7 @@ async def export_receipts_payments_pdf(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "search_fields": body.get("search_fields"),
         "filters": body.get("filters"),

@@ -63,7 +63,7 @@ async def _get_products_search_query_info(request: Request) -> QueryInfo:
 			data = json.loads(body_bytes)
 			if isinstance(data, dict) and data:
 				_allowed = (
-					"take", "skip", "sort_by", "sort_desc", "search",
+					"take", "skip", "sort_by", "sort_desc", "sort", "search",
 					"search_fields", "searchFields",
 					"category_ids", "categoryIds",
 					"filters", "include_inventory", "inventory_as_of_date",
@@ -94,11 +94,21 @@ async def _get_products_search_query_info(request: Request) -> QueryInfo:
 				filters_parsed = None
 		except (json.JSONDecodeError, TypeError):
 			pass
+	sort_param = q.get("sort")
+	sort_parsed = None
+	if sort_param:
+		try:
+			sp = json.loads(sort_param)
+			if isinstance(sp, list):
+				sort_parsed = sp
+		except (json.JSONDecodeError, TypeError, ValueError):
+			pass
 	return QueryInfo(
 		take=max(1, min(1000, _int("take", 20))),
 		skip=max(0, _int("skip", 0)),
 		sort_by=q.get("sort_by") or None,
 		sort_desc=_bool("sort_desc", False),
+		sort=sort_parsed,
 		search=q.get("search") or None,
 		search_fields=None,
 		filters=filters_parsed,
@@ -386,6 +396,7 @@ def search_products_endpoint(
 			"skip": query_info.skip,
 			"sort_by": query_info.sort_by,
 			"sort_desc": query_info.sort_desc,
+			"sort": to_serializable(query_info.sort) if getattr(query_info, "sort", None) else None,
 			"search": query_info.search,
 			"filters": serializable_filters,
 			"category_ids": to_serializable(query_info.category_ids) if query_info.category_ids else None,
@@ -407,6 +418,7 @@ def search_products_endpoint(
 			"skip": query_info.skip,
 			"sort_by": query_info.sort_by,
 			"sort_desc": query_info.sort_desc,
+			"sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
 			"search": query_info.search,
 			"filters": query_info.filters,
 			"category_ids": query_info.category_ids,
@@ -1129,6 +1141,7 @@ async def export_products_excel(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
@@ -2340,6 +2353,7 @@ async def export_products_pdf(
         "skip": int(body.get("skip", 0)),
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
+        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
         "search": body.get("search"),
         "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),

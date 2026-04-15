@@ -157,9 +157,11 @@ import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
 import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
+import 'pages/business/backup/business_ftp_backup_settings_page.dart';
 import 'pages/business/backup/restore_page.dart';
 import 'pages/profile/delete_business_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
+import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
@@ -832,6 +834,13 @@ class _MyAppState extends State<MyApp> {
           name: 'public_person_share_link',
           builder: (context, state) => PublicPersonShareLinkPage(
             code: state.pathParameters['code'] ?? '',
+          ),
+        ),
+        GoRoute(
+          path: '/public/storage-file/:token',
+          name: 'public_storage_file_share',
+          builder: (context, state) => PublicStorageFileSharePage(
+            token: state.pathParameters['token'] ?? '',
           ),
         ),
         GoRoute(
@@ -2494,6 +2503,23 @@ class _MyAppState extends State<MyApp> {
                   return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
                 }
                 return NoTransitionPage(child: BusinessBackupPage(businessId: businessId));
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/ftp-backup',
+              name: 'business_settings_ftp_backup',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                final isOwner = _authStore!.currentBusiness?.id == businessId &&
+                    _authStore!.currentBusiness?.isOwner == true;
+                final hasFtp = _authStore!.hasBusinessPermission('settings', 'manage_ftp');
+                if (!isOwner && !hasFtp) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                return NoTransitionPage(child: BusinessFtpBackupSettingsPage(businessId: businessId));
               },
             ),
             GoRoute(

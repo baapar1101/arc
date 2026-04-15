@@ -132,6 +132,14 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  bool _canManageFtpBackupSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (authStore.currentBusiness?.id != widget.businessId) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('settings', 'manage_ftp');
+  }
+
   bool _canAccessRepairShopSettings() {
     final authStore = _authStore;
     if (authStore == null) return false;
@@ -348,6 +356,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                   icon: Icons.backup,
                                   onTap: () => context.go('/business/${widget.businessId}/settings/backup'),
                                 ),
+                                if (_canManageFtpBackupSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.ftpBackupSettingsTitle,
+                                    subtitle: t.ftpBackupSettingsDescription,
+                                    icon: Icons.cloud_upload_outlined,
+                                    onTap: () => context.go('/business/${widget.businessId}/settings/ftp-backup'),
+                                  ),
                                 _buildSettingItem(
                                   context,
                                   title: t.dataRestore,
@@ -640,6 +656,14 @@ class _SettingsPageState extends State<SettingsPage> {
                             icon: Icons.backup,
                             onTap: () => context.go('/business/${widget.businessId}/settings/backup'),
                           ),
+                          if (_canManageFtpBackupSettings())
+                            _buildSettingItem(
+                              context,
+                              title: t.ftpBackupSettingsTitle,
+                              subtitle: t.ftpBackupSettingsDescription,
+                              icon: Icons.cloud_upload_outlined,
+                              onTap: () => context.go('/business/${widget.businessId}/settings/ftp-backup'),
+                            ),
                           _buildSettingItem(
                             context,
                             title: t.dataRestore,

@@ -31,8 +31,17 @@ def list_price_lists(db: Session, business_id: int, query: Dict[str, Any]) -> Di
     skip = int(query.get("skip", 0) or 0)
     sort_by = query.get("sort_by")
     sort_desc = bool(query.get("sort_desc", True))
+    sort_multi = query.get("sort") if isinstance(query.get("sort"), list) else None
     search = query.get("search")
-    return repo.search(business_id=business_id, take=take, skip=skip, sort_by=sort_by, sort_desc=sort_desc, search=search)
+    return repo.search(
+        business_id=business_id,
+        take=take,
+        skip=skip,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        sort=sort_multi,
+        search=search,
+    )
 
 
 def get_price_list(db: Session, business_id: int, id: int) -> Optional[Dict[str, Any]]:

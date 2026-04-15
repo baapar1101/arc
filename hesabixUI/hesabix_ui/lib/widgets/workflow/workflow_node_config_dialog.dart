@@ -4286,6 +4286,16 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
     }
 
     if (key.startsWith('crm.lead.')) {
+      if (key.contains('assigned')) {
+        return [
+          _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+          _workflowSuggestedField('old_assigned_to_user_id', 'شناسه مسئول قبلی', 'قبل از تغییر تخصیص', 'number'),
+          _workflowSuggestedField('new_assigned_to_user_id', 'شناسه مسئول جدید', 'پس از تغییر تخصیص', 'number'),
+          _workflowSuggestedField('lead_code', 'کد سرنخ', 'کد یکتای سرنخ', 'string'),
+          _workflowSuggestedField('stage_name', 'نام مرحله', 'نام مرحله فعلی سرنخ', 'string'),
+          _workflowSuggestedField('assigned_to_user_name', 'نام مسئول', 'نام کاربر مسئول', 'string'),
+        ];
+      }
       if (key.contains('stage_changed')) {
         return [
           _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
@@ -4293,12 +4303,15 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
               'old_stage_id', t.workflowFieldOldStageId, t.workflowFieldDescOldStageId, 'number'),
           _workflowSuggestedField(
               'new_stage_id', t.workflowFieldNewStageId, t.workflowFieldDescNewStageId, 'number'),
+          _workflowSuggestedField('old_stage_name', 'نام مرحله قبلی', 'متن مرحله قبل از تغییر', 'string'),
+          _workflowSuggestedField('new_stage_name', 'نام مرحله جدید', 'متن مرحله بعد از تغییر', 'string'),
         ];
       }
       if (key.contains('converted')) {
         return [
           _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
           _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+          _workflowSuggestedField('person_name', t.workflowFieldPersonName, t.workflowFieldDescPersonName, 'string'),
         ];
       }
       return [
@@ -4307,15 +4320,40 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
             t.workflowFieldDescProcessDefinitionId, 'number'),
         _workflowSuggestedField('stage_id', t.workflowFieldStageId, t.workflowFieldDescStageId, 'number'),
         _workflowSuggestedField('name', t.workflowFieldName, t.workflowFieldDescName, 'string'),
+        _workflowSuggestedField('source_code', 'کد منبع', 'منبع سرنخ در CRM', 'string'),
+        _workflowSuggestedField('mobile', t.workflowFieldMobile, t.workflowFieldDescMobile, 'string'),
+        _workflowSuggestedField('email', t.workflowFieldEmail, t.workflowFieldDescEmail, 'string'),
+      ];
+    }
+
+    if (key.startsWith('crm.activity')) {
+      return [
+        _workflowSuggestedField('activity_id', 'شناسه فعالیت', 'شناسه رکورد فعالیت', 'number'),
+        _workflowSuggestedField('activity_code', 'کد فعالیت', 'کد یکتای فعالیت', 'string'),
+        _workflowSuggestedField('activity_type', 'نوع فعالیت', 'call | email | meeting | note', 'string'),
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+        _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
+        _workflowSuggestedField('subject', 'موضوع', 'موضوع فعالیت', 'string'),
       ];
     }
 
     if (key.startsWith('crm.deal.')) {
+      if (key.contains('assigned')) {
+        return [
+          _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
+          _workflowSuggestedField('old_assigned_to_user_id', 'شناسه مسئول قبلی', 'قبل از تغییر تخصیص', 'number'),
+          _workflowSuggestedField('new_assigned_to_user_id', 'شناسه مسئول جدید', 'پس از تغییر تخصیص', 'number'),
+          _workflowSuggestedField('title', t.workflowFieldTitle, t.workflowFieldDescTitle, 'string'),
+          _workflowSuggestedField('person_name', t.workflowFieldPersonName, t.workflowFieldDescPersonName, 'string'),
+        ];
+      }
       if (key.contains('closed')) {
         return [
           _workflowSuggestedField('deal_id', t.workflowFieldDealId, t.workflowFieldDescDealId, 'number'),
           _workflowSuggestedField('amount', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
           _workflowSuggestedField('is_win', t.workflowFieldIsWin, t.workflowFieldDescIsWin, 'boolean'),
+          _workflowSuggestedField('is_lost', 'شکست معامله', 'true اگر مرحله بازنده باشد', 'boolean'),
           _workflowSuggestedField('document_id', t.workflowFieldDocumentId, t.workflowFieldDescDocumentId, 'number'),
         ];
       }
@@ -4326,6 +4364,8 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
               'old_stage_id', t.workflowFieldOldStageId, t.workflowFieldDescOldStageId, 'number'),
           _workflowSuggestedField(
               'new_stage_id', t.workflowFieldNewStageId, t.workflowFieldDescNewStageId, 'number'),
+          _workflowSuggestedField('old_stage_name', 'نام مرحله قبلی', 'متن مرحله قبل از تغییر', 'string'),
+          _workflowSuggestedField('new_stage_name', 'نام مرحله جدید', 'متن مرحله بعد از تغییر', 'string'),
         ];
       }
       return [

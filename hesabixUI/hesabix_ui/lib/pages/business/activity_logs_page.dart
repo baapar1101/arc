@@ -252,6 +252,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
       searchFields: const ['description', 'user_name'],
       dateRangeField: 'created_at',
       enableDateRangeFilter: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -405,7 +406,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
             ),
           ),
           // Data Table
-          Expanded(
+          SingleChildScrollView(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(_additionalParams().toString()), // برای rebuild با تغییر فیلترها
               config: _buildTableConfig(t),

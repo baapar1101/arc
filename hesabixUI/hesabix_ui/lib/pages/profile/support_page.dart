@@ -1519,9 +1519,10 @@ class _SupportPageState extends State<SupportPage> {
               ),
             Expanded(
               child: !isMobile
-                  ? DataTableWidget<Map<String, dynamic>>(
-                      key: ValueKey('data_table_$_refreshCounter'),
-                      config: DataTableConfig<Map<String, dynamic>>(
+                  ? SingleChildScrollView(
+                      child: DataTableWidget<Map<String, dynamic>>(
+                        key: ValueKey('data_table_$_refreshCounter'),
+                        config: DataTableConfig<Map<String, dynamic>>(
                         title: null,
                         subtitle: null,
                         endpoint: '/api/v1/support/search',
@@ -1647,10 +1648,11 @@ class _SupportPageState extends State<SupportPage> {
                             ),
                           ),
                         ],
-                      
-        expandBodyHeightToFitRows: true,),
-                      fromJson: (json) => json,
-                      calendarController: widget.calendarController,
+                        expandBodyHeightToFitRows: true,
+                        ),
+                        fromJson: (json) => json,
+                        calendarController: widget.calendarController,
+                      ),
                     )
                   : _buildMobileTicketsList(t, theme),
             ),

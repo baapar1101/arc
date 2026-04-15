@@ -100,10 +100,12 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<BankAccount>(
-        key: _bankAccountsTableKey,
-        config: _buildDataTableConfig(t),
-        fromJson: BankAccount.fromJson,
+      body: SingleChildScrollView(
+        child: DataTableWidget<BankAccount>(
+          key: _bankAccountsTableKey,
+          config: _buildDataTableConfig(t),
+          fromJson: BankAccount.fromJson,
+        ),
       ),
     );
   }
@@ -352,6 +354,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
             ),
           ),
       ],
+      expandBodyHeightToFitRows: true,
     );
   }
 

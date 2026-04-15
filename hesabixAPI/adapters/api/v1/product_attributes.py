@@ -59,6 +59,7 @@ def search_product_attributes(
         "skip": query.skip,
         "sort_by": query.sort_by,
         "sort_desc": query.sort_desc,
+        "sort": [s.model_dump() for s in query.sort] if query.sort else None,
         "search": query.search,
         "filters": query.filters,
     })

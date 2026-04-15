@@ -260,13 +260,10 @@ class _AIUsagePageState extends State<AIUsagePage> {
           ),
           const SizedBox(height: 24),
           // Daily Stats Table (DataTableWidget)
-          SizedBox(
-            height: 420,
-            child: DataTableWidget<Map<String, dynamic>>(
-              key: _dailyTableKey,
-              config: _buildDailyTableConfig(),
-              fromJson: (json) => Map<String, dynamic>.from(json as Map),
-            ),
+          DataTableWidget<Map<String, dynamic>>(
+            key: _dailyTableKey,
+            config: _buildDailyTableConfig(),
+            fromJson: (json) => Map<String, dynamic>.from(json as Map),
           ),
           const SizedBox(height: 24),
           // By Model Table
@@ -356,10 +353,12 @@ class _AIUsagePageState extends State<AIUsagePage> {
   Widget _buildLogsTab() {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: DataTableWidget<AIUsageLog>(
-        key: _logsTableKey,
-        config: _buildLogsTableConfig(),
-        fromJson: AIUsageLog.fromJson,
+      child: SingleChildScrollView(
+        child: DataTableWidget<AIUsageLog>(
+          key: _logsTableKey,
+          config: _buildLogsTableConfig(),
+          fromJson: AIUsageLog.fromJson,
+        ),
       ),
     );
   }
@@ -452,6 +451,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
           formatter: (item) => _formatLogDate((item as AIUsageLog).createdAt),
         ),
       ],
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -502,6 +502,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
           formatter: (item) => _formatNumberField(item as Map<String, dynamic>, 'requests'),
         ),
       ],
+      expandBodyHeightToFitRows: true,
     );
   }
 

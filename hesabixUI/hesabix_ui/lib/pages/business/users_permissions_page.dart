@@ -1057,6 +1057,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'print': t.printSettings,
         'history': t.eventHistory,
         'users': t.usersAndPermissions,
+        'manage_ftp': t.settingsPermissionManageFtp,
       },
       'storage': {
         'view': '${t.view} ${t.storageSpace}',

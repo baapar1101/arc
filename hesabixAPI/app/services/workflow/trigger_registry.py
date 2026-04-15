@@ -78,9 +78,12 @@ class TriggerRegistry:
             LeadCreatedTrigger,
             LeadStageChangedTrigger,
             LeadConvertedTrigger,
+            LeadAssignedTrigger,
             DealCreatedTrigger,
             DealStageChangedTrigger,
             DealClosedTrigger,
+            DealAssignedTrigger,
+            ActivityCreatedTrigger,
         )
         
         # Document triggers
@@ -109,7 +112,10 @@ class TriggerRegistry:
         self.register("crm.lead.created", LeadCreatedTrigger())
         self.register("crm.lead.stage_changed", LeadStageChangedTrigger())
         self.register("crm.lead.converted", LeadConvertedTrigger())
+        self.register("crm.lead.assigned", LeadAssignedTrigger())
         self.register("crm.deal.created", DealCreatedTrigger())
         self.register("crm.deal.stage_changed", DealStageChangedTrigger())
         self.register("crm.deal.closed", DealClosedTrigger())
+        self.register("crm.deal.assigned", DealAssignedTrigger())
+        self.register("crm.activity.created", ActivityCreatedTrigger())
 

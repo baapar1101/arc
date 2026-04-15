@@ -195,6 +195,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
         'debit': 'جمع بدهکار',
         'credit': 'جمع بستانکار',
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -442,18 +443,18 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
           ),
           
           // Data Table
-          Expanded(
+          SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-            child: DataTableWidget<Map<String, dynamic>>(
-              key: ValueKey({
-                _selectedFiscalYearId,
-                _selectedCurrencyId,
-                _selectedPerson?.id,
-                _selectedDocumentType,
-                _fromDate?.toIso8601String(),
-                _toDate?.toIso8601String(),
-              }.toString()),
+              child: DataTableWidget<Map<String, dynamic>>(
+                key: ValueKey({
+                  _selectedFiscalYearId,
+                  _selectedCurrencyId,
+                  _selectedPerson?.id,
+                  _selectedDocumentType,
+                  _fromDate?.toIso8601String(),
+                  _toDate?.toIso8601String(),
+                }.toString()),
                 config: _buildTableConfig(t),
                 fromJson: (json) => Map<String, dynamic>.from(json as Map),
                 calendarController: widget.calendarController,

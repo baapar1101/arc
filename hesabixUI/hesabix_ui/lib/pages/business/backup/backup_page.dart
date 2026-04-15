@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:dio/dio.dart';
@@ -28,6 +29,14 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
   String? _jobMessage;
   bool _jobRunning = false;
   Timer? _pollTimer;
+  bool _uploadToFtp = false;
+
+  bool _canFtpAfterBackup() {
+    final store = ApiClient.getAuthStore();
+    if (store?.currentBusiness?.id != widget.businessId) return false;
+    if (store!.currentBusiness?.isOwner == true) return true;
+    return store.hasBusinessPermission('settings', 'manage_ftp');
+  }
 
   @override
   void initState() {
@@ -63,7 +72,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     if (!context.mounted) return;
     final ctx = context;
     try {
-      final jobId = await _service.startBackupAsync(widget.businessId);
+      final jobId = await _service.startBackupAsync(widget.businessId, uploadToFtp: _uploadToFtp);
       if (!ctx.mounted) return;
       _startJob(jobId, AppLocalizations.of(ctx).inProgress);
       _startPollingJob();
@@ -94,10 +103,21 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
       try {
         final st = await _service.getJobStatus(_currentJobId!);
         if (!ctx.mounted) return;
+        final meta = st['meta'];
+        int? prog;
+        String? rawMessage;
+        if (meta is Map) {
+          prog = meta['progress'] as int?;
+          rawMessage = meta['message'] as String?;
+        }
+        prog ??= st['progress'] as int?;
+        rawMessage ??= st['message'] as String?;
+        if (!ctx.mounted) return;
         setState(() {
-          _jobProgress = (st['progress'] as int?) ?? _jobProgress;
-          final rawMessage = (st['message'] as String?) ?? _jobMessage;
-          _jobMessage = _translateJobMessage(rawMessage);
+          _jobProgress = prog ?? _jobProgress;
+          if (rawMessage != null) {
+            _jobMessage = _translateJobMessage(rawMessage);
+          }
         });
         final state = (st['state'] as String?) ?? '';
         if (state == 'succeeded') {
@@ -231,6 +251,19 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
         children: [
           Text(t.dataBackupDescription, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 16),
+          if (_canFtpAfterBackup()) ...[
+            CheckboxListTile(
+              value: _uploadToFtp,
+              onChanged: _creating || _jobRunning
+                  ? null
+                  : (v) => setState(() => _uploadToFtp = v ?? false),
+              title: Text(t.ftpSendAfterBackup),
+              subtitle: Text(t.ftpSendAfterBackupSubtitle),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+          ],
           if (_jobRunning || _jobMessage != null) _buildJobStatusCard(t),
           if (_items.isEmpty)
             _buildEmptyState(t)
@@ -391,6 +424,9 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     }
     if (lowerMessage == 'uploading file') {
       return t.jobUploadingFile;
+    }
+    if (lowerMessage == 'uploading to ftp') {
+      return t.jobUploadingToFtp;
     }
     if (lowerMessage == 'starting restore') {
       return t.jobStartingRestore;

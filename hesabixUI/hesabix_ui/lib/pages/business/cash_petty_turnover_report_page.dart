@@ -242,6 +242,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
         'withdrawal': 'جمع برداشت',
         'balance': 'موجودی فعلی',
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -506,7 +507,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
             ),
           ),
           // Table
-          Expanded(
+          SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTableWidget<Map<String, dynamic>>(

@@ -263,15 +263,57 @@
     });
   </script>
 
-  <!-- App update notification & auto-reload when a new Service Worker version is available -->
+  <!-- به‌روزرسانی: نسخهٔ سرور (version.json) + Service Worker (آفلاین حفظ می‌شود) -->
   <script>
     (function() {
-      if (!('serviceWorker' in navigator)) {
-        return;
-      }
-
+      var STORAGE_BUILD = 'hesabix_web_build';
+      var SESSION_PENDING = 'hesabix_pending_build';
+      var SESSION_NO_SW_RELOAD = 'hesabix_no_sw_build_reload';
       var UPDATE_BANNER_ID = 'flutter-update-banner';
       var hasReloadedForUpdate = false;
+      var VERSION_POLL_MS = 5 * 60 * 1000;
+
+      function storageGet(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function storageSet(key, val) {
+        try {
+          localStorage.setItem(key, val);
+        } catch (e) {}
+      }
+
+      function sessionGet(key) {
+        try {
+          return sessionStorage.getItem(key);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function sessionSet(key, val) {
+        try {
+          sessionStorage.setItem(key, val);
+        } catch (e) {}
+      }
+
+      function sessionRemove(key) {
+        try {
+          sessionStorage.removeItem(key);
+        } catch (e) {}
+      }
+
+      function commitPendingBuildBeforeReload() {
+        var pb = sessionGet(SESSION_PENDING);
+        if (pb) {
+          storageSet(STORAGE_BUILD, pb);
+          sessionRemove(SESSION_PENDING);
+        }
+      }
 
       function createUpdateBanner() {
         if (document.getElementById(UPDATE_BANNER_ID)) {
@@ -332,25 +374,118 @@
         document.body.appendChild(banner);
       }
 
-      function requestAppUpdate() {
-        navigator.serviceWorker.getRegistration().then(function(reg) {
+      function fetchServerBuild() {
+        var url = 'version.json?t=' + Date.now();
+        return fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+          .then(function(r) {
+            if (!r.ok) return null;
+            return r.json();
+          })
+          .then(function(j) {
+            return j && typeof j.build === 'string' ? j.build : null;
+          })
+          .catch(function() {
+            return null;
+          });
+      }
+
+      function tryActivateWaitingWorker() {
+        return navigator.serviceWorker.getRegistration().then(function(reg) {
           if (reg && reg.waiting) {
-            // به Service Worker می‌گوییم فوراً نسخه جدید را فعال کند
             reg.waiting.postMessage('skipWaiting');
-          } else {
-            // اگر به هر دلیل waiting نداریم، fallback به reload ساده
-            window.location.reload();
+            return true;
           }
-        }).catch(function() {
-          window.location.reload();
+          return false;
         });
       }
 
-      function setupUpdateFlow() {
-        // وقتی Service Worker کنترل صفحه را عوض کرد، یک بار صفحه را ریفرش کن
+      /** اگر waiting باشد skipWaiting؛ در غیر این صورت فقط در مسیر قدیمی SW به reload برگردیم تا از حلقه جلوگیری شود */
+      function requestAppUpdate(allowReloadFallback) {
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+          if (reg && reg.waiting) {
+            reg.waiting.postMessage('skipWaiting');
+          } else if (allowReloadFallback) {
+            window.location.reload();
+          }
+        }).catch(function() {
+          if (allowReloadFallback) {
+            window.location.reload();
+          }
+        });
+      }
+
+      function onServerNewerBuild(reg, serverBuild) {
+        sessionSet(SESSION_PENDING, serverBuild);
+        createUpdateBanner();
+
+        if (reg) {
+          reg.update()
+            .then(function() {
+              return tryActivateWaitingWorker();
+            })
+            .then(function(activated) {
+              if (activated) return;
+              return new Promise(function(resolve) {
+                setTimeout(resolve, 400);
+              }).then(function() {
+                return tryActivateWaitingWorker();
+              });
+            })
+            .then(function(activated) {
+              if (activated) return;
+              return new Promise(function(resolve) {
+                setTimeout(resolve, 1600);
+              }).then(function() {
+                return tryActivateWaitingWorker();
+              });
+            })
+            .catch(function() {});
+        } else {
+          if (!sessionGet(SESSION_NO_SW_RELOAD)) {
+            sessionSet(SESSION_NO_SW_RELOAD, '1');
+            storageSet(STORAGE_BUILD, serverBuild);
+            window.location.reload();
+          }
+        }
+      }
+
+      function runVersionCheck(reg) {
+        fetchServerBuild().then(function(serverBuild) {
+          if (!serverBuild) return;
+
+          var stored = storageGet(STORAGE_BUILD);
+          if (stored === null || stored === '') {
+            storageSet(STORAGE_BUILD, serverBuild);
+            return;
+          }
+          if (stored === serverBuild) {
+            sessionRemove(SESSION_NO_SW_RELOAD);
+            return;
+          }
+
+          onServerNewerBuild(reg, serverBuild);
+        });
+      }
+
+      function startVersionPolling(reg) {
+        runVersionCheck(reg);
+        setInterval(function() {
+          if (document.visibilityState === 'visible') {
+            runVersionCheck(reg);
+          }
+        }, VERSION_POLL_MS);
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'visible') {
+            runVersionCheck(reg);
+          }
+        });
+      }
+
+      function setupServiceWorkerUpdateFlow() {
         navigator.serviceWorker.addEventListener('controllerchange', function() {
           if (hasReloadedForUpdate) return;
           hasReloadedForUpdate = true;
+          commitPendingBuildBeforeReload();
           window.location.reload();
         });
 
@@ -358,22 +493,20 @@
           .then(function(reg) {
             if (!reg) return;
 
+            startVersionPolling(reg);
+
             function handleWaiting(worker) {
               if (!worker) return;
-              // اگر صفحه فعلی از قبل توسط یک SW کنترل می‌شود، یعنی نسخه جدید نسبت به نسخه فعلی است
               if (navigator.serviceWorker.controller) {
                 createUpdateBanner();
-                // به‌صورت خودکار فعال‌سازی نسخه جدید را آغاز کن
-                requestAppUpdate();
+                requestAppUpdate(true);
               }
             }
 
-            // اگر از قبل یک SW در حالت waiting داریم (مثلاً کاربر بعد از دیپلوی برگشته)
             if (reg.waiting) {
               handleWaiting(reg.waiting);
             }
 
-            // وقتی نسخه جدید Service Worker پیدا شد
             reg.addEventListener('updatefound', function() {
               var newWorker = reg.installing;
               if (!newWorker) return;
@@ -385,12 +518,16 @@
               });
             });
           })
-          .catch(function() {
-            // مشکلی در SW نباید باعث ارور مرئی در UI شود
-          });
+          .catch(function() {});
       }
 
-      window.addEventListener('load', setupUpdateFlow);
+      window.addEventListener('load', function() {
+        if ('serviceWorker' in navigator) {
+          setupServiceWorkerUpdateFlow();
+        } else {
+          startVersionPolling(null);
+        }
+      });
     })();
   </script>
 

@@ -243,6 +243,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
         'total_quantity': 'جمع تعداد فروش',
         'total_amount': 'جمع مبلغ کل فروش',
       },
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -440,7 +441,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
           ),
           
           // Data Table
-          Expanded(
+          SingleChildScrollView(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(
                 '${_selectedFiscalYearId}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}_${_selectedCurrencyId}_${_selectedCategoryId}_${_selectedProduct?['id']}_$_includeZeroSales',

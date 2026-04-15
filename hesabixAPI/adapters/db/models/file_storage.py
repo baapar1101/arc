@@ -41,6 +41,28 @@ class FileStorage(Base):
     storage_config = relationship("StorageConfig", foreign_keys=[storage_config_id])
     business = relationship("Business", foreign_keys=[business_id])
     subscription = relationship("BusinessStorageSubscription", foreign_keys=[subscription_id])
+    shares = relationship("FileStorageShare", back_populates="file", cascade="all, delete-orphan")
+
+
+class FileStorageShare(Base):
+	__tablename__ = "file_storage_shares"
+
+	id = Column(Integer, primary_key=True, autoincrement=True)
+	file_storage_id = Column(String(36), ForeignKey("file_storage.id", ondelete="CASCADE"), nullable=False, index=True)
+	business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	token_hash = Column(String(64), nullable=False, unique=True, index=True)
+	password_hash = Column(String(255), nullable=True)
+	expires_at = Column(DateTime(timezone=True), nullable=True)
+	revoked_at = Column(DateTime(timezone=True), nullable=True)
+	access_count = Column(Integer, nullable=False, default=0)
+	last_access_at = Column(DateTime(timezone=True), nullable=True)
+	created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+	created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+	updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+	file = relationship("FileStorage", foreign_keys=[file_storage_id], back_populates="shares")
+	business = relationship("Business", foreign_keys=[business_id])
+	creator = relationship("User", foreign_keys=[created_by])
 
 
 class StorageConfig(Base):

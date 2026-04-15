@@ -176,6 +176,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'total_sales',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -358,7 +359,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

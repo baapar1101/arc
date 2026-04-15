@@ -111,6 +111,7 @@ class _WarehousePerformanceReportPageState extends State<WarehousePerformanceRep
       defaultPageSize: 50,
       defaultSortBy: 'warehouse_code',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -198,7 +199,7 @@ class _WarehousePerformanceReportPageState extends State<WarehousePerformanceRep
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

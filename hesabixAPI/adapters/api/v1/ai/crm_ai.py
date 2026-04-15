@@ -9,7 +9,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Path, Body
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from adapters.db.session import get_db
 from adapters.db.models.crm import Lead, Deal, CrmActivity
@@ -94,13 +94,17 @@ async def summarize_lead(
         )
 
     lead_text = _lead_context(lead)
-    activities = (
-        db.query(CrmActivity)
-        .filter(CrmActivity.person_id == lead.person_id, CrmActivity.business_id == business_id)
-        .order_by(CrmActivity.activity_date.desc())
-        .limit(5)
-        .all()
-    )
+    act_q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+    if lead.person_id:
+        act_q = act_q.filter(
+            or_(
+                CrmActivity.person_id == lead.person_id,
+                CrmActivity.lead_id == lead.id,
+            )
+        )
+    else:
+        act_q = act_q.filter(CrmActivity.lead_id == lead.id)
+    activities = act_q.order_by(CrmActivity.activity_date.desc()).limit(5).all()
     activities_text = _activities_context(activities)
 
     system_prompt = """شما دستیار فروش CRM هستید. بر اساس اطلاعات سرنخ و فعالیت‌ها، یک خلاصه کوتاه (۲-۳ جمله) و یک پیشنهاد برای مرحله بعد (مثلاً تماس تلفنی، ارسال پیشنهاد، جلسه حضوری) ارائه دهید. پاسخ را به صورت متن ساده و بدون فرمت خاص بنویسید."""

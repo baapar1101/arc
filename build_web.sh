@@ -426,6 +426,20 @@ EOF
   "$FIX_SCRIPT" "$BUILD_DIR"
 fi
 
+# فایل سبک برای تشخیص دیپلوی جدید در مرورگر (با web/index.html هماهنگ است)
+echo ""
+echo "Writing version.json for client-side update checks..."
+GEN_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+RND_HEX="$(openssl rand -hex 4 2>/dev/null || printf '%04x%04x' "$RANDOM" "$RANDOM")"
+GITREV="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+if [ -n "$GITREV" ]; then
+  BUILD_ID="${GEN_AT}-${RND_HEX}-${GITREV}"
+else
+  BUILD_ID="${GEN_AT}-${RND_HEX}"
+fi
+printf '{"build":"%s","generated_at":"%s"}\n' "$BUILD_ID" "$GEN_AT" > "$BUILD_DIR/version.json"
+echo "✓ version.json → build=\"$BUILD_ID\""
+
 # Check icon files
 echo ""
 echo "Checking icon files..."
@@ -531,5 +545,20 @@ echo "To serve, you can use a web server:"
 echo "  cd $BUILD_DIR && python3 -m http.server 8080"
 echo "or use nginx/apache for serving."
 echo ""
+
+# اگر روی همان میزبان nginx و hesabix-ui.conf وجود داشته باشد، بلاک‌های version.json / SW اعمال می‌شود.
+if [[ "${SKIP_NGINX_ENSURE:-}" != "1" ]]; then
+  ENSURE_NGINX_SCRIPT="$REPO_ROOT/scripts/ensure_nginx_ui_version_probe.sh"
+  if [[ -f "$ENSURE_NGINX_SCRIPT" ]]; then
+    chmod +x "$ENSURE_NGINX_SCRIPT" 2>/dev/null || true
+    if bash "$ENSURE_NGINX_SCRIPT"; then
+      :
+    else
+      warn "بررسی/به‌روزرسانی nginx انجام نشد (روی میزبان بدون nginx یا بدون sudo طبیعی است). برای رد کردن: SKIP_NGINX_ENSURE=1"
+    fi
+  else
+    warn "اسکریپت یافت نشد: $ENSURE_NGINX_SCRIPT"
+  fi
+fi
 
 

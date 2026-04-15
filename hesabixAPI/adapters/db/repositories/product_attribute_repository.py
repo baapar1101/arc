@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 
+from adapters.api.v1.schemas import QueryInfo
+from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product_attribute import ProductAttribute
 
@@ -20,6 +22,7 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
         skip: int = 0,
         sort_by: str | None = None,
         sort_desc: bool = True,
+        sort: list[Any] | None = None,
         search: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -31,12 +34,24 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
 
         # Sorting
-        if sort_by == 'title':
-            order_col = ProductAttribute.title.desc() if sort_desc else ProductAttribute.title.asc()
-            stmt = stmt.order_by(order_col)
+        _allowed = frozenset({"title", "id", "created_at"})
+        try:
+            qi = QueryInfo(sort_by=sort_by, sort_desc=sort_desc, sort=sort)  # type: ignore[arg-type]
+            specs = effective_sort_specs(qi, allowed=_allowed, default_when_empty=None)
+        except Exception:
+            specs = []
+        order_parts = []
+        for col_name, desc in specs:
+            if col_name not in _allowed:
+                continue
+            col = getattr(ProductAttribute, col_name)
+            order_parts.append(col.desc() if desc else col.asc())
+        if not order_parts:
+            stmt = stmt.order_by(ProductAttribute.id.desc() if sort_desc else ProductAttribute.id.asc())
         else:
-            order_col = ProductAttribute.id.desc() if sort_desc else ProductAttribute.id.asc()
-            stmt = stmt.order_by(order_col)
+            if not specs or specs[-1][0] != "id":
+                order_parts.append(ProductAttribute.id.asc())
+            stmt = stmt.order_by(*order_parts)
 
         # Paging
         stmt = stmt.offset(skip).limit(take)

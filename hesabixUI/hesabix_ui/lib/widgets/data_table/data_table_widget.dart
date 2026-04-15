@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
@@ -131,12 +132,62 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (widget.config.enableSorting) {
       _sortBy = widget.config.defaultSortBy;
       _sortDesc = widget.config.defaultSortDesc;
+      if (_sortBy != null && _sortBy!.isNotEmpty) {
+        _multiSort
+          ..clear()
+          ..add(_SortSpec(by: _sortBy!, desc: _sortDesc));
+      }
     }
     _setupSearchListener();
     _loadColumnSettings();
     _loadDensityPreference();
     _loadExportCalendarPreference();
-    _fetchData();
+    if (widget.config.persistPageSize) {
+      _loadingList = true;
+      unawaited(_bootstrapInitialFetch());
+    } else {
+      _fetchData();
+    }
+  }
+
+  int _resolvePersistedPageSize(int? stored) {
+    final options = widget.config.pageSizeOptions;
+    if (options.isEmpty) return widget.config.defaultPageSize;
+    if (stored != null && options.contains(stored)) return stored;
+    if (options.contains(widget.config.defaultPageSize)) {
+      return widget.config.defaultPageSize;
+    }
+    return options.first;
+  }
+
+  Future<void> _loadPageSizePreference() async {
+    if (!widget.config.persistPageSize) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'data_table_page_size_${widget.config.effectiveTableId}';
+      final stored = prefs.getInt(key);
+      if (!mounted) return;
+      setState(() {
+        _limit = _resolvePersistedPageSize(stored);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _savePageSizePreference() async {
+    if (!widget.config.persistPageSize) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'data_table_page_size_${widget.config.effectiveTableId}';
+      if (widget.config.pageSizeOptions.contains(_limit)) {
+        await prefs.setInt(key, _limit);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _bootstrapInitialFetch() async {
+    await _loadPageSizePreference();
+    if (!mounted) return;
+    await _fetchData();
   }
 
   Future<void> _loadExportCalendarPreference() async {
@@ -309,6 +360,42 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       filteredItems = filtered;
       filteredRawItems = filteredRaw;
     }
+
+    // مرتب‌سازی محلی (چندستونه یا تک‌ستونه) قبل از صفحه‌بندی
+    if (widget.config.enableSorting &&
+        (_multiSort.isNotEmpty ||
+            (_sortBy != null && _sortBy!.isNotEmpty))) {
+      final specs = _multiSort.isNotEmpty
+          ? List<_SortSpec>.from(_multiSort)
+          : [_SortSpec(by: _sortBy!, desc: _sortDesc)];
+      filteredItems = List<T>.from(filteredItems);
+      filteredRawItems = List<Map<String, dynamic>>.from(filteredRawItems);
+      int cmpDynamic(dynamic a, dynamic b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        if (a is num && b is num) return a.compareTo(b);
+        if (a is Comparable && b is Comparable) {
+          try {
+            return a.compareTo(b);
+          } catch (_) {}
+        }
+        return a.toString().compareTo(b.toString());
+      }
+
+      final order = List<int>.generate(filteredRawItems.length, (i) => i);
+      order.sort((ia, ib) {
+        for (final s in specs) {
+          final va = filteredRawItems[ia][s.by];
+          final vb = filteredRawItems[ib][s.by];
+          final c = cmpDynamic(va, vb);
+          if (c != 0) return s.desc ? -c : c;
+        }
+        return 0;
+      });
+      filteredItems = order.map((i) => filteredItems[i]).toList();
+      filteredRawItems = order.map((i) => filteredRawItems[i]).toList();
+    }
     
     // Calculate total pages based on filtered items
     _total = filteredItems.length;
@@ -416,10 +503,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           'skip': (_page - 1) * _limit,
         };
         
-        // Add sorting
+        // Add sorting (قدیمی: sort_by/sort_desc؛ چندستونه: پارامتر JSON sort)
         if (_sortBy != null) {
           queryParams['sort_by'] = _sortBy;
           queryParams['sort_desc'] = _sortDesc;
+        }
+        if (_multiSort.isNotEmpty) {
+          queryParams['sort'] = jsonEncode(
+            _multiSort
+                .map((s) => <String, dynamic>{'by': s.by, 'desc': s.desc})
+                .toList(),
+          );
         }
         
         // Add search
@@ -503,6 +597,24 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   @override
   void didUpdateWidget(covariant DataTableWidget<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final identityChanged =
+        oldWidget.config.effectiveTableId != widget.config.effectiveTableId;
+    if (identityChanged) {
+      if (widget.config.persistPageSize) {
+        setState(() {
+          _loadingList = true;
+          _page = 1;
+        });
+        unawaited(_bootstrapInitialFetch());
+      } else {
+        setState(() {
+          _limit = widget.config.defaultPageSize;
+          _page = 1;
+        });
+        _fetchData();
+      }
+      return;
+    }
     // If local data changes, refresh immediately.
     if (widget.localRawItems != null && !identical(oldWidget.localRawItems, widget.localRawItems)) {
       _fetchData();
@@ -738,6 +850,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       _searchCtrl.clear();
       _sortBy = null;
       _sortDesc = false;
+      _multiSort.clear();
       _columnSearchValues.clear();
       _columnSearchTypes.clear();
       _columnMultiSelectValues.clear();
@@ -952,7 +1065,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       });
 
 
-      final queryInfo = {
+      final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
         'take': _limit,
@@ -963,6 +1076,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
+      if (_multiSort.isNotEmpty) {
+        queryInfo['sort'] = _multiSort
+            .map((s) => <String, dynamic>{'by': s.by, 'desc': s.desc})
+            .toList();
+      }
 
       final params = <String, dynamic>{
         'selected_only': selectedOnly,
@@ -2009,6 +2127,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           _limit = value;
                           _page = 1;
                         });
+                        unawaited(_savePageSizePreference());
                         _fetchData();
                       }
                     },
@@ -3069,7 +3188,7 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
     const double buttonSize = buttonIconSize + (buttonPadding * 2);
     
     return Tooltip(
-      message: 'کلیک برای مرتب‌سازی • راست‌کلیک برای منوی تنظیمات • درگ لبه راست برای تغییر عرض',
+      message: 'کلیک برای مرتب‌سازی • Shift+کلیک برای افزودن سطح دوم مرتب‌سازی • راست‌کلیک برای منوی تنظیمات • درگ لبه راست برای تغییر عرض',
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() {

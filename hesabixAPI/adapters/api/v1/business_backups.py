@@ -22,6 +22,8 @@ from app.services.business_service import create_business
 from adapters.api.v1.schemas import BusinessCreateRequest, BusinessType, BusinessField
 import logging
 from app.services.job_manager import JobManager
+from adapters.api.v1.business_ftp_backup import assert_can_use_ftp_on_backup, upload_saved_backup_to_ftp
+from app.services.business_ftp_service import load_decrypted_params
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,10 @@ router = APIRouter(prefix="/businesses/{business_id}/backups", tags=["پشتیب
 class RestoreBackupRequest(BaseModel):
     backup_id: str | None = Field(default=None, description="شناسه بکاپ برای بازیابی")
     mode: str = Field(default="new_business", description="حالت بازیابی: replace یا new_business")
+
+
+class CreateBackupBody(BaseModel):
+    upload_to_ftp: bool = Field(default=False, description="پس از ذخیره داخلی، ارسال کپی به سرور FTP")
 
 
 def _normalize_business_type(value: Any) -> BusinessType:
@@ -306,14 +312,22 @@ async def create_backup(
     background: BackgroundTasks = None,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
+    body: CreateBackupBody | None = Body(None),
 ):
     """
     ایجاد بکاپ پویا. به‌صورت پیش‌فرض غیرهمزمان اجرا می‌شود و job_id برمی‌گرداند.
     """
+    upload_to_ftp = bool(body.upload_to_ftp) if body else False
+    if upload_to_ftp:
+        assert_can_use_ftp_on_backup(db, ctx, business_id)
+        if not load_decrypted_params(db, business_id):
+            raise ApiError("FTP_NOT_CONFIGURED", "ابتدا تنظیمات FTP را در بخش تنظیمات ذخیره کنید", http_status=400)
+
     if async_mode:
         jm = JobManager.instance()
         job_id = jm.create("Backup queued")
         logger.info(f"[BACKUP] Created backup job {job_id} for business_id: {business_id}")
+        do_ftp = upload_to_ftp
 
         def task():
             # استفاده از get_db_session برای background task
@@ -342,7 +356,14 @@ async def create_backup(
                         )
                         return saved
                     saved = anyio.run(_upload)
-                    jm.succeed(job_id, {"file": saved, "metadata": data["metadata"]}, "Backup completed")
+                    result_payload: Dict[str, Any] = {"file": saved, "metadata": data["metadata"]}
+                    if do_ftp:
+                        jm.update(job_id, 94, "Uploading to FTP")
+                        ftp_info = upload_saved_backup_to_ftp(db, business_id, data["filename"], data["zip_bytes"])
+                        if not ftp_info:
+                            raise ApiError("FTP_NOT_CONFIGURED", "تنظیمات FTP در دسترس نبود", http_status=400)
+                        result_payload["ftp"] = ftp_info
+                    jm.succeed(job_id, result_payload, "Backup completed")
                 except Exception as e:
                     # استخراج error message به صورت مناسب
                     error_msg = None
@@ -397,7 +418,13 @@ async def create_backup(
             business_id=business_id,
             check_storage_limit=True,
         )
-        return success_response({"file": saved, "metadata": data["metadata"]}, request=request, message="Backup created")
+        out: Dict[str, Any] = {"file": saved, "metadata": data["metadata"]}
+        if upload_to_ftp:
+            ftp_info = upload_saved_backup_to_ftp(db, business_id, data["filename"], data["zip_bytes"])
+            if not ftp_info:
+                raise ApiError("FTP_NOT_CONFIGURED", "تنظیمات FTP در دسترس نبود", http_status=400)
+            out["ftp"] = ftp_info
+        return success_response(out, request=request, message="Backup created")
 
 
 @router.get("/{backup_id}/download", dependencies=[Depends(require_business_access_dep)])

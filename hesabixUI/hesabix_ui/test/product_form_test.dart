@@ -52,6 +52,21 @@ void main() {
       expect(updated.itemType, original.itemType); // unchanged
     });
 
+    test('copyWith can clear nullable fields (e.g. default warehouse)', () {
+      final original = ProductFormData(
+        name: 'کالا',
+        defaultWarehouseId: 42,
+        taxTypeId: 7,
+      );
+      final cleared = original.copyWith(
+        defaultWarehouseId: null,
+        taxTypeId: null,
+      );
+      expect(cleared.defaultWarehouseId, isNull);
+      expect(cleared.taxTypeId, isNull);
+      expect(cleared.name, original.name);
+    });
+
     test('should convert to payload', () {
       final formData = ProductFormData(
         name: 'کالای تست',

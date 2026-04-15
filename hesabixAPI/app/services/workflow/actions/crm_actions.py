@@ -83,6 +83,20 @@ class CreateLeadAction(ActionHandler):
         db.add(lead)
         db.flush()
         db.refresh(lead)
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_lead_created
+
+            trigger_lead_created(
+                db,
+                int(business_id),
+                lead_id=lead.id,
+                process_definition_id=lead.process_definition_id,
+                stage_id=lead.stage_id,
+                name=lead.name,
+                user_id=int(created_by) if created_by else None,
+            )
+        except Exception:
+            pass
         return {"success": True, "lead_id": lead.id, "code": lead.code}
 
 
@@ -164,6 +178,22 @@ class CreateDealAction(ActionHandler):
         db.add(deal)
         db.flush()
         db.refresh(deal)
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_deal_created
+
+            trigger_deal_created(
+                db,
+                int(business_id),
+                deal_id=deal.id,
+                process_definition_id=deal.process_definition_id,
+                stage_id=deal.stage_id,
+                person_id=deal.person_id,
+                title=deal.title,
+                amount=float(deal.amount),
+                user_id=int(created_by) if created_by else None,
+            )
+        except Exception:
+            pass
         return {"success": True, "deal_id": deal.id, "code": deal.code}
 
 
@@ -175,7 +205,8 @@ class CreateCrmActivityAction(ActionHandler):
             "name": "ثبت فعالیت CRM",
             "description": "ثبت یک فعالیت (تماس، ایمیل، جلسه، یادداشت) برای یک مشتری",
             "config_schema": {
-                "person_id": {"type": "integer", "description": "شناسه شخص (مشتری)", "required": True},
+                "person_id": {"type": "integer", "description": "شناسه شخص (مشتری) — در صورت ثبت برای سرنخ خالی بگذارید", "required": False},
+                "lead_id": {"type": "integer", "description": "شناسه سرنخ (فعالیت قبل از تبدیل به مشتری)", "required": False},
                 "activity_type": {"type": "string", "description": "نوع: call | email | meeting | note", "required": True, "enum": ["call", "email", "meeting", "note"]},
                 "subject": {"type": "string", "description": "موضوع", "required": False},
                 "description": {"type": "string", "description": "شرح", "required": False},
@@ -203,12 +234,22 @@ class CreateCrmActivityAction(ActionHandler):
         user_id = user_id or 0
 
         person_id = WorkflowEngine._resolve_value_static(config.get("person_id"), context, node_results)
+        lead_id = WorkflowEngine._resolve_value_static(config.get("lead_id"), context, node_results)
         activity_type = WorkflowEngine._resolve_value_static(config.get("activity_type"), context, node_results) or "note"
         if activity_type not in ("call", "email", "meeting", "note"):
             activity_type = "note"
-        if not person_id:
-            return {"success": False, "error": "person_id is required"}
-        person_id = int(person_id)
+        person_id_int = int(person_id) if person_id else None
+        lead_id_int = int(lead_id) if lead_id else None
+        if not person_id_int and not lead_id_int:
+            return {"success": False, "error": "person_id یا lead_id لازم است"}
+        if lead_id_int:
+            from adapters.db.models.crm import Lead
+
+            lead = db.query(Lead).filter(Lead.id == lead_id_int, Lead.business_id == business_id).first()
+            if not lead:
+                return {"success": False, "error": "lead not found"}
+            if lead.person_id and not person_id_int:
+                person_id_int = int(lead.person_id)
 
         activity_date_str = WorkflowEngine._resolve_value_static(config.get("activity_date"), context, node_results)
         if activity_date_str:
@@ -226,10 +267,17 @@ class CreateCrmActivityAction(ActionHandler):
             created_by = biz.owner_id if biz else None
         if not created_by:
             return {"success": False, "error": "user_id or business owner required to create activity"}
+        if person_id_int:
+            from adapters.db.models.person import Person
+
+            person = db.query(Person).filter(Person.id == person_id_int, Person.business_id == business_id).first()
+            if not person:
+                return {"success": False, "error": "person not found"}
         code_val = generate_document_code(db, business_id, "crm_activity", activity_date.date())
         act = CrmActivity(
             business_id=business_id,
-            person_id=person_id,
+            person_id=person_id_int,
+            lead_id=lead_id_int,
             code=code_val,
             activity_type=activity_type,
             subject=WorkflowEngine._resolve_value_static(config.get("subject"), context, node_results) or None,
@@ -241,4 +289,190 @@ class CreateCrmActivityAction(ActionHandler):
         db.add(act)
         db.flush()
         db.refresh(act)
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_crm_activity_created
+
+            trigger_crm_activity_created(db, int(business_id), act.id, user_id=int(created_by) if created_by else None)
+        except Exception:
+            pass
         return {"success": True, "activity_id": act.id, "code": act.code}
+
+
+class UpdateLeadAction(ActionHandler):
+    """به‌روزرسانی سرنخ از ورک‌فلو"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "به‌روزرسانی سرنخ",
+            "description": "تغییر مرحله، مسئول، پیگیری یا نام سرنخ",
+            "config_schema": {
+                "lead_id": {"type": "integer", "required": True},
+                "stage_id": {"type": "integer", "required": False},
+                "assigned_to_user_id": {"type": "integer", "required": False},
+                "next_follow_up_at": {"type": "string", "description": "ISO datetime", "required": False},
+                "name": {"type": "string", "required": False},
+                "source_code": {"type": "string", "required": False},
+            },
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from app.services.workflow.workflow_engine import WorkflowEngine
+        from adapters.db.models.crm import Lead, CrmProcessStage
+
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if not db or business_id is None:
+            return {"success": False, "error": "db or business_id missing in context"}
+        lead_id = WorkflowEngine._resolve_value_static(config.get("lead_id"), context, node_results)
+        if not lead_id:
+            return {"success": False, "error": "lead_id is required"}
+        lead = db.query(Lead).filter(Lead.id == int(lead_id), Lead.business_id == business_id).first()
+        if not lead:
+            return {"success": False, "error": "lead not found"}
+        sid = WorkflowEngine._resolve_value_static(config.get("stage_id"), context, node_results)
+        if sid is not None:
+            st = (
+                db.query(CrmProcessStage)
+                .filter(
+                    CrmProcessStage.id == int(sid),
+                    CrmProcessStage.process_definition_id == lead.process_definition_id,
+                )
+                .first()
+            )
+            if not st:
+                return {"success": False, "error": "invalid stage_id"}
+            lead.stage_id = int(sid)
+        aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
+        if aid is not None:
+            lead.assigned_to_user_id = int(aid) if aid else None
+        nfu = WorkflowEngine._resolve_value_static(config.get("next_follow_up_at"), context, node_results)
+        if nfu:
+            try:
+                lead.next_follow_up_at = datetime.fromisoformat(str(nfu).replace("Z", "+00:00"))
+            except Exception:
+                pass
+        nm = WorkflowEngine._resolve_value_static(config.get("name"), context, node_results)
+        if nm is not None:
+            lead.name = str(nm).strip()[:255]
+        sc = WorkflowEngine._resolve_value_static(config.get("source_code"), context, node_results)
+        if sc is not None:
+            lead.source_code = str(sc) if sc else None
+        db.flush()
+        db.refresh(lead)
+        return {"success": True, "lead_id": lead.id}
+
+
+class UpdateDealAction(ActionHandler):
+    """به‌روزرسانی فرصت فروش از ورک‌فلو"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "به‌روزرسانی فرصت فروش",
+            "description": "تغییر مرحله، مسئول، مبلغ، احتمال، سند مرتبط",
+            "config_schema": {
+                "deal_id": {"type": "integer", "required": True},
+                "stage_id": {"type": "integer", "required": False},
+                "assigned_to_user_id": {"type": "integer", "required": False},
+                "amount": {"type": "number", "required": False},
+                "probability_percent": {"type": "integer", "required": False},
+                "document_id": {"type": "integer", "required": False},
+                "title": {"type": "string", "required": False},
+            },
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from app.services.workflow.workflow_engine import WorkflowEngine
+        from adapters.db.models.crm import Deal, CrmProcessStage
+
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if not db or business_id is None:
+            return {"success": False, "error": "db or business_id missing in context"}
+        deal_id = WorkflowEngine._resolve_value_static(config.get("deal_id"), context, node_results)
+        if not deal_id:
+            return {"success": False, "error": "deal_id is required"}
+        deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
+        if not deal:
+            return {"success": False, "error": "deal not found"}
+        sid = WorkflowEngine._resolve_value_static(config.get("stage_id"), context, node_results)
+        if sid is not None:
+            st = (
+                db.query(CrmProcessStage)
+                .filter(
+                    CrmProcessStage.id == int(sid),
+                    CrmProcessStage.process_definition_id == deal.process_definition_id,
+                )
+                .first()
+            )
+            if not st:
+                return {"success": False, "error": "invalid stage_id"}
+            deal.stage_id = int(sid)
+        aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
+        if aid is not None:
+            deal.assigned_to_user_id = int(aid) if aid else None
+        amt = WorkflowEngine._resolve_value_static(config.get("amount"), context, node_results)
+        if amt is not None:
+            deal.amount = float(amt)
+        pr = WorkflowEngine._resolve_value_static(config.get("probability_percent"), context, node_results)
+        if pr is not None:
+            deal.probability_percent = int(pr) if pr is not None else None
+        doc = WorkflowEngine._resolve_value_static(config.get("document_id"), context, node_results)
+        if doc is not None:
+            deal.document_id = int(doc) if doc else None
+        ttl = WorkflowEngine._resolve_value_static(config.get("title"), context, node_results)
+        if ttl is not None:
+            deal.title = str(ttl).strip()[:255]
+        db.flush()
+        db.refresh(deal)
+        return {"success": True, "deal_id": deal.id}
+
+
+class CrmLinkDealDocumentAction(ActionHandler):
+    """اتصال سند حسابداری به فرصت فروش (مثلاً پس از صدور فاکتور)"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "لینک سند به فرصت فروش",
+            "description": "تنظیم document_id روی یک فرصت فروش",
+            "config_schema": {
+                "deal_id": {"type": "integer", "required": True},
+                "document_id": {"type": "integer", "required": True},
+            },
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from app.services.workflow.workflow_engine import WorkflowEngine
+        from adapters.db.models.crm import Deal
+
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if not db or business_id is None:
+            return {"success": False, "error": "db or business_id missing in context"}
+        deal_id = WorkflowEngine._resolve_value_static(config.get("deal_id"), context, node_results)
+        document_id = WorkflowEngine._resolve_value_static(config.get("document_id"), context, node_results)
+        if not deal_id or not document_id:
+            return {"success": False, "error": "deal_id and document_id are required"}
+        deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
+        if not deal:
+            return {"success": False, "error": "deal not found"}
+        deal.document_id = int(document_id)
+        db.flush()
+        return {"success": True, "deal_id": deal.id, "document_id": int(document_id)}

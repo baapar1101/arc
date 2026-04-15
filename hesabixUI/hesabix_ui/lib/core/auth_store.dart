@@ -504,6 +504,10 @@ class AuthStore with ChangeNotifier {
     return hasBusinessPermission('settings', 'users');
   }
 
+  bool canManageFtpBackup() {
+    return hasBusinessPermission('settings', 'manage_ftp');
+  }
+
   // بررسی دسترسی به کسب و کار
   bool canAccessBusiness(int businessId) {
     if (_currentBusiness == null) return false;

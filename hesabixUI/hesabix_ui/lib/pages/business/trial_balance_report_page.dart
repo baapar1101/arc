@@ -250,6 +250,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
       },
       defaultSortBy: 'account_code',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -438,7 +439,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
           ),
           
           // Data Table
-          Expanded(
+          SingleChildScrollView(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(
                 'trial_balance_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedAccountType}_${_includeZeroBalance}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',

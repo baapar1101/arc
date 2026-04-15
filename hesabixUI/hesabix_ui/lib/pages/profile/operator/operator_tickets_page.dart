@@ -683,7 +683,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
+            SingleChildScrollView(
               child: DataTableWidget<Map<String, dynamic>>(
                 key: ValueKey('data_table_$_refreshCounter'),
                 config: DataTableConfig<Map<String, dynamic>>(
@@ -844,8 +844,8 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   borderRadius: BorderRadius.circular(8),
                   padding: const EdgeInsets.all(16),
                   onRowTap: (ticketData) => _navigateToTicketDetail(ticketData),
-                
-        expandBodyHeightToFitRows: true,),
+                  expandBodyHeightToFitRows: true,
+                ),
                 fromJson: (json) => json,
                 calendarController: widget.calendarController,
               ),

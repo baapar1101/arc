@@ -270,6 +270,7 @@ class _MonthlySalesReportPageState extends State<MonthlySalesReportPage> {
       defaultPageSize: 50,
       defaultSortBy: 'month_key',
       defaultSortDesc: true,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -424,7 +425,7 @@ class _MonthlySalesReportPageState extends State<MonthlySalesReportPage> {
             ),
             
             // Data Table
-            Expanded(
+            SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

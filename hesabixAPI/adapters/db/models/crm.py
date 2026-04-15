@@ -214,6 +214,11 @@ class Lead(Base):
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
     person = relationship("Person", foreign_keys=[person_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    activities: Mapped[list["CrmActivity"]] = relationship(
+        "CrmActivity",
+        back_populates="lead",
+        foreign_keys="[CrmActivity.lead_id]",
+    )
 
 
 # --- فرصت فروش (Deal) ---
@@ -317,6 +322,7 @@ class CrmActivity(Base):
     __tablename__ = "crm_activities"
     __table_args__ = (
         Index("idx_crm_activities_person", "business_id", "person_id"),
+        Index("idx_crm_activities_business_lead", "business_id", "lead_id"),
         UniqueConstraint("business_id", "code", name="uq_crm_activities_business_code"),
     )
 
@@ -327,11 +333,17 @@ class CrmActivity(Base):
         nullable=False,
         index=True,
     )
-    person_id: Mapped[int] = mapped_column(
+    person_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("persons.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+    )
+    lead_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_leads.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="فعالیت مرتبط با سرنخ قبل از تبدیل به مشتری",
     )
     code: Mapped[str] = mapped_column(String(50), nullable=False, index=True, comment="کد یکتا")
     activity_type: Mapped[str] = mapped_column(
@@ -366,6 +378,7 @@ class CrmActivity(Base):
 
     business = relationship("Business", back_populates="crm_activities")
     person = relationship("Person", back_populates="crm_activities")
+    lead = relationship("Lead", back_populates="activities", foreign_keys=[lead_id])
     deal = relationship("Deal", back_populates="activities")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
 

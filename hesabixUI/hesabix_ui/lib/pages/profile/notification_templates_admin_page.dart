@@ -23,10 +23,12 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DataTableWidget<NotificationTemplate>(
-        key: _tableKey,
-        config: _buildDataTableConfig(),
-        fromJson: NotificationTemplate.fromJson,
+      body: SingleChildScrollView(
+        child: DataTableWidget<NotificationTemplate>(
+          key: _tableKey,
+          config: _buildDataTableConfig(),
+          fromJson: NotificationTemplate.fromJson,
+        ),
       ),
     );
   }
@@ -45,6 +47,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
       enableSorting: true,
       enableGlobalSearch: true,
       defaultPageSize: 20,
+      expandBodyHeightToFitRows: true,
       pageSizeOptions: [10, 20, 50, 100],
       searchFields: ['event_key', 'channel', 'subject', 'body'],
       filterFields: ['event_key', 'channel', 'is_active'],

@@ -1301,16 +1301,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get basePath => 'Base Path';
 
   @override
-  String get ftpHost => 'FTP Host';
+  String get ftpHost => 'Host';
 
   @override
-  String get ftpPort => 'FTP Port';
+  String get ftpPort => 'Port';
 
   @override
-  String get ftpUsername => 'FTP Username';
+  String get ftpUsername => 'Username';
 
   @override
-  String get ftpPassword => 'FTP Password';
+  String get ftpPassword => 'Password';
 
   @override
   String get ftpDirectory => 'FTP Directory';
@@ -1569,7 +1569,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageManagementDescription =>
-      'Configure file storage systems and manage files';
+      'Configure file storage, public app URL for share links (file sharing), and manage files';
 
   @override
   String get systemConfiguration => 'System Configuration';
@@ -7574,6 +7574,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowCategoryPersons => 'Persons';
 
   @override
+  String get workflowCategoryCrm => 'CRM';
+
+  @override
+  String get workflowTemplateCrmNewLeadNotifyName =>
+      'New lead in-app notification';
+
+  @override
+  String get workflowTemplateCrmNewLeadNotifyDesc =>
+      'When a lead is created, an in-app notification is recorded';
+
+  @override
+  String get workflowTemplateCrmDealWonLogName => 'Log won deal closure';
+
+  @override
+  String get workflowTemplateCrmDealWonLogDesc =>
+      'Only won deals; writes an info log entry';
+
+  @override
   String get settingsCategoriesCount => 'Categories';
 
   @override
@@ -8576,4 +8594,100 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get invoiceWarehouseReleaseBusinessSubtitle =>
       'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.';
+
+  @override
+  String get ftpBackupSettingsTitle => 'FTP backup destination';
+
+  @override
+  String get ftpBackupSettingsDescription =>
+      'Store connection details for optional backup upload to your FTP server.';
+
+  @override
+  String get ftpPasswordLeaveEmptyHint =>
+      'Leave empty to keep the current password';
+
+  @override
+  String get ftpRemotePath => 'Remote folder';
+
+  @override
+  String get ftpPassiveMode => 'Passive mode (PASV)';
+
+  @override
+  String get ftpUseFtps => 'Use FTPS (FTP over TLS)';
+
+  @override
+  String get ftpSaveSettings => 'Save';
+
+  @override
+  String get ftpDeleteSettings => 'Remove FTP settings';
+
+  @override
+  String get ftpTestConnection => 'Test connection';
+
+  @override
+  String get ftpScanUsage => 'Scan folder usage';
+
+  @override
+  String get ftpUsageTotal => 'Total size (this folder)';
+
+  @override
+  String get ftpUsageFiles => 'Files counted';
+
+  @override
+  String get ftpUsageTruncated => 'Scan stopped early (too many files)';
+
+  @override
+  String get ftpLastScan => 'Last scan';
+
+  @override
+  String get ftpSettingsUpdatedAt => 'Settings last saved';
+
+  @override
+  String get ftpNotConfigured => 'Not configured';
+
+  @override
+  String get ftpSendAfterBackup => 'Also upload to FTP after backup';
+
+  @override
+  String get ftpSendAfterBackupSubtitle =>
+      'Requires saved FTP settings and permission';
+
+  @override
+  String get jobUploadingToFtp => 'Uploading to FTP';
+
+  @override
+  String get jobFtpTestStarting => 'FTP test starting';
+
+  @override
+  String get jobFtpTestRunning => 'Running FTP checks';
+
+  @override
+  String get jobFtpTestCompleted => 'FTP test completed';
+
+  @override
+  String get jobFtpTestFailed => 'FTP test failed';
+
+  @override
+  String get jobFtpUsageStarting => 'Scanning FTP usage';
+
+  @override
+  String get jobFtpUsageConnecting => 'Connecting to FTP';
+
+  @override
+  String get jobFtpUsageScanning => 'Scanning remote folders';
+
+  @override
+  String get jobFtpUsageCompleted => 'FTP usage scan completed';
+
+  @override
+  String get jobFtpUsageFailed => 'FTP usage scan failed';
+
+  @override
+  String get ftpTestResultTitle => 'Connection test';
+
+  @override
+  String get ftpClose => 'Close';
+
+  @override
+  String get settingsPermissionManageFtp => 'FTP backup connection';
 }
