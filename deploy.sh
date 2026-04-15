@@ -1315,6 +1315,8 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+# قبل از start/restart: اعمال میگریشن‌ها؛ در صورت شکست، سرویس استارت نمی‌شود
+ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
 Restart=always
 RestartSec=10
