@@ -1490,6 +1490,16 @@ class _ProductsPageState extends State<ProductsPage> {
                 icon: const Icon(Icons.auto_graph),
               ),
             ),
+            if (widget.authStore.hasBusinessPermission('products', 'view'))
+              Tooltip(
+                message: t.bulkProductPricesSheetTitle,
+                child: IconButton(
+                  onPressed: () {
+                    context.push('/business/${widget.businessId}/products/bulk-prices-sheet');
+                  },
+                  icon: const Icon(Icons.table_chart_outlined),
+                ),
+              ),
             Tooltip(
               message: t.addProduct,
               child: IconButton(

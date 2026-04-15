@@ -5,6 +5,16 @@ class SystemServicesService {
   
   SystemServicesService(this._api);
 
+  /// نام سرویس‌های systemd مجاز (هم‌راستا با بک‌اند)
+  Future<List<String>> getAllowedServices() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/system-services/allowed-services',
+    );
+    final data = res.data?['data'] as Map?;
+    final raw = data?['services'] as List? ?? const [];
+    return raw.map((e) => e.toString()).toList();
+  }
+
   /// دریافت لاگ‌های یک سرویس
   Future<Map<String, dynamic>> getServiceLogs({
     required String serviceName,

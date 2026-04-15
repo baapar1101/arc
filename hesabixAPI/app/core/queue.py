@@ -31,39 +31,53 @@ QUEUE_EXPORTS = "exports"
 QUEUE_TAX = "tax"  # Queue مخصوص عملیات مالیاتی
 
 
+def load_redis_settings_from_configuration() -> tuple[bool, str, int, int, Optional[str]]:
+    """
+    خواندن تنظیمات Redis از دیتابیس (تنظیمات کل سیستم) یا متغیرهای محیطی.
+    اگر مدیر Redis را غیرفعال کرده باشد، enabled=False برمی‌گردد.
+    """
+    settings = get_settings()
+    redis_enabled = getattr(settings, "redis_enabled", False)
+    redis_host = getattr(settings, "redis_host", "localhost")
+    redis_port = getattr(settings, "redis_port", 6379)
+    redis_db = getattr(settings, "redis_db", 0)
+    redis_password = getattr(settings, "redis_password", None)
+    try:
+        from adapters.db.session import get_db
+        from app.services.system_settings_service import get_redis_configuration
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            redis_config = get_redis_configuration(db)
+            redis_enabled = redis_config.get("enabled", False)
+            redis_host = redis_config.get("host", "localhost")
+            redis_port = redis_config.get("port", 6379)
+            redis_db = redis_config.get("db", 0)
+            redis_password = redis_config.get("password")
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return bool(redis_enabled), str(redis_host), int(redis_port), int(redis_db), redis_password
+
+
+def is_redis_enabled_in_configuration() -> bool:
+    """آیا Redis در تنظیمات سیستم روشن است (بدون تست اتصال شبکه)."""
+    return load_redis_settings_from_configuration()[0]
+
+
 def get_redis_connection() -> Optional[Redis]:
     """دریافت Redis connection برای RQ"""
     client = get_redis_client()
     if client is None:
         return None
-    
-    # RQ نیاز به Redis client بدون decode_responses دارد
-    settings = get_settings()
-    
-    try:
-        from adapters.db.session import get_db
-        from app.services.system_settings_service import get_redis_configuration
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            redis_config = get_redis_configuration(db)
-            redis_enabled = redis_config.get('enabled', False)
-            redis_host = redis_config.get('host', 'localhost')
-            redis_port = redis_config.get('port', 6379)
-            redis_db = redis_config.get('db', 0)
-            redis_password = redis_config.get('password')
-        finally:
-            db.close()
-    except Exception:
-        redis_enabled = getattr(settings, 'redis_enabled', False)
-        redis_host = getattr(settings, 'redis_host', 'localhost')
-        redis_port = getattr(settings, 'redis_port', 6379)
-        redis_db = getattr(settings, 'redis_db', 0)
-        redis_password = getattr(settings, 'redis_password', None)
-    
+
+    redis_enabled, redis_host, redis_port, redis_db, redis_password = load_redis_settings_from_configuration()
+
     if not redis_enabled:
         return None
-    
+
     try:
         # RQ نیاز به Redis بدون decode_responses دارد
         redis_conn = Redis(
@@ -75,7 +89,7 @@ def get_redis_connection() -> Optional[Redis]:
             socket_connect_timeout=2,
             socket_timeout=2,
             retry_on_timeout=True,
-            health_check_interval=30
+            health_check_interval=30,
         )
         redis_conn.ping()
         return redis_conn

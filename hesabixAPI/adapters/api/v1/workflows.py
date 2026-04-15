@@ -842,21 +842,13 @@ async def get_triggers_metadata(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """دریافت metadata triggerها"""
-    from app.services.workflow.i18n import translate_metadata
-
     trigger_registry = TriggerRegistry()
     all_triggers = trigger_registry.get_all_metadata()
-    
-    # ترجمه metadata
-    translated_triggers = []
-    for trigger in all_triggers:
-        tk = trigger.get("key")
-        translated_triggers.append(
-            translate_metadata(trigger, lang, action_key=tk) if tk else trigger
-        )
-    
+    # نام/توضیح از get_metadata() هر هندلر می‌آید. translate_metadata برای اکشن است
+    # و action_key را به‌عنوان context ترجمه می‌گیرد؛ با کلید تریگر همه‌جا «action_name» برمی‌گشت.
+
     return success_response(
-        data=translated_triggers,
+        data=all_triggers,
         request=request,
         message="TRIGGERS_METADATA_RETRIEVED",
     )

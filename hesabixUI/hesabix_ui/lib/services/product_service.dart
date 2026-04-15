@@ -146,6 +146,32 @@ class ProductService {
     List<String>? searchFields,
     List<int>? categoryIds,
   }) async {
+    final data = await searchProductsRaw(
+      businessId: businessId,
+      searchQuery: searchQuery,
+      limit: limit,
+      skip: skip,
+      filters: filters,
+      searchFields: searchFields,
+      categoryIds: categoryIds,
+    );
+    final items = data['items'];
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  /// پاسخ خام جستجوی محصولات (شامل total_count).
+  Future<Map<String, dynamic>> searchProductsRaw({
+    required int businessId,
+    String? searchQuery,
+    int limit = 20,
+    int skip = 0,
+    List<Map<String, dynamic>>? filters,
+    List<String>? searchFields,
+    List<int>? categoryIds,
+  }) async {
     final body = <String, dynamic>{
       'take': limit,
       'skip': skip,
@@ -157,6 +183,41 @@ class ProductService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/products/business/$businessId/search',
       data: body,
+    );
+    final data = res.data?['data'];
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return const <String, dynamic>{};
+  }
+
+  /// اعمال دسته‌ای قیمت پایه از نمای ویرایش گسترده.
+  Future<Map<String, dynamic>> applyBulkProductPriceSheet({
+    required int businessId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/bulk-prices-sheet/apply',
+      data: {'items': items},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  /// ردیف‌های قیمت لیست برای کالاهای همین صفحه (ورق ویرایش).
+  Future<List<Map<String, dynamic>>> fetchBulkPriceSheetItems({
+    required int businessId,
+    required List<int> productIds,
+    required List<int> priceListIds,
+  }) async {
+    if (productIds.isEmpty || priceListIds.isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/bulk-prices-sheet/price-items',
+      data: {
+        'product_ids': productIds,
+        'price_list_ids': priceListIds,
+      },
     );
     final data = res.data?['data'];
     final items = (data is Map<String, dynamic>) ? data['items'] : null;

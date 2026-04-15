@@ -4205,6 +4205,192 @@ abstract class AppLocalizations {
   /// **'Failed to set as default'**
   String get storageConfigSetDefaultFailed;
 
+  /// No description provided for @adminStorageFtpPurposeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Used as the default file storage backend for uploads (not the same as per-business backup FTP).'**
+  String get adminStorageFtpPurposeSubtitle;
+
+  /// No description provided for @adminStorageFtpInsecureWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Without TLS, credentials and data can be read on the network. Enable TLS when the server supports it.'**
+  String get adminStorageFtpInsecureWarning;
+
+  /// No description provided for @adminStorageFtpPasswordOptionalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the current password'**
+  String get adminStorageFtpPasswordOptionalHint;
+
+  /// No description provided for @adminStorageFtpPassive.
+  ///
+  /// In en, this message translates to:
+  /// **'Passive mode (PASV)'**
+  String get adminStorageFtpPassive;
+
+  /// No description provided for @adminStorageFormSectionBasic.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic information'**
+  String get adminStorageFormSectionBasic;
+
+  /// No description provided for @adminStorageFormSectionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration details'**
+  String get adminStorageFormSectionDetails;
+
+  /// No description provided for @adminStorageFormSectionOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get adminStorageFormSectionOptions;
+
+  /// No description provided for @adminStorageNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for this storage profile'**
+  String get adminStorageNameHint;
+
+  /// No description provided for @adminStorageFtpHostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP host'**
+  String get adminStorageFtpHostLabel;
+
+  /// No description provided for @adminStorageFtpHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hostname or IP of the FTP server'**
+  String get adminStorageFtpHostHint;
+
+  /// No description provided for @adminStorageFtpPortHintPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Default 21 without TLS'**
+  String get adminStorageFtpPortHintPlain;
+
+  /// No description provided for @adminStorageFtpPortHintTls.
+  ///
+  /// In en, this message translates to:
+  /// **'Often 990 with implicit TLS, or 21 with explicit TLS'**
+  String get adminStorageFtpPortHintTls;
+
+  /// No description provided for @adminStorageFtpDirectoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote folder'**
+  String get adminStorageFtpDirectoryLabel;
+
+  /// No description provided for @adminStorageFtpDirectoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote folder for stored files (e.g. /hesabix_files)'**
+  String get adminStorageFtpDirectoryHint;
+
+  /// No description provided for @adminStorageLocalBasePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Base path'**
+  String get adminStorageLocalBasePath;
+
+  /// No description provided for @adminStorageFtpUseTlsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use TLS'**
+  String get adminStorageFtpUseTlsTitle;
+
+  /// No description provided for @adminStorageFtpUseTlsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP over TLS (FTPS) when supported'**
+  String get adminStorageFtpUseTlsSubtitle;
+
+  /// No description provided for @adminStorageDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get adminStorageDefaultTitle;
+
+  /// No description provided for @adminStorageDefaultSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this profile as the default storage'**
+  String get adminStorageDefaultSubtitle;
+
+  /// No description provided for @adminStorageActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminStorageActiveTitle;
+
+  /// No description provided for @adminStorageActiveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive profiles are not used for new uploads'**
+  String get adminStorageActiveSubtitle;
+
+  /// No description provided for @adminStorageCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create storage profile'**
+  String get adminStorageCreateTitle;
+
+  /// No description provided for @adminStorageEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit storage profile'**
+  String get adminStorageEditTitle;
+
+  /// No description provided for @adminStorageFtpServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP server'**
+  String get adminStorageFtpServerTitle;
+
+  /// No description provided for @adminStorageTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get adminStorageTestConnection;
+
+  /// No description provided for @adminStorageTestingConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing connection…'**
+  String get adminStorageTestingConnection;
+
+  /// No description provided for @adminStorageTestSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test succeeded'**
+  String get adminStorageTestSuccess;
+
+  /// No description provided for @adminStorageTestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test failed'**
+  String get adminStorageTestFailed;
+
+  /// No description provided for @adminStorageSaveInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get adminStorageSaveInProgress;
+
+  /// No description provided for @adminStorageCreateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get adminStorageCreateButton;
+
+  /// No description provided for @adminStorageUpdateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get adminStorageUpdateButton;
+
   /// No description provided for @passwordChangeError.
   ///
   /// In en, this message translates to:
@@ -6353,6 +6539,144 @@ abstract class AppLocalizations {
   /// **'Increase or decrease prices with advanced filters'**
   String get bulkPriceUpdateSubtitle;
 
+  /// No description provided for @bulkPriceUpdateApplyScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to'**
+  String get bulkPriceUpdateApplyScopeTitle;
+
+  /// No description provided for @bulkPriceUpdateScopeBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base prices only'**
+  String get bulkPriceUpdateScopeBase;
+
+  /// No description provided for @bulkPriceUpdateScopePriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Price lists only'**
+  String get bulkPriceUpdateScopePriceLists;
+
+  /// No description provided for @bulkPriceUpdateScopeBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Base prices and price lists'**
+  String get bulkPriceUpdateScopeBoth;
+
+  /// No description provided for @bulkPriceUpdateStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary stats'**
+  String get bulkPriceUpdateStatsTitle;
+
+  /// No description provided for @bulkPriceUpdateListOnlyTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only sale prices inside price lists will change.'**
+  String get bulkPriceUpdateListOnlyTargetHint;
+
+  /// No description provided for @bulkPriceUpdatePriceListsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If none selected, all price lists (matching currency filter) apply.'**
+  String get bulkPriceUpdatePriceListsHint;
+
+  /// No description provided for @bulkPriceUpdatePreviewListChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list'**
+  String get bulkPriceUpdatePreviewListChanges;
+
+  /// No description provided for @bulkPriceUpdatePreviewListRowsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} rows'**
+  String bulkPriceUpdatePreviewListRowsCount(int count);
+
+  /// No description provided for @bulkPriceUpdateSummaryListRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list rows'**
+  String get bulkPriceUpdateSummaryListRows;
+
+  /// No description provided for @bulkPriceUpdateSummaryListDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'Total price list delta'**
+  String get bulkPriceUpdateSummaryListDelta;
+
+  /// No description provided for @bulkProductPricesSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk price sheet'**
+  String get bulkProductPricesSheetTitle;
+
+  /// No description provided for @bulkProductPricesSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit base prices in a table; each page is saved separately.'**
+  String get bulkProductPricesSheetSubtitle;
+
+  /// No description provided for @bulkProductPricesSheetSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this page'**
+  String get bulkProductPricesSheetSave;
+
+  /// No description provided for @bulkProductPricesSheetNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get bulkProductPricesSheetNext;
+
+  /// No description provided for @bulkProductPricesSheetPrev.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get bulkProductPricesSheetPrev;
+
+  /// No description provided for @bulkProductPricesSheetSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get bulkProductPricesSheetSearch;
+
+  /// No description provided for @bulkProductPricesSheetClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get bulkProductPricesSheetClearSearch;
+
+  /// No description provided for @bulkProductPricesSheetNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to save'**
+  String get bulkProductPricesSheetNoChanges;
+
+  /// No description provided for @bulkProductPricesSheetCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get bulkProductPricesSheetCode;
+
+  /// No description provided for @bulkProductPricesSheetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get bulkProductPricesSheetName;
+
+  /// No description provided for @bulkProductPricesSheetPriceListsForColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list columns'**
+  String get bulkProductPricesSheetPriceListsForColumns;
+
+  /// No description provided for @bulkProductPricesSheetSelectListsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select one or more price lists to show and edit list prices, then load the page.'**
+  String get bulkProductPricesSheetSelectListsHint;
+
   /// No description provided for @preview.
   ///
   /// In en, this message translates to:
@@ -7036,6 +7360,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export JSON'**
   String get reportTemplateExportThis;
+
+  /// No description provided for @reportTemplatesFilterScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Report scope'**
+  String get reportTemplatesFilterScopeLabel;
+
+  /// No description provided for @reportTemplateStatusFilterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'All statuses'**
+  String get reportTemplateStatusFilterHint;
+
+  /// No description provided for @reportTemplatePlaceholdersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Available placeholders'**
+  String get reportTemplatePlaceholdersTitle;
+
+  /// No description provided for @reportTemplateVariablesHelpButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Placeholder help'**
+  String get reportTemplateVariablesHelpButton;
+
+  /// No description provided for @reportTemplatesSchemaFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load placeholder schema: {error}'**
+  String reportTemplatesSchemaFetchError(String error);
+
+  /// No description provided for @reportTemplatesEmptyList.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates found'**
+  String get reportTemplatesEmptyList;
+
+  /// No description provided for @reportTemplateDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete template'**
+  String get reportTemplateDeleteConfirmTitle;
+
+  /// No description provided for @reportTemplateDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this template? This cannot be undone.'**
+  String get reportTemplateDeleteConfirmMessage;
+
+  /// No description provided for @reportTemplateSetDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get reportTemplateSetDefaultTitle;
+
+  /// No description provided for @reportTemplateSetDefaultMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this template as the default for its module and subtype?'**
+  String get reportTemplateSetDefaultMessage;
+
+  /// No description provided for @reportTemplateEditSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save template: {error}'**
+  String reportTemplateEditSaveError(String error);
+
+  /// No description provided for @reportTemplatePreviewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview failed: {error}'**
+  String reportTemplatePreviewError(String error);
+
+  /// No description provided for @reportTemplateInvalidJsonError.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid JSON: {error}'**
+  String reportTemplateInvalidJsonError(String error);
+
+  /// No description provided for @reportTemplatePdfDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF download started'**
+  String get reportTemplatePdfDownloadStarted;
+
+  /// No description provided for @reportTemplatePdfSavedToPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to: {path}'**
+  String reportTemplatePdfSavedToPath(String path);
+
+  /// No description provided for @reportTemplatePdfSavedGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved'**
+  String get reportTemplatePdfSavedGeneric;
+
+  /// No description provided for @reportTemplateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get reportTemplateDownload;
+
+  /// No description provided for @reportTemplateOpenInNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in new tab'**
+  String get reportTemplateOpenInNewTab;
+
+  /// No description provided for @reportTemplatePdfInlineFailedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'In-page PDF preview failed; use the HTML tab.'**
+  String get reportTemplatePdfInlineFailedHint;
+
+  /// No description provided for @reportTemplateBuilderDesignEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual builder design is empty.'**
+  String get reportTemplateBuilderDesignEmpty;
+
+  /// No description provided for @reportTemplatePaperCustomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom paper size (optional)'**
+  String get reportTemplatePaperCustomLabel;
+
+  /// No description provided for @reportTemplatePaperCustomHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'If set, this replaces the selected paper size (max 32 characters).'**
+  String get reportTemplatePaperCustomHelper;
+
+  /// No description provided for @reportTemplateEditorTabCss.
+  ///
+  /// In en, this message translates to:
+  /// **'CSS'**
+  String get reportTemplateEditorTabCss;
+
+  /// No description provided for @reportTemplateEditorTabHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Header'**
+  String get reportTemplateEditorTabHeader;
+
+  /// No description provided for @reportTemplateEditorTabFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Footer'**
+  String get reportTemplateEditorTabFooter;
+
+  /// No description provided for @reportTemplatePageSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Page settings'**
+  String get reportTemplatePageSettingsSection;
+
+  /// No description provided for @reportTemplateFieldName.
+  ///
+  /// In en, this message translates to:
+  /// **'Template name'**
+  String get reportTemplateFieldName;
+
+  /// No description provided for @reportTemplateFieldDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get reportTemplateFieldDescription;
+
+  /// No description provided for @reportTemplateModuleKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'module_key'**
+  String get reportTemplateModuleKeyLabel;
+
+  /// No description provided for @reportTemplateSubtypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'subtype'**
+  String get reportTemplateSubtypeLabel;
+
+  /// No description provided for @reportTemplateModuleKeyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'API report module identifier.'**
+  String get reportTemplateModuleKeyTooltip;
+
+  /// No description provided for @reportTemplateSubtypeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'API report subtype (e.g. list or detail).'**
+  String get reportTemplateSubtypeTooltip;
+
+  /// No description provided for @reportTemplateHintHtmlBody.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML body (Jinja2 placeholders allowed)'**
+  String get reportTemplateHintHtmlBody;
+
+  /// No description provided for @reportTemplateHintCss.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional CSS'**
+  String get reportTemplateHintCss;
+
+  /// No description provided for @reportTemplateHintHeaderHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional header HTML'**
+  String get reportTemplateHintHeaderHtml;
+
+  /// No description provided for @reportTemplateHintFooterHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional footer HTML'**
+  String get reportTemplateHintFooterHtml;
 
   /// No description provided for @printPdf.
   ///
@@ -15044,8 +15584,200 @@ abstract class AppLocalizations {
   /// No description provided for @settingsServiceLogsDescription.
   ///
   /// In en, this message translates to:
-  /// **'View logs of hesabix-api and hesabix-rq-worker and manage services'**
+  /// **'View logs for hesabix-api, hesabix-rq-worker, and hesabix-notification-moderation and manage services'**
   String get settingsServiceLogsDescription;
+
+  /// No description provided for @serviceLogsPauseAutoRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause auto-refresh'**
+  String get serviceLogsPauseAutoRefreshTooltip;
+
+  /// No description provided for @serviceLogsResumeAutoRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume auto-refresh'**
+  String get serviceLogsResumeAutoRefreshTooltip;
+
+  /// No description provided for @serviceLogsRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get serviceLogsRefreshTooltip;
+
+  /// No description provided for @serviceLogsFollowTailOnTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow latest log line is on; turn off to read older entries'**
+  String get serviceLogsFollowTailOnTooltip;
+
+  /// No description provided for @serviceLogsFollowTailOffTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow latest log line is off'**
+  String get serviceLogsFollowTailOffTooltip;
+
+  /// No description provided for @serviceLogsLinesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Line count'**
+  String get serviceLogsLinesLabel;
+
+  /// No description provided for @serviceLogsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search log text…'**
+  String get serviceLogsSearchHint;
+
+  /// No description provided for @serviceLogsFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get serviceLogsFilterAll;
+
+  /// No description provided for @serviceLogsFilterErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get serviceLogsFilterErrors;
+
+  /// No description provided for @serviceLogsFilterWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Warn+'**
+  String get serviceLogsFilterWarnings;
+
+  /// No description provided for @serviceLogsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get serviceLogsActive;
+
+  /// No description provided for @serviceLogsInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get serviceLogsInactive;
+
+  /// No description provided for @serviceLogsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled at boot'**
+  String get serviceLogsEnabled;
+
+  /// No description provided for @serviceLogsDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled at boot'**
+  String get serviceLogsDisabled;
+
+  /// No description provided for @serviceLogsRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get serviceLogsRestart;
+
+  /// No description provided for @serviceLogsRestartConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm restart'**
+  String get serviceLogsRestartConfirmTitle;
+
+  /// No description provided for @serviceLogsRestartConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Service «{serviceName}» may be briefly unavailable. Type the exact service name to continue.'**
+  String serviceLogsRestartConfirmBody(String serviceName);
+
+  /// No description provided for @serviceLogsRestartTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Service name'**
+  String get serviceLogsRestartTypeHint;
+
+  /// No description provided for @serviceLogsStatusDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'systemctl status details'**
+  String get serviceLogsStatusDetails;
+
+  /// No description provided for @serviceLogsNoStatusOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'No status output available.'**
+  String get serviceLogsNoStatusOutput;
+
+  /// No description provided for @serviceLogsErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load logs'**
+  String get serviceLogsErrorTitle;
+
+  /// No description provided for @serviceLogsRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get serviceLogsRetry;
+
+  /// No description provided for @serviceLogsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No log entries'**
+  String get serviceLogsEmpty;
+
+  /// No description provided for @serviceLogsLogCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Log lines: {count}'**
+  String serviceLogsLogCount(int count);
+
+  /// No description provided for @serviceLogsFilteredCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total}'**
+  String serviceLogsFilteredCount(int shown, int total);
+
+  /// No description provided for @serviceLogsLegendError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get serviceLogsLegendError;
+
+  /// No description provided for @serviceLogsLegendWarn.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get serviceLogsLegendWarn;
+
+  /// No description provided for @serviceLogsLegendInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get serviceLogsLegendInfo;
+
+  /// No description provided for @serviceLogsFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to fetch logs: {error}'**
+  String serviceLogsFetchError(String error);
+
+  /// No description provided for @serviceLogsRestartError.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart failed: {error}'**
+  String serviceLogsRestartError(String error);
+
+  /// No description provided for @serviceLogsRestartSuccessDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Service restarted successfully'**
+  String get serviceLogsRestartSuccessDefault;
+
+  /// No description provided for @serviceLogsFollowTailChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow tail'**
+  String get serviceLogsFollowTailChip;
 
   /// No description provided for @settingsDatabaseBackup.
   ///
@@ -16325,6 +17057,60 @@ abstract class AppLocalizations {
   /// **'Not configured'**
   String get ftpNotConfigured;
 
+  /// No description provided for @ftpUseSftp.
+  ///
+  /// In en, this message translates to:
+  /// **'Use SFTP (SSH)'**
+  String get ftpUseSftp;
+
+  /// No description provided for @ftpInsecureWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Without FTPS or SFTP, credentials and data can be read on the network. Enable FTPS or SFTP when possible.'**
+  String get ftpInsecureWarning;
+
+  /// No description provided for @ftpDeleteSettingsConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove backup destination'**
+  String get ftpDeleteSettingsConfirmTitle;
+
+  /// No description provided for @ftpDeleteSettingsConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove FTP/SFTP settings for this business? Automatic upload after backup will stop.'**
+  String get ftpDeleteSettingsConfirmMessage;
+
+  /// No description provided for @ftpTestResultSampleCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Directory listing sample: about {count} entries'**
+  String ftpTestResultSampleCount(int count);
+
+  /// No description provided for @backupFtpUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy on your server'**
+  String get backupFtpUploaded;
+
+  /// No description provided for @backupFtpNotUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent to FTP'**
+  String get backupFtpNotUploaded;
+
+  /// No description provided for @backupOpenFtpSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP settings'**
+  String get backupOpenFtpSettings;
+
+  /// No description provided for @backupFtpNotConfiguredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Save an FTP/SFTP destination in settings first.'**
+  String get backupFtpNotConfiguredError;
+
   /// No description provided for @ftpSendAfterBackup.
   ///
   /// In en, this message translates to:
@@ -16414,6 +17200,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'FTP backup connection'**
   String get settingsPermissionManageFtp;
+
+  /// No description provided for @crmMenuNotesCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes & calendar'**
+  String get crmMenuNotesCalendar;
+
+  /// No description provided for @crmNotesCalendarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM notes & calendar'**
+  String get crmNotesCalendarTitle;
+
+  /// No description provided for @crmNotesRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get crmNotesRefresh;
+
+  /// No description provided for @crmNotesAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'New note'**
+  String get crmNotesAdd;
+
+  /// No description provided for @crmNotesMonthPrev.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get crmNotesMonthPrev;
+
+  /// No description provided for @crmNotesMonthNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get crmNotesMonthNext;
+
+  /// No description provided for @crmNotesToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get crmNotesToday;
+
+  /// No description provided for @crmNotesDayNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes for this day'**
+  String get crmNotesDayNotes;
+
+  /// No description provided for @crmNotesNoNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'No notes'**
+  String get crmNotesNoNotes;
+
+  /// No description provided for @crmNotesVisibilityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Who can see this note'**
+  String get crmNotesVisibilityLabel;
+
+  /// No description provided for @crmNotesVisibilityPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Private (only me)'**
+  String get crmNotesVisibilityPrivate;
+
+  /// No description provided for @crmNotesVisibilityBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone in this business'**
+  String get crmNotesVisibilityBusiness;
+
+  /// No description provided for @crmNotesVisibilityShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected people'**
+  String get crmNotesVisibilityShared;
+
+  /// No description provided for @crmNotesType.
+  ///
+  /// In en, this message translates to:
+  /// **'Note type'**
+  String get crmNotesType;
+
+  /// No description provided for @crmNotesTitleOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (optional)'**
+  String get crmNotesTitleOptional;
+
+  /// No description provided for @crmNotesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get crmNotesBody;
+
+  /// No description provided for @crmNotesLeadOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead (optional)'**
+  String get crmNotesLeadOptional;
+
+  /// No description provided for @crmNotesClearLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear lead'**
+  String get crmNotesClearLead;
+
+  /// No description provided for @crmNotesSharedUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'People who can see this note'**
+  String get crmNotesSharedUsers;
+
+  /// No description provided for @crmNotesMeetingStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get crmNotesMeetingStart;
+
+  /// No description provided for @crmNotesMeetingEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End (optional)'**
+  String get crmNotesMeetingEnd;
+
+  /// No description provided for @crmNotesSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get crmNotesSave;
+
+  /// No description provided for @crmNotesDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get crmNotesDelete;
+
+  /// No description provided for @crmNotesComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get crmNotesComments;
+
+  /// No description provided for @crmNotesNoComments.
+  ///
+  /// In en, this message translates to:
+  /// **'No comments yet'**
+  String get crmNotesNoComments;
+
+  /// No description provided for @crmNotesCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a comment…'**
+  String get crmNotesCommentHint;
+
+  /// No description provided for @crmNotesSendComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get crmNotesSendComment;
+
+  /// No description provided for @crmNotesAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Change history'**
+  String get crmNotesAudit;
+
+  /// No description provided for @crmNotesAuditEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No audit entries'**
+  String get crmNotesAuditEmpty;
+
+  /// No description provided for @crmNotesClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get crmNotesClose;
+
+  /// No description provided for @crmNotesEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get crmNotesEdit;
+
+  /// No description provided for @crmNotesSearchLeads.
+  ///
+  /// In en, this message translates to:
+  /// **'Search leads'**
+  String get crmNotesSearchLeads;
+
+  /// No description provided for @crmNotesApplySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get crmNotesApplySearch;
+
+  /// No description provided for @crmNotesErrorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load'**
+  String get crmNotesErrorLoading;
+
+  /// No description provided for @crmNotesErrorSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save'**
+  String get crmNotesErrorSaving;
+
+  /// No description provided for @crmNotesAddNoteType.
+  ///
+  /// In en, this message translates to:
+  /// **'New note type'**
+  String get crmNotesAddNoteType;
+
+  /// No description provided for @crmNotesNoteTypeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code (Latin, e.g. follow_up)'**
+  String get crmNotesNoteTypeCode;
+
+  /// No description provided for @crmNotesNoteTypeTitleFa.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (Persian)'**
+  String get crmNotesNoteTypeTitleFa;
+
+  /// No description provided for @crmNotesNoteTypeTitleEn.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (English)'**
+  String get crmNotesNoteTypeTitleEn;
+
+  /// No description provided for @crmNotesNoteTypeScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduling'**
+  String get crmNotesNoteTypeScheduling;
+
+  /// No description provided for @crmNotesNoteTypeDayOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Date only'**
+  String get crmNotesNoteTypeDayOnly;
+
+  /// No description provided for @crmNotesNoteTypeMeeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting (date & time)'**
+  String get crmNotesNoteTypeMeeting;
+
+  /// No description provided for @crmNotesNoteTypeAllowComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow comments (for public notes)'**
+  String get crmNotesNoteTypeAllowComments;
+
+  /// No description provided for @crmNotesNoteTypeCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Note type created'**
+  String get crmNotesNoteTypeCreated;
+
+  /// No description provided for @crmNotesPickDateTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick date & time'**
+  String get crmNotesPickDateTime;
+
+  /// No description provided for @crmNotesDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This note will be removed. Continue?'**
+  String get crmNotesDeleteConfirmMessage;
 }
 
 class _AppLocalizationsDelegate

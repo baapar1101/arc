@@ -310,7 +310,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       SnackBarHelper.show(context, message: t.reportTemplateImportDoneOpenHtml);
       await _createDialog();
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: 'JSON نامعتبر: $e');
+      if (mounted) SnackBarHelper.showError(context, message: t.reportTemplateInvalidJsonError('$e'));
     }
   }
 
@@ -378,15 +378,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 children: [
                   TextField(
                     controller: _nameCtrl,
-                    decoration: const InputDecoration(labelText: 'نام قالب'),
+                    decoration: InputDecoration(labelText: t.reportTemplateFieldName),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _descCtrl,
-                    decoration: const InputDecoration(labelText: 'توضیحات'),
+                    decoration: InputDecoration(labelText: t.reportTemplateFieldDescription),
                   ),
                   const SizedBox(height: 12),
-                  Text('تنظیمات صفحه', style: Theme.of(context).textTheme.titleSmall),
+                  Text(t.reportTemplatePageSettingsSection, style: Theme.of(context).textTheme.titleSmall),
                   Row(
                     children: [
                       SizedBox(
@@ -444,10 +444,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginRightCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'راست (mm)',
+                                decoration: InputDecoration(
+                                  labelText: t.marginRight,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -461,10 +461,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginBottomCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'پایین (mm)',
+                                decoration: InputDecoration(
+                                  labelText: t.marginBottom,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -478,10 +478,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginLeftCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'چپ (mm)',
+                                decoration: InputDecoration(
+                                  labelText: t.marginLeft,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -499,11 +499,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   TextField(
                     controller: _paperCustomCtrl,
                     maxLength: kReportTemplatePaperSizeMaxLength,
-                    decoration: const InputDecoration(
-                      labelText: 'سایز سفارشی کاغذ (اختیاری)',
-                      helperText:
-                          'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.reportTemplatePaperCustomLabel,
+                      helperText: t.reportTemplatePaperCustomHelper,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -515,11 +514,11 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       children: [
                         TabBar(
                           labelColor: Theme.of(context).colorScheme.primary,
-                          tabs: const [
-                            Tab(text: 'HTML'),
-                            Tab(text: 'CSS'),
-                            Tab(text: 'Header'),
-                            Tab(text: 'Footer'),
+                          tabs: [
+                            Tab(text: t.reportTemplatePreviewHtmlTab),
+                            Tab(text: t.reportTemplateEditorTabCss),
+                            Tab(text: t.reportTemplateEditorTabHeader),
+                            Tab(text: t.reportTemplateEditorTabFooter),
                           ],
                         ),
                         SizedBox(
@@ -529,33 +528,33 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               TextField(
                                 controller: _htmlCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML محتوا (Jinja2 variables allowed)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: t.reportTemplateHintHtmlBody,
                                 ),
                               ),
                               TextField(
                                 controller: _cssCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'CSS اختیاری',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: t.reportTemplateHintCss,
                                 ),
                               ),
                               TextField(
                                 controller: _headerCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML هدر (اختیاری)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: t.reportTemplateHintHeaderHtml,
                                 ),
                               ),
                               TextField(
                                 controller: _footerCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML فوتر (اختیاری)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: t.reportTemplateHintFooterHtml,
                                 ),
                               ),
                             ],
@@ -662,7 +661,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         builderAssets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? {};
         builderDesign = (builderAssets['builder_design'] as Map?)?.cast<String, dynamic>();
         if (builderDesign == null) {
-          throw StateError('طرح سازندهٔ بصری خالی است');
+          throw StateError(t.reportTemplateBuilderDesignEmpty);
         }
         res = await _service.preview(
           businessId: widget.businessId,
@@ -771,7 +770,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           Navigator.of(context).pop();
           loadingOpen = false;
         }
-        SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
+        SnackBarHelper.showError(context, message: t.reportTemplatePreviewError('$e'));
       }
     }
   }
@@ -807,14 +806,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           mimeType: 'application/pdf',
                         );
                         if (mounted) {
-                          SnackBarHelper.show(context, message: 'دانلود PDF آغاز شد');
+                          SnackBarHelper.show(context, message: t.reportTemplatePdfDownloadStarted);
                         }
                       } else {
                         final path = await FileSaver.saveBytes(pdfBytes, 'report_preview.pdf');
                         if (mounted) {
                           SnackBarHelper.show(
                             context,
-                            message: path != null ? 'ذخیره شد: $path' : 'فایل ذخیره شد',
+                            message: path != null ? t.reportTemplatePdfSavedToPath(path) : t.reportTemplatePdfSavedGeneric,
                           );
                         }
                       }
@@ -825,7 +824,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     }
                   },
                   icon: const Icon(Icons.download, size: 18),
-                  label: const Text('دانلود'),
+                  label: Text(t.reportTemplateDownload),
                 ),
                 if (kIsWeb)
                   TextButton.icon(
@@ -837,7 +836,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       web_utils.openUrlInNewTabWeb(url);
                     },
                     icon: const Icon(Icons.open_in_new, size: 18),
-                    label: const Text('تب جدید'),
+                    label: Text(t.reportTemplateOpenInNewTab),
                   ),
               ],
             ),
@@ -851,8 +850,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       );
     }
     final msg = pdfFetchFailed
-        ? '${t.reportTemplatePreviewPdfBytes('$fallbackLen')}\n'
-            'تولید PDF برای پیش‌نمایش درون‌صفحه ناموفق بود؛ می‌توانید از پیش‌نمایش HTML استفاده کنید.'
+        ? '${t.reportTemplatePreviewPdfBytes('$fallbackLen')}\n${t.reportTemplatePdfInlineFailedHint}'
         : t.reportTemplatePreviewPdfBytes('$fallbackLen');
     return Center(
       child: Padding(
@@ -905,11 +903,12 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     }
 
     final ctx = context;
+    final tEdit = AppLocalizations.of(context);
     await showDialog(
       context: ctx,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('ویرایش قالب'),
+          title: Text(tEdit.reportTemplateEdit),
           content: SizedBox(
             width: 700,
             child: SingleChildScrollView(
@@ -918,22 +917,26 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 children: [
                   TextField(
                     controller: _nameCtrl,
-                    decoration: const InputDecoration(labelText: 'نام قالب'),
+                    decoration: InputDecoration(labelText: tEdit.reportTemplateFieldName),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _descCtrl,
-                    decoration: const InputDecoration(labelText: 'توضیحات'),
+                    decoration: InputDecoration(labelText: tEdit.reportTemplateFieldDescription),
                   ),
                   const SizedBox(height: 12),
-                  Text('تنظیمات صفحه', style: Theme.of(context).textTheme.titleSmall),
+                  Text(tEdit.reportTemplatePageSettingsSection, style: Theme.of(context).textTheme.titleSmall),
                   Row(
                     children: [
                       SizedBox(
                         width: 140,
                         child: DropdownButtonFormField<String>(
                           value: _paperSize,
-                          decoration: const InputDecoration(labelText: 'سایز صفحه', isDense: true, border: OutlineInputBorder()),
+                          decoration: InputDecoration(
+                            labelText: tEdit.pageSize,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
                           items: _paperSizeDropdownItems(_paperSize),
                           onChanged: (v) => setState(() => _paperSize = v),
                         ),
@@ -943,10 +946,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         width: 140,
                         child: DropdownButtonFormField<String>(
                           value: _orientation,
-                          decoration: const InputDecoration(labelText: 'جهت', isDense: true, border: OutlineInputBorder()),
-                          items: const [
-                            DropdownMenuItem(value: 'portrait', child: Text('Portrait')),
-                            DropdownMenuItem(value: 'landscape', child: Text('Landscape')),
+                          decoration: InputDecoration(
+                            labelText: tEdit.orientation,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: [
+                            DropdownMenuItem(value: 'portrait', child: Text(tEdit.portrait)),
+                            DropdownMenuItem(value: 'landscape', child: Text(tEdit.landscape)),
                           ],
                           onChanged: (v) => setState(() => _orientation = v),
                         ),
@@ -959,10 +966,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginTopCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'بالا (mm)',
+                                decoration: InputDecoration(
+                                  labelText: tEdit.marginTop,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -976,10 +983,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginRightCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'راست (mm)',
+                                decoration: InputDecoration(
+                                  labelText: tEdit.marginRight,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -993,10 +1000,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginBottomCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'پایین (mm)',
+                                decoration: InputDecoration(
+                                  labelText: tEdit.marginBottom,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -1010,10 +1017,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginLeftCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'چپ (mm)',
+                                decoration: InputDecoration(
+                                  labelText: tEdit.marginLeft,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -1031,11 +1038,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   TextField(
                     controller: _paperCustomCtrl,
                     maxLength: kReportTemplatePaperSizeMaxLength,
-                    decoration: const InputDecoration(
-                      labelText: 'سایز سفارشی کاغذ (اختیاری)',
-                      helperText:
-                          'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: tEdit.reportTemplatePaperCustomLabel,
+                      helperText: tEdit.reportTemplatePaperCustomHelper,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -1047,11 +1053,11 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       children: [
                         TabBar(
                           labelColor: Theme.of(context).colorScheme.primary,
-                          tabs: const [
-                            Tab(text: 'HTML'),
-                            Tab(text: 'CSS'),
-                            Tab(text: 'Header'),
-                            Tab(text: 'Footer'),
+                          tabs: [
+                            Tab(text: tEdit.reportTemplatePreviewHtmlTab),
+                            Tab(text: tEdit.reportTemplateEditorTabCss),
+                            Tab(text: tEdit.reportTemplateEditorTabHeader),
+                            Tab(text: tEdit.reportTemplateEditorTabFooter),
                           ],
                         ),
                         SizedBox(
@@ -1061,33 +1067,33 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               TextField(
                                 controller: _htmlCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML محتوا (Jinja2 variables allowed)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: tEdit.reportTemplateHintHtmlBody,
                                 ),
                               ),
                               TextField(
                                 controller: _cssCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'CSS اختیاری',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: tEdit.reportTemplateHintCss,
                                 ),
                               ),
                               TextField(
                                 controller: _headerCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML هدر (اختیاری)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: tEdit.reportTemplateHintHeaderHtml,
                                 ),
                               ),
                               TextField(
                                 controller: _footerCtrl,
                                 maxLines: 14,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'HTML فوتر (اختیاری)',
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  hintText: tEdit.reportTemplateHintFooterHtml,
                                 ),
                               ),
                             ],
@@ -1101,12 +1107,12 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tEdit.cancel)),
             TextButton(
               onPressed: () async {
                 await _previewTemplate(item);
               },
-              child: const Text('پیش‌نمایش'),
+              child: Text(tEdit.reportTemplatePreview),
             ),
             FilledButton(
               onPressed: () async {
@@ -1152,10 +1158,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   await _fetch();
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  SnackBarHelper.show(ctx, message: 'خطا در ویرایش: $e');
+                  SnackBarHelper.showError(ctx, message: tEdit.reportTemplateEditSaveError('$e'));
                 }
               },
-              child: const Text('ذخیره'),
+              child: Text(tEdit.save),
             ),
           ],
         );
@@ -1164,14 +1170,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
   Future<void> _setDefault(Map<String, dynamic> item) async {
+    final loc = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('تایید'),
-        content: const Text('این قالب به‌عنوان پیش‌فرض تنظیم شود؟'),
+        title: Text(loc.reportTemplateSetDefaultTitle),
+        content: Text(loc.reportTemplateSetDefaultMessage),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تایید')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.confirm)),
         ],
       ),
     );
@@ -1189,14 +1196,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    final loc = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف قالب'),
-        content: const Text('آیا از حذف این قالب مطمئن هستید؟'),
+        title: Text(loc.reportTemplateDeleteConfirmTitle),
+        content: Text(loc.reportTemplateDeleteConfirmMessage),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.reportTemplateDelete)),
         ],
       ),
     );
@@ -1273,7 +1281,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   child: DropdownButtonFormField<String>(
                     value: _filterPresetId,
                     decoration: InputDecoration(
-                      labelText: t.templates,
+                      labelText: t.reportTemplatesFilterScopeLabel,
                       border: const OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -1288,27 +1296,33 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 130,
-                    child: TextField(
-                      controller: _moduleCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'module_key',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                    child: Tooltip(
+                      message: t.reportTemplateModuleKeyTooltip,
+                      child: TextField(
+                        controller: _moduleCtrl,
+                        decoration: InputDecoration(
+                          labelText: t.reportTemplateModuleKeyLabel,
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onSubmitted: (_) => _fetch(),
                       ),
-                      onSubmitted: (_) => _fetch(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 110,
-                    child: TextField(
-                      controller: _subtypeCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'subtype',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                    child: Tooltip(
+                      message: t.reportTemplateSubtypeTooltip,
+                      child: TextField(
+                        controller: _subtypeCtrl,
+                        decoration: InputDecoration(
+                          labelText: t.reportTemplateSubtypeLabel,
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onSubmitted: (_) => _fetch(),
                       ),
-                      onSubmitted: (_) => _fetch(),
                     ),
                   ),
                 ],
@@ -1330,7 +1344,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         builder: (dctx) {
                           final loc = AppLocalizations.of(dctx);
                           return AlertDialog(
-                            title: const Text('متغیرهای قابل استفاده'),
+                            title: Text(loc.reportTemplatePlaceholdersTitle),
                             content: SizedBox(
                               width: 500,
                               child: SingleChildScrollView(
@@ -1367,20 +1381,20 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                     } catch (e) {
                       if (!ctx.mounted) return;
-                      SnackBarHelper.show(ctx, message: 'خطا در دریافت schema: $e');
+                      SnackBarHelper.showError(ctx, message: t.reportTemplatesSchemaFetchError('$e'));
                     }
                   },
                   icon: const Icon(Icons.help_outline),
-                  label: const Text('راهنمای متغیرها'),
+                  label: Text(t.reportTemplateVariablesHelpButton),
                 ),
                 const SizedBox(width: 8),
                 DropdownButton<String?>(
                   value: _statusFilter,
-                  hint: const Text('همه وضعیت‌ها'),
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('همه')),
-                    DropdownMenuItem(value: 'published', child: Text('منتشر شده')),
-                    DropdownMenuItem(value: 'draft', child: Text('پیش‌نویس')),
+                  hint: Text(t.reportTemplateStatusFilterHint),
+                  items: [
+                    DropdownMenuItem(value: null, child: Text(t.all)),
+                    DropdownMenuItem(value: 'published', child: Text(t.reportTemplateStatusPublished)),
+                    DropdownMenuItem(value: 'draft', child: Text(t.reportTemplateStatusDraft)),
                   ],
                   onChanged: (v) {
                     setState(() => _statusFilter = v);
@@ -1442,7 +1456,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _items.isEmpty
-                      ? const Center(child: Text('قالبی یافت نشد'))
+                      ? Center(child: Text(t.reportTemplatesEmptyList))
                       : Card(
                           clipBehavior: Clip.antiAlias,
                           child: ListView.separated(

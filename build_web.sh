@@ -561,4 +561,17 @@ if [[ "${SKIP_NGINX_ENSURE:-}" != "1" ]]; then
   fi
 fi
 
+# پس از build/reload nginx، یونیت‌های systemd را تازه کن (مثل نیاز بعد از تغییر فایل سرویس)
+if command -v systemctl >/dev/null 2>&1; then
+  SUDO_DR=()
+  if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
+    SUDO_DR=(sudo)
+  fi
+  if "${SUDO_DR[@]}" systemctl daemon-reload 2>/dev/null; then
+    echo "systemd daemon-reload انجام شد."
+  else
+    warn "daemon-reload انجام نشد؛ در صورت خطای start سرویس‌ها: sudo systemctl daemon-reload"
+  fi
+fi
+
 

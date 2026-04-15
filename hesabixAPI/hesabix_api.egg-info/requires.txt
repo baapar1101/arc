@@ -28,6 +28,7 @@ psutil>=5.9.0
 simpleeval>=0.9.14
 croniter>=2.0.0
 pytz>=2024.1
+paramiko>=3.4.0
 
 [dev]
 pytest>=8.2.0

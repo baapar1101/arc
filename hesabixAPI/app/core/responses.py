@@ -42,7 +42,7 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 	calendar_type = request.state.calendar_type
 	
 	# Fields that should show only date (no time) and return as string (not object)
-	DATE_ONLY_FIELDS = {'issue_date', 'due_date', 'start_date', 'end_date', 'document_date'}
+	DATE_ONLY_FIELDS = {'issue_date', 'due_date', 'start_date', 'end_date', 'document_date', 'occurs_on'}
 	
 	if isinstance(data, dict):
 		formatted_data = {}

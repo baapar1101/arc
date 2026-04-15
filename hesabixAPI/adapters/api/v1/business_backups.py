@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import tempfile
 import zipfile
 from datetime import datetime, date
 from decimal import Decimal
@@ -26,6 +28,24 @@ from adapters.api.v1.business_ftp_backup import assert_can_use_ftp_on_backup, up
 from app.services.business_ftp_service import load_decrypted_params
 
 logger = logging.getLogger(__name__)
+
+
+def _merge_backup_ftp_metadata(db: Session, file_id: str, ftp_info: dict[str, Any]) -> None:
+	from adapters.db.models.file_storage import FileStorage
+	from sqlalchemy.orm.attributes import flag_modified
+
+	fs = db.query(FileStorage).filter(FileStorage.id == file_id).first()
+	if not fs:
+		return
+	dev = dict(fs.developer_data or {})
+	dev["ftp_uploaded"] = True
+	dev["ftp_remote_path"] = ftp_info.get("remote_path")
+	dev["ftp_remote_filename"] = ftp_info.get("remote_filename")
+	dev["ftp_transport"] = ftp_info.get("transport")
+	fs.developer_data = dev
+	flag_modified(fs, "developer_data")
+	db.add(fs)
+	db.commit()
 
 router = APIRouter(prefix="/businesses/{business_id}/backups", tags=["پشتیبان‌گیری"])
 
@@ -228,6 +248,9 @@ async def list_backups(
                     "created_at": f.created_at.isoformat() if f.created_at else None,
                     "checksum": f.checksum,
                     "mime_type": f.mime_type,
+                    "ftp_uploaded": bool(dev.get("ftp_uploaded")),
+                    "ftp_remote_filename": dev.get("ftp_remote_filename"),
+                    "ftp_transport": dev.get("ftp_transport"),
                 }
             )
     return success_response({"items": items}, request=request)
@@ -359,10 +382,26 @@ async def create_backup(
                     result_payload: Dict[str, Any] = {"file": saved, "metadata": data["metadata"]}
                     if do_ftp:
                         jm.update(job_id, 94, "Uploading to FTP")
-                        ftp_info = upload_saved_backup_to_ftp(db, business_id, data["filename"], data["zip_bytes"])
+                        tmp_path: str | None = None
+                        try:
+                            with tempfile.NamedTemporaryFile(suffix=".hbx", delete=False) as tf:
+                                tf.write(data["zip_bytes"])
+                                tmp_path = tf.name
+                            ftp_info = upload_saved_backup_to_ftp(
+                                db, business_id, data["filename"], data=None, file_path=tmp_path
+                            )
+                        finally:
+                            if tmp_path and os.path.isfile(tmp_path):
+                                try:
+                                    os.unlink(tmp_path)
+                                except OSError:
+                                    pass
                         if not ftp_info:
                             raise ApiError("FTP_NOT_CONFIGURED", "تنظیمات FTP در دسترس نبود", http_status=400)
                         result_payload["ftp"] = ftp_info
+                        fid = (saved or {}).get("file_id")
+                        if fid:
+                            _merge_backup_ftp_metadata(db, str(fid), ftp_info)
                     jm.succeed(job_id, result_payload, "Backup completed")
                 except Exception as e:
                     # استخراج error message به صورت مناسب
@@ -420,10 +459,26 @@ async def create_backup(
         )
         out: Dict[str, Any] = {"file": saved, "metadata": data["metadata"]}
         if upload_to_ftp:
-            ftp_info = upload_saved_backup_to_ftp(db, business_id, data["filename"], data["zip_bytes"])
+            tmp_path: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".hbx", delete=False) as tf:
+                    tf.write(data["zip_bytes"])
+                    tmp_path = tf.name
+                ftp_info = upload_saved_backup_to_ftp(
+                    db, business_id, data["filename"], data=None, file_path=tmp_path
+                )
+            finally:
+                if tmp_path and os.path.isfile(tmp_path):
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
             if not ftp_info:
                 raise ApiError("FTP_NOT_CONFIGURED", "تنظیمات FTP در دسترس نبود", http_status=400)
             out["ftp"] = ftp_info
+            fid = (saved or {}).get("file_id")
+            if fid:
+                _merge_backup_ftp_metadata(db, str(fid), ftp_info)
         return success_response(out, request=request, message="Backup created")
 
 

@@ -258,6 +258,14 @@ class AIService:
                     "sufficient": available_balance >= estimated_cost
                 }
                 
+                cur_label = (
+                    wallet.get("base_currency_symbol")
+                    or wallet.get("base_currency_title")
+                    or wallet.get("base_currency_code")
+                    or ""
+                ).strip()
+                cur_suffix = f" {cur_label}" if cur_label else ""
+
                 if available_balance < estimated_cost:
                     return {
                         "can_use": False,
@@ -267,15 +275,15 @@ class AIService:
                             "wallet": wallet_info,
                             "subscription": subscription_info,
                             "suggestions": [
-                                f"موجودی فعلی: {available_balance:,.0f} ریال",
-                                f"هزینه تخمینی: {estimated_cost:,.0f} ریال",
+                                f"موجودی فعلی: {available_balance:,.0f}{cur_suffix}",
+                                f"هزینه تخمینی: {estimated_cost:,.0f}{cur_suffix}",
                                 "لطفاً کیف پول خود را شارژ کنید"
                             ]
                         }
                     }
                 
                 if available_balance < estimated_cost * 10:  # هشدار اگر کمتر از 10 بار استفاده باقی مانده
-                    suggestions.append(f"💰 موجودی کیف پول: {available_balance:,.0f} ریال")
+                    suggestions.append(f"💰 موجودی کیف پول: {available_balance:,.0f}{cur_suffix}")
                     suggestions.append("پیشنهاد می‌کنیم کیف پول خود را شارژ کنید")
                 
             except Exception as e:

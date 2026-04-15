@@ -351,6 +351,7 @@ class StorageConfigCard extends StatelessWidget {
     final username = configData['username'] ?? '';
     final directory = configData['directory'] ?? '/';
     final useTls = configData['use_tls'] == true;
+    final passive = configData['passive'] != false;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -415,6 +416,13 @@ class StorageConfigCard extends StatelessWidget {
             Icons.security,
             'امنیت',
             useTls ? 'TLS فعال' : 'TLS غیرفعال',
+          ),
+          const SizedBox(height: 8),
+          _buildConfigRow(
+            context,
+            Icons.router_outlined,
+            l10n.adminStorageFtpPassive,
+            passive ? l10n.yes : l10n.no,
           ),
         ],
       ),

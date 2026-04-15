@@ -2,7 +2,7 @@
 """Schema models برای CRM (فرایندها، مراحل، سرنخ، فرصت، فعالیت)"""
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel, Field, model_validator
@@ -294,3 +294,55 @@ class CrmActivityResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- یادداشت و تقویم CRM ---
+
+
+class CrmNoteTypeCreate(BaseModel):
+    code: str = Field(..., min_length=1, max_length=50)
+    title_i18n: Dict[str, str] = Field(..., description="کلید زبان (fa, en) به متن نمایش")
+    scheduling_mode: str = Field(default="day_only", max_length=20, description="day_only | meeting")
+    allow_comments: bool = True
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CrmNoteTypeUpdate(BaseModel):
+    title_i18n: Optional[Dict[str, str]] = None
+    scheduling_mode: Optional[str] = Field(None, max_length=20)
+    allow_comments: Optional[bool] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+
+
+class CrmNoteCreate(BaseModel):
+    note_type_id: int = Field(..., gt=0)
+    visibility: str = Field(..., max_length=20, description="private | business_public | shared")
+    title: Optional[str] = Field(None, max_length=255)
+    body: str = Field(..., min_length=1)
+    occurs_on: Optional[date] = Field(None, description="برای day_only؛ برای meeting از starts_at پر می‌شود")
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    lead_id: Optional[int] = Field(None, gt=0)
+    shared_user_ids: Optional[List[int]] = Field(
+        default=None,
+        description="برای visibility=shared: شناسه کاربران عضو کسب‌وکار (غیر از سازنده)",
+    )
+
+
+class CrmNoteUpdate(BaseModel):
+    note_type_id: Optional[int] = Field(None, gt=0)
+    visibility: Optional[str] = Field(None, max_length=20)
+    title: Optional[str] = Field(None, max_length=255)
+    body: Optional[str] = Field(None, min_length=1)
+    occurs_on: Optional[date] = None
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    lead_id: Optional[int] = None
+    clear_lead: bool = False
+    status: Optional[str] = Field(None, max_length=20)
+    shared_user_ids: Optional[List[int]] = None
+
+
+class CrmNoteCommentCreate(BaseModel):
+    body: str = Field(..., min_length=1)

@@ -505,3 +505,85 @@ msgstr "Invalid custom serials count"
 
 msgid "INVALID_CUSTOM_CODES"
 msgstr "Invalid custom codes count"
+
+# CRM notes / calendar
+msgid "CRM_NOTE_TYPE_CREATED"
+msgstr "Note type created"
+
+msgid "CRM_NOTE_TYPE_UPDATED"
+msgstr "Note type updated"
+
+msgid "CRM_NOTE_TYPE_DELETED"
+msgstr "Note type deleted"
+
+msgid "CRM_NOTE_CREATED"
+msgstr "Note created"
+
+msgid "CRM_NOTE_UPDATED"
+msgstr "Note updated"
+
+msgid "CRM_NOTE_DELETED"
+msgstr "Note deleted"
+
+msgid "CRM_NOTE_COMMENT_CREATED"
+msgstr "Comment added"
+
+msgid "CRM_NOTE_COMMENT_DELETED"
+msgstr "Comment deleted"
+
+msgid "CRM_NOTE_NOT_FOUND"
+msgstr "Note not found"
+
+msgid "CRM_NOTE_TYPE_NOT_FOUND"
+msgstr "Note type not found"
+
+msgid "CRM_NOTE_TYPE_CODE_EXISTS"
+msgstr "This note type code already exists"
+
+msgid "CRM_NOTE_TYPE_INVALID_MODE"
+msgstr "Invalid scheduling mode"
+
+msgid "CRM_NOTE_TYPE_SYSTEM"
+msgstr "System note type cannot be deleted"
+
+msgid "CRM_NOTE_TYPE_IN_USE"
+msgstr "This type is used by notes"
+
+msgid "CRM_NOTE_LEAD_INVALID"
+msgstr "Invalid lead"
+
+msgid "CRM_NOTE_SHARED_EMPTY"
+msgstr "Select at least one user for shared access"
+
+msgid "CRM_NOTE_SHARED_USER_INVALID"
+msgstr "A selected user is not a member of this business"
+
+msgid "CRM_NOTE_VISIBILITY_INVALID"
+msgstr "Invalid visibility"
+
+msgid "CRM_NOTE_MEETING_START"
+msgstr "Meeting start time is required"
+
+msgid "CRM_NOTE_DATE_REQUIRED"
+msgstr "Event date is required"
+
+msgid "CRM_NOTE_FORBIDDEN"
+msgstr "You are not allowed to access this note"
+
+msgid "CRM_NOTE_COMMENTS_DISABLED"
+msgstr "Comments are disabled for this note"
+
+msgid "CRM_NOTE_COMMENT_NOT_FOUND"
+msgstr "Comment not found"
+
+msgid "CRM_NOTE_AUDIT_FORBIDDEN"
+msgstr "You are not allowed to view the audit log"
+
+msgid "CRM_NOTE_ACL_NOT_SHARED"
+msgstr "This note is not in shared visibility mode"
+
+msgid "CRM_NOTE_STATUS_INVALID"
+msgstr "Invalid status"
+
+msgid "CRM_NOTE_DATE_RANGE_INVALID"
+msgstr "Invalid date range"

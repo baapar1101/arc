@@ -13,6 +13,21 @@ from adapters.db.session import get_db_session
 from sqlalchemy import text
 
 
+def _coerce_db_job_result(raw: Any) -> Dict[str, Any] | None:
+    """ستون JSONB در PostgreSQL ممکن است dict برگرداند؛ json.loads فقط رشته می‌پذیرد."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, (str, bytes, bytearray)):
+        try:
+            parsed: Any = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
 @dataclass
 class JobStatus:
     id: str
@@ -276,7 +291,7 @@ class JobManager:
                         state=result.state,
                         progress=int(result.progress) if result.progress is not None else 0,
                         message=result.message,
-                        result=json.loads(result.result) if result.result else None,
+                        result=_coerce_db_job_result(result.result),
                         error=result.error,
                         created_at=created_at,
                         updated_at=updated_at,

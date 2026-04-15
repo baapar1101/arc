@@ -18,8 +18,8 @@ Environment="PATH=/var/www/arc/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin
 # اجرای Worker
 ExecStart=/var/www/arc/hesabixAPI/.venv/bin/python /var/www/arc/hesabixAPI/rq_worker.py
 
-# Restart settings
-Restart=always
+# Restart=on-failure: خروج عادی (مثلاً وقتی Redis در تنظیمات سیستم غیرفعال است) باعث حلقهٔ ری‌استارت نشود
+Restart=on-failure
 RestartSec=10
 StartLimitInterval=5min
 StartLimitBurst=3

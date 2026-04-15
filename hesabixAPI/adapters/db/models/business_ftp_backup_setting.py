@@ -20,5 +20,6 @@ class BusinessFtpBackupSetting(Base):
 	remote_path: Mapped[str] = mapped_column(String(1024), nullable=False, default="/")
 	passive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 	use_ftps: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	use_sftp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

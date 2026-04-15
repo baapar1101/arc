@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
+import 'package:hesabix_ui/services/business_ftp_backup_service.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:dio/dio.dart';
 import '../../../utils/snackbar_helper.dart';
@@ -20,6 +21,7 @@ class BusinessBackupPage extends StatefulWidget {
 
 class _BusinessBackupPageState extends State<BusinessBackupPage> {
   final BackupService _service = BackupService();
+  final BusinessFtpBackupService _ftpService = BusinessFtpBackupService();
   bool _loading = true;
   bool _creating = false;
   String? _error;
@@ -30,6 +32,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
   bool _jobRunning = false;
   Timer? _pollTimer;
   bool _uploadToFtp = false;
+  bool? _ftpConfigured;
 
   bool _canFtpAfterBackup() {
     final store = ApiClient.getAuthStore();
@@ -54,6 +57,18 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
       setState(() {
         _items = items;
       });
+      if (_canFtpAfterBackup()) {
+        try {
+          final ftp = await _ftpService.getSettings(widget.businessId);
+          if (mounted) {
+            setState(() => _ftpConfigured = ftp['configured'] == true);
+          }
+        } catch (_) {
+          if (mounted) {
+            setState(() => _ftpConfigured = false);
+          }
+        }
+      }
     } catch (e) {
       setState(() {
         _error = '$e';
@@ -66,6 +81,11 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
   }
 
   Future<void> _createBackup() async {
+    final t = AppLocalizations.of(context);
+    if (_uploadToFtp && _ftpConfigured != true) {
+      SnackBarHelper.showError(context, message: t.backupFtpNotConfiguredError);
+      return;
+    }
     setState(() {
       _creating = true;
     });
@@ -120,7 +140,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
           }
         });
         final state = (st['state'] as String?) ?? '';
-        if (state == 'succeeded') {
+        if (state == 'succeeded' || state == 'finished') {
           timer.cancel();
           setState(() {
             _jobRunning = false;
@@ -262,6 +282,15 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: _creating || _jobRunning
+                    ? null
+                    : () => context.go('/business/${widget.businessId}/settings/ftp-backup'),
+                child: Text(t.backupOpenFtpSettings),
+              ),
+            ),
             const SizedBox(height: 8),
           ],
           if (_jobRunning || _jobMessage != null) _buildJobStatusCard(t),
@@ -326,6 +355,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     final name = (data['filename'] as String?) ?? t.defaultBackupFilename;
     final size = (data['size'] as int?) ?? 0;
     final createdAt = (data['created_at'] as String?) ?? '';
+    final ftpUploaded = data['ftp_uploaded'] == true;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -349,6 +379,18 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
             ),
             const SizedBox(height: 8),
             Text('$createdAt • ${_formatBytes(size)}', style: Theme.of(context).textTheme.bodySmall),
+            if (ftpUploaded) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Chip(
+                  avatar: const Icon(Icons.cloud_done_outlined, size: 18),
+                  label: Text(t.backupFtpUploaded),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

@@ -14,9 +14,24 @@ class StorageConfigCreateRequest(BaseModel):
 
 
 class StorageConfigUpdateRequest(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100, description="نام پیکربندی")
-    config_data: Optional[Dict[str, Any]] = Field(default=None, description="داده‌های پیکربندی")
-    is_active: Optional[bool] = Field(default=None, description="آیا فعال است")
+    name: str = Field(..., min_length=1, max_length=100, description="نام پیکربندی")
+    storage_type: str = Field(..., description="نوع ذخیره‌سازی")
+    config_data: Dict[str, Any] = Field(default_factory=dict, description="داده‌های پیکربندی")
+    is_default: bool = Field(default=False, description="آیا پیش‌فرض است")
+    is_active: bool = Field(default=True, description="آیا فعال است")
+
+
+class FtpStorageTestDraftRequest(BaseModel):
+    """تست اتصال FTP قبل از ذخیره یا با ادغام رمز از پیکربندی موجود."""
+
+    config_data: Dict[str, Any] = Field(
+        ...,
+        description="host, port, username, password?, directory, use_tls, passive",
+    )
+    existing_config_id: Optional[str] = Field(
+        default=None,
+        description="اگر ست شود و password در config_data خالی باشد، رمز از DB خوانده می‌شود",
+    )
 
 
 class FileUploadRequest(BaseModel):

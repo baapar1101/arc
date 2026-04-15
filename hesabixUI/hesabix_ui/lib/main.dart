@@ -99,6 +99,7 @@ import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
+import 'pages/business/product_bulk_prices_sheet_page.dart';
 import 'pages/business/projects_page.dart';
 import 'pages/business/warranty_management_page.dart';
 import 'pages/business/warranty_settings_page.dart';
@@ -180,6 +181,7 @@ import 'pages/business/crm/crm_leads_page.dart';
 import 'pages/business/crm/crm_deals_page.dart';
 import 'pages/business/crm/crm_activities_page.dart';
 import 'pages/business/crm/crm_reports_page.dart';
+import 'pages/business/crm/crm_notes_calendar_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -1909,6 +1911,21 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/crm/notes-calendar',
+              name: 'business_crm_notes_calendar',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmNotesCalendarPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/user/profile/system-settings/wallet',
               name: 'system_wallet_settings',
               pageBuilder: (context, state) => const NoTransitionPage(
@@ -2724,6 +2741,24 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: ProductAttributesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/products/bulk-prices-sheet',
+              name: 'business_product_bulk_prices_sheet',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('products', 'view')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: ProductBulkPricesSheetPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

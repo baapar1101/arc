@@ -17,6 +17,7 @@ from adapters.db.models.file_storage import StorageConfig, FileStorage
 from adapters.api.v1.schema_models.file_storage import (
     StorageConfigCreateRequest,
     StorageConfigUpdateRequest,
+    FtpStorageTestDraftRequest,
     FileUploadRequest,
     FileVerificationRequest,
     FileInfo,
@@ -280,6 +281,155 @@ async def get_file_statistics(
         )
 
 
+def test_ftp_config_data(config_data: dict) -> dict:
+    """تست اتصال FTP از دیکشنری پیکربندی (بدون نیاز به ردیف دیتابیس)."""
+    import ftplib
+    import os
+    import tempfile
+    from datetime import datetime
+
+    try:
+        cd = config_data or {}
+        host = cd.get("host")
+        port = int(cd.get("port", 21))
+        username = cd.get("username")
+        password = cd.get("password")
+        directory = cd.get("directory", "/")
+        use_tls = bool(cd.get("use_tls", False))
+        passive = cd.get("passive", True) is not False
+
+        if not all([host, username, password]):
+            return {
+                "success": False,
+                "error": "پارامترهای ضروری FTP (host, username, password) موجود نیست",
+                "storage_type": "ftp",
+                "tested_at": datetime.utcnow().isoformat(),
+            }
+
+        if use_tls:
+            ftp: ftplib.FTP | ftplib.FTP_TLS = ftplib.FTP_TLS()
+        else:
+            ftp = ftplib.FTP()
+
+        ftp.connect(host, port, timeout=15)
+        ftp.login(username, password)
+        if use_tls and isinstance(ftp, ftplib.FTP_TLS):
+            try:
+                ftp.prot_p()
+            except Exception as e:
+                try:
+                    ftp.quit()
+                except Exception:
+                    try:
+                        ftp.close()
+                    except Exception:
+                        pass
+                return {
+                    "success": False,
+                    "error": f"فعال‌سازی TLS روی کانال داده (prot_p) ناموفق: {e}",
+                    "storage_type": "ftp",
+                    "tested_at": datetime.utcnow().isoformat(),
+                }
+        ftp.set_pasv(passive)
+
+        if directory and str(directory).strip() not in ("", "/"):
+            try:
+                ftp.cwd(directory)
+            except ftplib.error_perm:
+                try:
+                    ftp.quit()
+                except Exception:
+                    pass
+                return {
+                    "success": False,
+                    "error": f"دسترسی به دایرکتوری {directory} وجود ندارد",
+                    "storage_type": "ftp",
+                    "tested_at": datetime.utcnow().isoformat(),
+                }
+
+        test_filename = f"test_connection_{datetime.utcnow().timestamp()}.txt"
+        test_content = "Test FTP connection file"
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp_file:
+            temp_file.write(test_content)
+            temp_file_path = temp_file.name
+
+        try:
+            with open(temp_file_path, "rb") as file:
+                ftp.storbinary(f"STOR {test_filename}", file)
+
+            file_list: list[str] = []
+            ftp.retrlines("LIST", file_list.append)
+            file_exists = any(test_filename in line for line in file_list)
+
+            if not file_exists:
+                return {
+                    "success": False,
+                    "error": "فایل تست آپلود نشد",
+                    "storage_type": "ftp",
+                    "tested_at": datetime.utcnow().isoformat(),
+                }
+
+            try:
+                ftp.delete(test_filename)
+            except ftplib.error_perm:
+                pass
+
+            try:
+                ftp.quit()
+            except Exception:
+                try:
+                    ftp.close()
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "message": "اتصال به FTP server موفقیت‌آمیز بود",
+                "storage_type": "ftp",
+                "host": host,
+                "port": port,
+                "directory": directory,
+                "use_tls": use_tls,
+                "passive": passive,
+                "tested_at": datetime.utcnow().isoformat(),
+            }
+        finally:
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                pass
+
+    except ftplib.error_perm as e:
+        return {
+            "success": False,
+            "error": f"خطا در احراز هویت FTP: {str(e)}",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat(),
+        }
+    except ftplib.error_temp as e:
+        return {
+            "success": False,
+            "error": f"خطای موقت FTP: {str(e)}",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat(),
+        }
+    except ConnectionRefusedError:
+        return {
+            "success": False,
+            "error": "اتصال به سرور FTP رد شد. بررسی کنید که سرور در حال اجرا باشد",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"خطا در تست FTP storage: {str(e)}",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat(),
+        }
+
+
 # Storage Configuration Management
 @router.get("/storage-configs/", response_model=dict)
 @require_app_permission("superadmin")
@@ -294,20 +444,27 @@ async def get_storage_configs(
         config_repo = StorageConfigRepository(db)
         configs = config_repo.get_all_configs()
         
-        data = {
-            "configs": [
+        configs_out: list[dict] = []
+        for config in configs:
+            cd_raw = config.config_data or {}
+            cd_out = dict(cd_raw) if isinstance(cd_raw, dict) else {}
+            if config.storage_type == "ftp":
+                has_pw = bool(str(cd_out.get("password") or "").strip())
+                cd_out.pop("password", None)
+                cd_out["has_password"] = has_pw
+            configs_out.append(
                 {
                     "id": str(config.id),
                     "name": config.name,
                     "storage_type": config.storage_type,
                     "is_default": config.is_default,
                     "is_active": config.is_active,
-                    "config_data": config.config_data,
-                    "created_at": config.created_at.isoformat()
+                    "config_data": cd_out,
+                    "created_at": config.created_at.isoformat(),
                 }
-                for config in configs
-            ]
-        }
+            )
+
+        data = {"configs": configs_out}
         
         return success_response(data, request)
     except Exception as e:
@@ -356,6 +513,43 @@ async def create_storage_config(
         )
 
 
+@router.post("/storage-configs/ftp/test-draft", response_model=dict)
+@require_app_permission("superadmin")
+async def test_ftp_storage_draft(
+    request: Request,
+    body: FtpStorageTestDraftRequest,
+    db: Session = Depends(get_db),
+    current_user: AuthContext = Depends(get_current_user),
+    translator = Depends(locale_dependency),
+):
+    """تست اتصال FTP با مقادیر فرم (بدون ذخیره). برای ویرایش، با existing_config_id رمز ذخیره‌شده ادغام می‌شود."""
+    try:
+        data = dict(body.config_data)
+        ex_id = (body.existing_config_id or "").strip()
+        if ex_id:
+            row = db.query(StorageConfig).filter(StorageConfig.id == ex_id).first()
+            if row and row.storage_type == "ftp" and isinstance(row.config_data, dict):
+                if not str(data.get("password") or "").strip():
+                    prev_pw = row.config_data.get("password")
+                    if prev_pw:
+                        data["password"] = prev_pw
+        test_result = test_ftp_config_data(data)
+        if test_result.get("success"):
+            msg = translator.t("STORAGE_CONNECTION_SUCCESS", "اتصال به storage موفقیت‌آمیز بود")
+        else:
+            msg = translator.t("STORAGE_CONNECTION_FAILED", "اتصال به storage ناموفق بود")
+        return success_response({"message": msg, "test_result": test_result}, request)
+    except ApiError:
+        raise
+    except Exception as e:
+        raise ApiError(
+            code="TEST_STORAGE_DRAFT_ERROR",
+            message=translator.t("TEST_STORAGE_DRAFT_ERROR", f"خطا در تست اتصال: {str(e)}"),
+            http_status=500,
+            translator=translator,
+        )
+
+
 @router.put("/storage-configs/{config_id}", response_model=dict)
 @require_app_permission("superadmin")
 async def update_storage_config(
@@ -369,10 +563,28 @@ async def update_storage_config(
     """بروزرسانی تنظیمات ذخیره‌سازی"""
     try:
         config_repo = StorageConfigRepository(db)
-        
-        # TODO: پیاده‌سازی بروزرسانی
-        data = {"message": translator.t("STORAGE_CONFIG_UPDATE_NOT_IMPLEMENTED", "Storage configuration update - to be implemented")}
+        updated = await config_repo.update_config(
+            str(config_id),
+            name=config_request.name,
+            storage_type=config_request.storage_type,
+            config_data=config_request.config_data,
+            is_default=config_request.is_default,
+            is_active=config_request.is_active,
+        )
+        if not updated:
+            raise ApiError(
+                code="STORAGE_CONFIG_NOT_FOUND",
+                message=translator.t("STORAGE_CONFIG_NOT_FOUND", "تنظیمات ذخیره‌سازی یافت نشد"),
+                http_status=404,
+                translator=translator,
+            )
+        data = {
+            "message": translator.t("STORAGE_CONFIG_UPDATED", "تنظیمات ذخیره‌سازی به‌روزرسانی شد"),
+            "config_id": str(updated.id),
+        }
         return success_response(data, request)
+    except ApiError:
+        raise
     except Exception as e:
         raise ApiError(
             code="UPDATE_STORAGE_CONFIG_ERROR",
@@ -522,7 +734,7 @@ async def _test_storage_connection(config: StorageConfig) -> dict:
         if config.storage_type == "local":
             return await _test_local_storage(config)
         elif config.storage_type == "ftp":
-            return await _test_ftp_storage(config)
+            return test_ftp_config_data(config.config_data if isinstance(config.config_data, dict) else {})
         else:
             return {
                 "success": False,
@@ -589,137 +801,5 @@ async def _test_local_storage(config: StorageConfig) -> dict:
         return {
             "success": False,
             "error": f"خطا در تست local storage: {str(e)}",
-            "tested_at": datetime.utcnow().isoformat()
-        }
-
-
-async def _test_ftp_storage(config: StorageConfig) -> dict:
-    """تست اتصال به FTP storage"""
-    import ftplib
-    import tempfile
-    import os
-    from datetime import datetime
-    
-    try:
-        # دریافت تنظیمات FTP
-        config_data = config.config_data
-        host = config_data.get("host")
-        port = int(config_data.get("port", 21))
-        username = config_data.get("username")
-        password = config_data.get("password")
-        directory = config_data.get("directory", "/")
-        use_tls = config_data.get("use_tls", False)
-        
-        # بررسی وجود پارامترهای ضروری
-        if not all([host, username, password]):
-            return {
-                "success": False,
-                "error": "پارامترهای ضروری FTP (host, username, password) موجود نیست",
-                "storage_type": "ftp",
-                "tested_at": datetime.utcnow().isoformat()
-            }
-        
-        # اتصال به FTP
-        if use_tls:
-            ftp = ftplib.FTP_TLS()
-        else:
-            ftp = ftplib.FTP()
-        
-        # تنظیم timeout
-        ftp.connect(host, port, timeout=10)
-        ftp.login(username, password)
-        
-        # تغییر به دایرکتوری مورد نظر
-        if directory and directory != "/":
-            try:
-                ftp.cwd(directory)
-            except ftplib.error_perm:
-                return {
-                    "success": False,
-                    "error": f"دسترسی به دایرکتوری {directory} وجود ندارد",
-                    "storage_type": "ftp",
-                    "tested_at": datetime.utcnow().isoformat()
-                }
-        
-        # تست نوشتن فایل
-        test_filename = f"test_connection_{datetime.utcnow().timestamp()}.txt"
-        test_content = "Test FTP connection file"
-        
-        # ایجاد فایل موقت
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
-            temp_file.write(test_content)
-            temp_file_path = temp_file.name
-        
-        try:
-            # آپلود فایل
-            with open(temp_file_path, 'rb') as file:
-                ftp.storbinary(f'STOR {test_filename}', file)
-            
-            # بررسی وجود فایل
-            file_list = []
-            ftp.retrlines('LIST', file_list.append)
-            file_exists = any(test_filename in line for line in file_list)
-            
-            if not file_exists:
-                return {
-                    "success": False,
-                    "error": "فایل تست آپلود نشد",
-                    "storage_type": "ftp",
-                    "tested_at": datetime.utcnow().isoformat()
-                }
-            
-            # حذف فایل تست
-            try:
-                ftp.delete(test_filename)
-            except ftplib.error_perm:
-                pass  # اگر نتوانست حذف کند، مهم نیست
-            
-            # بستن اتصال
-            ftp.quit()
-            
-            return {
-                "success": True,
-                "message": "اتصال به FTP server موفقیت‌آمیز بود",
-                "storage_type": "ftp",
-                "host": host,
-                "port": port,
-                "directory": directory,
-                "use_tls": use_tls,
-                "tested_at": datetime.utcnow().isoformat()
-            }
-            
-        finally:
-            # حذف فایل موقت
-            try:
-                os.unlink(temp_file_path)
-            except:
-                pass
-        
-    except ftplib.error_perm as e:
-        return {
-            "success": False,
-            "error": f"خطا در احراز هویت FTP: {str(e)}",
-            "storage_type": "ftp",
-            "tested_at": datetime.utcnow().isoformat()
-        }
-    except ftplib.error_temp as e:
-        return {
-            "success": False,
-            "error": f"خطای موقت FTP: {str(e)}",
-            "storage_type": "ftp",
-            "tested_at": datetime.utcnow().isoformat()
-        }
-    except ConnectionRefusedError:
-        return {
-            "success": False,
-            "error": "اتصال به سرور FTP رد شد. بررسی کنید که سرور در حال اجرا باشد",
-            "storage_type": "ftp",
-            "tested_at": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"خطا در تست FTP storage: {str(e)}",
-            "storage_type": "ftp",
             "tested_at": datetime.utcnow().isoformat()
         }

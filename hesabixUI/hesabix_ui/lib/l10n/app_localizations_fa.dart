@@ -2130,6 +2130,106 @@ class AppLocalizationsFa extends AppLocalizations {
   String get storageConfigSetDefaultFailed => 'خطا در تنظیم به عنوان پیش‌فرض';
 
   @override
+  String get adminStorageFtpPurposeSubtitle =>
+      'به‌عنوان پس‌زمینهٔ پیش‌فرض ذخیرهٔ فایل‌های سیستم استفاده می‌شود (جدا از FTP بکاپ هر کسب‌وکار).';
+
+  @override
+  String get adminStorageFtpInsecureWarning =>
+      'بدون TLS، رمز و داده روی شبکه قابل شنود است. در صورت پشتیبانی سرور، TLS را فعال کنید.';
+
+  @override
+  String get adminStorageFtpPasswordOptionalHint =>
+      'برای حفظ رمز فعلی خالی بگذارید';
+
+  @override
+  String get adminStorageFtpPassive => 'حالت غیرفعال (PASV)';
+
+  @override
+  String get adminStorageFormSectionBasic => 'اطلاعات پایه';
+
+  @override
+  String get adminStorageFormSectionDetails => 'جزئیات پیکربندی';
+
+  @override
+  String get adminStorageFormSectionOptions => 'گزینه‌ها';
+
+  @override
+  String get adminStorageNameHint => 'نام این پیکربندی ذخیره‌سازی را وارد کنید';
+
+  @override
+  String get adminStorageFtpHostLabel => 'میزبان FTP';
+
+  @override
+  String get adminStorageFtpHostHint => 'نام میزبان یا IP سرور FTP';
+
+  @override
+  String get adminStorageFtpPortHintPlain => 'پیش‌فرض ۲۱ بدون TLS';
+
+  @override
+  String get adminStorageFtpPortHintTls => 'با TLS اغلب ۹۹۰ یا ۲۱ بسته به سرور';
+
+  @override
+  String get adminStorageFtpDirectoryLabel => 'پوشه روی سرور';
+
+  @override
+  String get adminStorageFtpDirectoryHint =>
+      'پوشهٔ روی سرور برای فایل‌ها (مثلاً /hesabix_files)';
+
+  @override
+  String get adminStorageLocalBasePath => 'مسیر پایه';
+
+  @override
+  String get adminStorageFtpUseTlsTitle => 'استفاده از TLS';
+
+  @override
+  String get adminStorageFtpUseTlsSubtitle =>
+      'FTP روی TLS (FTPS) در صورت پشتیبانی سرور';
+
+  @override
+  String get adminStorageDefaultTitle => 'تنظیم به عنوان پیش‌فرض';
+
+  @override
+  String get adminStorageDefaultSubtitle =>
+      'این پیکربندی به‌عنوان ذخیره‌سازی پیش‌فرض استفاده شود';
+
+  @override
+  String get adminStorageActiveTitle => 'فعال';
+
+  @override
+  String get adminStorageActiveSubtitle =>
+      'پیکربندی‌های غیرفعال برای آپلود جدید استفاده نمی‌شوند';
+
+  @override
+  String get adminStorageCreateTitle => 'ایجاد پیکربندی ذخیره‌سازی';
+
+  @override
+  String get adminStorageEditTitle => 'ویرایش پیکربندی ذخیره‌سازی';
+
+  @override
+  String get adminStorageFtpServerTitle => 'سرور FTP';
+
+  @override
+  String get adminStorageTestConnection => 'تست اتصال';
+
+  @override
+  String get adminStorageTestingConnection => 'در حال تست اتصال…';
+
+  @override
+  String get adminStorageTestSuccess => 'تست اتصال موفق بود';
+
+  @override
+  String get adminStorageTestFailed => 'تست اتصال ناموفق بود';
+
+  @override
+  String get adminStorageSaveInProgress => 'در حال ذخیره…';
+
+  @override
+  String get adminStorageCreateButton => 'ایجاد';
+
+  @override
+  String get adminStorageUpdateButton => 'به‌روزرسانی';
+
+  @override
   String get passwordChangeError => 'خطا در تغییر کلمه عبور';
 
   @override
@@ -3237,6 +3337,81 @@ class AppLocalizationsFa extends AppLocalizations {
       'اعمال افزایش یا کاهش قیمت با فیلترهای پیشرفته';
 
   @override
+  String get bulkPriceUpdateApplyScopeTitle => 'محدوده اعمال';
+
+  @override
+  String get bulkPriceUpdateScopeBase => 'فقط قیمت پایه';
+
+  @override
+  String get bulkPriceUpdateScopePriceLists => 'فقط لیست‌های قیمت';
+
+  @override
+  String get bulkPriceUpdateScopeBoth => 'قیمت پایه و لیست‌ها';
+
+  @override
+  String get bulkPriceUpdateStatsTitle => 'خلاصه آمار';
+
+  @override
+  String get bulkPriceUpdateListOnlyTargetHint =>
+      'در این حالت فقط قیمت فروش داخل لیست‌های قیمت تغییر می‌کند.';
+
+  @override
+  String get bulkPriceUpdatePriceListsHint =>
+      'بدون انتخاب، همهٔ لیست‌های قیمت (مطابق فیلتر ارز) اعمال می‌شود.';
+
+  @override
+  String get bulkPriceUpdatePreviewListChanges => 'لیست قیمت';
+
+  @override
+  String bulkPriceUpdatePreviewListRowsCount(int count) {
+    return '$count ردیف';
+  }
+
+  @override
+  String get bulkPriceUpdateSummaryListRows => 'ردیف‌های لیست قیمت';
+
+  @override
+  String get bulkPriceUpdateSummaryListDelta => 'جمع تغییر قیمت لیست‌ها';
+
+  @override
+  String get bulkProductPricesSheetTitle => 'ویرایش گسترده قیمت‌ها';
+
+  @override
+  String get bulkProductPricesSheetSubtitle =>
+      'قیمت پایه را در جدول ویرایش کنید؛ هر صفحه جدا ذخیره می‌شود.';
+
+  @override
+  String get bulkProductPricesSheetSave => 'ذخیره این صفحه';
+
+  @override
+  String get bulkProductPricesSheetNext => 'صفحه بعد';
+
+  @override
+  String get bulkProductPricesSheetPrev => 'صفحه قبل';
+
+  @override
+  String get bulkProductPricesSheetSearch => 'جستجو';
+
+  @override
+  String get bulkProductPricesSheetClearSearch => 'پاک کردن';
+
+  @override
+  String get bulkProductPricesSheetNoChanges => 'تغییری برای ذخیره نیست';
+
+  @override
+  String get bulkProductPricesSheetCode => 'کد';
+
+  @override
+  String get bulkProductPricesSheetName => 'نام';
+
+  @override
+  String get bulkProductPricesSheetPriceListsForColumns => 'ستون‌های لیست قیمت';
+
+  @override
+  String get bulkProductPricesSheetSelectListsHint =>
+      'برای نمایش و ویرایش قیمت داخل لیست‌ها، یک یا چند لیست را انتخاب کنید و صفحه را بارگذاری کنید.';
+
+  @override
   String get preview => 'پیش‌نمایش';
 
   @override
@@ -3476,25 +3651,25 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reload => 'بارگذاری مجدد';
 
   @override
-  String get presetInvoicesList => 'Invoices/List';
+  String get presetInvoicesList => 'فاکتورها / لیست';
 
   @override
-  String get presetInvoicesDetail => 'Invoices/Detail';
+  String get presetInvoicesDetail => 'فاکتورها / جزئیات';
 
   @override
-  String get presetReceiptsPaymentsList => 'ReceiptsPayments/List';
+  String get presetReceiptsPaymentsList => 'دریافت و پرداخت / لیست';
 
   @override
-  String get presetReceiptsPaymentsDetail => 'ReceiptsPayments/Detail';
+  String get presetReceiptsPaymentsDetail => 'دریافت و پرداخت / جزئیات';
 
   @override
-  String get presetExpenseIncomeList => 'ExpenseIncome/List';
+  String get presetExpenseIncomeList => 'هزینه و درآمد / لیست';
 
   @override
-  String get presetDocumentsList => 'Documents/List';
+  String get presetDocumentsList => 'اسناد / لیست';
 
   @override
-  String get presetDocumentsDetail => 'Documents/Detail';
+  String get presetDocumentsDetail => 'اسناد / جزئیات';
 
   @override
   String get presetTransfersList => 'انتقال وجه / لیست';
@@ -3587,6 +3762,130 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get reportTemplateExportThis => 'خروجی JSON';
+
+  @override
+  String get reportTemplatesFilterScopeLabel => 'حوزهٔ گزارش';
+
+  @override
+  String get reportTemplateStatusFilterHint => 'همهٔ وضعیت‌ها';
+
+  @override
+  String get reportTemplatePlaceholdersTitle => 'متغیرهای قابل استفاده';
+
+  @override
+  String get reportTemplateVariablesHelpButton => 'راهنمای متغیرها';
+
+  @override
+  String reportTemplatesSchemaFetchError(String error) {
+    return 'خطا در دریافت فهرست متغیرها: $error';
+  }
+
+  @override
+  String get reportTemplatesEmptyList => 'قالبی یافت نشد';
+
+  @override
+  String get reportTemplateDeleteConfirmTitle => 'حذف قالب';
+
+  @override
+  String get reportTemplateDeleteConfirmMessage =>
+      'آیا از حذف این قالب مطمئن هستید؟ این عمل برگشت‌ناپذیر است.';
+
+  @override
+  String get reportTemplateSetDefaultTitle => 'تایید';
+
+  @override
+  String get reportTemplateSetDefaultMessage =>
+      'این قالب به‌عنوان پیش‌فرض برای همین حوزه تنظیم شود؟';
+
+  @override
+  String reportTemplateEditSaveError(String error) {
+    return 'ذخیرهٔ قالب ناموفق: $error';
+  }
+
+  @override
+  String reportTemplatePreviewError(String error) {
+    return 'خطا در پیش‌نمایش: $error';
+  }
+
+  @override
+  String reportTemplateInvalidJsonError(String error) {
+    return 'JSON نامعتبر: $error';
+  }
+
+  @override
+  String get reportTemplatePdfDownloadStarted => 'دانلود PDF آغاز شد';
+
+  @override
+  String reportTemplatePdfSavedToPath(String path) {
+    return 'ذخیره شد: $path';
+  }
+
+  @override
+  String get reportTemplatePdfSavedGeneric => 'فایل ذخیره شد';
+
+  @override
+  String get reportTemplateDownload => 'دانلود';
+
+  @override
+  String get reportTemplateOpenInNewTab => 'تب جدید';
+
+  @override
+  String get reportTemplatePdfInlineFailedHint =>
+      'نمایش PDF در همین صفحه ناموفق بود؛ از تب HTML استفاده کنید.';
+
+  @override
+  String get reportTemplateBuilderDesignEmpty => 'طرح سازندهٔ بصری خالی است.';
+
+  @override
+  String get reportTemplatePaperCustomLabel => 'سایز سفارشی کاغذ (اختیاری)';
+
+  @override
+  String get reportTemplatePaperCustomHelper =>
+      'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه).';
+
+  @override
+  String get reportTemplateEditorTabCss => 'CSS';
+
+  @override
+  String get reportTemplateEditorTabHeader => 'هدر';
+
+  @override
+  String get reportTemplateEditorTabFooter => 'فوتر';
+
+  @override
+  String get reportTemplatePageSettingsSection => 'تنظیمات صفحه';
+
+  @override
+  String get reportTemplateFieldName => 'نام قالب';
+
+  @override
+  String get reportTemplateFieldDescription => 'توضیحات';
+
+  @override
+  String get reportTemplateModuleKeyLabel => 'module_key';
+
+  @override
+  String get reportTemplateSubtypeLabel => 'subtype';
+
+  @override
+  String get reportTemplateModuleKeyTooltip =>
+      'شناسهٔ ماژول گزارش ارسالی به API.';
+
+  @override
+  String get reportTemplateSubtypeTooltip =>
+      'زیرنوع گزارش در API (مثلاً list یا detail).';
+
+  @override
+  String get reportTemplateHintHtmlBody => 'HTML محتوا (متغیرهای Jinja2 مجاز)';
+
+  @override
+  String get reportTemplateHintCss => 'CSS اختیاری';
+
+  @override
+  String get reportTemplateHintHeaderHtml => 'HTML هدر (اختیاری)';
+
+  @override
+  String get reportTemplateHintFooterHtml => 'HTML فوتر (اختیاری)';
 
   @override
   String get printPdf => 'چاپ PDF';
@@ -7922,7 +8221,115 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get settingsServiceLogsDescription =>
-      'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها';
+      'مشاهده لاگ سرویس‌های hesabix-api، hesabix-rq-worker و hesabix-notification-moderation و مدیریت سرویس‌ها';
+
+  @override
+  String get serviceLogsPauseAutoRefreshTooltip => 'توقف بروزرسانی خودکار';
+
+  @override
+  String get serviceLogsResumeAutoRefreshTooltip => 'شروع بروزرسانی خودکار';
+
+  @override
+  String get serviceLogsRefreshTooltip => 'بروزرسانی';
+
+  @override
+  String get serviceLogsFollowTailOnTooltip =>
+      'چسبیدن به آخرین خط روشن است؛ برای خواندن لاگ‌های قدیمی خاموش کنید';
+
+  @override
+  String get serviceLogsFollowTailOffTooltip => 'چسبیدن به آخرین خط خاموش است';
+
+  @override
+  String get serviceLogsLinesLabel => 'تعداد خط';
+
+  @override
+  String get serviceLogsSearchHint => 'جستجو در متن لاگ…';
+
+  @override
+  String get serviceLogsFilterAll => 'همه';
+
+  @override
+  String get serviceLogsFilterErrors => 'خطا';
+
+  @override
+  String get serviceLogsFilterWarnings => 'هشدار+';
+
+  @override
+  String get serviceLogsActive => 'فعال';
+
+  @override
+  String get serviceLogsInactive => 'غیرفعال';
+
+  @override
+  String get serviceLogsEnabled => 'فعال در بوت';
+
+  @override
+  String get serviceLogsDisabled => 'غیرفعال در بوت';
+
+  @override
+  String get serviceLogsRestart => 'راه‌اندازی مجدد';
+
+  @override
+  String get serviceLogsRestartConfirmTitle => 'تایید راه‌اندازی مجدد';
+
+  @override
+  String serviceLogsRestartConfirmBody(String serviceName) {
+    return 'سرویس «$serviceName» موقتاً در دسترس نخواهد بود. برای ادامه نام سرویس را دقیقاً وارد کنید.';
+  }
+
+  @override
+  String get serviceLogsRestartTypeHint => 'نام سرویس';
+
+  @override
+  String get serviceLogsStatusDetails => 'جزئیات systemctl status';
+
+  @override
+  String get serviceLogsNoStatusOutput => 'خروجی وضعیت در دسترس نیست.';
+
+  @override
+  String get serviceLogsErrorTitle => 'خطا در دریافت لاگ‌ها';
+
+  @override
+  String get serviceLogsRetry => 'تلاش مجدد';
+
+  @override
+  String get serviceLogsEmpty => 'لاگی یافت نشد';
+
+  @override
+  String serviceLogsLogCount(int count) {
+    return 'تعداد لاگ‌ها: $count';
+  }
+
+  @override
+  String serviceLogsFilteredCount(int shown, int total) {
+    return 'نمایش $shown از $total';
+  }
+
+  @override
+  String get serviceLogsLegendError => 'خطا';
+
+  @override
+  String get serviceLogsLegendWarn => 'هشدار';
+
+  @override
+  String get serviceLogsLegendInfo => 'اطلاعات';
+
+  @override
+  String serviceLogsFetchError(String error) {
+    return 'خطا در دریافت لاگ‌ها: $error';
+  }
+
+  @override
+  String serviceLogsRestartError(String error) {
+    return 'خطا در راه‌اندازی مجدد: $error';
+  }
+
+  @override
+  String get serviceLogsRestartSuccessDefault =>
+      'سرویس با موفقیت راه‌اندازی مجدد شد';
+
+  @override
+  String get serviceLogsFollowTailChip => 'آخر خط';
 
   @override
   String get settingsDatabaseBackup => 'بکاپ دیتابیس';
@@ -8604,6 +9011,38 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ftpNotConfigured => 'تنظیم نشده';
 
   @override
+  String get ftpUseSftp => 'استفاده از SFTP (SSH)';
+
+  @override
+  String get ftpInsecureWarning =>
+      'بدون FTPS یا SFTP، رمز و داده روی شبکه قابل شنود هستند. در صورت امکان FTPS یا SFTP را فعال کنید.';
+
+  @override
+  String get ftpDeleteSettingsConfirmTitle => 'حذف مقصد بکاپ';
+
+  @override
+  String get ftpDeleteSettingsConfirmMessage =>
+      'تنظیمات FTP/SFTP این کسب‌وکار حذف شود؟ ارسال خودکار پس از بکاپ قطع می‌شود.';
+
+  @override
+  String ftpTestResultSampleCount(int count) {
+    return 'نمونه فهرست: حدود $count مورد';
+  }
+
+  @override
+  String get backupFtpUploaded => 'کپی روی سرور شما';
+
+  @override
+  String get backupFtpNotUploaded => 'بدون ارسال به FTP';
+
+  @override
+  String get backupOpenFtpSettings => 'تنظیمات FTP';
+
+  @override
+  String get backupFtpNotConfiguredError =>
+      'ابتدا در تنظیمات، مقصد FTP/SFTP را ذخیره کنید.';
+
+  @override
   String get ftpSendAfterBackup => 'ارسال به FTP پس از بکاپ';
 
   @override
@@ -8648,4 +9087,144 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get settingsPermissionManageFtp => 'اتصال FTP بکاپ';
+
+  @override
+  String get crmMenuNotesCalendar => 'یادداشت و تقویم';
+
+  @override
+  String get crmNotesCalendarTitle => 'یادداشت و تقویم CRM';
+
+  @override
+  String get crmNotesRefresh => 'به‌روزرسانی';
+
+  @override
+  String get crmNotesAdd => 'یادداشت جدید';
+
+  @override
+  String get crmNotesMonthPrev => 'ماه قبل';
+
+  @override
+  String get crmNotesMonthNext => 'ماه بعد';
+
+  @override
+  String get crmNotesToday => 'امروز';
+
+  @override
+  String get crmNotesDayNotes => 'یادداشت‌های این روز';
+
+  @override
+  String get crmNotesNoNotes => 'یادداشتی نیست';
+
+  @override
+  String get crmNotesVisibilityLabel => 'سطح دسترسی';
+
+  @override
+  String get crmNotesVisibilityPrivate => 'خصوصی (فقط خودم)';
+
+  @override
+  String get crmNotesVisibilityBusiness => 'همه اعضای این کسب‌وکار';
+
+  @override
+  String get crmNotesVisibilityShared => 'افراد انتخابی';
+
+  @override
+  String get crmNotesType => 'نوع یادداشت';
+
+  @override
+  String get crmNotesTitleOptional => 'عنوان (اختیاری)';
+
+  @override
+  String get crmNotesBody => 'متن';
+
+  @override
+  String get crmNotesLeadOptional => 'سرنخ (اختیاری)';
+
+  @override
+  String get crmNotesClearLead => 'حذف اتصال سرنخ';
+
+  @override
+  String get crmNotesSharedUsers => 'افرادی که این یادداشت را می‌بینند';
+
+  @override
+  String get crmNotesMeetingStart => 'شروع';
+
+  @override
+  String get crmNotesMeetingEnd => 'پایان (اختیاری)';
+
+  @override
+  String get crmNotesSave => 'ذخیره';
+
+  @override
+  String get crmNotesDelete => 'حذف';
+
+  @override
+  String get crmNotesComments => 'نظرات';
+
+  @override
+  String get crmNotesNoComments => 'نظری ثبت نشده';
+
+  @override
+  String get crmNotesCommentHint => 'نظر خود را بنویسید…';
+
+  @override
+  String get crmNotesSendComment => 'ارسال';
+
+  @override
+  String get crmNotesAudit => 'تاریخچه تغییرات';
+
+  @override
+  String get crmNotesAuditEmpty => 'رویدادی نیست';
+
+  @override
+  String get crmNotesClose => 'بستن';
+
+  @override
+  String get crmNotesEdit => 'ویرایش';
+
+  @override
+  String get crmNotesSearchLeads => 'جستجوی سرنخ';
+
+  @override
+  String get crmNotesApplySearch => 'جستجو';
+
+  @override
+  String get crmNotesErrorLoading => 'خطا در بارگذاری';
+
+  @override
+  String get crmNotesErrorSaving => 'خطا در ذخیره';
+
+  @override
+  String get crmNotesAddNoteType => 'نوع یادداشت جدید';
+
+  @override
+  String get crmNotesNoteTypeCode => 'کد (لاتین، مثلاً follow_up)';
+
+  @override
+  String get crmNotesNoteTypeTitleFa => 'عنوان فارسی';
+
+  @override
+  String get crmNotesNoteTypeTitleEn => 'عنوان انگلیسی';
+
+  @override
+  String get crmNotesNoteTypeScheduling => 'نوع زمان‌بندی';
+
+  @override
+  String get crmNotesNoteTypeDayOnly => 'فقط تاریخ';
+
+  @override
+  String get crmNotesNoteTypeMeeting => 'جلسه (تاریخ و ساعت)';
+
+  @override
+  String get crmNotesNoteTypeAllowComments =>
+      'اجازهٔ کامنت (برای یادداشت عمومی)';
+
+  @override
+  String get crmNotesNoteTypeCreated => 'نوع یادداشت ایجاد شد';
+
+  @override
+  String get crmNotesPickDateTime => 'انتخاب تاریخ و ساعت';
+
+  @override
+  String get crmNotesDeleteConfirmMessage =>
+      'این یادداشت حذف می‌شود. ادامه می‌دهید؟';
 }

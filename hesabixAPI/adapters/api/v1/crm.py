@@ -36,6 +36,11 @@ from adapters.api.v1.schema_models.crm import (
     CrmActivityCreate,
     CrmActivityUpdate,
     CrmActivityResponse,
+    CrmNoteTypeCreate,
+    CrmNoteTypeUpdate,
+    CrmNoteCreate,
+    CrmNoteUpdate,
+    CrmNoteCommentCreate,
 )
 from adapters.db.models.person import Person, PersonType
 from adapters.api.v1.schema_models.person import PersonCreateRequest
@@ -43,6 +48,7 @@ from app.services.person_service import create_person
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.services import crm_calendar_note_service as crm_cal_notes
 
 router = APIRouter(prefix="/crm", tags=["CRM"])
 
@@ -2107,3 +2113,339 @@ async def delete_activity(
     db.delete(activity)
     db.commit()
     return success_response(message="CRM_ACTIVITY_DELETED", request=request)
+
+
+# --- یادداشت و تقویم CRM ---
+
+
+def _crm_note_translator(request: Request):
+    return getattr(request.state, "translator", None)
+
+
+@router.get(
+    "/businesses/{business_id}/note-types",
+    summary="انواع یادداشت CRM",
+)
+@require_business_access("business_id")
+async def list_crm_note_types(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    lang = getattr(ctx, "language", None) or "fa"
+    items = crm_cal_notes.list_note_types(db, business_id, lang)
+    db.commit()
+    return success_response(data={"items": format_datetime_fields(items, request)}, request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/note-types",
+    summary="ایجاد نوع یادداشت سفارشی",
+)
+@require_business_access("business_id")
+async def create_crm_note_type(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmNoteTypeCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    lang = getattr(ctx, "language", None) or "fa"
+    tr = _crm_note_translator(request)
+    row = crm_cal_notes.create_note_type(
+        db,
+        business_id,
+        code=body.code,
+        title_i18n=dict(body.title_i18n),
+        scheduling_mode=body.scheduling_mode,
+        allow_comments=body.allow_comments,
+        sort_order=body.sort_order,
+        lang=lang,
+        translator=tr,
+    )
+    db.commit()
+    return success_response(data=format_datetime_fields(row, request), request=request, message="CRM_NOTE_TYPE_CREATED")
+
+
+@router.patch(
+    "/businesses/{business_id}/note-types/{type_id}",
+    summary="ویرایش نوع یادداشت",
+)
+@require_business_access("business_id")
+async def update_crm_note_type(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    type_id: int = Path(..., gt=0),
+    body: CrmNoteTypeUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    lang = getattr(ctx, "language", None) or "fa"
+    tr = _crm_note_translator(request)
+    row = crm_cal_notes.update_note_type(
+        db,
+        business_id,
+        type_id,
+        title_i18n=body.title_i18n,
+        scheduling_mode=body.scheduling_mode,
+        allow_comments=body.allow_comments,
+        is_active=body.is_active,
+        sort_order=body.sort_order,
+        lang=lang,
+        translator=tr,
+    )
+    db.commit()
+    return success_response(data=format_datetime_fields(row, request), request=request, message="CRM_NOTE_TYPE_UPDATED")
+
+
+@router.delete(
+    "/businesses/{business_id}/note-types/{type_id}",
+    summary="حذف نوع یادداشت غیرسیستمی",
+)
+@require_business_access("business_id")
+async def delete_crm_note_type(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    type_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    crm_cal_notes.delete_note_type(db, business_id, type_id, tr)
+    db.commit()
+    return success_response(message="CRM_NOTE_TYPE_DELETED", request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/notes",
+    summary="لیست یادداشت‌های تقویم در بازه تاریخ",
+)
+@require_business_access("business_id")
+async def list_crm_notes(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    from_date: str = Query(..., description="YYYY-MM-DD میلادی"),
+    to_date: str = Query(..., description="YYYY-MM-DD میلادی"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from datetime import datetime as dt
+
+    try:
+        fd = dt.strptime(from_date, "%Y-%m-%d").date()
+        td = dt.strptime(to_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise ApiError("CRM_NOTE_DATE_RANGE_INVALID", "Invalid date range", translator=_crm_note_translator(request))
+    lang = getattr(ctx, "language", None) or "fa"
+    items = crm_cal_notes.list_notes(db, ctx, business_id, fd, td, lang)
+    db.commit()
+    return success_response(data={"items": format_datetime_fields(items, request)}, request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/notes/{note_id}",
+    summary="جزئیات یادداشت",
+)
+@require_business_access("business_id")
+async def get_crm_note(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    lang = getattr(ctx, "language", None) or "fa"
+    data = crm_cal_notes.get_note(db, ctx, business_id, note_id, lang)
+    db.commit()
+    if not data:
+        raise ApiError("CRM_NOTE_NOT_FOUND", "Not found", http_status=404, translator=_crm_note_translator(request))
+    return success_response(data=format_datetime_fields(data, request), request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/notes",
+    summary="ایجاد یادداشت",
+)
+@require_business_access("business_id")
+async def create_crm_note(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmNoteCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    note = crm_cal_notes.create_note(
+        db,
+        ctx,
+        business_id,
+        note_type_id=body.note_type_id,
+        visibility=body.visibility,
+        title=body.title,
+        body=body.body,
+        occurs_on=body.occurs_on,
+        starts_at=body.starts_at,
+        ends_at=body.ends_at,
+        lead_id=body.lead_id,
+        shared_user_ids=body.shared_user_ids,
+        translator=tr,
+    )
+    db.commit()
+    db.refresh(note)
+    lang = getattr(ctx, "language", None) or "fa"
+    data = crm_cal_notes.get_note(db, ctx, business_id, note.id, lang)
+    return success_response(data=format_datetime_fields(data, request), request=request, message="CRM_NOTE_CREATED")
+
+
+@router.patch(
+    "/businesses/{business_id}/notes/{note_id}",
+    summary="ویرایش یادداشت",
+)
+@require_business_access("business_id")
+async def update_crm_note(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    body: CrmNoteUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    dump = body.model_dump(exclude_unset=True)
+    if dump.get("clear_lead"):
+        lead_field_set = True
+        lead_val = None
+    elif "lead_id" in dump:
+        lead_field_set = True
+        lead_val = dump.get("lead_id")
+    else:
+        lead_field_set = False
+        lead_val = None
+    note = crm_cal_notes.update_note(
+        db,
+        ctx,
+        business_id,
+        note_id,
+        note_type_id=body.note_type_id,
+        visibility=body.visibility,
+        title=body.title,
+        body=body.body,
+        occurs_on=body.occurs_on,
+        starts_at=body.starts_at,
+        ends_at=body.ends_at,
+        lead_id=lead_val,
+        lead_field_set=lead_field_set,
+        status=body.status,
+        shared_user_ids=body.shared_user_ids,
+        translator=tr,
+    )
+    db.commit()
+    lang = getattr(ctx, "language", None) or "fa"
+    data = crm_cal_notes.get_note(db, ctx, business_id, note.id, lang)
+    return success_response(data=format_datetime_fields(data, request), request=request, message="CRM_NOTE_UPDATED")
+
+
+@router.delete(
+    "/businesses/{business_id}/notes/{note_id}",
+    summary="حذف نرم یادداشت",
+)
+@require_business_access("business_id")
+async def delete_crm_note(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    crm_cal_notes.soft_delete_note(db, ctx, business_id, note_id, tr)
+    db.commit()
+    return success_response(message="CRM_NOTE_DELETED", request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/notes/{note_id}/comments",
+    summary="کامنت‌های یادداشت",
+)
+@require_business_access("business_id")
+async def list_crm_note_comments(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    lang = getattr(ctx, "language", None) or "fa"
+    items = crm_cal_notes.list_comments(db, ctx, business_id, note_id, lang)
+    db.commit()
+    return success_response(data={"items": format_datetime_fields(items, request)}, request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/notes/{note_id}/comments",
+    summary="افزودن کامنت",
+)
+@require_business_access("business_id")
+async def create_crm_note_comment(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    body: CrmNoteCommentCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    row = crm_cal_notes.add_comment(db, ctx, business_id, note_id, body.body, tr)
+    db.commit()
+    return success_response(data=format_datetime_fields(row, request), request=request, message="CRM_NOTE_COMMENT_CREATED")
+
+
+@router.delete(
+    "/businesses/{business_id}/notes/{note_id}/comments/{comment_id}",
+    summary="حذف کامنت",
+)
+@require_business_access("business_id")
+async def delete_crm_note_comment(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    comment_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    crm_cal_notes.delete_comment(db, ctx, business_id, note_id, comment_id, tr)
+    db.commit()
+    return success_response(message="CRM_NOTE_COMMENT_DELETED", request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/notes/{note_id}/audit",
+    summary="تاریخچه audit یادداشت",
+)
+@require_business_access("business_id")
+async def list_crm_note_audit(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    note_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    tr = _crm_note_translator(request)
+    items = crm_cal_notes.list_audit(db, ctx, business_id, note_id)
+    db.commit()
+    return success_response(data={"items": format_datetime_fields(items, request)}, request=request)

@@ -4,7 +4,7 @@ Schema models کامل برای محصولات (Products)
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
 from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -461,6 +461,13 @@ class BulkPriceUpdateTarget(str, Enum):
     BOTH = "both"
 
 
+class BulkPriceUpdateScope(str, Enum):
+    """محدوده اعمال تغییر قیمت گروهی"""
+    BASE_PRICES = "base_prices"
+    PRICE_LIST_ITEMS = "price_list_items"
+    BOTH = "both"
+
+
 class BulkPriceUpdateRequest(BaseModel):
     """
     درخواست تغییر گروهی قیمت (نسخه جدید)
@@ -479,6 +486,10 @@ class BulkPriceUpdateRequest(BaseModel):
     target: BulkPriceUpdateTarget = Field(
         ...,
         description="هدف تغییر: sales_price / purchase_price / both"
+    )
+    update_scope: BulkPriceUpdateScope = Field(
+        default=BulkPriceUpdateScope.BOTH,
+        description="محدوده اعمال: فقط قیمت پایه، فقط آیتم‌های لیست قیمت، یا هر دو",
     )
     value: Decimal = Field(
         ...,
@@ -503,13 +514,25 @@ class BulkPriceUpdateRequest(BaseModel):
         description="فقط کالاهایی که قیمت پایه (متناسب با target) دارند"
     )
 
-    @validator("value")
-    def validate_value(cls, v: Decimal, values: dict):
-        update_type = values.get("update_type")
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, v: Decimal, info: ValidationInfo) -> Decimal:
+        update_type = info.data.get("update_type")
         # محدودیت منطقی برای درصد
         if update_type == BulkPriceUpdateType.PERCENTAGE and v > Decimal("1000"):
             raise ValueError("درصد نمی‌تواند بیشتر از 1000 باشد")
         return v
+
+    @model_validator(mode="after")
+    def validate_scope_vs_target(self) -> "BulkPriceUpdateRequest":
+        if (
+            self.update_scope == BulkPriceUpdateScope.PRICE_LIST_ITEMS
+            and self.target == BulkPriceUpdateTarget.PURCHASE_PRICE
+        ):
+            raise ValueError(
+                "لیست‌های قیمت فقط قیمت فروش دارند؛ هدف «فقط قیمت خرید» با محدوده «فقط لیست قیمت» سازگار نیست"
+            )
+        return self
 
     class Config:
         json_schema_extra = {
@@ -539,6 +562,18 @@ class BulkPriceUpdateRequest(BaseModel):
         }
 
 
+class BulkPriceListItemPreview(BaseModel):
+    """پیش‌نمایش یک ردیف قیمت در لیست قیمت"""
+    price_item_id: int
+    price_list_id: int
+    price_list_name: Optional[str] = None
+    currency_id: int
+    tier_name: str
+    current_price: Decimal
+    new_price: Decimal
+    price_change: Decimal
+
+
 class BulkPriceUpdatePreview(BaseModel):
     """پیش‌نمایش تغییرات قیمت"""
     product_id: int
@@ -551,6 +586,10 @@ class BulkPriceUpdatePreview(BaseModel):
     new_purchase_price: Optional[Decimal] = None
     sales_price_change: Optional[Decimal] = None
     purchase_price_change: Optional[Decimal] = None
+    price_list_items: List[BulkPriceListItemPreview] = Field(
+        default_factory=list,
+        description="پیش‌نمایش تغییر قیمت در لیست‌های قیمت (هم‌خوان با اعمال)",
+    )
 
 
 class BulkPriceUpdatePreviewResponse(BaseModel):
@@ -594,3 +633,67 @@ class BulkPriceUpdatePreviewResponse(BaseModel):
                 },
             }
         }
+
+
+class BulkProductPriceSheetPriceItemUpdate(BaseModel):
+    """به‌روزرسانی یک سلول قیمت در لیست قیمت (ورق ویرایش)"""
+    price_item_id: int = Field(..., gt=0)
+    price: Decimal = Field(..., ge=0, description="قیمت جدید (عدد صحیح غیرمنفی)")
+
+
+class BulkProductPriceSheetRow(BaseModel):
+    """یک ردیف ویرایش گسترده: قیمت پایه و/یا ردیف‌های لیست قیمت"""
+    product_id: int = Field(..., gt=0)
+    base_sales_price: Optional[Decimal] = Field(
+        None,
+        description="در صورت ارسال (و بدون clear)، قیمت فروش پایه به‌روز می‌شود",
+    )
+    base_purchase_price: Optional[Decimal] = Field(
+        None,
+        description="در صورت ارسال (و بدون clear)، قیمت خرید پایه به‌روز می‌شود",
+    )
+    clear_base_sales_price: bool = Field(
+        default=False,
+        description="اگر true باشد قیمت فروش پایه پاک (null) می‌شود",
+    )
+    clear_base_purchase_price: bool = Field(
+        default=False,
+        description="اگر true باشد قیمت خرید پایه پاک (null) می‌شود",
+    )
+    price_item_updates: List[BulkProductPriceSheetPriceItemUpdate] = Field(
+        default_factory=list,
+        description="تغییر قیمت ردیف‌های لیست قیمت مرتبط با همین کالا",
+    )
+
+    @model_validator(mode="after")
+    def at_least_one_action(self) -> "BulkProductPriceSheetRow":
+        has_base = (
+            self.clear_base_sales_price
+            or self.clear_base_purchase_price
+            or self.base_sales_price is not None
+            or self.base_purchase_price is not None
+        )
+        if not has_base and not self.price_item_updates:
+            raise ValueError("حداقل یک تغییر (قیمت پایه، پاک کردن پایه، یا قیمت لیست) لازم است")
+        return self
+
+
+class BulkProductPriceSheetItemsRequest(BaseModel):
+    """دریافت ردیف‌های قیمت لیست برای نمایش در ورق ویرایش"""
+    product_ids: List[int] = Field(..., min_length=1, max_length=200)
+    price_list_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        max_length=12,
+        description="حداقل یک لیست قیمت برای بارگذاری ستون‌ها",
+    )
+
+
+class BulkProductPriceSheetApplyRequest(BaseModel):
+    """اعمال دسته‌ای قیمت‌های پایه (مثلاً از نمای شبیه اکسل)"""
+    items: List[BulkProductPriceSheetRow] = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="حداکثر ۵۰۰ ردیف در هر درخواست",
+    )

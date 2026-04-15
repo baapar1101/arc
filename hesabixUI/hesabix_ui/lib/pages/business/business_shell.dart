@@ -867,6 +867,14 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            label: t.crmMenuNotesCalendar,
+            icon: Icons.calendar_month_outlined,
+            selectedIcon: Icons.calendar_month,
+            path: '/business/${widget.businessId}/crm/notes-calendar',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             label: 'فرایندها و زون ارجاعات',
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
@@ -2218,7 +2226,7 @@ class _BusinessShellState extends State<BusinessShell> {
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
   String? _sectionForLabel(String label, AppLocalizations t) {
     if (label == t.people) return 'people';
-    if (label == 'CRM' || label == 'داشبورد' || label == 'فرایندها و زون ارجاعات' || label == 'سرنخ‌ها' || label == 'فرصت‌های فروش' || label == 'فعالیت‌ها' || label == 'گزارشات') return 'crm';
+    if (label == 'CRM' || label == 'داشبورد' || label == 'فرایندها و زون ارجاعات' || label == 'سرنخ‌ها' || label == 'فرصت‌های فروش' || label == 'فعالیت‌ها' || label == 'گزارشات' || label == t.crmMenuNotesCalendar) return 'crm';
     if (label == t.products) return 'products';
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';

@@ -113,4 +113,9 @@ from .crm import (  # noqa: F401
     Deal,
     CrmActivity,
     CrmChangeHistory,
+    CrmNoteType,
+    CrmNote,
+    CrmNoteAclUser,
+    CrmNoteComment,
+    CrmNoteAuditEvent,
 )

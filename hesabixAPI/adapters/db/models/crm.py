@@ -415,3 +415,211 @@ class CrmChangeHistory(Base):
     changed_by = relationship("User", foreign_keys=[changed_by_user_id])
 
 
+# --- یادداشت و تقویم CRM ---
+
+
+class CrmNoteType(Base):
+    """نوع یادداشت قابل تنظیم در سطح کسب‌وکار (عنوان چندزبانه در JSON)"""
+    __tablename__ = "crm_note_types"
+    __table_args__ = (
+        UniqueConstraint("business_id", "code", name="uq_crm_note_types_business_code"),
+        Index("ix_crm_note_types_business_id", "business_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    title_i18n: Mapped[dict] = mapped_column(JSON, nullable=False)
+    scheduling_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="day_only",
+        server_default="day_only",
+        comment="day_only | meeting",
+    )
+    allow_comments: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    business = relationship("Business")
+
+
+class CrmNote(Base):
+    """یادداشت/رویداد تقویم CRM"""
+    __tablename__ = "crm_notes"
+    __table_args__ = (
+        Index("ix_crm_notes_business_occurs_on", "business_id", "occurs_on"),
+        Index("ix_crm_notes_business_deleted", "business_id", "deleted_at"),
+        Index("ix_crm_notes_lead_id", "lead_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    note_type_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_note_types.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="private | business_public | shared",
+    )
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    occurs_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lead_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_leads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="active",
+        server_default="active",
+        comment="active | archived | cancelled",
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    business = relationship("Business")
+    note_type = relationship("CrmNoteType", foreign_keys=[note_type_id])
+    lead = relationship("Lead", foreign_keys=[lead_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    acl_users: Mapped[list["CrmNoteAclUser"]] = relationship(
+        "CrmNoteAclUser",
+        back_populates="note",
+        cascade="all, delete-orphan",
+    )
+
+
+class CrmNoteAclUser(Base):
+    """دسترسی افراد انتخابی برای یادداشت‌های visibility=shared"""
+    __tablename__ = "crm_note_acl_users"
+    __table_args__ = (UniqueConstraint("note_id", "user_id", name="uq_crm_note_acl_note_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    note_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    note = relationship("CrmNote", back_populates="acl_users")
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class CrmNoteComment(Base):
+    """کامنت روی یادداشت‌های عمومی کسب‌وکار"""
+    __tablename__ = "crm_note_comments"
+    __table_args__ = (Index("ix_crm_note_comments_note_id", "note_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    note_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    note = relationship("CrmNote", foreign_keys=[note_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
+class CrmNoteAuditEvent(Base):
+    """رخدادهای audit برای یادداشت CRM"""
+    __tablename__ = "crm_note_audit_events"
+    __table_args__ = (Index("ix_crm_note_audit_note_id", "note_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    note_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    note = relationship("CrmNote", foreign_keys=[note_id])
+    actor = relationship("User", foreign_keys=[actor_user_id])
+
+

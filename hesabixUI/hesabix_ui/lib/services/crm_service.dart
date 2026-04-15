@@ -738,4 +738,114 @@ class CrmService {
     );
     return _extractData(res.data);
   }
+
+  /// انواع یادداشت CRM (چندزبانه در سرور)
+  Future<List<dynamic>> listCrmNoteTypes({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/note-types');
+    final data = _extractData(res.data);
+    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    return [];
+  }
+
+  /// ایجاد نوع یادداشت سفارشی (code + title_i18n + scheduling_mode + allow_comments)
+  Future<Map<String, dynamic>> createCrmNoteType({
+    required int businessId,
+    required Map<String, dynamic> body,
+  }) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/note-types',
+      data: body,
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  /// یادداشت‌های بازه تقویم (from/to میلادی YYYY-MM-DD)
+  Future<List<dynamic>> listCrmNotes({
+    required int businessId,
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/notes',
+      query: {'from_date': fromDate, 'to_date': toDate},
+    );
+    final data = _extractData(res.data);
+    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    return [];
+  }
+
+  Future<Map<String, dynamic>> getCrmNote({required int businessId, required int noteId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/notes/$noteId');
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> createCrmNote({
+    required int businessId,
+    required Map<String, dynamic> body,
+  }) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/notes',
+      data: body,
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> updateCrmNote({
+    required int businessId,
+    required int noteId,
+    required Map<String, dynamic> body,
+  }) async {
+    final res = await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/notes/$noteId',
+      data: body,
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<void> deleteCrmNote({required int businessId, required int noteId}) async {
+    await _apiClient.delete<void>('/api/v1/crm/businesses/$businessId/notes/$noteId');
+  }
+
+  Future<List<dynamic>> listCrmNoteComments({required int businessId, required int noteId}) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/notes/$noteId/comments',
+    );
+    final data = _extractData(res.data);
+    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    return [];
+  }
+
+  Future<void> addCrmNoteComment({
+    required int businessId,
+    required int noteId,
+    required String body,
+  }) async {
+    await _apiClient.post<void>(
+      '/api/v1/crm/businesses/$businessId/notes/$noteId/comments',
+      data: {'body': body},
+    );
+  }
+
+  Future<void> deleteCrmNoteComment({
+    required int businessId,
+    required int noteId,
+    required int commentId,
+  }) async {
+    await _apiClient.delete<void>(
+      '/api/v1/crm/businesses/$businessId/notes/$noteId/comments/$commentId',
+    );
+  }
+
+  Future<List<dynamic>> listCrmNoteAudit({required int businessId, required int noteId}) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/notes/$noteId/audit',
+    );
+    final data = _extractData(res.data);
+    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    return [];
+  }
 }

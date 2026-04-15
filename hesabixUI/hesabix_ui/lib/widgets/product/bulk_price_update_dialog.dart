@@ -46,6 +46,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   // فرم داده‌ها
   BulkPriceUpdateType _updateType = BulkPriceUpdateType.percentage;
   BulkPriceUpdateTarget _target = BulkPriceUpdateTarget.salesPrice;
+  BulkPriceUpdateScope _updateScope = BulkPriceUpdateScope.both;
   BulkPriceUpdateDirection _direction = BulkPriceUpdateDirection.increase;
   double _value = 0.0;
   
@@ -132,6 +133,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         updateType: _updateType,
         direction: _direction,
         target: _target,
+        updateScope: _updateScope,
         value: _value,
         categoryIds: _selectedCategoryIds.isNotEmpty ? _selectedCategoryIds : null,
         currencyIds: _selectedCurrencyIds.isNotEmpty ? _selectedCurrencyIds : null,
@@ -220,6 +222,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         updateType: _updateType,
         direction: _direction,
         target: _target,
+        updateScope: _updateScope,
         value: _value,
         categoryIds: _selectedCategoryIds.isNotEmpty ? _selectedCategoryIds : null,
         currencyIds: _selectedCurrencyIds.isNotEmpty ? _selectedCurrencyIds : null,
@@ -351,6 +354,12 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                                         title: t.changeTypeAndDirection,
                                         icon: Icons.tune,
                                         child: _buildUpdateTypeSection(isCompact: isCompact),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildSectionCard(
+                                        title: t.bulkPriceUpdateApplyScopeTitle,
+                                        icon: Icons.layers_outlined,
+                                        child: _buildScopeSection(),
                                       ),
                                       const SizedBox(height: 14),
                                       _buildSectionCard(
@@ -492,24 +501,62 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
     );
   }
 
+  Widget _buildScopeSection() {
+    final t = AppLocalizations.of(context);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<BulkPriceUpdateScope>(
+      segments: [
+        ButtonSegment(
+          value: BulkPriceUpdateScope.basePrices,
+          label: Text(t.bulkPriceUpdateScopeBase),
+          icon: const Icon(Icons.inventory_2_outlined, size: 18),
+        ),
+        ButtonSegment(
+          value: BulkPriceUpdateScope.priceListItems,
+          label: Text(t.bulkPriceUpdateScopePriceLists),
+          icon: const Icon(Icons.list_alt, size: 18),
+        ),
+        ButtonSegment(
+          value: BulkPriceUpdateScope.both,
+          label: Text(t.bulkPriceUpdateScopeBoth),
+          icon: const Icon(Icons.layers, size: 18),
+        ),
+      ],
+      selected: {_updateScope},
+      onSelectionChanged: (selection) {
+        final v = selection.first;
+        setState(() {
+          _updateScope = v;
+          if (v == BulkPriceUpdateScope.priceListItems && _target == BulkPriceUpdateTarget.purchasePrice) {
+            _target = BulkPriceUpdateTarget.salesPrice;
+          }
+        });
+      },
+    ),
+    );
+  }
+
   Widget _buildTargetSection() {
+    final t = AppLocalizations.of(context);
+    final listOnly = _updateScope == BulkPriceUpdateScope.priceListItems;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (listOnly)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              t.bulkPriceUpdateListOnlyTargetHint,
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
         SegmentedButton<BulkPriceUpdateTarget>(
-          segments: const [
-            ButtonSegment(
-              value: BulkPriceUpdateTarget.salesPrice,
-              label: Text('قیمت فروش'),
-            ),
-            ButtonSegment(
-              value: BulkPriceUpdateTarget.purchasePrice,
-              label: Text('قیمت خرید'),
-            ),
-            ButtonSegment(
-              value: BulkPriceUpdateTarget.both,
-              label: Text('هر دو'),
-            ),
+          segments: [
+            ButtonSegment(value: BulkPriceUpdateTarget.salesPrice, label: Text(t.salesPrice)),
+            if (!listOnly)
+              ButtonSegment(value: BulkPriceUpdateTarget.purchasePrice, label: Text(t.purchasePrice)),
+            ButtonSegment(value: BulkPriceUpdateTarget.both, label: Text(t.both)),
           ],
           selected: {_target},
           onSelectionChanged: (selection) {
@@ -698,32 +745,47 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   }
 
   Widget _buildPriceListFilter() {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('لیست قیمت'),
+        Text(t.priceLists),
         const SizedBox(height: 4),
-        DropdownButtonFormField<int?>(
-          initialValue: _selectedPriceListIds.isNotEmpty ? _selectedPriceListIds.first : null,
-          items: [
-            const DropdownMenuItem<int?>(
-              value: null,
-              child: Text('همه لیست‌ها'),
+        Text(
+          t.bulkPriceUpdatePriceListsHint,
+          style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            FilterChip(
+              label: Text(t.allPriceLists),
+              selected: _selectedPriceListIds.isEmpty,
+              onSelected: (_) => setState(() => _selectedPriceListIds = []),
             ),
-            ..._priceLists.map((priceList) => DropdownMenuItem<int>(
-              value: priceList['id'] as int,
-              child: Text(priceList['name']?.toString() ?? 'بدون نام'),
-            )),
+            ..._priceLists.map((priceList) {
+              final id = priceList['id'] as int;
+              final selected = _selectedPriceListIds.contains(id);
+              return FilterChip(
+                label: Text(
+                  priceList['name']?.toString() ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                selected: selected,
+                onSelected: (value) {
+                  setState(() {
+                    if (value) {
+                      _selectedPriceListIds = [..._selectedPriceListIds, id];
+                    } else {
+                      _selectedPriceListIds = [..._selectedPriceListIds]..remove(id);
+                    }
+                  });
+                },
+              );
+            }),
           ],
-          onChanged: (value) {
-            setState(() {
-              _selectedPriceListIds = value != null ? [value] : [];
-            });
-          },
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
         ),
       ],
     );
@@ -792,6 +854,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
 
   Widget _buildPreviewSection({required bool isCompact}) {
     if (_previewResponse == null) return const SizedBox.shrink();
+    final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
 
     return Column(
@@ -811,7 +874,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                   Icon(Icons.info_outline, color: Colors.blue[700]),
                   const SizedBox(width: 8),
                   Text(
-                    'خلاصه تغییرات',
+                    t.bulkPriceUpdateStatsTitle,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.blue[700],
@@ -824,13 +887,13 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                   ? Column(
                       children: [
                         _buildSummaryItem(
-                          'کل کالاها',
+                          t.totalProducts,
                           _previewResponse!.totalProducts.toString(),
                           Icons.inventory_2,
                         ),
                         const SizedBox(height: 8),
                         _buildSummaryItem(
-                          'کالاهای تأثیرپذیر',
+                          t.affectedProducts,
                           _previewResponse!.affectedProducts.length.toString(),
                           Icons.touch_app,
                         ),
@@ -840,14 +903,14 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                       children: [
                         Expanded(
                           child: _buildSummaryItem(
-                            'کل کالاها',
+                            t.totalProducts,
                             _previewResponse!.totalProducts.toString(),
                             Icons.inventory_2,
                           ),
                         ),
                         Expanded(
                           child: _buildSummaryItem(
-                            'کالاهای تأثیرپذیر',
+                            t.affectedProducts,
                             _previewResponse!.affectedProducts.length.toString(),
                             Icons.touch_app,
                           ),
@@ -859,15 +922,21 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                   ? Column(
                       children: [
                         _buildSummaryItem(
-                          'تغییرات قیمت فروش',
+                          t.salesPriceChanges,
                           _previewResponse!.summary['products_with_sales_change']?.toString() ?? '0',
                           Icons.sell,
                         ),
                         const SizedBox(height: 8),
                         _buildSummaryItem(
-                          'تغییرات قیمت خرید',
+                          t.purchasePriceChanges,
                           _previewResponse!.summary['products_with_purchase_change']?.toString() ?? '0',
                           Icons.shopping_cart,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildSummaryItem(
+                          t.bulkPriceUpdateSummaryListRows,
+                          _previewResponse!.summary['price_list_items_changed']?.toString() ?? '0',
+                          Icons.list_alt,
                         ),
                       ],
                     )
@@ -875,16 +944,23 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                       children: [
                         Expanded(
                           child: _buildSummaryItem(
-                            'تغییرات قیمت فروش',
+                            t.salesPriceChanges,
                             _previewResponse!.summary['products_with_sales_change']?.toString() ?? '0',
                             Icons.sell,
                           ),
                         ),
                         Expanded(
                           child: _buildSummaryItem(
-                            'تغییرات قیمت خرید',
+                            t.purchasePriceChanges,
                             _previewResponse!.summary['products_with_purchase_change']?.toString() ?? '0',
                             Icons.shopping_cart,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            t.bulkPriceUpdateSummaryListRows,
+                            _previewResponse!.summary['price_list_items_changed']?.toString() ?? '0',
+                            Icons.list_alt,
                           ),
                         ),
                       ],
@@ -894,36 +970,59 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: isMobile ? 260 : 240,
+          height: isMobile ? 320 : 300,
           child: ListView.builder(
             itemCount: _previewResponse!.affectedProducts.length,
             itemBuilder: (context, index) {
               final product = _previewResponse!.affectedProducts[index];
+              final listItems = product.priceListItems;
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(product.productName),
-                  subtitle: Text('کد: ${product.productCode}'),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (product.salesPriceChange != null)
-                        Text(
-                          'فروش: ${formatWithThousands(product.currentSalesPrice ?? 0)} → ${formatWithThousands(product.newSalesPrice ?? 0)}',
+                child: ExpansionTile(
+                  initiallyExpanded: false,
+                  title: Text(product.productName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('${t.code}: ${product.productCode}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  children: [
+                    if (product.salesPriceChange != null)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          '${t.salesPrice}: ${formatWithThousands(product.currentSalesPrice ?? 0)} → ${formatWithThousands(product.newSalesPrice ?? 0)}',
                           style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      if (product.purchasePriceChange != null)
-                        Text(
-                          'خرید: ${formatWithThousands(product.currentPurchasePrice ?? 0)} → ${formatWithThousands(product.newPurchasePrice ?? 0)}',
+                      ),
+                    if (product.purchasePriceChange != null)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          '${t.purchasePrice}: ${formatWithThousands(product.currentPurchasePrice ?? 0)} → ${formatWithThousands(product.newPurchasePrice ?? 0)}',
                           style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                    if (listItems.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '${t.bulkPriceUpdatePreviewListChanges} (${t.bulkPriceUpdatePreviewListRowsCount(listItems.length)})',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary),
+                      ),
+                      const SizedBox(height: 4),
+                      ...listItems.take(12).map(
+                            (it) => Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Text(
+                                '${it.priceListName ?? it.priceListId.toString()} · ${it.tierName}: '
+                                '${formatWithThousands(it.currentPrice)} → ${formatWithThousands(it.newPrice)}',
+                                style: const TextStyle(fontSize: 11),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                      if (listItems.length > 12)
+                        Text('… +${listItems.length - 12}', style: const TextStyle(fontSize: 11)),
                     ],
-                  ),
+                  ],
                 ),
               );
             },
@@ -1069,6 +1168,8 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         return 'فقط کالاهای با موجودی';
       case 'only_products_with_base_price':
         return 'فقط کالاهای با قیمت پایه';
+      case 'update_scope':
+        return 'محدوده اعمال';
     }
     return null;
   }

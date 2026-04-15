@@ -528,3 +528,85 @@ msgstr "تعداد سریال‌های دلخواه نامعتبر است"
 
 msgid "INVALID_CUSTOM_CODES"
 msgstr "تعداد کدهای دلخواه نامعتبر است"
+
+# CRM notes / calendar
+msgid "CRM_NOTE_TYPE_CREATED"
+msgstr "نوع یادداشت ایجاد شد"
+
+msgid "CRM_NOTE_TYPE_UPDATED"
+msgstr "نوع یادداشت به‌روزرسانی شد"
+
+msgid "CRM_NOTE_TYPE_DELETED"
+msgstr "نوع یادداشت حذف شد"
+
+msgid "CRM_NOTE_CREATED"
+msgstr "یادداشت ثبت شد"
+
+msgid "CRM_NOTE_UPDATED"
+msgstr "یادداشت به‌روزرسانی شد"
+
+msgid "CRM_NOTE_DELETED"
+msgstr "یادداشت حذف شد"
+
+msgid "CRM_NOTE_COMMENT_CREATED"
+msgstr "کامنت ثبت شد"
+
+msgid "CRM_NOTE_COMMENT_DELETED"
+msgstr "کامنت حذف شد"
+
+msgid "CRM_NOTE_NOT_FOUND"
+msgstr "یادداشت یافت نشد"
+
+msgid "CRM_NOTE_TYPE_NOT_FOUND"
+msgstr "نوع یادداشت یافت نشد"
+
+msgid "CRM_NOTE_TYPE_CODE_EXISTS"
+msgstr "این کد نوع یادداشت از قبل وجود دارد"
+
+msgid "CRM_NOTE_TYPE_INVALID_MODE"
+msgstr "حالت زمان‌بندی نامعتبر است"
+
+msgid "CRM_NOTE_TYPE_SYSTEM"
+msgstr "نوع سیستمی قابل حذف نیست"
+
+msgid "CRM_NOTE_TYPE_IN_USE"
+msgstr "این نوع در یادداشت‌ها استفاده شده است"
+
+msgid "CRM_NOTE_LEAD_INVALID"
+msgstr "سرنخ نامعتبر است"
+
+msgid "CRM_NOTE_SHARED_EMPTY"
+msgstr "برای اشتراک باید حداقل یک کاربر انتخاب شود"
+
+msgid "CRM_NOTE_SHARED_USER_INVALID"
+msgstr "یکی از کاربران انتخاب‌شده عضو این کسب‌وکار نیست"
+
+msgid "CRM_NOTE_VISIBILITY_INVALID"
+msgstr "سطح دسترسی نامعتبر است"
+
+msgid "CRM_NOTE_MEETING_START"
+msgstr "برای جلسه، زمان شروع الزامی است"
+
+msgid "CRM_NOTE_DATE_REQUIRED"
+msgstr "تاریخ رویداد الزامی است"
+
+msgid "CRM_NOTE_FORBIDDEN"
+msgstr "دسترسی به این یادداشت مجاز نیست"
+
+msgid "CRM_NOTE_COMMENTS_DISABLED"
+msgstr "کامنت برای این یادداشت غیرفعال است"
+
+msgid "CRM_NOTE_COMMENT_NOT_FOUND"
+msgstr "کامنت یافت نشد"
+
+msgid "CRM_NOTE_AUDIT_FORBIDDEN"
+msgstr "مشاهده تاریخچه audit مجاز نیست"
+
+msgid "CRM_NOTE_ACL_NOT_SHARED"
+msgstr "این یادداشت حالت اشتراکی ندارد"
+
+msgid "CRM_NOTE_STATUS_INVALID"
+msgstr "وضعیت نامعتبر است"
+
+msgid "CRM_NOTE_DATE_RANGE_INVALID"
+msgstr "بازه تاریخ نامعتبر است"

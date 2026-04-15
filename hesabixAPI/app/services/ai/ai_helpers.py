@@ -104,12 +104,11 @@ def estimate_request_cost(
         # در subscription معمولاً هزینه اضافی نداریم
         return Decimal(0)
     
-    # برای pay_as_go و hybrid
-    input_price = Decimal(str(pricing_config.get("input_token_price", 0)))
-    output_price = Decimal(str(pricing_config.get("output_token_price", 0)))
-    
-    cost = (Decimal(input_tokens) * input_price) + (Decimal(output_tokens) * output_price)
-    return cost
+    # برای pay_as_go و hybrid (هم‌خوان با ai_service._calculate_cost)
+    pay_as_go = pricing_config.get("pay_as_go") or {}
+    input_per_token = Decimal(str(pay_as_go.get("price_per_1k_input_tokens", 0))) / 1000
+    output_per_token = Decimal(str(pay_as_go.get("price_per_1k_output_tokens", 0))) / 1000
+    return (Decimal(input_tokens) * input_per_token) + (Decimal(output_tokens) * output_per_token)
 
 
 def can_user_use_ai(

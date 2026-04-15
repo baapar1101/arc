@@ -1297,6 +1297,7 @@ print('Connection successful')
 
   # Set ownership
   chown -R www-data:www-data "${api_dir}"
+  chmod +x "${api_dir}/deployment/systemd/hesabix-api-prestart.sh" 2>/dev/null || true
 
   # systemd service
   # Type=simple: uvicorn does not send sd_notify; Type=notify would cause start timeout.
@@ -1315,6 +1316,8 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+# ! = اجرا با root: daemon-reload + در صورت نیاز pip از آینه‌های deploy (قبل از alembic)
+ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
 # قبل از start/restart: اعمال میگریشن‌ها؛ در صورت شکست، سرویس استارت نمی‌شود
 ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
@@ -1367,7 +1370,7 @@ WorkingDirectory=${api_dir}
 Environment=PATH=${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
 ExecStart=${api_dir}/.venv/bin/python ${api_dir}/rq_worker.py
-Restart=always
+Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
@@ -1385,20 +1388,15 @@ UNIT
   
   systemctl enable hesabix-rq-worker
   
-  # Start RQ worker only if Redis is available (redis-server.service on Debian/Ubuntu, or redis.service)
-  if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null || \
-     systemctl is-enabled --quiet redis-server 2>/dev/null || systemctl is-enabled --quiet redis 2>/dev/null; then
-    systemctl start hesabix-rq-worker
-    sleep 2
-    if check_service hesabix-rq-worker; then
-      log_success "RQ Worker started (service: hesabix-rq-worker)."
-    else
-      log_warning "RQ Worker failed to start. Check logs: journalctl -u hesabix-rq-worker"
-      log_warning "Background jobs will not work until Redis is configured and RQ worker is running."
-    fi
+  # همیشه RQ worker را استارت می‌کنیم: اگر Redis در تنظیمات سیستم خاموش باشد، اسکریپت با کد ۰ خارج می‌شود
+  # و با Restart=on-failure دیگر حلقهٔ ری‌استارت بی‌معنی ایجاد نمی‌شود.
+  systemctl start hesabix-rq-worker
+  sleep 2
+  if systemctl is-active --quiet hesabix-rq-worker 2>/dev/null; then
+    log_success "RQ Worker is running (hesabix-rq-worker)."
   else
-    log_warning "Redis service not found. RQ Worker not started."
-    log_warning "To enable background jobs, install and configure Redis, then run: systemctl start hesabix-rq-worker"
+    log_warning "RQ Worker is not active. If Redis is disabled in system settings, this is expected; enable Redis then: systemctl start hesabix-rq-worker"
+    log_warning "Otherwise check: journalctl -u hesabix-rq-worker -n 50"
   fi
 
   # Notification Moderation Worker service

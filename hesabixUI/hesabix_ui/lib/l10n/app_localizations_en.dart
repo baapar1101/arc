@@ -2139,6 +2139,107 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageConfigSetDefaultFailed => 'Failed to set as default';
 
   @override
+  String get adminStorageFtpPurposeSubtitle =>
+      'Used as the default file storage backend for uploads (not the same as per-business backup FTP).';
+
+  @override
+  String get adminStorageFtpInsecureWarning =>
+      'Without TLS, credentials and data can be read on the network. Enable TLS when the server supports it.';
+
+  @override
+  String get adminStorageFtpPasswordOptionalHint =>
+      'Leave empty to keep the current password';
+
+  @override
+  String get adminStorageFtpPassive => 'Passive mode (PASV)';
+
+  @override
+  String get adminStorageFormSectionBasic => 'Basic information';
+
+  @override
+  String get adminStorageFormSectionDetails => 'Configuration details';
+
+  @override
+  String get adminStorageFormSectionOptions => 'Options';
+
+  @override
+  String get adminStorageNameHint => 'Enter a name for this storage profile';
+
+  @override
+  String get adminStorageFtpHostLabel => 'FTP host';
+
+  @override
+  String get adminStorageFtpHostHint => 'Hostname or IP of the FTP server';
+
+  @override
+  String get adminStorageFtpPortHintPlain => 'Default 21 without TLS';
+
+  @override
+  String get adminStorageFtpPortHintTls =>
+      'Often 990 with implicit TLS, or 21 with explicit TLS';
+
+  @override
+  String get adminStorageFtpDirectoryLabel => 'Remote folder';
+
+  @override
+  String get adminStorageFtpDirectoryHint =>
+      'Remote folder for stored files (e.g. /hesabix_files)';
+
+  @override
+  String get adminStorageLocalBasePath => 'Base path';
+
+  @override
+  String get adminStorageFtpUseTlsTitle => 'Use TLS';
+
+  @override
+  String get adminStorageFtpUseTlsSubtitle =>
+      'FTP over TLS (FTPS) when supported';
+
+  @override
+  String get adminStorageDefaultTitle => 'Set as default';
+
+  @override
+  String get adminStorageDefaultSubtitle =>
+      'Use this profile as the default storage';
+
+  @override
+  String get adminStorageActiveTitle => 'Active';
+
+  @override
+  String get adminStorageActiveSubtitle =>
+      'Inactive profiles are not used for new uploads';
+
+  @override
+  String get adminStorageCreateTitle => 'Create storage profile';
+
+  @override
+  String get adminStorageEditTitle => 'Edit storage profile';
+
+  @override
+  String get adminStorageFtpServerTitle => 'FTP server';
+
+  @override
+  String get adminStorageTestConnection => 'Test connection';
+
+  @override
+  String get adminStorageTestingConnection => 'Testing connection…';
+
+  @override
+  String get adminStorageTestSuccess => 'Connection test succeeded';
+
+  @override
+  String get adminStorageTestFailed => 'Connection test failed';
+
+  @override
+  String get adminStorageSaveInProgress => 'Saving…';
+
+  @override
+  String get adminStorageCreateButton => 'Create';
+
+  @override
+  String get adminStorageUpdateButton => 'Update';
+
+  @override
   String get passwordChangeError => 'Error changing password';
 
   @override
@@ -3252,6 +3353,81 @@ class AppLocalizationsEn extends AppLocalizations {
       'Increase or decrease prices with advanced filters';
 
   @override
+  String get bulkPriceUpdateApplyScopeTitle => 'Apply to';
+
+  @override
+  String get bulkPriceUpdateScopeBase => 'Base prices only';
+
+  @override
+  String get bulkPriceUpdateScopePriceLists => 'Price lists only';
+
+  @override
+  String get bulkPriceUpdateScopeBoth => 'Base prices and price lists';
+
+  @override
+  String get bulkPriceUpdateStatsTitle => 'Summary stats';
+
+  @override
+  String get bulkPriceUpdateListOnlyTargetHint =>
+      'Only sale prices inside price lists will change.';
+
+  @override
+  String get bulkPriceUpdatePriceListsHint =>
+      'If none selected, all price lists (matching currency filter) apply.';
+
+  @override
+  String get bulkPriceUpdatePreviewListChanges => 'Price list';
+
+  @override
+  String bulkPriceUpdatePreviewListRowsCount(int count) {
+    return '$count rows';
+  }
+
+  @override
+  String get bulkPriceUpdateSummaryListRows => 'Price list rows';
+
+  @override
+  String get bulkPriceUpdateSummaryListDelta => 'Total price list delta';
+
+  @override
+  String get bulkProductPricesSheetTitle => 'Bulk price sheet';
+
+  @override
+  String get bulkProductPricesSheetSubtitle =>
+      'Edit base prices in a table; each page is saved separately.';
+
+  @override
+  String get bulkProductPricesSheetSave => 'Save this page';
+
+  @override
+  String get bulkProductPricesSheetNext => 'Next page';
+
+  @override
+  String get bulkProductPricesSheetPrev => 'Previous page';
+
+  @override
+  String get bulkProductPricesSheetSearch => 'Search';
+
+  @override
+  String get bulkProductPricesSheetClearSearch => 'Clear';
+
+  @override
+  String get bulkProductPricesSheetNoChanges => 'Nothing to save';
+
+  @override
+  String get bulkProductPricesSheetCode => 'Code';
+
+  @override
+  String get bulkProductPricesSheetName => 'Name';
+
+  @override
+  String get bulkProductPricesSheetPriceListsForColumns => 'Price list columns';
+
+  @override
+  String get bulkProductPricesSheetSelectListsHint =>
+      'Select one or more price lists to show and edit list prices, then load the page.';
+
+  @override
   String get preview => 'Preview';
 
   @override
@@ -3604,6 +3780,131 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportTemplateExportThis => 'Export JSON';
+
+  @override
+  String get reportTemplatesFilterScopeLabel => 'Report scope';
+
+  @override
+  String get reportTemplateStatusFilterHint => 'All statuses';
+
+  @override
+  String get reportTemplatePlaceholdersTitle => 'Available placeholders';
+
+  @override
+  String get reportTemplateVariablesHelpButton => 'Placeholder help';
+
+  @override
+  String reportTemplatesSchemaFetchError(String error) {
+    return 'Failed to load placeholder schema: $error';
+  }
+
+  @override
+  String get reportTemplatesEmptyList => 'No templates found';
+
+  @override
+  String get reportTemplateDeleteConfirmTitle => 'Delete template';
+
+  @override
+  String get reportTemplateDeleteConfirmMessage =>
+      'Are you sure you want to delete this template? This cannot be undone.';
+
+  @override
+  String get reportTemplateSetDefaultTitle => 'Confirm';
+
+  @override
+  String get reportTemplateSetDefaultMessage =>
+      'Use this template as the default for its module and subtype?';
+
+  @override
+  String reportTemplateEditSaveError(String error) {
+    return 'Could not save template: $error';
+  }
+
+  @override
+  String reportTemplatePreviewError(String error) {
+    return 'Preview failed: $error';
+  }
+
+  @override
+  String reportTemplateInvalidJsonError(String error) {
+    return 'Invalid JSON: $error';
+  }
+
+  @override
+  String get reportTemplatePdfDownloadStarted => 'PDF download started';
+
+  @override
+  String reportTemplatePdfSavedToPath(String path) {
+    return 'Saved to: $path';
+  }
+
+  @override
+  String get reportTemplatePdfSavedGeneric => 'File saved';
+
+  @override
+  String get reportTemplateDownload => 'Download';
+
+  @override
+  String get reportTemplateOpenInNewTab => 'Open in new tab';
+
+  @override
+  String get reportTemplatePdfInlineFailedHint =>
+      'In-page PDF preview failed; use the HTML tab.';
+
+  @override
+  String get reportTemplateBuilderDesignEmpty =>
+      'Visual builder design is empty.';
+
+  @override
+  String get reportTemplatePaperCustomLabel => 'Custom paper size (optional)';
+
+  @override
+  String get reportTemplatePaperCustomHelper =>
+      'If set, this replaces the selected paper size (max 32 characters).';
+
+  @override
+  String get reportTemplateEditorTabCss => 'CSS';
+
+  @override
+  String get reportTemplateEditorTabHeader => 'Header';
+
+  @override
+  String get reportTemplateEditorTabFooter => 'Footer';
+
+  @override
+  String get reportTemplatePageSettingsSection => 'Page settings';
+
+  @override
+  String get reportTemplateFieldName => 'Template name';
+
+  @override
+  String get reportTemplateFieldDescription => 'Description';
+
+  @override
+  String get reportTemplateModuleKeyLabel => 'module_key';
+
+  @override
+  String get reportTemplateSubtypeLabel => 'subtype';
+
+  @override
+  String get reportTemplateModuleKeyTooltip => 'API report module identifier.';
+
+  @override
+  String get reportTemplateSubtypeTooltip =>
+      'API report subtype (e.g. list or detail).';
+
+  @override
+  String get reportTemplateHintHtmlBody =>
+      'HTML body (Jinja2 placeholders allowed)';
+
+  @override
+  String get reportTemplateHintCss => 'Optional CSS';
+
+  @override
+  String get reportTemplateHintHeaderHtml => 'Optional header HTML';
+
+  @override
+  String get reportTemplateHintFooterHtml => 'Optional footer HTML';
 
   @override
   String get printPdf => 'Print PDF';
@@ -7962,7 +8263,115 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsServiceLogsDescription =>
-      'View logs of hesabix-api and hesabix-rq-worker and manage services';
+      'View logs for hesabix-api, hesabix-rq-worker, and hesabix-notification-moderation and manage services';
+
+  @override
+  String get serviceLogsPauseAutoRefreshTooltip => 'Pause auto-refresh';
+
+  @override
+  String get serviceLogsResumeAutoRefreshTooltip => 'Resume auto-refresh';
+
+  @override
+  String get serviceLogsRefreshTooltip => 'Refresh';
+
+  @override
+  String get serviceLogsFollowTailOnTooltip =>
+      'Follow latest log line is on; turn off to read older entries';
+
+  @override
+  String get serviceLogsFollowTailOffTooltip => 'Follow latest log line is off';
+
+  @override
+  String get serviceLogsLinesLabel => 'Line count';
+
+  @override
+  String get serviceLogsSearchHint => 'Search log text…';
+
+  @override
+  String get serviceLogsFilterAll => 'All';
+
+  @override
+  String get serviceLogsFilterErrors => 'Errors';
+
+  @override
+  String get serviceLogsFilterWarnings => 'Warn+';
+
+  @override
+  String get serviceLogsActive => 'Active';
+
+  @override
+  String get serviceLogsInactive => 'Inactive';
+
+  @override
+  String get serviceLogsEnabled => 'Enabled at boot';
+
+  @override
+  String get serviceLogsDisabled => 'Disabled at boot';
+
+  @override
+  String get serviceLogsRestart => 'Restart';
+
+  @override
+  String get serviceLogsRestartConfirmTitle => 'Confirm restart';
+
+  @override
+  String serviceLogsRestartConfirmBody(String serviceName) {
+    return 'Service «$serviceName» may be briefly unavailable. Type the exact service name to continue.';
+  }
+
+  @override
+  String get serviceLogsRestartTypeHint => 'Service name';
+
+  @override
+  String get serviceLogsStatusDetails => 'systemctl status details';
+
+  @override
+  String get serviceLogsNoStatusOutput => 'No status output available.';
+
+  @override
+  String get serviceLogsErrorTitle => 'Failed to load logs';
+
+  @override
+  String get serviceLogsRetry => 'Retry';
+
+  @override
+  String get serviceLogsEmpty => 'No log entries';
+
+  @override
+  String serviceLogsLogCount(int count) {
+    return 'Log lines: $count';
+  }
+
+  @override
+  String serviceLogsFilteredCount(int shown, int total) {
+    return 'Showing $shown of $total';
+  }
+
+  @override
+  String get serviceLogsLegendError => 'Error';
+
+  @override
+  String get serviceLogsLegendWarn => 'Warning';
+
+  @override
+  String get serviceLogsLegendInfo => 'Info';
+
+  @override
+  String serviceLogsFetchError(String error) {
+    return 'Failed to fetch logs: $error';
+  }
+
+  @override
+  String serviceLogsRestartError(String error) {
+    return 'Restart failed: $error';
+  }
+
+  @override
+  String get serviceLogsRestartSuccessDefault =>
+      'Service restarted successfully';
+
+  @override
+  String get serviceLogsFollowTailChip => 'Follow tail';
 
   @override
   String get settingsDatabaseBackup => 'Database Backup';
@@ -8646,6 +9055,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ftpNotConfigured => 'Not configured';
 
   @override
+  String get ftpUseSftp => 'Use SFTP (SSH)';
+
+  @override
+  String get ftpInsecureWarning =>
+      'Without FTPS or SFTP, credentials and data can be read on the network. Enable FTPS or SFTP when possible.';
+
+  @override
+  String get ftpDeleteSettingsConfirmTitle => 'Remove backup destination';
+
+  @override
+  String get ftpDeleteSettingsConfirmMessage =>
+      'Remove FTP/SFTP settings for this business? Automatic upload after backup will stop.';
+
+  @override
+  String ftpTestResultSampleCount(int count) {
+    return 'Directory listing sample: about $count entries';
+  }
+
+  @override
+  String get backupFtpUploaded => 'Copy on your server';
+
+  @override
+  String get backupFtpNotUploaded => 'Not sent to FTP';
+
+  @override
+  String get backupOpenFtpSettings => 'FTP settings';
+
+  @override
+  String get backupFtpNotConfiguredError =>
+      'Save an FTP/SFTP destination in settings first.';
+
+  @override
   String get ftpSendAfterBackup => 'Also upload to FTP after backup';
 
   @override
@@ -8690,4 +9131,144 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPermissionManageFtp => 'FTP backup connection';
+
+  @override
+  String get crmMenuNotesCalendar => 'Notes & calendar';
+
+  @override
+  String get crmNotesCalendarTitle => 'CRM notes & calendar';
+
+  @override
+  String get crmNotesRefresh => 'Refresh';
+
+  @override
+  String get crmNotesAdd => 'New note';
+
+  @override
+  String get crmNotesMonthPrev => 'Previous month';
+
+  @override
+  String get crmNotesMonthNext => 'Next month';
+
+  @override
+  String get crmNotesToday => 'Today';
+
+  @override
+  String get crmNotesDayNotes => 'Notes for this day';
+
+  @override
+  String get crmNotesNoNotes => 'No notes';
+
+  @override
+  String get crmNotesVisibilityLabel => 'Who can see this note';
+
+  @override
+  String get crmNotesVisibilityPrivate => 'Private (only me)';
+
+  @override
+  String get crmNotesVisibilityBusiness => 'Everyone in this business';
+
+  @override
+  String get crmNotesVisibilityShared => 'Selected people';
+
+  @override
+  String get crmNotesType => 'Note type';
+
+  @override
+  String get crmNotesTitleOptional => 'Title (optional)';
+
+  @override
+  String get crmNotesBody => 'Content';
+
+  @override
+  String get crmNotesLeadOptional => 'Lead (optional)';
+
+  @override
+  String get crmNotesClearLead => 'Clear lead';
+
+  @override
+  String get crmNotesSharedUsers => 'People who can see this note';
+
+  @override
+  String get crmNotesMeetingStart => 'Start';
+
+  @override
+  String get crmNotesMeetingEnd => 'End (optional)';
+
+  @override
+  String get crmNotesSave => 'Save';
+
+  @override
+  String get crmNotesDelete => 'Delete';
+
+  @override
+  String get crmNotesComments => 'Comments';
+
+  @override
+  String get crmNotesNoComments => 'No comments yet';
+
+  @override
+  String get crmNotesCommentHint => 'Write a comment…';
+
+  @override
+  String get crmNotesSendComment => 'Send';
+
+  @override
+  String get crmNotesAudit => 'Change history';
+
+  @override
+  String get crmNotesAuditEmpty => 'No audit entries';
+
+  @override
+  String get crmNotesClose => 'Close';
+
+  @override
+  String get crmNotesEdit => 'Edit';
+
+  @override
+  String get crmNotesSearchLeads => 'Search leads';
+
+  @override
+  String get crmNotesApplySearch => 'Search';
+
+  @override
+  String get crmNotesErrorLoading => 'Failed to load';
+
+  @override
+  String get crmNotesErrorSaving => 'Failed to save';
+
+  @override
+  String get crmNotesAddNoteType => 'New note type';
+
+  @override
+  String get crmNotesNoteTypeCode => 'Code (Latin, e.g. follow_up)';
+
+  @override
+  String get crmNotesNoteTypeTitleFa => 'Title (Persian)';
+
+  @override
+  String get crmNotesNoteTypeTitleEn => 'Title (English)';
+
+  @override
+  String get crmNotesNoteTypeScheduling => 'Scheduling';
+
+  @override
+  String get crmNotesNoteTypeDayOnly => 'Date only';
+
+  @override
+  String get crmNotesNoteTypeMeeting => 'Meeting (date & time)';
+
+  @override
+  String get crmNotesNoteTypeAllowComments =>
+      'Allow comments (for public notes)';
+
+  @override
+  String get crmNotesNoteTypeCreated => 'Note type created';
+
+  @override
+  String get crmNotesPickDateTime => 'Pick date & time';
+
+  @override
+  String get crmNotesDeleteConfirmMessage =>
+      'This note will be removed. Continue?';
 }

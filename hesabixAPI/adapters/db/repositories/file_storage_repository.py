@@ -266,6 +266,35 @@ class StorageConfigRepository(BaseRepository[StorageConfig]):
         self.db.commit()
         return True
 
+    async def update_config(
+        self,
+        config_id: str,
+        *,
+        name: str,
+        storage_type: str,
+        config_data: Dict[str, Any],
+        is_default: bool,
+        is_active: bool,
+    ) -> Optional[StorageConfig]:
+        row = self.db.query(StorageConfig).filter(StorageConfig.id == str(config_id)).first()
+        if not row:
+            return None
+        if is_default:
+            await self.clear_default_configs()
+        merged = dict(config_data) if isinstance(config_data, dict) else {}
+        if storage_type == "ftp":
+            prev = row.config_data if isinstance(row.config_data, dict) else {}
+            if not str(merged.get("password") or "").strip() and str(prev.get("password") or "").strip():
+                merged["password"] = prev["password"]
+        row.name = name
+        row.storage_type = storage_type
+        row.config_data = merged
+        row.is_default = is_default
+        row.is_active = is_active
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
 
 class FileVerificationRepository(BaseRepository[FileVerification]):
     def __init__(self, db: Session):

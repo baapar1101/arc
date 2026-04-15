@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import copy
+import json
 import subprocess
 import logging
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, List, Tuple
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
@@ -22,12 +25,50 @@ ALLOWED_SERVICES = [
     "hesabix-notification-moderation"  # Worker بررسی قالب‌های نوتیفیکیشن
 ]
 
+_LOGS_CACHE: Dict[Tuple[str, int], Tuple[float, Dict[str, Any]]] = {}
+_LOGS_CACHE_TTL_SEC = 2.0
+
+
+def _normalize_journal_message(message: Any) -> str:
+	"""تبدیل MESSAGE ژورنال به رشتهٔ قابل‌نمایش (متن، بایت، آرایهٔ بایت و …)."""
+	if message is None:
+		return ""
+	if isinstance(message, str):
+		return message
+	if isinstance(message, (bytes, bytearray)):
+		try:
+			return bytes(message).decode("utf-8", errors="replace")
+		except Exception:
+			return repr(message)
+	if isinstance(message, list):
+		try:
+			if message and all(isinstance(x, int) for x in message):
+				return bytes(message).decode("utf-8", errors="replace")
+		except Exception:
+			pass
+		return "".join(_normalize_journal_message(x) for x in message)
+	return str(message)
+
+
+def _priority_to_str(value: Any) -> str:
+	if value is None:
+		return "6"
+	if isinstance(value, int):
+		return str(value)
+	return str(value)
+
 
 def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 	"""دریافت لاگ‌های یک سرویس از journalctl"""
 	if service_name not in ALLOWED_SERVICES:
 		raise ApiError("INVALID_SERVICE", f"سرویس '{service_name}' مجاز نیست", http_status=400)
-	
+
+	cache_key = (service_name, lines)
+	now_m = time.monotonic()
+	cached = _LOGS_CACHE.get(cache_key)
+	if cached and (now_m - cached[0]) < _LOGS_CACHE_TTL_SEC:
+		return copy.deepcopy(cached[1])
+
 	try:
 		# دریافت لاگ‌ها با journalctl
 		cmd = ["journalctl", "-u", service_name, "-n", str(lines), "--no-pager", "-o", "json"]
@@ -38,38 +79,52 @@ def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 			timeout=10,
 			check=False
 		)
-		
+
 		if result.returncode != 0:
-			logger.error(f"Error getting logs for {service_name}: {result.stderr}")
-			raise ApiError("INTERNAL_ERROR", f"خطا در دریافت لاگ‌ها: {result.stderr}", http_status=500)
-		
+			out_preview = (result.stdout or "")[:500]
+			logger.error(
+				"journalctl failed for %s rc=%s stderr=%s stdout_preview=%s",
+				service_name,
+				result.returncode,
+				(result.stderr or "").strip(),
+				out_preview,
+			)
+			raise ApiError(
+				"INTERNAL_ERROR",
+				"خطا در دریافت لاگ‌ها از journalctl",
+				http_status=500,
+			)
+
 		# Parse JSON lines
-		logs = []
-		import json
+		logs: List[Dict[str, Any]] = []
 		for line in result.stdout.strip().split('\n'):
 			if line.strip():
 				try:
 					log_entry = json.loads(line)
 					logs.append({
-						"timestamp": log_entry.get("__REALTIME_TIMESTAMP", ""),
-						"level": log_entry.get("PRIORITY", "6"),  # 0=emerg, 1=alert, 2=crit, 3=err, 4=warning, 5=notice, 6=info, 7=debug
-						"message": log_entry.get("MESSAGE", ""),
-						"service": log_entry.get("_SYSTEMD_UNIT", ""),
-						"pid": log_entry.get("_PID", ""),
+						"timestamp": str(log_entry.get("__REALTIME_TIMESTAMP", "") or ""),
+						"level": _priority_to_str(log_entry.get("PRIORITY", "6")),
+						"message": _normalize_journal_message(log_entry.get("MESSAGE")),
+						"service": log_entry.get("_SYSTEMD_UNIT", "") or "",
+						"pid": log_entry.get("_PID", "") or "",
 					})
 				except json.JSONDecodeError:
 					continue
-		
+
 		# معکوس کردن برای نمایش جدیدترین اول
 		logs.reverse()
-		
-		return {
+
+		payload: Dict[str, Any] = {
 			"service": service_name,
 			"total_lines": len(logs),
-			"logs": logs
+			"logs": logs,
 		}
+		_LOGS_CACHE[cache_key] = (now_m, copy.deepcopy(payload))
+		return copy.deepcopy(payload)
 	except subprocess.TimeoutExpired:
 		raise ApiError("TIMEOUT", "دریافت لاگ‌ها زمان‌بر شد", http_status=504)
+	except ApiError:
+		raise
 	except Exception as e:
 		logger.error(f"Error getting service logs: {e}", exc_info=True)
 		raise ApiError("INTERNAL_ERROR", f"خطا در دریافت لاگ‌ها: {str(e)}", http_status=500)
@@ -158,7 +213,7 @@ def _get_service_status(service_name: str) -> Dict[str, Any]:
 			"service": service_name,
 			"is_active": is_active_result.stdout.strip() == "active",
 			"is_enabled": is_enabled_result.stdout.strip() == "enabled",
-			"status_output": result.stdout[:500] if result.returncode == 0 else None,
+			"status_output": result.stdout[:2000] if result.returncode == 0 else None,
 		}
 	except subprocess.TimeoutExpired:
 		raise ApiError("TIMEOUT", "دریافت وضعیت سرویس زمان‌بر شد", http_status=504)
@@ -168,14 +223,28 @@ def _get_service_status(service_name: str) -> Dict[str, Any]:
 
 
 @router.get(
+	"/allowed-services",
+	summary="نام سرویس‌های مجاز",
+	description="لیست واحدهای systemd مجاز برای مشاهده لاگ و restart",
+)
+@require_app_permission("system_settings")
+def list_allowed_services(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	return success_response({"services": list(ALLOWED_SERVICES)}, request)
+
+
+@router.get(
 	"/logs",
 	summary="دریافت لاگ‌های سرویس‌های سیستم",
-	description="دریافت لاگ‌های سرویس‌های hesabix-api و hesabix-rq-worker از journalctl",
+	description="دریافت لاگ از journalctl برای سرویس‌های مجاز (لیست در /allowed-services)",
 )
 @require_app_permission("system_settings")
 def get_service_logs(
 	request: Request,
-	service_name: str = Query(..., description="نام سرویس (hesabix-api یا hesabix-rq-worker)"),
+	service_name: str = Query(..., description="نام واحد systemd (مثلاً hesabix-api)"),
 	lines: int = Query(100, ge=1, le=1000, description="تعداد خطوط لاگ"),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
@@ -199,7 +268,7 @@ def get_service_logs(
 @require_app_permission("system_settings")
 def get_service_status(
 	request: Request,
-	service_name: str = Query(..., description="نام سرویس (hesabix-api یا hesabix-rq-worker)"),
+	service_name: str = Query(..., description="نام واحد systemd مجاز"),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -248,12 +317,12 @@ def get_all_services_status(
 @router.post(
 	"/restart",
 	summary="Restart کردن سرویس سیستم",
-	description="Restart کردن سرویس‌های hesabix-api یا hesabix-rq-worker",
+	description="Restart یک واحد systemd از لیست سرویس‌های مجاز",
 )
 @require_app_permission("system_settings")
 def restart_service(
 	request: Request,
-	service_name: str = Query(..., description="نام سرویس (hesabix-api یا hesabix-rq-worker)"),
+	service_name: str = Query(..., description="نام واحد systemd مجاز"),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:

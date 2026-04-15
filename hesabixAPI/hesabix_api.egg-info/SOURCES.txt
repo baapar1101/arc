@@ -11,6 +11,7 @@ adapters/api/v1/bank_accounts.py
 adapters/api/v1/boms.py
 adapters/api/v1/business_backups.py
 adapters/api/v1/business_dashboard.py
+adapters/api/v1/business_ftp_backup.py
 adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
@@ -45,6 +46,7 @@ adapters/api/v1/products.py
 adapters/api/v1/profile_dashboard.py
 adapters/api/v1/projects.py
 adapters/api/v1/public_share_links.py
+adapters/api/v1/public_storage_file_shares.py
 adapters/api/v1/quick_sales.py
 adapters/api/v1/receipts_payments.py
 adapters/api/v1/repair_shop.py
@@ -149,6 +151,7 @@ adapters/db/models/api_key.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
+adapters/db/models/business_ftp_backup_setting.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
 adapters/db/models/business_print_settings.py
@@ -303,8 +306,12 @@ app/services/auth_service.py
 app/services/bank_account_service.py
 app/services/bom_service.py
 app/services/bulk_price_update_service.py
+app/services/bulk_product_prices_sheet_service.py
 app/services/business_background_jobs.py
 app/services/business_dashboard_service.py
+app/services/business_ftp_access.py
+app/services/business_ftp_queue_jobs.py
+app/services/business_ftp_service.py
 app/services/business_notification_service.py
 app/services/business_service.py
 app/services/cache_invalidation_subscriber.py
@@ -313,9 +320,11 @@ app/services/cash_register_service.py
 app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
+app/services/crm_calendar_note_service.py
 app/services/dashboard_widgets_service.py
 app/services/database_backup_service.py
 app/services/database_restore_service.py
+app/services/document_list_sort.py
 app/services/document_monetization_background_jobs.py
 app/services/document_monetization_jobs.py
 app/services/document_monetization_service.py
@@ -327,6 +336,7 @@ app/services/encryption_service.py
 app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
+app/services/file_storage_share_service.py
 app/services/general_ledger_service.py
 app/services/invoice_product_price_sync_service.py
 app/services/invoice_service.py
@@ -363,11 +373,14 @@ app/services/repair_shop_operations.py
 app/services/repair_shop_service.py
 app/services/report_template_service.py
 app/services/session_service.py
+app/services/sort_resolution.py
+app/services/sqlalchemy_sort_from_query.py
 app/services/storage_background_jobs.py
 app/services/storage_cleanup_service.py
 app/services/storage_export_service.py
 app/services/storage_invoice_service.py
 app/services/storage_plan_service.py
+app/services/storage_share_access_token.py
 app/services/storage_subscription_service.py
 app/services/system_settings_service.py
 app/services/tax_audit_trail.py
@@ -470,6 +483,11 @@ migrations/versions/20260409_000001_add_admin_script_runs_tables.py
 migrations/versions/20260410_000001_invoice_sync_product_prices.py
 migrations/versions/20260411_000001_add_invoice_warehouse_release_mode.py
 migrations/versions/20260411_000002_seed_notification_templates_all_channels.py
+migrations/versions/20260415_000001_add_file_storage_shares.py
+migrations/versions/20260415_000002_crm_activity_lead_and_indexes.py
+migrations/versions/20260415_000003_business_ftp_backup_settings.py
+migrations/versions/20260416_000001_add_use_sftp_business_ftp_backup.py
+migrations/versions/20260416_000002_crm_notes_calendar.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py

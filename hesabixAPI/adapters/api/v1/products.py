@@ -18,6 +18,8 @@ from adapters.api.v1.schema_models.product import (
     ProductListResponse,
     BulkPriceUpdateRequest,
     BulkPriceUpdatePreviewResponse,
+    BulkProductPriceSheetApplyRequest,
+    BulkProductPriceSheetItemsRequest,
     BulkDefaultWarehouseRequest,
     BulkDefaultWarehousePreviewResponse,
     BulkDefaultWarehouseApplyResponse,
@@ -39,6 +41,10 @@ from app.services.product_service import (
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
     apply_bulk_price_update,
+)
+from app.services.bulk_product_prices_sheet_service import (
+    apply_bulk_product_price_sheet,
+    list_bulk_price_sheet_items,
 )
 from adapters.db.models.business import Business
 from adapters.db.models.product import Product
@@ -2765,6 +2771,42 @@ def apply_bulk_price_update_endpoint(
 ) -> Dict[str, Any]:
     
     result = apply_bulk_price_update(db, business_id, payload)
+    return success_response(data=result, request=request)
+
+
+@router.post(
+    "/business/{business_id}/bulk-prices-sheet/price-items",
+    summary="دریافت ردیف‌های قیمت لیست برای ورق ویرایش گسترده",
+    response_model=SuccessResponse[Dict[str, Any]],
+)
+@require_business_access("business_id")
+def list_bulk_product_prices_sheet_items_endpoint(
+    request: Request,
+    business_id: int,
+    payload: BulkProductPriceSheetItemsRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "view")),
+) -> Dict[str, Any]:
+    result = list_bulk_price_sheet_items(db, business_id, payload)
+    return success_response(data=result, request=request)
+
+
+@router.post(
+    "/business/{business_id}/bulk-prices-sheet/apply",
+    summary="اعمال دسته‌ای قیمت پایه (نمای ویرایش گسترده)",
+    response_model=SuccessResponse[Dict[str, Any]],
+)
+@require_business_access("business_id")
+def apply_bulk_product_prices_sheet_endpoint(
+    request: Request,
+    business_id: int,
+    payload: BulkProductPriceSheetApplyRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
+) -> Dict[str, Any]:
+    result = apply_bulk_product_price_sheet(db, business_id, payload)
     return success_response(data=result, request=request)
 
 
