@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// دیالوگ رسپانسیو برای فرم‌های CRM؛ در موبایل تمام‌صفحه یا نزدیک به آن، در دسکتاپ با حداکثر عرض محدود.
 class CrmResponsiveDialog extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final Widget child;
   final List<Widget>? actions;
   final bool scrollable;
@@ -11,6 +13,7 @@ class CrmResponsiveDialog extends StatelessWidget {
   const CrmResponsiveDialog({
     super.key,
     required this.title,
+    this.subtitle,
     required this.child,
     this.actions,
     this.scrollable = true,
@@ -86,7 +89,7 @@ class CrmResponsiveDialog extends StatelessWidget {
     }
 
     return AlertDialog(
-      title: Text(title),
+      title: _dialogTitle(context),
       titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -107,26 +110,62 @@ class CrmResponsiveDialog extends StatelessWidget {
     );
   }
 
+  Widget _dialogTitle(BuildContext context) {
+    final theme = Theme.of(context);
+    final sub = subtitle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        if (sub != null && sub.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            sub,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildTitleBar(BuildContext context, bool isNarrow) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ],
             ),
           ),
           if (isNarrow)
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => Navigator.of(context).pop(),
-              tooltip: 'بستن',
+              tooltip: t.dialogClose,
             ),
         ],
       ),
@@ -134,13 +173,33 @@ class CrmResponsiveDialog extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context) {
+    final list = actions!;
+    final stack = list.length >= 3;
+    if (stack) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < list.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(bottom: i < list.length - 1 ? 8 : 0),
+                  child: list[i],
+                ),
+            ],
+          ),
+        ),
+      );
+    }
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
-          children: actions!
+          children: list
               .map((a) => Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: a,

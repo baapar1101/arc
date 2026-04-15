@@ -9173,7 +9173,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesAudit => 'تاریخچه تغییرات';
 
   @override
-  String get crmNotesAuditEmpty => 'رویدادی نیست';
+  String get crmNotesAuditEmpty => 'هنوز رویدادی ثبت نشده است.';
 
   @override
   String get crmNotesClose => 'بستن';
@@ -9219,6 +9219,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'اجازهٔ کامنت (برای یادداشت عمومی)';
 
   @override
+  String get crmNotesNoteTypeAllowCommentsHint =>
+      'فقط برای یادداشت‌هایی که برای کسب‌وکار قابل مشاهده‌اند (عمومی) اعمال می‌شود.';
+
+  @override
   String get crmNotesNoteTypeCreated => 'نوع یادداشت ایجاد شد';
 
   @override
@@ -9227,4 +9231,283 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get crmNotesDeleteConfirmMessage =>
       'این یادداشت حذف می‌شود. ادامه می‌دهید؟';
+
+  @override
+  String get crmNotesDeleteConfirmTitle => 'حذف یادداشت';
+
+  @override
+  String get crmNotesDeleteWarnComments => 'کامنت‌های ثبت‌شده نیز حذف می‌شوند.';
+
+  @override
+  String get crmNoteTabDetails => 'جزئیات';
+
+  @override
+  String get crmNoteTabComments => 'گفتگو';
+
+  @override
+  String get crmNoteTabAudit => 'تاریخچه';
+
+  @override
+  String get crmNotesVisibilityShortPrivate => 'خصوصی';
+
+  @override
+  String get crmNotesVisibilityShortBusiness => 'تیم';
+
+  @override
+  String get crmNotesVisibilityShortShared => 'انتخابی';
+
+  @override
+  String get crmNotesVisibilityHintPrivate =>
+      'فقط خودتان این یادداشت را می‌بینید.';
+
+  @override
+  String get crmNotesVisibilityHintBusiness =>
+      'همه اعضایی که به CRM دسترسی دارند (در این کسب‌وکار).';
+
+  @override
+  String get crmNotesVisibilityHintShared =>
+      'فقط شما و افرادی که انتخاب می‌کنید.';
+
+  @override
+  String get crmNotesSharedPickHint =>
+      'حداقل یک همکار را انتخاب کنید (خودتان همیشه شامل می‌شوید).';
+
+  @override
+  String get crmNotesEventDateButton => 'انتخاب تاریخ';
+
+  @override
+  String get crmNotesNoLeadsFound => 'سرنخی با این جستجو یافت نشد.';
+
+  @override
+  String get crmNotesLeadSearchInDialogHint => 'نام، کد، موبایل یا ایمیل…';
+
+  @override
+  String get crmNotesCommentsDisabledTab =>
+      'برای این نوع یا سطح دسترسی، کامنت غیرفعال است.';
+
+  @override
+  String get crmNotesNoteTypeCodeHelper =>
+      'فقط حروف لاتین، عدد و زیرخط؛ برای استفاده داخلی و گزارش‌ها.';
+
+  @override
+  String get crmNotesNoteTypePreview => 'پیش‌نمایش با زبان فعلی رابط';
+
+  @override
+  String get crmNotesNoteTypeSectionIdentity => 'شناسه';
+
+  @override
+  String get crmNotesNoteTypeSectionTitles => 'عناوین';
+
+  @override
+  String get crmNotesNoteTypeSectionBehavior => 'رفتار';
+
+  @override
+  String get crmNotesCommentInputLabel => 'نظر جدید';
+
+  @override
+  String crmNotesAuditRecentLimit(int count) {
+    return 'نمایش $count رویداد اخیر';
+  }
+
+  @override
+  String get crmNoteAuditCreated => 'ایجاد';
+
+  @override
+  String get crmNoteAuditUpdated => 'ویرایش';
+
+  @override
+  String get crmNoteAuditVisibility => 'تغییر سطح دسترسی';
+
+  @override
+  String get crmNoteAuditAcl => 'تغییر لیست اشتراک';
+
+  @override
+  String get crmNoteAuditSoftDeleted => 'حذف نرم';
+
+  @override
+  String get crmNoteAuditCommentCreated => 'ثبت کامنت';
+
+  @override
+  String get crmNoteAuditCommentDeleted => 'حذف کامنت';
+
+  @override
+  String get crmNoteAuditOther => 'رویداد';
+
+  @override
+  String get crmDeleteIrreversible => 'این عمل قابل بازگشت نیست.';
+
+  @override
+  String get crmDeleteLeadTitle => 'حذف سرنخ';
+
+  @override
+  String crmDeleteLeadMessage(Object name) {
+    return 'سرنخ «$name» حذف شود؟';
+  }
+
+  @override
+  String get crmDeleteActivityTitle => 'حذف فعالیت';
+
+  @override
+  String crmDeleteActivityMessageNamed(Object subject) {
+    return 'فعالیت «$subject» حذف شود؟';
+  }
+
+  @override
+  String get crmDeleteActivityMessageUnnamed => 'این فعالیت حذف شود؟';
+
+  @override
+  String get crmDeleteDealTitle => 'حذف فرصت فروش';
+
+  @override
+  String crmDeleteDealMessage(Object title) {
+    return 'فرصت فروش «$title» حذف شود؟';
+  }
+
+  @override
+  String get crmDeleteProcessTitle => 'حذف فرایند';
+
+  @override
+  String crmDeleteProcessMessage(Object name) {
+    return 'فرایند «$name» حذف شود؟';
+  }
+
+  @override
+  String get crmDeleteStageTitle => 'حذف مرحله';
+
+  @override
+  String crmDeleteStageMessage(Object name) {
+    return 'مرحله «$name» حذف شود؟';
+  }
+
+  @override
+  String get crmLeadFormSubtitle => 'اطلاعات تماس، فانل و پیگیری را مشخص کنید.';
+
+  @override
+  String get crmActivityFormSubtitle =>
+      'فعالیت را به مشتری یا سرنخ وصل کنید و نتیجه را بنویسید.';
+
+  @override
+  String get crmDealFormSubtitle =>
+      'مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.';
+
+  @override
+  String get crmConvertLeadTitle => 'تبدیل به مشتری';
+
+  @override
+  String get crmConvertLeadSubtitle => 'یک شخص جدید در بخش اشخاص ایجاد می‌شود.';
+
+  @override
+  String get crmConvertLeadIntro =>
+      'سرنخ تبدیل می‌شود و رکورد شخص جدید در اشخاص ثبت می‌شود.';
+
+  @override
+  String get crmConvertWithDealLabel => 'همزمان فرصت فروش ایجاد شود';
+
+  @override
+  String get crmConvertNoPipeline => 'پایپلاین فروش فعالی یافت نشد.';
+
+  @override
+  String get crmConvertPipelineLabel => 'پایپلاین فروش';
+
+  @override
+  String get crmConvertStageLabel => 'مرحله';
+
+  @override
+  String get crmConvertDealTitleLabel => 'عنوان فرصت فروش';
+
+  @override
+  String get crmConvertAmountLabel => 'مبلغ (ریال)';
+
+  @override
+  String get crmConvertSubmit => 'تبدیل';
+
+  @override
+  String get crmSectionIdentityContact => 'هویت و تماس';
+
+  @override
+  String get crmSectionFunnel => 'فانل و مرحله';
+
+  @override
+  String get crmSectionAssignmentFollowup => 'تخصیص و یادآور';
+
+  @override
+  String get crmSectionDescription => 'توضیحات';
+
+  @override
+  String get crmSectionActivityLink => 'مشتری یا سرنخ';
+
+  @override
+  String get crmSectionActivityScheduling => 'زمان‌بندی';
+
+  @override
+  String get crmSectionActivityDetails => 'موضوع و شرح';
+
+  @override
+  String get crmSectionDealPipeline => 'پایپلاین و شناسه';
+
+  @override
+  String get crmSectionDealCustomer => 'مشتری و اسناد';
+
+  @override
+  String get crmSectionDealMoney => 'مبلغ، ارز و تاریخ‌ها';
+
+  @override
+  String get crmActivityPickLead => 'جستجو و انتخاب سرنخ';
+
+  @override
+  String get crmActivityClearLead => 'حذف اتصال سرنخ';
+
+  @override
+  String get crmActivityTypeCall => 'تماس';
+
+  @override
+  String get crmActivityTypeEmail => 'ایمیل';
+
+  @override
+  String get crmActivityTypeMeeting => 'جلسه';
+
+  @override
+  String get crmActivityTypeNote => 'یادداشت';
+
+  @override
+  String get crmProcessFormSubtitle =>
+      'کد، نام نمایشی و گزینه‌های پیش‌فرض این فرایند را مشخص کنید.';
+
+  @override
+  String get crmProcessSectionMain => 'تعریف فرایند';
+
+  @override
+  String get crmProcessSectionStages => 'مراحل اولیه (فقط هنگام ایجاد)';
+
+  @override
+  String get inventoryNegativePolicySectionTitle =>
+      'کنترل کسری هنگام قطعی حواله انبار';
+
+  @override
+  String get inventoryNegativePolicyIntro =>
+      'پیش‌فرض سیستم مانع قطعی حوالهٔ خروج می‌شود اگر موجودی کافی نباشد. با گزینه‌های زیر می‌توانید به‌صورت تفکیک‌شده برای کالای فله‌ای یا یونیک استثنا بگذارید. حواله‌های انتقال را می‌توان همیشه سخت‌گیرانه نگه داشت.';
+
+  @override
+  String get inventoryNegativePolicyBulkTitle =>
+      'اجازه خروج با موجودی منفی برای کالای فله‌ای';
+
+  @override
+  String get inventoryNegativePolicyBulkSubtitle =>
+      'کالاهایی که حالت موجودی «فله‌ای» دارند و کنترل موجودی فعال است.';
+
+  @override
+  String get inventoryNegativePolicyUniqueTitle =>
+      'اجازه خروج با موجودی منفی برای کالای یونیک';
+
+  @override
+  String get inventoryNegativePolicyUniqueSubtitle =>
+      'کالاهایی که با سریال/نسخهٔ یونیک ردیابی می‌شوند؛ ریسک ثبت ناسازگار با فیزیک بالاتر است.';
+
+  @override
+  String get inventoryNegativePolicyTransferTitle =>
+      'انتقال بین انبار همیشه نیاز به موجودی کافی';
+
+  @override
+  String get inventoryNegativePolicyTransferSubtitle =>
+      'اگر روشن باشد، حوالهٔ انتقال صرف‌نظر از دو گزینهٔ بالا کنترل کسری کامل دارد.';
 }

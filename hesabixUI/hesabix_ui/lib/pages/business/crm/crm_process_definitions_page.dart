@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 
 /// صفحه لیست فرایندهای CRM (فانل سرنخ، pipeline فروش و ...)
@@ -239,16 +243,11 @@ class _CrmProcessDefinitionsPageState extends State<CrmProcessDefinitionsPage> {
 
   Future<void> _onDelete(int? id, String name) async {
     if (id == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف فرایند'),
-        content: Text('آیا از حذف فرایند «$name» اطمینان دارید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    final ok = await showCrmDeleteConfirmDialog(
+      context,
+      title: t.crmDeleteProcessTitle,
+      message: t.crmDeleteProcessMessage(name),
     );
     if (ok != true || !mounted) return;
     try {
@@ -346,114 +345,129 @@ class _ProcessDefinitionFormDialogState extends State<_ProcessDefinitionFormDial
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.initial != null;
-    return AlertDialog(
-      title: Text(isEdit ? 'ویرایش فرایند' : 'فرایند جدید'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!isEdit)
-                DropdownButtonFormField<String>(
-                  value: _processType,
-                  decoration: const InputDecoration(labelText: 'نوع فرایند'),
-                  items: const [
-                    DropdownMenuItem(value: 'lead_funnel', child: Text('فانل سرنخ')),
-                    DropdownMenuItem(value: 'sales_pipeline', child: Text('پایپلاین فروش')),
-                    DropdownMenuItem(value: 'activity_type', child: Text('نوع فعالیت')),
-                    DropdownMenuItem(value: 'lead_source', child: Text('منبع سرنخ')),
-                  ],
-                  onChanged: (v) => setState(() => _processType = v ?? _processType),
-                ),
-              if (!isEdit) const SizedBox(height: 12),
-              TextFormField(
-                controller: _codeController,
-                decoration: const InputDecoration(labelText: 'کد'),
-                readOnly: isEdit,
-                validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'نام'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'توضیحات'),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              CheckboxListTile(
-                title: const Text('فعال'),
-                value: _isActive,
-                onChanged: (v) => setState(() => _isActive = v ?? true),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              CheckboxListTile(
-                title: const Text('پیش‌فرض برای این نوع'),
-                value: _isDefault,
-                onChanged: (v) => setState(() => _isDefault = v ?? false),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              if (!isEdit) ...[
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('مراحل اولیه', style: Theme.of(context).textTheme.titleSmall),
-                    TextButton.icon(
-                      onPressed: _addStageInput,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('افزودن مرحله'),
-                    ),
-                  ],
-                ),
-                ...List.generate(_stageInputs.length, (i) {
-                  final s = _stageInputs[i];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: s.code,
-                            decoration: const InputDecoration(labelText: 'کد', isDense: true),
-                            textCapitalization: TextCapitalization.none,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: s.name,
-                            decoration: const InputDecoration(labelText: 'نام', isDense: true),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () => _removeStageInput(i),
-                          tooltip: 'حذف',
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ],
-          ),
-        ),
-      ),
+    final t = AppLocalizations.of(context);
+    return CrmResponsiveDialog(
+      title: isEdit ? 'ویرایش فرایند' : 'فرایند جدید',
+      subtitle: t.crmProcessFormSubtitle,
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(), child: const Text('انصراف')),
+        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(), child: Text(t.cancel)),
         FilledButton(
           onPressed: _saving ? null : _save,
           child: _saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('ذخیره'),
         ),
       ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CrmSectionCard(
+              title: t.crmProcessSectionMain,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!isEdit)
+                    DropdownButtonFormField<String>(
+                      value: _processType,
+                      decoration: const InputDecoration(labelText: 'نوع فرایند', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'lead_funnel', child: Text('فانل سرنخ')),
+                        DropdownMenuItem(value: 'sales_pipeline', child: Text('پایپلاین فروش')),
+                        DropdownMenuItem(value: 'activity_type', child: Text('نوع فعالیت')),
+                        DropdownMenuItem(value: 'lead_source', child: Text('منبع سرنخ')),
+                      ],
+                      onChanged: (v) => setState(() => _processType = v ?? _processType),
+                    ),
+                  if (!isEdit) const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _codeController,
+                    decoration: const InputDecoration(labelText: 'کد', border: OutlineInputBorder()),
+                    readOnly: isEdit,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'نام', border: OutlineInputBorder()),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _descController,
+                    decoration: const InputDecoration(labelText: 'توضیحات', border: OutlineInputBorder()),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    title: const Text('فعال'),
+                    value: _isActive,
+                    onChanged: (v) => setState(() => _isActive = v ?? true),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: const Text('پیش‌فرض برای این نوع'),
+                    value: _isDefault,
+                    onChanged: (v) => setState(() => _isDefault = v ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            if (!isEdit) ...[
+              const SizedBox(height: 16),
+              CrmSectionCard(
+                title: t.crmProcessSectionStages,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton.icon(
+                        onPressed: _addStageInput,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('افزودن مرحله'),
+                      ),
+                    ),
+                    ...List.generate(_stageInputs.length, (i) {
+                      final s = _stageInputs[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: s.code,
+                                decoration: const InputDecoration(labelText: 'کد', isDense: true, border: OutlineInputBorder()),
+                                textCapitalization: TextCapitalization.none,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: s.name,
+                                decoration: const InputDecoration(labelText: 'نام', isDense: true, border: OutlineInputBorder()),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline),
+                              onPressed: () => _removeStageInput(i),
+                              tooltip: 'حذف',
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -618,16 +632,11 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
     final id = stage['id'] as int?;
     if (id == null) return;
     final stageName = stage['name']?.toString() ?? '';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف مرحله'),
-        content: Text('آیا از حذف مرحله «$stageName» اطمینان دارید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    final ok = await showCrmDeleteConfirmDialog(
+      context,
+      title: t.crmDeleteStageTitle,
+      message: t.crmDeleteStageMessage(stageName),
     );
     if (ok != true || !mounted) return;
     try {

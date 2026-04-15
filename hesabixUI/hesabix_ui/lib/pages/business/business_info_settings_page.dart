@@ -65,6 +65,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
+  // سیاست موجودی منفی هنگام قطعی حواله
+  bool _allowNegativeInventoryForBulk = false;
+  bool _allowNegativeInventoryForUnique = false;
+  bool _warehouseTransferRequirePositiveStock = true;
+
   // ارز پیش‌فرض
   int? _selectedDefaultCurrencyId;
   List<Map<String, dynamic>> _currencies = [];
@@ -140,6 +145,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
       _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
+      _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
+      _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
+      _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
 
       // بررسی اینکه آیا کسب‌وکار ارز پیش‌فرض دارد یا نه
       if (resp.defaultCurrency == null) {
@@ -269,6 +277,15 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
       payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
+    }
+    if (_allowNegativeInventoryForBulk != orig.allowNegativeInventoryForBulk) {
+      payload['allow_negative_inventory_for_bulk'] = _allowNegativeInventoryForBulk;
+    }
+    if (_allowNegativeInventoryForUnique != orig.allowNegativeInventoryForUnique) {
+      payload['allow_negative_inventory_for_unique'] = _allowNegativeInventoryForUnique;
+    }
+    if (_warehouseTransferRequirePositiveStock != orig.warehouseTransferRequirePositiveStock) {
+      payload['warehouse_transfer_require_positive_stock'] = _warehouseTransferRequirePositiveStock;
     }
 
     // ارز پیش‌فرض (فقط اگر کسب‌وکار ارز پیش‌فرض ندارد)
@@ -922,6 +939,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildInvoiceWarehouseReleaseSettings(cs),
 
+              const SizedBox(height: 24),
+              _buildSectionTitle(AppLocalizations.of(context).inventoryNegativePolicySectionTitle, cs),
+              const SizedBox(height: 8),
+              _buildInventoryNegativePolicySettings(cs),
+
             ],
           ),
         ),
@@ -1196,6 +1218,43 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       child: Text('قیمت تمام‌شده ردیف (خرید) / در فروش همان قیمت واحد'),
     ),
   ];
+
+  Widget _buildInventoryNegativePolicySettings(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.inventoryNegativePolicyIntro,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              title: Text(t.inventoryNegativePolicyBulkTitle),
+              subtitle: Text(t.inventoryNegativePolicyBulkSubtitle),
+              value: _allowNegativeInventoryForBulk,
+              onChanged: (v) => setState(() => _allowNegativeInventoryForBulk = v),
+            ),
+            SwitchListTile(
+              title: Text(t.inventoryNegativePolicyUniqueTitle),
+              subtitle: Text(t.inventoryNegativePolicyUniqueSubtitle),
+              value: _allowNegativeInventoryForUnique,
+              onChanged: (v) => setState(() => _allowNegativeInventoryForUnique = v),
+            ),
+            SwitchListTile(
+              title: Text(t.inventoryNegativePolicyTransferTitle),
+              subtitle: Text(t.inventoryNegativePolicyTransferSubtitle),
+              value: _warehouseTransferRequirePositiveStock,
+              onChanged: (v) => setState(() => _warehouseTransferRequirePositiveStock = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildInvoiceWarehouseReleaseSettings(ColorScheme cs) {
     final t = AppLocalizations.of(context);

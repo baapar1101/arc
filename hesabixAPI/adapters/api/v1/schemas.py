@@ -640,6 +640,18 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="حواله پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)",
 	)
+	allow_negative_inventory_for_bulk: Optional[bool] = Field(
+		default=None,
+		description="اجازه قطعی حواله با کسری برای کالاهای فله‌ای (غیر یونیک) با کنترل موجودی",
+	)
+	allow_negative_inventory_for_unique: Optional[bool] = Field(
+		default=None,
+		description="اجازه قطعی حواله با کسری برای کالاهای یونیک با کنترل موجودی",
+	)
+	warehouse_transfer_require_positive_stock: Optional[bool] = Field(
+		default=None,
+		description="اگر true باشد، حواله انتقال همیشه کنترل کسری کامل دارد",
+	)
 
 	@validator("invoice_warehouse_release_mode")
 	def _validate_invoice_warehouse_release_mode(cls, v):  # noqa: N805
@@ -699,6 +711,18 @@ class BusinessResponse(BaseModel):
 	invoice_warehouse_release_mode: str = Field(
 		default="draft",
 		description="حواله پس از ثبت فاکتور: none، draft، posted",
+	)
+	allow_negative_inventory_for_bulk: bool = Field(
+		default=False,
+		description="خروج با موجودی منفی برای کالاهای فله‌ای هنگام قطعی حواله",
+	)
+	allow_negative_inventory_for_unique: bool = Field(
+		default=False,
+		description="خروج با موجودی منفی برای کالاهای یونیک هنگام قطعی حواله",
+	)
+	warehouse_transfer_require_positive_stock: bool = Field(
+		default=True,
+		description="انتقال بین انبار همیشه نیاز به موجودی کافی",
 	)
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")

@@ -439,23 +439,37 @@ def create_manual_warehouse_document(
 	# ادغام با extra_info موجود
 	extra_info = {**existing_extra_info, **delivery_fields}
 	
-	# ایجاد حواله
-	wh = WarehouseDocument(
-		business_id=business_id,
-		fiscal_year_id=fy.id,
-		code=code,
-		document_date=document_date,
-		status="draft",
-		doc_type=doc_type,
-		warehouse_id_from=int(warehouse_id_from) if warehouse_id_from else None,
-		warehouse_id_to=int(warehouse_id_to) if warehouse_id_to else None,
-		source_type="manual",
-		source_document_id=None,
-		created_by_user_id=user_id,
-		extra_info=extra_info if extra_info else None,
-	)
-	db.add(wh)
-	db.flush()
+	# ایجاد حواله — تولید code و INSERT در برابر برخورد unique روی warehouse_documents.code
+	wh: Optional[WarehouseDocument] = None
+	for attempt in range(10):
+		code = _build_wh_code("WH")
+		try:
+			with db.begin_nested():
+				wh = WarehouseDocument(
+					business_id=business_id,
+					fiscal_year_id=fy.id,
+					code=code,
+					document_date=document_date,
+					status="draft",
+					doc_type=doc_type,
+					warehouse_id_from=int(warehouse_id_from) if warehouse_id_from else None,
+					warehouse_id_to=int(warehouse_id_to) if warehouse_id_to else None,
+					source_type="manual",
+					source_document_id=None,
+					created_by_user_id=user_id,
+					extra_info=extra_info if extra_info else None,
+				)
+				db.add(wh)
+				db.flush()
+			break
+		except IntegrityError as e:
+			err_msg = str(getattr(e, "orig", e))
+			if ("Duplicate entry" in err_msg) and ("warehouse_documents.code" in err_msg) and (attempt < 9):
+				continue
+			raise
+
+	if wh is None:
+		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
 	
 	# ایجاد خطوط
 	for i, ln in enumerate(lines_data, start=1):
@@ -1564,7 +1578,12 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 	اگر doc_type='transfer' باشد، یک سند حسابداری هم ایجاد می‌شود.
 	توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود.
 	"""
-	from app.services.invoice_service import _ensure_stock_sufficient, _get_current_fiscal_year
+	from app.services.invoice_service import (
+		_ensure_stock_sufficient,
+		_get_current_fiscal_year,
+		filter_outgoing_lines_for_stock_enforcement,
+	)
+	from adapters.db.models.business import Business
 	from adapters.db.models.document import Document
 	from adapters.db.models.document_line import DocumentLine
 	from adapters.db.models.currency import Currency
@@ -1604,19 +1623,33 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 					},
 				})
 	
-	# کنترل کسری موجودی با استفاده از تابع موجود
+	# کنترل کسری موجودی (با رعایت سیاست کسب‌وکار: فله / یونیک / انتقال)
 	if outgoing_lines:
-		try:
-			_ensure_stock_sufficient(
-				db,
-				wh.business_id,
-				wh.document_date,
-				outgoing_lines,
-				exclude_document_id=None,  # این حواله هنوز پست نشده
-			)
-		except ApiError as e:
-			# خطای کسری موجودی را به صورت واضح نمایش بده
-			raise ApiError("INSUFFICIENT_STOCK", str(e), http_status=409)
+		biz = db.query(Business).filter(Business.id == int(wh.business_id)).first()
+		allow_bulk = bool(getattr(biz, "allow_negative_inventory_for_bulk", False)) if biz else False
+		allow_unique = bool(getattr(biz, "allow_negative_inventory_for_unique", False)) if biz else False
+		transfer_strict = bool(getattr(biz, "warehouse_transfer_require_positive_stock", True)) if biz else True
+		lines_to_check = filter_outgoing_lines_for_stock_enforcement(
+			db,
+			int(wh.business_id),
+			outgoing_lines,
+			allow_negative_for_bulk=allow_bulk,
+			allow_negative_for_unique=allow_unique,
+			warehouse_doc_type=getattr(wh, "doc_type", None),
+			transfer_require_positive_stock=transfer_strict,
+		)
+		if lines_to_check:
+			try:
+				_ensure_stock_sufficient(
+					db,
+					wh.business_id,
+					wh.document_date,
+					lines_to_check,
+					exclude_document_id=None,  # این حواله هنوز پست نشده
+				)
+			except ApiError as e:
+				# خطای کسری موجودی را به صورت واضح نمایش بده
+				raise ApiError("INSUFFICIENT_STOCK", str(e), http_status=409)
 
 	# برای حواله‌های transfer، به‌روزرسانی instance های کالاهای یونیک
 	if wh.doc_type == "transfer":

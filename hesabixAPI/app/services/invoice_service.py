@@ -475,6 +475,71 @@ def _ensure_stock_sufficient(
             )
 
 
+def _product_inventory_mode_is_unique(inventory_mode: Optional[str]) -> bool:
+    return (inventory_mode or "bulk").strip().lower() == "unique"
+
+
+def filter_outgoing_lines_for_stock_enforcement(
+    db: Session,
+    business_id: int,
+    outgoing_lines: List[Dict[str, Any]],
+    *,
+    allow_negative_for_bulk: bool,
+    allow_negative_for_unique: bool,
+    warehouse_doc_type: Optional[str],
+    transfer_require_positive_stock: bool,
+) -> List[Dict[str, Any]]:
+    """
+    خطوطی که باید با _ensure_stock_sufficient کنترل شوند.
+    اگر transfer_require_positive_stock و نوع سند transfer باشد، همه خطوط برمی‌گردد (کنترل کامل).
+    در غیر این صورت، خطوط کالاهایی که سیاست کسب‌وکار اجازه منفی می‌دهد از لیست حذف می‌شوند.
+    """
+    if not outgoing_lines:
+        return []
+    doc_type = (warehouse_doc_type or "").strip().lower()
+    if doc_type == "transfer" and transfer_require_positive_stock:
+        return list(outgoing_lines)
+
+    product_ids: List[int] = []
+    for ln in outgoing_lines:
+        pid = ln.get("product_id")
+        if pid is not None:
+            try:
+                product_ids.append(int(pid))
+            except (TypeError, ValueError):
+                continue
+    if not product_ids:
+        return list(outgoing_lines)
+
+    rows = (
+        db.query(Product.id, Product.inventory_mode)
+        .filter(Product.business_id == int(business_id), Product.id.in_(list(set(product_ids))))
+        .all()
+    )
+    mode_map: Dict[int, str] = {int(r.id): (r.inventory_mode or "bulk") for r in rows}
+
+    filtered: List[Dict[str, Any]] = []
+    for ln in outgoing_lines:
+        pid_raw = ln.get("product_id")
+        if pid_raw is None:
+            filtered.append(ln)
+            continue
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            filtered.append(ln)
+            continue
+        mode = mode_map.get(pid, "bulk")
+        if _product_inventory_mode_is_unique(mode):
+            if allow_negative_for_unique:
+                continue
+        else:
+            if allow_negative_for_bulk:
+                continue
+        filtered.append(ln)
+    return filtered
+
+
 def _calculate_fifo_cogs_for_outgoing(
     db: Session,
     business_id: int,

@@ -6,8 +6,12 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -322,16 +326,11 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
   }
 
   Future<void> _onDelete(int id, String subject) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف فعالیت'),
-        content: Text('آیا از حذف این فعالیت${subject.isNotEmpty ? ' «$subject»' : ''} اطمینان دارید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    final ok = await showCrmDeleteConfirmDialog(
+      context,
+      title: t.crmDeleteActivityTitle,
+      message: subject.trim().isNotEmpty ? t.crmDeleteActivityMessageNamed(subject.trim()) : t.crmDeleteActivityMessageUnnamed,
     );
     if (ok != true || !mounted) return;
     try {
@@ -380,7 +379,8 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   late TextEditingController _subjectController;
   late TextEditingController _descController;
   late TextEditingController _codeController;
-  late TextEditingController _leadIdController;
+  int? _leadId;
+  String _leadLabel = '';
   bool _codeAuto = true;
   String _activityType = 'call';
   DateTime _activityDate = DateTime.now();
@@ -390,13 +390,6 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   bool _saving = false;
   bool _loadingSuggest = false;
 
-  static const Map<String, String> _activityTypes = {
-    'call': 'تماس',
-    'email': 'ایمیل',
-    'meeting': 'جلسه',
-    'note': 'یادداشت',
-  };
-
   @override
   void initState() {
     super.initState();
@@ -405,8 +398,15 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _codeController = TextEditingController(text: i['code']?.toString() ?? '');
     _codeAuto = i['id'] == null;
     _descController = TextEditingController(text: i['description']?.toString() ?? '');
-    final lid = (i['lead_id'] as num?)?.toInt();
-    _leadIdController = TextEditingController(text: lid != null ? '$lid' : '');
+    _leadId = (i['lead_id'] as num?)?.toInt();
+    final lc = i['lead_code']?.toString();
+    final ln = i['lead_name']?.toString();
+    if (_leadId != null) {
+      final parts = <String>[];
+      if (lc != null && lc.isNotEmpty) parts.add(lc);
+      if (ln != null && ln.isNotEmpty) parts.add(ln);
+      _leadLabel = parts.isEmpty ? 'ID: $_leadId' : parts.join(' — ');
+    }
     _activityType = i['activity_type']?.toString() ?? 'call';
     final pid = (i['person_id'] as num?)?.toInt();
     _personId = pid;
@@ -422,16 +422,56 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _subjectController.dispose();
     _codeController.dispose();
     _descController.dispose();
-    _leadIdController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickLead() async {
+    if ((widget.initial?['id']) != null) return;
+    final m = await showCrmLeadPickerDialog(context, businessId: widget.businessId);
+    if (m != null && mounted) {
+      setState(() {
+        _leadId = (m['id'] as num?)?.toInt();
+        final name = (m['name'] ?? '').toString();
+        final code = (m['code'] ?? '').toString();
+        _leadLabel = [code, name].where((s) => s.isNotEmpty).join(' — ');
+      });
+    }
+  }
+
+  void _clearLead() {
+    setState(() {
+      _leadId = null;
+      _leadLabel = '';
+    });
+  }
+
+  Future<void> _pickDateTimeFull() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _activityDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    final tod = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_activityDate),
+    );
+    if (tod != null && mounted) {
+      setState(() => _activityDate = DateTime(picked.year, picked.month, picked.day, tod.hour, tod.minute));
+    } else if (mounted) {
+      setState(() => _activityDate = DateTime(picked.year, picked.month, picked.day, _activityDate.hour, _activityDate.minute));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final isEdit = (widget.initial?['id']) != null;
     final cal = widget.calendarController;
     return CrmResponsiveDialog(
       title: isEdit ? 'ویرایش فعالیت' : 'ثبت فعالیت',
+      subtitle: t.crmActivityFormSubtitle,
       actions: [
         TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(), child: const Text('انصراف')),
         FilledButton(
@@ -446,7 +486,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           if (isEdit)
             TextFormField(
               controller: _codeController,
-              decoration: const InputDecoration(labelText: 'کد'),
+              decoration: const InputDecoration(labelText: 'کد', border: OutlineInputBorder()),
               textCapitalization: TextCapitalization.characters,
             ),
           if (isEdit) const SizedBox(height: 12),
@@ -461,109 +501,154 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
             if (!_codeAuto) ...[
               TextFormField(
                 controller: _codeController,
-                decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: A-001'),
+                decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: A-001', border: OutlineInputBorder()),
                 textCapitalization: TextCapitalization.characters,
               ),
               const SizedBox(height: 12),
             ],
           ],
-          PersonComboboxWidget(
-            businessId: widget.businessId,
-            label: 'مشتری (در صورت ثبت برای سرنخ می‌توان خالی بماند)',
-            hintText: 'جست‌وجو و انتخاب مشتری',
-            isRequired: false,
-            personTypes: [PersonType.customer.persianName],
-            selectedPerson: _selectedPerson,
-            onChanged: (p) {
-              setState(() {
-                _selectedPerson = p;
-                _personId = p?.id;
-              });
-            },
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _leadIdController,
-            enabled: !isEdit,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'شناسه سرنخ (اختیاری)',
-              helperText: 'برای تماس قبل از تبدیل به مشتری؛ در غیر این صورت مشتری را انتخاب کنید',
-            ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-              value: _activityType,
-              decoration: const InputDecoration(labelText: 'نوع فعالیت'),
-              items: _activityTypes.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-              onChanged: (v) => setState(() => _activityType = v ?? _activityType),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _subjectController,
-              decoration: const InputDecoration(labelText: 'موضوع'),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          CrmSectionCard(
+            title: t.crmSectionActivityLink,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('توضیحات', style: Theme.of(context).textTheme.labelLarge),
-                if (_personId != null)
-                  TextButton.icon(
-                    onPressed: _loadingSuggest ? null : _suggestActivityText,
-                    icon: _loadingSuggest ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 16),
-                    label: Text(_loadingSuggest ? '...' : 'پیشنهاد AI'),
+                PersonComboboxWidget(
+                  businessId: widget.businessId,
+                  label: 'مشتری (برای سرنخ می‌توان خالی بماند)',
+                  hintText: 'جست‌وجو و انتخاب مشتری',
+                  isRequired: false,
+                  personTypes: [PersonType.customer.persianName],
+                  selectedPerson: _selectedPerson,
+                  onChanged: (p) {
+                    setState(() {
+                      _selectedPerson = p;
+                      _personId = p?.id;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                if (!isEdit) ...[
+                  if (_leadId != null)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                      title: Text(t.crmActivityPickLead, style: Theme.of(context).textTheme.labelMedium),
+                      subtitle: Text(_leadLabel, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      trailing: IconButton(
+                        tooltip: t.crmActivityClearLead,
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clearLead,
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: _pickLead,
+                      icon: const Icon(Icons.person_search_outlined),
+                      label: Text(t.crmActivityPickLead),
+                    ),
+                ] else if (_leadLabel.isNotEmpty)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t.crmActivityPickLead, style: Theme.of(context).textTheme.labelMedium),
+                    subtitle: Text(_leadLabel),
                   ),
               ],
             ),
-            const SizedBox(height: 4),
-            TextField(
-              controller: _descController,
-              decoration: const InputDecoration(labelText: 'توضیحات', alignLabelWithHint: true),
-              maxLines: 3,
+          ),
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: t.crmSectionActivityDetails,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(value: 'call', label: Text(t.crmActivityTypeCall), icon: const Icon(Icons.phone_outlined, size: 18)),
+                      ButtonSegment(value: 'email', label: Text(t.crmActivityTypeEmail), icon: const Icon(Icons.email_outlined, size: 18)),
+                      ButtonSegment(value: 'meeting', label: Text(t.crmActivityTypeMeeting), icon: const Icon(Icons.event_outlined, size: 18)),
+                      ButtonSegment(value: 'note', label: Text(t.crmActivityTypeNote), icon: const Icon(Icons.sticky_note_2_outlined, size: 18)),
+                    ],
+                    selected: {_activityType},
+                    emptySelectionAllowed: false,
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) {
+                      if (s.isEmpty) return;
+                      setState(() => _activityType = s.first);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _subjectController,
+                  decoration: const InputDecoration(labelText: 'موضوع', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('توضیحات', style: Theme.of(context).textTheme.labelLarge),
+                    if (_personId != null)
+                      TextButton.icon(
+                        onPressed: _loadingSuggest ? null : _suggestActivityText,
+                        icon: _loadingSuggest ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 16),
+                        label: Text(_loadingSuggest ? '...' : 'پیشنهاد AI'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _descController,
+                  decoration: const InputDecoration(labelText: 'توضیحات', alignLabelWithHint: true, border: OutlineInputBorder()),
+                  maxLines: 3,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            if (cal != null) ...[
-              DateInputField(
-                calendarController: cal,
-                labelText: 'تاریخ فعالیت',
-                value: DateTime(_activityDate.year, _activityDate.month, _activityDate.day),
-                onChanged: (d) {
-                  if (d != null) setState(() => _activityDate = DateTime(d.year, d.month, d.day, _activityDate.hour, _activityDate.minute));
-                },
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                title: Text('ساعت: ${DateFormat('HH:mm').format(_activityDate)}'),
-                trailing: TextButton(
-                  onPressed: () async {
-                    final t = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(_activityDate),
-                    );
-                    if (t != null) setState(() => _activityDate = DateTime(_activityDate.year, _activityDate.month, _activityDate.day, t.hour, t.minute));
-                  },
-                  child: const Text('تغییر'),
-                ),
-              ),
-            ] else
-              ListTile(
-                title: Text('تاریخ و زمان: ${DateFormat('y/MM/dd HH:mm').format(_activityDate)}'),
-                trailing: TextButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _activityDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) setState(() => _activityDate = DateTime(picked.year, picked.month, picked.day, _activityDate.hour, _activityDate.minute));
-                  },
-                  child: const Text('تغییر'),
-                ),
-              ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: t.crmSectionActivityScheduling,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (cal != null) ...[
+                  DateInputField(
+                    calendarController: cal,
+                    labelText: 'تاریخ فعالیت',
+                    value: DateTime(_activityDate.year, _activityDate.month, _activityDate.day),
+                    onChanged: (d) {
+                      if (d != null) setState(() => _activityDate = DateTime(d.year, d.month, d.day, _activityDate.hour, _activityDate.minute));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final tod = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(_activityDate),
+                      );
+                      if (tod != null && mounted) {
+                        setState(() => _activityDate = DateTime(_activityDate.year, _activityDate.month, _activityDate.day, tod.hour, tod.minute));
+                      }
+                    },
+                    icon: const Icon(Icons.schedule),
+                    label: Text('${t.crmNotesPickDateTime} · ${DateFormat('HH:mm').format(_activityDate)}'),
+                  ),
+                ] else ...[
+                  Text(DateFormat('y/MM/dd HH:mm').format(_activityDate), style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickDateTimeFull,
+                    icon: const Icon(Icons.edit_calendar_outlined),
+                    label: Text(t.crmNotesPickDateTime),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -593,15 +678,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   Future<void> _save() async {
     final isEdit = (widget.initial?['id']) != null;
     final personId = _selectedPerson?.id ?? _personId;
-    final leadRaw = _leadIdController.text.trim();
-    int? leadId;
-    if (leadRaw.isNotEmpty) {
-      leadId = int.tryParse(leadRaw);
-      if (leadId == null || leadId <= 0) {
-        SnackBarHelper.show(context, message: 'شناسه سرنخ نامعتبر است', isError: true);
-        return;
-      }
-    }
+    final leadId = _leadId;
     if (!isEdit && personId == null && leadId == null) {
       SnackBarHelper.show(context, message: 'یکی از مشتری یا شناسه سرنخ لازم است', isError: true);
       return;
@@ -644,6 +721,4 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
-  bool get isEdit => (widget.initial?['id']) != null;
 }

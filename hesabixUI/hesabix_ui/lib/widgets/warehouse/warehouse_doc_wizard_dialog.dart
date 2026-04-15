@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
@@ -17,12 +16,12 @@ class WarehouseDocWizardResult {
   final String? sourceLabel;
 
   const WarehouseDocWizardResult.manual()
-      : isManual = true,
-        sourceKey = null,
-        docType = null,
-        invoiceId = null,
-        invoiceCode = null,
-        sourceLabel = null;
+    : isManual = true,
+      sourceKey = null,
+      docType = null,
+      invoiceId = null,
+      invoiceCode = null,
+      sourceLabel = null;
 
   const WarehouseDocWizardResult.invoice({
     required this.sourceKey,
@@ -54,7 +53,8 @@ const List<WarehouseDocSourceOption> _sourceOptions = [
   WarehouseDocSourceOption(
     key: 'manual',
     title: 'حواله دستی',
-    description: 'تعریف حواله بدون وابستگی به فاکتور (ورود، خروج، انتقال و ...)',
+    description:
+        'تعریف حواله بدون وابستگی به فاکتور (ورود، خروج، انتقال و ...)',
     icon: Icons.edit_note,
   ),
   WarehouseDocSourceOption(
@@ -121,7 +121,8 @@ class WarehouseDocWizardDialog extends StatefulWidget {
   });
 
   @override
-  State<WarehouseDocWizardDialog> createState() => _WarehouseDocWizardDialogState();
+  State<WarehouseDocWizardDialog> createState() =>
+      _WarehouseDocWizardDialogState();
 }
 
 class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
@@ -168,22 +169,29 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
   void _confirmInvoiceSelection() {
     debugPrint('_confirmInvoiceSelection called');
     debugPrint('_selectedOption: ${_selectedOption?.key}');
-    debugPrint('_selectedInvoice: ${_selectedInvoice?.code} (ID: ${_selectedInvoice?.invoiceId})');
-    
+    debugPrint(
+      '_selectedInvoice: ${_selectedInvoice?.code} (ID: ${_selectedInvoice?.invoiceId})',
+    );
+
     if (_selectedOption == null || _selectedInvoice == null) {
       debugPrint('Cannot confirm: _selectedOption or _selectedInvoice is null');
       return;
     }
-    
+
     final result = WarehouseDocWizardResult.invoice(
       sourceKey: _selectedOption!.key,
-      docType: _selectedOption!.docType ?? _selectedInvoice!.warehouseDocTypeHint ?? 'issue',
+      docType:
+          _selectedOption!.docType ??
+          _selectedInvoice!.warehouseDocTypeHint ??
+          'issue',
       invoiceId: _selectedInvoice!.invoiceId,
       invoiceCode: _selectedInvoice!.code,
       sourceLabel: _selectedOption!.title,
     );
-    
-    debugPrint('Returning result: invoiceId=${result.invoiceId}, code=${result.invoiceCode}');
+
+    debugPrint(
+      'Returning result: invoiceId=${result.invoiceId}, code=${result.invoiceCode}',
+    );
     Navigator.of(context).pop(result);
   }
 
@@ -215,23 +223,28 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
     }
   }
 
-  Widget _buildSourceStep() {
+  Widget _buildSourceStep({required bool singleColumnCards}) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = MediaQuery.of(context).size.width;
+        final screenWidth = MediaQuery.sizeOf(context).width;
         final isMobile = screenWidth < 600;
         final isTablet = screenWidth >= 600 && screenWidth < 1024;
-        final cardWidth = isMobile
+        final cardWidth = singleColumnCards
+            ? constraints.maxWidth
+            : isMobile
             ? (constraints.maxWidth - 24) / 2
             : isTablet
-                ? (constraints.maxWidth - 36) / 3
-                : 210.0;
+            ? (constraints.maxWidth - 36) / 3
+            : 210.0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('ابتدا مشخص کنید این حواله برای چه فرآیندی است:'),
+            Text(
+              'ابتدا مشخص کنید این حواله برای چه فرآیندی است:',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -247,26 +260,35 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey.shade300,
                         width: selected ? 2 : 1,
                       ),
-                      color: selected ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4) : Colors.white,
+                      color: selected
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer.withOpacity(0.4)
+                          : Colors.white,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(option.icon, color: Theme.of(context).colorScheme.primary),
+                        Icon(
+                          option.icon,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           option.title,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           option.description,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black87),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.black87),
                         ),
                       ],
                     ),
@@ -280,13 +302,115 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
     );
   }
 
-  Widget _buildInvoiceStep() {
+  Widget _buildInvoiceSearchTable() {
+    final isJalali = widget.calendarController?.isJalali ?? false;
     if (_selectedOption == null || _selectedOption!.isManual) {
       return const SizedBox.shrink();
     }
+    return DataTableWidget<Map<String, dynamic>>(
+      key: ValueKey('${_selectedOption?.key}_$_includeCompleted'),
+      config: DataTableConfig<Map<String, dynamic>>(
+        endpoint:
+            '/api/v1/warehouse-docs/business/${widget.businessId}/sources/invoices/search',
+        title: null,
+        showSearch: true,
+        showFilters: false,
+        showPagination: true,
+        showColumnSearch: false,
+        showRefreshButton: false,
+        showClearFiltersButton: false,
+        showBackButton: false,
+        showTableIcon: false,
+        enableRowSelection: false,
+        enableMultiRowSelection: false,
+        searchFields: ['code'],
+        columns: [
+          TextColumn('code', 'کد فاکتور', width: ColumnWidth.medium),
+          TextColumn(
+            'person_name',
+            'طرف حساب',
+            width: ColumnWidth.medium,
+            formatter: (item) =>
+                item['person_name']?.toString() ?? 'بدون طرف حساب',
+          ),
+          DateColumn(
+            'document_date',
+            'تاریخ',
+            width: ColumnWidth.medium,
+            formatter: (item) {
+              final dateStr = item['document_date']?.toString();
+              if (dateStr == null || dateStr.isEmpty) return null;
+              final date = DateTime.tryParse(dateStr);
+              if (date == null) return null;
+              return HesabixDateUtils.formatForDisplay(date, isJalali);
+            },
+          ),
+          NumberColumn(
+            'net_amount',
+            'مبلغ',
+            width: ColumnWidth.medium,
+            decimalPlaces: 0,
+            formatter: (item) {
+              final amount = item['net_amount'];
+              if (amount == null) return null;
+              return formatWithThousands(amount, decimalPlaces: 0);
+            },
+          ),
+          CustomColumn(
+            'warehouse_state',
+            'وضعیت',
+            width: ColumnWidth.small,
+            builder: (item, index) {
+              final state = item['warehouse_state']?.toString() ?? 'missing';
+              return Chip(
+                label: Text(_stateLabel(state)),
+                backgroundColor: _stateColor(context, state).withOpacity(0.15),
+                labelStyle: TextStyle(
+                  color: _stateColor(context, state),
+                  fontSize: 12,
+                ),
+                visualDensity: VisualDensity.compact,
+              );
+            },
+          ),
+        ],
+        additionalParams: {
+          'invoice_type': _selectedOption!.key,
+          if (_includeCompleted) 'include_completed': true,
+        },
+        rowColorBuilder: (item, index) {
+          try {
+            final invoice = WarehouseInvoiceSource.fromJson(item);
+            if (_selectedInvoice?.invoiceId == invoice.invoiceId) {
+              return Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withOpacity(0.3);
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+          return null;
+        },
+        onRowTap: (item) {
+          _selectInvoice(item);
+        },
+        onRowDoubleTap: (item) {
+          _selectInvoice(item);
+          if (_selectedInvoice != null && _selectedOption != null) {
+            Future.microtask(() => _confirmInvoiceSelection());
+          }
+        },
+        emptyStateMessage: 'فاکتوری مطابق فیلتر یافت نشد',
+      ),
+      fromJson: (json) => json,
+      calendarController: widget.calendarController,
+    );
+  }
 
-    final isJalali = widget.calendarController?.isJalali ?? false;
-
+  Widget _buildInvoiceStepHeader() {
+    if (_selectedOption == null || _selectedOption!.isManual) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -306,108 +430,81 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
           },
         ),
         const SizedBox(height: 8),
-        Expanded(
-          child: DataTableWidget<Map<String, dynamic>>(
-            key: ValueKey('${_selectedOption?.key}_$_includeCompleted'),
-            config: DataTableConfig<Map<String, dynamic>>(
-              endpoint: '/api/v1/warehouse-docs/business/${widget.businessId}/sources/invoices/search',
-              title: null,
-              showSearch: true,
-              showFilters: false,
-              showPagination: true,
-              showColumnSearch: false,
-              showRefreshButton: false,
-              showClearFiltersButton: false,
-              showBackButton: false,
-              showTableIcon: false,
-              enableRowSelection: false,
-              enableMultiRowSelection: false,
-              searchFields: ['code'],
-              columns: [
-                TextColumn(
-                  'code',
-                  'کد فاکتور',
-                  width: ColumnWidth.medium,
-                ),
-                TextColumn(
-                  'person_name',
-                  'طرف حساب',
-                  width: ColumnWidth.medium,
-                  formatter: (item) => item['person_name']?.toString() ?? 'بدون طرف حساب',
-                ),
-                DateColumn(
-                  'document_date',
-                  'تاریخ',
-                  width: ColumnWidth.medium,
-                  formatter: (item) {
-                    final dateStr = item['document_date']?.toString();
-                    if (dateStr == null || dateStr.isEmpty) return null;
-                    final date = DateTime.tryParse(dateStr);
-                    if (date == null) return null;
-                    return HesabixDateUtils.formatForDisplay(date, isJalali);
-                  },
-                ),
-                NumberColumn(
-                  'net_amount',
-                  'مبلغ',
-                  width: ColumnWidth.medium,
-                  decimalPlaces: 0,
-                  formatter: (item) {
-                    final amount = item['net_amount'];
-                    if (amount == null) return null;
-                    return formatWithThousands(amount, decimalPlaces: 0);
-                  },
-                ),
-                CustomColumn(
-                  'warehouse_state',
-                  'وضعیت',
-                  width: ColumnWidth.small,
-                  builder: (item, index) {
-                    final state = item['warehouse_state']?.toString() ?? 'missing';
-                    return Chip(
-                      label: Text(_stateLabel(state)),
-                      backgroundColor: _stateColor(context, state).withOpacity(0.15),
-                      labelStyle: TextStyle(
-                        color: _stateColor(context, state),
-                        fontSize: 12,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    );
-                  },
-                ),
-              ],
-              additionalParams: {
-                'invoice_type': _selectedOption!.key,
-                if (_includeCompleted) 'include_completed': true,
-              },
-              rowColorBuilder: (item, index) {
-                try {
-                  final invoice = WarehouseInvoiceSource.fromJson(item);
-                  if (_selectedInvoice?.invoiceId == invoice.invoiceId) {
-                    return Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3);
-                  }
-                } catch (e) {
-                  // Ignore parsing errors
-                }
-                return null;
-              },
-              onRowTap: (item) {
-                _selectInvoice(item);
-              },
-              onRowDoubleTap: (item) {
-                // Double tap to quickly confirm selection
-                _selectInvoice(item);
-                if (_selectedInvoice != null && _selectedOption != null) {
-                  Future.microtask(() => _confirmInvoiceSelection());
-                }
-              },
-              emptyStateMessage: 'فاکتوری مطابق فیلتر یافت نشد',
-            ),
-            fromJson: (json) => json,
-            calendarController: widget.calendarController,
+      ],
+    );
+  }
+
+  Widget _buildBottomActions({required bool isMobile}) {
+    final children = <Widget>[
+      if (_currentStep == 1)
+        TextButton(
+          onPressed: () => setState(() {
+            _currentStep = 0;
+            _selectedInvoice = null;
+          }),
+          child: const Text('بازگشت'),
+        ),
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('انصراف'),
+      ),
+      const SizedBox(width: 8),
+      FilledButton(
+        onPressed: _currentStep == 0
+            ? (_selectedOption == null ? null : _goToInvoices)
+            : (_selectedInvoice == null ? null : _confirmInvoiceSelection),
+        child: Text(_currentStep == 0 ? 'ادامه' : 'تأیید و ادامه'),
+      ),
+    ];
+
+    if (isMobile) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton(
+                onPressed: _currentStep == 0
+                    ? (_selectedOption == null ? null : _goToInvoices)
+                    : (_selectedInvoice == null
+                          ? null
+                          : _confirmInvoiceSelection),
+                child: Text(_currentStep == 0 ? 'ادامه' : 'تأیید و ادامه'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (_currentStep == 1)
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _currentStep = 0;
+                        _selectedInvoice = null;
+                      }),
+                      child: const Text('بازگشت'),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('انصراف'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-      ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.end, children: children),
     );
   }
 
@@ -419,119 +516,166 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
 
-    final dialogWidth = (isMobile
-        ? screenWidth * 0.95
-        : isTablet
-            ? screenWidth * 0.85
-            : screenWidth > 1200
+    final dialogWidth =
+        (isMobile
+                ? screenWidth * 0.95
+                : isTablet
+                ? screenWidth * 0.85
+                : screenWidth > 1200
                 ? 900.0
-                : screenWidth * 0.75).toDouble();
+                : screenWidth * 0.75)
+            .toDouble();
 
-    final dialogHeight = (_currentStep == 0
-        ? (isMobile ? screenHeight * 0.6 : 400.0)
-        : (isMobile ? screenHeight * 0.75 : 580.0)).toDouble();
+    final dialogHeight =
+        (_currentStep == 0
+                ? (isMobile ? screenHeight * 0.6 : 400.0)
+                : (isMobile ? screenHeight * 0.75 : 580.0))
+            .toDouble();
+
+    final titleText = _currentStep == 0 ? 'ایجاد حواله جدید' : 'انتخاب فاکتور';
+    final stepLabel = 'مرحله ${_currentStep + 1} از ۲';
+
+    if (isMobile) {
+      return PopScope(
+        canPop: false,
+        child: Dialog.fullscreen(
+          child: Scaffold(
+            appBar: AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'بستن',
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(titleText),
+                  Text(
+                    stepLabel,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.75),
+                    ),
+                  ),
+                ],
+              ),
+              titleSpacing: 0,
+            ),
+            body: _currentStep == 0
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildSourceStep(singleColumnCards: true),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: _buildInvoiceStepHeader(),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildInvoiceSearchTable(),
+                        ),
+                      ),
+                    ],
+                  ),
+            bottomNavigationBar: _buildBottomActions(isMobile: true),
+          ),
+        ),
+      );
+    }
 
     return PopScope(
       canPop: false,
       child: Dialog(
-        insetPadding: EdgeInsets.all(isMobile ? 8 : 16),
+        insetPadding: const EdgeInsets.all(16),
         child: Container(
-        constraints: BoxConstraints(
-          maxWidth: dialogWidth,
-          maxHeight: screenHeight * 0.9,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _currentStep == 0 ? Icons.add_circle_outline : Icons.receipt_long,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _currentStep == 0 ? 'ایجاد حواله جدید' : 'انتخاب فاکتور',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'بستن',
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Flexible(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxHeight: dialogHeight,
-                  minHeight: isMobile ? 300 : 360,
-                ),
+          constraints: BoxConstraints(
+            maxWidth: dialogWidth,
+            maxHeight: screenHeight * 0.9,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
                 padding: const EdgeInsets.all(16),
-                child: _currentStep == 0 ? _buildSourceStep() : _buildInvoiceStep(),
-              ),
-            ),
-            // Actions
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade300),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withOpacity(0.3),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (_currentStep == 1)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: TextButton(
-                        onPressed: () => setState(() {
-                          _currentStep = 0;
-                          _selectedInvoice = null;
-                        }),
-                        child: const Text('بازگشت'),
+                child: Row(
+                  children: [
+                    Icon(
+                      _currentStep == 0
+                          ? Icons.add_circle_outline
+                          : Icons.receipt_long,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            titleText,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            stepLabel,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.75),
+                                ),
+                          ),
+                        ],
                       ),
                     ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('انصراف'),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_currentStep == 0)
-                    FilledButton(
-                      onPressed: _selectedOption == null ? null : _goToInvoices,
-                      child: const Text('ادامه'),
-                    )
-                  else
-                    FilledButton(
-                      onPressed: _selectedInvoice == null ? null : _confirmInvoiceSelection,
-                      child: const Text('تأیید و ادامه'),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                      tooltip: 'بستن',
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: dialogHeight,
+                    minHeight: 360,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: _currentStep == 0
+                      ? SingleChildScrollView(
+                          child: _buildSourceStep(singleColumnCards: false),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInvoiceStepHeader(),
+                            Expanded(child: _buildInvoiceSearchTable()),
+                          ],
+                        ),
+                ),
+              ),
+              _buildBottomActions(isMobile: false),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
-

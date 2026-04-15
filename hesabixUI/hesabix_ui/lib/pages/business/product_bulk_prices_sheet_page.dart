@@ -42,6 +42,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   List<Map<String, dynamic>> _rows = [];
 
   List<Map<String, dynamic>> _priceLists = [];
+  String? _priceListsLoadError;
   List<int> _selectedPriceListIds = [];
 
   final Map<int, TextEditingController> _salesControllers = {};
@@ -79,12 +80,17 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       final raw = res['items'];
       if (!mounted) return;
       setState(() {
+        _priceListsLoadError = null;
         _priceLists = raw is List
             ? raw.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList()
             : <Map<String, dynamic>>[];
       });
-    } catch (_) {
-      /* نادیده */
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _priceLists = [];
+        _priceListsLoadError = ErrorExtractor.extractErrorMessage(e);
+      });
     }
   }
 
@@ -92,8 +98,16 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
 
   String _fmtBase(dynamic v) {
     if (v == null) return '';
-    if (v is num) return formatWithThousands(v.toDouble(), decimalPlaces: 0);
-    return '';
+    num? n;
+    if (v is num) {
+      n = v;
+    } else {
+      final s = toEnglishDigits(v.toString()).replaceAll(',', '').trim();
+      if (s.isEmpty) return '';
+      n = num.tryParse(s);
+    }
+    if (n == null) return '';
+    return formatWithThousands(n.toDouble(), decimalPlaces: 0);
   }
 
   void _disposeRowControllers() {
@@ -436,6 +450,21 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                     );
                   }).toList(),
                 ),
+                if (_priceListsLoadError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _priceListsLoadError!,
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.error),
+                  ),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: _loadPriceLists,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: Text(t.retry),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [

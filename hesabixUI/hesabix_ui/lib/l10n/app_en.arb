@@ -3559,8 +3559,123 @@
   "crmNotesNoteTypeDayOnly": "Date only",
   "crmNotesNoteTypeMeeting": "Meeting (date & time)",
   "crmNotesNoteTypeAllowComments": "Allow comments (for public notes)",
+  "crmNotesNoteTypeAllowCommentsHint": "Only affects notes that are visible to the business (public notes).",
   "crmNotesNoteTypeCreated": "Note type created",
   "crmNotesPickDateTime": "Pick date & time",
-  "crmNotesDeleteConfirmMessage": "This note will be removed. Continue?"
+  "crmNotesDeleteConfirmMessage": "This note will be removed. Continue?",
+  "crmNotesDeleteConfirmTitle": "Delete note",
+  "crmNotesDeleteWarnComments": "Existing comments will also be removed.",
+  "crmNoteTabDetails": "Details",
+  "crmNoteTabComments": "Discussion",
+  "crmNoteTabAudit": "History",
+  "crmNotesVisibilityShortPrivate": "Private",
+  "crmNotesVisibilityShortBusiness": "Team",
+  "crmNotesVisibilityShortShared": "Selected",
+  "crmNotesVisibilityHintPrivate": "Only you can see this note.",
+  "crmNotesVisibilityHintBusiness": "All members of this business who can access CRM.",
+  "crmNotesVisibilityHintShared": "Only you and the people you select.",
+  "crmNotesSharedPickHint": "Select at least one teammate (you are always included).",
+  "crmNotesEventDateButton": "Choose date",
+  "crmNotesNoLeadsFound": "No leads match your search.",
+  "crmNotesLeadSearchInDialogHint": "Type name, code, phone, or email…",
+  "crmNotesCommentsDisabledTab": "Comments are disabled for this note type or visibility.",
+  "crmNotesAuditEmpty": "No history entries yet.",
+  "crmNotesNoteTypeCodeHelper": "Latin letters, numbers, and underscore only. Used internally.",
+  "crmNotesNoteTypePreview": "Preview in current language",
+  "crmNotesNoteTypeSectionIdentity": "Identity",
+  "crmNotesNoteTypeSectionTitles": "Titles",
+  "crmNotesNoteTypeSectionBehavior": "Behavior",
+  "crmNotesCommentInputLabel": "New comment",
+  "crmNotesAuditRecentLimit": "Showing the latest {count} entries",
+  "@crmNotesAuditRecentLimit": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "crmNoteAuditCreated": "Created",
+  "crmNoteAuditUpdated": "Updated",
+  "crmNoteAuditVisibility": "Visibility changed",
+  "crmNoteAuditAcl": "Sharing list changed",
+  "crmNoteAuditSoftDeleted": "Deleted",
+  "crmNoteAuditCommentCreated": "Comment added",
+  "crmNoteAuditCommentDeleted": "Comment removed",
+  "crmNoteAuditOther": "Event",
+  "crmDeleteIrreversible": "This cannot be undone.",
+  "crmDeleteLeadTitle": "Delete lead",
+  "crmDeleteLeadMessage": "Delete lead «{name}»?",
+  "@crmDeleteLeadMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmDeleteActivityTitle": "Delete activity",
+  "crmDeleteActivityMessageNamed": "Delete activity «{subject}»?",
+  "@crmDeleteActivityMessageNamed": {
+    "placeholders": {
+      "subject": {}
+    }
+  },
+  "crmDeleteActivityMessageUnnamed": "Delete this activity?",
+  "crmDeleteDealTitle": "Delete deal",
+  "crmDeleteDealMessage": "Delete deal «{title}»?",
+  "@crmDeleteDealMessage": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "crmDeleteProcessTitle": "Delete process",
+  "crmDeleteProcessMessage": "Delete process «{name}»?",
+  "@crmDeleteProcessMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmDeleteStageTitle": "Delete stage",
+  "crmDeleteStageMessage": "Delete stage «{name}»?",
+  "@crmDeleteStageMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmLeadFormSubtitle": "Contact details, funnel stage, and follow-up.",
+  "crmActivityFormSubtitle": "Link to a customer or a lead, then describe the interaction.",
+  "crmDealFormSubtitle": "Customer, pipeline stage, and financial details.",
+  "crmConvertLeadTitle": "Convert to customer",
+  "crmConvertLeadSubtitle": "Creates a new person in contacts.",
+  "crmConvertLeadIntro": "The lead will be converted and a new person record will be created in contacts.",
+  "crmConvertWithDealLabel": "Also create a sales deal",
+  "crmConvertNoPipeline": "No active sales pipeline is available.",
+  "crmConvertPipelineLabel": "Sales pipeline",
+  "crmConvertStageLabel": "Stage",
+  "crmConvertDealTitleLabel": "Deal title",
+  "crmConvertAmountLabel": "Amount",
+  "crmConvertSubmit": "Convert",
+  "crmSectionIdentityContact": "Identity & contact",
+  "crmSectionFunnel": "Funnel & stage",
+  "crmSectionAssignmentFollowup": "Assignment & reminder",
+  "crmSectionDescription": "Description",
+  "crmSectionActivityLink": "Customer or lead",
+  "crmSectionActivityScheduling": "Schedule",
+  "crmSectionActivityDetails": "Subject & details",
+  "crmSectionDealPipeline": "Pipeline & identity",
+  "crmSectionDealCustomer": "Customer & documents",
+  "crmSectionDealMoney": "Amount, currency & dates",
+  "crmActivityPickLead": "Search & select lead",
+  "crmActivityClearLead": "Clear lead",
+  "crmActivityTypeCall": "Call",
+  "crmActivityTypeEmail": "Email",
+  "crmActivityTypeMeeting": "Meeting",
+  "crmActivityTypeNote": "Note",
+  "crmProcessFormSubtitle": "Code, display name, and default flags for this workflow.",
+  "crmProcessSectionMain": "Definition",
+  "crmProcessSectionStages": "Initial stages (new only)",
+  "inventoryNegativePolicySectionTitle": "Warehouse posting: stock shortage rules",
+  "inventoryNegativePolicyIntro": "By default, outgoing warehouse documents cannot be posted if tracked stock is insufficient. Use the switches below to allow negative stock separately for bulk vs unique-tracked products. Transfers can always stay strict.",
+  "inventoryNegativePolicyBulkTitle": "Allow negative stock for bulk items",
+  "inventoryNegativePolicyBulkSubtitle": "Products in bulk inventory mode with inventory tracking enabled.",
+  "inventoryNegativePolicyUniqueTitle": "Allow negative stock for unique items",
+  "inventoryNegativePolicyUniqueSubtitle": "Serialized / unique inventory mode; higher risk of mismatches with physical stock.",
+  "inventoryNegativePolicyTransferTitle": "Transfers always require sufficient stock",
+  "inventoryNegativePolicyTransferSubtitle": "When enabled, transfer documents always run full shortage checks, regardless of the two options above."
 }
 

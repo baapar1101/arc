@@ -9,10 +9,13 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
+import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -638,16 +641,11 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
   }
 
   Future<void> _onDelete(int id, String title) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف فرصت فروش'),
-        content: Text('آیا از حذف «$title» اطمینان دارید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    final ok = await showCrmDeleteConfirmDialog(
+      context,
+      title: t.crmDeleteDealTitle,
+      message: t.crmDeleteDealMessage(title),
     );
     if (ok != true || !mounted) return;
     try {
@@ -837,8 +835,10 @@ class _DealFormDialogState extends State<_DealFormDialog> {
   Widget build(BuildContext context) {
     final isEdit = widget.initial != null;
     final cal = widget.calendarController;
+    final t = AppLocalizations.of(context);
     return CrmResponsiveDialog(
       title: isEdit ? 'ویرایش فرصت فروش' : 'فرصت فروش جدید',
+      subtitle: t.crmDealFormSubtitle,
       actions: [
         TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(), child: const Text('انصراف')),
         FilledButton(
@@ -857,207 +857,227 @@ class _DealFormDialogState extends State<_DealFormDialog> {
               dealId: widget.initial!['id'] as int?,
             ),
           if (isEdit && (widget.initial!['id'] as int?) != null) const SizedBox(height: 12),
-          if (isEdit)
-            TextFormField(
-              controller: _codeController,
-              decoration: const InputDecoration(labelText: 'کد'),
-              textCapitalization: TextCapitalization.characters,
+          CrmSectionCard(
+            title: t.crmSectionDealCustomer,
+            child: PersonComboboxWidget(
+              businessId: widget.businessId,
+              label: 'مشتری (شخص)',
+              hintText: 'جست‌وجو و انتخاب مشتری',
+              isRequired: true,
+              personTypes: [PersonType.customer.persianName],
+              selectedPerson: _selectedPerson,
+              onChanged: (p) {
+                setState(() {
+                  _selectedPerson = p;
+                  _selectedPersonId = p?.id;
+                });
+                if (p?.id != null) _loadPersonDocuments(p!.id!);
+              },
             ),
-          if (isEdit) const SizedBox(height: 12),
-          if (!isEdit) ...[
-            SwitchListTile(
-              title: const Text('کد خودکار'),
-              subtitle: Text(_codeAuto ? 'کد به صورت خودکار تولید می‌شود' : 'کد دستی وارد کنید'),
-              value: _codeAuto,
-              onChanged: (v) => setState(() => _codeAuto = v),
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (!_codeAuto) ...[
-              TextFormField(
-                controller: _codeController,
-                decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: D-001'),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-          PersonComboboxWidget(
-            businessId: widget.businessId,
-            label: 'مشتری (شخص)',
-            hintText: 'جست‌وجو و انتخاب مشتری',
-            isRequired: true,
-            personTypes: [PersonType.customer.persianName],
-            selectedPerson: _selectedPerson,
-            onChanged: (p) {
-              setState(() {
-                _selectedPerson = p;
-                _selectedPersonId = p?.id;
-              });
-              if (p?.id != null) _loadPersonDocuments(p!.id!);
-            },
           ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int?>(
-                value: _selectedProcessId,
-                decoration: const InputDecoration(labelText: 'پایپلاین فروش'),
-                items: widget.processDefs.map((p) => DropdownMenuItem<int?>(value: p['id'] as int?, child: Text(p['name']?.toString() ?? ''))).toList(),
-                onChanged: isEdit ? null : (v) {
-                  setState(() {
-                    _selectedProcessId = v;
-                    _selectedStageId = null;
-                    if (v != null) {
-                      final proc = widget.processDefs.firstWhere((e) => e['id'] == v, orElse: () => <String, dynamic>{});
-                      _stages = (proc['stages'] is List ? (proc['stages'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[]);
-                      _selectedStageId = _stages.isNotEmpty ? _stages.first['id'] as int? : null;
-                    } else {
-                      _stages = [];
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int?>(
-                value: _selectedStageId,
-                decoration: const InputDecoration(labelText: 'مرحله'),
-                items: _stages.map((s) => DropdownMenuItem<int?>(value: s['id'] as int?, child: Text(s['name']?.toString() ?? ''))).toList(),
-                onChanged: (v) => setState(() => _selectedStageId = v),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'عنوان *'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _amountController,
-                decoration: const InputDecoration(labelText: 'مبلغ'),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              if (_currencies.isNotEmpty)
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: t.crmSectionDealPipeline,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (isEdit)
+                  TextFormField(
+                    controller: _codeController,
+                    decoration: const InputDecoration(labelText: 'کد', border: OutlineInputBorder()),
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                if (isEdit) const SizedBox(height: 12),
+                if (!isEdit) ...[
+                  SwitchListTile(
+                    title: const Text('کد خودکار'),
+                    subtitle: Text(_codeAuto ? 'کد به صورت خودکار تولید می‌شود' : 'کد دستی وارد کنید'),
+                    value: _codeAuto,
+                    onChanged: (v) => setState(() => _codeAuto = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (!_codeAuto) ...[
+                    TextFormField(
+                      controller: _codeController,
+                      decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: D-001', border: OutlineInputBorder()),
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ],
                 DropdownButtonFormField<int?>(
-                  value: _selectedCurrencyId,
-                  decoration: const InputDecoration(labelText: 'ارز', isDense: true),
-                  items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('پیش‌فرض')),
-                    ..._currencies.map((c) => DropdownMenuItem<int?>(
-                          value: (c['id'] as num?)?.toInt(),
-                          child: Text(c['code']?.toString() ?? c['title']?.toString() ?? ''),
-                        )),
-                  ],
-                  onChanged: (v) => setState(() => _selectedCurrencyId = v),
+                  value: _selectedProcessId,
+                  decoration: const InputDecoration(labelText: 'پایپلاین فروش', border: OutlineInputBorder()),
+                  items: widget.processDefs.map((p) => DropdownMenuItem<int?>(value: p['id'] as int?, child: Text(p['name']?.toString() ?? ''))).toList(),
+                  onChanged: isEdit
+                      ? null
+                      : (v) {
+                          setState(() {
+                            _selectedProcessId = v;
+                            _selectedStageId = null;
+                            if (v != null) {
+                              final proc = widget.processDefs.firstWhere((e) => e['id'] == v, orElse: () => <String, dynamic>{});
+                              _stages = (proc['stages'] is List ? (proc['stages'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[]);
+                              _selectedStageId = _stages.isNotEmpty ? _stages.first['id'] as int? : null;
+                            } else {
+                              _stages = [];
+                            }
+                          });
+                        },
                 ),
-              if (_currencies.isNotEmpty) const SizedBox(height: 12),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  showValueIndicator: ShowValueIndicator.always,
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int?>(
+                  value: _selectedStageId,
+                  decoration: const InputDecoration(labelText: 'مرحله', border: OutlineInputBorder()),
+                  items: _stages.map((s) => DropdownMenuItem<int?>(value: s['id'] as int?, child: Text(s['name']?.toString() ?? ''))).toList(),
+                  onChanged: (v) => setState(() => _selectedStageId = v),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('احتمال موفقیت: ${_probabilityPercent ?? 0}%', style: Theme.of(context).textTheme.bodySmall),
-                        if (isEdit && (widget.initial!['id'] as int?) != null)
-                          TextButton.icon(
-                            onPressed: _loadingProbability ? null : _suggestDealProbability,
-                            icon: _loadingProbability ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 16),
-                            label: Text(_loadingProbability ? '...' : 'پیشنهاد AI'),
-                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-                          ),
-                      ],
-                    ),
-                    Slider(
-                      value: (_probabilityPercent ?? 0).toDouble(),
-                      min: 0,
-                      max: 100,
-                      divisions: 10,
-                      label: '${_probabilityPercent ?? 0}%',
-                      onChanged: (v) => setState(() => _probabilityPercent = v.round()),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'عنوان *', border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
                 ),
-              ),
-              const SizedBox(height: 8),
-              if (cal != null)
-                DateInputField(
-                  calendarController: cal,
-                  labelText: 'تاریخ پیش‌بینی بسته شدن',
-                  hintText: 'انتخاب تاریخ',
-                  value: _expectedCloseDate,
-                  onChanged: (v) => setState(() => _expectedCloseDate = v),
-                )
-              else
-                ListTile(
-                  title: Text('تاریخ پیش‌بینی بسته شدن'),
-                  subtitle: Text(
-                    _expectedCloseDate != null
-                        ? DateFormat('y/MM/dd').format(_expectedCloseDate!)
-                        : 'انتخاب نشده',
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: t.crmSectionDealMoney,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _amountController,
+                  decoration: const InputDecoration(labelText: 'مبلغ', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                if (_currencies.isNotEmpty)
+                  DropdownButtonFormField<int?>(
+                    value: _selectedCurrencyId,
+                    decoration: const InputDecoration(labelText: 'ارز', isDense: true, border: OutlineInputBorder()),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('پیش‌فرض')),
+                      ..._currencies.map((c) => DropdownMenuItem<int?>(
+                            value: (c['id'] as num?)?.toInt(),
+                            child: Text(c['code']?.toString() ?? c['title']?.toString() ?? ''),
+                          )),
+                    ],
+                    onChanged: (v) => setState(() => _selectedCurrencyId = v),
                   ),
-                  trailing: TextButton.icon(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _expectedCloseDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) setState(() => _expectedCloseDate = picked);
-                    },
-                    icon: const Icon(Icons.calendar_today, size: 18),
-                    label: Text(_expectedCloseDate != null ? 'تغییر' : 'انتخاب'),
+                if (_currencies.isNotEmpty) const SizedBox(height: 12),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    showValueIndicator: ShowValueIndicator.always,
                   ),
-                ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  _nextFollowUpAt == null
-                      ? 'یادآور پیگیری: تعیین نشده'
-                      : 'یادآور پیگیری: ${DateFormat('y/MM/dd HH:mm').format(_nextFollowUpAt!)}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _nextFollowUpAt ?? DateTime.now(),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (date == null || !mounted) return;
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: _nextFollowUpAt != null
-                              ? TimeOfDay.fromDateTime(_nextFollowUpAt!)
-                              : TimeOfDay.now(),
-                        );
-                        if (time != null && mounted) {
-                          setState(() => _nextFollowUpAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
-                        }
-                      },
-                      child: const Text('انتخاب'),
-                    ),
-                    if (_nextFollowUpAt != null)
-                      TextButton(
-                        onPressed: () => setState(() => _nextFollowUpAt = null),
-                        child: const Text('پاک کردن'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('احتمال موفقیت: ${_probabilityPercent ?? 0}%', style: Theme.of(context).textTheme.bodySmall),
+                          if (isEdit && (widget.initial!['id'] as int?) != null)
+                            TextButton.icon(
+                              onPressed: _loadingProbability ? null : _suggestDealProbability,
+                              icon: _loadingProbability ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 16),
+                              label: Text(_loadingProbability ? '...' : 'پیشنهاد AI'),
+                              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            ),
+                        ],
                       ),
-                  ],
+                      Slider(
+                        value: (_probabilityPercent ?? 0).toDouble(),
+                        min: 0,
+                        max: 100,
+                        divisions: 10,
+                        label: '${_probabilityPercent ?? 0}%',
+                        onChanged: (v) => setState(() => _probabilityPercent = v.round()),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'توضیحات'),
-                maxLines: 2,
-              ),
+                const SizedBox(height: 8),
+                if (cal != null)
+                  DateInputField(
+                    calendarController: cal,
+                    labelText: 'تاریخ پیش‌بینی بسته شدن',
+                    hintText: 'انتخاب تاریخ',
+                    value: _expectedCloseDate,
+                    onChanged: (v) => setState(() => _expectedCloseDate = v),
+                  )
+                else
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                    title: Text('تاریخ پیش‌بینی بسته شدن'),
+                    subtitle: Text(
+                      _expectedCloseDate != null ? DateFormat('y/MM/dd').format(_expectedCloseDate!) : 'انتخاب نشده',
+                    ),
+                    trailing: TextButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _expectedCloseDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setState(() => _expectedCloseDate = picked);
+                      },
+                      icon: const Icon(Icons.calendar_today, size: 18),
+                      label: Text(_expectedCloseDate != null ? 'تغییر' : 'انتخاب'),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                  title: Text(
+                    _nextFollowUpAt == null
+                        ? 'یادآور پیگیری: تعیین نشده'
+                        : 'یادآور پیگیری: ${DateFormat('y/MM/dd HH:mm').format(_nextFollowUpAt!)}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _nextFollowUpAt ?? DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date == null || !mounted) return;
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: _nextFollowUpAt != null ? TimeOfDay.fromDateTime(_nextFollowUpAt!) : TimeOfDay.now(),
+                          );
+                          if (time != null && mounted) {
+                            setState(() => _nextFollowUpAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+                          }
+                        },
+                        child: const Text('انتخاب'),
+                      ),
+                      if (_nextFollowUpAt != null)
+                        TextButton(
+                          onPressed: () => setState(() => _nextFollowUpAt = null),
+                          child: const Text('پاک کردن'),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descController,
+                  decoration: const InputDecoration(labelText: 'توضیحات', border: OutlineInputBorder()),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
               if (isEdit && widget.initial!['closed_at'] == null) ...[
                 const SizedBox(height: 16),
                 const Divider(),
@@ -1110,21 +1130,32 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                 ),
               ],
               if (isEdit && widget.initial!['closed_at'] != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(top: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade700),
-                      const SizedBox(width: 8),
-                      Text('معامله بسته شده', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
+                Builder(
+                  builder: (ctx) {
+                    final cs = Theme.of(ctx).colorScheme;
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(top: 12),
+                      decoration: BoxDecoration(
+                        color: cs.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.onTertiaryContainer.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: cs.onTertiaryContainer),
+                          const SizedBox(width: 8),
+                          Text(
+                            'معامله بسته شده',
+                            style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                                  color: cs.onTertiaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               if (isEdit && (widget.initial!['id'] as int?) != null) ...[
                 const SizedBox(height: 16),

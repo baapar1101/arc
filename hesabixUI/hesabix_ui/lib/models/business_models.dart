@@ -364,6 +364,12 @@ class BusinessResponse {
   final String? invoiceSyncPurchasePriceBasis;
   /// none | draft | posted
   final String invoiceWarehouseReleaseMode;
+  /// خروج با کسری برای کالای فله‌ای هنگام قطعی حواله
+  final bool allowNegativeInventoryForBulk;
+  /// خروج با کسری برای کالای یونیک هنگام قطعی حواله
+  final bool allowNegativeInventoryForUnique;
+  /// حواله انتقال همیشه کنترل کسری کامل
+  final bool warehouseTransferRequirePositiveStock;
   final Map<String, dynamic>? defaultCurrency;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -405,6 +411,9 @@ class BusinessResponse {
     this.invoiceSyncSalesPriceBasis,
     this.invoiceSyncPurchasePriceBasis,
     this.invoiceWarehouseReleaseMode = 'draft',
+    this.allowNegativeInventoryForBulk = false,
+    this.allowNegativeInventoryForUnique = false,
+    this.warehouseTransferRequirePositiveStock = true,
     this.defaultCurrency,
     required this.createdAt,
     required this.updatedAt,
@@ -457,6 +466,10 @@ class BusinessResponse {
       invoiceWarehouseReleaseMode: _normalizeInvoiceWarehouseReleaseMode(
         json['invoice_warehouse_release_mode'] as String?,
       ),
+      allowNegativeInventoryForBulk: (json['allow_negative_inventory_for_bulk'] as bool?) ?? false,
+      allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
+      warehouseTransferRequirePositiveStock:
+          (json['warehouse_transfer_require_positive_stock'] as bool?) ?? true,
       defaultCurrency: json['default_currency'] != null ? Map<String, dynamic>.from(json['default_currency'] as Map) : null,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),

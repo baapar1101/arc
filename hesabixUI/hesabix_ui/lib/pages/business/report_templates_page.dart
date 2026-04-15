@@ -363,263 +363,390 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     }
   }
 
-  Future<void> _createDialog() async {
-    final t = AppLocalizations.of(context);
-    await showDialog(
+  /// موبایل: کوچک‌ترین ضلع کمتر از ۶۰۰ → ادیتور تمام‌صفحه.
+  bool _reportHtmlEditorUseFullscreenLayout(BuildContext context) {
+    return MediaQuery.sizeOf(context).shortestSide < 600;
+  }
+
+  TextStyle? _reportHtmlCodeStyle(BuildContext context) {
+    final base = Theme.of(context).textTheme.bodyMedium;
+    return base?.copyWith(fontFamily: 'monospace', fontSize: 13, height: 1.4);
+  }
+
+  List<TextInputFormatter> get _reportHtmlMarginInputFormatters => [
+        EnglishDigitsFormatter(),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+      ];
+
+  Widget _reportHtmlCodeEditorField({
+    required BuildContext context,
+    required TextEditingController controller,
+    required String hintText,
+  }) {
+    return TextField(
+      controller: controller,
+      style: _reportHtmlCodeStyle(context),
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        hintText: hintText,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        alignLabelWithHint: true,
+        isDense: true,
+        contentPadding: const EdgeInsets.all(12),
+      ),
+      maxLines: null,
+      minLines: null,
+      expands: true,
+      textAlignVertical: TextAlignVertical.top,
+      keyboardType: TextInputType.multiline,
+    );
+  }
+
+  Widget _reportHtmlEditorPageSettingsForm(BuildContext context, AppLocalizations t) {
+    const marginDec = InputDecoration(
+      isDense: true,
+      border: OutlineInputBorder(),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _paperSize,
+                decoration: InputDecoration(
+                  labelText: t.pageSize,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+                items: _paperSizeDropdownItems(_paperSize),
+                onChanged: (v) => setState(() => _paperSize = v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _orientation,
+                decoration: InputDecoration(
+                  labelText: t.orientation,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem(value: 'portrait', child: Text(t.portrait)),
+                  DropdownMenuItem(value: 'landscape', child: Text(t.landscape)),
+                ],
+                onChanged: (v) => setState(() => _orientation = v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _marginTopCtrl,
+                decoration: marginDec.copyWith(labelText: t.marginTop),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _reportHtmlMarginInputFormatters,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _marginRightCtrl,
+                decoration: marginDec.copyWith(labelText: t.marginRight),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _reportHtmlMarginInputFormatters,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _marginBottomCtrl,
+                decoration: marginDec.copyWith(labelText: t.marginBottom),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _reportHtmlMarginInputFormatters,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _marginLeftCtrl,
+                decoration: marginDec.copyWith(labelText: t.marginLeft),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _reportHtmlMarginInputFormatters,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _paperCustomCtrl,
+          maxLength: kReportTemplatePaperSizeMaxLength,
+          decoration: InputDecoration(
+            labelText: t.reportTemplatePaperCustomLabel,
+            helperText: t.reportTemplatePaperCustomHelper,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _reportHtmlEditorCodeTabs(BuildContext context, AppLocalizations t) {
+    final cs = Theme.of(context).colorScheme;
+    return DefaultTabController(
+      length: 4,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabBar(
+            isScrollable: true,
+            labelColor: cs.primary,
+            tabs: [
+              Tab(text: t.reportTemplatePreviewHtmlTab),
+              Tab(text: t.reportTemplateEditorTabCss),
+              Tab(text: t.reportTemplateEditorTabHeader),
+              Tab(text: t.reportTemplateEditorTabFooter),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _reportHtmlCodeEditorField(
+                  context: context,
+                  controller: _htmlCtrl,
+                  hintText: t.reportTemplateHintHtmlBody,
+                ),
+                _reportHtmlCodeEditorField(
+                  context: context,
+                  controller: _cssCtrl,
+                  hintText: t.reportTemplateHintCss,
+                ),
+                _reportHtmlCodeEditorField(
+                  context: context,
+                  controller: _headerCtrl,
+                  hintText: t.reportTemplateHintHeaderHtml,
+                ),
+                _reportHtmlCodeEditorField(
+                  context: context,
+                  controller: _footerCtrl,
+                  hintText: t.reportTemplateHintFooterHtml,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportHtmlEditorFormHeader(BuildContext context, AppLocalizations t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _nameCtrl,
+          decoration: InputDecoration(
+            labelText: t.reportTemplateFieldName,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _descCtrl,
+          decoration: InputDecoration(
+            labelText: t.reportTemplateFieldDescription,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: EdgeInsets.zero,
+          title: Text(
+            t.reportTemplatePageSettingsSection,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          childrenPadding: const EdgeInsets.only(bottom: 4),
+          children: [
+            _reportHtmlEditorPageSettingsForm(context, t),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openReportHtmlEditorAdaptive({
+    required String title,
+    required Widget Function(BuildContext dialogContext) buildBody,
+    required List<Widget> Function(BuildContext dialogContext) buildActions,
+  }) async {
+    await showDialog<void>(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(t.reportTemplateNewHtml),
-          content: SizedBox(
-            width: 700,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(labelText: t.reportTemplateFieldName),
+      useSafeArea: true,
+      builder: (dialogContext) {
+        final actions = buildActions(dialogContext);
+        final body = buildBody(dialogContext);
+        final fullscreen = _reportHtmlEditorUseFullscreenLayout(dialogContext);
+        if (fullscreen) {
+          return Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(title),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: MaterialLocalizations.of(dialogContext).closeButtonLabel,
+                  onPressed: () => Navigator.pop(dialogContext),
+                ),
+              ),
+              body: body,
+              bottomNavigationBar: Material(
+                elevation: 6,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                    child: OverflowBar(
+                      alignment: MainAxisAlignment.end,
+                      spacing: 8,
+                      overflowSpacing: 8,
+                      overflowAlignment: OverflowBarAlignment.end,
+                      children: actions,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _descCtrl,
-                    decoration: InputDecoration(labelText: t.reportTemplateFieldDescription),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(t.reportTemplatePageSettingsSection, style: Theme.of(context).textTheme.titleSmall),
-                  Row(
+                ),
+              ),
+            ),
+          );
+        }
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 960,
+              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.92,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 4, 4),
+                  child: Row(
                     children: [
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          value: _paperSize,
-                          decoration: InputDecoration(
-                            labelText: t.pageSize,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                          ),
-                          items: _paperSizeDropdownItems(_paperSize),
-                          onChanged: (v) => setState(() => _paperSize = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          value: _orientation,
-                          decoration: InputDecoration(
-                            labelText: t.orientation,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                          ),
-                          items: [
-                            DropdownMenuItem(value: 'portrait', child: Text(t.portrait)),
-                            DropdownMenuItem(value: 'landscape', child: Text(t.landscape)),
-                          ],
-                          onChanged: (v) => setState(() => _orientation = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginTopCtrl,
-                                decoration: InputDecoration(
-                                  labelText: t.marginTop,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginRightCtrl,
-                                decoration: InputDecoration(
-                                  labelText: t.marginRight,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginBottomCtrl,
-                                decoration: InputDecoration(
-                                  labelText: t.marginBottom,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginLeftCtrl,
-                                decoration: InputDecoration(
-                                  labelText: t.marginLeft,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: Text(title, style: Theme.of(dialogContext).textTheme.titleLarge),
+                      ),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(dialogContext).closeButtonLabel,
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(dialogContext),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _paperCustomCtrl,
-                    maxLength: kReportTemplatePaperSizeMaxLength,
-                    decoration: InputDecoration(
-                      labelText: t.reportTemplatePaperCustomLabel,
-                      helperText: t.reportTemplatePaperCustomHelper,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
+                ),
+                const Divider(height: 1),
+                Expanded(child: body),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: OverflowBar(
+                      spacing: 8,
+                      overflowSpacing: 8,
+                      overflowAlignment: OverflowBarAlignment.end,
+                      children: actions,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  DefaultTabController(
-                    length: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TabBar(
-                          labelColor: Theme.of(context).colorScheme.primary,
-                          tabs: [
-                            Tab(text: t.reportTemplatePreviewHtmlTab),
-                            Tab(text: t.reportTemplateEditorTabCss),
-                            Tab(text: t.reportTemplateEditorTabHeader),
-                            Tab(text: t.reportTemplateEditorTabFooter),
-                          ],
-                        ),
-                        SizedBox(
-                          height: 320,
-                          child: TabBarView(
-                            children: [
-                              TextField(
-                                controller: _htmlCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: t.reportTemplateHintHtmlBody,
-                                ),
-                              ),
-                              TextField(
-                                controller: _cssCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: t.reportTemplateHintCss,
-                                ),
-                              ),
-                              TextField(
-                                controller: _headerCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: t.reportTemplateHintHeaderHtml,
-                                ),
-                              ),
-                              TextField(
-                                controller: _footerCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: t.reportTemplateHintFooterHtml,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  Map<String, dynamic>? margins;
-                  double? _parse(String s) {
-                    try {
-                      if (s.trim().isEmpty) return null;
-                      return double.parse(s.trim());
-                    } catch (_) {
-                      return null;
-                    }
-                  }
-                  final mt = _parse(_marginTopCtrl.text);
-                  final mr = _parse(_marginRightCtrl.text);
-                  final mb = _parse(_marginBottomCtrl.text);
-                  final ml = _parse(_marginLeftCtrl.text);
-                  margins = {
-                    if (mt != null) 'top': mt,
-                    if (mr != null) 'right': mr,
-                    if (mb != null) 'bottom': mb,
-                    if (ml != null) 'left': ml,
-                  };
-                  if (margins.isEmpty) margins = null;
-                  final id = await _service.createTemplate(
-                    businessId: widget.businessId,
-                    moduleKey: _moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim(),
-                    subtype: _subtypeCtrl.text.trim().isEmpty ? 'list' : _subtypeCtrl.text.trim(),
-                    name: _nameCtrl.text.trim().isEmpty ? 'Template' : _nameCtrl.text.trim(),
-                    description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-                    contentHtml: _htmlCtrl.text,
-                    contentCss: _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
-                    headerHtml: _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
-                    footerHtml: _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                    paperSize: _effectivePaperSize(),
-                    orientation: _orientation,
-                    margins: margins,
-                  );
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  SnackBarHelper.showSuccess(ctx, message: t.templateCreatedWithId(id));
-                  await _fetch();
-                } catch (e) {
-                  if (!ctx.mounted) return;
-                  SnackBarHelper.showError(ctx, message: t.createError(e.toString()));
-                }
-              },
-              child: Text(t.create),
-            ),
-          ],
         );
       },
+    );
+  }
+
+  Future<void> _createDialog() async {
+    final t = AppLocalizations.of(context);
+    await _openReportHtmlEditorAdaptive(
+      title: t.reportTemplateNewHtml,
+      buildBody: (dctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _reportHtmlEditorFormHeader(dctx, t),
+              const SizedBox(height: 8),
+              Expanded(child: _reportHtmlEditorCodeTabs(dctx, t)),
+            ],
+          ),
+        );
+      },
+      buildActions: (dctx) => [
+        TextButton(onPressed: () => Navigator.pop(dctx), child: Text(t.cancel)),
+        FilledButton(
+          onPressed: () async {
+            try {
+              Map<String, dynamic>? margins;
+              double? parseMargin(String s) {
+                try {
+                  if (s.trim().isEmpty) return null;
+                  return double.parse(s.trim());
+                } catch (_) {
+                  return null;
+                }
+              }
+              final mt = parseMargin(_marginTopCtrl.text);
+              final mr = parseMargin(_marginRightCtrl.text);
+              final mb = parseMargin(_marginBottomCtrl.text);
+              final ml = parseMargin(_marginLeftCtrl.text);
+              margins = {
+                if (mt != null) 'top': mt,
+                if (mr != null) 'right': mr,
+                if (mb != null) 'bottom': mb,
+                if (ml != null) 'left': ml,
+              };
+              if (margins.isEmpty) margins = null;
+              final id = await _service.createTemplate(
+                businessId: widget.businessId,
+                moduleKey: _moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim(),
+                subtype: _subtypeCtrl.text.trim().isEmpty ? 'list' : _subtypeCtrl.text.trim(),
+                name: _nameCtrl.text.trim().isEmpty ? 'Template' : _nameCtrl.text.trim(),
+                description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+                contentHtml: _htmlCtrl.text,
+                contentCss: _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
+                headerHtml: _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
+                footerHtml: _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
+                paperSize: _effectivePaperSize(),
+                orientation: _orientation,
+                margins: margins,
+              );
+              if (!dctx.mounted) return;
+              Navigator.pop(dctx);
+              SnackBarHelper.showSuccess(dctx, message: t.templateCreatedWithId(id));
+              await _fetch();
+            } catch (e) {
+              if (!dctx.mounted) return;
+              SnackBarHelper.showError(dctx, message: t.createError(e.toString()));
+            }
+          },
+          child: Text(t.create),
+        ),
+      ],
     );
   }
 
@@ -902,270 +1029,80 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       return;
     }
 
-    final ctx = context;
     final tEdit = AppLocalizations.of(context);
-    await showDialog(
-      context: ctx,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(tEdit.reportTemplateEdit),
-          content: SizedBox(
-            width: 700,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(labelText: tEdit.reportTemplateFieldName),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _descCtrl,
-                    decoration: InputDecoration(labelText: tEdit.reportTemplateFieldDescription),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(tEdit.reportTemplatePageSettingsSection, style: Theme.of(context).textTheme.titleSmall),
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          value: _paperSize,
-                          decoration: InputDecoration(
-                            labelText: tEdit.pageSize,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                          ),
-                          items: _paperSizeDropdownItems(_paperSize),
-                          onChanged: (v) => setState(() => _paperSize = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          value: _orientation,
-                          decoration: InputDecoration(
-                            labelText: tEdit.orientation,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                          ),
-                          items: [
-                            DropdownMenuItem(value: 'portrait', child: Text(tEdit.portrait)),
-                            DropdownMenuItem(value: 'landscape', child: Text(tEdit.landscape)),
-                          ],
-                          onChanged: (v) => setState(() => _orientation = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginTopCtrl,
-                                decoration: InputDecoration(
-                                  labelText: tEdit.marginTop,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginRightCtrl,
-                                decoration: InputDecoration(
-                                  labelText: tEdit.marginRight,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginBottomCtrl,
-                                decoration: InputDecoration(
-                                  labelText: tEdit.marginBottom,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 90,
-                              child: TextField(
-                                controller: _marginLeftCtrl,
-                                decoration: InputDecoration(
-                                  labelText: tEdit.marginLeft,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _paperCustomCtrl,
-                    maxLength: kReportTemplatePaperSizeMaxLength,
-                    decoration: InputDecoration(
-                      labelText: tEdit.reportTemplatePaperCustomLabel,
-                      helperText: tEdit.reportTemplatePaperCustomHelper,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DefaultTabController(
-                    length: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TabBar(
-                          labelColor: Theme.of(context).colorScheme.primary,
-                          tabs: [
-                            Tab(text: tEdit.reportTemplatePreviewHtmlTab),
-                            Tab(text: tEdit.reportTemplateEditorTabCss),
-                            Tab(text: tEdit.reportTemplateEditorTabHeader),
-                            Tab(text: tEdit.reportTemplateEditorTabFooter),
-                          ],
-                        ),
-                        SizedBox(
-                          height: 320,
-                          child: TabBarView(
-                            children: [
-                              TextField(
-                                controller: _htmlCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: tEdit.reportTemplateHintHtmlBody,
-                                ),
-                              ),
-                              TextField(
-                                controller: _cssCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: tEdit.reportTemplateHintCss,
-                                ),
-                              ),
-                              TextField(
-                                controller: _headerCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: tEdit.reportTemplateHintHeaderHtml,
-                                ),
-                              ),
-                              TextField(
-                                controller: _footerCtrl,
-                                maxLines: 14,
-                                decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  hintText: tEdit.reportTemplateHintFooterHtml,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    await _openReportHtmlEditorAdaptive(
+      title: tEdit.reportTemplateEdit,
+      buildBody: (dctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _reportHtmlEditorFormHeader(dctx, tEdit),
+              const SizedBox(height: 8),
+              Expanded(child: _reportHtmlEditorCodeTabs(dctx, tEdit)),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tEdit.cancel)),
-            TextButton(
-              onPressed: () async {
-                await _previewTemplate(item);
-              },
-              child: Text(tEdit.reportTemplatePreview),
-            ),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  Map<String, dynamic>? margins;
-                  double? _parse(String s) {
-                    try {
-                      if (s.trim().isEmpty) return null;
-                      return double.parse(s.trim());
-                    } catch (_) {
-                      return null;
-                    }
-                  }
-                  final mt = _parse(_marginTopCtrl.text);
-                  final mr = _parse(_marginRightCtrl.text);
-                  final mb = _parse(_marginBottomCtrl.text);
-                  final ml = _parse(_marginLeftCtrl.text);
-                  margins = {
-                    if (mt != null) 'top': mt,
-                    if (mr != null) 'right': mr,
-                    if (mb != null) 'bottom': mb,
-                    if (ml != null) 'left': ml,
-                  };
-                  if (margins.isEmpty) margins = null;
-                  final changes = <String, dynamic>{
-                    'name': _nameCtrl.text.trim(),
-                    'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-                    'content_html': _htmlCtrl.text,
-                    'content_css': _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
-                    'header_html': _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
-                    'footer_html': _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                    'paper_size': _effectivePaperSize(),
-                    'orientation': _orientation,
-                    if (margins != null) 'margins': margins,
-                  };
-                  await _service.updateTemplate(
-                    businessId: widget.businessId,
-                    templateId: (item['id'] as num).toInt(),
-                    changes: changes,
-                  );
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  await _fetch();
-                } catch (e) {
-                  if (!ctx.mounted) return;
-                  SnackBarHelper.showError(ctx, message: tEdit.reportTemplateEditSaveError('$e'));
-                }
-              },
-              child: Text(tEdit.save),
-            ),
-          ],
         );
       },
+      buildActions: (dctx) => [
+        TextButton(onPressed: () => Navigator.pop(dctx), child: Text(tEdit.cancel)),
+        TextButton(
+          onPressed: () async {
+            await _previewTemplate(item);
+          },
+          child: Text(tEdit.reportTemplatePreview),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              Map<String, dynamic>? margins;
+              double? parseMargin(String s) {
+                try {
+                  if (s.trim().isEmpty) return null;
+                  return double.parse(s.trim());
+                } catch (_) {
+                  return null;
+                }
+              }
+              final mt = parseMargin(_marginTopCtrl.text);
+              final mr = parseMargin(_marginRightCtrl.text);
+              final mb = parseMargin(_marginBottomCtrl.text);
+              final ml = parseMargin(_marginLeftCtrl.text);
+              margins = {
+                if (mt != null) 'top': mt,
+                if (mr != null) 'right': mr,
+                if (mb != null) 'bottom': mb,
+                if (ml != null) 'left': ml,
+              };
+              if (margins.isEmpty) margins = null;
+              final changes = <String, dynamic>{
+                'name': _nameCtrl.text.trim(),
+                'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+                'content_html': _htmlCtrl.text,
+                'content_css': _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
+                'header_html': _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
+                'footer_html': _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
+                'paper_size': _effectivePaperSize(),
+                'orientation': _orientation,
+                if (margins != null) 'margins': margins,
+              };
+              await _service.updateTemplate(
+                businessId: widget.businessId,
+                templateId: (item['id'] as num).toInt(),
+                changes: changes,
+              );
+              if (!dctx.mounted) return;
+              Navigator.pop(dctx);
+              await _fetch();
+            } catch (e) {
+              if (!dctx.mounted) return;
+              SnackBarHelper.showError(dctx, message: tEdit.reportTemplateEditSaveError('$e'));
+            }
+          },
+          child: Text(tEdit.save),
+        ),
+      ],
     );
   }
 
@@ -1362,7 +1299,6 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                         icon: const Icon(Icons.copy),
                                         onPressed: () async {
                                           await Clipboard.setData(ClipboardData(text: '{{ $name }}'));
-                                          _htmlCtrl.text += '{{ $name }}';
                                           if (dctx.mounted) {
                                             SnackBarHelper.show(dctx, message: loc.reportTemplateCopied);
                                           }

@@ -3601,8 +3601,123 @@
   "crmNotesNoteTypeDayOnly": "فقط تاریخ",
   "crmNotesNoteTypeMeeting": "جلسه (تاریخ و ساعت)",
   "crmNotesNoteTypeAllowComments": "اجازهٔ کامنت (برای یادداشت عمومی)",
+  "crmNotesNoteTypeAllowCommentsHint": "فقط برای یادداشت‌هایی که برای کسب‌وکار قابل مشاهده‌اند (عمومی) اعمال می‌شود.",
   "crmNotesNoteTypeCreated": "نوع یادداشت ایجاد شد",
   "crmNotesPickDateTime": "انتخاب تاریخ و ساعت",
-  "crmNotesDeleteConfirmMessage": "این یادداشت حذف می‌شود. ادامه می‌دهید؟"
+  "crmNotesDeleteConfirmMessage": "این یادداشت حذف می‌شود. ادامه می‌دهید؟",
+  "crmNotesDeleteConfirmTitle": "حذف یادداشت",
+  "crmNotesDeleteWarnComments": "کامنت‌های ثبت‌شده نیز حذف می‌شوند.",
+  "crmNoteTabDetails": "جزئیات",
+  "crmNoteTabComments": "گفتگو",
+  "crmNoteTabAudit": "تاریخچه",
+  "crmNotesVisibilityShortPrivate": "خصوصی",
+  "crmNotesVisibilityShortBusiness": "تیم",
+  "crmNotesVisibilityShortShared": "انتخابی",
+  "crmNotesVisibilityHintPrivate": "فقط خودتان این یادداشت را می‌بینید.",
+  "crmNotesVisibilityHintBusiness": "همه اعضایی که به CRM دسترسی دارند (در این کسب‌وکار).",
+  "crmNotesVisibilityHintShared": "فقط شما و افرادی که انتخاب می‌کنید.",
+  "crmNotesSharedPickHint": "حداقل یک همکار را انتخاب کنید (خودتان همیشه شامل می‌شوید).",
+  "crmNotesEventDateButton": "انتخاب تاریخ",
+  "crmNotesNoLeadsFound": "سرنخی با این جستجو یافت نشد.",
+  "crmNotesLeadSearchInDialogHint": "نام، کد، موبایل یا ایمیل…",
+  "crmNotesCommentsDisabledTab": "برای این نوع یا سطح دسترسی، کامنت غیرفعال است.",
+  "crmNotesAuditEmpty": "هنوز رویدادی ثبت نشده است.",
+  "crmNotesNoteTypeCodeHelper": "فقط حروف لاتین، عدد و زیرخط؛ برای استفاده داخلی و گزارش‌ها.",
+  "crmNotesNoteTypePreview": "پیش‌نمایش با زبان فعلی رابط",
+  "crmNotesNoteTypeSectionIdentity": "شناسه",
+  "crmNotesNoteTypeSectionTitles": "عناوین",
+  "crmNotesNoteTypeSectionBehavior": "رفتار",
+  "crmNotesCommentInputLabel": "نظر جدید",
+  "crmNotesAuditRecentLimit": "نمایش {count} رویداد اخیر",
+  "@crmNotesAuditRecentLimit": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "crmNoteAuditCreated": "ایجاد",
+  "crmNoteAuditUpdated": "ویرایش",
+  "crmNoteAuditVisibility": "تغییر سطح دسترسی",
+  "crmNoteAuditAcl": "تغییر لیست اشتراک",
+  "crmNoteAuditSoftDeleted": "حذف نرم",
+  "crmNoteAuditCommentCreated": "ثبت کامنت",
+  "crmNoteAuditCommentDeleted": "حذف کامنت",
+  "crmNoteAuditOther": "رویداد",
+  "crmDeleteIrreversible": "این عمل قابل بازگشت نیست.",
+  "crmDeleteLeadTitle": "حذف سرنخ",
+  "crmDeleteLeadMessage": "سرنخ «{name}» حذف شود؟",
+  "@crmDeleteLeadMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmDeleteActivityTitle": "حذف فعالیت",
+  "crmDeleteActivityMessageNamed": "فعالیت «{subject}» حذف شود؟",
+  "@crmDeleteActivityMessageNamed": {
+    "placeholders": {
+      "subject": {}
+    }
+  },
+  "crmDeleteActivityMessageUnnamed": "این فعالیت حذف شود؟",
+  "crmDeleteDealTitle": "حذف فرصت فروش",
+  "crmDeleteDealMessage": "فرصت فروش «{title}» حذف شود؟",
+  "@crmDeleteDealMessage": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "crmDeleteProcessTitle": "حذف فرایند",
+  "crmDeleteProcessMessage": "فرایند «{name}» حذف شود؟",
+  "@crmDeleteProcessMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmDeleteStageTitle": "حذف مرحله",
+  "crmDeleteStageMessage": "مرحله «{name}» حذف شود؟",
+  "@crmDeleteStageMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "crmLeadFormSubtitle": "اطلاعات تماس، فانل و پیگیری را مشخص کنید.",
+  "crmActivityFormSubtitle": "فعالیت را به مشتری یا سرنخ وصل کنید و نتیجه را بنویسید.",
+  "crmDealFormSubtitle": "مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.",
+  "crmConvertLeadTitle": "تبدیل به مشتری",
+  "crmConvertLeadSubtitle": "یک شخص جدید در بخش اشخاص ایجاد می‌شود.",
+  "crmConvertLeadIntro": "سرنخ تبدیل می‌شود و رکورد شخص جدید در اشخاص ثبت می‌شود.",
+  "crmConvertWithDealLabel": "همزمان فرصت فروش ایجاد شود",
+  "crmConvertNoPipeline": "پایپلاین فروش فعالی یافت نشد.",
+  "crmConvertPipelineLabel": "پایپلاین فروش",
+  "crmConvertStageLabel": "مرحله",
+  "crmConvertDealTitleLabel": "عنوان فرصت فروش",
+  "crmConvertAmountLabel": "مبلغ (ریال)",
+  "crmConvertSubmit": "تبدیل",
+  "crmSectionIdentityContact": "هویت و تماس",
+  "crmSectionFunnel": "فانل و مرحله",
+  "crmSectionAssignmentFollowup": "تخصیص و یادآور",
+  "crmSectionDescription": "توضیحات",
+  "crmSectionActivityLink": "مشتری یا سرنخ",
+  "crmSectionActivityScheduling": "زمان‌بندی",
+  "crmSectionActivityDetails": "موضوع و شرح",
+  "crmSectionDealPipeline": "پایپلاین و شناسه",
+  "crmSectionDealCustomer": "مشتری و اسناد",
+  "crmSectionDealMoney": "مبلغ، ارز و تاریخ‌ها",
+  "crmActivityPickLead": "جستجو و انتخاب سرنخ",
+  "crmActivityClearLead": "حذف اتصال سرنخ",
+  "crmActivityTypeCall": "تماس",
+  "crmActivityTypeEmail": "ایمیل",
+  "crmActivityTypeMeeting": "جلسه",
+  "crmActivityTypeNote": "یادداشت",
+  "crmProcessFormSubtitle": "کد، نام نمایشی و گزینه‌های پیش‌فرض این فرایند را مشخص کنید.",
+  "crmProcessSectionMain": "تعریف فرایند",
+  "crmProcessSectionStages": "مراحل اولیه (فقط هنگام ایجاد)",
+  "inventoryNegativePolicySectionTitle": "کنترل کسری هنگام قطعی حواله انبار",
+  "inventoryNegativePolicyIntro": "پیش‌فرض سیستم مانع قطعی حوالهٔ خروج می‌شود اگر موجودی کافی نباشد. با گزینه‌های زیر می‌توانید به‌صورت تفکیک‌شده برای کالای فله‌ای یا یونیک استثنا بگذارید. حواله‌های انتقال را می‌توان همیشه سخت‌گیرانه نگه داشت.",
+  "inventoryNegativePolicyBulkTitle": "اجازه خروج با موجودی منفی برای کالای فله‌ای",
+  "inventoryNegativePolicyBulkSubtitle": "کالاهایی که حالت موجودی «فله‌ای» دارند و کنترل موجودی فعال است.",
+  "inventoryNegativePolicyUniqueTitle": "اجازه خروج با موجودی منفی برای کالای یونیک",
+  "inventoryNegativePolicyUniqueSubtitle": "کالاهایی که با سریال/نسخهٔ یونیک ردیابی می‌شوند؛ ریسک ثبت ناسازگار با فیزیک بالاتر است.",
+  "inventoryNegativePolicyTransferTitle": "انتقال بین انبار همیشه نیاز به موجودی کافی",
+  "inventoryNegativePolicyTransferSubtitle": "اگر روشن باشد، حوالهٔ انتقال صرف‌نظر از دو گزینهٔ بالا کنترل کسری کامل دارد."
 }
 

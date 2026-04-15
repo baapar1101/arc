@@ -9217,7 +9217,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmNotesAudit => 'Change history';
 
   @override
-  String get crmNotesAuditEmpty => 'No audit entries';
+  String get crmNotesAuditEmpty => 'No history entries yet.';
 
   @override
   String get crmNotesClose => 'Close';
@@ -9263,6 +9263,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Allow comments (for public notes)';
 
   @override
+  String get crmNotesNoteTypeAllowCommentsHint =>
+      'Only affects notes that are visible to the business (public notes).';
+
+  @override
   String get crmNotesNoteTypeCreated => 'Note type created';
 
   @override
@@ -9271,4 +9275,285 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get crmNotesDeleteConfirmMessage =>
       'This note will be removed. Continue?';
+
+  @override
+  String get crmNotesDeleteConfirmTitle => 'Delete note';
+
+  @override
+  String get crmNotesDeleteWarnComments =>
+      'Existing comments will also be removed.';
+
+  @override
+  String get crmNoteTabDetails => 'Details';
+
+  @override
+  String get crmNoteTabComments => 'Discussion';
+
+  @override
+  String get crmNoteTabAudit => 'History';
+
+  @override
+  String get crmNotesVisibilityShortPrivate => 'Private';
+
+  @override
+  String get crmNotesVisibilityShortBusiness => 'Team';
+
+  @override
+  String get crmNotesVisibilityShortShared => 'Selected';
+
+  @override
+  String get crmNotesVisibilityHintPrivate => 'Only you can see this note.';
+
+  @override
+  String get crmNotesVisibilityHintBusiness =>
+      'All members of this business who can access CRM.';
+
+  @override
+  String get crmNotesVisibilityHintShared =>
+      'Only you and the people you select.';
+
+  @override
+  String get crmNotesSharedPickHint =>
+      'Select at least one teammate (you are always included).';
+
+  @override
+  String get crmNotesEventDateButton => 'Choose date';
+
+  @override
+  String get crmNotesNoLeadsFound => 'No leads match your search.';
+
+  @override
+  String get crmNotesLeadSearchInDialogHint =>
+      'Type name, code, phone, or email…';
+
+  @override
+  String get crmNotesCommentsDisabledTab =>
+      'Comments are disabled for this note type or visibility.';
+
+  @override
+  String get crmNotesNoteTypeCodeHelper =>
+      'Latin letters, numbers, and underscore only. Used internally.';
+
+  @override
+  String get crmNotesNoteTypePreview => 'Preview in current language';
+
+  @override
+  String get crmNotesNoteTypeSectionIdentity => 'Identity';
+
+  @override
+  String get crmNotesNoteTypeSectionTitles => 'Titles';
+
+  @override
+  String get crmNotesNoteTypeSectionBehavior => 'Behavior';
+
+  @override
+  String get crmNotesCommentInputLabel => 'New comment';
+
+  @override
+  String crmNotesAuditRecentLimit(int count) {
+    return 'Showing the latest $count entries';
+  }
+
+  @override
+  String get crmNoteAuditCreated => 'Created';
+
+  @override
+  String get crmNoteAuditUpdated => 'Updated';
+
+  @override
+  String get crmNoteAuditVisibility => 'Visibility changed';
+
+  @override
+  String get crmNoteAuditAcl => 'Sharing list changed';
+
+  @override
+  String get crmNoteAuditSoftDeleted => 'Deleted';
+
+  @override
+  String get crmNoteAuditCommentCreated => 'Comment added';
+
+  @override
+  String get crmNoteAuditCommentDeleted => 'Comment removed';
+
+  @override
+  String get crmNoteAuditOther => 'Event';
+
+  @override
+  String get crmDeleteIrreversible => 'This cannot be undone.';
+
+  @override
+  String get crmDeleteLeadTitle => 'Delete lead';
+
+  @override
+  String crmDeleteLeadMessage(Object name) {
+    return 'Delete lead «$name»?';
+  }
+
+  @override
+  String get crmDeleteActivityTitle => 'Delete activity';
+
+  @override
+  String crmDeleteActivityMessageNamed(Object subject) {
+    return 'Delete activity «$subject»?';
+  }
+
+  @override
+  String get crmDeleteActivityMessageUnnamed => 'Delete this activity?';
+
+  @override
+  String get crmDeleteDealTitle => 'Delete deal';
+
+  @override
+  String crmDeleteDealMessage(Object title) {
+    return 'Delete deal «$title»?';
+  }
+
+  @override
+  String get crmDeleteProcessTitle => 'Delete process';
+
+  @override
+  String crmDeleteProcessMessage(Object name) {
+    return 'Delete process «$name»?';
+  }
+
+  @override
+  String get crmDeleteStageTitle => 'Delete stage';
+
+  @override
+  String crmDeleteStageMessage(Object name) {
+    return 'Delete stage «$name»?';
+  }
+
+  @override
+  String get crmLeadFormSubtitle =>
+      'Contact details, funnel stage, and follow-up.';
+
+  @override
+  String get crmActivityFormSubtitle =>
+      'Link to a customer or a lead, then describe the interaction.';
+
+  @override
+  String get crmDealFormSubtitle =>
+      'Customer, pipeline stage, and financial details.';
+
+  @override
+  String get crmConvertLeadTitle => 'Convert to customer';
+
+  @override
+  String get crmConvertLeadSubtitle => 'Creates a new person in contacts.';
+
+  @override
+  String get crmConvertLeadIntro =>
+      'The lead will be converted and a new person record will be created in contacts.';
+
+  @override
+  String get crmConvertWithDealLabel => 'Also create a sales deal';
+
+  @override
+  String get crmConvertNoPipeline => 'No active sales pipeline is available.';
+
+  @override
+  String get crmConvertPipelineLabel => 'Sales pipeline';
+
+  @override
+  String get crmConvertStageLabel => 'Stage';
+
+  @override
+  String get crmConvertDealTitleLabel => 'Deal title';
+
+  @override
+  String get crmConvertAmountLabel => 'Amount';
+
+  @override
+  String get crmConvertSubmit => 'Convert';
+
+  @override
+  String get crmSectionIdentityContact => 'Identity & contact';
+
+  @override
+  String get crmSectionFunnel => 'Funnel & stage';
+
+  @override
+  String get crmSectionAssignmentFollowup => 'Assignment & reminder';
+
+  @override
+  String get crmSectionDescription => 'Description';
+
+  @override
+  String get crmSectionActivityLink => 'Customer or lead';
+
+  @override
+  String get crmSectionActivityScheduling => 'Schedule';
+
+  @override
+  String get crmSectionActivityDetails => 'Subject & details';
+
+  @override
+  String get crmSectionDealPipeline => 'Pipeline & identity';
+
+  @override
+  String get crmSectionDealCustomer => 'Customer & documents';
+
+  @override
+  String get crmSectionDealMoney => 'Amount, currency & dates';
+
+  @override
+  String get crmActivityPickLead => 'Search & select lead';
+
+  @override
+  String get crmActivityClearLead => 'Clear lead';
+
+  @override
+  String get crmActivityTypeCall => 'Call';
+
+  @override
+  String get crmActivityTypeEmail => 'Email';
+
+  @override
+  String get crmActivityTypeMeeting => 'Meeting';
+
+  @override
+  String get crmActivityTypeNote => 'Note';
+
+  @override
+  String get crmProcessFormSubtitle =>
+      'Code, display name, and default flags for this workflow.';
+
+  @override
+  String get crmProcessSectionMain => 'Definition';
+
+  @override
+  String get crmProcessSectionStages => 'Initial stages (new only)';
+
+  @override
+  String get inventoryNegativePolicySectionTitle =>
+      'Warehouse posting: stock shortage rules';
+
+  @override
+  String get inventoryNegativePolicyIntro =>
+      'By default, outgoing warehouse documents cannot be posted if tracked stock is insufficient. Use the switches below to allow negative stock separately for bulk vs unique-tracked products. Transfers can always stay strict.';
+
+  @override
+  String get inventoryNegativePolicyBulkTitle =>
+      'Allow negative stock for bulk items';
+
+  @override
+  String get inventoryNegativePolicyBulkSubtitle =>
+      'Products in bulk inventory mode with inventory tracking enabled.';
+
+  @override
+  String get inventoryNegativePolicyUniqueTitle =>
+      'Allow negative stock for unique items';
+
+  @override
+  String get inventoryNegativePolicyUniqueSubtitle =>
+      'Serialized / unique inventory mode; higher risk of mismatches with physical stock.';
+
+  @override
+  String get inventoryNegativePolicyTransferTitle =>
+      'Transfers always require sufficient stock';
+
+  @override
+  String get inventoryNegativePolicyTransferSubtitle =>
+      'When enabled, transfer documents always run full shortage checks, regardless of the two options above.';
 }

@@ -17372,7 +17372,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmNotesAuditEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No audit entries'**
+  /// **'No history entries yet.'**
   String get crmNotesAuditEmpty;
 
   /// No description provided for @crmNotesClose.
@@ -17459,6 +17459,12 @@ abstract class AppLocalizations {
   /// **'Allow comments (for public notes)'**
   String get crmNotesNoteTypeAllowComments;
 
+  /// No description provided for @crmNotesNoteTypeAllowCommentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only affects notes that are visible to the business (public notes).'**
+  String get crmNotesNoteTypeAllowCommentsHint;
+
   /// No description provided for @crmNotesNoteTypeCreated.
   ///
   /// In en, this message translates to:
@@ -17476,6 +17482,504 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This note will be removed. Continue?'**
   String get crmNotesDeleteConfirmMessage;
+
+  /// No description provided for @crmNotesDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete note'**
+  String get crmNotesDeleteConfirmTitle;
+
+  /// No description provided for @crmNotesDeleteWarnComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing comments will also be removed.'**
+  String get crmNotesDeleteWarnComments;
+
+  /// No description provided for @crmNoteTabDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get crmNoteTabDetails;
+
+  /// No description provided for @crmNoteTabComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Discussion'**
+  String get crmNoteTabComments;
+
+  /// No description provided for @crmNoteTabAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get crmNoteTabAudit;
+
+  /// No description provided for @crmNotesVisibilityShortPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Private'**
+  String get crmNotesVisibilityShortPrivate;
+
+  /// No description provided for @crmNotesVisibilityShortBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Team'**
+  String get crmNotesVisibilityShortBusiness;
+
+  /// No description provided for @crmNotesVisibilityShortShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get crmNotesVisibilityShortShared;
+
+  /// No description provided for @crmNotesVisibilityHintPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you can see this note.'**
+  String get crmNotesVisibilityHintPrivate;
+
+  /// No description provided for @crmNotesVisibilityHintBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'All members of this business who can access CRM.'**
+  String get crmNotesVisibilityHintBusiness;
+
+  /// No description provided for @crmNotesVisibilityHintShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you and the people you select.'**
+  String get crmNotesVisibilityHintShared;
+
+  /// No description provided for @crmNotesSharedPickHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one teammate (you are always included).'**
+  String get crmNotesSharedPickHint;
+
+  /// No description provided for @crmNotesEventDateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose date'**
+  String get crmNotesEventDateButton;
+
+  /// No description provided for @crmNotesNoLeadsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No leads match your search.'**
+  String get crmNotesNoLeadsFound;
+
+  /// No description provided for @crmNotesLeadSearchInDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type name, code, phone, or email…'**
+  String get crmNotesLeadSearchInDialogHint;
+
+  /// No description provided for @crmNotesCommentsDisabledTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments are disabled for this note type or visibility.'**
+  String get crmNotesCommentsDisabledTab;
+
+  /// No description provided for @crmNotesNoteTypeCodeHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Latin letters, numbers, and underscore only. Used internally.'**
+  String get crmNotesNoteTypeCodeHelper;
+
+  /// No description provided for @crmNotesNoteTypePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview in current language'**
+  String get crmNotesNoteTypePreview;
+
+  /// No description provided for @crmNotesNoteTypeSectionIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get crmNotesNoteTypeSectionIdentity;
+
+  /// No description provided for @crmNotesNoteTypeSectionTitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Titles'**
+  String get crmNotesNoteTypeSectionTitles;
+
+  /// No description provided for @crmNotesNoteTypeSectionBehavior.
+  ///
+  /// In en, this message translates to:
+  /// **'Behavior'**
+  String get crmNotesNoteTypeSectionBehavior;
+
+  /// No description provided for @crmNotesCommentInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New comment'**
+  String get crmNotesCommentInputLabel;
+
+  /// No description provided for @crmNotesAuditRecentLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the latest {count} entries'**
+  String crmNotesAuditRecentLimit(int count);
+
+  /// No description provided for @crmNoteAuditCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get crmNoteAuditCreated;
+
+  /// No description provided for @crmNoteAuditUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get crmNoteAuditUpdated;
+
+  /// No description provided for @crmNoteAuditVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility changed'**
+  String get crmNoteAuditVisibility;
+
+  /// No description provided for @crmNoteAuditAcl.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharing list changed'**
+  String get crmNoteAuditAcl;
+
+  /// No description provided for @crmNoteAuditSoftDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get crmNoteAuditSoftDeleted;
+
+  /// No description provided for @crmNoteAuditCommentCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment added'**
+  String get crmNoteAuditCommentCreated;
+
+  /// No description provided for @crmNoteAuditCommentDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment removed'**
+  String get crmNoteAuditCommentDeleted;
+
+  /// No description provided for @crmNoteAuditOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Event'**
+  String get crmNoteAuditOther;
+
+  /// No description provided for @crmDeleteIrreversible.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get crmDeleteIrreversible;
+
+  /// No description provided for @crmDeleteLeadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete lead'**
+  String get crmDeleteLeadTitle;
+
+  /// No description provided for @crmDeleteLeadMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete lead «{name}»?'**
+  String crmDeleteLeadMessage(Object name);
+
+  /// No description provided for @crmDeleteActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete activity'**
+  String get crmDeleteActivityTitle;
+
+  /// No description provided for @crmDeleteActivityMessageNamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete activity «{subject}»?'**
+  String crmDeleteActivityMessageNamed(Object subject);
+
+  /// No description provided for @crmDeleteActivityMessageUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this activity?'**
+  String get crmDeleteActivityMessageUnnamed;
+
+  /// No description provided for @crmDeleteDealTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete deal'**
+  String get crmDeleteDealTitle;
+
+  /// No description provided for @crmDeleteDealMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete deal «{title}»?'**
+  String crmDeleteDealMessage(Object title);
+
+  /// No description provided for @crmDeleteProcessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete process'**
+  String get crmDeleteProcessTitle;
+
+  /// No description provided for @crmDeleteProcessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete process «{name}»?'**
+  String crmDeleteProcessMessage(Object name);
+
+  /// No description provided for @crmDeleteStageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete stage'**
+  String get crmDeleteStageTitle;
+
+  /// No description provided for @crmDeleteStageMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete stage «{name}»?'**
+  String crmDeleteStageMessage(Object name);
+
+  /// No description provided for @crmLeadFormSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact details, funnel stage, and follow-up.'**
+  String get crmLeadFormSubtitle;
+
+  /// No description provided for @crmActivityFormSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to a customer or a lead, then describe the interaction.'**
+  String get crmActivityFormSubtitle;
+
+  /// No description provided for @crmDealFormSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer, pipeline stage, and financial details.'**
+  String get crmDealFormSubtitle;
+
+  /// No description provided for @crmConvertLeadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Convert to customer'**
+  String get crmConvertLeadTitle;
+
+  /// No description provided for @crmConvertLeadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creates a new person in contacts.'**
+  String get crmConvertLeadSubtitle;
+
+  /// No description provided for @crmConvertLeadIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The lead will be converted and a new person record will be created in contacts.'**
+  String get crmConvertLeadIntro;
+
+  /// No description provided for @crmConvertWithDealLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Also create a sales deal'**
+  String get crmConvertWithDealLabel;
+
+  /// No description provided for @crmConvertNoPipeline.
+  ///
+  /// In en, this message translates to:
+  /// **'No active sales pipeline is available.'**
+  String get crmConvertNoPipeline;
+
+  /// No description provided for @crmConvertPipelineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales pipeline'**
+  String get crmConvertPipelineLabel;
+
+  /// No description provided for @crmConvertStageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage'**
+  String get crmConvertStageLabel;
+
+  /// No description provided for @crmConvertDealTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Deal title'**
+  String get crmConvertDealTitleLabel;
+
+  /// No description provided for @crmConvertAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get crmConvertAmountLabel;
+
+  /// No description provided for @crmConvertSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Convert'**
+  String get crmConvertSubmit;
+
+  /// No description provided for @crmSectionIdentityContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity & contact'**
+  String get crmSectionIdentityContact;
+
+  /// No description provided for @crmSectionFunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'Funnel & stage'**
+  String get crmSectionFunnel;
+
+  /// No description provided for @crmSectionAssignmentFollowup.
+  ///
+  /// In en, this message translates to:
+  /// **'Assignment & reminder'**
+  String get crmSectionAssignmentFollowup;
+
+  /// No description provided for @crmSectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get crmSectionDescription;
+
+  /// No description provided for @crmSectionActivityLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer or lead'**
+  String get crmSectionActivityLink;
+
+  /// No description provided for @crmSectionActivityScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get crmSectionActivityScheduling;
+
+  /// No description provided for @crmSectionActivityDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject & details'**
+  String get crmSectionActivityDetails;
+
+  /// No description provided for @crmSectionDealPipeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Pipeline & identity'**
+  String get crmSectionDealPipeline;
+
+  /// No description provided for @crmSectionDealCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer & documents'**
+  String get crmSectionDealCustomer;
+
+  /// No description provided for @crmSectionDealMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount, currency & dates'**
+  String get crmSectionDealMoney;
+
+  /// No description provided for @crmActivityPickLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Search & select lead'**
+  String get crmActivityPickLead;
+
+  /// No description provided for @crmActivityClearLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear lead'**
+  String get crmActivityClearLead;
+
+  /// No description provided for @crmActivityTypeCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get crmActivityTypeCall;
+
+  /// No description provided for @crmActivityTypeEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get crmActivityTypeEmail;
+
+  /// No description provided for @crmActivityTypeMeeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting'**
+  String get crmActivityTypeMeeting;
+
+  /// No description provided for @crmActivityTypeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get crmActivityTypeNote;
+
+  /// No description provided for @crmProcessFormSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Code, display name, and default flags for this workflow.'**
+  String get crmProcessFormSubtitle;
+
+  /// No description provided for @crmProcessSectionMain.
+  ///
+  /// In en, this message translates to:
+  /// **'Definition'**
+  String get crmProcessSectionMain;
+
+  /// No description provided for @crmProcessSectionStages.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial stages (new only)'**
+  String get crmProcessSectionStages;
+
+  /// No description provided for @inventoryNegativePolicySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse posting: stock shortage rules'**
+  String get inventoryNegativePolicySectionTitle;
+
+  /// No description provided for @inventoryNegativePolicyIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'By default, outgoing warehouse documents cannot be posted if tracked stock is insufficient. Use the switches below to allow negative stock separately for bulk vs unique-tracked products. Transfers can always stay strict.'**
+  String get inventoryNegativePolicyIntro;
+
+  /// No description provided for @inventoryNegativePolicyBulkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow negative stock for bulk items'**
+  String get inventoryNegativePolicyBulkTitle;
+
+  /// No description provided for @inventoryNegativePolicyBulkSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Products in bulk inventory mode with inventory tracking enabled.'**
+  String get inventoryNegativePolicyBulkSubtitle;
+
+  /// No description provided for @inventoryNegativePolicyUniqueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow negative stock for unique items'**
+  String get inventoryNegativePolicyUniqueTitle;
+
+  /// No description provided for @inventoryNegativePolicyUniqueSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Serialized / unique inventory mode; higher risk of mismatches with physical stock.'**
+  String get inventoryNegativePolicyUniqueSubtitle;
+
+  /// No description provided for @inventoryNegativePolicyTransferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers always require sufficient stock'**
+  String get inventoryNegativePolicyTransferTitle;
+
+  /// No description provided for @inventoryNegativePolicyTransferSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, transfer documents always run full shortage checks, regardless of the two options above.'**
+  String get inventoryNegativePolicyTransferSubtitle;
 }
 
 class _AppLocalizationsDelegate

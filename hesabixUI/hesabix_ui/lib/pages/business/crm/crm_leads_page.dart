@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/services/business_user_service.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
+import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 
@@ -707,16 +710,11 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
   }
 
   Future<void> _onDelete(int id, String name) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف سرنخ'),
-        content: Text('آیا از حذف سرنخ «$name» اطمینان دارید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله، حذف')),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    final ok = await showCrmDeleteConfirmDialog(
+      context,
+      title: t.crmDeleteLeadTitle,
+      message: t.crmDeleteLeadMessage(name),
     );
     if (ok != true || !mounted) return;
     try {
@@ -841,88 +839,125 @@ class _ConvertLeadDialogState extends State<_ConvertLeadDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('تبدیل به مشتری'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('آیا می‌خواهید سرنخ «${widget.leadName}» را به مشتری تبدیل کنید؟ شخص جدید در بخش اشخاص ایجاد می‌شود.'),
-            const SizedBox(height: 16),
-            CheckboxListTile(
-              value: _createDeal,
-              onChanged: (v) {
-                setState(() => _createDeal = v ?? false);
-                if (v == true && _pipelineDefs.isNotEmpty && _selectedProcessId == null) {
-                  _selectedProcessId = _pipelineDefs.first['id'] as int?;
-                  if (_selectedProcessId != null) _loadStagesFor(_selectedProcessId!);
-                }
-              },
-              title: const Text('همزمان فرصت فروش ایجاد کن'),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return CrmResponsiveDialog(
+      title: t.crmConvertLeadTitle,
+      subtitle: t.crmConvertLeadSubtitle,
+      maxWidth: 520,
+      actions: [
+        TextButton(onPressed: _submitting ? null : () => Navigator.of(context).pop(null), child: Text(t.cancel)),
+        FilledButton(
+          onPressed: _submitting ? null : _onConfirm,
+          child: _submitting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(t.crmConvertSubmit),
+        ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
             ),
-            if (_createDeal) ...[
-              const SizedBox(height: 8),
-              if (_loadingPipelines)
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: cs.primary, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('«${widget.leadName}»', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text(t.crmConvertLeadIntro, style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          CheckboxListTile(
+            value: _createDeal,
+            onChanged: (v) {
+              setState(() => _createDeal = v ?? false);
+              if (v == true && _pipelineDefs.isNotEmpty && _selectedProcessId == null) {
+                _selectedProcessId = _pipelineDefs.first['id'] as int?;
+                if (_selectedProcessId != null) _loadStagesFor(_selectedProcessId!);
+              }
+            },
+            title: Text(t.crmConvertWithDealLabel),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (_createDeal) ...[
+            const SizedBox(height: 8),
+            if (_loadingPipelines)
+              const Padding(padding: EdgeInsets.all(8), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+            else if (_pipelineDefs.isEmpty)
+              ListTile(
+                leading: Icon(Icons.warning_amber_rounded, color: cs.onErrorContainer),
+                title: Text(
+                  t.crmConvertNoPipeline,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.onErrorContainer),
+                ),
+                tileColor: cs.errorContainer,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              )
+            else ...[
+              DropdownButtonFormField<int>(
+                value: _selectedProcessId,
+                decoration: InputDecoration(labelText: t.crmConvertPipelineLabel, border: const OutlineInputBorder()),
+                items: _pipelineDefs.map((e) {
+                  final id = e['id'] as int?;
+                  final name = e['name']?.toString() ?? '${e['code'] ?? id}';
+                  return DropdownMenuItem<int>(value: id, child: Text(name));
+                }).toList(),
+                onChanged: (id) {
+                  if (id != null) {
+                    setState(() => _selectedProcessId = id);
+                    _loadStagesFor(id);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              if (_loadingStages)
                 const Padding(padding: EdgeInsets.all(8), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
-              else if (_pipelineDefs.isEmpty)
-                const Padding(padding: EdgeInsets.all(8), child: Text('فرایند فروش (پایپلاین) یافت نشد.', style: TextStyle(color: Colors.orange)))
-              else ...[
+              else
                 DropdownButtonFormField<int>(
-                  value: _selectedProcessId,
-                  decoration: const InputDecoration(labelText: 'پایپلاین فروش', border: OutlineInputBorder()),
-                  items: _pipelineDefs.map((e) {
+                  value: _selectedStageId,
+                  decoration: InputDecoration(labelText: t.crmConvertStageLabel, border: const OutlineInputBorder()),
+                  items: _stages.map((e) {
                     final id = e['id'] as int?;
                     final name = e['name']?.toString() ?? '${e['code'] ?? id}';
                     return DropdownMenuItem<int>(value: id, child: Text(name));
                   }).toList(),
-                  onChanged: (id) {
-                    if (id != null) {
-                      setState(() => _selectedProcessId = id);
-                      _loadStagesFor(id);
-                    }
-                  },
+                  onChanged: (id) => setState(() => _selectedStageId = id),
                 ),
-                const SizedBox(height: 12),
-                if (_loadingStages)
-                  const Padding(padding: EdgeInsets.all(8), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
-                else
-                  DropdownButtonFormField<int>(
-                    value: _selectedStageId,
-                    decoration: const InputDecoration(labelText: 'مرحله', border: OutlineInputBorder()),
-                    items: _stages.map((e) {
-                      final id = e['id'] as int?;
-                      final name = e['name']?.toString() ?? '${e['code'] ?? id}';
-                      return DropdownMenuItem<int>(value: id, child: Text(name));
-                    }).toList(),
-                    onChanged: (id) => setState(() => _selectedStageId = id),
-                  ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(labelText: 'عنوان فرصت فروش', border: OutlineInputBorder()),
-                  maxLength: 255,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _amountController,
-                  decoration: const InputDecoration(labelText: 'مبلغ (ریال)', border: OutlineInputBorder()),
-                  keyboardType: TextInputType.number,
-                ),
-              ],
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(labelText: t.crmConvertDealTitleLabel, border: const OutlineInputBorder()),
+                maxLength: 255,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _amountController,
+                decoration: InputDecoration(labelText: t.crmConvertAmountLabel, border: const OutlineInputBorder()),
+                keyboardType: TextInputType.number,
+              ),
             ],
           ],
-        ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: _submitting ? null : () => Navigator.of(context).pop(null), child: const Text('انصراف')),
-        FilledButton(
-          onPressed: _submitting ? null : _onConfirm,
-          child: _submitting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('تبدیل'),
-        ),
-      ],
     );
   }
 }
@@ -1025,8 +1060,10 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.initial != null;
+    final t = AppLocalizations.of(context);
     return CrmResponsiveDialog(
       title: isEdit ? 'ویرایش سرنخ' : 'سرنخ جدید',
+      subtitle: t.crmLeadFormSubtitle,
       actions: [
         if (isEdit &&
             widget.initial != null &&
@@ -1056,172 +1093,207 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
                   leadId: widget.initial!['id'] as int?,
                 ),
               if (isEdit && (widget.initial!['person_id'] != null || widget.initial!['converted_at'] != null))
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'تبدیل شده به مشتری${widget.initial!['person_name'] != null ? ': ${widget.initial!['person_name']}' : ''}',
-                          style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w500),
-                        ),
+                Builder(
+                  builder: (ctx) {
+                    final cs = Theme.of(ctx).colorScheme;
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: cs.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.onTertiaryContainer.withValues(alpha: 0.25)),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: cs.onTertiaryContainer),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'تبدیل شده به مشتری${widget.initial!['person_name'] != null ? ': ${widget.initial!['person_name']}' : ''}',
+                              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                                    color: cs.onTertiaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              if (isEdit)
-                TextFormField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(labelText: 'کد'),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-              if (isEdit) const SizedBox(height: 12),
-              if (!isEdit) ...[
-                SwitchListTile(
-                  title: const Text('کد خودکار'),
-                  subtitle: Text(_codeAuto ? 'کد به صورت خودکار تولید می‌شود' : 'کد دستی وارد کنید'),
-                  value: _codeAuto,
-                  onChanged: (v) => setState(() => _codeAuto = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                if (!_codeAuto) ...[
-                  TextFormField(
-                    controller: _codeController,
-                    decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: L-001'),
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              ],
-              if (widget.leadSources.isNotEmpty)
-                DropdownButtonFormField<String?>(
-                  value: _selectedSourceCode,
-                  decoration: const InputDecoration(labelText: 'منبع سرنخ', isDense: true),
-                  items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('انتخاب نشده')),
-                    ...widget.leadSources.map((s) => DropdownMenuItem<String?>(
-                          value: s['code'] as String?,
-                          child: Text(s['label']?.toString() ?? s['code']?.toString() ?? ''),
-                        )),
-                  ],
-                  onChanged: (v) => setState(() => _selectedSourceCode = v),
-                ),
-              if (widget.leadSources.isNotEmpty) const SizedBox(height: 12),
-              DropdownButtonFormField<int?>(
-                value: _selectedProcessId,
-                decoration: const InputDecoration(labelText: 'فانل سرنخ'),
-                items: widget.processDefs.map((p) => DropdownMenuItem<int?>(value: p['id'] as int?, child: Text(p['name']?.toString() ?? ''))).toList(),
-                onChanged: isEdit ? null : (v) {
-                  setState(() {
-                    _selectedProcessId = v;
-                    _selectedStageId = null;
-                    if (v != null) {
-                      final proc = widget.processDefs.firstWhere((e) => e['id'] == v, orElse: () => <String, dynamic>{});
-                      _stages = (proc['stages'] is List ? (proc['stages'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[]);
-                      _selectedStageId = _stages.isNotEmpty ? _stages.first['id'] as int? : null;
-                    } else {
-                      _stages = [];
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int?>(
-                value: _selectedStageId,
-                decoration: const InputDecoration(labelText: 'مرحله'),
-                items: _stages.map((s) => DropdownMenuItem<int?>(value: s['id'] as int?, child: Text(s['name']?.toString() ?? ''))).toList(),
-                onChanged: (v) => setState(() => _selectedStageId = v),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'نام *'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _companyController,
-                decoration: const InputDecoration(labelText: 'نام شرکت'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _mobileController,
-                decoration: const InputDecoration(labelText: 'موبایل'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'ایمیل'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'توضیحات'),
-                maxLines: 2,
-              ),
-              if (_businessUsers.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int?>(
-                  value: _selectedAssignedToUserId,
-                  decoration: const InputDecoration(labelText: 'تخصیص به', isDense: true),
-                  items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('انتخاب نشده')),
-                    ..._businessUsers.map((u) => DropdownMenuItem<int?>(
-                          value: (u['id'] as num?)?.toInt(),
-                          child: Text(u['name']?.toString() ?? ''),
-                        )),
-                  ],
-                  onChanged: (v) => setState(() => _selectedAssignedToUserId = v),
-                ),
-              ],
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  _nextFollowUpAt == null
-                      ? 'یادآور پیگیری: تعیین نشده'
-                      : 'یادآور پیگیری: ${DateFormat('yyyy/MM/dd HH:mm').format(_nextFollowUpAt!)}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+              CrmSectionCard(
+                title: t.crmSectionFunnel,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextButton(
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _nextFollowUpAt ?? DateTime.now(),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (date == null || !mounted) return;
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: _nextFollowUpAt != null
-                              ? TimeOfDay.fromDateTime(_nextFollowUpAt!)
-                              : TimeOfDay.now(),
-                        );
-                        if (time != null && mounted) {
-                          setState(() => _nextFollowUpAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
-                        }
-                      },
-                      child: const Text('انتخاب'),
-                    ),
-                    if (_nextFollowUpAt != null)
-                      TextButton(
-                        onPressed: () => setState(() => _nextFollowUpAt = null),
-                        child: const Text('پاک کردن'),
+                    if (widget.leadSources.isNotEmpty)
+                      DropdownButtonFormField<String?>(
+                        value: _selectedSourceCode,
+                        decoration: const InputDecoration(labelText: 'منبع سرنخ', isDense: true, border: OutlineInputBorder()),
+                        items: [
+                          const DropdownMenuItem<String?>(value: null, child: Text('انتخاب نشده')),
+                          ...widget.leadSources.map((s) => DropdownMenuItem<String?>(
+                                value: s['code'] as String?,
+                                child: Text(s['label']?.toString() ?? s['code']?.toString() ?? ''),
+                              )),
+                        ],
+                        onChanged: (v) => setState(() => _selectedSourceCode = v),
                       ),
+                    if (widget.leadSources.isNotEmpty) const SizedBox(height: 12),
+                    DropdownButtonFormField<int?>(
+                      value: _selectedProcessId,
+                      decoration: const InputDecoration(labelText: 'فانل سرنخ', border: OutlineInputBorder()),
+                      items: widget.processDefs.map((p) => DropdownMenuItem<int?>(value: p['id'] as int?, child: Text(p['name']?.toString() ?? ''))).toList(),
+                      onChanged: isEdit
+                          ? null
+                          : (v) {
+                              setState(() {
+                                _selectedProcessId = v;
+                                _selectedStageId = null;
+                                if (v != null) {
+                                  final proc = widget.processDefs.firstWhere((e) => e['id'] == v, orElse: () => <String, dynamic>{});
+                                  _stages = (proc['stages'] is List ? (proc['stages'] as List).cast<Map<String, dynamic>>() : <Map<String, dynamic>>[]);
+                                  _selectedStageId = _stages.isNotEmpty ? _stages.first['id'] as int? : null;
+                                } else {
+                                  _stages = [];
+                                }
+                              });
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int?>(
+                      value: _selectedStageId,
+                      decoration: const InputDecoration(labelText: 'مرحله', border: OutlineInputBorder()),
+                      items: _stages.map((s) => DropdownMenuItem<int?>(value: s['id'] as int?, child: Text(s['name']?.toString() ?? ''))).toList(),
+                      onChanged: (v) => setState(() => _selectedStageId = v),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              CrmSectionCard(
+                title: t.crmSectionIdentityContact,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isEdit)
+                      TextFormField(
+                        controller: _codeController,
+                        decoration: const InputDecoration(labelText: 'کد', border: OutlineInputBorder()),
+                        textCapitalization: TextCapitalization.characters,
+                      ),
+                    if (isEdit) const SizedBox(height: 12),
+                    if (!isEdit) ...[
+                      SwitchListTile(
+                        title: const Text('کد خودکار'),
+                        subtitle: Text(_codeAuto ? 'کد به صورت خودکار تولید می‌شود' : 'کد دستی وارد کنید'),
+                        value: _codeAuto,
+                        onChanged: (v) => setState(() => _codeAuto = v),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      if (!_codeAuto) ...[
+                        TextFormField(
+                          controller: _codeController,
+                          decoration: const InputDecoration(labelText: 'کد دستی', hintText: 'مثال: L-001', border: OutlineInputBorder()),
+                          textCapitalization: TextCapitalization.characters,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'نام *', border: OutlineInputBorder()),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'الزامی' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _companyController,
+                      decoration: const InputDecoration(labelText: 'نام شرکت', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _mobileController,
+                      decoration: const InputDecoration(labelText: 'موبایل', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(labelText: 'ایمیل', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              CrmSectionCard(
+                title: t.crmSectionDescription,
+                child: TextFormField(
+                  controller: _descController,
+                  decoration: const InputDecoration(labelText: 'توضیحات', border: OutlineInputBorder()),
+                  maxLines: 2,
+                ),
+              ),
+              const SizedBox(height: 16),
+              CrmSectionCard(
+                title: t.crmSectionAssignmentFollowup,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_businessUsers.isNotEmpty)
+                      DropdownButtonFormField<int?>(
+                        value: _selectedAssignedToUserId,
+                        decoration: const InputDecoration(labelText: 'تخصیص به', isDense: true, border: OutlineInputBorder()),
+                        items: [
+                          const DropdownMenuItem<int?>(value: null, child: Text('انتخاب نشده')),
+                          ..._businessUsers.map((u) => DropdownMenuItem<int?>(
+                                value: (u['id'] as num?)?.toInt(),
+                                child: Text(u['name']?.toString() ?? ''),
+                              )),
+                        ],
+                        onChanged: (v) => setState(() => _selectedAssignedToUserId = v),
+                      ),
+                    if (_businessUsers.isNotEmpty) const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                      title: Text(
+                        _nextFollowUpAt == null
+                            ? 'یادآور پیگیری: تعیین نشده'
+                            : 'یادآور پیگیری: ${DateFormat('yyyy/MM/dd HH:mm').format(_nextFollowUpAt!)}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: _nextFollowUpAt ?? DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (date == null || !mounted) return;
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: _nextFollowUpAt != null ? TimeOfDay.fromDateTime(_nextFollowUpAt!) : TimeOfDay.now(),
+                              );
+                              if (time != null && mounted) {
+                                setState(() => _nextFollowUpAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+                              }
+                            },
+                            child: const Text('انتخاب'),
+                          ),
+                          if (_nextFollowUpAt != null)
+                            TextButton(
+                              onPressed: () => setState(() => _nextFollowUpAt = null),
+                              child: const Text('پاک کردن'),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -93,6 +93,29 @@ class Business(Base):
         server_default="draft",
         comment="none | draft | posted",
     )
+
+    # کنترل کسری هنگام قطعی کردن حواله (خروج): پیش‌فرض سخت‌گیرانه
+    allow_negative_inventory_for_bulk: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="خروج با موجودی منفی برای کالاهای فله‌ای (inventory_mode غیر unique)",
+    )
+    allow_negative_inventory_for_unique: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="خروج با موجودی منفی برای کالاهای یونیک",
+    )
+    warehouse_transfer_require_positive_stock: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="انتقال بین انبار همیشه نیاز به موجودی کافی (نادیده گرفتن اجازه منفی)",
+    )
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
