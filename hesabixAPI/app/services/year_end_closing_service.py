@@ -89,7 +89,7 @@ def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
     return {"metadata": metadata, "tables": data_out}
 
 
-def _create_backup_before_closing(
+async def _create_backup_before_closing(
     db: Session,
     business_id: int,
     user_id: int,
@@ -121,27 +121,22 @@ def _create_backup_before_closing(
         
         # ذخیره فایل
         storage = FileStorageService(db)
-        import anyio
-        async def _upload():
-            faux_upload = UploadFile(filename=filename, file=io.BytesIO(buf.getvalue()))
-            saved = await storage.upload_file(
-                faux_upload,
-                user_id=user_id,
-                module_context="business_backup",
-                developer_data={
-                    "business_id": business_id,
-                    "schema_version": snapshot["metadata"]["schema_version"],
-                    "backup_reason": "year_end_closing",
-                    "fiscal_year_id": fiscal_year_id,
-                },
-                is_temporary=False,
-                expires_in_days=3650,
-                business_id=business_id,
-                check_storage_limit=True,
-            )
-            return saved
-        
-        saved = anyio.run(_upload)
+        faux_upload = UploadFile(filename=filename, file=io.BytesIO(buf.getvalue()))
+        saved = await storage.upload_file(
+            faux_upload,
+            user_id=user_id,
+            module_context="business_backup",
+            developer_data={
+                "business_id": business_id,
+                "schema_version": snapshot["metadata"]["schema_version"],
+                "backup_reason": "year_end_closing",
+                "fiscal_year_id": fiscal_year_id,
+            },
+            is_temporary=False,
+            expires_in_days=3650,
+            business_id=business_id,
+            check_storage_limit=True,
+        )
         
         return {
             "success": True,
@@ -428,7 +423,7 @@ def preview_year_end_closing(
     }
 
 
-def close_fiscal_year(
+async def close_fiscal_year(
     db: Session,
     business_id: int,
     fiscal_year_id: int,
@@ -467,7 +462,7 @@ def close_fiscal_year(
     8. تراز افتتاحیه سال جدید را ایجاد می‌کند (در صورت نیاز)
     """
     # مرحله 1: ایجاد پشتیبان قبل از بستن
-    backup_result = _create_backup_before_closing(db, business_id, user_id, fiscal_year_id)
+    backup_result = await _create_backup_before_closing(db, business_id, user_id, fiscal_year_id)
     if not backup_result.get("success", False):
         raise ApiError(
             "BACKUP_FAILED",
@@ -951,19 +946,13 @@ def _create_person_balance_document(
         if person_balance == 0:
             continue
         
-        # پیدا کردن حساب مربوط به شخص
-        person_account_id = person.account_id
-        
-        if not person_account_id:
-            # اگر حساب مشخص نشده، از حساب پیش‌فرض استفاده کن
-            if person_balance > 0:
-                # بدهکار = حساب دریافتنی
-                person_account = _get_fixed_account_by_code(db, "13101")
-            else:
-                # بستانکار = حساب پرداختنی
-                person_account = _get_fixed_account_by_code(db, "21101")
-            person_account_id = person_account.id
-        
+        # حساب کنترل اشخاص (مدل Person فیلد account_id ندارد؛ از حساب‌های ثابت نمودار استفاده می‌شود)
+        if person_balance > 0:
+            person_account = _get_fixed_account_by_code(db, "13101")
+        else:
+            person_account = _get_fixed_account_by_code(db, "21101")
+        person_account_id = person_account.id
+
         # اضافه کردن به خطوط سند
         if person_balance > 0:
             person_lines.append({
@@ -1304,19 +1293,13 @@ def _create_opening_balance_for_new_fiscal_year(
         if person_balance == 0:
             continue
         
-        # پیدا کردن حساب مربوط به شخص
-        person_account_id = person.account_id
-        
-        if not person_account_id:
-            # اگر حساب مشخص نشده، از حساب پیش‌فرض استفاده کن
-            if person_balance > 0:
-                # بدهکار = حساب دریافتنی
-                person_account = _get_fixed_account_by_code(db, "13101")
-            else:
-                # بستانکار = حساب پرداختنی
-                person_account = _get_fixed_account_by_code(db, "21101")
-            person_account_id = person_account.id
-        
+        # حساب کنترل اشخاص (مدل Person فیلد account_id ندارد؛ از حساب‌های ثابت نمودار استفاده می‌شود)
+        if person_balance > 0:
+            person_account = _get_fixed_account_by_code(db, "13101")
+        else:
+            person_account = _get_fixed_account_by_code(db, "21101")
+        person_account_id = person_account.id
+
         # اضافه کردن به خطوط سند
         if person_balance > 0:
             account_lines.append({
@@ -1324,7 +1307,7 @@ def _create_opening_balance_for_new_fiscal_year(
                 'person_id': person.id,
                 'debit': float(person_balance),
                 'credit': 0.0,
-                'description': f'مانده ابتدای دوره - {person.name}',
+                'description': f'مانده ابتدای دوره - {person.alias_name}',
             })
         else:
             account_lines.append({
@@ -1332,7 +1315,7 @@ def _create_opening_balance_for_new_fiscal_year(
                 'person_id': person.id,
                 'debit': 0.0,
                 'credit': float(-person_balance),
-                'description': f'مانده ابتدای دوره - {person.name}',
+                'description': f'مانده ابتدای دوره - {person.alias_name}',
             })
     
     # محاسبه مانده حساب‌های بانکی و صندوق

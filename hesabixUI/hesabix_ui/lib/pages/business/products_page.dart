@@ -992,9 +992,10 @@ class _ProductsPageState extends State<ProductsPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<Map<String, dynamic>>(
-        key: _tableKey,
-        config: DataTableConfig<Map<String, dynamic>>(
+      body: SingleChildScrollView(
+        child: DataTableWidget<Map<String, dynamic>>(
+          key: _tableKey,
+          config: DataTableConfig<Map<String, dynamic>>(
           endpoint: '/api/v1/products/business/${widget.businessId}/search',
           title: t.products,
           excelEndpoint: '/api/v1/products/business/${widget.businessId}/export/excel',
@@ -1553,9 +1554,10 @@ class _ProductsPageState extends State<ProductsPage> {
             'include_inventory': true,
           },
           onRowTap: (item) => _showProductDetailsDialog(item),
-        
-        expandBodyHeightToFitRows: true,),
+          expandBodyHeightToFitRows: true,
+        ),
         fromJson: (json) => json,
+        ),
       ),
     );
   }

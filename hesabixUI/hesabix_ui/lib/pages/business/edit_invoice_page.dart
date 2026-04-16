@@ -66,7 +66,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
-  // Party selections (اختیاری برای نمایش؛ هنگام ذخیره از extra_info اصلی نگهداری می‌شود)
+  // طرف حساب (فروش/برگشت فروش: مشتری؛ خرید/برگشت خرید: تامین‌کننده)
   Customer? _selectedCustomer;
   Person? _selectedSupplier;
 
@@ -899,7 +899,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         },
                       ),
                       const SizedBox(height: 8),
-                      const Text('توجه: در ویرایش فاکتور، حواله‌های انبار به صورت خودکار بازسازی نمی‌شوند. لطفاً پس از ذخیره تغییرات، حواله‌های مرتبط را بررسی کنید.'),
+                      const Text(
+                        'توجه: با ذخیرهٔ فاکتور، حواله‌های قبلی مرتبط با همین فاکتور با تنظیمات بالا جایگزین می‌شوند؛ '
+                        'حوالهٔ پیش‌نویس حذف می‌شود و برای حوالهٔ قطعی، سند معکوس ثبت می‌شود. اگر خطای همگام‌سازی دیدید، وضعیت انبار را بررسی کنید.',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                 ),
@@ -1051,6 +1055,25 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         }
         mergedExtra['installment_plan'] = st.buildPlanMap();
       }
+    }
+
+    final isSalesOrReturn =
+        _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
+    final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase ||
+        _selectedInvoiceType == InvoiceType.purchaseReturn;
+
+    if (isSalesOrReturn && _selectedCustomer == null) {
+      return 'انتخاب طرف حساب الزامی است';
+    }
+    if (isPurchaseOrReturn && _selectedSupplier == null) {
+      return 'انتخاب تامین‌کننده الزامی است';
+    }
+
+    // هم‌راستا با new_invoice_page: person_id باید از انتخاب فعلی در extra_info برود
+    if (isSalesOrReturn && _selectedCustomer != null) {
+      mergedExtra['person_id'] = _selectedCustomer!.id;
+    } else if (isPurchaseOrReturn && _selectedSupplier != null) {
+      mergedExtra['person_id'] = _selectedSupplier!.id;
     }
 
     String _convertInvoiceTypeToApi(InvoiceType type) => 'invoice_${type.value}';

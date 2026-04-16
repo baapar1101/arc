@@ -166,7 +166,7 @@ def preview_year_end_closing_endpoint(
 
 @router.post("/{business_id}/fiscal-years/{fiscal_year_id}/close")
 @require_business_access("business_id")
-def close_fiscal_year_endpoint(
+async def close_fiscal_year_endpoint(
     request: Request,
     business_id: int,
     fiscal_year_id: int,
@@ -177,7 +177,7 @@ def close_fiscal_year_endpoint(
 ) -> Dict[str, Any]:
     """بستن سال مالی"""
     try:
-        result = close_fiscal_year(
+        result = await close_fiscal_year(
             db=db,
             business_id=business_id,
             fiscal_year_id=fiscal_year_id,

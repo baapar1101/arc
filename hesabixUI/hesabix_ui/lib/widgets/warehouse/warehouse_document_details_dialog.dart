@@ -674,114 +674,123 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                     child: Center(child: Text('خطی وجود ندارد')),
                   )
                 else
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columnSpacing: 20,
-                      columns: const [
-                        DataColumn(label: Text('کالا / دسته')),
-                        DataColumn(label: Text('واحد')),
-                        DataColumn(label: Text('انبار')),
-                        DataColumn(label: Text('نوع حرکت')),
-                        DataColumn(label: Text('تعداد')),
-                        DataColumn(label: Text('یونیک / سریال')),
-                        DataColumn(label: Text('سایر')),
-                      ],
-                      rows: lines.map<DataRow>((line) {
-                        final lineMap = Map<String, dynamic>.from(line as Map);
-                        final lineId = lineMap['id'] as int?;
-                        final productId = lineMap['product_id'] as int?;
-                        final warehouseId = lineMap['warehouse_id'] as int?;
-                        final warehouseName = lineMap['warehouse_name'] as String?;
-                        final movement = lineMap['movement'] as String?;
-                        final quantity = lineMap['quantity'] as num?;
-                        final productName = lineMap['product_name'] as String?;
-                        final productCode = lineMap['product_code'] as String?;
-                        final productCategoryName = lineMap['product_category_name'] as String?;
-                        final unit = lineMap['product_main_unit'] as String?;
-                        final instanceSummary = _instanceSummaryText(lineMap['instance_data']);
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: DataTable(
+                            columnSpacing: 20,
+                            columns: const [
+                              DataColumn(label: Text('کالا / دسته')),
+                              DataColumn(label: Text('واحد')),
+                              DataColumn(label: Text('انبار')),
+                              DataColumn(label: Text('نوع حرکت')),
+                              DataColumn(label: Text('تعداد')),
+                              DataColumn(label: Text('یونیک / سریال')),
+                              DataColumn(label: Text('سایر')),
+                            ],
+                            rows: lines.map<DataRow>((line) {
+                              final lineMap = Map<String, dynamic>.from(line as Map);
+                              final lineId = lineMap['id'] as int?;
+                              final productId = lineMap['product_id'] as int?;
+                              final warehouseId = lineMap['warehouse_id'] as int?;
+                              final warehouseName = lineMap['warehouse_name'] as String?;
+                              final movement = lineMap['movement'] as String?;
+                              final quantity = lineMap['quantity'] as num?;
+                              final productName = lineMap['product_name'] as String?;
+                              final productCode = lineMap['product_code'] as String?;
+                              final productCategoryName = lineMap['product_category_name'] as String?;
+                              final unit = lineMap['product_main_unit'] as String?;
+                              final instanceSummary = _instanceSummaryText(lineMap['instance_data']);
 
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 220),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      productName ?? (productId != null ? 'شناسه $productId' : '-'),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 220),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            productName ?? (productId != null ? 'شناسه $productId' : '-'),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (productCode != null && productCode.isNotEmpty)
+                                            Text(
+                                              'کد: $productCode',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          if (productCategoryName != null && productCategoryName.isNotEmpty)
+                                            Text(
+                                              'دسته: $productCategoryName',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                    if (productCode != null && productCode.isNotEmpty)
-                                      Text(
-                                        'کد: $productCode',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    if (productCategoryName != null && productCategoryName.isNotEmpty)
-                                      Text(
-                                        'دسته: $productCategoryName',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            DataCell(Text(unit?.isNotEmpty == true ? unit! : '-')),
-                            DataCell(
-                              isDraft && lineId != null
-                                  ? SizedBox(
-                                      width: 160,
-                                      child: WarehouseComboboxWidget(
-                                        businessId: widget.businessId,
-                                        selectedWarehouseId: warehouseId,
-                                        onChanged: (wid) {
-                                          _updateLineWarehouse(lineId, wid);
-                                        },
-                                      ),
-                                    )
-                                  : ConstrainedBox(
-                                      constraints: const BoxConstraints(maxWidth: 160),
+                                  ),
+                                  DataCell(Text(unit?.isNotEmpty == true ? unit! : '-')),
+                                  DataCell(
+                                    isDraft && lineId != null
+                                        ? SizedBox(
+                                            width: 160,
+                                            child: WarehouseComboboxWidget(
+                                              businessId: widget.businessId,
+                                              selectedWarehouseId: warehouseId,
+                                              onChanged: (wid) {
+                                                _updateLineWarehouse(lineId, wid);
+                                              },
+                                            ),
+                                          )
+                                        : ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 160),
+                                            child: Text(
+                                              warehouseName ??
+                                                  (warehouseId != null ? 'شناسه $warehouseId' : '-'),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                  ),
+                                  DataCell(Text(movement == 'in' ? 'ورود' : 'خروج')),
+                                  DataCell(Text(_formatQuantity(quantity))),
+                                  DataCell(
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 200),
                                       child: Text(
-                                        warehouseName ??
-                                            (warehouseId != null ? 'شناسه $warehouseId' : '-'),
-                                        maxLines: 2,
+                                        instanceSummary,
+                                        maxLines: 4,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                            ),
-                            DataCell(Text(movement == 'in' ? 'ورود' : 'خروج')),
-                            DataCell(Text(_formatQuantity(quantity))),
-                            DataCell(
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 200),
-                                child: Text(
-                                  instanceSummary,
-                                  maxLines: 4,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              _lineExtraSnippet(lineMap['extra_info']) == null
-                                  ? const Text('—')
-                                  : Tooltip(
-                                      message: _lineExtraSnippet(lineMap['extra_info'])!,
-                                      child: const Icon(Icons.info_outline, size: 20),
-                                    ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                                  ),
+                                  DataCell(
+                                    _lineExtraSnippet(lineMap['extra_info']) == null
+                                        ? const Text('—')
+                                        : Tooltip(
+                                            message: _lineExtraSnippet(lineMap['extra_info'])!,
+                                            child: const Icon(Icons.info_outline, size: 20),
+                                          ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   ),
               ],
             ),

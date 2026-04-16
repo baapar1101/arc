@@ -336,6 +336,126 @@ def _apply_business_defaults_invoice_warehouse(db: Session, business_id: int, da
     data["extra_info"] = extra
 
 
+def _remove_old_invoice_warehouse_documents(
+    db: Session,
+    business_id: int,
+    invoice_document_id: int,
+    warehouse_document_ids: List[int],
+    user_id: int,
+) -> None:
+    """
+    حذف حوالهٔ پیش‌نویس یا لغو+پست معکوس برای حوالهٔ قطعی،
+    فقط برای اسنادی که source_type=invoice و source_document_id همین فاکتور است.
+    """
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    from app.services.warehouse_service import cancel_warehouse_document, post_warehouse_document
+
+    seen: set[int] = set()
+    for raw_id in warehouse_document_ids:
+        try:
+            wid = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if wid in seen:
+            continue
+        seen.add(wid)
+        wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wid).first()
+        if not wh or int(wh.business_id) != int(business_id):
+            continue
+        if (wh.source_type or "") != "invoice":
+            continue
+        if wh.source_document_id is None or int(wh.source_document_id) != int(invoice_document_id):
+            continue
+        st = (wh.status or "").strip().lower()
+        if st == "draft":
+            db.query(WarehouseDocumentLine).filter(
+                WarehouseDocumentLine.warehouse_document_id == wh.id
+            ).delete(synchronize_session=False)
+            db.delete(wh)
+        elif st == "posted":
+            cancel_wh = cancel_warehouse_document(db, business_id, int(wh.id), user_id)
+            post_warehouse_document(db, int(cancel_wh.id))
+        # cancelled: بدون اقدام
+    db.flush()
+
+
+def _create_warehouse_documents_for_invoice(
+    db: Session,
+    business_id: int,
+    document: Document,
+    user_id: int,
+    lines_input: List[Dict[str, Any]],
+    invoice_type: str,
+) -> List[int]:
+    """
+    ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
+    در صورت ایجاد حواله، extra_info.links.warehouse_document_ids روی سند فاکتور به‌روز می‌شود.
+    """
+    if not bool((document.extra_info or {}).get("post_inventory", True)):
+        return []
+    from app.services.warehouse_service import (
+        create_from_invoice,
+        invoice_lines_have_trackable_inventory_products,
+        post_warehouse_document,
+    )
+    from adapters.db.models.product_instance import ProductInstance
+
+    created_wh_ids: List[int] = []
+    auto_post_warehouse = bool((document.extra_info or {}).get("auto_post_warehouse", False))
+
+    if invoice_type == INVOICE_PRODUCTION:
+        out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
+        in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+        if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
+            wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
+            created_wh_ids.append(int(wh_issue.id))
+            if auto_post_warehouse:
+                post_warehouse_document(db, int(wh_issue.id))
+        if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
+            wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
+            created_wh_ids.append(int(wh_receipt.id))
+            if auto_post_warehouse:
+                post_warehouse_document(db, int(wh_receipt.id))
+    elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_input):
+        if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
+            wh_type = "issue"
+        elif invoice_type in {INVOICE_PURCHASE, INVOICE_SALES_RETURN}:
+            wh_type = "receipt"
+        else:
+            wh_type = "issue"
+        wh = create_from_invoice(db, business_id, document, lines_input, wh_type, user_id)
+        created_wh_ids.append(int(wh.id))
+
+        if auto_post_warehouse:
+            post_warehouse_document(db, int(wh.id))
+
+            if invoice_type == INVOICE_SALES:
+                for line in lines_input:
+                    instance_id = (line.get("extra_info") or {}).get("instance_id")
+                    if instance_id:
+                        instance = db.query(ProductInstance).filter(
+                            ProductInstance.id == int(instance_id),
+                            ProductInstance.business_id == business_id,
+                        ).first()
+                        if instance:
+                            instance.status = "sold"
+                            instance.current_invoice_id = document.id
+                            instance.warehouse_id = None
+                            db.flush()
+
+    if created_wh_ids:
+        extra = dict(document.extra_info) if document.extra_info else {}
+        links = dict((extra.get("links") or {}))
+        links["warehouse_document_ids"] = created_wh_ids
+        extra["links"] = links
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
+        flag_modified(document, "extra_info")
+        db.flush()
+
+    return created_wh_ids
+
+
 def _build_product_tax_snapshot_map(
     db: Session,
     business_id: int,
@@ -2923,79 +3043,18 @@ def create_invoice(
     else:
         logger.warning(f"No payment_docs to save for invoice {document.id}. payments data: {payments}")
 
-    # ایجاد حواله انبار در صورت نیاز (بر اساس تنظیمات enable_warehouse_document)
-    # post_inventory: تعیین می‌کند که آیا اصلاً حواله ایجاد شود یا نه
-    # auto_post_warehouse: تعیین می‌کند که آیا حواله بلافاصله قطعی شود (posted) یا به صورت پیش‌نویس (draft) بماند
+    # ایجاد حواله انبار در صورت نیاز (همان منطق در _create_warehouse_documents_for_invoice)
+    # post_inventory: آیا حواله ایجاد شود؛ auto_post_warehouse: قطعی فوری یا پیش‌نویس
     try:
-        if bool(data.get("extra_info", {}).get("post_inventory", True)):
-            from app.services.warehouse_service import (
-                create_from_invoice,
-                invoice_lines_have_trackable_inventory_products,
-                post_warehouse_document,
-            )
-            from adapters.db.models.product_instance import ProductInstance
-            from adapters.db.models.warehouse_document import WarehouseDocument
-            
-            created_wh_ids: List[int] = []
-            auto_post_warehouse = bool(data.get("extra_info", {}).get("auto_post_warehouse", False))
-            
-            if invoice_type == INVOICE_PRODUCTION:
-                out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
-                in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
-                if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
-                    wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
-                    created_wh_ids.append(int(wh_issue.id))
-                    if auto_post_warehouse:
-                        post_warehouse_document(db, int(wh_issue.id))
-                if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
-                    wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
-                    created_wh_ids.append(int(wh_receipt.id))
-                    if auto_post_warehouse:
-                        post_warehouse_document(db, int(wh_receipt.id))
-            elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_input):
-                if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
-                    wh_type = "issue"
-                elif invoice_type in {INVOICE_PURCHASE, INVOICE_SALES_RETURN}:
-                    wh_type = "receipt"
-                else:
-                    wh_type = "issue"
-                wh = create_from_invoice(db, business_id, document, lines_input, wh_type, user_id)
-                created_wh_ids.append(int(wh.id))
-                
-                # قطعی خودکار حواله در صورت فعال بودن
-                if auto_post_warehouse:
-                    post_warehouse_document(db, int(wh.id))
-                    
-                    # به‌روزرسانی وضعیت کالاهای یونیک برای فاکتورهای فروش
-                    if invoice_type == INVOICE_SALES:
-                        for line in lines_input:
-                            instance_id = (line.get("extra_info") or {}).get("instance_id")
-                            if instance_id:
-                                instance = db.query(ProductInstance).filter(
-                                    ProductInstance.id == int(instance_id),
-                                    ProductInstance.business_id == business_id,
-                                ).first()
-                                if instance:
-                                    instance.status = "sold"
-                                    instance.current_invoice_id = document.id
-                                    # انبار را null می‌کنیم چون کالا فروخته شده
-                                    instance.warehouse_id = None
-                                    db.flush()
-
-            if created_wh_ids:
-                # ذخیره لینک حواله‌ها در extra_info.links
-                extra = document.extra_info or {}
-                links = dict((extra.get("links") or {}))
-                links["warehouse_document_ids"] = created_wh_ids
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-                db.commit()
+        created_wh_ids = _create_warehouse_documents_for_invoice(
+            db, business_id, document, user_id, lines_input, invoice_type
+        )
+        if created_wh_ids:
+            db.commit()
     except Exception as ex:
         # عدم موفقیت در ساخت حواله نباید مانع بازگشت فاکتور شود
         # فاکتور قبلاً commit شده است، پس فقط exception را log می‌کنیم
         logger.exception(f"Failed to create warehouse document for invoice {document.id}: {ex}")
-        # فقط تغییرات uncommitted را rollback می‌کنیم (نه فاکتور commit شده)
         try:
             db.rollback()
         except Exception:
@@ -3062,6 +3121,9 @@ def update_invoice(
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+
+    _pre_links_wh = (document.extra_info or {}).get("links") or {}
+    _old_warehouse_document_ids = list(_pre_links_wh.get("warehouse_document_ids") or [])
 
     # Only editable in current fiscal year
     try:
@@ -3799,6 +3861,36 @@ def update_invoice(
         except Exception as ex:
             logger.exception("could not update receipt/payment for invoice: %s", ex)
             # حتی در صورت خطا، ادامه بده
+
+    try:
+        _remove_old_invoice_warehouse_documents(
+            db,
+            int(document.business_id),
+            int(document.id),
+            _old_warehouse_document_ids,
+            user_id,
+        )
+        extra_wh = dict(document.extra_info) if document.extra_info else {}
+        links_wh = dict(extra_wh.get("links") or {})
+        links_wh.pop("warehouse_document_ids", None)
+        extra_wh["links"] = links_wh
+        document.extra_info = _normalize_document_extra_info_for_storage(extra_wh)
+        flag_modified(document, "extra_info")
+        db.flush()
+
+        if not document.is_proforma:
+            _create_warehouse_documents_for_invoice(
+                db, int(document.business_id), document, user_id, lines_input, inv_type
+            )
+    except ApiError:
+        raise
+    except Exception as ex:
+        logger.exception("invoice update warehouse sync failed for document %s: %s", document.id, ex)
+        raise ApiError(
+            "WAREHOUSE_SYNC_FAILED",
+            "همگام‌سازی حواله انبار با فاکتور ناموفق بود. در صورت حواله قطعی، وضعیت انبار یا وابستگی‌ها را بررسی کنید.",
+            http_status=409,
+        )
 
     if not document.is_proforma:
         db.flush()
