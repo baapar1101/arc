@@ -675,6 +675,55 @@ class BusinessUpdateRequest(BaseModel):
 			raise ValueError("مبنای همگام‌سازی قیمت نامعتبر است")
 		return v
 
+	@validator("invoice_profit_calculation_method")
+	def _validate_invoice_profit_calculation_method(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"automatic", "manual", "disabled"}
+		value = str(v).strip().lower()
+		if value not in allowed:
+			raise ValueError("روش محاسبه سود فاکتور نامعتبر است")
+		return value
+
+	@validator("invoice_profit_calculation_basis")
+	def _validate_invoice_profit_calculation_basis(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {
+			"purchase_price",
+			"cost_price",
+			"average_cost",
+			"fifo",
+			"lifo",
+			"weighted_average",
+			"standard_cost",
+			"actual_cost",
+		}
+		value = str(v).strip().lower()
+		if value not in allowed:
+			raise ValueError("مبنای محاسبه سود نامعتبر است")
+		return value
+
+	@validator("invoice_profit_overhead_type")
+	def _validate_invoice_profit_overhead_type(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"none", "production_overhead", "all_overhead", "custom_percent"}
+		value = str(v).strip().lower()
+		if value not in allowed:
+			raise ValueError("نوع هزینه سربار نامعتبر است")
+		return value
+
+	@validator("invoice_profit_calculation_type")
+	def _validate_invoice_profit_calculation_type(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"gross", "net", "both"}
+		value = str(v).strip().lower()
+		if value not in allowed:
+			raise ValueError("نوع محاسبه سود نامعتبر است")
+		return value
+
 
 class BusinessResponse(BaseModel):
 	id: int = Field(..., description="شناسه کسب و کار")

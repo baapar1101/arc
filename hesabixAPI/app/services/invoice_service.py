@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -142,6 +142,131 @@ SUPPORTED_INVOICE_TYPES = {
     INVOICE_PRODUCTION,
     INVOICE_WASTE,
 }
+
+ALLOWED_INVOICE_PROFIT_METHODS = {"automatic", "manual", "disabled"}
+ALLOWED_INVOICE_PROFIT_BASIS = {
+    "purchase_price",
+    "cost_price",
+    "average_cost",
+    "fifo",
+    "lifo",
+    "weighted_average",
+    "standard_cost",
+    "actual_cost",
+}
+ALLOWED_INVOICE_PROFIT_TYPES = {"gross", "net", "both"}
+ALLOWED_INVOICE_PROFIT_OVERHEAD_TYPES = {"none", "production_overhead", "all_overhead", "custom_percent"}
+
+
+def _normalize_invoice_profit_method(value: Optional[str]) -> str:
+    method = str(value or "automatic").strip().lower()
+    if method not in ALLOWED_INVOICE_PROFIT_METHODS:
+        return "automatic"
+    return method
+
+
+def _normalize_invoice_profit_basis(value: Optional[str]) -> str:
+    basis = str(value or "purchase_price").strip().lower()
+    if basis not in ALLOWED_INVOICE_PROFIT_BASIS:
+        return "purchase_price"
+    return basis
+
+
+def _normalize_invoice_profit_type(value: Optional[str]) -> str:
+    calc_type = str(value or "gross").strip().lower()
+    if calc_type not in ALLOWED_INVOICE_PROFIT_TYPES:
+        return "gross"
+    return calc_type
+
+
+def _normalize_invoice_profit_overhead_type(value: Optional[str]) -> str:
+    overhead_type = str(value or "none").strip().lower()
+    if overhead_type not in ALLOWED_INVOICE_PROFIT_OVERHEAD_TYPES:
+        return "none"
+    return overhead_type
+
+
+def _build_cost_layers_from_movements(
+    movements: List[Dict[str, Any]],
+    *,
+    reverse: bool = False,
+) -> deque:
+    """
+    ساخت لایه‌های هزینه از حرکات تاریخی واقعی (in/out).
+    reverse=False => FIFO ، reverse=True => LIFO
+    """
+    # حرکات باید همیشه به‌ترتیب زمانی پردازش شوند تا لایه‌های باقی‌مانده واقعی بمانند.
+    # reverse فقط استراتژی چیدن لایه‌های ورودی را تغییر می‌دهد (FIFO/LIFO).
+    sorted_movements = sorted(
+        movements,
+        key=lambda x: (x["document_date"], x["document_id"]),
+    )
+    layers: deque = deque()
+    for mv in sorted_movements:
+        mv_type = mv.get("movement")
+        qty = Decimal(str(mv.get("quantity") or 0))
+        if qty <= 0:
+            continue
+
+        if mv_type == "in":
+            layer = {
+                "qty": qty,
+                "cost": Decimal(str(mv.get("cost_price") or 0)),
+            }
+            if reverse:
+                # در LIFO لایه جدید در ابتدای صف قرار می‌گیرد تا مصرف از جدیدترین باشد.
+                layers.appendleft(layer)
+            else:
+                layers.append(layer)
+            continue
+
+        if mv_type == "out":
+            remain = qty
+            while remain > 0 and layers:
+                top = layers[0]
+                take = min(remain, Decimal(str(top.get("qty") or 0)))
+                top["qty"] = Decimal(str(top.get("qty") or 0)) - take
+                remain -= take
+                if top["qty"] <= 0:
+                    layers.popleft()
+            # کسری تاریخی را به لایه منفی تبدیل نمی‌کنیم تا هزینه غیرواقعی تولید نشود
+    return layers
+
+
+def _consume_cost_layers_for_quantity(layers: deque, quantity: Decimal) -> Decimal:
+    """
+    مصرف تعداد موردنیاز از لایه‌ها و بازگرداندن هزینه هر واحد.
+    در کمبود لایه، با آخرین هزینه مصرف‌شده fallback می‌کند.
+    """
+    qty = Decimal(str(quantity or 0))
+    if qty <= 0:
+        return Decimal(0)
+
+    remain = qty
+    total_cost = Decimal(0)
+    last_cost = Decimal(0)
+    used_any = False
+
+    while remain > 0 and layers:
+        top = layers[0]
+        layer_qty = Decimal(str(top.get("qty") or 0))
+        if layer_qty <= 0:
+            layers.popleft()
+            continue
+        layer_cost = Decimal(str(top.get("cost") or 0))
+        take = min(remain, layer_qty)
+        total_cost += take * layer_cost
+        top["qty"] = layer_qty - take
+        remain -= take
+        last_cost = layer_cost
+        used_any = True
+        if top["qty"] <= 0:
+            layers.popleft()
+
+    if remain > 0 and used_any:
+        total_cost += remain * last_cost
+
+    return total_cost / qty if qty > 0 else Decimal(0)
 
 
 # --- Inventory & Costing helpers ---
@@ -305,8 +430,11 @@ def _iter_product_movements(
             # fallback از نوع سند اگر صراحتاً مشخص نشده باشد
             inv_move, _ = _movement_from_type(doc.document_type)
             movement = inv_move
-        if warehouse_ids and wh_id is not None and int(wh_id) not in warehouse_ids:
-            continue
+        if warehouse_ids:
+            if wh_id is None:
+                continue
+            if int(wh_id) not in warehouse_ids:
+                continue
         if movement not in ("in", "out"):
             continue
         qty = Decimal(str(line.quantity or 0))
@@ -1251,46 +1379,116 @@ def _calculate_average_purchase_cost(
     """
     محاسبه میانگین قیمت خرید محصول از تاریخچه
     """
-    # دریافت تمام فاکتورهای خرید تا تاریخ مشخص
-    purchase_docs = db.query(Document).join(DocumentLine).filter(
+    # دریافت تمام ردیف‌های خرید از جدول اقلام فاکتور تا تاریخ مشخص
+    purchase_lines = (
+        db.query(InvoiceItemLine, Document)
+        .join(Document, Document.id == InvoiceItemLine.document_id)
+        .filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_PURCHASE,
             Document.document_date <= as_of_date,
-            DocumentLine.product_id == product_id
+                Document.is_proforma == False,  # noqa: E712
+            InvoiceItemLine.product_id == product_id
         )
-    ).all()
+        )
+        .all()
+    )
     
     total_cost = Decimal(0)
     total_qty = Decimal(0)
     
-    for doc in purchase_docs:
-        lines = db.query(DocumentLine).filter(
-            and_(
-                DocumentLine.document_id == doc.id,
-                DocumentLine.product_id == product_id
-            )
-        ).all()
-        
-        for line in lines:
-            qty = Decimal(str(line.quantity or 0))
-            if qty <= 0:
-                continue
-            
-            # استفاده از cost_price از extra_info یا unit_price
-            extra_info = line.extra_info or {}
-            cost_per_unit = Decimal(0)
-            if extra_info.get("cost_price") is not None:
-                cost_per_unit = Decimal(str(extra_info.get("cost_price")))
-            elif line.unit_price is not None:
-                cost_per_unit = Decimal(str(line.unit_price))
-            
-            total_cost += qty * cost_per_unit
-            total_qty += qty
+    for line, _doc in purchase_lines:
+        qty = Decimal(str(line.quantity or 0))
+        if qty <= 0:
+            continue
+        extra_info = line.extra_info or {}
+        cost_per_unit = Decimal(0)
+        if extra_info.get("cost_price") is not None:
+            cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+        elif extra_info.get("unit_price") is not None:
+            cost_per_unit = Decimal(str(extra_info.get("unit_price")))
+        total_cost += qty * cost_per_unit
+        total_qty += qty
     
     if total_qty > 0:
         return total_cost / total_qty
     return Decimal(0)
+
+
+def _iter_profit_movements_from_invoice_lines(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    as_of_date: date,
+    warehouse_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    حرکات کالا برای محاسبه هزینه سود (FIFO/LIFO) از روی اقلام فاکتور.
+    این مسیر مستقل از جدول DocumentLine است و با معماری جدید invoice_item_lines سازگار است.
+    """
+    rows = (
+        db.query(InvoiceItemLine, Document)
+        .join(Document, Document.id == InvoiceItemLine.document_id)
+        .filter(
+            and_(
+                Document.business_id == int(business_id),
+                Document.is_proforma == False,  # noqa: E712
+                Document.document_date <= as_of_date,
+                InvoiceItemLine.product_id == int(product_id),
+            )
+        )
+        .order_by(Document.document_date.asc(), Document.id.asc(), InvoiceItemLine.id.asc())
+        .all()
+    )
+    movements: List[Dict[str, Any]] = []
+    for line, doc in rows:
+        info = line.extra_info or {}
+        doc_extra = doc.extra_info or {}
+        # اگر سند صراحتاً بدون اثر انبار باشد، در لایه هزینه وارد نشود.
+        if doc_extra.get("post_inventory") is False:
+            continue
+        if info.get("inventory_tracked") is False:
+            continue
+        movement = (info.get("movement") or None)
+        if movement is None:
+            movement, _ = _movement_from_type(doc.document_type)
+        if movement not in ("in", "out"):
+            continue
+        qty = Decimal(str(line.quantity or 0))
+        if qty <= 0:
+            continue
+        wh_id_raw = info.get("warehouse_id")
+        wh_id: Optional[int]
+        try:
+            wh_id = int(wh_id_raw) if wh_id_raw is not None else None
+        except Exception:
+            wh_id = None
+        if warehouse_id is not None:
+            if wh_id is None or int(wh_id) != int(warehouse_id):
+                continue
+        cost_price = None
+        if info.get("cogs_amount") is not None and qty > 0 and movement == "out":
+            try:
+                cost_price = Decimal(str(info.get("cogs_amount"))) / qty
+            except Exception:
+                cost_price = None
+        if cost_price is None and info.get("cost_price") is not None:
+            cost_price = Decimal(str(info.get("cost_price")))
+        if cost_price is None and info.get("unit_price") is not None:
+            cost_price = Decimal(str(info.get("unit_price")))
+        movements.append(
+            {
+                "document_id": int(doc.id),
+                "document_date": doc.document_date,
+                "product_id": int(product_id),
+                "warehouse_id": wh_id,
+                "movement": movement,
+                "quantity": qty,
+                "cost_price": cost_price,
+            }
+        )
+    return movements
 
 
 def _calculate_fifo_cost(
@@ -1304,34 +1502,15 @@ def _calculate_fifo_cost(
     """
     محاسبه هزینه با روش FIFO (اول ورود، اول خروج)
     """
-    movements = _iter_product_movements(
-        db, business_id, [product_id],
-        [warehouse_id] if warehouse_id else None,
-        as_of_date, None
+    movements = _iter_profit_movements_from_invoice_lines(
+        db=db,
+        business_id=business_id,
+        product_id=product_id,
+        as_of_date=as_of_date,
+        warehouse_id=warehouse_id,
     )
-    
-    # مرتب‌سازی بر اساس تاریخ (قدیمی‌ترین اول)
-    movements.sort(key=lambda x: (x["document_date"], x["document_id"]))
-    
-    remaining_qty = quantity
-    total_cost = Decimal(0)
-    
-    for mv in movements:
-        if mv["movement"] == "in" and remaining_qty > 0:
-            qty_available = mv["quantity"]
-            cost_per_unit = mv.get("cost_price") or Decimal(0)
-            
-            if qty_available > remaining_qty:
-                total_cost += remaining_qty * cost_per_unit
-                remaining_qty = Decimal(0)
-                break
-            else:
-                total_cost += qty_available * cost_per_unit
-                remaining_qty -= qty_available
-    
-    if quantity > 0:
-        return total_cost / quantity
-    return Decimal(0)
+    layers = _build_cost_layers_from_movements(movements, reverse=False)
+    return _consume_cost_layers_for_quantity(layers, Decimal(str(quantity or 0)))
 
 
 def _calculate_lifo_cost(
@@ -1345,34 +1524,15 @@ def _calculate_lifo_cost(
     """
     محاسبه هزینه با روش LIFO (آخر ورود، اول خروج)
     """
-    movements = _iter_product_movements(
-        db, business_id, [product_id],
-        [warehouse_id] if warehouse_id else None,
-        as_of_date, None
+    movements = _iter_profit_movements_from_invoice_lines(
+        db=db,
+        business_id=business_id,
+        product_id=product_id,
+        as_of_date=as_of_date,
+        warehouse_id=warehouse_id,
     )
-    
-    # مرتب‌سازی بر اساس تاریخ (جدیدترین اول)
-    movements.sort(key=lambda x: (x["document_date"], x["document_id"]), reverse=True)
-    
-    remaining_qty = quantity
-    total_cost = Decimal(0)
-    
-    for mv in movements:
-        if mv["movement"] == "in" and remaining_qty > 0:
-            qty_available = mv["quantity"]
-            cost_per_unit = mv.get("cost_price") or Decimal(0)
-            
-            if qty_available > remaining_qty:
-                total_cost += remaining_qty * cost_per_unit
-                remaining_qty = Decimal(0)
-                break
-            else:
-                total_cost += qty_available * cost_per_unit
-                remaining_qty -= qty_available
-    
-    if quantity > 0:
-        return total_cost / quantity
-    return Decimal(0)
+    layers = _build_cost_layers_from_movements(movements, reverse=True)
+    return _consume_cost_layers_for_quantity(layers, Decimal(str(quantity or 0)))
 
 
 def _calculate_weighted_average_cost(
@@ -1392,7 +1552,7 @@ def _get_cost_per_unit_by_basis(
     db: Session,
     business_id: int,
     product: Product,
-    line: DocumentLine,
+    line: Any,
     calculation_basis: str,
     document_date: date,
     warehouse_id: Optional[int] = None
@@ -1401,35 +1561,36 @@ def _get_cost_per_unit_by_basis(
     محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
     """
     extra_info = line.extra_info or {}
+    normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
     
-    if calculation_basis == "purchase_price":
+    if normalized_basis == "purchase_price":
         return Decimal(str(product.base_purchase_price or 0))
     
-    elif calculation_basis == "cost_price":
+    elif normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         return Decimal(str(product.base_purchase_price or 0))
     
-    elif calculation_basis == "actual_cost":
+    elif normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and line.quantity > 0:
             return Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
         return Decimal(str(product.base_purchase_price or 0))
     
-    elif calculation_basis == "average_cost":
+    elif normalized_basis == "average_cost":
         return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
     
-    elif calculation_basis == "fifo":
+    elif normalized_basis == "fifo":
         return _calculate_fifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
     
-    elif calculation_basis == "lifo":
+    elif normalized_basis == "lifo":
         return _calculate_lifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
     
-    elif calculation_basis == "weighted_average":
+    elif normalized_basis == "weighted_average":
         return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
     
-    elif calculation_basis == "standard_cost":
+    elif normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
         return Decimal(str(product.base_purchase_price or 0))
@@ -1486,8 +1647,12 @@ def _calculate_invoice_profit(
     """
     محاسبه سود فاکتور با پشتیبانی از روش‌های مختلف و هزینه‌های سربار
     """
+    normalized_method = _normalize_invoice_profit_method(calculation_method)
+    normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
+    normalized_type = _normalize_invoice_profit_type(calculation_type)
+    normalized_overhead_type = _normalize_invoice_profit_overhead_type(overhead_type)
     # اگر محاسبه سود غیرفعال است
-    if calculation_method == "disabled":
+    if normalized_method == "disabled":
         return _empty_profit_response()
     
     # دریافت فاکتور
@@ -1507,8 +1672,8 @@ def _calculate_invoice_profit(
     
     # برای فاکتور تولید
     if document.document_type == "invoice_production":
-        # دریافت ردیف‌های فاکتور از DocumentLine (برای فاکتور تولید)
-        lines = db.query(DocumentLine).filter(DocumentLine.document_id == document_id).all()
+        # دریافت ردیف‌های فاکتور از InvoiceItemLine (برای فاکتور تولید)
+        lines = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).all()
         # جداسازی خطوط ورودی و خروجی
         out_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "out"]
         in_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "in"]
@@ -1523,9 +1688,11 @@ def _calculate_invoice_profit(
                 continue
             
             qty = Decimal(str(line.quantity or 0))
+            line_extra = line.extra_info or {}
+            line_warehouse_id = line_extra.get("warehouse_id")
             cost_per_unit = _get_cost_per_unit_by_basis(
-                db, business_id, product, line, calculation_basis,
-                document.document_date, line.warehouse_id
+                db, business_id, product, line, normalized_basis,
+                document.document_date, line_warehouse_id
             )
             total_materials_cost += qty * cost_per_unit
         
@@ -1579,10 +1746,10 @@ def _calculate_invoice_profit(
             })
         
         total_overhead = Decimal(0)
-        if include_overhead and overhead_type != "production_overhead":
+        if include_overhead and normalized_overhead_type != "production_overhead":
             total_overhead = _calculate_overhead_cost(
                 db, business_id, document.id, total_production_cost,
-                overhead_type, overhead_percent
+                normalized_overhead_type, overhead_percent
             )
         
         total_net_profit = total_gross_profit - total_overhead
@@ -1614,33 +1781,33 @@ def _calculate_invoice_profit(
             
             # محاسبه هزینه هر واحد - استفاده مستقیم از extra_info
             cost_per_unit = Decimal(0)
-            if calculation_basis == "purchase_price":
+            if normalized_basis == "purchase_price":
                 # اگر قیمت خرید صفر یا None باشد، باید از cost_price در extra_info استفاده کنیم
                 base_cost = product.base_purchase_price or 0
                 if base_cost == 0 and extra_info.get("cost_price") is not None:
                     base_cost = extra_info.get("cost_price")
                 cost_per_unit = Decimal(str(base_cost))
-            elif calculation_basis == "cost_price":
+            elif normalized_basis == "cost_price":
                 if extra_info.get("cost_price") is not None:
                     cost_per_unit = Decimal(str(extra_info.get("cost_price")))
                 else:
                     cost_per_unit = Decimal(str(product.base_purchase_price or 0))
-            elif calculation_basis == "actual_cost":
+            elif normalized_basis == "actual_cost":
                 if extra_info.get("cost_price") is not None:
                     cost_per_unit = Decimal(str(extra_info.get("cost_price")))
                 elif extra_info.get("cogs_amount") is not None and qty > 0:
                     cost_per_unit = Decimal(str(extra_info.get("cogs_amount"))) / qty
                 else:
                     cost_per_unit = Decimal(str(product.base_purchase_price or 0))
-            elif calculation_basis == "average_cost":
+            elif normalized_basis == "average_cost":
                 cost_per_unit = _calculate_average_purchase_cost(db, business_id, product.id, document.document_date)
-            elif calculation_basis == "fifo":
+            elif normalized_basis == "fifo":
                 cost_per_unit = _calculate_fifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
-            elif calculation_basis == "lifo":
+            elif normalized_basis == "lifo":
                 cost_per_unit = _calculate_lifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
-            elif calculation_basis == "weighted_average":
+            elif normalized_basis == "weighted_average":
                 cost_per_unit = _calculate_weighted_average_cost(db, business_id, product.id, document.document_date)
-            elif calculation_basis == "standard_cost":
+            elif normalized_basis == "standard_cost":
                 if extra_info.get("standard_cost") is not None:
                     cost_per_unit = Decimal(str(extra_info.get("standard_cost")))
                 else:
@@ -1659,7 +1826,7 @@ def _calculate_invoice_profit(
             if include_overhead:
                 line_overhead = _calculate_overhead_cost(
                     db, business_id, document_id, total_line_cost,
-                    overhead_type, overhead_percent
+                    normalized_overhead_type, overhead_percent
                 ) / len(item_lines) if len(item_lines) > 0 else Decimal(0)
             
             # محاسبه سود خالص ردیف
@@ -1693,7 +1860,7 @@ def _calculate_invoice_profit(
         if include_overhead:
             total_overhead = _calculate_overhead_cost(
                 db, business_id, document_id, total_cost,
-                overhead_type, overhead_percent
+                normalized_overhead_type, overhead_percent
             )
             total_net_profit = total_gross_profit - total_overhead
     
@@ -1707,19 +1874,19 @@ def _calculate_invoice_profit(
         "line_profits": line_profits
     }
     
-    if calculation_type in ["gross", "both"]:
+    if normalized_type in ["gross", "both"]:
         result["gross_profit"] = float(total_gross_profit)
         result["gross_profit_percent"] = float(gross_profit_percent)
     
-    if calculation_type in ["net", "both"]:
+    if normalized_type in ["net", "both"]:
         result["net_profit"] = float(total_net_profit)
         result["net_profit_percent"] = float(net_profit_percent)
     
     # برای سازگاری با کد قدیم
-    if calculation_type == "gross":
+    if normalized_type == "gross":
         result["total_profit"] = result["gross_profit"]
         result["total_profit_percent"] = result["gross_profit_percent"]
-    elif calculation_type == "net":
+    elif normalized_type == "net":
         result["total_profit"] = result["net_profit"]
         result["total_profit_percent"] = result["net_profit_percent"]
     
