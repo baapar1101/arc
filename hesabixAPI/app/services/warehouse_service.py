@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from datetime import datetime, date
 import logging
-import secrets
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -28,6 +27,7 @@ from adapters.api.v1.schema_models.warehouse import WarehouseCreateRequest, Ware
 from adapters.api.v1.schemas import QueryInfo, FilterItem
 from app.services.query_service import QueryService
 from app.services.product_attribute_service import validate_custom_attributes
+from app.services.document_numbering_service import generate_document_code
 
 
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
@@ -37,13 +37,9 @@ def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
 	return fy
 
 
-def _build_wh_code(prefix_base: str) -> str:
-	today = datetime.now().date()
-	# IMPORTANT:
-	# کد قبلی بر اساس timestamp ثانیه‌ای تولید می‌شد و در بار همزمان (۸ worker)
-	# باعث برخورد (Duplicate) روی unique index `warehouse_documents.code` می‌شد.
-	# این suffix را تصادفی و ثابت‌طول (۵ رقم) می‌سازیم تا احتمال برخورد بسیار کم شود.
-	return f"{prefix_base}-{today.strftime('%Y%m%d')}-{secrets.randbelow(100000):05d}"
+def _generate_warehouse_document_code(db: Session, business_id: int, document_date: date) -> str:
+	"""کد حواله انبار بر اساس تنظیمات شماره‌گذاری اسناد (نوع warehouse_document)."""
+	return generate_document_code(db, business_id, "warehouse_document", document_date)
 
 
 def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
@@ -148,7 +144,7 @@ def create_from_invoice(
 	# و تراکنش اصلی ساخت فاکتور از بین نرود.
 	wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
-		code = _build_wh_code("WH")
+		code = _generate_warehouse_document_code(db, business_id, invoice.document_date)
 		try:
 			with db.begin_nested():
 				wh = WarehouseDocument(
@@ -442,7 +438,7 @@ def create_manual_warehouse_document(
 	# ایجاد حواله — تولید code و INSERT در برابر برخورد unique روی warehouse_documents.code
 	wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
-		code = _build_wh_code("WH")
+		code = _generate_warehouse_document_code(db, business_id, document_date)
 		try:
 			with db.begin_nested():
 				wh = WarehouseDocument(
@@ -2354,7 +2350,7 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 		raise ApiError("NO_LINES", "حواله خطی ندارد", http_status=400)
 	
 	fy = _get_current_fiscal_year(db, business_id)
-	code = _build_wh_code("WH-CANCEL")
+	code = _generate_warehouse_document_code(db, business_id, wh.document_date)
 	
 	# تعیین نوع حواله معکوس
 	reverse_doc_type = wh.doc_type
@@ -2733,7 +2729,7 @@ def create_stock_count_adjustment(
 ) -> WarehouseDocument:
 	"""ایجاد حواله تعدیل از تفاوت‌های انبار گردانی."""
 	fy = _get_current_fiscal_year(db, business_id)
-	code = _build_wh_code("WH-ADJ")
+	code = _generate_warehouse_document_code(db, business_id, stock_count_date)
 	
 	# فیلتر کردن فقط آیتم‌هایی که تفاوت دارند
 	adjustment_items = [item for item in items if item.get("difference", 0) != 0]

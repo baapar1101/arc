@@ -83,9 +83,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   // For preserving and merging extra_info
   Map<String, dynamic> _originalExtraInfo = <String, dynamic>{};
 
-  /// در زمان بارگذاری سند، آیا طرح اقساط داشت (برای نمایش تب ویرایش اقساط)
+  /// در زمان بارگذاری سند، آیا طرح اقساط داشت (برای پر کردن اولیهٔ ویرایشگر)
   bool _documentHadInstallmentPlanAtLoad = false;
   Map<String, dynamic>? _initialInstallmentPlanCopy;
+
+  /// فروش اقساطی فعال (مثل صفحهٔ افزودن؛ حتی اگر بار اول بدون طرح بوده باشد)
+  bool _useInstallments = false;
   final GlobalKey<InvoiceInstallmentsEditorState> _installmentsEditorKey =
       GlobalKey<InvoiceInstallmentsEditorState>();
 
@@ -107,13 +110,64 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     return false;
   }
 
-  /// تب اقساط: فقط فاکتورهای فروش/برگشت از فروش قطعی که در زمان بارگذاری طرح اقساط داشتند
+  /// تب اقساط: فروش/برگشت از فروش قطعی وقتی کاربر فروش اقساطی را فعال کرده باشد
   bool get _shouldShowInstallmentsTab {
     if (_isProforma) return false;
     if (_selectedInvoiceType != InvoiceType.sales && _selectedInvoiceType != InvoiceType.salesReturn) {
       return false;
     }
-    return _documentHadInstallmentPlanAtLoad;
+    return _useInstallments;
+  }
+
+  Map<String, dynamic>? get _installmentPlanForEditor =>
+      _documentHadInstallmentPlanAtLoad ? _initialInstallmentPlanCopy : null;
+
+  void _syncTabControllerLength() {
+    final newTabCount = _getTabCount();
+    if (newTabCount != _tabController.length) {
+      _tabController.dispose();
+      _tabController = TabController(length: newTabCount, vsync: this);
+    }
+  }
+
+  void _onUseInstallmentsChanged(bool value) {
+    setState(() {
+      _useInstallments = value;
+      _syncTabControllerLength();
+    });
+    if (value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final instIdx = 2 + (_shouldShowTransactionsTab ? 1 : 0);
+        if (instIdx >= 0 && instIdx < _tabController.length) {
+          _tabController.animateTo(instIdx);
+        }
+      });
+    }
+  }
+
+  void _handleInvoiceTypeChanged(InvoiceType? type) {
+    setState(() {
+      _selectedInvoiceType = type;
+      if (_isProforma ||
+          (type != InvoiceType.sales && type != InvoiceType.salesReturn)) {
+        _useInstallments = false;
+      }
+      _syncTabControllerLength();
+    });
+  }
+
+  void _handleDraftChanged(bool isDraft) {
+    setState(() {
+      _isProforma = isDraft;
+      if (isDraft && _transactions.isNotEmpty) {
+        _transactions = [];
+      }
+      if (isDraft) {
+        _useInstallments = false;
+      }
+      _syncTabControllerLength();
+    });
   }
 
   // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
@@ -181,6 +235,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       } else {
         _initialInstallmentPlanCopy = null;
       }
+      _useInstallments = _documentHadInstallmentPlanAtLoad;
       final pi = _originalExtraInfo['post_inventory'];
       final ap = _originalExtraInfo['auto_post_warehouse'];
       final postOn = (pi is bool) ? pi : true;
@@ -517,7 +572,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         calendarController: widget.calendarController,
                         sumTotal: _sumTotal,
                         invoiceDate: _invoiceDate,
-                        initialInstallmentPlan: _initialInstallmentPlanCopy,
+                        initialInstallmentPlan: _installmentPlanForEditor,
                       ),
                     _buildSettingsTab(),
                   ],
@@ -543,30 +598,9 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                       children: [
                         InvoiceTypeCombobox(
                           selectedType: _selectedInvoiceType,
-                          onTypeChanged: (type) {
-                            setState(() {
-                              _selectedInvoiceType = type;
-                              final newTabCount = _getTabCount();
-                              if (newTabCount != _tabController.length) {
-                                _tabController.dispose();
-                                _tabController = TabController(length: newTabCount, vsync: this);
-                              }
-                            });
-                          },
+                          onTypeChanged: _handleInvoiceTypeChanged,
                           isDraft: _isProforma,
-                          onDraftChanged: (isDraft) {
-                            setState(() {
-                              _isProforma = isDraft;
-                              if (isDraft && _transactions.isNotEmpty) {
-                                _transactions = [];
-                              }
-                              final newTabCount = _getTabCount();
-                              if (newTabCount != _tabController.length) {
-                                _tabController.dispose();
-                                _tabController = TabController(length: newTabCount, vsync: this);
-                              }
-                            });
-                          },
+                          onDraftChanged: _handleDraftChanged,
                           isRequired: true,
                           label: 'نوع فاکتور',
                           hintText: 'انتخاب نوع فاکتور',
@@ -622,32 +656,9 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             Expanded(
                               child: InvoiceTypeCombobox(
                                 selectedType: _selectedInvoiceType,
-                                onTypeChanged: (type) {
-                                  setState(() {
-                                    _selectedInvoiceType = type;
-                                    final newTabCount = _getTabCount();
-                                    if (newTabCount != _tabController.length) {
-                                      _tabController.dispose();
-                                      _tabController = TabController(length: newTabCount, vsync: this);
-                                    }
-                                  });
-                                },
+                                onTypeChanged: _handleInvoiceTypeChanged,
                                 isDraft: _isProforma,
-                                onDraftChanged: (isDraft) {
-                                  setState(() {
-                                    _isProforma = isDraft;
-                                    // اگر پیش‌فاکتور فعال شد، تراکنش‌های پرداخت را پاک کن
-                                    if (isDraft && _transactions.isNotEmpty) {
-                                      _transactions = [];
-                                    }
-                                    // به‌روزرسانی TabController
-                                    final newTabCount = _getTabCount();
-                                    if (newTabCount != _tabController.length) {
-                                      _tabController.dispose();
-                                      _tabController = TabController(length: newTabCount, vsync: this);
-                                    }
-                                  });
-                                },
+                                onDraftChanged: _handleDraftChanged,
                                 isRequired: true,
                                 label: 'نوع فاکتور',
                                 hintText: 'انتخاب نوع فاکتور',
@@ -852,6 +863,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   }
 
   Widget _buildSettingsTab() {
+    final t = AppLocalizations.of(context);
+    final isSalesOrReturn =
+        _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -860,6 +875,20 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (isSalesOrReturn) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SwitchListTile(
+                      title: Text(t.installmentsTitle),
+                      subtitle: Text(t.installmentsSubtitle),
+                      value: _useInstallments,
+                      onChanged: _isProforma ? null : (value) => _onUseInstallmentsChanged(value),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -867,12 +896,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppLocalizations.of(context).invoiceWarehouseReleaseSectionTitle,
+                        t.invoiceWarehouseReleaseSectionTitle,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        AppLocalizations.of(context).invoiceWarehouseReleaseSectionSubtitle,
+                        t.invoiceWarehouseReleaseSectionSubtitle,
                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
                       ),
                       const SizedBox(height: 12),
@@ -880,15 +909,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         segments: <ButtonSegment<String>>[
                           ButtonSegment<String>(
                             value: 'none',
-                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleaseNone),
+                            label: Text(t.invoiceWarehouseReleaseNone),
                           ),
                           ButtonSegment<String>(
                             value: 'draft',
-                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleaseDraft),
+                            label: Text(t.invoiceWarehouseReleaseDraft),
                           ),
                           ButtonSegment<String>(
                             value: 'posted',
-                            label: Text(AppLocalizations.of(context).invoiceWarehouseReleasePosted),
+                            label: Text(t.invoiceWarehouseReleasePosted),
                           ),
                         ],
                         selected: <String>{_invoiceWarehouseReleaseMode},
@@ -915,10 +944,23 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     );
   }
 
+  /// `TabBarView` ممکن است تب اقساط را تا قبل از بازدید نسازد؛ برای اعتبارسنجی/ذخیره باید ویرایشگر وجود داشته باشد.
+  Future<void> _ensureInstallmentsEditorBuilt() async {
+    if (!_shouldShowInstallmentsTab) return;
+    if (_installmentsEditorKey.currentState != null) return;
+    final instIdx = 2 + (_shouldShowTransactionsTab ? 1 : 0);
+    if (instIdx < 0 || instIdx >= _tabController.length) return;
+    await _tabController.animateTo(instIdx);
+    if (!mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+  }
+
   Future<void> _saveChanges() async {
     if (_isSaving) return;
     setState(() => _isSaving = true);
     try {
+      await _ensureInstallmentsEditorBuilt();
+      if (!mounted) return;
       final payloadOrError = _validateAndBuildPayload();
       if (payloadOrError is String) {
         if (!mounted) return;
@@ -1043,18 +1085,19 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final canKeepInstallments = !_isProforma &&
         (_selectedInvoiceType == InvoiceType.sales ||
             _selectedInvoiceType == InvoiceType.salesReturn) &&
-        _documentHadInstallmentPlanAtLoad;
+        _useInstallments;
     if (!canKeepInstallments) {
       mergedExtra.remove('installment_plan');
     } else {
       final st = _installmentsEditorKey.currentState;
-      if (st != null) {
-        final instErr = st.validate();
-        if (instErr != null) {
-          return instErr;
-        }
-        mergedExtra['installment_plan'] = st.buildPlanMap();
+      if (st == null) {
+        return 'برای ذخیرهٔ طرح اقساط، یک بار به تب «اقساط» بروید تا فرم بارگذاری شود.';
       }
+      final instErr = st.validate();
+      if (instErr != null) {
+        return instErr;
+      }
+      mergedExtra['installment_plan'] = st.buildPlanMap();
     }
 
     final isSalesOrReturn =

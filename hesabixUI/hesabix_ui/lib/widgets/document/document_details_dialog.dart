@@ -37,6 +37,8 @@ import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, parseJsonDoubleOrNull;
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/services/business_api_service.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_print_options_bottom_sheet.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
@@ -99,7 +101,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   final ReportTemplateService _templateService = ReportTemplateService(ApiClient());
   List<Map<String, dynamic>> _invoiceTemplates = const [];
   bool _loadingInvoiceTemplates = false;
-  int? _selectedInvoiceTemplateId;
+  String? _invoicePrintPaperSize;
+  String _invoicePrintOrientation = 'landscape';
+  bool _invoicePrintShowStamp = true;
+  int? _invoicePrintTemplateId;
   
   // تراکنش‌های پرداخت
   final _receiptPaymentService = ReceiptPaymentService(ApiClient());
@@ -317,23 +322,74 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Future<void> _generatePdf() async {
+  Future<void> _loadInvoicePrintStampDefault(DocumentModel doc) async {
+    try {
+      final data = await BusinessApiService.getPrintSettings(doc.businessId);
+      final defaultSettings = (data['default'] as Map?)?.cast<String, dynamic>();
+      final perType = (data['per_type'] as Map?)?.cast<String, dynamic>();
+      Map<String, dynamic>? target = perType?[doc.documentType];
+      target ??= defaultSettings;
+      if (target == null || !mounted) return;
+      final ss = target['show_stamp'];
+      if (ss is bool) {
+        setState(() => _invoicePrintShowStamp = ss);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onInvoicePrintPdfTapped() async {
     if (_document == null) return;
+    final result = await showInvoicePrintOptionsBottomSheet(
+      context: context,
+      templates: _invoiceTemplates,
+      loadingTemplates: _loadingInvoiceTemplates,
+      initialPaperSize: _invoicePrintPaperSize,
+      initialOrientation: _invoicePrintOrientation,
+      initialShowStamp: _invoicePrintShowStamp,
+      initialTemplateId: _invoicePrintTemplateId,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _invoicePrintPaperSize = result.paperSize;
+      _invoicePrintOrientation = result.orientation;
+      _invoicePrintShowStamp = result.showStamp;
+      _invoicePrintTemplateId = result.templateId;
+    });
+    await _generatePdf(invoicePrint: result);
+  }
+
+  Future<void> _generatePdf({InvoicePrintOptionsResult? invoicePrint}) async {
+    if (_document == null) return;
+    final doc = _document!;
+    final isInvoice = doc.documentType.startsWith('invoice');
+    if (isInvoice && invoicePrint == null) {
+      return;
+    }
     setState(() => _isGeneratingPdf = true);
     try {
       final api = ApiClient();
-      final doc = _document!;
       String path;
       // اگر فاکتور است، از endpoint اختصاصی فاکتور استفاده کنیم تا قالب invoices/detail اعمال شود
-      if (doc.documentType.startsWith('invoice')) {
+      if (isInvoice) {
         path = '/invoices/business/${doc.businessId}/${doc.id}/pdf';
       } else {
         // سایر اسناد: endpoint عمومی با قالب documents/detail
         path = '/documents/${doc.id}/pdf';
       }
       final query = <String, dynamic>{};
-      if (doc.documentType.startsWith('invoice') && _selectedInvoiceTemplateId != null) {
-        query['template_id'] = _selectedInvoiceTemplateId;
+      if (isInvoice) {
+        final p = invoicePrint!;
+        final ps = p.paperSize;
+        if (ps != null && ps.isNotEmpty) {
+          query['paper_size'] = ps;
+        }
+        if (p.orientation.isNotEmpty) {
+          query['orientation'] = p.orientation;
+        }
+        query['show_stamp'] = p.showStamp ? 'true' : 'false';
+        if (p.templateId != null) {
+          query['template_id'] = p.templateId;
+        }
       }
       final bytes = await api.downloadPdf(path, query: query.isNotEmpty ? query : null);
       await _savePdfFile(bytes, doc.code);
@@ -435,6 +491,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       try {
         if (doc.documentType.startsWith('invoice')) {
           await _loadInvoiceTemplates(doc.businessId);
+          await _loadInvoicePrintStampDefault(doc);
         }
       } catch (_) {
         // خطای بارگذاری قالب‌ها نباید نمایش سند را متوقف کند
@@ -3490,13 +3547,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final showEdit = _document != null &&
         _document!.documentType.startsWith('invoice') &&
         (ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false);
-    final showTemplateDropdown = _document != null &&
-        _document!.documentType.startsWith('invoice') &&
-        !_loadingInvoiceTemplates &&
-        _invoiceTemplates.isNotEmpty;
 
     Widget pdfButton() => OutlinedButton.icon(
-          onPressed: _isGeneratingPdf ? null : _generatePdf,
+          onPressed: _isGeneratingPdf
+              ? null
+              : () {
+                  final d = _document;
+                  if (d != null && d.documentType.startsWith('invoice')) {
+                    _onInvoicePrintPdfTapped();
+                  } else {
+                    _generatePdf();
+                  }
+                },
           icon: _isGeneratingPdf
               ? const SizedBox(
                   width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -3521,43 +3583,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           label: Text('${t.edit} ${t.invoice}'),
         );
 
-    Widget templateDropdown({required bool expanded}) => DropdownButton<int?>(
-          isExpanded: expanded,
-          value: _selectedInvoiceTemplateId,
-          hint: Text(t.printTemplatePublished),
-          items: [
-            DropdownMenuItem<int?>(
-              value: null,
-              child: Text(t.noCustomTemplate),
-            ),
-            ..._invoiceTemplates.map((tpl) {
-              final id = (tpl['id'] as num).toInt();
-              final name = (tpl['name'] ?? 'Template').toString();
-              final isDefault = tpl['is_default'] == true;
-              return DropdownMenuItem<int?>(
-                value: id,
-                child: Row(
-                  children: [
-                    if (isDefault) const Icon(Icons.star, size: 16),
-                    if (isDefault) const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-          onChanged: (value) {
-            setState(() {
-              _selectedInvoiceTemplateId = value;
-            });
-          },
-        );
-
     Widget closeButton() => ElevatedButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('بستن'),
@@ -3566,7 +3591,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final rowChildren = <Widget>[
       pdfButton(),
       if (showEdit) editButton(),
-      if (!dense && showTemplateDropdown) templateDropdown(expanded: false),
       closeButton(),
     ];
 
@@ -3596,10 +3620,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     closeButton(),
                   ],
                 ),
-                if (showTemplateDropdown) ...[
-                  const SizedBox(height: 8),
-                  templateDropdown(expanded: true),
-                ],
               ],
             )
           : Row(
