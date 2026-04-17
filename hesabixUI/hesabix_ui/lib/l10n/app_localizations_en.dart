@@ -7819,6 +7819,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowFieldDescBaleChatId => 'Recipient Bale chat ID';
 
   @override
+  String get workflowFieldFileStorageId => 'File ID (storage)';
+
+  @override
+  String get workflowFieldDescFileStorageId =>
+      'UUID of the file on the file server; use in Bale attachment_file_id as \$node_id.file_id';
+
+  @override
+  String get workflowFieldAttachmentFileId => 'Attachment file ID';
+
+  @override
+  String get workflowFieldDescAttachmentFileId =>
+      'Same as file_id on backup success; alias for referencing in Bale';
+
+  @override
+  String get workflowFieldStoredFilename => 'Stored filename';
+
+  @override
+  String get workflowFieldDescStoredFilename =>
+      'Original filename of the backup or attachment on the file server';
+
+  @override
+  String get workflowFieldSendFileAttachment => 'Send file attachment';
+
+  @override
+  String get workflowFieldDescSendFileAttachment =>
+      'Whether the Bale action sent a document from file storage';
+
+  @override
   String get workflowFieldEmailTo => 'To';
 
   @override
@@ -9243,6 +9271,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmNotesNoNotes => 'No notes';
+
+  @override
+  String get crmNotesEmptyDayHint =>
+      'No notes for this day yet. Add one to keep your CRM timeline up to date.';
+
+  @override
+  String get crmNotesRetry => 'Try again';
+
+  @override
+  String get crmNotesEditorMoreOptions => 'More options';
 
   @override
   String get crmNotesVisibilityLabel => 'Who can see this note';

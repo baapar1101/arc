@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -23,6 +24,8 @@ from adapters.db.models.workflow_marketplace import (
     WorkflowMarketplacePackage,
     WorkflowMarketplacePackageStatus,
 )
+
+_logger = logging.getLogger(__name__)
 
 # کلیدهایی که نباید در بستهٔ عمومی بمانند (ارجاع به موجودیت‌های محیطی یا اسرار)
 _ENTITY_REF_KEYS = frozenset(
@@ -363,8 +366,15 @@ def install_package_to_business(
     user_id: int,
     new_name: Optional[str],
 ) -> Tuple[Workflow, WorkflowMarketplaceInstall]:
+    _logger.debug(
+        "install_package_to_business enter package_id=%s target_business_id=%s user_id=%s",
+        package_id,
+        target_business_id,
+        user_id,
+    )
     pkg = get_published_package(db, package_id)
     if not pkg:
+        _logger.warning("install_package_to_business package_not_found package_id=%s", package_id)
         raise ValueError("WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND")
 
     wd = remap_workflow_ids_for_import(pkg.workflow_data or {})
@@ -372,6 +382,11 @@ def install_package_to_business(
 
     val_errs = validate_workflow_data(wd)
     if val_errs:
+        _logger.warning(
+            "install_package_to_business validation_failed package_id=%s errors=%s",
+            package_id,
+            val_errs[:5],
+        )
         raise ValueError("WORKFLOW_DATA_INVALID_IMPORT")
 
     name = (new_name or "").strip() or f"{pkg.title} ({pkg.version_label})"
@@ -389,6 +404,11 @@ def install_package_to_business(
     )
     db.add(wf)
     db.flush()
+    _logger.debug(
+        "install_package_to_business after_flush workflow_id=%s package_id=%s",
+        wf.id,
+        package_id,
+    )
 
     from app.services.workflow.workflow_trigger_service import ensure_workflow_webhook_settings
 
@@ -407,11 +427,23 @@ def install_package_to_business(
 
     try:
         db.commit()
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
+        _logger.exception(
+            "install_package_to_business commit_failed package_id=%s workflow_id=%s: %s",
+            package_id,
+            getattr(wf, "id", None),
+            e,
+        )
         db.rollback()
         raise
 
     db.refresh(wf)
     db.refresh(inst)
     db.refresh(pkg)
+    _logger.info(
+        "install_package_to_business done workflow_id=%s package_id=%s business_id=%s",
+        wf.id,
+        package_id,
+        target_business_id,
+    )
     return wf, inst

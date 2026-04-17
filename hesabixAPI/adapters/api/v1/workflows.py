@@ -146,6 +146,22 @@ def validate_workflow_data(workflow_data: Dict[str, Any]) -> List[str]:
     trigger_nodes = [n for n in nodes if isinstance(n, dict) and n.get("type") == "trigger"]
     if len(trigger_nodes) == 0:
         errors.append("workflow باید حداقل یک trigger node داشته باشد")
+
+    # تریگر زمان‌بندی: باید کرون معتبر یا حالت سادهٔ قابل تبدیل داشته باشد
+    try:
+        from app.services.workflow.schedule_cron_resolution import schedule_config_is_valid
+
+        for n in trigger_nodes:
+            cfg = (n.get("config") or {}) if isinstance(n, dict) else {}
+            if cfg.get("trigger_type") != "scheduled":
+                continue
+            if not schedule_config_is_valid(cfg):
+                errors.append(
+                    "تریگر زمان‌بندی‌شده: عبارت کرون را وارد کنید یا حالت ساده را کامل کنید"
+                )
+                break
+    except Exception:
+        pass
     
     # بررسی محدودیت اندازه
     import json
@@ -887,6 +903,8 @@ async def get_actions_metadata(
         translation_context = None
         if action_key == "ai_agent":
             translation_context = "ai_agent"
+        elif action_key == "business_backup":
+            translation_context = "business_backup"
         elif "invoice" in action_key and "create" in action_key:
             translation_context = "create_invoice"
         elif "bale" in action_key:
@@ -930,6 +948,8 @@ async def get_workflow_translations(
         OTHER_ACTIONS_TRANSLATIONS,
         RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
         DOCUMENT_CREATED_TRANSLATIONS,
+        BUSINESS_BACKUP_TRANSLATIONS,
+        SCHEDULED_TRIGGER_TRANSLATIONS,
     )
     
     # ترکیب تمام ترجمه‌ها
@@ -946,6 +966,8 @@ async def get_workflow_translations(
     # ترجمه تریگرها (کلید = همان trigger_type برای UI)
     all_translations["receipt_payment.created"] = RECEIPT_PAYMENT_CREATED_TRANSLATIONS.get(lang, {})
     all_translations["document.created"] = DOCUMENT_CREATED_TRANSLATIONS.get(lang, {})
+    all_translations["scheduled"] = SCHEDULED_TRIGGER_TRANSLATIONS.get(lang, {})
+    all_translations["business_backup"] = BUSINESS_BACKUP_TRANSLATIONS.get(lang, {})
     
     return success_response(
         data={

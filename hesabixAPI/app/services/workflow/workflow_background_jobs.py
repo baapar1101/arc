@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.check import Check, CheckStatus
 from adapters.db.models.workflow import Workflow, WorkflowStatus
+from app.services.workflow.schedule_cron_resolution import resolve_schedule_config_to_cron
 from app.services.workflow.workflow_trigger_service import (
     fire_check_due_workflow_triggers,
     run_scheduled_workflow_fire,
@@ -85,7 +86,7 @@ def _tick_scheduled_workflows(db: Session, now_utc: Optional[datetime] = None) -
         if not trigger_node:
             continue
         cfg = trigger_node.get("config") or {}
-        schedule = cfg.get("schedule")
+        schedule = resolve_schedule_config_to_cron(cfg if isinstance(cfg, dict) else {})
         tz_name = cfg.get("timezone") or "Asia/Tehran"
         ok, minute_key = _cron_should_fire_now(str(schedule or ""), tz_name, now_utc)
         if not ok or not minute_key:

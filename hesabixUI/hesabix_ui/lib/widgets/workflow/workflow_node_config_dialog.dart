@@ -4420,6 +4420,18 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
       ];
     }
 
+    if (key == 'business_backup') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField(
+            'file_id', t.workflowFieldFileStorageId, t.workflowFieldDescFileStorageId, 'string'),
+        _workflowSuggestedField(
+            'attachment_file_id', t.workflowFieldAttachmentFileId, t.workflowFieldDescAttachmentFileId, 'string'),
+        _workflowSuggestedField(
+            'filename', t.workflowFieldStoredFilename, t.workflowFieldDescStoredFilename, 'string'),
+      ];
+    }
+
     if (key == 'send_telegram') {
       return [
         _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
@@ -4437,6 +4449,12 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
             'user_id', t.workflowFieldWorkflowUserId, t.workflowFieldDescWorkflowUserId, 'number'),
         _workflowSuggestedField('bale_chat_id', t.workflowFieldBaleChatId, t.workflowFieldDescBaleChatId, 'string'),
         _workflowSuggestedField('message', t.workflowFieldSentMessage, t.workflowFieldDescSentMessage, 'string'),
+        _workflowSuggestedField(
+            'send_file_attachment', t.workflowFieldSendFileAttachment, t.workflowFieldDescSendFileAttachment, 'boolean'),
+        _workflowSuggestedField(
+            'attachment_file_id', t.workflowFieldAttachmentFileId, t.workflowFieldDescAttachmentFileId, 'string'),
+        _workflowSuggestedField(
+            'filename', t.workflowFieldStoredFilename, t.workflowFieldDescStoredFilename, 'string'),
       ];
     }
     if (key == 'send_email') {

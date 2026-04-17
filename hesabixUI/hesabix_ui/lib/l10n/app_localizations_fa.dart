@@ -7785,6 +7785,34 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowFieldDescBaleChatId => 'Chat ID بله گیرنده';
 
   @override
+  String get workflowFieldFileStorageId => 'شناسه فایل (فایل‌سرور)';
+
+  @override
+  String get workflowFieldDescFileStorageId =>
+      'UUID فایل در فایل‌سرور؛ در بله در attachment_file_id به صورت \$شناسه_نود.file_id';
+
+  @override
+  String get workflowFieldAttachmentFileId => 'شناسه فایل پیوست';
+
+  @override
+  String get workflowFieldDescAttachmentFileId =>
+      'پس از پشتیبان همان file_id است؛ برای ارجاع در بله';
+
+  @override
+  String get workflowFieldStoredFilename => 'نام فایل ذخیره‌شده';
+
+  @override
+  String get workflowFieldDescStoredFilename =>
+      'نام فایل پشتیبان یا پیوست روی فایل‌سرور';
+
+  @override
+  String get workflowFieldSendFileAttachment => 'ارسال فایل پیوست';
+
+  @override
+  String get workflowFieldDescSendFileAttachment =>
+      'آیا اکشن بله سند را از فایل‌سرور ارسال کرده است';
+
+  @override
   String get workflowFieldEmailTo => 'گیرنده';
 
   @override
@@ -9199,6 +9227,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmNotesNoNotes => 'یادداشتی نیست';
+
+  @override
+  String get crmNotesEmptyDayHint =>
+      'هنوز یادداشتی برای این روز ثبت نشده است. با افزودن یادداشت، پیگیری‌ها را منظم نگه دارید.';
+
+  @override
+  String get crmNotesRetry => 'تلاش مجدد';
+
+  @override
+  String get crmNotesEditorMoreOptions => 'گزینه‌های بیشتر';
 
   @override
   String get crmNotesVisibilityLabel => 'سطح دسترسی';

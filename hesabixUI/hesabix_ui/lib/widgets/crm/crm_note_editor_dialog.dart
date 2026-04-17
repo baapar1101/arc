@@ -13,6 +13,7 @@ import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 
 /// نمایش دیالوگ ایجاد/ویرایش یادداشت CRM با تب‌ها، کارت‌های بخش و UX بهبود یافته.
@@ -421,22 +422,185 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
     }
   }
 
-  Widget _sectionCard(BuildContext context, String title, List<Widget> children) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
-            ...children,
+  String _formatCommentTime(Map<String, dynamic> m) {
+    final raw = (m['created_at_raw'] ?? m['created_at'] ?? '').toString();
+    final dt = DateTime.tryParse(raw);
+    if (dt != null) {
+      return HesabixDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
+    }
+    return '';
+  }
+
+  String _avatarInitial(String name) {
+    final s = name.trim();
+    if (s.isEmpty) return '?';
+    final it = s.runes.iterator;
+    return it.moveNext() ? String.fromCharCode(it.current) : '?';
+  }
+
+  Widget _buildVisibilityControl(AppLocalizations t, ThemeData theme, bool canWrite) {
+    final disabled = !canWrite;
+    final seg = IgnorePointer(
+      ignoring: disabled,
+      child: Opacity(
+        opacity: disabled ? 0.6 : 1,
+        child: SegmentedButton<String>(
+          segments: [
+            ButtonSegment(
+              value: 'private',
+              label: Text(t.crmNotesVisibilityShortPrivate),
+              icon: const Icon(Icons.lock_outline, size: 18),
+            ),
+            ButtonSegment(
+              value: 'business_public',
+              label: Text(t.crmNotesVisibilityShortBusiness),
+              icon: const Icon(Icons.groups_2_outlined, size: 18),
+            ),
+            ButtonSegment(
+              value: 'shared',
+              label: Text(t.crmNotesVisibilityShortShared),
+              icon: const Icon(Icons.person_search_outlined, size: 18),
+            ),
           ],
+          selected: {_visibility},
+          emptySelectionAllowed: false,
+          showSelectedIcon: false,
+          onSelectionChanged: (s) {
+            if (!canWrite || s.isEmpty) return;
+            setState(() => _visibility = s.first);
+          },
+        ),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, c) {
+        if (c.maxWidth < 420) {
+          return DropdownButtonFormField<String>(
+            value: _visibility,
+            decoration: InputDecoration(
+              labelText: t.crmNotesVisibilityLabel,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: 'private',
+                child: Row(
+                  children: [
+                    const Icon(Icons.lock_outline, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(t.crmNotesVisibilityShortPrivate)),
+                  ],
+                ),
+              ),
+              DropdownMenuItem(
+                value: 'business_public',
+                child: Row(
+                  children: [
+                    const Icon(Icons.groups_2_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(t.crmNotesVisibilityShortBusiness)),
+                  ],
+                ),
+              ),
+              DropdownMenuItem(
+                value: 'shared',
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_search_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(t.crmNotesVisibilityShortShared)),
+                  ],
+                ),
+              ),
+            ],
+            onChanged: disabled
+                ? null
+                : (v) {
+                    if (v != null) setState(() => _visibility = v);
+                  },
+          );
+        }
+        return seg;
+      },
+    );
+  }
+
+  Widget _buildCommentBubble(ThemeData theme, Map<String, dynamic> m) {
+    final body = m['body']?.toString() ?? '';
+    final who = m['created_by_name']?.toString() ?? '';
+    final when = _formatCommentTime(m);
+    final authorId = (m['created_by_user_id'] as num?)?.toInt();
+    final selfId = widget.authStore.currentUserId;
+    final mine = selfId != null && authorId == selfId;
+    final cs = theme.colorScheme;
+    final initial = _avatarInitial(who);
+    final bubbleBg = mine ? cs.primaryContainer : cs.surfaceContainerHighest;
+    final align = mine ? Alignment.centerRight : Alignment.centerLeft;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: align,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!mine) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: cs.secondaryContainer,
+                  child: Text(initial, style: theme.textTheme.labelLarge),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      alignment: mine ? WrapAlignment.end : WrapAlignment.start,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (who.isNotEmpty)
+                          Text(
+                            who,
+                            style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        if (when.isNotEmpty)
+                          Text(when, style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: bubbleBg,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(12),
+                          topRight: const Radius.circular(12),
+                          bottomLeft: Radius.circular(mine ? 12 : 4),
+                          bottomRight: Radius.circular(mine ? 4 : 12),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: SelectableText(body, style: theme.textTheme.bodyMedium),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (mine) ...[
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: cs.primaryContainer,
+                  child: Text(initial, style: theme.textTheme.labelLarge),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -477,24 +641,28 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
 
   Widget _buildDetailsTab(AppLocalizations t, ThemeData theme, bool canWrite) {
     final mode = _schedulingModeForType(_typeId);
+    final cs = theme.colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        _sectionCard(
-          context,
-          t.crmNotesType,
-          [
-            Row(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CrmSectionCard(
+            title: t.crmNotesType,
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: DropdownButtonFormField<int>(
                     value: _typeId,
-                    decoration: InputDecoration(labelText: t.crmNotesType, border: const OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
                     isExpanded: true,
                     items: _noteTypesList.map((raw) {
                       if (raw is! Map) return null;
-                      final m = Map<String, dynamic>.from(raw as Map);
+                      final m = Map<String, dynamic>.from(raw);
                       final tid = (m['id'] as num?)?.toInt();
                       final label = (m['title'] ?? m['code'] ?? '').toString();
                       return DropdownMenuItem(value: tid, child: Text(label));
@@ -519,202 +687,206 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
                 ],
               ],
             ),
-          ],
+          ),
         ),
-        _sectionCard(
-          context,
-          t.crmNotesVisibilityLabel,
-          [
-            IgnorePointer(
-              ignoring: !canWrite,
-              child: Opacity(
-                opacity: canWrite ? 1 : 0.6,
-                child: SegmentedButton<String>(
-                  segments: [
-                    ButtonSegment(
-                      value: 'private',
-                      label: Text(t.crmNotesVisibilityShortPrivate),
-                      icon: const Icon(Icons.lock_outline, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: 'business_public',
-                      label: Text(t.crmNotesVisibilityShortBusiness),
-                      icon: const Icon(Icons.groups_2_outlined, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: 'shared',
-                      label: Text(t.crmNotesVisibilityShortShared),
-                      icon: const Icon(Icons.person_search_outlined, size: 18),
-                    ),
-                  ],
-                  selected: {_visibility},
-                  emptySelectionAllowed: false,
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) {
-                    if (!canWrite || s.isEmpty) return;
-                    setState(() => _visibility = s.first);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _visibility == 'private'
-                  ? t.crmNotesVisibilityHintPrivate
-                  : _visibility == 'business_public'
-                      ? t.crmNotesVisibilityHintBusiness
-                      : t.crmNotesVisibilityHintShared,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            if (_visibility == 'shared') ...[
-              const SizedBox(height: 12),
-              Text(t.crmNotesSharedPickHint, style: theme.textTheme.labelMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: _members.map((u) {
-                  final uid = u['user_id'] as int;
-                  final selfId = widget.authStore.currentUserId;
-                  if (selfId != null && uid == selfId) return const SizedBox.shrink();
-                  final sel = _sharedIds.contains(uid);
-                  return FilterChip(
-                    label: Text((u['name'] ?? '$uid').toString()),
-                    selected: sel,
-                    onSelected: canWrite
-                        ? (b) => setState(() {
-                              if (b) {
-                                _sharedIds.add(uid);
-                              } else {
-                                _sharedIds.remove(uid);
-                              }
-                            })
-                        : null,
-                  );
-                }).toList(),
-              ),
-            ],
-          ],
-        ),
-        _sectionCard(
-          context,
-          t.crmNotesDayNotes,
-          [
-            if (mode == 'day_only') ...[
-              Text(
-                _occursOn == null ? '—' : HesabixDateUtils.formatForDisplay(_occursOn!, widget.calendarController.isJalali),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: canWrite ? _pickDate : null,
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(t.crmNotesEventDateButton),
-                ),
-              ),
-            ],
-            if (mode == 'meeting') ...[
-              Text(t.crmNotesMeetingStart, style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(
-                _startAt == null ? '—' : HesabixDateUtils.formatDateTime(_startAt, widget.calendarController.isJalali),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: !canWrite
-                      ? null
-                      : () async {
-                          final dt = await _pickMeetingDateTime(initial: _startAt ?? DateTime.now());
-                          if (dt == null || !mounted) return;
-                          setState(() {
-                            _startAt = dt;
-                            _occursOn = DateTime(dt.year, dt.month, dt.day);
-                          });
-                        },
-                  icon: const Icon(Icons.schedule),
-                  label: Text(t.crmNotesPickDateTime),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(t.crmNotesMeetingEnd, style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(
-                _endAt == null ? '—' : HesabixDateUtils.formatDateTime(_endAt, widget.calendarController.isJalali),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: !canWrite
-                      ? null
-                      : () async {
-                          final dt = await _pickMeetingDateTime(initial: _endAt ?? _startAt ?? DateTime.now());
-                          if (dt == null || !mounted) return;
-                          setState(() => _endAt = dt);
-                        },
-                  icon: const Icon(Icons.schedule_outlined),
-                  label: Text(t.crmNotesPickDateTime),
-                ),
-              ),
-            ],
-          ],
-        ),
-        _sectionCard(
-          context,
-          t.crmNotesBody,
-          [
-            TextField(
-              controller: _titleCtrl,
-              decoration: InputDecoration(
-                labelText: t.crmNotesTitleOptional,
-                border: const OutlineInputBorder(),
-              ),
-              readOnly: !canWrite,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _bodyCtrl,
-              decoration: InputDecoration(
-                labelText: t.crmNotesBody,
-                alignLabelWithHint: true,
-                border: const OutlineInputBorder(),
-              ),
-              minLines: 8,
-              maxLines: 14,
-              readOnly: !canWrite,
-            ),
-          ],
-        ),
-        _sectionCard(
-          context,
-          t.crmNotesLeadOptional,
-          [
-            if (_leadId != null && _leadLabel.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: InputChip(
-                  label: Text(_leadLabel),
-                  onDeleted: canWrite ? () => setState(() { _leadId = null; _leadLabel = ''; }) : null,
-                ),
-              ),
-            Row(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CrmSectionCard(
+            title: t.crmNotesVisibilityLabel,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: canWrite ? _pickLead : null,
-                    icon: const Icon(Icons.search),
-                    label: Text(t.crmNotesSearchLeads),
+                _buildVisibilityControl(t, theme, canWrite),
+                const SizedBox(height: 8),
+                Text(
+                  _visibility == 'private'
+                      ? t.crmNotesVisibilityHintPrivate
+                      : _visibility == 'business_public'
+                          ? t.crmNotesVisibilityHintBusiness
+                          : t.crmNotesVisibilityHintShared,
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                if (_visibility == 'shared') ...[
+                  const SizedBox(height: 12),
+                  Text(t.crmNotesSharedPickHint, style: theme.textTheme.labelMedium),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _members.map((u) {
+                      final uid = u['user_id'] as int;
+                      final selfId = widget.authStore.currentUserId;
+                      if (selfId != null && uid == selfId) return const SizedBox.shrink();
+                      final sel = _sharedIds.contains(uid);
+                      return FilterChip(
+                        label: Text((u['name'] ?? '$uid').toString()),
+                        selected: sel,
+                        onSelected: canWrite
+                            ? (b) => setState(() {
+                                  if (b) {
+                                    _sharedIds.add(uid);
+                                  } else {
+                                    _sharedIds.remove(uid);
+                                  }
+                                })
+                            : null,
+                      );
+                    }).toList(),
                   ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CrmSectionCard(
+            title: t.crmNotesDayNotes,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (mode == 'day_only') ...[
+                  Text(
+                    _occursOn == null ? '—' : HesabixDateUtils.formatForDisplay(_occursOn!, widget.calendarController.isJalali),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: canWrite ? _pickDate : null,
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      label: Text(t.crmNotesEventDateButton),
+                    ),
+                  ),
+                ],
+                if (mode == 'meeting') ...[
+                  Text(t.crmNotesMeetingStart, style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    _startAt == null ? '—' : HesabixDateUtils.formatDateTime(_startAt, widget.calendarController.isJalali),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: !canWrite
+                          ? null
+                          : () async {
+                              final dt = await _pickMeetingDateTime(initial: _startAt ?? DateTime.now());
+                              if (dt == null || !mounted) return;
+                              setState(() {
+                                _startAt = dt;
+                                _occursOn = DateTime(dt.year, dt.month, dt.day);
+                              });
+                            },
+                      icon: const Icon(Icons.schedule),
+                      label: Text(t.crmNotesPickDateTime),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(t.crmNotesMeetingEnd, style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    _endAt == null ? '—' : HesabixDateUtils.formatDateTime(_endAt, widget.calendarController.isJalali),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: !canWrite
+                          ? null
+                          : () async {
+                              final dt = await _pickMeetingDateTime(initial: _endAt ?? _startAt ?? DateTime.now());
+                              if (dt == null || !mounted) return;
+                              setState(() => _endAt = dt);
+                            },
+                      icon: const Icon(Icons.schedule_outlined),
+                      label: Text(t.crmNotesPickDateTime),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CrmSectionCard(
+            title: t.crmNotesBody,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _titleCtrl,
+                  decoration: InputDecoration(
+                    labelText: t.crmNotesTitleOptional,
+                    border: const OutlineInputBorder(),
+                  ),
+                  readOnly: !canWrite,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _bodyCtrl,
+                  decoration: const InputDecoration(
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  minLines: 8,
+                  maxLines: 14,
+                  readOnly: !canWrite,
                 ),
               ],
             ),
-          ],
+          ),
+        ),
+        Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          color: cs.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: _leadId != null,
+            leading: Icon(Icons.person_search_outlined, color: cs.primary),
+            title: Text(t.crmNotesLeadOptional),
+            subtitle: Text(
+              _leadLabel.isNotEmpty ? _leadLabel : t.crmNotesEditorMoreOptions,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_leadId != null && _leadLabel.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InputChip(
+                          label: Text(_leadLabel),
+                          onDeleted: canWrite ? () => setState(() { _leadId = null; _leadLabel = ''; }) : null,
+                        ),
+                      ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: canWrite ? _pickLead : null,
+                        icon: const Icon(Icons.search),
+                        label: Text(t.crmNotesSearchLeads),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -737,50 +909,71 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
       children: [
         Expanded(
           child: _comments.isEmpty
-              ? Center(child: Text(t.crmNotesNoComments))
-              : ListView.separated(
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.forum_outlined, size: 48, color: theme.colorScheme.outline),
+                        const SizedBox(height: 12),
+                        Text(
+                          t.crmNotesNoComments,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
                   controller: _commentScroll,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                   itemCount: _comments.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) {
                     final m = Map<String, dynamic>.from(_comments[i] as Map);
-                    final body = m['body']?.toString() ?? '';
-                    final who = m['created_by_name']?.toString() ?? '';
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(body),
-                      subtitle: Text(who, style: theme.textTheme.bodySmall),
-                      dense: true,
-                    );
+                    return _buildCommentBubble(theme, m);
                   },
                 ),
         ),
         if (canWrite)
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + MediaQuery.paddingOf(context).bottom),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentCtrl,
-                    decoration: InputDecoration(
-                      labelText: t.crmNotesCommentInputLabel,
-                      hintText: t.crmNotesCommentHint,
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        tooltip: t.crmNotesSendComment,
-                        icon: const Icon(Icons.send),
-                        onPressed: _sendComment,
+          Material(
+            elevation: 2,
+            shadowColor: theme.shadowColor.withValues(alpha: 0.12),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + MediaQuery.paddingOf(context).bottom),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _commentCtrl,
+                      decoration: InputDecoration(
+                        labelText: t.crmNotesCommentInputLabel,
+                        hintText: t.crmNotesCommentHint,
+                        border: const OutlineInputBorder(),
+                        filled: true,
                       ),
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.newline,
+                      onSubmitted: (_) => _sendComment(),
                     ),
-                    minLines: 1,
-                    maxLines: 4,
-                    onSubmitted: (_) => _sendComment(),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: t.crmNotesSendComment,
+                    child: FilledButton(
+                      onPressed: _sendComment,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                        minimumSize: const Size(48, 48),
+                      ),
+                      child: const Icon(Icons.send),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
       ],

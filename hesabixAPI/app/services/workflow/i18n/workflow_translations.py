@@ -284,17 +284,21 @@ CREATE_INVOICE_TRANSLATIONS = {
 SEND_BALE_TRANSLATIONS = {
     "fa": {
         "action_name": "ارسال پیام به بله",
-        "action_description": "ارسال پیام به کاربر عضو کسب و کار از طریق پیام‌رسان بله (فقط کاربران متصل به ربات)",
+        "action_description": "ارسال متن و/یا فایل (مثلاً پشتیبان از نود قبلی) به کاربر متصل به ربات بله",
         # برچسب فیلدها
         "field_user_id": "کاربر گیرنده",
-        "field_message": "متن پیام",
+        "field_send_file_attachment": "ارسال فایل",
+        "field_attachment_file_id": "شناسه فایل (ذخیره‌شده)",
+        "field_message": "متن / زیرنویس فایل",
         "field_parse_mode": "حالت پارس متن",
         "field_retry_on_failure": "تلاش مجدد در صورت خطا",
         "field_retry_attempts": "تعداد تلاش‌های مجدد",
         "field_retry_delay_seconds": "تاخیر بین تلاش‌ها",
         # توضیحات فیلدها
         "field_user_id_desc": "شناسه کاربر عضو کسب و کار که به ربات بله متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
-        "field_message_desc": "متن چندخطی؛ می‌توانید چند متغیر از نود قبلی بگذارید (مثلاً مبلغ: $شناسه_نود.total_amount)",
+        "field_send_file_attachment_desc": "اگر روشن باشد، فایل از فایل‌سرور با sendDocument ارسال می‌شود (نه فقط متن)",
+        "field_attachment_file_id_desc": "شناسه UUID فایل؛ پس از نود پشتیبان معمولاً $همان_نود.file_id یا $همان_نود.attachment_file_id",
+        "field_message_desc": "متن پیام؛ در حالت ارسال فایل به‌عنوان زیرنویس (caption) استفاده می‌شود و می‌تواند خالی باشد",
         "field_parse_mode_desc": "حالت پارس متن (متن ساده، HTML یا Markdown)",
         "field_retry_on_failure_desc": "تلاش مجدد در صورت شکست ارسال",
         "field_retry_attempts_desc": "تعداد تلاش‌های مجدد",
@@ -308,17 +312,21 @@ SEND_BALE_TRANSLATIONS = {
     },
     "en": {
         "action_name": "Send Bale Message",
-        "action_description": "Send message to business member via Bale messenger (only connected users)",
+        "action_description": "Send text and/or a file (e.g. backup from previous node) via Bale",
         # Field labels
         "field_user_id": "Recipient User",
-        "field_message": "Message Text",
+        "field_send_file_attachment": "Send file",
+        "field_attachment_file_id": "Stored file ID",
+        "field_message": "Text / file caption",
         "field_parse_mode": "Parse Mode",
         "field_retry_on_failure": "Retry on Failure",
         "field_retry_attempts": "Retry Attempts",
         "field_retry_delay_seconds": "Retry Delay",
         # Field descriptions
         "field_user_id_desc": "User ID of business member connected to Bale bot (can use previous nodes: $node_id.user_id)",
-        "field_message_desc": "Multi-line message; embed variables from previous nodes (e.g. amount: $node_id.total_amount)",
+        "field_send_file_attachment_desc": "If enabled, sends a file via sendDocument from file storage",
+        "field_attachment_file_id_desc": "File UUID; after backup node use e.g. $that_node.file_id",
+        "field_message_desc": "Message text; when sending a file, used as caption (can be empty)",
         "field_parse_mode_desc": "Parse mode (plain text, HTML or Markdown)",
         "field_retry_on_failure_desc": "Retry on send failure",
         "field_retry_attempts_desc": "Number of retry attempts",
@@ -786,9 +794,116 @@ DOCUMENT_CREATED_TRANSLATIONS = {
     },
 }
 
+# ترجمه تریگر scheduled
+SCHEDULED_TRIGGER_TRANSLATIONS = {
+    "fa": {
+        "trigger_name": "زمان‌بندی شده",
+        "trigger_description": "اجرای ورک‌فلو در زمان مشخص (کرون دستی یا حالت ساده)",
+        "field_schedule_mode": "نحوهٔ تنظیم زمان",
+        "field_schedule_mode_desc": "کرون پیشرفته برای کاربران حرفه‌ای، یا حالت ساده بدون نوشتن کرون",
+        "cron": "کرون پیشرفته (دستی)",
+        "simple": "زمان‌بندی ساده",
+        "field_schedule": "عبارت کرون",
+        "field_schedule_desc": "پنج بخش: دقیقه ساعت روز ماه روزهفته — فقط در حالت کرون پیشرفته",
+        "field_simple_repeat": "تکرار",
+        "field_simple_repeat_desc": "نوع تکرار در حالت ساده (روزانه، هفتگی، هر چند دقیقه/ساعت)",
+        "daily": "هر روز",
+        "weekly": "هفتگی",
+        "every_minutes": "هر چند دقیقه",
+        "every_hours": "هر چند ساعت",
+        "field_simple_time": "ساعت اجرا",
+        "field_simple_time_desc": "فرمت HH:mm برای حالت روزانه یا هفتگی",
+        "field_simple_weekday": "روز هفته (هفتگی)",
+        "field_simple_weekday_desc": "۰=یکشنبه تا ۶=شنبه (مطابق استاندارد کرون)",
+        "field_simple_interval": "فاصله (عدد)",
+        "field_simple_interval_desc": "برای هر N دقیقه یا هر N ساعت",
+        "field_timezone": "منطقهٔ زمانی",
+        "field_timezone_desc": "زمان محلی برای محاسبهٔ اجرای کرون",
+        "Asia_Tehran": "تهران",
+        "UTC": "UTC",
+        "Asia_Dubai": "دبی",
+        "Europe_London": "لندن",
+        "America_New_York": "نیویورک",
+        "field_business_hours_only": "فقط ساعات کاری",
+        "field_business_hours_only_desc": "بعد از تطبیق زمان، فقط در بازهٔ ساعت کاری اجرا شود",
+        "field_business_hours_start": "شروع ساعت کاری",
+        "field_business_hours_start_desc": "فرمت HH:mm",
+        "field_business_hours_end": "پایان ساعت کاری",
+        "field_business_hours_end_desc": "فرمت HH:mm",
+        "field_exclude_holidays": "حذف تعطیلات",
+        "field_exclude_holidays_desc": "رزرو برای نسخه‌های بعدی",
+        "field_max_execution_time": "حداکثر زمان اجرا (ثانیه)",
+        "field_max_execution_time_desc": "راهنمای UI؛ محدودیت سخت موتور جداگانه است",
+        "field_retry_on_failure": "تلاش مجدد",
+        "field_retry_on_failure_desc": "رزرو",
+        "field_retry_attempts": "تعداد تلاش مجدد",
+        "field_retry_attempts_desc": "رزرو",
+    },
+    "en": {
+        "trigger_name": "Scheduled",
+        "trigger_description": "Run the workflow on a schedule (advanced cron or simple mode)",
+        "field_schedule_mode": "Schedule mode",
+        "field_schedule_mode_desc": "Advanced cron for power users, or simple mode without writing cron",
+        "cron": "Advanced cron",
+        "simple": "Simple schedule",
+        "field_schedule": "Cron expression",
+        "field_schedule_desc": "Five fields: minute hour day month weekday — only in advanced mode",
+        "field_simple_repeat": "Repeat",
+        "field_simple_repeat_desc": "Repeat type in simple mode",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "every_minutes": "Every N minutes",
+        "every_hours": "Every N hours",
+        "field_simple_time": "Time of day",
+        "field_simple_time_desc": "HH:mm for daily or weekly",
+        "field_simple_weekday": "Weekday (weekly)",
+        "field_simple_weekday_desc": "0=Sunday … 6=Saturday (cron convention)",
+        "field_simple_interval": "Interval (number)",
+        "field_simple_interval_desc": "For every N minutes or every N hours",
+        "field_timezone": "Timezone",
+        "field_timezone_desc": "Local timezone used to evaluate the schedule",
+        "Asia_Tehran": "Tehran",
+        "UTC": "UTC",
+        "Asia_Dubai": "Dubai",
+        "Europe_London": "London",
+        "America_New_York": "New York",
+        "field_business_hours_only": "Business hours only",
+        "field_business_hours_only_desc": "After schedule matches, only run within business hours",
+        "field_business_hours_start": "Business hours start",
+        "field_business_hours_start_desc": "HH:mm format",
+        "field_business_hours_end": "Business hours end",
+        "field_business_hours_end_desc": "HH:mm format",
+        "field_exclude_holidays": "Exclude holidays",
+        "field_exclude_holidays_desc": "Reserved for future use",
+        "field_max_execution_time": "Max execution time (seconds)",
+        "field_max_execution_time_desc": "UI hint; engine limits may differ",
+        "field_retry_on_failure": "Retry on failure",
+        "field_retry_on_failure_desc": "Reserved",
+        "field_retry_attempts": "Retry attempts",
+        "field_retry_attempts_desc": "Reserved",
+    },
+}
+
+# ترجمه اکشن business_backup
+BUSINESS_BACKUP_TRANSLATIONS = {
+    "fa": {
+        "action_name": "پشتیبان کسب‌وکار",
+        "action_description": "ایجاد فایل پشتیبان کامل و ذخیره در فایل‌سرور؛ خروجی file_id برای نود بعدی (مثلاً ارسال فایل در بله با $node_id.file_id). اختیاری: FTP",
+        "field_upload_to_ftp": "ارسال به FTP",
+        "field_upload_to_ftp_desc": "پس از ذخیرهٔ فایل، کپی روی سرور FTP (نیازمند تنظیمات FTP کسب‌وکار)",
+    },
+    "en": {
+        "action_name": "Business backup",
+        "action_description": "Create a full .hbx backup and store it; exposes file_id for the next node (e.g. Bale: $node_id.file_id). Optional FTP",
+        "field_upload_to_ftp": "Upload to FTP",
+        "field_upload_to_ftp_desc": "After saving, upload a copy to FTP (requires FTP settings)",
+    },
+}
+
 TRIGGER_TRANSLATIONS_BY_KEY = {
     "receipt_payment.created": RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
     "document.created": DOCUMENT_CREATED_TRANSLATIONS,
+    "scheduled": SCHEDULED_TRIGGER_TRANSLATIONS,
 }
 
 
@@ -821,6 +936,7 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
             "send_bale": SEND_BALE_TRANSLATIONS,
             "send_email": SEND_EMAIL_TRANSLATIONS,
             "ai_agent": AI_AGENT_TRANSLATIONS,
+            "business_backup": BUSINESS_BACKUP_TRANSLATIONS,
             "others": OTHER_ACTIONS_TRANSLATIONS,
         }
         
@@ -946,8 +1062,16 @@ def translate_trigger_metadata(metadata: Dict[str, Any], lang: str = "fa", trigg
             if "enum" in translated_field:
                 translated_enum_labels = {}
                 for enum_value in translated_field["enum"]:
-                    ek = str(enum_value).replace("-", "_").replace(".", "_")
-                    translated_enum_labels[enum_value] = get_translation(ek, lang, trigger_key)
+                    ek = (
+                        str(enum_value)
+                        .replace("-", "_")
+                        .replace(".", "_")
+                        .replace("/", "_")
+                    )
+                    lbl = get_translation(ek, lang, trigger_key)
+                    if lbl == ek:
+                        lbl = get_translation(str(enum_value), lang, trigger_key)
+                    translated_enum_labels[enum_value] = lbl
                 if "ui_config" not in translated_field:
                     translated_field["ui_config"] = {}
                 translated_field["ui_config"]["labels"] = translated_enum_labels
@@ -957,8 +1081,16 @@ def translate_trigger_metadata(metadata: Dict[str, Any], lang: str = "fa", trigg
                 if isinstance(items, dict) and items.get("enum"):
                     translated_item_labels = {}
                     for enum_value in items["enum"]:
-                        ek = str(enum_value).replace("-", "_").replace(".", "_")
-                        translated_item_labels[enum_value] = get_translation(ek, lang, trigger_key)
+                        ek = (
+                            str(enum_value)
+                            .replace("-", "_")
+                            .replace(".", "_")
+                            .replace("/", "_")
+                        )
+                        il = get_translation(ek, lang, trigger_key)
+                        if il == ek:
+                            il = get_translation(str(enum_value), lang, trigger_key)
+                        translated_item_labels[enum_value] = il
                     uc = dict(translated_field.get("ui_config") or {})
                     uc["labels"] = translated_item_labels
                     translated_field["ui_config"] = uc

@@ -7,7 +7,7 @@ import tempfile
 import zipfile
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -325,6 +325,128 @@ def _perform_backup(db: Session, ctx: AuthContext, business_id: int, job_id: str
             
             jm.fail(job_id, final_error, "Backup failed")
         raise
+
+
+def run_workflow_business_backup(
+    db: Session,
+    business_id: int,
+    user_id: Optional[int],
+    upload_to_ftp: bool = False,
+) -> Dict[str, Any]:
+    """
+    بکاپ کامل کسب‌وکار برای اجرای ورک‌فلو (هم‌زمان، بدون JobManager).
+    در صورت نبود user_id از مالک کسب‌وکار استفاده می‌شود.
+    """
+    from adapters.db.models.business import Business
+    from adapters.db.models.user import User
+    from app.core.auth_dependency import AuthContext
+    from adapters.db.session import get_db_session
+    from app.services.async_isolated import run_coroutine_isolated
+
+    uid: Optional[int] = user_id
+    if uid is None:
+        b = db.get(Business, int(business_id))
+        if b and getattr(b, "owner_id", None):
+            uid = int(b.owner_id)
+    if not uid:
+        return {"success": False, "error": "NO_USER_FOR_BACKUP", "message": "user_id یا مالک کسب‌وکار یافت نشد"}
+
+    user = db.get(User, int(uid))
+    if not user:
+        return {"success": False, "error": "USER_NOT_FOUND", "message": "کاربر یافت نشد"}
+
+    ctx = AuthContext(user, api_key_id=0, db=db, business_id=int(business_id))
+
+    if upload_to_ftp:
+        try:
+            assert_can_use_ftp_on_backup(db, ctx, business_id)
+        except ApiError as e:
+            return {
+                "success": False,
+                "error": "FTP_FORBIDDEN",
+                "message": getattr(e, "detail", None) or str(e),
+            }
+        if not load_decrypted_params(db, business_id):
+            return {
+                "success": False,
+                "error": "FTP_NOT_CONFIGURED",
+                "message": "تنظیمات FTP برای این کسب‌وکار کامل نیست",
+            }
+
+    try:
+        data = _perform_backup(db, ctx, business_id, job_id=None)
+    except Exception as e:
+        logger.exception("run_workflow_business_backup _perform_backup failed")
+        return {"success": False, "error": "BACKUP_FAILED", "message": str(e)}
+    # آپلود async است؛ ورک‌فلو از داخل درخواست async اجرا می‌شود و در همان ترد حلقهٔ asyncio فعال است.
+    # anyio.run / asyncio.run در آن حالت خطا می‌دهند؛ session هم باید در همان ترد آپلود ساخته شود.
+    bid = int(business_id)
+    schema_ver = data["metadata"]["schema_version"]
+    fname = data["filename"]
+    zip_bytes = data["zip_bytes"]
+
+    async def _upload_async():
+        with get_db_session() as thread_db:
+            user = thread_db.get(User, int(uid))
+            if not user:
+                raise RuntimeError("USER_NOT_FOUND")
+            tctx = AuthContext(user, api_key_id=0, db=thread_db, business_id=bid)
+            faux = UploadFile(filename=fname, file=io.BytesIO(zip_bytes))
+            storage = FileStorageService(thread_db)
+            return await storage.upload_file(
+                faux,
+                user_id=tctx.get_user_id(),
+                module_context="business_backup",
+                developer_data={
+                    "business_id": bid,
+                    "schema_version": schema_ver,
+                    "source": "workflow_action",
+                },
+                is_temporary=False,
+                expires_in_days=3650,
+                business_id=bid,
+                check_storage_limit=True,
+            )
+
+    try:
+        saved = run_coroutine_isolated(lambda: _upload_async())
+    except Exception as e:
+        logger.exception("run_workflow_business_backup upload failed")
+        return {"success": False, "error": "UPLOAD_FAILED", "message": str(e)}
+
+    out: Dict[str, Any] = {
+        "success": True,
+        "file_id": (saved or {}).get("file_id"),
+        "filename": data["filename"],
+        "metadata": data["metadata"],
+    }
+    if upload_to_ftp:
+        tmp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".hbx", delete=False) as tf:
+                tf.write(data["zip_bytes"])
+                tmp_path = tf.name
+            ftp_info = upload_saved_backup_to_ftp(
+                db, business_id, data["filename"], data=None, file_path=tmp_path
+            )
+        finally:
+            if tmp_path and os.path.isfile(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+        if not ftp_info:
+            return {
+                "success": False,
+                "error": "FTP_UPLOAD_FAILED",
+                "message": "آپلود FTP انجام نشد",
+                "file_id": out.get("file_id"),
+            }
+        out["ftp"] = ftp_info
+        fid = (saved or {}).get("file_id")
+        if fid:
+            _merge_backup_ftp_metadata(db, str(fid), ftp_info)
+    return out
 
 
 @router.post("", dependencies=[Depends(require_business_access_dep)])

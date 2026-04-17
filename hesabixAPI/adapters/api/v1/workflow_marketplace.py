@@ -4,7 +4,11 @@ API مخزن ورک‌فلو: انتشار، لیست، جزئیات، نصب د
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any, Dict, Optional
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,6 +34,19 @@ from app.services.workflow.workflow_marketplace_service import (
 router = APIRouter(tags=["workflow-marketplace"])
 
 
+def _json_plain(value: Any) -> Any:
+    """
+    تبدیل به ساختار JSON خالص تا Pydantic / pydantic_core هنگام dump_json خطای
+    InstanceState یا انواع غیرقابل سریالایز ندهد.
+    """
+    if value is None:
+        return None
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except (TypeError, ValueError, OverflowError):
+        return value
+
+
 def _workflow_to_api_dict(workflow: Workflow, request: Request) -> Dict[str, Any]:
     """فقط ستون‌های مدل — بدون _sa_instance_state و بدون مقادیر غیر JSON."""
     st = workflow.status
@@ -40,8 +57,8 @@ def _workflow_to_api_dict(workflow: Workflow, request: Request) -> Dict[str, Any
         "name": workflow.name,
         "description": workflow.description,
         "status": status_val,
-        "workflow_data": workflow.workflow_data,
-        "settings": workflow.settings,
+        "workflow_data": _json_plain(workflow.workflow_data) if workflow.workflow_data is not None else {},
+        "settings": _json_plain(workflow.settings) if workflow.settings is not None else None,
         "created_by_user_id": workflow.created_by_user_id,
         "created_at": workflow.created_at,
         "updated_at": workflow.updated_at,
@@ -195,29 +212,72 @@ async def marketplace_install(
     package_id = body.get("package_id")
     if not package_id:
         raise ApiError("PACKAGE_ID_REQUIRED", "شناسه بسته الزامی است", http_status=400)
+    pid = int(package_id)
+    uid = ctx.get_user_id()
+    _logger.info(
+        "workflow_marketplace_install_start business_id=%s package_id=%s user_id=%s",
+        business_id,
+        pid,
+        uid,
+    )
     try:
         wf, _inst = install_package_to_business(
             db,
-            package_id=int(package_id),
+            package_id=pid,
             target_business_id=business_id,
-            user_id=ctx.get_user_id(),
+            user_id=uid,
             new_name=body.get("name"),
+        )
+        _logger.info(
+            "workflow_marketplace_install_db_ok workflow_id=%s business_id=%s package_id=%s",
+            wf.id,
+            business_id,
+            pid,
         )
     except ValueError as e:
         code = str(e.args[0]) if e.args else "INSTALL_FAILED"
+        _logger.warning(
+            "workflow_marketplace_install_value_error code=%s business_id=%s package_id=%s user_id=%s",
+            code,
+            business_id,
+            pid,
+            uid,
+            exc_info=True,
+        )
         if code == "WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND":
             raise ApiError(code, "بسته یافت نشد", http_status=404)
         if code == "WORKFLOW_DATA_INVALID_IMPORT":
             raise ApiError("WORKFLOW_DATA_INVALID", "ساختار ورک‌فلو پس از نصب نامعتبر است", http_status=400)
         raise ApiError(code, "نصب ناموفق بود", http_status=400)
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.rollback()
+        _logger.exception(
+            "workflow_marketplace_install_sqlalchemy business_id=%s package_id=%s user_id=%s err=%s",
+            business_id,
+            pid,
+            uid,
+            e,
+        )
         raise ApiError(
             "WORKFLOW_MARKETPLACE_INSTALL_DB",
             "ذخیره نصب ناموفق بود. در صورت تازه‌بودن قابلیت مخزن، migration پایگاه داده را اجرا کنید.",
             http_status=500,
         )
 
-    data = _workflow_to_api_dict(wf, request)
-    _attach_workflow_webhook_url(data, request)
-    return success_response(data={"workflow": data}, request=request, message="WORKFLOW_MARKETPLACE_INSTALLED")
+    try:
+        data = _workflow_to_api_dict(wf, request)
+        _attach_workflow_webhook_url(data, request)
+        return success_response(data={"workflow": data}, request=request, message="WORKFLOW_MARKETPLACE_INSTALLED")
+    except Exception as e:
+        _logger.exception(
+            "workflow_marketplace_install_response_failed workflow_id=%s business_id=%s package_id=%s: %s",
+            getattr(wf, "id", None),
+            business_id,
+            pid,
+            e,
+        )
+        raise ApiError(
+            "WORKFLOW_MARKETPLACE_INSTALL_RESPONSE",
+            "ساخت پاسخ نصب ناموفق بود. جزئیات در لاگ سرور ثبت شده است.",
+            http_status=500,
+        )

@@ -91,6 +91,7 @@ class ActionRegistry:
             UpdateDealAction,
             CrmLinkDealDocumentAction,
         )
+        from app.services.workflow.actions.backup_action import BusinessBackupAction
         
         # Communication actions
         self.register("send_email", SendEmailAction())
@@ -119,6 +120,7 @@ class ActionRegistry:
         # Utility actions
         self.register("set_variable", SetVariableAction())
         self.register("log", LogAction())
+        self.register("business_backup", BusinessBackupAction())
 
         # AI Agent
         self.register("ai_agent", AIAgentAction())

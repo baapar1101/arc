@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, Optional
 from urllib import request
 
+import httpx
 import structlog
 
 from app.core.settings import get_settings
@@ -55,6 +56,55 @@ class BaleProvider:
 		except Exception as exc:
 			logger.error(
 				"bale_send_exception",
+				chat_id=chat_id,
+				exception_type=type(exc).__name__,
+				exception_message=str(exc),
+			)
+			return False
+
+	def send_document(
+		self,
+		chat_id: int,
+		file_bytes: bytes,
+		filename: str,
+		caption: str | None = None,
+	) -> bool:
+		"""
+		ارسال فایل (مستند) به چت؛ API مشابه تلگرام: sendDocument
+		https://docs.bale.ai/ — multipart/form-data
+		"""
+		if not self.is_configured():
+			return False
+		token = self.bot_token
+		assert token
+		url = f"{BALE_API_BASE}/bot{token}/sendDocument"
+		data: Dict[str, Any] = {"chat_id": str(int(chat_id))}
+		if caption is not None and str(caption).strip():
+			data["caption"] = str(caption).strip()[:1024]
+		files = {
+			"document": (filename or "file.bin", file_bytes, "application/octet-stream"),
+		}
+		try:
+			with httpx.Client(timeout=120.0) as client:
+				resp = client.post(url, data=data, files=files)
+			if resp.status_code != 200:
+				logger.warning(
+					"bale_send_document_http",
+					status=resp.status_code,
+					body=resp.text[:500],
+				)
+				return False
+			try:
+				j = resp.json()
+			except Exception:
+				return False
+			ok = j.get("ok") is True
+			if not ok:
+				logger.warning("bale_send_document_failed", response=j)
+			return ok
+		except Exception as exc:
+			logger.error(
+				"bale_send_document_exception",
 				chat_id=chat_id,
 				exception_type=type(exc).__name__,
 				exception_message=str(exc),

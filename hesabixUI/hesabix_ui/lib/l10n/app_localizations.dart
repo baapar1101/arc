@@ -14795,6 +14795,54 @@ abstract class AppLocalizations {
   /// **'Recipient Bale chat ID'**
   String get workflowFieldDescBaleChatId;
 
+  /// No description provided for @workflowFieldFileStorageId.
+  ///
+  /// In en, this message translates to:
+  /// **'File ID (storage)'**
+  String get workflowFieldFileStorageId;
+
+  /// No description provided for @workflowFieldDescFileStorageId.
+  ///
+  /// In en, this message translates to:
+  /// **'UUID of the file on the file server; use in Bale attachment_file_id as \$node_id.file_id'**
+  String get workflowFieldDescFileStorageId;
+
+  /// No description provided for @workflowFieldAttachmentFileId.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment file ID'**
+  String get workflowFieldAttachmentFileId;
+
+  /// No description provided for @workflowFieldDescAttachmentFileId.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as file_id on backup success; alias for referencing in Bale'**
+  String get workflowFieldDescAttachmentFileId;
+
+  /// No description provided for @workflowFieldStoredFilename.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored filename'**
+  String get workflowFieldStoredFilename;
+
+  /// No description provided for @workflowFieldDescStoredFilename.
+  ///
+  /// In en, this message translates to:
+  /// **'Original filename of the backup or attachment on the file server'**
+  String get workflowFieldDescStoredFilename;
+
+  /// No description provided for @workflowFieldSendFileAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Send file attachment'**
+  String get workflowFieldSendFileAttachment;
+
+  /// No description provided for @workflowFieldDescSendFileAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether the Bale action sent a document from file storage'**
+  String get workflowFieldDescSendFileAttachment;
+
   /// No description provided for @workflowFieldEmailTo.
   ///
   /// In en, this message translates to:
@@ -17422,6 +17470,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No notes'**
   String get crmNotesNoNotes;
+
+  /// No description provided for @crmNotesEmptyDayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No notes for this day yet. Add one to keep your CRM timeline up to date.'**
+  String get crmNotesEmptyDayHint;
+
+  /// No description provided for @crmNotesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get crmNotesRetry;
+
+  /// No description provided for @crmNotesEditorMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get crmNotesEditorMoreOptions;
 
   /// No description provided for @crmNotesVisibilityLabel.
   ///

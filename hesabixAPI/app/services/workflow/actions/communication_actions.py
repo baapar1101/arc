@@ -404,7 +404,7 @@ class SendBaleAction(ActionHandler):
     def get_metadata(self) -> Dict[str, Any]:
         return {
             "name": "ارسال پیام به بله",
-            "description": "ارسال پیام به کاربر عضو کسب و کار از طریق پیام‌رسان بله (فقط کاربران متصل به ربات)",
+            "description": "ارسال متن و/یا فایل (مثلاً خروجی نود پشتیبان) به کاربر متصل به ربات بله",
             "config_schema": {
                 "user_id": {
                     "type": "string",
@@ -416,10 +416,21 @@ class SendBaleAction(ActionHandler):
                         "business_scoped": True
                     }
                 },
+                "send_file_attachment": {
+                    "type": "boolean",
+                    "description": "ارسال فایل از فایل‌سرور (مثلاً فایل پشتیبان نود قبلی)",
+                    "default": False,
+                    "required": False,
+                },
+                "attachment_file_id": {
+                    "type": "string",
+                    "description": "شناسه فایل ذخیره‌شده؛ معمولاً $شناسه_نود_پشتیبان.file_id",
+                    "required": False,
+                },
                 "message": {
                     "type": "string",
-                    "description": "متن پیام (می‌تواند شامل چند متغیر از نودهای قبلی باشد، مثلاً مبلغ: $node_id.total_amount)",
-                    "required": True,
+                    "description": "متن پیام یا زیرنویس فایل (caption). اگر فقط فایل می‌فرستید می‌توانید خالی بگذارید یا توضیح کوتاه بنویسید",
+                    "required": False,
                     "ui_type": "textarea",
                     "maxLength": 8000,
                 },
@@ -546,25 +557,117 @@ class SendBaleAction(ActionHandler):
                 "error": "ربات بله پیکربندی نشده است"
             }
 
-        raw_message = config.get("message")
-        if raw_message is None or (isinstance(raw_message, str) and not raw_message.strip()):
-            return {
-                "success": False,
-                "error": "متن پیام مشخص نشده است"
-            }
-        message_template = raw_message if isinstance(raw_message, str) else str(raw_message)
-        message = WorkflowEngine._resolve_value_static(
-            message_template, context, node_results
+        _sf = WorkflowEngine._resolve_value_static(
+            config.get("send_file_attachment"), context, node_results
         )
-        if message is None or (isinstance(message, str) and not message.strip()):
-            return {
-                "success": False,
-                "error": "متن پیام مشخص نشده است"
-            }
+        if isinstance(_sf, str):
+            send_file = _sf.strip().lower() in ("1", "true", "yes", "on")
+        else:
+            send_file = bool(_sf)
+
+        raw_message = config.get("message")
+        message_template = raw_message if isinstance(raw_message, str) else ("" if raw_message is None else str(raw_message))
+        message = WorkflowEngine._resolve_value_static(message_template, context, node_results)
+        if message is None:
+            message = ""
+        message = str(message).strip() if isinstance(message, str) else str(message)
 
         parse_mode = config.get("parse_mode", "None")
         if parse_mode == "None":
             parse_mode = None
+
+        if send_file:
+            att_raw = config.get("attachment_file_id")
+            if att_raw is None or (isinstance(att_raw, str) and not att_raw.strip()):
+                return {
+                    "success": False,
+                    "error": "برای ارسال فایل، attachment_file_id الزامی است (مثلاً $node_id.file_id)",
+                    "user_id": user_id,
+                    "bale_chat_id": bale_chat_id,
+                }
+            fid_resolved = WorkflowEngine._resolve_value_static(att_raw, context, node_results)
+            if fid_resolved is None or str(fid_resolved).strip() == "":
+                return {
+                    "success": False,
+                    "error": "شناسه فایل نامعتبر است",
+                    "user_id": user_id,
+                    "bale_chat_id": bale_chat_id,
+                }
+            from uuid import UUID
+
+            try:
+                fid = UUID(str(fid_resolved).strip())
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": f"attachment_file_id نامعتبر: {fid_resolved}",
+                    "user_id": user_id,
+                    "bale_chat_id": bale_chat_id,
+                }
+
+            from adapters.db.session import get_db_session
+            from app.services.async_isolated import run_coroutine_isolated
+            from app.services.file_storage_service import FileStorageService
+
+            async def _dl():
+                with get_db_session() as thread_db:
+                    svc = FileStorageService(thread_db)
+                    return await svc.download_file(fid)
+
+            try:
+                blob = run_coroutine_isolated(lambda: _dl())
+            except Exception as e:
+                logger.error("bale workflow download attachment: %s", e, exc_info=True)
+                return {
+                    "success": False,
+                    "error": f"دانلود فایل برای ارسال: {e}",
+                    "user_id": user_id,
+                    "bale_chat_id": bale_chat_id,
+                }
+
+            content = blob.get("content") or b""
+            fname = (blob.get("filename") or "attachment.bin").strip() or "attachment.bin"
+            caption = message if message else None
+
+            def _send_bale_doc():
+                return bale.send_document(
+                    chat_id=int(bale_chat_id),
+                    file_bytes=bytes(content),
+                    filename=fname,
+                    caption=caption,
+                )
+
+            retry_on_failure = config.get("retry_on_failure", True)
+            try:
+                if retry_on_failure:
+                    retry_config = get_retry_config_from_action_config(config)
+                    success = execute_with_retry(_send_bale_doc, **retry_config)
+                else:
+                    success = _send_bale_doc()
+            except Exception as e:
+                logger.error(f"Error sending bale document: {e}", exc_info=True)
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "user_id": user_id,
+                    "bale_chat_id": bale_chat_id,
+                }
+
+            return {
+                "success": success,
+                "user_id": user_id,
+                "bale_chat_id": bale_chat_id,
+                "message": message,
+                "send_file_attachment": True,
+                "attachment_file_id": str(fid),
+                "filename": fname,
+            }
+
+        if not message:
+            return {
+                "success": False,
+                "error": "متن پیام مشخص نشده است (یا send_file_attachment را فعال کنید)",
+            }
 
         def _send_bale():
             return bale.send_text(
