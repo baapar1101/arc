@@ -142,7 +142,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
                 ],
               ),
             ),
-          SingleChildScrollView(
+          Expanded(
             child: DataTableWidget<WarrantyCode>(
               key: ValueKey('warranty_codes_${_statusFilter}_${_productIdFilter}_$_refreshCounter'),
               calendarController: widget.calendarController,

@@ -7,6 +7,9 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/product/product_form_dialog.dart';
+import '../../widgets/product/product_list_category_filter_bar.dart';
+import '../../widgets/product/category_tree_widget.dart';
+import '../../services/category_service.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/bulk_default_warehouse_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
@@ -51,11 +54,49 @@ class _ProductsPageState extends State<ProductsPage> {
   final GlobalKey _tableKey = GlobalKey();
   late final BusinessStorageService _storageService;
   final ProductImageCache _imageCache = GlobalImageCache.instance;
-  
+
+  List<CategoryNode> _categoryTree = const [];
+  bool _categoriesLoading = false;
+  int? _quickCategoryFilterId;
+
   @override
   void initState() {
     super.initState();
     _storageService = BusinessStorageService(ApiClient());
+    _loadCategoryTreeForFilter();
+  }
+
+  Future<void> _loadCategoryTreeForFilter() async {
+    setState(() => _categoriesLoading = true);
+    try {
+      final svc = CategoryService(ApiClient());
+      final raw = await svc.getCategoriesTree(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _categoryTree = raw.map((e) => CategoryNode.fromMap(e)).toList();
+        _categoriesLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _categoriesLoading = false);
+      }
+    }
+  }
+
+  void _onQuickCategoryFilterChanged(int? categoryId) {
+    setState(() => _quickCategoryFilterId = categoryId);
+    final ids = <int>[];
+    if (categoryId != null) {
+      final node = findCategoryNode(_categoryTree, categoryId);
+      if (node != null) {
+        ids.addAll(getAllCategoryIds(node));
+      } else {
+        ids.add(categoryId);
+      }
+    }
+    try {
+      (_tableKey.currentState as dynamic)?.applyCategoryIdFilter(ids);
+    } catch (_) {}
   }
   
   String? _buildFullImageUrl(String? imageUrl) {
@@ -992,11 +1033,22 @@ class _ProductsPageState extends State<ProductsPage> {
     }
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: DataTableWidget<Map<String, dynamic>>(
-          key: _tableKey,
-          config: DataTableConfig<Map<String, dynamic>>(
-          endpoint: '/api/v1/products/business/${widget.businessId}/search',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ProductListCategoryFilterBar(
+            businessId: widget.businessId,
+            categories: _categoryTree,
+            loading: _categoriesLoading,
+            selectedCategoryId: _quickCategoryFilterId,
+            onCategoryChanged: _onQuickCategoryFilterChanged,
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: DataTableWidget<Map<String, dynamic>>(
+              key: _tableKey,
+              config: DataTableConfig<Map<String, dynamic>>(
+                endpoint: '/api/v1/products/business/${widget.businessId}/search',
           title: t.products,
           excelEndpoint: '/api/v1/products/business/${widget.businessId}/export/excel',
           pdfEndpoint: '/api/v1/products/business/${widget.businessId}/export/pdf',
@@ -1550,14 +1602,20 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
           ],
-          additionalParams: {
-            'include_inventory': true,
-          },
-          onRowTap: (item) => _showProductDetailsDialog(item),
-          expandBodyHeightToFitRows: true,
-        ),
-        fromJson: (json) => json,
-        ),
+                additionalParams: {
+                  'include_inventory': true,
+                },
+                onRowTap: (item) => _showProductDetailsDialog(item),
+                expandBodyHeightToFitRows: true,
+                onAllFiltersCleared: () {
+                  if (!mounted) return;
+                  setState(() => _quickCategoryFilterId = null);
+                },
+              ),
+              fromJson: (json) => json,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
-import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
 
 /// ویجت انتخاب پروژه (کمبوباکس)
@@ -145,17 +144,17 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     }
   }
 
+  /// همان کنترلر تقویم اپ یا بارگذاری از تنظیمات محلی (مثل سایر فرم‌ها).
+  Future<CalendarController> _resolveCalendarController() async {
+    final fromWidget = widget.calendarController;
+    if (fromWidget != null) return fromWidget;
+    final fromApi = ApiClient.getCalendarController();
+    if (fromApi != null) return fromApi;
+    return CalendarController.load();
+  }
+
   Future<void> _showQuickCreateDialog() async {
-    // بررسی وجود CalendarController
-    if (widget.calendarController == null) {
-      if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: 'برای ایجاد پروژه، CalendarController مورد نیاز است',
-        );
-      }
-      return;
-    }
+    final calendarController = await _resolveCalendarController();
 
     // ذخیره تعداد پروژه‌های فعلی برای تشخیص پروژه جدید
     final projectsCountBefore = _projects.length;
@@ -164,7 +163,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
       context: context,
       builder: (context) => ProjectFormDialog(
         businessId: widget.businessId,
-        calendarController: widget.calendarController!,
+        calendarController: calendarController,
         onSuccess: () async {
           // بارگذاری مجدد لیست پروژه‌ها
           await _loadProjects();

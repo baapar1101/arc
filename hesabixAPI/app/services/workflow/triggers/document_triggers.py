@@ -67,6 +67,39 @@ class DocumentCreatedTrigger(BaseTrigger):
                     "description": "فیلتر بر اساس کلمات کلیدی در شرح",
                     "required": False
                 },
+                "project_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس پروژه",
+                    "required": False
+                },
+                "currency_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس ارز سند",
+                    "required": False,
+                    "ui_type": "currency_selector",
+                    "ui_config": {"business_scoped": True, "show_all_option": True}
+                },
+                "person_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر اگر هر سطر دارای این شخص باشد",
+                    "required": False,
+                    "ui_type": "person_selector",
+                    "ui_config": {"business_scoped": True}
+                },
+                "line_account_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر اگر هر سطر سند شامل این حساب معین باشد",
+                    "required": False,
+                    "ui_type": "account_selector",
+                    "ui_config": {"business_scoped": True}
+                },
+                "item_account_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر برای حساب سطر اقلام (هزینه/درآمد و …)",
+                    "required": False,
+                    "ui_type": "account_selector",
+                    "ui_config": {"business_scoped": True}
+                },
                 "cooldown_seconds": {
                     "type": "integer",
                     "description": "مدت زمان انتظار بین triggerهای متوالی (ثانیه)",
@@ -77,6 +110,16 @@ class DocumentCreatedTrigger(BaseTrigger):
         }
     
     def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if db is not None and business_id is not None:
+            from app.services.workflow.workflow_entity_validation import (
+                validate_document_created_config_entities,
+            )
+
+            if not validate_document_created_config_entities(db, int(business_id), config):
+                return {}
+
         data = super().execute(context, config)
         if not data:
             return {}
@@ -116,6 +159,84 @@ class DocumentCreatedTrigger(BaseTrigger):
         if description_contains:
             description = data.get("description", "")
             if description_contains.lower() not in description.lower():
+                return {}
+
+        proj_f = config.get("project_id_filter")
+        if proj_f is not None:
+            try:
+                dp = data.get("project_id")
+                if dp is None or int(dp) != int(proj_f):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        cur_f = config.get("currency_id_filter")
+        if cur_f is not None:
+            try:
+                dc = data.get("currency_id")
+                if dc is None or int(dc) != int(cur_f):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        person_f = config.get("person_id_filter")
+        if person_f is not None:
+            try:
+                want = int(person_f)
+            except (TypeError, ValueError):
+                return {}
+            pids = data.get("person_ids") or []
+            if not isinstance(pids, list):
+                pids = []
+            pids_i = []
+            for x in pids:
+                try:
+                    pids_i.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            ps = data.get("person_id")
+            if ps is not None:
+                try:
+                    pids_i.append(int(ps))
+                except (TypeError, ValueError):
+                    pass
+            if want not in pids_i:
+                return {}
+
+        line_acc_f = config.get("line_account_id_filter")
+        if line_acc_f is not None:
+            try:
+                want_a = int(line_acc_f)
+            except (TypeError, ValueError):
+                return {}
+            la = data.get("line_account_ids") or []
+            if not isinstance(la, list):
+                la = []
+            la_i = []
+            for x in la:
+                try:
+                    la_i.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            if want_a not in la_i:
+                return {}
+
+        item_acc_f = config.get("item_account_id_filter")
+        if item_acc_f is not None:
+            try:
+                want_i = int(item_acc_f)
+            except (TypeError, ValueError):
+                return {}
+            ia = data.get("item_line_account_ids") or []
+            if not isinstance(ia, list):
+                ia = []
+            ia_i = []
+            for x in ia:
+                try:
+                    ia_i.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            if want_i not in ia_i:
                 return {}
         
         return data

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../models/person_group_model.dart';
 import '../../models/person_model.dart';
+import '../../services/person_group_service.dart';
 import '../../services/person_service.dart';
+import 'person_groups_manage_dialog.dart';
 import '../../services/credit_api_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../services/business_dashboard_service.dart';
@@ -33,7 +36,11 @@ class PersonFormDialog extends StatefulWidget {
 class _PersonFormDialogState extends State<PersonFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _personService = PersonService();
+  final _personGroupService = PersonGroupService();
   final _businessDashboardService = BusinessDashboardService(ApiClient());
+  List<PersonGroup> _personGroups = [];
+  int? _selectedPersonGroupId;
+  bool _loadingPersonGroups = false;
   bool _isLoading = false;
 
   // Code (unique) controls
@@ -109,6 +116,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   void initState() {
     super.initState();
     _initializeForm();
+    Future.microtask(_loadPersonGroups);
     _aliasAndNameFieldsListener = () {
       if (mounted) setState(() {});
     };
@@ -174,6 +182,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionExcludeDiscounts = person.commissionExcludeDiscounts;
       _commissionExcludeAdditionsDeductions = person.commissionExcludeAdditionsDeductions;
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
+      _selectedPersonGroupId = person.personGroupId;
     } else {
       // برای افزودن شخص جدید، نوع شخص به صورت پیش‌فرض "مشتری" انتخاب می‌شود
       _selectedPersonTypes.add(PersonType.customer);
@@ -231,6 +240,126 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     if (title.isNotEmpty) return title;
     if (code.isNotEmpty) return code;
     return '';
+  }
+
+  Future<void> _loadPersonGroups() async {
+    setState(() => _loadingPersonGroups = true);
+    try {
+      final list = await _personGroupService.listGroups(
+        businessId: widget.businessId,
+        activeOnly: false,
+        rootOnly: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _personGroups = list;
+        if (_selectedPersonGroupId != null &&
+            !_personGroups.any((g) => g.id == _selectedPersonGroupId)) {
+          _selectedPersonGroupId = null;
+        }
+        _loadingPersonGroups = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingPersonGroups = false);
+    }
+  }
+
+  void _applyProfileDefaultsFromGroup(Map<String, dynamic> raw) {
+    if (raw.isEmpty) return;
+    final pt = raw['person_types'];
+    if (pt is List && pt.isNotEmpty) {
+      _selectedPersonTypes.clear();
+      for (final e in pt) {
+        try {
+          _selectedPersonTypes.add(PersonType.fromString(e.toString()));
+        } catch (_) {}
+      }
+      if (_selectedPersonTypes.isNotEmpty) {
+        _selectedPersonType = _selectedPersonTypes.first;
+      }
+    }
+    final let = raw['legal_entity_type']?.toString();
+    if (let == 'legal' || let == 'natural') {
+      _legalEntityType = let!;
+    }
+    final np = raw['name_prefix']?.toString();
+    if (np != null && np.isNotEmpty) {
+      _namePrefixSelection = _personNamePrefixChoices.contains(np) ? np : '';
+    }
+    void setStr(TextEditingController c, String key) {
+      final v = raw[key]?.toString();
+      if (v != null && v.trim().isNotEmpty) c.text = v;
+    }
+
+    setStr(_companyNameController, 'company_name');
+    setStr(_paymentIdController, 'payment_id');
+    setStr(_nationalIdController, 'national_id');
+    setStr(_registrationNumberController, 'registration_number');
+    setStr(_economicIdController, 'economic_id');
+    setStr(_countryController, 'country');
+    setStr(_provinceController, 'province');
+    setStr(_cityController, 'city');
+    setStr(_addressController, 'address');
+    setStr(_postalCodeController, 'postal_code');
+    setStr(_phoneController, 'phone');
+    setStr(_mobileController, 'mobile');
+    setStr(_faxController, 'fax');
+    setStr(_emailController, 'email');
+    setStr(_websiteController, 'website');
+    final sc = raw['share_count'];
+    if (sc != null) {
+      final n = sc is int ? sc : int.tryParse(sc.toString());
+      if (n != null && n > 0) _shareCountController.text = n.toString();
+    }
+    final csp = raw['commission_sale_percent'];
+    if (csp != null) {
+      final n = csp is num ? csp.toString() : csp.toString();
+      if (n.isNotEmpty) _commissionSalePercentController.text = n;
+    }
+    final csrp = raw['commission_sales_return_percent'];
+    if (csrp != null) {
+      final n = csrp is num ? csrp.toString() : csrp.toString();
+      if (n.isNotEmpty) _commissionSalesReturnPercentController.text = n;
+    }
+    final csa = raw['commission_sales_amount'];
+    if (csa != null) {
+      final n = csa is num ? csa.toString() : csa.toString();
+      if (n.isNotEmpty) _commissionSalesAmountController.text = n;
+    }
+    final csra = raw['commission_sales_return_amount'];
+    if (csra != null) {
+      final n = csra is num ? csra.toString() : csra.toString();
+      if (n.isNotEmpty) _commissionSalesReturnAmountController.text = n;
+    }
+    final ced = raw['commission_exclude_discounts'];
+    if (ced is bool) {
+      _commissionExcludeDiscounts = ced;
+    } else if (ced is int) {
+      _commissionExcludeDiscounts = ced != 0;
+    }
+    final cea = raw['commission_exclude_additions_deductions'];
+    if (cea is bool) {
+      _commissionExcludeAdditionsDeductions = cea;
+    } else if (cea is int) {
+      _commissionExcludeAdditionsDeductions = cea != 0;
+    }
+    final cp = raw['commission_post_in_invoice_document'];
+    if (cp is bool) {
+      _commissionPostInInvoiceDocument = cp;
+    } else if (cp is int) {
+      _commissionPostInInvoiceDocument = cp != 0;
+    }
+    final cl = raw['credit_limit'];
+    if (cl != null) {
+      final s = cl is num ? cl.toString() : cl.toString();
+      if (s.isNotEmpty) _creditLimitController.text = s;
+    }
+    final cce = raw['credit_check_enabled'];
+    if (cce is bool) {
+      _creditCheckMode = cce ? 'enabled' : 'disabled';
+    } else if (cce is int) {
+      _creditCheckMode = cce != 0 ? 'enabled' : 'disabled';
+    }
   }
 
   @override
@@ -339,6 +468,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           commissionPostInInvoiceDocument: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
               ? _commissionPostInInvoiceDocument
               : null,
+          personGroupId: _selectedPersonGroupId,
         );
 
         final created = await _personService.createPerson(
@@ -409,6 +539,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           commissionPostInInvoiceDocument: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
               ? _commissionPostInInvoiceDocument
               : null,
+          personGroupId: _selectedPersonGroupId,
         );
 
         final updated = await _personService.updatePerson(
@@ -1057,6 +1188,55 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     );
   }
 
+  Widget _buildPersonGroupRow(AppLocalizations t) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<int?>(
+            value: _selectedPersonGroupId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: t.personGroup,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem<int?>(value: null, child: Text(t.personGroupNone)),
+              ..._personGroups.map(
+                (g) => DropdownMenuItem<int?>(value: g.id, child: Text(g.name)),
+              ),
+            ],
+            onChanged: _loadingPersonGroups
+                ? null
+                : (v) async {
+                    setState(() => _selectedPersonGroupId = v);
+                    if (v == null) return;
+                    try {
+                      final g = await _personGroupService.getGroup(widget.businessId, v);
+                      if (!mounted) return;
+                      setState(() => _applyProfileDefaultsFromGroup(g.profileDefaults));
+                    } catch (_) {}
+                  },
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: t.personGroupsManage,
+          onPressed: _loadingPersonGroups
+              ? null
+              : () async {
+                  await showDialog<void>(
+                    context: context,
+                    builder: (ctx) => PersonGroupsManageDialog(businessId: widget.businessId),
+                  );
+                  await _loadPersonGroups();
+                },
+          icon: const Icon(Icons.group_work_outlined),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBasicInfoFields(AppLocalizations t, bool isMobile) {
     final spacing = ResponsiveHelper.getGridSpacing(context);
     return Column(
@@ -1113,6 +1293,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             return null;
           },
         ),
+        SizedBox(height: spacing),
+        _buildPersonGroupRow(t),
         SizedBox(height: spacing),
         if (isMobile)
           Column(

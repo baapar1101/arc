@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/ping_pong/ping_pong_dialog.dart';
+import '../widgets/memorial/hesabix_developers_memorial_dialog.dart';
 import '../widgets/calculator/calculator_dialog.dart';
 import '../main.dart'; // برای دسترسی به navigatorKey
 
@@ -19,7 +20,8 @@ class KeyboardShortcutListener extends StatefulWidget {
 
 class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
   final List<LogicalKeyboardKey> _keySequence = [];
-  static const List<LogicalKeyboardKey> _targetSequence = [
+  /// میانبر مخفی: Q سپس hesabix → پینگ‌پونگ
+  static const List<LogicalKeyboardKey> _pingPongSequence = [
     LogicalKeyboardKey.keyQ,
     LogicalKeyboardKey.keyH,
     LogicalKeyboardKey.keyE,
@@ -28,6 +30,13 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
     LogicalKeyboardKey.keyB,
     LogicalKeyboardKey.keyI,
     LogicalKeyboardKey.keyX,
+  ];
+  /// میانبر مخفی: Q سپس jam → گرامیداشت
+  static const List<LogicalKeyboardKey> _memorialSequence = [
+    LogicalKeyboardKey.keyQ,
+    LogicalKeyboardKey.keyJ,
+    LogicalKeyboardKey.keyA,
+    LogicalKeyboardKey.keyM,
   ];
   DateTime? _lastKeyPressTime;
   static const Duration _resetDelay = Duration(seconds: 3);
@@ -111,7 +120,6 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
       final now = DateTime.now();
       final logicalKey = event.logicalKey;
 
-
       // Reset sequence اگر مدت زیادی از آخرین فشردن کلید گذشته باشد
       if (_lastKeyPressTime != null &&
           now.difference(_lastKeyPressTime!) > _resetDelay) {
@@ -120,48 +128,82 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
 
       _lastKeyPressTime = now;
 
-      // بررسی اینکه آیا این کلید در توالی هدف است
-      final expectedIndex = _keySequence.length;
-      
-      if (expectedIndex < _targetSequence.length) {
-        final expectedKey = _targetSequence[expectedIndex];
-        
-        
-        // مقایسه با استفاده از keyId که مستقل از زبان است
-        if (_keysMatch(logicalKey, expectedKey)) {
+      final len = _keySequence.length;
+
+      // منتظر Q
+      if (len == 0) {
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
           _keySequence.add(logicalKey);
-          
-          // اگر توالی کامل شد، دیالوگ را باز کن
-          if (_keySequence.length == _targetSequence.length) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && context.mounted) {
+        }
+        return;
+      }
+
+      // فقط Q: شاخه به H (پینگ‌پونگ) یا J (گرامیداشت)
+      if (len == 1) {
+        if (!_keysMatch(_keySequence[0], LogicalKeyboardKey.keyQ)) {
+          _keySequence.clear();
+          if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
+            _keySequence.add(logicalKey);
+          }
+          return;
+        }
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyH)) {
+          _keySequence.add(logicalKey);
+          return;
+        }
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyJ)) {
+          _keySequence.add(logicalKey);
+          return;
+        }
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
+          _keySequence
+            ..clear()
+            ..add(logicalKey);
+          return;
+        }
+        _keySequence.clear();
+        return;
+      }
+
+      // مسیر پینگ‌پونگ یا گرامیداشت
+      final bool isPingPong =
+          _keysMatch(_keySequence[1], LogicalKeyboardKey.keyH);
+      final bool isMemorial =
+          _keysMatch(_keySequence[1], LogicalKeyboardKey.keyJ);
+      if (!isPingPong && !isMemorial) {
+        _keySequence.clear();
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
+          _keySequence.add(logicalKey);
+        }
+        return;
+      }
+
+      final active = isPingPong ? _pingPongSequence : _memorialSequence;
+      if (len >= active.length) {
+        _keySequence.clear();
+        if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
+          _keySequence.add(logicalKey);
+        }
+        return;
+      }
+
+      final expectedKey = active[len];
+      if (_keysMatch(logicalKey, expectedKey)) {
+        _keySequence.add(logicalKey);
+        if (_keySequence.length == active.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && context.mounted) {
+              if (active == _pingPongSequence) {
                 _openPingPongDialog();
               } else {
+                _openMemorialDialog();
               }
-            });
-            _keySequence.clear();
-          }
-        } else {
-          // اگر کلید اشتباه است، sequence را reset کن
-          // اما اگر کلید اول Q باشد، شروع کن
-          if (expectedIndex == 0 && _keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
-            _keySequence.clear();
-            _keySequence.add(logicalKey);
-          } else if (expectedIndex > 0) {
-            // اگر sequence شروع شده بود، reset کن
-            _keySequence.clear();
-            // دوباره چک کن که آیا Q فشرده شده
-            if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
-              _keySequence.add(logicalKey);
             }
-          } else {
-            _keySequence.clear();
-          }
+          });
+          _keySequence.clear();
         }
       } else {
-        // اگر sequence کامل شده، reset کن
         _keySequence.clear();
-        // دوباره چک کن که آیا Q فشرده شده
         if (_keysMatch(logicalKey, LogicalKeyboardKey.keyQ)) {
           _keySequence.add(logicalKey);
         }
@@ -176,107 +218,130 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
   }
 
   void _openPingPongDialog() {
+    _openShortcutDialog(
+      dialog: const PingPongDialog(),
+      barrierDismissible: false,
+    );
+  }
+
+  void _openMemorialDialog() {
+    _openShortcutDialog(
+      dialog: const HesabixDevelopersMemorialDialog(),
+      barrierDismissible: true,
+    );
+  }
+
+  void _openShortcutDialog({
+    required Widget dialog,
+    required bool barrierDismissible,
+  }) {
     if (!mounted) {
       return;
     }
 
-    
-    // استفاده از postFrameCallback برای اطمینان از اینکه widget tree کامل build شده
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      
+
       try {
-        // استفاده از context فعلی که باید MaterialApp را داشته باشد
         final contextToUse = _dialogContext ?? context;
-        
-        
-        // تلاش برای باز کردن دیالوگ
-        _showDialogWithContext(contextToUse);
+        _showDialogWithContext(
+          contextToUse,
+          dialog: dialog,
+          barrierDismissible: barrierDismissible,
+        );
       } catch (e) {
       }
     });
   }
 
-  void _showDialogWithContext(BuildContext contextToUse) {
+  void _showDialogWithContext(
+    BuildContext contextToUse, {
+    required Widget dialog,
+    required bool barrierDismissible,
+  }) {
     try {
-      
-      // بررسی وجود Navigator در context
       final navigator = Navigator.maybeOf(contextToUse, rootNavigator: false);
       if (navigator == null) {
-        
-        // تلاش برای پیدا کردن context معتبر با استفاده از Builder
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             final newContext = _dialogContext ?? context;
             final newNavigator = Navigator.maybeOf(newContext, rootNavigator: false);
             if (newNavigator != null) {
-              _showDialogDirectly(newContext);
+              _showDialogDirectly(
+                newContext,
+                dialog: dialog,
+                barrierDismissible: barrierDismissible,
+              );
             } else {
-              // آخرین تلاش: استفاده مستقیم از showDialog
-              _showDialogDirectly(newContext);
+              _showDialogDirectly(
+                newContext,
+                dialog: dialog,
+                barrierDismissible: barrierDismissible,
+              );
             }
           }
         });
         return;
       }
-      
-      _showDialogDirectly(contextToUse);
+
+      _showDialogDirectly(
+        contextToUse,
+        dialog: dialog,
+        barrierDismissible: barrierDismissible,
+      );
     } catch (e) {
     }
   }
 
-  void _showDialogDirectly(BuildContext contextToUse) {
+  void _showDialogDirectly(
+    BuildContext contextToUse, {
+    required Widget dialog,
+    required bool barrierDismissible,
+  }) {
     try {
-      
-      // استفاده از navigatorKey.currentContext که همیشه معتبر است
       BuildContext? dialogContext = navigatorKey.currentContext;
-      
+
       if (dialogContext == null) {
-        // اگر navigatorKey.currentContext null است، از contextToUse استفاده کن
         dialogContext = contextToUse;
-        
-        // بررسی Navigator
+
         final navigator = Navigator.maybeOf(dialogContext, rootNavigator: true);
-        
+
         if (navigator == null) {
-          // صبر کن تا Navigator آماده شود
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               dialogContext = navigatorKey.currentContext ?? contextToUse;
-              _showDialogDirectly(dialogContext!);
+              _showDialogDirectly(
+                dialogContext!,
+                dialog: dialog,
+                barrierDismissible: barrierDismissible,
+              );
             }
           });
           return;
         }
-      } else {
       }
-      
-      // استفاده مستقیم از showDialog با navigatorKey.currentContext یا contextToUse
+
       showDialog<void>(
         context: dialogContext,
-        barrierDismissible: false,
-        useRootNavigator: true, // استفاده از root navigator
+        barrierDismissible: barrierDismissible,
+        useRootNavigator: true,
         builder: (dialogBuildContext) {
-          return const PingPongDialog();
+          return dialog;
         },
-      ).then((_) {
-      }).catchError((e) {
-      });
+      ).then((_) {}).catchError((_) {});
     } catch (e) {
-      
-      // آخرین تلاش: استفاده از showGeneralDialog
       try {
         final fallbackContext = navigatorKey.currentContext ?? contextToUse;
         showGeneralDialog<void>(
           context: fallbackContext,
-          barrierDismissible: false,
+          barrierDismissible: barrierDismissible,
           barrierLabel: '',
           barrierColor: Colors.black54,
           transitionDuration: const Duration(milliseconds: 200),
           pageBuilder: (context, animation, secondaryAnimation) {
-            return const PingPongDialog();
+            return dialog;
           },
           transitionBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
@@ -303,10 +368,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
       try {
         final contextToUse = _dialogContext ?? context;
         final dialogContext = navigatorKey.currentContext ?? contextToUse;
-
-        if (dialogContext != null) {
-          CalculatorDialog.show(dialogContext);
-        }
+        CalculatorDialog.show(dialogContext);
       } catch (e) {
         // خطا در باز کردن ماشین حساب
       }

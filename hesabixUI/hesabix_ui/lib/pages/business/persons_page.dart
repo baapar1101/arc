@@ -7,6 +7,7 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_import_dialog.dart';
+import '../../widgets/person/person_groups_manage_dialog.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
@@ -113,12 +114,10 @@ class _PersonsPageState extends State<PersonsPage> {
     }
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: DataTableWidget<Person>(
-          key: _personsTableKey,
-          config: _buildDataTableConfig(t),
-          fromJson: Person.fromJson,
-        ),
+      body: DataTableWidget<Person>(
+        key: _personsTableKey,
+        config: _buildDataTableConfig(t),
+        fromJson: Person.fromJson,
       ),
     );
   }
@@ -192,6 +191,12 @@ class _PersonsPageState extends State<PersonsPage> {
           t.personLastName,
           width: ColumnWidth.medium,
           formatter: (person) => person.lastName ?? '-',
+        ),
+        TextColumn(
+          'person_group_name',
+          t.personGroupColumn,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.personGroupName ?? '-',
         ),
         TextColumn(
           'person_type',
@@ -499,6 +504,23 @@ class _PersonsPageState extends State<PersonsPage> {
             child: IconButton(
               onPressed: _addPerson,
               icon: const Icon(Icons.add),
+            ),
+          ),
+        ),
+        PermissionButton(
+          section: 'people',
+          action: 'edit',
+          authStore: widget.authStore,
+          child: Tooltip(
+            message: t.personGroupsManage,
+            child: IconButton(
+              onPressed: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => PersonGroupsManageDialog(businessId: widget.businessId),
+                );
+              },
+              icon: const Icon(Icons.group_work_outlined),
             ),
           ),
         ),

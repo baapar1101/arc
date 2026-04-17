@@ -561,7 +561,26 @@ def create_expense_income(
         document_id=document.id,
         document_type=document.document_type
     )
-    
+
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_document_created
+
+        trigger_document_created(
+            db=db,
+            business_id=business_id,
+            document_id=document.id,
+            document_type=str(document.document_type),
+            user_id=user_id,
+            extra_fields=None,
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to trigger workflows for expense/income document %s: %s",
+            document.id,
+            e,
+            exc_info=True,
+        )
+
     return result
 
 

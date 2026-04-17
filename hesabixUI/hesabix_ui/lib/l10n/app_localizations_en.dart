@@ -2742,6 +2742,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personsList => 'Persons List';
 
   @override
+  String get personGroup => 'Person group';
+
+  @override
+  String get personGroupNone => 'No group';
+
+  @override
+  String get personGroupsManage => 'Manage person groups';
+
+  @override
+  String get personGroupColumn => 'Group';
+
+  @override
   String get editPerson => 'Edit Person';
 
   @override
@@ -9629,4 +9641,90 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get inventoryNegativePolicyTransferSubtitle =>
       'When enabled, transfer documents always run full shortage checks, regardless of the two options above.';
+
+  @override
+  String get workflowMarketplaceTitle => 'Workflow repository';
+
+  @override
+  String get workflowMarketplaceSubtitle =>
+      'Browse workflows published by others and add them to your business.';
+
+  @override
+  String get workflowMarketplaceSearchHint =>
+      'Search title and short description…';
+
+  @override
+  String get workflowMarketplaceTagFilterHint => 'Tag filter (optional)';
+
+  @override
+  String get workflowMarketplaceEmpty => 'No items in the repository yet.';
+
+  @override
+  String get workflowMarketplaceInstallCount => 'Installs';
+
+  @override
+  String get workflowMarketplacePublisher => 'Publisher';
+
+  @override
+  String get workflowMarketplacePublishedAt => 'Published';
+
+  @override
+  String get workflowMarketplaceVersion => 'Version';
+
+  @override
+  String get workflowMarketplaceInstall => 'Add to this business';
+
+  @override
+  String get workflowMarketplaceDetailTitle => 'Package details';
+
+  @override
+  String get workflowMarketplaceLongDescription => 'Full description';
+
+  @override
+  String get workflowMarketplaceChangelog => 'Changes in this version';
+
+  @override
+  String get workflowMarketplaceBrowseTab => 'Browse';
+
+  @override
+  String get workflowMarketplaceOpen => 'Workflow repository';
+
+  @override
+  String get workflowMarketplaceMyPublished => 'My published';
+
+  @override
+  String get workflowMarketplacePublish => 'Publish to repository';
+
+  @override
+  String get workflowMarketplacePublishTitleLabel => 'Repository title';
+
+  @override
+  String get workflowMarketplaceShortDescriptionLabel => 'Summary (list card)';
+
+  @override
+  String get workflowMarketplaceLongDescriptionLabel =>
+      'Full description for repository';
+
+  @override
+  String get workflowMarketplaceTagsLabel => 'Tags (comma-separated)';
+
+  @override
+  String get workflowMarketplaceVersionLabel => 'Version';
+
+  @override
+  String get workflowMarketplacePublishSubmit => 'Publish';
+
+  @override
+  String get workflowMarketplacePublishSaved =>
+      'Workflow published to the repository.';
+
+  @override
+  String get workflowMarketplaceInstalled => 'Workflow added as draft.';
+
+  @override
+  String get workflowMarketplaceNameAfterInstall =>
+      'Workflow name after install (optional)';
+
+  @override
+  String get workflowMarketplaceError => 'Repository error';
 }

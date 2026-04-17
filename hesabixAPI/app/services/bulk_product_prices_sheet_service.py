@@ -48,6 +48,8 @@ def list_bulk_price_sheet_items(
                 "currency_code": cur_code or "",
                 "tier_name": pi.tier_name or "",
                 "price": pi.price,
+                "created_at": pi.created_at,
+                "updated_at": pi.updated_at,
             }
         )
     return {"items": rows}

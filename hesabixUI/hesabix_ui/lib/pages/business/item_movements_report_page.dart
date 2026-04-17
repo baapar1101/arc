@@ -412,7 +412,7 @@ class _ItemMovementsReportPageState extends State<ItemMovementsReportPage> {
           ),
           
           // Data Table
-          SingleChildScrollView(
+          Expanded(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(
                 '${_selectedFiscalYearId}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}_${_selectedWarehouseId}_${_selectedCategoryId}_${_selectedProduct?['id']}_$_includeZeroBalance',

@@ -79,6 +79,7 @@ class PersonCreateRequest(BaseModel):
         description="نوع حقوقی: natural=حقیقی، legal=حقوقی",
     )
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
+    person_group_id: Optional[int] = Field(default=None, description="گروه اشخاص (اختیاری؛ قالب پیش‌فرض)")
 
     @field_validator("name_prefix", mode="before")
     @classmethod
@@ -175,6 +176,7 @@ class PersonUpdateRequest(BaseModel):
     name_prefix: Optional[str] = Field(default=None, max_length=64, description="پیشوند")
     legal_entity_type: Optional[str] = Field(default=None, description="نوع حقوقی: natural یا legal")
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
+    person_group_id: Optional[int] = Field(default=None, description="گروه اشخاص (خالی برای حذف انتساب)")
 
     @field_validator("name_prefix", mode="before")
     @classmethod
@@ -270,6 +272,8 @@ class PersonResponse(BaseModel):
     name_prefix: Optional[str] = Field(default=None, description="پیشوند نام")
     legal_entity_type: str = Field(default="natural", description="نوع حقوقی: natural یا legal")
     payment_id: Optional[str] = Field(default=None, description="شناسه پرداخت")
+    person_group_id: Optional[int] = Field(default=None, description="شناسه گروه اشخاص")
+    person_group_name: Optional[str] = Field(default=None, description="نام گروه اشخاص")
     
     # اطلاعات اقتصادی
     national_id: Optional[str] = Field(default=None, description="شناسه ملی")

@@ -11,6 +11,7 @@ import '../../utils/number_normalizer.dart'
     show toEnglishDigits, EnglishDigitsFormatter, ThousandsSeparatorInputFormatter;
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/api_datetime_display.dart';
 
 /// ویرایش گسترده قیمت پایه و (اختیاری) قیمت‌های لیست قیمت، با صفحه‌بندی.
 class ProductBulkPricesSheetPage extends StatefulWidget {
@@ -54,6 +55,8 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   final Map<int, String> _columnLabels = {};
   final Map<String, String> _priceItemInitial = {};
   final Map<String, TextEditingController> _priceItemControllers = {};
+  /// زمان آخرین به‌روزرسانی هر ردیف لیست قیمت (کلید: productId_priceItemId)
+  final Map<String, String> _priceItemUpdatedAt = {};
 
   @override
   void dispose() {
@@ -129,6 +132,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     }
     _priceItemControllers.clear();
     _priceItemInitial.clear();
+    _priceItemUpdatedAt.clear();
     _columnOrder.clear();
     _columnLabels.clear();
   }
@@ -164,6 +168,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       final s = _fmtBase(it['price']);
       _priceItemInitial[key] = s;
       _priceItemControllers[key] = TextEditingController(text: s);
+      _priceItemUpdatedAt[key] = resolveApiDateTimeDisplay(Map<String, dynamic>.from(it), 'updated_at');
     }
   }
 
@@ -347,6 +352,52 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     _loadPage();
   }
 
+  Widget _buildPriceListCell(
+    BuildContext context, {
+    required TextEditingController controller,
+    required bool enabled,
+    String? updatedAtDisplay,
+  }) {
+    final theme = Theme.of(context);
+    final d = updatedAtDisplay?.trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: 128,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              enabled: enabled,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.allow(RegExp(r'^[\d,]*\.?\d*')),
+                const ThousandsSeparatorInputFormatter(),
+              ],
+              decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+            ),
+            if (d != null && d.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 2),
+                child: Text(
+                  d,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -516,7 +567,8 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                       child: SingleChildScrollView(
                         child: DataTable(
                           headingRowHeight: 48,
-                          dataRowMinHeight: 44,
+                          dataRowMinHeight: 76,
+                          dataRowMaxHeight: 120,
                           columns: [
                             DataColumn(label: Text(t.bulkProductPricesSheetCode)),
                             DataColumn(label: SizedBox(width: 200, child: Text(t.bulkProductPricesSheetName))),
@@ -597,20 +649,13 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                                   if (c == null) {
                                     return const DataCell(Text('—'));
                                   }
+                                  final updated = _priceItemUpdatedAt[key];
                                   return DataCell(
-                                    SizedBox(
-                                      width: 128,
-                                      child: TextField(
-                                        controller: c,
-                                        enabled: canEdit,
-                                        keyboardType: TextInputType.number,
-                                        inputFormatters: [
-                                          const EnglishDigitsFormatter(),
-                                          FilteringTextInputFormatter.allow(RegExp(r'^[\d,]*\.?\d*')),
-                                          const ThousandsSeparatorInputFormatter(),
-                                        ],
-                                        decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                                      ),
+                                    _buildPriceListCell(
+                                      context,
+                                      controller: c,
+                                      enabled: canEdit,
+                                      updatedAtDisplay: updated,
                                     ),
                                   );
                                 }),

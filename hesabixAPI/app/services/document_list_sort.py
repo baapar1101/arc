@@ -2,14 +2,26 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from sqlalchemy import Integer, Numeric, and_, cast, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Query
 
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
+from adapters.db.models.person import Person
 from app.services.sort_resolution import effective_sort_specs
 
-# فیلدهای مجاز برای لیست/جستجوی فاکتورها (همان نقشهٔ قبلی اندپوینت)
-INVOICE_DOCUMENT_SORT_ALLOWED = frozenset({"document_date", "code", "created_at", "registered_at"})
+# فیلدهای مجاز برای لیست/جستجوی فاکتورها (UI: طرف حساب / مبلغ کل و ستون‌های سند)
+INVOICE_DOCUMENT_SORT_ALLOWED = frozenset(
+	{
+		"document_date",
+		"code",
+		"created_at",
+		"registered_at",
+		"counterparty",
+		"total_amount",
+	}
+)
 
 
 def _invoice_sort_column(sort_key: str):
@@ -32,10 +44,37 @@ def invoice_search_sort_specs(query_info: QueryInfo) -> List[Tuple[str, bool]]:
 
 def apply_invoice_search_ordering(q: Query, query_info: QueryInfo) -> Query:
 	specs = invoice_search_sort_specs(query_info)
-	clauses = [
-		_invoice_sort_column(name).desc() if desc else _invoice_sort_column(name).asc()
-		for name, desc in specs
-	]
+	_extra_info_jb = cast(Document.extra_info, JSONB)
+	person_id_expr = cast(_extra_info_jb["person_id"].astext, Integer)
+
+	needs_person = any(name == "counterparty" for name, _ in specs)
+	if needs_person:
+		q = q.outerjoin(
+			Person,
+			and_(Person.id == person_id_expr, Person.business_id == Document.business_id),
+		)
+
+	clauses: List[Any] = []
+	for name, desc in specs:
+		if name == "counterparty":
+			# نزدیک به ترتیب نمایش _add_counterparty_to_invoice_item (شرکت / نام / نام مستعار)
+			full_name = func.nullif(func.trim(func.concat_ws(" ", Person.first_name, Person.last_name)), "")
+			expr = func.coalesce(
+				func.nullif(func.trim(Person.company_name), ""),
+				full_name,
+				Person.alias_name,
+			)
+			ord_expr = expr.desc() if desc else expr.asc()
+			clauses.append(ord_expr.nulls_last())
+		elif name == "total_amount":
+			# همان مبدأ غالب total_amount در خروجی لیست: extra_info.totals.net
+			net_txt = _extra_info_jb["totals"]["net"].astext
+			expr = cast(net_txt, Numeric(24, 8))
+			ord_expr = expr.desc() if desc else expr.asc()
+			clauses.append(ord_expr.nulls_last())
+		else:
+			col = _invoice_sort_column(name)
+			clauses.append(col.desc() if desc else col.asc())
 	clauses.append(Document.id.desc())
 	return q.order_by(*clauses)
 

@@ -643,6 +643,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             });
                           },
                         ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _invoiceTitle,
+                          onChanged: (value) {
+                            setState(() {
+                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'عنوان فاکتور',
+                            hintText: 'مثال: فروش محصولات',
+                            border: OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.next,
+                        ),
                       ],
                     );
                   } else {
@@ -765,9 +780,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         const SizedBox(height: 16),
                         TextFormField(
                           initialValue: _invoiceTitle,
-                          onChanged: (v) => setState(() => _invoiceTitle = v.trim().isEmpty ? null : v.trim()),
+                          onChanged: (value) {
+                            setState(() {
+                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+                            });
+                          },
                           decoration: const InputDecoration(
-                            labelText: 'توضیحات فاکتور',
+                            labelText: 'عنوان فاکتور',
                             hintText: 'مثال: فروش محصولات',
                             border: OutlineInputBorder(),
                           ),

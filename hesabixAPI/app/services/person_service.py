@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 import json
 from sqlalchemy.exc import IntegrityError
 from app.core.responses import ApiError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, String
 from adapters.db.models.person import Person, PersonBankAccount, PersonType
 from adapters.db.models.business import Business
@@ -13,6 +13,10 @@ from adapters.api.v1.schema_models.person import (
 )
 from app.core.responses import success_response
 from app.core.cache import get_cache
+from app.services.person_group_service import (
+    assert_assignable_person_group,
+    merge_person_create_with_group_defaults,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,6 +79,7 @@ def invalidate_persons_cache(business_id: int, fiscal_year_id: Optional[int] = N
 
 def create_person(db: Session, business_id: int, person_data: PersonCreateRequest) -> Dict[str, Any]:
     """ایجاد شخص جدید"""
+    person_data = merge_person_create_with_group_defaults(db, business_id, person_data)
     # محاسبه/اعتبارسنجی کد یکتا
     code: Optional[int] = getattr(person_data, 'code', None)
     if code is not None:
@@ -138,6 +143,7 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
 
     person = Person(
         business_id=business_id,
+        person_group_id=getattr(person_data, "person_group_id", None),
         code=code,
         alias_name=person_data.alias_name,
         first_name=person_data.first_name,
@@ -225,9 +231,12 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
 
 def get_person_by_id(db: Session, person_id: int, business_id: int) -> Optional[Dict[str, Any]]:
     """دریافت شخص بر اساس شناسه"""
-    person = db.query(Person).filter(
-        and_(Person.id == person_id, Person.business_id == business_id)
-    ).first()
+    person = (
+        db.query(Person)
+        .options(joinedload(Person.person_group))
+        .filter(and_(Person.id == person_id, Person.business_id == business_id))
+        .first()
+    )
     
     if not person:
         return None
@@ -255,7 +264,11 @@ def get_persons_by_business(
     fiscal_year_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """دریافت لیست اشخاص با جستجو و فیلتر"""
-    query = db.query(Person).filter(Person.business_id == business_id)
+    query = (
+        db.query(Person)
+        .options(joinedload(Person.person_group))
+        .filter(Person.business_id == business_id)
+    )
     
     # بررسی نیاز به محاسبه تراز قبل از pagination
     # (برای فیلتر یا مرتب‌سازی بر اساس تراز/وضعیت)
@@ -326,6 +339,14 @@ def get_persons_by_business(
                     query = query.filter(Person.code == value)
                 elif operator == 'in' and isinstance(value, list):
                     query = query.filter(Person.code.in_(value))
+                continue
+
+            # گروه اشخاص
+            if field == 'person_group_id':
+                if operator == '=':
+                    query = query.filter(Person.person_group_id == value)
+                elif operator == 'in' and isinstance(value, list):
+                    query = query.filter(Person.person_group_id.in_(value))
                 continue
 
             # انواع شخص چندانتخابی (رشته JSON)
@@ -572,6 +593,14 @@ def update_person(
         # همگام کردن person_type تکی برای سازگاری
         # person_type handling removed - only person_types is used now
 
+    if 'person_group_id' in update_data:
+        pgid = update_data.pop('person_group_id', None)
+        if pgid is None:
+            person.person_group_id = None
+        else:
+            assert_assignable_person_group(db, business_id, int(pgid))
+            person.person_group_id = int(pgid)
+
     # اگر شخص سهامدار شد، share_count معتبر باشد
     resulting_types: List[str] = []
     if person.person_types:
@@ -739,9 +768,12 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         except Exception:
             types_list = []
 
+    pg = getattr(person, "person_group", None)
     return {
         'id': person.id,
         'business_id': person.business_id,
+        'person_group_id': getattr(person, "person_group_id", None),
+        'person_group_name': pg.name if pg else None,
         'code': person.code,
         'alias_name': person.alias_name,
         'first_name': person.first_name,

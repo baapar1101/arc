@@ -5345,6 +5345,30 @@ abstract class AppLocalizations {
   /// **'Persons List'**
   String get personsList;
 
+  /// No description provided for @personGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Person group'**
+  String get personGroup;
+
+  /// No description provided for @personGroupNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No group'**
+  String get personGroupNone;
+
+  /// No description provided for @personGroupsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage person groups'**
+  String get personGroupsManage;
+
+  /// No description provided for @personGroupColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get personGroupColumn;
+
   /// No description provided for @editPerson.
   ///
   /// In en, this message translates to:
@@ -18124,6 +18148,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When enabled, transfer documents always run full shortage checks, regardless of the two options above.'**
   String get inventoryNegativePolicyTransferSubtitle;
+
+  /// No description provided for @workflowMarketplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow repository'**
+  String get workflowMarketplaceTitle;
+
+  /// No description provided for @workflowMarketplaceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse workflows published by others and add them to your business.'**
+  String get workflowMarketplaceSubtitle;
+
+  /// No description provided for @workflowMarketplaceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search title and short description…'**
+  String get workflowMarketplaceSearchHint;
+
+  /// No description provided for @workflowMarketplaceTagFilterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag filter (optional)'**
+  String get workflowMarketplaceTagFilterHint;
+
+  /// No description provided for @workflowMarketplaceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No items in the repository yet.'**
+  String get workflowMarketplaceEmpty;
+
+  /// No description provided for @workflowMarketplaceInstallCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Installs'**
+  String get workflowMarketplaceInstallCount;
+
+  /// No description provided for @workflowMarketplacePublisher.
+  ///
+  /// In en, this message translates to:
+  /// **'Publisher'**
+  String get workflowMarketplacePublisher;
+
+  /// No description provided for @workflowMarketplacePublishedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get workflowMarketplacePublishedAt;
+
+  /// No description provided for @workflowMarketplaceVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get workflowMarketplaceVersion;
+
+  /// No description provided for @workflowMarketplaceInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to this business'**
+  String get workflowMarketplaceInstall;
+
+  /// No description provided for @workflowMarketplaceDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Package details'**
+  String get workflowMarketplaceDetailTitle;
+
+  /// No description provided for @workflowMarketplaceLongDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Full description'**
+  String get workflowMarketplaceLongDescription;
+
+  /// No description provided for @workflowMarketplaceChangelog.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes in this version'**
+  String get workflowMarketplaceChangelog;
+
+  /// No description provided for @workflowMarketplaceBrowseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get workflowMarketplaceBrowseTab;
+
+  /// No description provided for @workflowMarketplaceOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow repository'**
+  String get workflowMarketplaceOpen;
+
+  /// No description provided for @workflowMarketplaceMyPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'My published'**
+  String get workflowMarketplaceMyPublished;
+
+  /// No description provided for @workflowMarketplacePublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish to repository'**
+  String get workflowMarketplacePublish;
+
+  /// No description provided for @workflowMarketplacePublishTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository title'**
+  String get workflowMarketplacePublishTitleLabel;
+
+  /// No description provided for @workflowMarketplaceShortDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary (list card)'**
+  String get workflowMarketplaceShortDescriptionLabel;
+
+  /// No description provided for @workflowMarketplaceLongDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Full description for repository'**
+  String get workflowMarketplaceLongDescriptionLabel;
+
+  /// No description provided for @workflowMarketplaceTagsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags (comma-separated)'**
+  String get workflowMarketplaceTagsLabel;
+
+  /// No description provided for @workflowMarketplaceVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get workflowMarketplaceVersionLabel;
+
+  /// No description provided for @workflowMarketplacePublishSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get workflowMarketplacePublishSubmit;
+
+  /// No description provided for @workflowMarketplacePublishSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow published to the repository.'**
+  String get workflowMarketplacePublishSaved;
+
+  /// No description provided for @workflowMarketplaceInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow added as draft.'**
+  String get workflowMarketplaceInstalled;
+
+  /// No description provided for @workflowMarketplaceNameAfterInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow name after install (optional)'**
+  String get workflowMarketplaceNameAfterInstall;
+
+  /// No description provided for @workflowMarketplaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository error'**
+  String get workflowMarketplaceError;
 }
 
 class _AppLocalizationsDelegate

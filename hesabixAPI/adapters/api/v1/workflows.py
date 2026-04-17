@@ -842,13 +842,20 @@ async def get_triggers_metadata(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """دریافت metadata triggerها"""
+    from app.services.workflow.i18n import translate_trigger_metadata, TRIGGER_TRANSLATIONS_BY_KEY
+
     trigger_registry = TriggerRegistry()
     all_triggers = trigger_registry.get_all_metadata()
-    # نام/توضیح از get_metadata() هر هندلر می‌آید. translate_metadata برای اکشن است
-    # و action_key را به‌عنوان context ترجمه می‌گیرد؛ با کلید تریگر همه‌جا «action_name» برمی‌گشت.
+    out = []
+    for t in all_triggers:
+        key = t.get("key") or ""
+        if key in TRIGGER_TRANSLATIONS_BY_KEY:
+            out.append(translate_trigger_metadata(t, lang, key))
+        else:
+            out.append(t)
 
     return success_response(
-        data=all_triggers,
+        data=out,
         request=request,
         message="TRIGGERS_METADATA_RETRIEVED",
     )
@@ -921,6 +928,8 @@ async def get_workflow_translations(
         SEND_TELEGRAM_TRANSLATIONS,
         SEND_EMAIL_TRANSLATIONS,
         OTHER_ACTIONS_TRANSLATIONS,
+        RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
+        DOCUMENT_CREATED_TRANSLATIONS,
     )
     
     # ترکیب تمام ترجمه‌ها
@@ -934,6 +943,9 @@ async def get_workflow_translations(
     all_translations["send_telegram"] = SEND_TELEGRAM_TRANSLATIONS.get(lang, {})
     all_translations["send_email"] = SEND_EMAIL_TRANSLATIONS.get(lang, {})
     all_translations["others"] = OTHER_ACTIONS_TRANSLATIONS.get(lang, {})
+    # ترجمه تریگرها (کلید = همان trigger_type برای UI)
+    all_translations["receipt_payment.created"] = RECEIPT_PAYMENT_CREATED_TRANSLATIONS.get(lang, {})
+    all_translations["document.created"] = DOCUMENT_CREATED_TRANSLATIONS.get(lang, {})
     
     return success_response(
         data={

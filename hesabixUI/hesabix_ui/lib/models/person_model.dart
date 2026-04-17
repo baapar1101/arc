@@ -147,6 +147,10 @@ class Person {
   final double? balance;
   final String? status;
 
+  /// گروه اشخاص (دسته‌بندی)
+  final int? personGroupId;
+  final String? personGroupName;
+
   Person({
     this.id,
     required this.businessId,
@@ -186,6 +190,8 @@ class Person {
     this.commissionPostInInvoiceDocument = false,
     this.balance,
     this.status,
+    this.personGroupId,
+    this.personGroupName,
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -236,6 +242,8 @@ class Person {
       commissionPostInInvoiceDocument: _fromJsonBool(json['commission_post_in_invoice_document'], false),
       balance: (json['balance'] as num?)?.toDouble(),
       status: json['status'] as String?,
+      personGroupId: json['person_group_id'] as int?,
+      personGroupName: json['person_group_name'] as String?,
     );
   }
 
@@ -279,6 +287,8 @@ class Person {
       'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'balance': balance,
       'status': status,
+      'person_group_id': personGroupId,
+      'person_group_name': personGroupName,
     };
   }
 
@@ -310,6 +320,8 @@ class Person {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<PersonBankAccount>? bankAccounts,
+    int? personGroupId,
+    String? personGroupName,
   }) {
     return Person(
       id: id ?? this.id,
@@ -349,6 +361,8 @@ class Person {
       commissionPostInInvoiceDocument: commissionPostInInvoiceDocument,
       balance: balance,
       status: status,
+      personGroupId: personGroupId ?? this.personGroupId,
+      personGroupName: personGroupName ?? this.personGroupName,
     );
   }
 
@@ -400,6 +414,7 @@ class PersonCreateRequest {
   final bool? commissionExcludeDiscounts;
   final bool? commissionExcludeAdditionsDeductions;
   final bool? commissionPostInInvoiceDocument;
+  final int? personGroupId;
 
   PersonCreateRequest({
     required this.aliasName,
@@ -433,6 +448,7 @@ class PersonCreateRequest {
     this.commissionExcludeDiscounts,
     this.commissionExcludeAdditionsDeductions,
     this.commissionPostInInvoiceDocument,
+    this.personGroupId,
   });
 
   Map<String, dynamic> toJson() {
@@ -477,6 +493,7 @@ class PersonCreateRequest {
       if (commissionExcludeDiscounts != null) 'commission_exclude_discounts': commissionExcludeDiscounts,
       if (commissionExcludeAdditionsDeductions != null) 'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
       if (commissionPostInInvoiceDocument != null) 'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
+      if (personGroupId != null) 'person_group_id': personGroupId,
     };
   }
 }
@@ -513,6 +530,7 @@ class PersonUpdateRequest {
   final bool? commissionExcludeDiscounts;
   final bool? commissionExcludeAdditionsDeductions;
   final bool? commissionPostInInvoiceDocument;
+  final int? personGroupId;
 
   PersonUpdateRequest({
     this.code,
@@ -546,6 +564,7 @@ class PersonUpdateRequest {
     this.commissionExcludeDiscounts,
     this.commissionExcludeAdditionsDeductions,
     this.commissionPostInInvoiceDocument,
+    this.personGroupId,
   });
 
   Map<String, dynamic> toJson() {
@@ -590,6 +609,7 @@ class PersonUpdateRequest {
         'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
       if (commissionPostInInvoiceDocument != null)
         'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
+      'person_group_id': personGroupId,
     };
   }
 }

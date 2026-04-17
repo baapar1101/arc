@@ -174,6 +174,7 @@ import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
 import 'pages/business/workflows_page.dart';
+import 'pages/business/workflow_marketplace_page.dart';
 import 'pages/business/workflow_visual_editor_page.dart';
 import 'pages/business/crm/crm_dashboard_page.dart';
 import 'pages/business/crm/crm_process_definitions_page.dart';
@@ -1811,6 +1812,21 @@ class _MyAppState extends State<MyApp> {
                 return MaterialPage(
                   key: state.pageKey,
                   child: WorkflowsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/workflows/marketplace',
+              name: 'business_workflow_marketplace',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: WorkflowMarketplacePage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,

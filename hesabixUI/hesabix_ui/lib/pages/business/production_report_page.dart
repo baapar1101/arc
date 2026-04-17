@@ -411,7 +411,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
           ),
           
           // Data Table
-          SingleChildScrollView(
+          Expanded(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(
                 'production_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedWarehouseId}_${_selectedProduct?['id']}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',

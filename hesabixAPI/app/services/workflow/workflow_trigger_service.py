@@ -229,7 +229,21 @@ def trigger_document_created(
     }
     if extra_fields:
         trigger_data.update(extra_fields)
-    
+    try:
+        from app.services.workflow.workflow_trigger_enrichment import (
+            build_document_trigger_enrichment,
+        )
+
+        enrichment = build_document_trigger_enrichment(db, business_id, document_id)
+        trigger_data.update(enrichment)
+    except Exception as e:
+        logger.warning(
+            "build_document_trigger_enrichment failed document_id=%s: %s",
+            document_id,
+            e,
+            exc_info=True,
+        )
+
     return trigger_workflows(db, business_id, "document.created", trigger_data, user_id)
 
 
@@ -245,9 +259,24 @@ def trigger_receipt_payment_created(
     trigger_data = {
         "receipt_payment_id": receipt_payment_id,
         "type": type,
-        "amount": amount
     }
-    
+    try:
+        from app.services.workflow.workflow_trigger_enrichment import (
+            build_receipt_payment_trigger_enrichment,
+        )
+
+        enrichment = build_receipt_payment_trigger_enrichment(db, business_id, receipt_payment_id)
+        trigger_data.update(enrichment)
+    except Exception as e:
+        logger.warning(
+            "build_receipt_payment_trigger_enrichment failed document_id=%s: %s",
+            receipt_payment_id,
+            e,
+            exc_info=True,
+        )
+    if trigger_data.get("amount") is None:
+        trigger_data["amount"] = float(amount)
+
     return trigger_workflows(db, business_id, "receipt_payment.created", trigger_data, user_id)
 
 

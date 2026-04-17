@@ -622,6 +622,176 @@ OTHER_ACTIONS_TRANSLATIONS = {
 }
 
 
+# ترجمه تریگر receipt_payment.created
+RECEIPT_PAYMENT_CREATED_TRANSLATIONS = {
+    "fa": {
+        "trigger_name": "ایجاد دریافت/پرداخت",
+        "trigger_description": "زمانی که یک سند دریافت یا پرداخت ثبت می‌شود",
+        "field_enabled": "فعال",
+        "field_enabled_desc": "غیرفعال کردن اجرای این تریگر بدون حذف از ورک‌فلو",
+        "field_type": "نوع سند",
+        "field_type_desc": "فقط دریافت یا فقط پرداخت",
+        "receipt": "دریافت",
+        "payment": "پرداخت",
+        "field_min_amount": "حداقل مبلغ",
+        "field_min_amount_desc": "فقط اگر مبلغ سند از این مقدار بیشتر یا مساوی باشد",
+        "field_max_amount": "حداکثر مبلغ",
+        "field_max_amount_desc": "فقط اگر مبلغ سند از این مقدار کمتر یا مساوی باشد",
+        "field_payment_method_filter": "روش پرداخت",
+        "field_payment_method_filter_desc": "حداقل یکی از روش‌های ثبت‌شده در سند باید در این لیست باشد",
+        "cash": "نقد",
+        "bank": "بانک",
+        "check": "چک",
+        "card": "کارت",
+        "field_account_id_filter": "حساب معین اصلی",
+        "field_account_id_filter_desc": "یکی از حساب‌های سطر سند باید این حساب باشد",
+        "field_account_ids_filter": "هرکدام از حساب‌ها",
+        "field_account_ids_filter_desc": "اگر هر سطر سند شامل یکی از این حساب‌های معین باشد، شرط برقرار است",
+        "field_include_balance": "شامل موجودی",
+        "field_include_balance_desc": "در صورت پشتیبانی، موجودی حساب به trigger_data اضافه می‌شود",
+        "field_check_duplicate": "بررسی تکراری",
+        "field_check_duplicate_desc": "منطق تشخیص تراکنش تکراری (در صورت پیاده‌سازی در بک‌اند)",
+        "field_cooldown_seconds": "فاصلهٔ بین اجرا (ثانیه)",
+        "field_cooldown_seconds_desc": "حداقل فاصلهٔ زمانی بین دو اجرای متوالی این ورک‌فلو",
+        "field_person_id_filter": "شخص",
+        "field_person_id_filter_desc": "فقط اگر این شخص در سطرهای سند باشد",
+        "field_project_id_filter": "پروژه",
+        "field_project_id_filter_desc": "فقط اسناد همین پروژه",
+        "field_currency_id_filter": "ارز",
+        "field_currency_id_filter_desc": "فقط اسناد با این ارز",
+        "field_fiscal_year_id_filter": "سال مالی",
+        "field_fiscal_year_id_filter_desc": "فقط اسناد این سال مالی",
+        "field_description_contains": "کلمه در شرح",
+        "field_description_contains_desc": "بخشی از شرح سند باید شامل این متن باشد",
+    },
+    "en": {
+        "trigger_name": "Receipt / payment created",
+        "trigger_description": "When a receipt or payment document is posted",
+        "field_enabled": "Enabled",
+        "field_enabled_desc": "Disable this trigger without removing the node",
+        "field_type": "Document side",
+        "field_type_desc": "Receipt only or payment only",
+        "receipt": "Receipt",
+        "payment": "Payment",
+        "field_min_amount": "Minimum amount",
+        "field_min_amount_desc": "Only when document amount is greater than or equal to this value",
+        "field_max_amount": "Maximum amount",
+        "field_max_amount_desc": "Only when document amount is less than or equal to this value",
+        "field_payment_method_filter": "Payment methods",
+        "field_payment_method_filter_desc": "At least one line method must match this list",
+        "cash": "Cash",
+        "bank": "Bank",
+        "check": "Check",
+        "card": "Card",
+        "field_account_id_filter": "Ledger account",
+        "field_account_id_filter_desc": "One of the document lines must use this account",
+        "field_account_ids_filter": "Any of these accounts",
+        "field_account_ids_filter_desc": "Triggers if any line hits one of these ledger accounts",
+        "field_include_balance": "Include balance",
+        "field_include_balance_desc": "When supported, append account balance to trigger data",
+        "field_check_duplicate": "Duplicate check",
+        "field_check_duplicate_desc": "Duplicate-transaction detection (if implemented)",
+        "field_cooldown_seconds": "Cooldown (seconds)",
+        "field_cooldown_seconds_desc": "Minimum delay between consecutive runs",
+        "field_person_id_filter": "Person",
+        "field_person_id_filter_desc": "Only when this person appears on a line",
+        "field_project_id_filter": "Project",
+        "field_project_id_filter_desc": "Only documents for this project",
+        "field_currency_id_filter": "Currency",
+        "field_currency_id_filter_desc": "Only documents in this currency",
+        "field_fiscal_year_id_filter": "Fiscal year",
+        "field_fiscal_year_id_filter_desc": "Only documents in this fiscal year",
+        "field_description_contains": "Description contains",
+        "field_description_contains_desc": "Document description must contain this text",
+    },
+}
+
+# ترجمه تریگر document.created
+DOCUMENT_CREATED_TRANSLATIONS = {
+    "fa": {
+        "trigger_name": "ایجاد سند",
+        "trigger_description": "زمانی که یک سند حسابداری (از جمله هزینه، درآمد، دستی و …) ثبت می‌شود",
+        "field_enabled": "فعال",
+        "field_enabled_desc": "غیرفعال کردن اجرای این تریگر",
+        "field_document_type": "نوع سند",
+        "field_document_type_desc": "محدود کردن به یک نوع سند مشخص",
+        "expense": "هزینه",
+        "income": "درآمد",
+        "receipt": "دریافت",
+        "payment": "پرداخت",
+        "transfer": "انتقال",
+        "manual": "دستی",
+        "opening_balance": "تراز افتتاحیه",
+        "year_end_closing": "سربندی سال",
+        "field_min_amount": "حداقل مبلغ",
+        "field_min_amount_desc": "بر اساس جمع بدهکار سند",
+        "field_max_amount": "حداکثر مبلغ",
+        "field_max_amount_desc": "بر اساس جمع بدهکار سند",
+        "field_fiscal_year_filter": "سال مالی",
+        "field_fiscal_year_filter_desc": "فقط اسناد این سال مالی",
+        "field_user_id_filter": "کاربر ایجادکننده",
+        "field_user_id_filter_desc": "فقط اگر سند توسط این کاربر ثبت شده باشد",
+        "field_description_contains": "کلمه در شرح",
+        "field_description_contains_desc": "بخشی از شرح باید شامل این متن باشد",
+        "field_project_id_filter": "پروژه",
+        "field_project_id_filter_desc": "فقط اسناد این پروژه",
+        "field_currency_id_filter": "ارز",
+        "field_currency_id_filter_desc": "فقط اسناد با این ارز",
+        "field_person_id_filter": "شخص در سطرها",
+        "field_person_id_filter_desc": "فقط اگر این شخص در یکی از سطرها باشد",
+        "field_line_account_id_filter": "حساب در هر سطر",
+        "field_line_account_id_filter_desc": "فقط اگر این حساب معین در هر سطر سند باشد",
+        "field_item_account_id_filter": "حساب سطر اقلام",
+        "field_item_account_id_filter_desc": "برای اسناد هزینه/درآمد: حساب اقلام باید شامل این حساب باشد",
+        "field_cooldown_seconds": "فاصلهٔ بین اجرا (ثانیه)",
+        "field_cooldown_seconds_desc": "حداقل فاصلهٔ زمانی بین دو اجرای متوالی",
+    },
+    "en": {
+        "trigger_name": "Document created",
+        "trigger_description": "When an accounting document is posted (expense, income, manual, etc.)",
+        "field_enabled": "Enabled",
+        "field_enabled_desc": "Disable this trigger",
+        "field_document_type": "Document type",
+        "field_document_type_desc": "Restrict to a specific document type",
+        "expense": "Expense",
+        "income": "Income",
+        "receipt": "Receipt",
+        "payment": "Payment",
+        "transfer": "Transfer",
+        "manual": "Manual",
+        "opening_balance": "Opening balance",
+        "year_end_closing": "Year-end closing",
+        "field_min_amount": "Minimum amount",
+        "field_min_amount_desc": "Based on total debit of the document",
+        "field_max_amount": "Maximum amount",
+        "field_max_amount_desc": "Based on total debit of the document",
+        "field_fiscal_year_filter": "Fiscal year",
+        "field_fiscal_year_filter_desc": "Only documents in this fiscal year",
+        "field_user_id_filter": "Created by user",
+        "field_user_id_filter_desc": "Only when posted by this user",
+        "field_description_contains": "Description contains",
+        "field_description_contains_desc": "Description must contain this text",
+        "field_project_id_filter": "Project",
+        "field_project_id_filter_desc": "Only documents for this project",
+        "field_currency_id_filter": "Currency",
+        "field_currency_id_filter_desc": "Only documents in this currency",
+        "field_person_id_filter": "Person on lines",
+        "field_person_id_filter_desc": "Only when this person appears on a line",
+        "field_line_account_id_filter": "Account on any line",
+        "field_line_account_id_filter_desc": "Only when this ledger account appears on a line",
+        "field_item_account_id_filter": "Item line account",
+        "field_item_account_id_filter_desc": "For expense/income: item lines must include this account",
+        "field_cooldown_seconds": "Cooldown (seconds)",
+        "field_cooldown_seconds_desc": "Minimum delay between consecutive runs",
+    },
+}
+
+TRIGGER_TRANSLATIONS_BY_KEY = {
+    "receipt_payment.created": RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
+    "document.created": DOCUMENT_CREATED_TRANSLATIONS,
+}
+
+
 def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
     """
     دریافت ترجمه یک کلید
@@ -640,6 +810,11 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
     
     # جستجو در ترجمه‌های خاص
     if context:
+        if context in TRIGGER_TRANSLATIONS_BY_KEY:
+            trans = TRIGGER_TRANSLATIONS_BY_KEY[context]
+            if lang in trans and key in trans[lang]:
+                return trans[lang][key]
+
         translations_map = {
             "create_invoice": CREATE_INVOICE_TRANSLATIONS,
             "send_telegram": SEND_TELEGRAM_TRANSLATIONS,
@@ -738,6 +913,68 @@ def translate_metadata(metadata: Dict[str, Any], lang: str = "fa", action_key: s
             translated_help[field_key] = get_translation(help_key, lang, action_key)
         translated["ui_config"]["help_texts"] = translated_help
     
+    return translated
+
+
+def translate_trigger_metadata(metadata: Dict[str, Any], lang: str = "fa", trigger_key: str = None) -> Dict[str, Any]:
+    """
+    ترجمه metadata یک trigger (نام، توضیح، فیلدهای config_schema).
+    """
+    if not trigger_key or trigger_key not in TRIGGER_TRANSLATIONS_BY_KEY:
+        return metadata.copy()
+
+    translated = metadata.copy()
+    translated["name"] = get_translation("trigger_name", lang, trigger_key)
+    translated["description"] = get_translation("trigger_description", lang, trigger_key)
+
+    if "config_schema" not in translated:
+        return translated
+
+    schema = translated["config_schema"]
+    translated_schema: Dict[str, Any] = {}
+
+    for field_key, field_config in schema.items():
+        if isinstance(field_config, dict):
+            translated_field = field_config.copy()
+            desc_key = f"field_{field_key}_desc"
+            translated_field["description"] = get_translation(desc_key, lang, trigger_key)
+            label_key = f"field_{field_key}"
+            label = get_translation(label_key, lang, trigger_key)
+            if label != label_key:
+                translated_field["title"] = label
+
+            if "enum" in translated_field:
+                translated_enum_labels = {}
+                for enum_value in translated_field["enum"]:
+                    ek = str(enum_value).replace("-", "_").replace(".", "_")
+                    translated_enum_labels[enum_value] = get_translation(ek, lang, trigger_key)
+                if "ui_config" not in translated_field:
+                    translated_field["ui_config"] = {}
+                translated_field["ui_config"]["labels"] = translated_enum_labels
+
+            if translated_field.get("type") == "array" and isinstance(translated_field.get("items"), dict):
+                items = translated_field["items"]
+                if isinstance(items, dict) and items.get("enum"):
+                    translated_item_labels = {}
+                    for enum_value in items["enum"]:
+                        ek = str(enum_value).replace("-", "_").replace(".", "_")
+                        translated_item_labels[enum_value] = get_translation(ek, lang, trigger_key)
+                    uc = dict(translated_field.get("ui_config") or {})
+                    uc["labels"] = translated_item_labels
+                    translated_field["ui_config"] = uc
+
+            placeholder_key = f"field_{field_key}_placeholder"
+            placeholder = get_translation(placeholder_key, lang, trigger_key)
+            if placeholder != placeholder_key:
+                if "ui_config" not in translated_field:
+                    translated_field["ui_config"] = {}
+                translated_field["ui_config"]["placeholder"] = placeholder
+
+            translated_schema[field_key] = translated_field
+        else:
+            translated_schema[field_key] = field_config
+
+    translated["config_schema"] = translated_schema
     return translated
 
 

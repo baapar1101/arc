@@ -27,6 +27,7 @@ from adapters.api.v1.products import router as products_router
 from adapters.api.v1.price_lists import router as price_lists_router
 from adapters.api.v1.invoices import router as invoices_router
 from adapters.api.v1.persons import router as persons_router
+from adapters.api.v1.person_group_routes import router as person_group_routes_router
 from adapters.api.v1.customers import router as customers_router
 from adapters.api.v1.bank_accounts import router as bank_accounts_router
 from adapters.api.v1.cash_registers import router as cash_registers_router
@@ -992,6 +993,7 @@ def create_app() -> FastAPI:
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
     application.include_router(invoices_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
+    application.include_router(person_group_routes_router, prefix=settings.api_v1_prefix)
     application.include_router(customers_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.projects import router as projects_router
     application.include_router(projects_router, prefix=settings.api_v1_prefix)
@@ -1051,6 +1053,8 @@ def create_app() -> FastAPI:
     # Workflows
     from adapters.api.v1.workflows import router as workflows_router
     application.include_router(workflows_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.workflow_marketplace import router as workflow_marketplace_router
+    application.include_router(workflow_marketplace_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_gateways import router as payment_gateways_router
     application.include_router(payment_gateways_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_callbacks import router as payment_callbacks_router

@@ -129,6 +129,7 @@ class Business(Base):
     
     # Relationships
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="business", cascade="all, delete-orphan")
+    person_groups = relationship("PersonGroup", back_populates="business", cascade="all, delete-orphan")
     fiscal_years = relationship("FiscalYear", back_populates="business", cascade="all, delete-orphan")
     currencies = relationship("Currency", secondary="business_currencies", back_populates="businesses")
     default_currency = relationship("Currency", foreign_keys="[Business.default_currency_id]", uselist=False)

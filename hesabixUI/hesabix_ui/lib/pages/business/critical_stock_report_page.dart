@@ -252,7 +252,7 @@ class _CriticalStockReportPageState extends State<CriticalStockReportPage> {
             ),
             
             // Data Table
-            SingleChildScrollView(
+            Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

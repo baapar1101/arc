@@ -2789,7 +2789,7 @@ def list_bulk_product_prices_sheet_items_endpoint(
     _: None = Depends(require_business_permission_dep("products", "view")),
 ) -> Dict[str, Any]:
     result = list_bulk_price_sheet_items(db, business_id, payload)
-    return success_response(data=result, request=request)
+    return success_response(data=format_datetime_fields(result, request), request=request)
 
 
 @router.post(

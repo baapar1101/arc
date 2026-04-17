@@ -2730,6 +2730,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personsList => 'لیست اشخاص';
 
   @override
+  String get personGroup => 'گروه اشخاص';
+
+  @override
+  String get personGroupNone => 'بدون گروه';
+
+  @override
+  String get personGroupsManage => 'مدیریت گروه‌های اشخاص';
+
+  @override
+  String get personGroupColumn => 'گروه';
+
+  @override
   String get editPerson => 'ویرایش شخص';
 
   @override
@@ -9583,4 +9595,88 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get inventoryNegativePolicyTransferSubtitle =>
       'اگر روشن باشد، حوالهٔ انتقال صرف‌نظر از دو گزینهٔ بالا کنترل کسری کامل دارد.';
+
+  @override
+  String get workflowMarketplaceTitle => 'مخزن ورک‌فلوها';
+
+  @override
+  String get workflowMarketplaceSubtitle =>
+      'ورک‌فلوهای منتشرشده توسط کاربران را ببینید و به کسب‌وکار خود اضافه کنید.';
+
+  @override
+  String get workflowMarketplaceSearchHint => 'جستجو در عنوان و توضیح کوتاه…';
+
+  @override
+  String get workflowMarketplaceTagFilterHint => 'فیلتر تگ (اختیاری)';
+
+  @override
+  String get workflowMarketplaceEmpty => 'موردی در مخزن نیست.';
+
+  @override
+  String get workflowMarketplaceInstallCount => 'تعداد نصب';
+
+  @override
+  String get workflowMarketplacePublisher => 'منتشرکننده';
+
+  @override
+  String get workflowMarketplacePublishedAt => 'تاریخ انتشار';
+
+  @override
+  String get workflowMarketplaceVersion => 'نسخه';
+
+  @override
+  String get workflowMarketplaceInstall => 'افزودن به این کسب‌وکار';
+
+  @override
+  String get workflowMarketplaceDetailTitle => 'جزئیات بسته';
+
+  @override
+  String get workflowMarketplaceLongDescription => 'توضیح کامل';
+
+  @override
+  String get workflowMarketplaceChangelog => 'تغییرات این نسخه';
+
+  @override
+  String get workflowMarketplaceBrowseTab => 'مرور مخزن';
+
+  @override
+  String get workflowMarketplaceOpen => 'مخزن ورک‌فلوها';
+
+  @override
+  String get workflowMarketplaceMyPublished => 'انتشارات من';
+
+  @override
+  String get workflowMarketplacePublish => 'انتشار در مخزن';
+
+  @override
+  String get workflowMarketplacePublishTitleLabel => 'عنوان در مخزن';
+
+  @override
+  String get workflowMarketplaceShortDescriptionLabel => 'خلاصه (کارت لیست)';
+
+  @override
+  String get workflowMarketplaceLongDescriptionLabel => 'توضیح کامل برای مخزن';
+
+  @override
+  String get workflowMarketplaceTagsLabel => 'تگ‌ها (با ویرگول جدا کنید)';
+
+  @override
+  String get workflowMarketplaceVersionLabel => 'شماره نسخه';
+
+  @override
+  String get workflowMarketplacePublishSubmit => 'انتشار';
+
+  @override
+  String get workflowMarketplacePublishSaved => 'ورک‌فلو در مخزن منتشر شد.';
+
+  @override
+  String get workflowMarketplaceInstalled =>
+      'ورک‌فلو به‌صورت پیش‌نویس اضافه شد.';
+
+  @override
+  String get workflowMarketplaceNameAfterInstall =>
+      'نام ورک‌فلو پس از افزودن (اختیاری)';
+
+  @override
+  String get workflowMarketplaceError => 'خطا در مخزن ورک‌فلو';
 }

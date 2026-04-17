@@ -302,6 +302,9 @@ class DataTableConfig<T> {
   
   // Refresh callback
   final VoidCallback? onRefresh;
+
+  /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
+  final VoidCallback? onAllFiltersCleared;
   
   // Auto-fit configuration
   final bool autoFitColumnsOnFirstLoad;
@@ -315,8 +318,8 @@ class DataTableConfig<T> {
   final String httpMethod;
 
   /// اگر true باشد، ناحیهٔ بدنهٔ جدول به‌جای [Expanded] با ارتفاع محاسبه‌شده از تعداد سطرها
-  /// اندازه می‌گیرد تا اسکرول عمودی داخل جدول حذف شود و والد (مثلاً [SingleChildScrollView])
-  /// اسکرول صفحه را بر عهده بگیرد. پیش‌فرض: غیرفعال.
+  /// اندازه می‌گیرد تا اسکرول عمودی داخل [DataTable2] حذف شود؛ خود [DataTableWidget] محتوای کارت را
+  /// در [SingleChildScrollView] می‌پیچد تا با ارتفاع زیاد، صفحه اسکرول شود. پیش‌فرض: غیرفعال.
   final bool expandBodyHeightToFitRows;
 
   const DataTableConfig({
@@ -401,6 +404,7 @@ class DataTableConfig<T> {
     this.headingRowHeight,
     this.dataRowHeight,
     this.onRefresh,
+    this.onAllFiltersCleared,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,
     this.autoFillAvailableWidth = true,

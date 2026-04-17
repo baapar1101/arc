@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, Body, Response
 from sqlalchemy import and_, or_, exists
 from sqlalchemy.orm import Session
 
-from adapters.db.session import get_db
+from adapters.db.session import get_db, SessionLocal
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
 from app.core.responses import success_response, ApiError
@@ -23,6 +23,7 @@ from app.services.invoice_service import (
 	INVOICE_WASTE,
 )
 from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document, bulk_delete_warehouse_documents, start_stock_count, calculate_stock_count_differences, create_stock_count_adjustment
+from app.services.invoice_warehouse_bulk_service import run_bulk_warehouse_invoice_operation
 
 
 router = APIRouter(prefix="/warehouse-docs", tags=["warehouse_docs"])
@@ -1295,5 +1296,87 @@ def create_stock_count_adjustment_endpoint(
 	)
 	db.commit()
 	return success_response(data=warehouse_document_to_dict(db, wh), request=request)
+
+
+@router.post("/business/{business_id}/invoices/bulk-warehouse-operations")
+@require_business_access("business_id")
+def bulk_warehouse_invoice_operations(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default={}),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	"""
+	عملیات گروهی روی فاکتورهای انتخاب‌شده (هر فاکتور در تراکنش جدا).
+	operation: create_draft | remove_linked | post_drafts
+	برای post_drafts: existing_posted_policy = skip | post_drafts_only | remove_all_then_create_and_post
+	"""
+	if not ctx.has_business_permission("inventory", "write"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+
+	body = payload or {}
+	operation = str(body.get("operation") or "").strip().lower()
+	existing_posted_policy = str(body.get("existing_posted_policy") or "skip").strip().lower()
+	if existing_posted_policy not in ("skip", "post_drafts_only", "remove_all_then_create_and_post"):
+		existing_posted_policy = "skip"
+	raw_ids = body.get("invoice_ids")
+	if not isinstance(raw_ids, list) or not raw_ids:
+		raise ApiError("INVALID_BODY", "invoice_ids (لیست شناسه فاکتور) الزامی است", http_status=400)
+
+	invoice_ids: List[int] = []
+	for x in raw_ids:
+		try:
+			invoice_ids.append(int(x))
+		except Exception:
+			continue
+
+	seen: set[int] = set()
+	uniq: List[int] = []
+	for iid in invoice_ids:
+		if iid not in seen:
+			seen.add(iid)
+			uniq.append(iid)
+	invoice_ids = uniq[:200]
+
+	user_id = ctx.get_user_id()
+	if user_id is None:
+		raise ApiError("UNAUTHORIZED", "کاربر نامعتبر", http_status=401)
+
+	results: List[Dict[str, Any]] = []
+	for iid in invoice_ids:
+		sess = SessionLocal()
+		try:
+			out = run_bulk_warehouse_invoice_operation(
+				sess,
+				business_id,
+				iid,
+				operation,
+				int(user_id),
+				existing_posted_policy=existing_posted_policy,
+			)
+			if out.get("ok"):
+				sess.commit()
+			else:
+				sess.rollback()
+			results.append({"invoice_id": iid, **out})
+		except Exception as exc:
+			sess.rollback()
+			results.append({
+				"invoice_id": iid,
+				"ok": False,
+				"code": "EXCEPTION",
+				"message": str(exc),
+			})
+		finally:
+			sess.close()
+
+	return success_response(
+		data={
+			"results": results,
+			"operation": operation,
+			"existing_posted_policy": existing_posted_policy,
+		},
+		request=request,
+	)
 
 

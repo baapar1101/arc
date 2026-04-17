@@ -5,6 +5,7 @@ from .workflow_translations import (
     SupportedLanguage,
     get_translation,
     translate_metadata,
+    translate_trigger_metadata,
     get_all_translation_keys,
     COMMON_TRANSLATIONS,
     CREATE_INVOICE_TRANSLATIONS,
@@ -13,19 +14,27 @@ from .workflow_translations import (
     SEND_EMAIL_TRANSLATIONS,
     AI_AGENT_TRANSLATIONS,
     OTHER_ACTIONS_TRANSLATIONS,
+    RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
+    DOCUMENT_CREATED_TRANSLATIONS,
+    TRIGGER_TRANSLATIONS_BY_KEY,
 )
 
 __all__ = [
     "SupportedLanguage",
     "get_translation",
     "translate_metadata",
+    "translate_trigger_metadata",
     "get_all_translation_keys",
     "COMMON_TRANSLATIONS",
     "CREATE_INVOICE_TRANSLATIONS",
     "SEND_TELEGRAM_TRANSLATIONS",
     "SEND_BALE_TRANSLATIONS",
     "SEND_EMAIL_TRANSLATIONS",
+    "AI_AGENT_TRANSLATIONS",
     "OTHER_ACTIONS_TRANSLATIONS",
+    "RECEIPT_PAYMENT_CREATED_TRANSLATIONS",
+    "DOCUMENT_CREATED_TRANSLATIONS",
+    "TRIGGER_TRANSLATIONS_BY_KEY",
 ]
 
 

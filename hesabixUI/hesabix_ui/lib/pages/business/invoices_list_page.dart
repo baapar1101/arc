@@ -13,6 +13,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
+import 'package:hesabix_ui/services/invoice_warehouse_bulk_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
@@ -53,6 +54,7 @@ class InvoicesListPage extends StatefulWidget {
 class _InvoicesListPageState extends State<InvoicesListPage> {
   final GlobalKey _tableKey = GlobalKey();
   final InvoiceService _invoiceService = InvoiceService();
+  late final InvoiceWarehouseBulkService _warehouseBulkService = InvoiceWarehouseBulkService(apiClient: widget.apiClient);
   late final BusinessDashboardService _dashboardService = BusinessDashboardService(widget.apiClient);
 
   static const double _mobileInvoiceRowHeight = 164;
@@ -65,6 +67,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   int? _selectedFiscalYearId;
   List<Map<String, dynamic>> _fiscalYears = [];
+  /// تا زمان آماده شدن لیست سال مالی، جدول ساخته نمی‌شود تا اولین درخواست با fiscal_year_id درست باشد.
+  bool _fiscalYearsResolved = false;
   int? _selectedProjectId; // فیلتر پروژه
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
@@ -156,9 +160,14 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           );
           _selectedFiscalYearId = current['id'] as int?;
         }
+        _fiscalYearsResolved = true;
       });
     } catch (_) {
-      // ignore errors
+      if (mounted) {
+        setState(() {
+          _fiscalYearsResolved = true;
+        });
+      }
     }
   }
 
@@ -185,12 +194,19 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                   // avoid FAB overlapping footer/pagination on mobile
                   isMobile ? 88 : 8,
                 ),
-                child: DataTableWidget<InvoiceListItem>(
-                  key: _tableKey,
-                  config: _buildTableConfig(t, isMobile: isMobile),
-                  fromJson: (json) => InvoiceListItem.fromJson(json),
-                  calendarController: widget.calendarController,
-                ),
+                child: _fiscalYearsResolved
+                    ? DataTableWidget<InvoiceListItem>(
+                        key: _tableKey,
+                        config: _buildTableConfig(t, isMobile: isMobile),
+                        fromJson: (json) => InvoiceListItem.fromJson(json),
+                        calendarController: widget.calendarController,
+                      )
+                    : const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -1129,6 +1145,32 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               label: Text('حذف ($_selectedCount)'),
             ),
           ),
+        if (widget.authStore.hasBusinessPermission('inventory', 'write')) ...[
+          Tooltip(
+            message: 'ایجاد پیش‌نویس حواله انبار برای فاکتورهای انتخاب‌شده (موجودی باقی‌مانده)',
+            child: FilledButton.tonalIcon(
+              onPressed: _selectedCount > 0 ? _onBulkCreateWarehouseDraft : null,
+              icon: const Icon(Icons.add_box_outlined),
+              label: Text('پیش‌نویس حواله ($_selectedCount)'),
+            ),
+          ),
+          Tooltip(
+            message: 'قطعی کردن پیش‌نویس حواله‌ها؛ در دیالوگ، نسبت به حواله‌های قبلاً صادرشده سیاست انتخاب کنید',
+            child: FilledButton.tonalIcon(
+              onPressed: _selectedCount > 0 ? _onBulkPostWarehouseDocuments : null,
+              icon: const Icon(Icons.check_circle_outline),
+              label: Text('صدور حواله ($_selectedCount)'),
+            ),
+          ),
+          Tooltip(
+            message: 'حذف پیش‌نویس‌ها یا لغو حواله‌های قطعی مرتبط با فاکتور (در صورت وجود حواله وابسته ابتدا آن را لغو کنید)',
+            child: FilledButton.tonalIcon(
+              onPressed: _selectedCount > 0 ? _onBulkRemoveInvoiceWarehouseDocuments : null,
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: Text('حذف حواله‌های مرتبط ($_selectedCount)'),
+            ),
+          ),
+        ],
         Tooltip(
           message: 'ایمپورت فاکتورها از فایل Excel',
           child: IconButton(
@@ -1508,6 +1550,256 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       final message = e is Exception ? e.toString() : 'خطا در حذف فاکتورها';
       SnackBarHelper.showError(context, message: message);
     }
+  }
+
+  List<InvoiceListItem>? _getSelectedInvoiceItems() {
+    final state = _tableKey.currentState;
+    if (state == null) return null;
+    try {
+      // ignore: avoid_dynamic_calls
+      final raw = (state as dynamic).getSelectedItems() as List<dynamic>;
+      if (raw.isEmpty) return null;
+      return raw.cast<InvoiceListItem>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _onBulkPostWarehouseDocuments() async {
+    final items = _getSelectedInvoiceItems();
+    if (items == null || items.isEmpty) return;
+
+    String policy = 'post_drafts_only';
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setLocal) {
+          return AlertDialog(
+            title: const Text('صدور گروهی حواله انبار'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'برای هر فاکتور، در صورت وجود حوالهٔ قطعی از قبل، یکی از سیاست‌ها اعمال می‌شود. '
+                    'گزینهٔ سوم همان قوانین امن «حذف حواله‌های مرتبط» را اجرا می‌کند، سپس پیش‌نویس تازه می‌سازد و قطعی می‌کند.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  RadioListTile<String>(
+                    title: const Text('رد فاکتور اگر حواله قطعی دارد'),
+                    subtitle: const Text('آن فاکتور در صدور گروهی نادیده گرفته می‌شود'),
+                    value: 'skip',
+                    groupValue: policy,
+                    onChanged: (v) {
+                      if (v != null) setLocal(() => policy = v);
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('فقط پیش‌نویس‌ها را قطعی کن'),
+                    subtitle: const Text('حواله‌های قطعی قبلی دست نمی‌خورند'),
+                    value: 'post_drafts_only',
+                    groupValue: policy,
+                    onChanged: (v) {
+                      if (v != null) setLocal(() => policy = v);
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('حذف امن همه حواله‌های قبلی، سپس پیش‌نویس جدید و صدور'),
+                    subtitle: const Text('در صورت مانع انبار، همان فاکتور خطا می‌گیرد و بقیه مستقل‌اند'),
+                    value: 'remove_all_then_create_and_post',
+                    groupValue: policy,
+                    onChanged: (v) {
+                      if (v != null) setLocal(() => policy = v);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, policy),
+                child: const Text('ادامه'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (chosen == null || !mounted) return;
+
+    await _confirmAndRunBulkWarehouse(
+      title: 'صدور گروهی حواله',
+      confirmMessage: '',
+      operation: 'post_drafts',
+      existingPostedPolicy: chosen,
+      skipConfirmDialog: true,
+    );
+  }
+
+  Future<void> _confirmAndRunBulkWarehouse({
+    required String title,
+    required String confirmMessage,
+    required String operation,
+    String? existingPostedPolicy,
+    bool skipConfirmDialog = false,
+  }) async {
+    final items = _getSelectedInvoiceItems();
+    if (items == null || items.isEmpty) return;
+
+    if (!skipConfirmDialog) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Text(confirmMessage),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('ادامه'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    final rootNav = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final idToCode = {for (final it in items) it.id: it.code};
+
+    try {
+      final data = await _warehouseBulkService.bulkWarehouseOperations(
+        businessId: widget.businessId,
+        operation: operation,
+        invoiceIds: items.map((e) => e.id).toList(),
+        existingPostedPolicy: existingPostedPolicy,
+      );
+      if (!mounted) return;
+      rootNav.pop();
+
+      final rawResults = data['results'] as List<dynamic>? ?? [];
+      var okCount = 0;
+      var failCount = 0;
+      for (final r in rawResults) {
+        if (r is Map && r['ok'] == true) {
+          okCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      if (mounted) {
+        setState(() => _selectedCount = 0);
+        _refreshData();
+      }
+
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        builder: (ctx) => AlertDialog(
+          title: const Text('نتیجه عملیات انبار (به‌ازای هر فاکتور)'),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'موفق: $okCount — ناموفق/رد شده: $failCount',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  ...rawResults.map((r) {
+                    final m = r is Map ? Map<String, dynamic>.from(r as Map) : <String, dynamic>{};
+                    final id = m['invoice_id'];
+                    final code = id != null ? idToCode[(id is num) ? id.toInt() : int.tryParse(id.toString()) ?? 0] : null;
+                    final success = m['ok'] == true;
+                    final msg = m['message']?.toString();
+                    final codeErr = m['code']?.toString();
+                    final blockWh = m['blocking_warehouse_code']?.toString();
+                    final hint = m['hint']?.toString();
+                    final postedWh = m['posted_warehouse_document_ids'];
+                    final lines = <String>[
+                      if (code != null && code.isNotEmpty) 'کد فاکتور: $code',
+                      if (codeErr != null && codeErr.isNotEmpty) 'کد خطا: $codeErr',
+                      if (msg != null && msg.isNotEmpty) msg,
+                      if (postedWh != null && success) 'حواله‌های صادرشده: $postedWh',
+                      if (blockWh != null && blockWh.isNotEmpty) 'حواله: $blockWh',
+                      if (hint != null && hint.isNotEmpty) hint,
+                    ];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        dense: true,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                        ),
+                        leading: Icon(
+                          success ? Icons.check_circle : Icons.warning_amber_rounded,
+                          color: success ? Colors.green : Colors.deepOrange,
+                        ),
+                        title: Text('شناسه فاکتور: ${id ?? "-"}'),
+                        subtitle: Text(lines.where((e) => e.isNotEmpty).join('\n')),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('بستن'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      rootNav.pop();
+      SnackBarHelper.showError(context, message: 'خطا در عملیات انبار: $e');
+    }
+  }
+
+  Future<void> _onBulkCreateWarehouseDraft() async {
+    await _confirmAndRunBulkWarehouse(
+      title: 'ثبت پیش‌نویس حواله انبار',
+      confirmMessage:
+          'برای هر فاکتور انتخاب‌شده، در صورت وجود کالای قابل رهگیری و ماندهٔ قابل ثبت، یک یا چند حوالهٔ پیش‌نویس ایجاد می‌شود.\n'
+          'اگر برای یک فاکتور خطا رخ دهد، بقیهٔ فاکتورها همچنان پردازش می‌شوند.',
+      operation: 'create_draft',
+    );
+  }
+
+  Future<void> _onBulkRemoveInvoiceWarehouseDocuments() async {
+    await _confirmAndRunBulkWarehouse(
+      title: 'حذف / لغو حواله‌های مرتبط با فاکتور',
+      confirmMessage:
+          'پیش‌نویس‌ها حذف می‌شوند. برای حواله‌های قطعی، ابتدا حوالهٔ معکوس ساخته و ثبت می‌شود.\n'
+          'اگر به‌خاطر حواله‌های بعدی (مثلاً انتقال) امکان لغو نباشد، آن فاکتور رد می‌شود و پیام راهنما نمایش داده می‌شود؛ بقیهٔ فاکتورها مستقل پردازش می‌شوند.',
+      operation: 'remove_linked',
+    );
   }
 
   Future<void> _onDelete(InvoiceListItem item) async {

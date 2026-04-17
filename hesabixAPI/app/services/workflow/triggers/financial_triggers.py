@@ -3,7 +3,7 @@ Triggerهای مربوط به عملیات مالی
 """
 
 from typing import Any, Dict
-from datetime import datetime
+
 from app.services.workflow.triggers.base_trigger import BaseTrigger
 
 
@@ -77,11 +77,58 @@ class ReceiptPaymentCreatedTrigger(BaseTrigger):
                     "description": "مدت زمان انتظار بین triggerهای متوالی (ثانیه)",
                     "default": 0,
                     "required": False
+                },
+                "person_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس طرف‌حساب (شخص)",
+                    "required": False,
+                    "ui_type": "person_selector",
+                    "ui_config": {"business_scoped": True}
+                },
+                "project_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس پروژه",
+                    "required": False
+                },
+                "currency_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس ارز سند",
+                    "required": False,
+                    "ui_type": "currency_selector",
+                    "ui_config": {"business_scoped": True, "show_all_option": True}
+                },
+                "fiscal_year_id_filter": {
+                    "type": "integer",
+                    "description": "فیلتر بر اساس سال مالی",
+                    "required": False,
+                    "ui_type": "fiscal_year_selector",
+                    "ui_config": {"business_scoped": True}
+                },
+                "account_ids_filter": {
+                    "type": "array",
+                    "description": "اگر هر حساب معین از این لیست در سطرهای سند باشد، تریگر فعال می‌شود",
+                    "items": {"type": "integer"},
+                    "required": False
+                },
+                "description_contains": {
+                    "type": "string",
+                    "description": "فیلتر متنی روی شرح سند",
+                    "required": False
                 }
             }
         }
     
     def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if db is not None and business_id is not None:
+            from app.services.workflow.workflow_entity_validation import (
+                validate_receipt_payment_config_entities,
+            )
+
+            if not validate_receipt_payment_config_entities(db, int(business_id), config):
+                return {}
+
         data = super().execute(context, config)
         if not data:
             return {}
@@ -106,15 +153,96 @@ class ReceiptPaymentCreatedTrigger(BaseTrigger):
         # فیلتر بر اساس روش پرداخت
         payment_method_filter = config.get("payment_method_filter")
         if payment_method_filter:
-            payment_method = data.get("payment_method")
-            if payment_method not in payment_method_filter:
+            pm_single = data.get("payment_method")
+            pm_list = data.get("payment_methods") or []
+            if not isinstance(pm_list, list):
+                pm_list = []
+            ok_pm = (pm_single in payment_method_filter) or any(
+                x in payment_method_filter for x in pm_list
+            )
+            if not ok_pm:
                 return {}
         
-        # فیلتر بر اساس حساب
+        # فیلتر بر اساس حساب (تک حساب یا لیست حساب‌های سطر)
         account_id_filter = config.get("account_id_filter")
         if account_id_filter is not None:
             account_id = data.get("account_id")
-            if account_id != account_id_filter:
+            acc_ids = data.get("account_ids") or []
+            if not isinstance(acc_ids, list):
+                acc_ids = []
+            try:
+                want = int(account_id_filter)
+            except (TypeError, ValueError):
+                return {}
+            if account_id != want and want not in [int(x) for x in acc_ids if x is not None]:
+                return {}
+
+        account_ids_filter = config.get("account_ids_filter")
+        if account_ids_filter and isinstance(account_ids_filter, list):
+            try:
+                need = {int(x) for x in account_ids_filter}
+            except (TypeError, ValueError):
+                return {}
+            have = data.get("account_ids") or []
+            if not isinstance(have, list):
+                have = []
+            have_int = set()
+            for x in have:
+                try:
+                    have_int.add(int(x))
+                except (TypeError, ValueError):
+                    continue
+            if not need.intersection(have_int):
+                return {}
+
+        person_id_filter = config.get("person_id_filter")
+        if person_id_filter is not None:
+            try:
+                want_p = int(person_id_filter)
+            except (TypeError, ValueError):
+                return {}
+            pids = data.get("person_ids") or []
+            if not isinstance(pids, list):
+                pids = []
+            pid_single = data.get("person_id")
+            pids_int = []
+            for x in pids:
+                try:
+                    pids_int.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            if pid_single != want_p and want_p not in pids_int:
+                return {}
+
+        proj_f = config.get("project_id_filter")
+        if proj_f is not None:
+            try:
+                dp = data.get("project_id")
+                if dp is None or int(dp) != int(proj_f):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        cur_f = config.get("currency_id_filter")
+        if cur_f is not None:
+            try:
+                if int(data.get("currency_id") or -1) != int(cur_f):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        fy_f = config.get("fiscal_year_id_filter")
+        if fy_f is not None:
+            try:
+                if int(data.get("fiscal_year_id") or -1) != int(fy_f):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        desc_sub = config.get("description_contains")
+        if desc_sub:
+            description = (data.get("description") or "") or ""
+            if str(desc_sub).lower() not in description.lower():
                 return {}
         
         # اضافه کردن موجودی حساب

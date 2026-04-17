@@ -507,7 +507,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
             ),
           ),
           // Table
-          SingleChildScrollView(
+          Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTableWidget<Map<String, dynamic>>(

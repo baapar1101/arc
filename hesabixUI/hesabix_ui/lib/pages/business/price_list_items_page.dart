@@ -7,6 +7,7 @@ import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/api_datetime_display.dart';
 
 class PriceListItemsPage extends StatefulWidget {
   final int businessId;
@@ -69,13 +70,32 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView.separated(
               itemCount: _items.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (context, _) => const Divider(height: 1),
               itemBuilder: (ctx, i) {
                 final it = _items[i];
                 final t = AppLocalizations.of(ctx);
+                final updatedStr = resolveApiDateTimeDisplay(it, 'updated_at');
                 return ListTile(
+                  contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 8, top: 10, bottom: 14),
                   title: Text('${t.products} ${it['product_id']} - ${it['tier_name']}'),
-                  subtitle: Text('${t.minQty} ${it['min_qty']} - ${t.price} ${it['price']} - ${t.currency} ${it['currency_id'] ?? '-'}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${t.minQty} ${it['min_qty']} - ${t.price} ${it['price']} - ${t.currency} ${it['currency_id'] ?? '-'}'),
+                      if (updatedStr.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, bottom: 2),
+                          child: Text(
+                            '${t.lastUpdated}: $updatedStr',
+                            style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  isThreeLine: updatedStr.isNotEmpty,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -100,6 +120,8 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
 
   Future<void> _openEditor({Map<String, dynamic>? item}) async {
     final formKey = GlobalKey<FormState>();
+    final existingUpdatedAt =
+        item == null ? '' : resolveApiDateTimeDisplay(Map<String, dynamic>.from(item), 'updated_at');
     int? productId = item?['product_id'] as int?;
     String tierName = (item?['tier_name'] as String?) ?? 'تکی';
     int? unitId = item?['unit_id'] as int?;
@@ -120,6 +142,18 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (item != null) ...[
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        '${t.lastUpdated}: ${existingUpdatedAt.isEmpty ? '—' : existingUpdatedAt}',
+                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextFormField(
                     initialValue: productId?.toString(),
                     decoration: InputDecoration(labelText: t.productId),

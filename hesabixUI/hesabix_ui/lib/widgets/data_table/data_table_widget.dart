@@ -208,6 +208,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _fetchData();
   }
 
+  /// فیلتر سریع دسته (مثلاً از نوار بالای لیست کالاها) — همان منطق فیلتر درختی ستون دسته‌بندی
+  void applyCategoryIdFilter(List<int> categoryIds) {
+    setState(() {
+      if (categoryIds.isEmpty) {
+        _columnMultiSelectValues.remove('category_id');
+      } else {
+        _columnMultiSelectValues['category_id'] =
+            categoryIds.map((e) => e.toString()).toList();
+      }
+    });
+    _page = 1;
+    _fetchData();
+  }
+
   // Public helpers for external widgets (via GlobalKey)
   List<int> getSelectedRowIndices() {
     return _selectedRows.toList();
@@ -863,6 +877,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     });
     _page = 1;
     _fetchData();
+    widget.config.onAllFiltersCleared?.call();
     // Call the callback if provided
     if (widget.config.onRowSelectionChanged != null) {
       widget.config.onRowSelectionChanged!(_selectedRows);
@@ -1386,27 +1401,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: widget.config.boxShadow != null ? 2 : 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: widget.config.padding ?? const EdgeInsets.all(16),
-        margin: widget.config.margin,
-        decoration: BoxDecoration(
-          color: widget.config.backgroundColor,
-          borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
-          border: widget.config.showBorder 
-              ? Border.all(
-                  color: widget.config.borderColor ?? theme.dividerColor,
-                  width: widget.config.borderWidth ?? 1.0,
-                )
-              : null,
-        ),
-        child: Column(
-          children: [
+    final List<Widget> tableBodyColumnChildren = [
             // Header
             if (_shouldShowHeader()) ...[
               _buildHeader(t, theme),
@@ -1546,8 +1541,37 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               const SizedBox(height: 12),
               _buildFooter(t, theme),
             ],
-          ],
+    ];
+
+    return Card(
+      elevation: widget.config.boxShadow != null ? 2 : 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: widget.config.padding ?? const EdgeInsets.all(16),
+        margin: widget.config.margin,
+        decoration: BoxDecoration(
+          color: widget.config.backgroundColor,
+          borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
+          border: widget.config.showBorder 
+              ? Border.all(
+                  color: widget.config.borderColor ?? theme.dividerColor,
+                  width: widget.config.borderWidth ?? 1.0,
+                )
+              : null,
         ),
+        child: widget.config.expandBodyHeightToFitRows
+            ? SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: tableBodyColumnChildren,
+                ),
+              )
+            : Column(
+                children: tableBodyColumnChildren,
+              ),
       ),
     );
   }

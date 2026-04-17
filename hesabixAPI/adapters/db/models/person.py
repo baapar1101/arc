@@ -28,7 +28,14 @@ class Person(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
-    
+    person_group_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("person_groups.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="گروه اشخاص (دسته‌بندی و قالب پیش‌فرض)",
+    )
+
     # اطلاعات پایه
     code: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="کد یکتا در هر کسب و کار")
     alias_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="نام مستعار (الزامی)")
@@ -84,6 +91,7 @@ class Person(Base):
     
     # Relationships
     business: Mapped["Business"] = relationship("Business", back_populates="persons")
+    person_group: Mapped["PersonGroup | None"] = relationship("PersonGroup", back_populates="persons")
     bank_accounts: Mapped[list["PersonBankAccount"]] = relationship("PersonBankAccount", back_populates="person", cascade="all, delete-orphan")
     crm_deals: Mapped[list["Deal"]] = relationship("Deal", back_populates="person", foreign_keys="[Deal.person_id]")
     crm_activities: Mapped[list["CrmActivity"]] = relationship("CrmActivity", back_populates="person", cascade="all, delete-orphan")

@@ -683,7 +683,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
               ],
             ),
             const SizedBox(height: 16),
-            SingleChildScrollView(
+            Expanded(
               child: DataTableWidget<Map<String, dynamic>>(
                 key: ValueKey('data_table_$_refreshCounter'),
                 config: DataTableConfig<Map<String, dynamic>>(

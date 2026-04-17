@@ -24,7 +24,10 @@ import '../../widgets/workflow/workflow_execution_history_panel.dart';
 import '../../widgets/workflow/workflow_templates.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';import '../../utils/snackbar_helper.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
 
 
 class WorkflowVisualEditorPage extends StatefulWidget {
@@ -214,6 +217,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 icon: const Icon(Icons.history),
                 onPressed: () => Scaffold.of(context).openEndDrawer(),
                 tooltip: t.workflowExecutionHistory,
+              ),
+            if (_workflow != null && _workflow!['id'] != null)
+              IconButton(
+                icon: const Icon(Icons.cloud_upload_outlined),
+                onPressed: _loading ? null : _publishToMarketplace,
+                tooltip: t.workflowMarketplacePublish,
               ),
             // در موبایل فقط آیکون ذخیره نمایش داده شود
             isMobile
@@ -644,6 +653,23 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         setState(() => _saving = false);
       }
     }
+  }
+
+  Future<void> _publishToMarketplace() async {
+    final t = AppLocalizations.of(context);
+    final rawId = _workflow?['id'];
+    if (rawId == null) return;
+    final workflowId = rawId is int ? rawId : int.tryParse(rawId.toString());
+    if (workflowId == null) return;
+    final defaultTitle = (_workflow?['name'] ?? t.workflow).toString();
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => WorkflowPublishToMarketplaceDialog(
+        businessId: widget.businessId,
+        workflowId: workflowId,
+        defaultTitle: defaultTitle,
+      ),
+    );
   }
 
   void _handleKeyEvent(KeyEvent event) {

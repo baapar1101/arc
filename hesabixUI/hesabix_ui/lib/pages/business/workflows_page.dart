@@ -183,6 +183,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             },
           ),
           IconButton(
+            tooltip: t.workflowMarketplaceOpen,
+            icon: const Icon(Icons.store_mall_directory_outlined),
+            onPressed: () {
+              context.go('/business/${widget.businessId}/workflows/marketplace');
+            },
+          ),
+          IconButton(
             tooltip: t.workflowRefresh,
             icon: const Icon(Icons.refresh),
             onPressed: _loadAll,

@@ -406,7 +406,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
             ),
           ),
           // Data Table
-          SingleChildScrollView(
+          Expanded(
             child: DataTableWidget<Map<String, dynamic>>(
               key: ValueKey(_additionalParams().toString()), // برای rebuild با تغییر فیلترها
               config: _buildTableConfig(t),

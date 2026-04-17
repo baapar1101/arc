@@ -67,7 +67,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
           children: [
             _buildHeader(t, isMobile),
             _buildFilters(t, isMobile),
-            SingleChildScrollView(
+            Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(

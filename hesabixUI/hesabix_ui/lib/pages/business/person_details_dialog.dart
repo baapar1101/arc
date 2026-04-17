@@ -669,6 +669,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             _InfoRow('نام', person.firstName),
             _InfoRow('نام خانوادگی', person.lastName),
             _InfoRow('انواع شخص', person.personTypes.map((e) => e.persianName).join('، ')),
+            _InfoRow(t.personGroup, person.personGroupName ?? '—'),
             _InfoRow('نام سازمان', person.companyName),
             _InfoRow('شناسه پرداخت', person.paymentId),
           ]),
