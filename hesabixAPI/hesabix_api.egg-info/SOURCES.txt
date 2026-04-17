@@ -36,6 +36,7 @@ adapters/api/v1/notifications_ws.py
 adapters/api/v1/opening_balance.py
 adapters/api/v1/payment_callbacks.py
 adapters/api/v1/payment_gateways.py
+adapters/api/v1/person_group_routes.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
 adapters/api/v1/ping_pong.py
@@ -65,6 +66,7 @@ adapters/api/v1/warehouse_docs.py
 adapters/api/v1/warehouse_reports.py
 adapters/api/v1/warehouses.py
 adapters/api/v1/warranty.py
+adapters/api/v1/workflow_marketplace.py
 adapters/api/v1/workflows.py
 adapters/api/v1/zohal.py
 adapters/api/v1/admin/ai_plans.py
@@ -112,6 +114,7 @@ adapters/api/v1/schema_models/email.py
 adapters/api/v1/schema_models/file_storage.py
 adapters/api/v1/schema_models/invoice.py
 adapters/api/v1/schema_models/person.py
+adapters/api/v1/schema_models/person_group.py
 adapters/api/v1/schema_models/price_list.py
 adapters/api/v1/schema_models/product.py
 adapters/api/v1/schema_models/product_attribute.py
@@ -180,6 +183,7 @@ adapters/db/models/otp_login_session.py
 adapters/db/models/password_reset.py
 adapters/db/models/payment_gateway.py
 adapters/db/models/person.py
+adapters/db/models/person_group.py
 adapters/db/models/person_share_link.py
 adapters/db/models/petty_cash.py
 adapters/db/models/ping_pong_score.py
@@ -208,6 +212,7 @@ adapters/db/models/warehouse_document.py
 adapters/db/models/warehouse_document_line.py
 adapters/db/models/warranty.py
 adapters/db/models/workflow.py
+adapters/db/models/workflow_marketplace.py
 adapters/db/models/zohal.py
 adapters/db/models/support/__init__.py
 adapters/db/models/support/category.py
@@ -302,6 +307,7 @@ app/services/ai_plan_service.py
 app/services/alert_service.py
 app/services/announcement_service.py
 app/services/api_key_service.py
+app/services/async_isolated.py
 app/services/auth_service.py
 app/services/bank_account_service.py
 app/services/bom_service.py
@@ -340,6 +346,7 @@ app/services/file_storage_share_service.py
 app/services/general_ledger_service.py
 app/services/invoice_product_price_sync_service.py
 app/services/invoice_service.py
+app/services/invoice_warehouse_bulk_service.py
 app/services/job_manager.py
 app/services/journal_ledger_service.py
 app/services/kardex_service.py
@@ -354,6 +361,7 @@ app/services/opening_balance_service.py
 app/services/otp_login_service.py
 app/services/password_reset_otp_service.py
 app/services/payment_service.py
+app/services/person_group_service.py
 app/services/person_service.py
 app/services/person_share_link_service.py
 app/services/petty_cash_service.py
@@ -402,9 +410,11 @@ app/services/template_builder_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
 app/services/wallet_service.py
+app/services/warehouse_postal_label_service.py
 app/services/warehouse_reports_service.py
 app/services/warehouse_service.py
 app/services/warranty_service.py
+app/services/ws_api_key_handshake.py
 app/services/year_end_closing_service.py
 app/services/zohal_service.py
 app/services/ai/__init__.py
@@ -441,12 +451,17 @@ app/services/voice/vad.py
 app/services/workflow/__init__.py
 app/services/workflow/action_registry.py
 app/services/workflow/logging_decorators.py
+app/services/workflow/schedule_cron_resolution.py
 app/services/workflow/trigger_registry.py
 app/services/workflow/workflow_background_jobs.py
 app/services/workflow/workflow_engine.py
+app/services/workflow/workflow_entity_validation.py
+app/services/workflow/workflow_marketplace_service.py
+app/services/workflow/workflow_trigger_enrichment.py
 app/services/workflow/workflow_trigger_service.py
 app/services/workflow/actions/__init__.py
 app/services/workflow/actions/ai_agent_action.py
+app/services/workflow/actions/backup_action.py
 app/services/workflow/actions/communication_actions.py
 app/services/workflow/actions/crm_actions.py
 app/services/workflow/actions/document_actions.py
@@ -488,8 +503,13 @@ migrations/versions/20260415_000002_crm_activity_lead_and_indexes.py
 migrations/versions/20260415_000003_business_ftp_backup_settings.py
 migrations/versions/20260416_000001_add_use_sftp_business_ftp_backup.py
 migrations/versions/20260416_000002_crm_notes_calendar.py
+migrations/versions/20260416_000003_business_inventory_negative_policy.py
+migrations/versions/20260416_000004_person_name_prefix_legal_entity.py
+migrations/versions/20260417_000001_person_groups.py
+migrations/versions/20260417_000002_workflow_marketplace.py
 tests/__init__.py
 tests/test_health.py
+tests/test_invoice_profit_costing.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
