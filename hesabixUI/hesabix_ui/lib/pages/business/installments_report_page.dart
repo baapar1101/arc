@@ -41,27 +41,31 @@ class _SummaryTile {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.title, required this.value});
+  const _SummaryCard({required this.title, required this.value, this.compact = false});
 
   final String title;
   final String value;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 170,
+      width: compact ? 148 : 170,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
+            maxLines: compact ? 2 : null,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: (compact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -90,6 +94,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   String? _bucket;
   final TextEditingController _minOverdueController = TextEditingController();
   List<Map<String, dynamic>> _groupedItems = <Map<String, dynamic>>[];
+
+  static const double _mobileBreakpoint = 600;
+
+  bool _isMobileWidth(double w) => w < _mobileBreakpoint;
 
   String? _extractFilenameFromContentDisposition(String? contentDisposition) {
     if (contentDisposition == null || contentDisposition.trim().isEmpty) return null;
@@ -279,6 +287,171 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     ];
   }
 
+  Widget _kvLine(String label, String value, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+            ),
+          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
+        ],
+      ),
+    );
+  }
+
+  Widget _installmentPaymentsContent(AppLocalizations t, ThemeData theme, Map<String, dynamic> it) {
+    final pays = (it['payments'] as List?) ?? const [];
+    final stRow = it['status']?.toString();
+    final paidRow = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+    final paidEvidence = paidRow > 0.009 || stRow == 'partial' || stRow == 'paid';
+    if (pays.isEmpty && paidEvidence) {
+      return Text(t.installmentsPaymentsDetailMissing, style: theme.textTheme.bodySmall);
+    }
+    if (pays.isEmpty) {
+      return Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: pays.map((p) {
+        final pm = p is Map<String, dynamic> ? p : <String, dynamic>{};
+        final code = pm['document_code']?.toString() ?? '';
+        final d = pm['document_date']?.toString() ?? '';
+        final amt = _formatNumber(pm['amount']);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text('$code • $d • $amt', style: theme.textTheme.bodySmall),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildScheduleNarrowCard(AppLocalizations t, ThemeData theme, Map<String, dynamic> it) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '#${it['seq']?.toString() ?? '-'}',
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                _buildStatusChip(it['status']?.toString(), t, theme),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _kvLine(t.installmentsTableDueDate, _formatDateValue(it, 'due_date'), theme),
+            _kvLine(t.installmentsTableTotal, _formatNumber(it['total']), theme),
+            _kvLine(t.installmentsTablePaid, _formatNumber(it['paid_amount']), theme),
+            _kvLine(t.installmentsTableRemaining, _formatNumber(it['remaining']), theme),
+            const SizedBox(height: 8),
+            Text(t.installmentsPaymentsColumn, style: theme.textTheme.labelSmall),
+            const SizedBox(height: 4),
+            _installmentPaymentsContent(t, theme, it),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortfolioCard(AppLocalizations t, Map<String, dynamic> row) {
+    final theme = Theme.of(context);
+    final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openInstallmentDetail(invId),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      row['invoice_code']?.toString() ?? '-',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusChip(row['worst_status']?.toString(), t, theme),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _kvLine(t.installmentsTablePerson, row['person_name']?.toString() ?? '-', theme),
+              if ((row['person_mobile']?.toString() ?? '').isNotEmpty)
+                _kvLine(t.installmentsTableMobile, row['person_mobile']?.toString() ?? '-', theme),
+              _kvLine(t.installmentsGroupedNextDue, _formatDateValue(row, 'next_due_date'), theme),
+              _kvLine(t.installmentsGroupedInstallments, row['installment_count']?.toString() ?? '-', theme),
+              _kvLine(t.installmentsGroupedPaidCount, row['paid_installment_count']?.toString() ?? '-', theme),
+              _kvLine(t.installmentsGroupedOverdueCount, row['overdue_installment_count']?.toString() ?? '-', theme),
+              const SizedBox(height: 4),
+              Text(
+                '${t.installmentsGroupedRemainingSum}: ${_formatNumber(row['remaining_sum'])}',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlatInstallmentCard(AppLocalizations t, Map<String, dynamic> row) {
+    final theme = Theme.of(context);
+    final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openInstallmentDetail(invId),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${row['invoice_code']?.toString() ?? '-'} · ${t.installmentsTableInstallment} ${row['seq']?.toString() ?? '-'}',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  _buildStatusChip(row['status']?.toString(), t, theme),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _kvLine(t.installmentsTablePerson, row['person_name']?.toString() ?? '-', theme),
+              if ((row['person_mobile']?.toString() ?? '').isNotEmpty)
+                _kvLine(t.installmentsTableMobile, row['person_mobile']?.toString() ?? '-', theme),
+              _kvLine(t.installmentsTableDueDate, _formatDateValue(row, 'due_date'), theme),
+              _kvLine(t.installmentsTablePrincipal, _formatNumber(row['principal']), theme),
+              _kvLine(t.installmentsTableInterest, _formatNumber(row['interest']), theme),
+              _kvLine(t.installmentsTableTotal, _formatNumber(row['total']), theme),
+              _kvLine(t.installmentsTablePaid, _formatNumber(row['paid_amount']), theme),
+              _kvLine(t.installmentsTableRemaining, _formatNumber(row['remaining']), theme),
+              _kvLine(t.installmentsTableLateFee, _formatNumber(row['late_fee_amount']), theme),
+              _kvLine(t.installmentsTableOverdueDays, row['overdue_days']?.toString() ?? '-', theme),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   DataRow _buildDataRow(Map<String, dynamic> row, AppLocalizations t, ThemeData theme) {
     final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
     return DataRow(
@@ -368,12 +541,80 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     return value.toString();
   }
 
-  Widget _buildPagination(AppLocalizations t) {
+  Widget _buildPagination(AppLocalizations t, {bool compact = false}) {
     final total = (_pagination?['total'] as num?)?.toInt() ??
         (_viewPortfolios ? _groupedItems.length : _items.length);
     final totalPages = total == 0 ? 1 : ((total - 1) ~/ _pageSize) + 1;
     final canGoPrev = _currentPage > 1;
     final hasNext = _pagination?['has_next'] == true;
+    final pageSizeDropdown = DropdownButton<int>(
+      value: _pageSize,
+      isExpanded: compact,
+      onChanged: _loading
+          ? null
+          : (value) {
+              if (value == null) return;
+              setState(() {
+                _pageSize = value;
+                _currentPage = 1;
+              });
+              _fetch();
+            },
+      items: _pageSizeOptions
+          .map(
+            (size) => DropdownMenuItem<int>(
+              value: size,
+              child: Text(size.toString()),
+            ),
+          )
+          .toList(),
+    );
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${t.page} $_currentPage / $totalPages',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: !_loading && canGoPrev ? () => _changePage(_currentPage - 1) : null,
+                      icon: const Icon(Icons.chevron_right),
+                      tooltip: t.page,
+                    ),
+                    IconButton(
+                      onPressed: !_loading && hasNext ? () => _changePage(_currentPage + 1) : null,
+                      icon: const Icon(Icons.chevron_left),
+                      tooltip: t.page,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(t.installmentsRowsPerPage, style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                    Expanded(flex: 3, child: pageSizeDropdown),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -382,27 +623,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           const Spacer(),
           Text(t.installmentsRowsPerPage),
           const SizedBox(width: 8),
-          DropdownButton<int>(
-            value: _pageSize,
-            onChanged: _loading
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    setState(() {
-                      _pageSize = value;
-                      _currentPage = 1;
-                    });
-                    _fetch();
-                  },
-            items: _pageSizeOptions
-                .map(
-                  (size) => DropdownMenuItem<int>(
-                    value: size,
-                    child: Text(size.toString()),
-                  ),
-                )
-                .toList(),
-          ),
+          pageSizeDropdown,
           IconButton(
             onPressed: !_loading && canGoPrev ? () => _changePage(_currentPage - 1) : null,
             icon: const Icon(Icons.chevron_right),
@@ -439,7 +660,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     });
   }
 
-  Widget _buildSummary(AppLocalizations t) {
+  Widget _buildSummary(AppLocalizations t, {required bool compact}) {
     final stats = _stats;
     if (stats == null) {
       return const SizedBox.shrink();
@@ -452,6 +673,33 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       _SummaryTile(t.installmentsSummaryRemaining, stats['remaining_total']),
       _SummaryTile(t.installmentsSummaryLateFee, stats['late_fee_total']),
     ];
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: SizedBox(
+              height: 92,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: tiles.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  final tile = tiles[i];
+                  return _SummaryCard(
+                    title: tile.title,
+                    value: _formatNumber(tile.value),
+                    compact: true,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Card(
@@ -516,10 +764,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     await showDialog<void>(
       context: context,
       builder: (ctx) {
+        final dialogW = MediaQuery.sizeOf(ctx).width - 48;
+        final contentWidth = dialogW.clamp(280.0, 720.0);
+        final useNarrowSchedule = dialogW < 520;
         return AlertDialog(
           title: Text(t.installmentsDetailTitle),
           content: SizedBox(
-            width: 720,
+            width: contentWidth,
             child: FutureBuilder<Map<String, dynamic>>(
               future: InvoiceService(apiClient: widget.apiClient).getInstallmentPlan(
                 businessId: widget.businessId,
@@ -541,60 +792,37 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                     children: [
                       SelectableText('${data['invoice_code'] ?? ''}'),
                       const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          showCheckboxColumn: false,
-                          columns: [
-                            DataColumn(label: Text(t.installmentsTableInstallment)),
-                            DataColumn(label: Text(t.installmentsTableDueDate)),
-                            DataColumn(label: Text(t.installmentsTableStatus)),
-                            DataColumn(numeric: true, label: Text(t.installmentsTableTotal)),
-                            DataColumn(numeric: true, label: Text(t.installmentsTablePaid)),
-                            DataColumn(numeric: true, label: Text(t.installmentsTableRemaining)),
-                            DataColumn(label: Text(t.installmentsPaymentsColumn)),
-                          ],
-                          rows: sched.map((it) {
-                            final pays = (it['payments'] as List?) ?? const [];
-                            final stRow = it['status']?.toString();
-                            final paidRow = (it['paid_amount'] as num?)?.toDouble() ?? 0;
-                            final paidEvidence =
-                                paidRow > 0.009 || stRow == 'partial' || stRow == 'paid';
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(it['seq']?.toString() ?? '-')),
-                                DataCell(Text(_formatDateValue(it, 'due_date'))),
-                                DataCell(_buildStatusChip(it['status']?.toString(), t, theme)),
-                                DataCell(Text(_formatNumber(it['total']))),
-                                DataCell(Text(_formatNumber(it['paid_amount']))),
-                                DataCell(Text(_formatNumber(it['remaining']))),
-                                DataCell(
-                                  pays.isEmpty && paidEvidence
-                                      ? Text(
-                                          t.installmentsPaymentsDetailMissing,
-                                          style: theme.textTheme.bodySmall,
-                                        )
-                                      : pays.isEmpty
-                                          ? Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall)
-                                      : Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: pays.map((p) {
-                                            final pm = p is Map<String, dynamic> ? p : <String, dynamic>{};
-                                            final code = pm['document_code']?.toString() ?? '';
-                                            final d = pm['document_date']?.toString() ?? '';
-                                            final amt = _formatNumber(pm['amount']);
-                                            return Padding(
-                                              padding: const EdgeInsets.only(bottom: 4),
-                                              child: Text('$code • $d • $amt', style: theme.textTheme.bodySmall),
-                                            );
-                                          }).toList(),
-                                        ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
+                      if (useNarrowSchedule)
+                        ...sched.map((it) => _buildScheduleNarrowCard(t, theme, it))
+                      else
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            showCheckboxColumn: false,
+                            columns: [
+                              DataColumn(label: Text(t.installmentsTableInstallment)),
+                              DataColumn(label: Text(t.installmentsTableDueDate)),
+                              DataColumn(label: Text(t.installmentsTableStatus)),
+                              DataColumn(numeric: true, label: Text(t.installmentsTableTotal)),
+                              DataColumn(numeric: true, label: Text(t.installmentsTablePaid)),
+                              DataColumn(numeric: true, label: Text(t.installmentsTableRemaining)),
+                              DataColumn(label: Text(t.installmentsPaymentsColumn)),
+                            ],
+                            rows: sched.map((it) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text(it['seq']?.toString() ?? '-')),
+                                  DataCell(Text(_formatDateValue(it, 'due_date'))),
+                                  DataCell(_buildStatusChip(it['status']?.toString(), t, theme)),
+                                  DataCell(Text(_formatNumber(it['total']))),
+                                  DataCell(Text(_formatNumber(it['paid_amount']))),
+                                  DataCell(Text(_formatNumber(it['remaining']))),
+                                  DataCell(_installmentPaymentsContent(t, theme, it)),
+                                ],
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 );
@@ -664,6 +892,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = _isMobileWidth(MediaQuery.sizeOf(context).width);
     return Scaffold(
       appBar: AppBar(
         title: Text(t.installmentsReportTitle),
@@ -676,211 +905,350 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildFilters(t),
-            _buildSummary(t),
-            Expanded(child: _buildTableArea(t)),
-          ],
-        ),
+        child: isMobile
+            ? _buildMobileBody(t)
+            : Column(
+                children: [
+                  _buildFilters(t, compact: false),
+                  _buildSummary(t, compact: false),
+                  Expanded(child: _buildTableArea(t)),
+                ],
+              ),
       ),
     );
   }
 
-  Widget _buildFilters(AppLocalizations t) {
+  Widget _buildMobileBody(AppLocalizations t) {
+    final hasRows = _viewPortfolios ? _groupedItems.isNotEmpty : _items.isNotEmpty;
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _buildFilters(t, compact: true)),
+        SliverToBoxAdapter(child: _buildSummary(t, compact: true)),
+        if (_loading)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          )
+        else if (_viewPortfolios ? _groupedItems.isEmpty : _items.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text(t.noDataFound)),
+          )
+        else if (_viewPortfolios)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final row = _groupedItems[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildPortfolioCard(t, row),
+                  );
+                },
+                childCount: _groupedItems.length,
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final row = _items[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildFlatInstallmentCard(t, row),
+                  );
+                },
+                childCount: _items.length,
+              ),
+            ),
+          ),
+        if (!_loading && hasRows) ...[
+          SliverToBoxAdapter(child: _buildPagination(t, compact: true)),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildViewModeChips(AppLocalizations t) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ChoiceChip(
+          label: Text(t.installmentsViewPortfolios),
+          selected: _viewPortfolios,
+          onSelected: (sel) {
+            if (!sel) return;
+            setState(() {
+              _viewPortfolios = true;
+              _currentPage = 1;
+            });
+            _fetch(resetPage: true);
+          },
+        ),
+        ChoiceChip(
+          label: Text(t.installmentsViewFlat),
+          selected: !_viewPortfolios,
+          onSelected: (sel) {
+            if (!sel) return;
+            setState(() {
+              _viewPortfolios = false;
+              _currentPage = 1;
+            });
+            _fetch(resetPage: true);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterFields(AppLocalizations t, {required bool fullWidth}) {
+    Widget sized(Widget child, double desktopW) {
+      return SizedBox(
+        width: fullWidth ? double.infinity : desktopW,
+        child: child,
+      );
+    }
+
+    final fields = <Widget>[
+      sized(
+        DropdownButtonFormField<int>(
+          value: _selectedFiscalYearId,
+          items: _fiscalYears
+              .map((fy) => DropdownMenuItem<int>(
+                    value: fy['id'] as int?,
+                    child: Text('${fy['title'] ?? ''}'),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _selectedFiscalYearId = v),
+          decoration: InputDecoration(
+            labelText: t.installmentsFiltersFiscalYear,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        220,
+      ),
+      sized(
+        DropdownButtonFormField<String?>(
+          value: _status,
+          items: _statusOptions(t)
+              .map((opt) => DropdownMenuItem<String?>(
+                    value: opt.value,
+                    child: Text(opt.label),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _status = v),
+          decoration: InputDecoration(
+            labelText: t.installmentsFiltersStatus,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        200,
+      ),
+      sized(
+        DropdownButtonFormField<String?>(
+          value: _bucket,
+          items: <DropdownMenuItem<String?>>[
+            DropdownMenuItem<String?>(value: null, child: Text(t.installmentsBucketAll)),
+            DropdownMenuItem<String?>(value: 'unpaid', child: Text(t.installmentsBucketUnpaid)),
+            DropdownMenuItem<String?>(value: 'upcoming', child: Text(t.installmentsBucketUpcoming)),
+            DropdownMenuItem<String?>(value: 'overdue_only', child: Text(t.installmentsBucketOverdueOnly)),
+          ],
+          onChanged: (v) => setState(() => _bucket = v),
+          decoration: InputDecoration(
+            labelText: t.installmentsFiltersBucket,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        220,
+      ),
+      sized(
+        TextFormField(
+          controller: _minOverdueController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: t.installmentsMinOverdueDaysLabel,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        120,
+      ),
+      sized(
+        DateInputField(
+          value: _fromDate,
+          onChanged: (d) => setState(() => _fromDate = d),
+          calendarController: widget.calendarController,
+          labelText: t.installmentsFiltersDueFrom,
+        ),
+        200,
+      ),
+      sized(
+        DateInputField(
+          value: _toDate,
+          onChanged: (d) => setState(() => _toDate = d),
+          calendarController: widget.calendarController,
+          labelText: t.installmentsFiltersDueTo,
+        ),
+        200,
+      ),
+      sized(
+        PersonComboboxWidget(
+          businessId: widget.businessId,
+          selectedPerson: _selectedPerson,
+          onChanged: (p) => setState(() {
+            _selectedPerson = p;
+            _selectedInvoiceId = null;
+            _invoiceController.clear();
+          }),
+          label: t.installmentsFiltersPerson,
+          hintText: t.installmentsFiltersPersonHint,
+        ),
+        240,
+      ),
+      sized(
+        TextFormField(
+          controller: _invoiceController,
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: t.installmentsFiltersInvoice,
+            hintText: t.installmentsFiltersInvoiceHint,
+            border: const OutlineInputBorder(),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_selectedInvoiceId != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: t.clear,
+                    onPressed: _loading ? null : _clearInvoiceSelection,
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  tooltip: t.installmentsFiltersInvoiceButton,
+                  onPressed: _loading ? null : _pickInvoice,
+                ),
+              ],
+            ),
+          ),
+        ),
+        240,
+      ),
+    ];
+
+    if (fullWidth) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < fields.length; i++) ...[
+            fields[i],
+            if (i < fields.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: fields,
+    );
+  }
+
+  Widget _buildFilterActionButtons(AppLocalizations t, {required bool fullWidth}) {
+    final searchBtn = FilledButton.icon(
+      onPressed: _loading ? null : () => _fetch(resetPage: true),
+      icon: const Icon(Icons.search),
+      label: Text(t.search),
+    );
+    final excelBtn = FilledButton.icon(
+      onPressed: _loading ? null : _exportExcel,
+      icon: const Icon(Icons.table_chart),
+      label: Text(t.exportToExcel),
+    );
+    final pdfBtn = FilledButton.icon(
+      onPressed: _loading ? null : _exportPdf,
+      icon: const Icon(Icons.picture_as_pdf),
+      label: Text(t.exportToPdf),
+    );
+    if (fullWidth) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [searchBtn, excelBtn, pdfBtn],
+      );
+    }
+    return Row(
+      children: [
+        searchBtn,
+        const SizedBox(width: 12),
+        excelBtn,
+        const SizedBox(width: 12),
+        pdfBtn,
+      ],
+    );
+  }
+
+  Widget _buildFilters(AppLocalizations t, {required bool compact}) {
+    final desktopBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildViewModeChips(t),
+        const SizedBox(height: 12),
+        _buildFilterFields(t, fullWidth: false),
+        const SizedBox(height: 16),
+        _buildFilterActionButtons(t, fullWidth: false),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        clipBehavior: Clip.antiAlias,
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ChoiceChip(
-                    label: Text(t.installmentsViewPortfolios),
-                    selected: _viewPortfolios,
-                    onSelected: (sel) {
-                      if (!sel) return;
-                      setState(() {
-                        _viewPortfolios = true;
-                        _currentPage = 1;
-                      });
-                      _fetch(resetPage: true);
-                    },
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: _buildViewModeChips(t),
                   ),
-                  ChoiceChip(
-                    label: Text(t.installmentsViewFlat),
-                    selected: !_viewPortfolios,
-                    onSelected: (sel) {
-                      if (!sel) return;
-                      setState(() {
-                        _viewPortfolios = false;
-                        _currentPage = 1;
-                      });
-                      _fetch(resetPage: true);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedFiscalYearId,
-                      items: _fiscalYears
-                          .map((fy) => DropdownMenuItem<int>(
-                                value: fy['id'] as int?,
-                                child: Text('${fy['title'] ?? ''}'),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedFiscalYearId = v),
-                      decoration: InputDecoration(
-                        labelText: t.installmentsFiltersFiscalYear,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 200,
-                    child: DropdownButtonFormField<String?>(
-                      value: _status,
-                      items: _statusOptions(t)
-                          .map((opt) => DropdownMenuItem<String?>(
-                                value: opt.value,
-                                child: Text(opt.label),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _status = v),
-                      decoration: InputDecoration(
-                        labelText: t.installmentsFiltersStatus,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String?>(
-                      value: _bucket,
-                      items: <DropdownMenuItem<String?>>[
-                        DropdownMenuItem<String?>(value: null, child: Text(t.installmentsBucketAll)),
-                        DropdownMenuItem<String?>(value: 'unpaid', child: Text(t.installmentsBucketUnpaid)),
-                        DropdownMenuItem<String?>(value: 'upcoming', child: Text(t.installmentsBucketUpcoming)),
-                        DropdownMenuItem<String?>(value: 'overdue_only', child: Text(t.installmentsBucketOverdueOnly)),
-                      ],
-                      onChanged: (v) => setState(() => _bucket = v),
-                      decoration: InputDecoration(
-                        labelText: t.installmentsFiltersBucket,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 120,
-                    child: TextFormField(
-                      controller: _minOverdueController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: t.installmentsMinOverdueDaysLabel,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 200,
-                    child: DateInputField(
-                      value: _fromDate,
-                      onChanged: (d) => setState(() => _fromDate = d),
-                      calendarController: widget.calendarController,
-                      labelText: t.installmentsFiltersDueFrom,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 200,
-                    child: DateInputField(
-                      value: _toDate,
-                      onChanged: (d) => setState(() => _toDate = d),
-                      calendarController: widget.calendarController,
-                      labelText: t.installmentsFiltersDueTo,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 240,
-                    child: PersonComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedPerson: _selectedPerson,
-                      onChanged: (p) => setState(() {
-                        _selectedPerson = p;
-                        _selectedInvoiceId = null;
-                        _invoiceController.clear();
-                      }),
-                      label: t.installmentsFiltersPerson,
-                      hintText: t.installmentsFiltersPersonHint,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 240,
-                    child: TextFormField(
-                      controller: _invoiceController,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        labelText: t.installmentsFiltersInvoice,
-                        hintText: t.installmentsFiltersInvoiceHint,
-                        border: const OutlineInputBorder(),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_selectedInvoiceId != null)
-                              IconButton(
-                                icon: const Icon(Icons.clear),
-                                tooltip: t.clear,
-                                onPressed: _loading ? null : _clearInvoiceSelection,
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.search),
-                              tooltip: t.installmentsFiltersInvoiceButton,
-                              onPressed: _loading ? null : _pickInvoice,
-                            ),
-                          ],
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      title: Text(t.filtersAndSearch),
+                      initiallyExpanded: false,
+                      childrenPadding: EdgeInsets.zero,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildFilterFields(t, fullWidth: true),
+                              const SizedBox(height: 16),
+                              _buildFilterActionButtons(t, fullWidth: true),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
+              )
+            : Padding(
+                padding: const EdgeInsets.all(16),
+                child: desktopBody,
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  FilledButton.icon(
-                    onPressed: _loading ? null : () => _fetch(resetPage: true),
-                    icon: const Icon(Icons.search),
-                    label: Text(t.search),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : _exportExcel,
-                    icon: const Icon(Icons.table_chart),
-                    label: Text(t.exportToExcel),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : _exportPdf,
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: Text(t.exportToPdf),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1013,7 +1381,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
             return AlertDialog(
               title: Text(t.installmentsInvoicePickerTitle),
               content: SizedBox(
-                width: 520,
+                width: (MediaQuery.sizeOf(ctx).width - 48).clamp(280.0, 520.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
