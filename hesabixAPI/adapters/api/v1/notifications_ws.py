@@ -7,48 +7,65 @@ from adapters.db.session import SessionLocal
 from adapters.db.repositories.api_key_repo import ApiKeyRepository
 from app.core.security import hash_api_key
 from app.services.realtime import realtime_manager
+from app.services.ws_api_key_handshake import (
+	WsAuthClientDisconnected,
+	WsAuthRejected,
+	WsAuthTimeout,
+	close_ws_safe,
+	read_api_key_from_first_text_message,
+)
 from adapters.db.models.user import User
 
 router = APIRouter()
+
+
+def _authenticate_api_key(api_key: str) -> int | None:
+	db: Session = SessionLocal()
+	try:
+		key_hash = hash_api_key(api_key)
+		repo = ApiKeyRepository(db)
+		obj = repo.get_by_hash(key_hash)
+		if not obj or obj.revoked_at is not None:
+			return None
+		user = db.get(User, obj.user_id)
+		if not user or not user.is_active:
+			return None
+		return user.id
+	finally:
+		db.close()
 
 
 @router.websocket("/ws/notifications")
 async def notifications_ws(websocket: WebSocket):
 	"""
 	WebSocket endpoint برای دریافت نوتیفیکیشن‌های لحظه‌ای
-	
-	⚠️ مهم: Session را فقط برای authentication استفاده می‌کنیم و سپس می‌بندیم
-	تا از connection leak جلوگیری کنیم.
+
+	احراز هویت: بلافاصله پس از برقراری TLS، کلاینت باید اولین فریم متنی JSON بفرستد:
+	{"type":"auth","api_key":"..."}
+	قرار دادن api_key در query string پشتیبانی نمی‌شود (در لاگ‌ها و تاریخچه لو می‌رود).
 	"""
-	# Expect query param ?api_key=... with raw value (like normal ApiKey header)
-	api_key = websocket.query_params.get("api_key")
-	if not api_key:
-		await websocket.close(code=4401)
-		return
-	
-	# ایجاد session موقت فقط برای authentication
-	db: Session = SessionLocal()
-	user_id = None
+	await websocket.accept()
 	try:
-		key_hash = hash_api_key(api_key)
-		repo = ApiKeyRepository(db)
-		obj = repo.get_by_hash(key_hash)
-		if not obj or obj.revoked_at is not None:
-			await websocket.close(code=4401)
-			return
-		
-		user = db.get(User, obj.user_id)
-		if not user or not user.is_active:
-			await websocket.close(code=4401)
-			return
-		
-		user_id = user.id
-	finally:
-		# بستن session بلافاصله بعد از authentication
-		db.close()
-	
-	# اتصال WebSocket (بدون session)
-	await realtime_manager.connect(user_id, websocket)
+		api_key = await read_api_key_from_first_text_message(websocket)
+	except WsAuthClientDisconnected:
+		return
+	except WsAuthTimeout:
+		await close_ws_safe(websocket, 4408)
+		return
+	except WsAuthRejected as e:
+		await close_ws_safe(websocket, e.close_code)
+		return
+
+	user_id = _authenticate_api_key(api_key)
+	if user_id is None:
+		await close_ws_safe(websocket, 4401)
+		return
+
+	await realtime_manager.connect(user_id, websocket, already_accepted=True)
+	try:
+		await websocket.send_json({"type": "auth_ok"})
+	except Exception:
+		pass
 	try:
 		while True:
 			# keep connection alive; ignore client messages
@@ -57,5 +74,4 @@ async def notifications_ws(websocket: WebSocket):
 		pass
 	finally:
 		await realtime_manager.disconnect(user_id, websocket)
-
 

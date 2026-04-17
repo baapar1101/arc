@@ -27,6 +27,13 @@ import time
 from app.services.voice.vad import VadEndpointing, VadConfig
 from app.services.voice.stt import WhisperSTT, STTConfig
 from app.services.voice.tts import TTSFactory, TTSConfig, TextChunker
+from app.services.ws_api_key_handshake import (
+	WsAuthClientDisconnected,
+	WsAuthRejected,
+	WsAuthTimeout,
+	close_ws_safe,
+	read_api_key_from_first_text_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +45,20 @@ async def ai_voice_ws(websocket: WebSocket):
 	"""
 	WebSocket دوطرفه برای گفت‌وگوی صوتی با AI.
 
-	- احراز هویت: `?api_key=...`
+	- احراز هویت: اولین پیام JSON روی TLS: {"type":"auth","api_key":"..."} (نه در query)
 	- ورودی صوت: PCM16 (mono, sample_rate=voice_sample_rate_hz) به صورت binary frame
 	- خروجی: JSON event + PCM16 output به صورت binary frame
 	"""
-	api_key = websocket.query_params.get("api_key")
-	if not api_key:
-		await websocket.close(code=4401)
+	await websocket.accept()
+	try:
+		api_key = await read_api_key_from_first_text_message(websocket)
+	except WsAuthClientDisconnected:
+		return
+	except WsAuthTimeout:
+		await close_ws_safe(websocket, 4408)
+		return
+	except WsAuthRejected as e:
+		await close_ws_safe(websocket, e.close_code)
 		return
 
 	# Auth (short DB session)
@@ -56,21 +70,19 @@ async def ai_voice_ws(websocket: WebSocket):
 		repo = ApiKeyRepository(db)
 		obj = repo.get_by_hash(key_hash)
 		if not obj or obj.revoked_at is not None:
-			await websocket.close(code=4401)
+			await close_ws_safe(websocket, 4401)
 			return
 		api_key_id = obj.id
 		user = db.get(User, obj.user_id)
 		if not user or not user.is_active:
-			await websocket.close(code=4401)
+			await close_ws_safe(websocket, 4401)
 			return
 	finally:
 		db.close()
 
-	await websocket.accept()
-
 	settings = get_settings()
 	if not settings.voice_enabled:
-		await websocket.close(code=4403)
+		await close_ws_safe(websocket, 4403)
 		return
 
 	# State

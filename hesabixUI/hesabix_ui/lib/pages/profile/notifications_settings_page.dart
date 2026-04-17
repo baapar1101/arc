@@ -160,7 +160,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     }
   }
 
-  static const String _defaultRealtimeEndpoint = 'wss://api.hesabix.com/ws/notifications?api_key=YOUR_API_KEY';
+  static const String _defaultRealtimeEndpoint = 'wss://api.hesabix.com/ws/notifications';
 
   Future<void> _save(AppLocalizations t) async {
     setState(() => _saving = true);

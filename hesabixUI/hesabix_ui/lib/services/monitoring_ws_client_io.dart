@@ -35,9 +35,10 @@ class MonitoringWebSocketClientIO implements MonitoringWebSocketClient {
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
-      final wsUrl = '$wsBase/api/v1/admin/monitoring/stream?api_key=${authStore.apiKey}';
+      final wsUrl = '$wsBase/api/v1/admin/monitoring/stream';
 
       _socket = await WebSocket.connect(wsUrl);
+      _socket!.add(jsonEncode(<String, String>{'type': 'auth', 'api_key': authStore.apiKey!}));
       _socket!.listen(
         (data) {
           try {

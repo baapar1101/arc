@@ -15,9 +15,10 @@ class MonitoringRealtimeManager:
 		self._connections: Set[WebSocket] = set()
 		self._lock = asyncio.Lock()
 	
-	async def connect(self, websocket: WebSocket) -> None:
+	async def connect(self, websocket: WebSocket, *, already_accepted: bool = False) -> None:
 		"""اتصال یک WebSocket جدید"""
-		await websocket.accept()
+		if not already_accepted:
+			await websocket.accept()
 		async with self._lock:
 			self._connections.add(websocket)
 	

@@ -11,8 +11,9 @@ class RealtimeManager:
 		self._user_sockets: Dict[int, Set[WebSocket]] = {}
 		self._lock = asyncio.Lock()
 
-	async def connect(self, user_id: int, websocket: WebSocket) -> None:
-		await websocket.accept()
+	async def connect(self, user_id: int, websocket: WebSocket, *, already_accepted: bool = False) -> None:
+		if not already_accepted:
+			await websocket.accept()
 		async with self._lock:
 			if user_id not in self._user_sockets:
 				self._user_sockets[user_id] = set()

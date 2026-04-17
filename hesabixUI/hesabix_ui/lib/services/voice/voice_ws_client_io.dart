@@ -46,9 +46,10 @@ class VoiceWsClientIO implements VoiceWsClient {
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
-      final url = '$wsBase/ws/ai/voice?api_key=$apiKey';
+      final url = '$wsBase/ws/ai/voice';
 
       _socket = await WebSocket.connect(url);
+      _socket!.add(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}));
       _reconnectAttempts = 0; // Reset on successful connection
       _socket!.listen(
         (dynamic data) {

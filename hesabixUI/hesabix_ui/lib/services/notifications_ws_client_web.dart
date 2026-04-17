@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:js_interop';
+
 import 'package:web/web.dart' as web;
 import '../config/app_config.dart';
 import 'notifications_ws_client_stub.dart';
@@ -17,13 +18,13 @@ class WebNotificationsWsClient implements NotificationsWsClient {
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
-      final url = '$wsBase/ws/notifications?api_key=$apiKey';
-      
+      final url = '$wsBase/ws/notifications';
+
       _ws = web.WebSocket(url);
-      
-      // Handle open event
+
+      // احراز هویت در اولین فریم متنی (TLS)؛ api_key در URL قرار نمی‌گیرد.
       _ws!.onOpen.listen((web.Event _) {
-        // اتصال با موفقیت برقرار شد (اختیاری: می‌توانید log کنید)
+        _ws!.send(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}).toJS);
       });
       
       // Handle connection errors silently

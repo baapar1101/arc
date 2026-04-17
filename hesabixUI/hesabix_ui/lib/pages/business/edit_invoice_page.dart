@@ -950,7 +950,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     if (_installmentsEditorKey.currentState != null) return;
     final instIdx = 2 + (_shouldShowTransactionsTab ? 1 : 0);
     if (instIdx < 0 || instIdx >= _tabController.length) return;
-    await _tabController.animateTo(instIdx);
+    // TabController.animateTo در این نسخه void است (نه Future).
+    _tabController.animateTo(instIdx);
     if (!mounted) return;
     await Future<void>.delayed(const Duration(milliseconds: 80));
   }

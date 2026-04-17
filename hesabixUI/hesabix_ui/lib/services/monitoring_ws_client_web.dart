@@ -36,10 +36,14 @@ class MonitoringWebSocketClientWeb implements MonitoringWebSocketClient {
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
-      final wsUrl = '$wsBase/api/v1/admin/monitoring/stream?api_key=${authStore.apiKey}';
+      final wsUrl = '$wsBase/api/v1/admin/monitoring/stream';
 
       _socket = web.WebSocket(wsUrl);
-      
+
+      _socket!.onOpen.listen((_) {
+        _socket!.send(jsonEncode(<String, String>{'type': 'auth', 'api_key': authStore.apiKey!}).toJS);
+      });
+
       // Handle connection errors silently
       _socket!.onError.listen((web.Event _) {
         _controller.addError(Exception('WebSocket error'));

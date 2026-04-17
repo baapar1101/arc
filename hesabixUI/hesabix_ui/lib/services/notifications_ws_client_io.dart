@@ -15,9 +15,10 @@ class IoNotificationsWsClient implements NotificationsWsClient {
     final wsBase = apiBase.startsWith('https://')
         ? apiBase.replaceFirst('https://', 'wss://')
         : apiBase.replaceFirst('http://', 'ws://');
-    final url = '$wsBase/ws/notifications?api_key=$apiKey';
+    final url = '$wsBase/ws/notifications';
     try {
       _socket = await WebSocket.connect(url);
+      _socket!.add(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}));
       _socket!.listen((dynamic data) {
         try {
           final Map<String, dynamic> msg = data is String ? jsonDecode(data) as Map<String, dynamic> : <String, dynamic>{};

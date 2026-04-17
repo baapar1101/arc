@@ -48,7 +48,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
-      final url = '$wsBase/ws/ai/voice?api_key=$apiKey';
+      final url = '$wsBase/ws/ai/voice';
 
       final openCompleter = Completer<void>();
       _openCompleter = openCompleter;
@@ -56,6 +56,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
       _ws!.binaryType = 'arraybuffer';
 
       _ws!.onOpen.listen((_) {
+        _ws!.send(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}).toJS);
         _connected = true;
         _reconnectAttempts = 0; // Reset on successful connection
         if (_openCompleter == openCompleter && !openCompleter.isCompleted) {

@@ -218,22 +218,38 @@ async def monitoring_stream(
 ):
 	"""
 	WebSocket endpoint برای دریافت داده‌های لحظه‌ای مانیتورینگ
-	
+
+	احراز هویت: اولین فریم متنی JSON پس از TLS:
+	{"type":"auth","api_key":"..."}
+	(api_key در query string پشتیبانی نمی‌شود.)
+
 	⚠️ مهم: Session را فقط برای authentication و داده‌های اولیه استفاده می‌کنیم
 	و سپس می‌بندیم تا از connection leak جلوگیری کنیم.
 	"""
-	# بررسی احراز هویت از طریق query parameter
-	api_key = websocket.query_params.get("api_key")
-	if not api_key:
-		await websocket.close(code=4401, reason="API key required")
-		return
-	
-	# بررسی صحت API key
 	from adapters.db.repositories.api_key_repo import ApiKeyRepository
 	from app.core.security import hash_api_key
 	from adapters.db.models.user import User
 	from adapters.db.session import SessionLocal
-	
+	from app.services.ws_api_key_handshake import (
+		WsAuthClientDisconnected,
+		WsAuthRejected,
+		WsAuthTimeout,
+		close_ws_safe,
+		read_api_key_from_first_text_message,
+	)
+
+	await websocket.accept()
+	try:
+		api_key = await read_api_key_from_first_text_message(websocket)
+	except WsAuthClientDisconnected:
+		return
+	except WsAuthTimeout:
+		await close_ws_safe(websocket, 4408)
+		return
+	except WsAuthRejected as e:
+		await close_ws_safe(websocket, e.close_code)
+		return
+
 	# ایجاد session موقت فقط برای authentication و داده‌های اولیه
 	db: Session = SessionLocal()
 	user = None
@@ -242,40 +258,40 @@ async def monitoring_stream(
 		repo = ApiKeyRepository(db)
 		obj = repo.get_by_hash(key_hash)
 		if not obj or obj.revoked_at is not None:
-			await websocket.close(code=4401, reason="Invalid API key")
+			await close_ws_safe(websocket, 4401)
 			return
-		
+
 		user = db.get(User, obj.user_id)
 		if not user or not user.is_active:
-			await websocket.close(code=4401, reason="User not found or inactive")
+			await close_ws_safe(websocket, 4401)
 			return
-		
+
 		# بررسی مجوز admin
 		if not (user.app_permissions and ("superadmin" in user.app_permissions or "system_settings" in user.app_permissions)):
-			await websocket.close(code=4403, reason="Permission denied")
+			await close_ws_safe(websocket, 4403)
 			return
-		
+
 		# ارسال داده‌های اولیه قبل از بستن session
 		hardware_service = HardwareMonitoringService(db)
 		service_monitor = ServiceMonitoringService(db)
-		
+
 		try:
 			initial_hardware = hardware_service.get_current_metrics()
 			await monitoring_realtime_manager.broadcast_hardware_metrics(initial_hardware)
-		except:
+		except Exception:
 			pass
-		
+
 		try:
 			initial_services = service_monitor.check_all_services()
 			await monitoring_realtime_manager.broadcast_service_status(initial_services)
-		except:
+		except Exception:
 			pass
 	finally:
 		# بستن session بلافاصله بعد از authentication و داده‌های اولیه
 		db.close()
-	
-	# اتصال WebSocket (بدون session)
-	await monitoring_realtime_manager.connect(websocket)
+
+	# اتصال WebSocket (بدون session؛ accept قبلاً انجام شده)
+	await monitoring_realtime_manager.connect(websocket, already_accepted=True)
 	
 	try:
 		# نگه داشتن اتصال
