@@ -123,8 +123,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     await _ensureCalendarController();
     if (!mounted) return null;
     final useJalali = _calendarController?.isJalali ?? true;
-    const firstDate = DateTime(2000);
-    const lastDate = DateTime(2100);
+    final firstDate = DateTime(2000);
+    final lastDate = DateTime(2100);
     if (useJalali) {
       return showJalaliDatePicker(
         context: pickerContext,
