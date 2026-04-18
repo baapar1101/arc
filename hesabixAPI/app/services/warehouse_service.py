@@ -325,6 +325,14 @@ def create_from_invoice(
 					instance.last_movement_date = invoice.document_date
 					instance_ids.append(instance.id)  # برای ذخیره در خط
 
+		# پیوند به ردیف فاکتور برای شناسایی بهای تمام‌شده قطعی و گزارش‌ها
+		if ln.get("invoice_item_line_id") is not None:
+			try:
+				extra = dict(extra or {})
+				extra["invoice_item_line_id"] = int(ln["invoice_item_line_id"])
+			except Exception:
+				pass
+
 		# اضافه کردن instance_ids به extra_info
 		if instance_ids:
 			extra["instance_ids"] = instance_ids
@@ -1864,6 +1872,19 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 			"warehouse_workflow_inventory_low_failed wh_id=%s err=%s",
 			wh.id,
 			inv_wf_err,
+			exc_info=True,
+		)
+
+	# شناسایی بهای تمام‌شده قطعی روی خطوط فاکتور مبدأ (در صورت تنظیم کسب‌وکار)
+	try:
+		from app.services.invoice_profit_ledger_service import on_warehouse_document_posted
+
+		on_warehouse_document_posted(db, int(wh.id))
+	except Exception as ledger_hook_err:
+		logger.warning(
+			"warehouse_post ledger recognition hook failed wh_id=%s err=%s",
+			getattr(wh, "id", None),
+			ledger_hook_err,
 			exc_info=True,
 		)
 

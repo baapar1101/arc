@@ -517,16 +517,23 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     });
 
     try {
-      await BusinessApiService.createBusiness(_businessData);
-      
+      final created = await BusinessApiService.createBusiness(_businessData);
+
       if (mounted) {
+        final seedFailed = _businessData.includeSampleData &&
+            created.sampleDataSeeded == false &&
+            (created.sampleDataError != null && created.sampleDataError!.isNotEmpty);
         ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
           SnackBar(
-            content: Text(t.businessCreatedSuccessfully),
-            backgroundColor: Colors.green,
+            content: Text(
+              seedFailed
+                  ? '${t.sampleDataSeedWarning}: ${created.sampleDataError}'
+                  : t.businessCreatedSuccessfully,
+            ),
+            backgroundColor: seedFailed ? Colors.deepOrange : Colors.green,
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: seedFailed ? 5 : 2),
           ),
         );
         context.goNamed('profile_businesses');
@@ -1287,6 +1294,26 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     }
                     return null;
                   },
+                ),
+                SizedBox(height: spacing),
+                CheckboxListTile(
+                  value: _businessData.includeSampleData,
+                  onChanged: _isLoading
+                      ? null
+                      : (v) {
+                          setState(() {
+                            _businessData.includeSampleData = v ?? false;
+                          });
+                        },
+                  title: Text(t.includeSampleDataLabel),
+                  subtitle: Text(
+                    t.includeSampleDataSubtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75),
+                        ),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
                 ),
             ],
           ),

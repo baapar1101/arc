@@ -186,6 +186,52 @@ def _normalize_invoice_profit_overhead_type(value: Optional[str]) -> str:
     return overhead_type
 
 
+def _movement_sort_key(mv: Dict[str, Any]) -> Tuple[Any, int, int]:
+    """ترتیب زمانی حرکات؛ در یک روز و یک سند، ترتیب اقلام فاکتور با invoice_item_line_id."""
+    return (
+        mv["document_date"],
+        int(mv["document_id"]),
+        int(mv.get("invoice_item_line_id") or 0),
+    )
+
+
+def _apply_movement_to_layers(mv: Dict[str, Any], layers: deque, *, reverse: bool) -> None:
+    """اعمال یک حرکت in/out روی لایه‌های هزینه (همان منطق FIFO/LIFO انبار دائمی)."""
+    mv_type = mv.get("movement")
+    qty = Decimal(str(mv.get("quantity") or 0))
+    if qty <= 0:
+        return
+
+    if mv_type == "in":
+        layer = {
+            "qty": qty,
+            "cost": Decimal(str(mv.get("cost_price") or 0)),
+        }
+        if reverse:
+            layers.appendleft(layer)
+        else:
+            layers.append(layer)
+        return
+
+    if mv_type == "out":
+        remain = qty
+        while remain > 0 and layers:
+            top = layers[0]
+            take = min(remain, Decimal(str(top.get("qty") or 0)))
+            top["qty"] = Decimal(str(top.get("qty") or 0)) - take
+            remain -= take
+            if top["qty"] <= 0:
+                layers.popleft()
+
+
+def _copy_cost_layers(layers: deque) -> deque:
+    """کپی عمیق لایه‌ها برای محاسبه بهای تمام‌شده بدون تخریب وضعیت."""
+    return deque(
+        {"qty": Decimal(str(top.get("qty") or 0)), "cost": Decimal(str(top.get("cost") or 0))}
+        for top in layers
+    )
+
+
 def _build_cost_layers_from_movements(
     movements: List[Dict[str, Any]],
     *,
@@ -195,42 +241,44 @@ def _build_cost_layers_from_movements(
     ساخت لایه‌های هزینه از حرکات تاریخی واقعی (in/out).
     reverse=False => FIFO ، reverse=True => LIFO
     """
-    # حرکات باید همیشه به‌ترتیب زمانی پردازش شوند تا لایه‌های باقی‌مانده واقعی بمانند.
-    # reverse فقط استراتژی چیدن لایه‌های ورودی را تغییر می‌دهد (FIFO/LIFO).
-    sorted_movements = sorted(
-        movements,
-        key=lambda x: (x["document_date"], x["document_id"]),
-    )
+    sorted_movements = sorted(movements, key=_movement_sort_key)
     layers: deque = deque()
     for mv in sorted_movements:
-        mv_type = mv.get("movement")
-        qty = Decimal(str(mv.get("quantity") or 0))
-        if qty <= 0:
-            continue
-
-        if mv_type == "in":
-            layer = {
-                "qty": qty,
-                "cost": Decimal(str(mv.get("cost_price") or 0)),
-            }
-            if reverse:
-                # در LIFO لایه جدید در ابتدای صف قرار می‌گیرد تا مصرف از جدیدترین باشد.
-                layers.appendleft(layer)
-            else:
-                layers.append(layer)
-            continue
-
-        if mv_type == "out":
-            remain = qty
-            while remain > 0 and layers:
-                top = layers[0]
-                take = min(remain, Decimal(str(top.get("qty") or 0)))
-                top["qty"] = Decimal(str(top.get("qty") or 0)) - take
-                remain -= take
-                if top["qty"] <= 0:
-                    layers.popleft()
-            # کسری تاریخی را به لایه منفی تبدیل نمی‌کنیم تا هزینه غیرواقعی تولید نشود
+        _apply_movement_to_layers(mv, layers, reverse=reverse)
     return layers
+
+
+def _unit_cost_at_target_outbound_line(
+    movements: List[Dict[str, Any]],
+    quantity: Decimal,
+    document_id: int,
+    invoice_item_line_id: int,
+    *,
+    reverse: bool,
+) -> Optional[Decimal]:
+    """
+    بهای تمام‌شده میانگین واحد برای «همان» ردیف خروج، بلافاصله قبل از اعمال آن خروج (FIFO/LIFO دائمی).
+    اگر ردیف در حرکات نباشد یا خروج نباشد → None.
+    """
+    qty = Decimal(str(quantity or 0))
+    if qty <= 0:
+        return Decimal(0)
+
+    sorted_movements = sorted(movements, key=_movement_sort_key)
+    layers: deque = deque()
+    target_mv: Optional[Dict[str, Any]] = None
+    for mv in sorted_movements:
+        if int(mv["document_id"]) == int(document_id) and int(mv.get("invoice_item_line_id") or 0) == int(
+            invoice_item_line_id
+        ):
+            target_mv = mv
+            break
+        _apply_movement_to_layers(mv, layers, reverse=reverse)
+
+    if target_mv is None or target_mv.get("movement") != "out":
+        return None
+
+    return _consume_cost_layers_for_quantity(_copy_cost_layers(layers), qty)
 
 
 def _consume_cost_layers_for_quantity(layers: deque, quantity: Decimal) -> Decimal:
@@ -380,6 +428,31 @@ def _remove_old_invoice_warehouse_documents(
     db.flush()
 
 
+def _persisted_invoice_lines_for_warehouse(db: Session, document_id: int) -> List[Dict[str, Any]]:
+    """
+    اقلام ذخیره‌شده برای ساخت حواله؛ شامل invoice_item_line_id برای پیوند قطعی سود/حواله.
+    """
+    rows = (
+        db.query(InvoiceItemLine)
+        .filter(InvoiceItemLine.document_id == int(document_id))
+        .order_by(InvoiceItemLine.id.asc())
+        .all()
+    )
+    lines_for_wh: List[Dict[str, Any]] = []
+    for row in rows:
+        extra = dict(row.extra_info or {})
+        lines_for_wh.append(
+            {
+                "product_id": row.product_id,
+                "quantity": float(row.quantity),
+                "description": row.description,
+                "extra_info": extra,
+                "invoice_item_line_id": int(row.id),
+            }
+        )
+    return lines_for_wh
+
+
 def _create_warehouse_documents_for_invoice(
     db: Session,
     business_id: int,
@@ -391,6 +464,7 @@ def _create_warehouse_documents_for_invoice(
     """
     ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
     در صورت ایجاد حواله، extra_info.links.warehouse_document_ids روی سند فاکتور به‌روز می‌شود.
+    از اقلام پایدار دیتابیس استفاده می‌شود تا شناسه ردیف فاکتور روی خط حواله ذخیره شود.
     """
     if not bool((document.extra_info or {}).get("post_inventory", True)):
         return []
@@ -401,12 +475,16 @@ def _create_warehouse_documents_for_invoice(
     )
     from adapters.db.models.product_instance import ProductInstance
 
+    lines_for_wh = _persisted_invoice_lines_for_warehouse(db, int(document.id))
+    if not lines_for_wh:
+        return []
+
     created_wh_ids: List[int] = []
     auto_post_warehouse = bool((document.extra_info or {}).get("auto_post_warehouse", False))
 
     if invoice_type == INVOICE_PRODUCTION:
-        out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
-        in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+        out_lines = [ln for ln in lines_for_wh if (ln.get("extra_info") or {}).get("movement") == "out"]
+        in_lines = [ln for ln in lines_for_wh if (ln.get("extra_info") or {}).get("movement") == "in"]
         if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
             wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
             created_wh_ids.append(int(wh_issue.id))
@@ -417,21 +495,21 @@ def _create_warehouse_documents_for_invoice(
             created_wh_ids.append(int(wh_receipt.id))
             if auto_post_warehouse:
                 post_warehouse_document(db, int(wh_receipt.id))
-    elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_input):
+    elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_for_wh):
         if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
             wh_type = "issue"
         elif invoice_type in {INVOICE_PURCHASE, INVOICE_SALES_RETURN}:
             wh_type = "receipt"
         else:
             wh_type = "issue"
-        wh = create_from_invoice(db, business_id, document, lines_input, wh_type, user_id)
+        wh = create_from_invoice(db, business_id, document, lines_for_wh, wh_type, user_id)
         created_wh_ids.append(int(wh.id))
 
         if auto_post_warehouse:
             post_warehouse_document(db, int(wh.id))
 
             if invoice_type == INVOICE_SALES:
-                for line in lines_input:
+                for line in lines_for_wh:
                     instance_id = (line.get("extra_info") or {}).get("instance_id")
                     if instance_id:
                         instance = db.query(ProductInstance).filter(
@@ -1606,6 +1684,7 @@ def _iter_profit_movements_from_invoice_lines(
                 "movement": movement,
                 "quantity": qty,
                 "cost_price": cost_price,
+                "invoice_item_line_id": int(line.id),
             }
         )
     return movements
@@ -1617,10 +1696,14 @@ def _calculate_fifo_cost(
     product_id: int,
     quantity: Decimal,
     as_of_date: date,
-    warehouse_id: Optional[int] = None
+    warehouse_id: Optional[int] = None,
+    *,
+    document_id: Optional[int] = None,
+    invoice_item_line_id: Optional[int] = None,
 ) -> Decimal:
     """
-    محاسبه هزینه با روش FIFO (اول ورود، اول خروج)
+    بهای تمام‌شده میانگین واحد با FIFO دائمی برای همان ردیف فاکتور (بلافاصله پیش از خروج این ردیف).
+    بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
     """
     movements = _iter_profit_movements_from_invoice_lines(
         db=db,
@@ -1629,8 +1712,19 @@ def _calculate_fifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
-    layers = _build_cost_layers_from_movements(movements, reverse=False)
-    return _consume_cost_layers_for_quantity(layers, Decimal(str(quantity or 0)))
+    qty = Decimal(str(quantity or 0))
+    if document_id is not None and invoice_item_line_id is not None:
+        unit = _unit_cost_at_target_outbound_line(
+            movements,
+            qty,
+            int(document_id),
+            int(invoice_item_line_id),
+            reverse=False,
+        )
+        if unit is not None:
+            return unit
+    # ردیف در زنجیره انبار نیست یا شناسه ناقص است → تحلیلی امن
+    return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
 
 
 def _calculate_lifo_cost(
@@ -1639,10 +1733,14 @@ def _calculate_lifo_cost(
     product_id: int,
     quantity: Decimal,
     as_of_date: date,
-    warehouse_id: Optional[int] = None
+    warehouse_id: Optional[int] = None,
+    *,
+    document_id: Optional[int] = None,
+    invoice_item_line_id: Optional[int] = None,
 ) -> Decimal:
     """
-    محاسبه هزینه با روش LIFO (آخر ورود، اول خروج)
+    بهای تمام‌شده میانگین واحد با LIFO دائمی برای همان ردیف فاکتور.
+    بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
     """
     movements = _iter_profit_movements_from_invoice_lines(
         db=db,
@@ -1651,8 +1749,18 @@ def _calculate_lifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
-    layers = _build_cost_layers_from_movements(movements, reverse=True)
-    return _consume_cost_layers_for_quantity(layers, Decimal(str(quantity or 0)))
+    qty = Decimal(str(quantity or 0))
+    if document_id is not None and invoice_item_line_id is not None:
+        unit = _unit_cost_at_target_outbound_line(
+            movements,
+            qty,
+            int(document_id),
+            int(invoice_item_line_id),
+            reverse=True,
+        )
+        if unit is not None:
+            return unit
+    return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
 
 
 def _calculate_weighted_average_cost(
@@ -1702,10 +1810,32 @@ def _get_cost_per_unit_by_basis(
         return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
     
     elif normalized_basis == "fifo":
-        return _calculate_fifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
-    
+        _doc_id = getattr(line, "document_id", None)
+        _line_id = getattr(line, "id", None)
+        return _calculate_fifo_cost(
+            db,
+            business_id,
+            product.id,
+            Decimal(str(line.quantity)),
+            document_date,
+            warehouse_id,
+            document_id=int(_doc_id) if _doc_id is not None else None,
+            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+        )
+
     elif normalized_basis == "lifo":
-        return _calculate_lifo_cost(db, business_id, product.id, Decimal(str(line.quantity)), document_date, warehouse_id)
+        _doc_id = getattr(line, "document_id", None)
+        _line_id = getattr(line, "id", None)
+        return _calculate_lifo_cost(
+            db,
+            business_id,
+            product.id,
+            Decimal(str(line.quantity)),
+            document_date,
+            warehouse_id,
+            document_id=int(_doc_id) if _doc_id is not None else None,
+            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+        )
     
     elif normalized_basis == "weighted_average":
         return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
@@ -1922,9 +2052,27 @@ def _calculate_invoice_profit(
             elif normalized_basis == "average_cost":
                 cost_per_unit = _calculate_average_purchase_cost(db, business_id, product.id, document.document_date)
             elif normalized_basis == "fifo":
-                cost_per_unit = _calculate_fifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
+                cost_per_unit = _calculate_fifo_cost(
+                    db,
+                    business_id,
+                    product.id,
+                    qty,
+                    document.document_date,
+                    warehouse_id,
+                    document_id=int(document.id),
+                    invoice_item_line_id=int(item_line.id),
+                )
             elif normalized_basis == "lifo":
-                cost_per_unit = _calculate_lifo_cost(db, business_id, product.id, qty, document.document_date, warehouse_id)
+                cost_per_unit = _calculate_lifo_cost(
+                    db,
+                    business_id,
+                    product.id,
+                    qty,
+                    document.document_date,
+                    warehouse_id,
+                    document_id=int(document.id),
+                    invoice_item_line_id=int(item_line.id),
+                )
             elif normalized_basis == "weighted_average":
                 cost_per_unit = _calculate_weighted_average_cost(db, business_id, product.id, document.document_date)
             elif normalized_basis == "standard_cost":
@@ -3060,6 +3208,25 @@ def create_invoice(
         except Exception:
             pass
 
+    # شناسایی سود قطعی دفتر وقتی مبنا «فاکتور» است (حواله جداگانه مسیر خود را دارد)
+    if not document.is_proforma:
+        try:
+            from app.services.invoice_profit_ledger_service import on_sales_invoice_document_finalized
+
+            on_sales_invoice_document_finalized(db, int(document.id))
+            db.commit()
+        except Exception as ledger_ex:
+            logger.warning(
+                "invoice profit ledger on create failed doc_id=%s err=%s",
+                document.id,
+                ledger_ex,
+                exc_info=True,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     # فراخوانی workflow triggers برای فاکتور ایجاد شده
     try:
         from app.services.workflow.workflow_trigger_service import (
@@ -3900,6 +4067,19 @@ def update_invoice(
             from app.services.invoice_product_price_sync_service import apply_invoice_product_price_sync
             apply_invoice_product_price_sync(db, _biz_ps_u, document, document.document_type)
 
+    if not document.is_proforma:
+        try:
+            from app.services.invoice_profit_ledger_service import on_sales_invoice_document_finalized
+
+            on_sales_invoice_document_finalized(db, int(document.id))
+        except Exception as ledger_ex:
+            logger.warning(
+                "invoice profit ledger on update failed doc_id=%s err=%s",
+                document.id,
+                ledger_ex,
+                exc_info=True,
+            )
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -4344,7 +4524,7 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     product_lines: List[Dict[str, Any]] = []
     for it in item_rows:
         product = db.query(Product).filter(Product.id == it.product_id).first()
-        product_lines.append({
+        row_dict: Dict[str, Any] = {
             "id": it.id,
             "product_id": it.product_id,
             "product_code": getattr(product, "code", None) if product else None,
@@ -4352,7 +4532,18 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
             "extra_info": it.extra_info,
-        })
+        }
+        if getattr(it, "ledger_unit_cogs", None) is not None:
+            row_dict["ledger_unit_cogs"] = float(it.ledger_unit_cogs)
+        if getattr(it, "ledger_line_cogs", None) is not None:
+            row_dict["ledger_line_cogs"] = float(it.ledger_line_cogs)
+        if getattr(it, "ledger_line_gross_profit", None) is not None:
+            row_dict["ledger_line_gross_profit"] = float(it.ledger_line_gross_profit)
+        if getattr(it, "ledger_recognized_at", None) is not None:
+            row_dict["ledger_recognized_at"] = it.ledger_recognized_at.isoformat()
+        if getattr(it, "ledger_recognition_event", None):
+            row_dict["ledger_recognition_event"] = it.ledger_recognition_event
+        product_lines.append(row_dict)
 
     # سطرهای حسابداری از document_lines خوانده می‌شوند
     acc_rows = db.query(DocumentLine).filter(DocumentLine.document_id == document.id, DocumentLine.account_id != None).all()  # noqa: E711
@@ -4451,7 +4642,20 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             result["total_profit_percent"] = profit_data["total_profit_percent"]
         result["total_overhead"] = profit_data.get("total_overhead", 0.0)
         result["line_profits"] = profit_data.get("line_profits", [])
-    
+        # پس‌زمینه: gross_profit / line_profits = محاسبه تحلیلی زنده (تنظیمات جاری)
+        result["profit_calculation_context"] = "analytical_live"
+
+    # سود و بهای تمام‌شده شناسایی‌شده در دفتر (پس از ذخیره روی خطوط)
+    if business and business.invoice_profit_calculation_method != "disabled":
+        try:
+            from app.services.invoice_profit_ledger_service import build_recognized_profit_summary
+
+            rp = build_recognized_profit_summary(db, document_id=int(document.id))
+            if rp:
+                result["recognized_profit_ledger"] = rp
+        except Exception as e:
+            logger.warning(f"recognized profit summary failed for document {document.id}: {e}")
+
     return result
 
 

@@ -602,6 +602,88 @@ def get_invoice_endpoint(
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
 
+@router.post("/business/{business_id}/backfill-profit-ledger")
+@require_business_access("business_id")
+def backfill_invoice_profit_ledger_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(default_factory=dict),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "edit")),
+) -> Dict[str, Any]:
+    """
+    ذخیرهٔ مقادیر بهای تمام‌شده و سود ناخالص قطعی (دفتر) برای اسناد قبلی،
+    مطابق تنظیم «زمان شناسایی قطعی» روی کسب‌وکار.
+    """
+    from adapters.db.models.business import Business
+
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+
+    if business.invoice_profit_calculation_method == "disabled":
+        return success_response(
+            data={
+                "message": "محاسبه سود برای این کسب و کار غیرفعال است",
+                "processed": 0,
+                "skipped": 0,
+            },
+            request=request,
+            message="PROFIT_CALCULATION_DISABLED",
+        )
+
+    fiscal_year_id = payload.get("fiscal_year_id")
+    invoice_ids = payload.get("invoice_ids")
+    limit = payload.get("limit")
+    use_background = bool(payload.get("use_background", False))
+
+    if use_background:
+        try:
+            from app.core.queue import get_queue_service, QUEUE_DEFAULT
+            from app.services.jobs.invoice_profit_ledger_backfill_job import (
+                backfill_invoice_profit_ledger_job,
+            )
+
+            qs = get_queue_service()
+            if qs and qs.enabled:
+                job = qs.enqueue(
+                    backfill_invoice_profit_ledger_job,
+                    business_id=business_id,
+                    user_id=ctx.get_user_id(),
+                    fiscal_year_id=fiscal_year_id,
+                    invoice_ids=invoice_ids,
+                    limit=limit,
+                    queue_name=QUEUE_DEFAULT,
+                    timeout=7200,
+                    result_ttl=7200,
+                )
+                if job:
+                    return success_response(
+                        data={
+                            "job_id": job.id,
+                            "status": "queued",
+                            "message": "به‌روزرسانی شناسایی قطعی در پس‌زمینه آغاز شد.",
+                        },
+                        request=request,
+                    )
+        except Exception as exc:
+            logger.warning("profit ledger queue failed, fallback sync: %s", exc)
+
+    from app.services.invoice_profit_ledger_service import (
+        backfill_recognized_profit_for_business,
+    )
+
+    result = backfill_recognized_profit_for_business(
+        db,
+        business_id,
+        fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+        invoice_ids=[int(x) for x in invoice_ids] if invoice_ids else None,
+        limit=int(limit) if limit is not None else None,
+    )
+    return success_response(data=result, request=request, message="PROFIT_LEDGER_BACKFILLED")
+
+
 @router.post("/business/{business_id}/recalculate-all-profits")
 @require_business_access("business_id")
 def recalculate_all_invoice_profits_endpoint(

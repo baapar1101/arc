@@ -834,6 +834,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businessBasicInfo => 'Basic Business Information';
 
   @override
+  String get includeSampleDataLabel => 'Add sample data for a quick start';
+
+  @override
+  String get includeSampleDataSubtitle =>
+      'Creates sample customers, product, warehouse, and cash/bank accounts (not used when restoring from a .hbx backup).';
+
+  @override
+  String get sampleDataSeedWarning =>
+      'Business created but sample data could not be completed';
+
+  @override
   String get businessContactInfo => 'Contact Information';
 
   @override
@@ -9265,6 +9276,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmNotesToday => 'Today';
+
+  @override
+  String get crmNotesViewWeek => 'Week';
+
+  @override
+  String get crmNotesViewMonth => 'Month';
+
+  @override
+  String get crmNotesWeekPrev => 'Previous week';
+
+  @override
+  String get crmNotesWeekNext => 'Next week';
+
+  @override
+  String get crmNotesMonthCalendarExpandTitle => 'Full month calendar';
+
+  @override
+  String get crmNotesPickDayTooltip => 'Choose day';
 
   @override
   String get crmNotesDayNotes => 'Notes for this day';

@@ -592,6 +592,10 @@ class BusinessCreateRequest(BaseModel):
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: Optional[bool] = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض (خاموش)")
+	include_sample_data: Optional[bool] = Field(
+		default=False,
+		description="در صورت true، پس از ایجاد کسب‌وکار دادهٔ نمونه (مشتری، کالا، انبار، ...) درج می‌شود؛ فقط برای ایجاد معقول است نه ایمپورت پشتیبان",
+	)
 
 
 class BusinessUpdateRequest(BaseModel):
@@ -619,6 +623,10 @@ class BusinessUpdateRequest(BaseModel):
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد هزینه‌های سربار (0-100) - فقط برای custom_percent")
 	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود: gross (ناخالص), net (خالص), both (هر دو)")
+	invoice_profit_ledger_recognition_basis: Optional[str] = Field(
+		default=None,
+		description="زمان شناسایی بهای تمام‌شده قطعی در دفتر: warehouse_document_posting | sales_invoice_document",
+	)
 	# به‌روزرسانی قیمت پایه کالا از فاکتور قطعی
 	invoice_sync_update_sales_price_enabled: Optional[bool] = Field(
 		default=None,
@@ -724,6 +732,19 @@ class BusinessUpdateRequest(BaseModel):
 			raise ValueError("نوع محاسبه سود نامعتبر است")
 		return value
 
+	@validator("invoice_profit_ledger_recognition_basis")
+	def _validate_invoice_profit_ledger_recognition_basis(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"warehouse_document_posting", "sales_invoice_document"}
+		value = str(v).strip().lower()
+		if value not in allowed:
+			raise ValueError(
+				"مبنای شناسایی قطعی نامعتبر است "
+				"(warehouse_document_posting یا sales_invoice_document)"
+			)
+		return value
+
 
 class BusinessResponse(BaseModel):
 	id: int = Field(..., description="شناسه کسب و کار")
@@ -753,6 +774,10 @@ class BusinessResponse(BaseModel):
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, description="درصد هزینه‌های سربار")
 	invoice_profit_calculation_type: Optional[str] = Field(default=None, description="نوع محاسبه سود")
+	invoice_profit_ledger_recognition_basis: Optional[str] = Field(
+		default=None,
+		description="شناسایی بهای تمام‌شده قطعی دفتر: با حواله یا با فاکتور",
+	)
 	invoice_sync_update_sales_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت فروش از فاکتور")
 	invoice_sync_update_purchase_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت خرید از فاکتور")
 	invoice_sync_sales_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت فروش")

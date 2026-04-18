@@ -633,10 +633,9 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                   ],
                 ),
               ),
-              // Data Table
-              SizedBox(
-                height: MediaQuery.of(context).size.height - 
-                    (_stats != null ? 400 : 200),
+              // جدول؛ اسکرول عمودی با کل صفحه
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: DataTableWidget<Map<String, dynamic>>(
                   config: DataTableConfig<Map<String, dynamic>>(
                     endpoint: '/admin/wallets/payouts/table',

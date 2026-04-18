@@ -774,9 +774,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 400,
-              child: DataTableWidget<Map<String, dynamic>>(
+            DataTableWidget<Map<String, dynamic>>(
                 key: _chargesTableKey,
                 config: DataTableConfig<Map<String, dynamic>>(
                   endpoint: '/api/v1/business/${widget.businessId}/document-monetization/charges/table',
@@ -932,7 +930,6 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                 fromJson: (json) => Map<String, dynamic>.from(json),
                 calendarController: _calendarController,
               ),
-            ),
           ],
         ),
       ),

@@ -282,10 +282,7 @@ class _WalletPageState extends State<WalletPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final double tableHeight = (constraints.maxHeight - 360).clamp(280.0, constraints.maxHeight);
-                    return SingleChildScrollView(
+              : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -383,9 +380,7 @@ class _WalletPageState extends State<WalletPage> {
                           const SizedBox(height: 16),
                           Text(t.walletRecentTransactions, style: theme.textTheme.titleMedium),
                           const SizedBox(height: 8),
-                          SizedBox(
-                            height: tableHeight,
-                            child: DataTableWidget<Map<String, dynamic>>(
+                          DataTableWidget<Map<String, dynamic>>(
                               config: DataTableConfig<Map<String, dynamic>>(
                                 endpoint: '/businesses/${widget.businessId}/wallet/transactions/table',
                                 title: t.walletTransactions,
@@ -471,12 +466,9 @@ class _WalletPageState extends State<WalletPage> {
                               fromJson: (json) => Map<String, dynamic>.from(json),
                               calendarController: _calendarCtrl,
                             ),
-                          ),
                         ],
                       ),
-                    );
-                  },
-                ),
+                    ),
     );
   }
 }

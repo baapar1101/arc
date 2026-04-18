@@ -114,6 +114,51 @@ class DateFormatters {
     return dateData.toString();
   }
 
+  /// زمان نسبی برای چند روز اخیر؛ برای قدیمی‌تر از [relativeDaysThreshold] روز، تاریخ و زمان با تقویم انتخاب‌شده کاربر (شمسی/میلادی).
+  static String formatRelativeOrAbsoluteDateTime(String? dateString, {int relativeDaysThreshold = 7}) {
+    if (dateString == null || dateString.isEmpty) return '-';
+
+    late final DateTime date;
+    try {
+      if (dateString.contains('T') || dateString.contains(' ')) {
+        final normalized = dateString.replaceAll(' ', 'T');
+        if (normalized.endsWith('Z')) {
+          date = DateTime.parse(normalized.substring(0, normalized.length - 1) + '+00:00').toLocal();
+        } else if (!normalized.contains('+') && !normalized.contains('-', 10)) {
+          date = DateTime.parse(normalized + 'Z').toLocal();
+        } else {
+          date = DateTime.parse(normalized).toLocal();
+        }
+      } else {
+        date = DateTime.parse(dateString).toLocal();
+      }
+    } catch (_) {
+      return dateString;
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        if (difference.inMinutes == 0) {
+          return 'همین الان';
+        }
+        return '${difference.inMinutes} دقیقه پیش';
+      }
+      return '${difference.inHours} ساعت پیش';
+    }
+    if (difference.inDays == 1) {
+      return 'دیروز';
+    }
+    if (difference.inDays < relativeDaysThreshold) {
+      return '${difference.inDays} روز پیش';
+    }
+
+    final isJalali = ApiClient.getCalendarController()?.isJalali ?? true;
+    return HesabixDateUtils.formatDateTime(date, isJalali);
+  }
+
   /// Format date only (without time) from server response
   /// Supports user's calendar preference (Jalali/Gregorian)
   static String formatServerDateOnly(dynamic dateData) {

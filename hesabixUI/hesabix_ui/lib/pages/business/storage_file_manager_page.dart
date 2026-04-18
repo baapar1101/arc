@@ -8,6 +8,8 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/utils/date_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// صفحه فایل منیجر برای مدیریت فایل‌های کسب‌وکار
@@ -31,12 +33,26 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
   String? _currentModuleContext; // null = ریشه، مقدار = پوشه فعلی
   bool _uploading = false;
 
+  CalendarController? _calendarController;
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    _calendarController = ApiClient.getCalendarController();
+    _calendarController?.addListener(_onCalendarChanged);
     _storageService = BusinessStorageService(ApiClient());
     _load();
     _checkAndShowHelp();
+  }
+
+  @override
+  void dispose() {
+    _calendarController?.removeListener(_onCalendarChanged);
+    super.dispose();
   }
 
   Future<void> _checkAndShowHelp() async {
@@ -886,6 +902,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     final fileSize = file['file_size'] as int? ?? 0;
     final mimeType = file['mime_type'] as String?;
     final fileId = file['id'] as String;
+    final createdAt = file['created_at'] as String?;
     final isImage = _isImage(mimeType);
 
     return InkWell(
@@ -945,6 +962,19 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
                       fontSize: 10,
                     ),
                   ),
+                  if (createdAt != null && createdAt.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormatters.formatRelativeOrAbsoluteDateTime(createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                        fontSize: 9,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
               ),
             ),

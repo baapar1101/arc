@@ -297,8 +297,24 @@ def create_business(
             logger = structlog.get_logger()
             logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
 
-    # تبدیل به response format
-    return _business_to_dict(created_business)
+    # تبدیل به response format (+ دادهٔ نمونه در صورت درخواست)
+    result = _business_to_dict(created_business)
+    want_sample = bool(getattr(business_data, "include_sample_data", False))
+    if want_sample and not defer_commit:
+        try:
+            from app.services.business_sample_data_service import seed_sample_data_for_new_business
+
+            seed_sample_data_for_new_business(db, created_business.id, owner_id)
+            result["sample_data_seeded"] = True
+        except Exception as e:
+            logger.exception(
+                "sample_data_seed_failed",
+                business_id=created_business.id,
+                error=str(e),
+            )
+            result["sample_data_seeded"] = False
+            result["sample_data_error"] = str(e)
+    return result
 
 
 def get_business_by_id(db: Session, business_id: int, owner_id: int) -> Optional[Dict[str, Any]]:
@@ -1333,6 +1349,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_profit_overhead_type": getattr(business, "invoice_profit_overhead_type", None),
         "invoice_profit_overhead_percent": float(business.invoice_profit_overhead_percent) if getattr(business, "invoice_profit_overhead_percent", None) is not None else None,
         "invoice_profit_calculation_type": getattr(business, "invoice_profit_calculation_type", None),
+        "invoice_profit_ledger_recognition_basis": getattr(
+            business, "invoice_profit_ledger_recognition_basis", None
+        ),
         "invoice_sync_update_sales_price_enabled": bool(getattr(business, "invoice_sync_update_sales_price_enabled", False)),
         "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),
         "invoice_sync_sales_price_basis": getattr(business, "invoice_sync_sales_price_basis", None),

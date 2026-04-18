@@ -834,6 +834,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessBasicInfo => 'اطلاعات پایه کسب و کار';
 
   @override
+  String get includeSampleDataLabel => 'افزودن دادهٔ نمونه برای شروع سریع';
+
+  @override
+  String get includeSampleDataSubtitle =>
+      'مشتری، کالا، انبار و حساب‌های نمونه ایجاد می‌شود (با بازیابی فایل .hbx اعمال نمی‌شود).';
+
+  @override
+  String get sampleDataSeedWarning =>
+      'کسب‌وکار ایجاد شد اما دادهٔ نمونه کامل نشد';
+
+  @override
   String get businessContactInfo => 'اطلاعات تماس';
 
   @override
@@ -9221,6 +9232,24 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmNotesToday => 'امروز';
+
+  @override
+  String get crmNotesViewWeek => 'هفته';
+
+  @override
+  String get crmNotesViewMonth => 'ماه';
+
+  @override
+  String get crmNotesWeekPrev => 'هفته قبل';
+
+  @override
+  String get crmNotesWeekNext => 'هفته بعد';
+
+  @override
+  String get crmNotesMonthCalendarExpandTitle => 'تقویم کامل ماه';
+
+  @override
+  String get crmNotesPickDayTooltip => 'انتخاب روز';
 
   @override
   String get crmNotesDayNotes => 'یادداشت‌های این روز';

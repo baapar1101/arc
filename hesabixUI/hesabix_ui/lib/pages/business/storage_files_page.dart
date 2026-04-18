@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
+import 'package:hesabix_ui/utils/date_formatters.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
@@ -56,9 +58,17 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   // Selection for bulk operations
   Set<String> _selectedFileIds = {};
 
+  CalendarController? _calendarController;
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    _calendarController = ApiClient.getCalendarController();
+    _calendarController?.addListener(_onCalendarChanged);
     _apiClient = ApiClient();
     _storageService = BusinessStorageService(_apiClient);
     _tabController = TabController(length: 3, vsync: this);
@@ -83,6 +93,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   
   @override
   void dispose() {
+    _calendarController?.removeListener(_onCalendarChanged);
     _tabController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -1453,7 +1464,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                             _buildFileInfoRow(
                               theme,
                               Icons.calendar_today_rounded,
-                              _formatDate(createdAt),
+                              DateFormatters.formatRelativeOrAbsoluteDateTime(createdAt),
                             ),
                           ],
                         ],
@@ -1517,33 +1528,6 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         ),
       ],
     );
-  }
-
-  String _formatDate(String? dateString) {
-    if (dateString == null || dateString.isEmpty) return '-';
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-      
-      if (difference.inDays == 0) {
-        if (difference.inHours == 0) {
-          if (difference.inMinutes == 0) {
-            return 'همین الان';
-          }
-          return '${difference.inMinutes} دقیقه پیش';
-        }
-        return '${difference.inHours} ساعت پیش';
-      } else if (difference.inDays == 1) {
-        return 'دیروز';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays} روز پیش';
-      } else {
-        return '${date.year}/${date.month}/${date.day}';
-      }
-    } catch (e) {
-      return dateString;
-    }
   }
 
   Widget _buildPlansTab(ThemeData theme) {

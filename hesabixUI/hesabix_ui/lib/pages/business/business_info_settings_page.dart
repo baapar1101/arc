@@ -56,6 +56,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   final _invoiceProfitOverheadPercentController = TextEditingController();
   String? _invoiceProfitCalculationType;
   bool _recalculatingProfits = false;
+  String? _invoiceProfitLedgerRecognitionBasis;
+  bool _backfillingProfitLedger = false;
 
   // همگام‌سازی قیمت پایه کالا از فاکتور قطعی (ارز کالا = ارز پیش‌فرض کسب‌وکار)
   bool _invoiceSyncUpdateSalesPriceEnabled = false;
@@ -140,6 +142,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceProfitOverheadType = resp.invoiceProfitOverheadType ?? 'none';
       _invoiceProfitOverheadPercentController.text = (resp.invoiceProfitOverheadPercent ?? 0).toStringAsFixed(2);
       _invoiceProfitCalculationType = resp.invoiceProfitCalculationType ?? 'gross';
+      _invoiceProfitLedgerRecognitionBasis =
+          resp.invoiceProfitLedgerRecognitionBasis ?? 'warehouse_document_posting';
       _invoiceSyncUpdateSalesPriceEnabled = resp.invoiceSyncUpdateSalesPriceEnabled;
       _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
@@ -262,6 +266,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceProfitCalculationType != null && _invoiceProfitCalculationType != orig.invoiceProfitCalculationType) {
       payload['invoice_profit_calculation_type'] = _invoiceProfitCalculationType;
+    }
+    final origLedgerBasis =
+        orig.invoiceProfitLedgerRecognitionBasis ?? 'warehouse_document_posting';
+    if (_invoiceProfitLedgerRecognitionBasis != null &&
+        _invoiceProfitLedgerRecognitionBasis != origLedgerBasis) {
+      payload['invoice_profit_ledger_recognition_basis'] = _invoiceProfitLedgerRecognitionBasis;
     }
     if (_invoiceSyncUpdateSalesPriceEnabled != orig.invoiceSyncUpdateSalesPriceEnabled) {
       payload['invoice_sync_update_sales_price_enabled'] = _invoiceSyncUpdateSalesPriceEnabled;
@@ -1056,6 +1066,31 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   });
                 },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _invoiceProfitLedgerRecognitionBasis,
+                decoration: const InputDecoration(
+                  labelText: 'شناسایی بهای تمام‌شده قطعی (دفتر)',
+                  helperText:
+                      '«تحلیلی» در gross_profit همیشه با تنظیمات جاری محاسبه می‌شود؛ این گزینه تعیین می‌کند ثبت قطعی روی خط فاکتور چه زمانی انجام شود.',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'warehouse_document_posting',
+                    child: Text('هنگام قطعی شدن حواله انبار مرتبط با فاکتور'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'sales_invoice_document',
+                    child: Text('هنگام ثبت فاکتور قطعی (بدون انتظار برای حواله)'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _invoiceProfitLedgerRecognitionBasis = value;
+                  });
+                },
+              ),
               // شامل کردن هزینه‌های سربار
               if (_invoiceProfitCalculationType != null && _invoiceProfitCalculationType != 'gross') ...[
                 const SizedBox(height: 16),
@@ -1187,6 +1222,34 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                         label: Text(_recalculatingProfits ? 'در حال به‌روزرسانی...' : 'به‌روزرسانی سود تمام فاکتورها'),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(double.infinity, 48),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _backfillingProfitLedger ? null : _backfillProfitLedgerForOldDocuments,
+                        icon: _backfillingProfitLedger
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.savings_outlined),
+                        label: Text(
+                          _backfillingProfitLedger
+                              ? 'در حال ثبت مقادیر قطعی...'
+                              : 'ثبت بهای تمام‌شده قطعی برای اسناد قبلی',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'دکمه بالا مقادیر ledger_* را برای فاکتورهای قطعی قبلی ذخیره می‌کند '
+                        '(بر اساس مبنای انتخاب‌شده و وجود حواله قطعی در صورت نیاز).',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -1352,6 +1415,55 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _backfillProfitLedgerForOldDocuments() async {
+    if (_backfillingProfitLedger) return;
+
+    setState(() {
+      _backfillingProfitLedger = true;
+    });
+
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/invoices/business/${widget.businessId}/backfill-profit-ledger',
+        data: <String, dynamic>{
+          'use_background': false,
+        },
+      );
+
+      final data = response.data?['data'] as Map<String, dynamic>?;
+
+      if (!mounted) return;
+
+      if (data != null && data['job_id'] != null) {
+        SnackBarHelper.show(
+          context,
+          message: 'ثبت مقادیر قطعی در پس‌زمینه آغاز شد.',
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        final processed = data?['processed'] as int? ?? 0;
+        final skipped = data?['skipped'] as int? ?? 0;
+        SnackBarHelper.show(
+          context,
+          message: 'ثبت قطعی انجام شد: $processed فاکتور پردازش شد، $skipped رد شد.',
+          duration: const Duration(seconds: 5),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در ثبت بهای قطعی: $e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _backfillingProfitLedger = false;
+        });
+      }
+    }
   }
 
   Future<void> _recalculateAllProfits() async {

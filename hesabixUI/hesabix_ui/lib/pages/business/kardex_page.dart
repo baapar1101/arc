@@ -378,6 +378,7 @@ class _KardexPageState extends State<KardexPage> {
       reportSubtype: 'list',
       title: t.kardexDocuments,
       showRowNumbers: true,
+      expandBodyHeightToFitRows: true,
       columns: [
         DateColumn(
           'document_date',
@@ -1279,21 +1280,13 @@ class _KardexPageState extends State<KardexPage> {
   }
 
   Widget _buildTableArea(AppLocalizations t) {
-    final screenH = MediaQuery.of(context).size.height;
-    // حداقل ارتفاع مناسب برای جدول؛ اگر فضا کمتر بود، صفحه اسکرول می‌خورد
-    final tableHeight = screenH - 280.0; // تقریبی با احتساب فیلترها و پدینگ
-    final effectiveHeight = tableHeight < 420 ? 420.0 : tableHeight;
-    _log('Building table area with height=' + effectiveHeight.toString());
-    return SizedBox(
-      height: effectiveHeight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-        child: DataTableWidget<Map<String, dynamic>>(
-          key: _tableKey,
-          config: _buildTableConfig(t),
-          fromJson: (json) => Map<String, dynamic>.from(json as Map),
-          calendarController: widget.calendarController,
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      child: DataTableWidget<Map<String, dynamic>>(
+        key: _tableKey,
+        config: _buildTableConfig(t),
+        fromJson: (json) => Map<String, dynamic>.from(json as Map),
+        calendarController: widget.calendarController,
       ),
     );
   }

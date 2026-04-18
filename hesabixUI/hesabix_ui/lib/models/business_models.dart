@@ -53,6 +53,9 @@ class BusinessData {
   int? defaultCurrencyId;
   List<int> currencyIds;
 
+  /// دادهٔ نمونه همراه ایجاد کسب‌وکار (فقط مسیر فرم؛ ایمپورت .hbx این فیلد را ندارد)
+  bool includeSampleData;
+
   BusinessData({
     this.name = '',
     this.businessType,
@@ -70,6 +73,7 @@ class BusinessData {
     List<FiscalYearData>? fiscalYears,
     this.defaultCurrencyId,
     List<int>? currencyIds,
+    this.includeSampleData = false,
   })  : fiscalYears = fiscalYears ?? <FiscalYearData>[],
         currencyIds = currencyIds ?? <int>[];
 
@@ -93,6 +97,7 @@ class BusinessData {
       'fiscal_years': fiscalYears.map((e) => e.toJson()).toList(),
       'default_currency_id': defaultCurrencyId,
       'currency_ids': _buildCurrencyIdsPayload(),
+      'include_sample_data': includeSampleData,
     };
   }
 
@@ -121,6 +126,7 @@ class BusinessData {
     List<FiscalYearData>? fiscalYears,
     int? defaultCurrencyId,
     List<int>? currencyIds,
+    bool? includeSampleData,
   }) {
     return BusinessData(
       name: name ?? this.name,
@@ -139,6 +145,7 @@ class BusinessData {
       fiscalYears: fiscalYears ?? this.fiscalYears,
       defaultCurrencyId: defaultCurrencyId ?? this.defaultCurrencyId,
       currencyIds: currencyIds ?? this.currencyIds,
+      includeSampleData: includeSampleData ?? this.includeSampleData,
     );
   }
 
@@ -358,6 +365,8 @@ class BusinessResponse {
   final String? invoiceProfitOverheadType;
   final double? invoiceProfitOverheadPercent;
   final String? invoiceProfitCalculationType;
+  /// زمان شناسایی بهای تمام‌شده قطعی در دفتر (با ISO API هم‌نام)
+  final String? invoiceProfitLedgerRecognitionBasis;
   final bool invoiceSyncUpdateSalesPriceEnabled;
   final bool invoiceSyncUpdatePurchasePriceEnabled;
   final String? invoiceSyncSalesPriceBasis;
@@ -379,6 +388,8 @@ class BusinessResponse {
   final String? autoDeleteAt;
   final bool isDeleted;
   final bool isDeletionPending;
+  final bool? sampleDataSeeded;
+  final String? sampleDataError;
 
   BusinessResponse({
     required this.id,
@@ -406,6 +417,7 @@ class BusinessResponse {
     this.invoiceProfitOverheadType,
     this.invoiceProfitOverheadPercent,
     this.invoiceProfitCalculationType,
+    this.invoiceProfitLedgerRecognitionBasis,
     this.invoiceSyncUpdateSalesPriceEnabled = false,
     this.invoiceSyncUpdatePurchasePriceEnabled = false,
     this.invoiceSyncSalesPriceBasis,
@@ -422,6 +434,8 @@ class BusinessResponse {
     this.autoDeleteAt,
     this.isDeleted = false,
     this.isDeletionPending = false,
+    this.sampleDataSeeded,
+    this.sampleDataError,
   });
 
   static String _normalizeInvoiceWarehouseReleaseMode(String? raw) {
@@ -457,6 +471,9 @@ class BusinessResponse {
       invoiceProfitOverheadType: json['invoice_profit_overhead_type'] as String?,
       invoiceProfitOverheadPercent: (json['invoice_profit_overhead_percent'] as num?)?.toDouble(),
       invoiceProfitCalculationType: json['invoice_profit_calculation_type'] as String?,
+      invoiceProfitLedgerRecognitionBasis:
+          (json['invoice_profit_ledger_recognition_basis'] as String?) ??
+              'warehouse_document_posting',
       invoiceSyncUpdateSalesPriceEnabled:
           (json['invoice_sync_update_sales_price_enabled'] as bool?) ?? false,
       invoiceSyncUpdatePurchasePriceEnabled:
@@ -478,6 +495,8 @@ class BusinessResponse {
       autoDeleteAt: json['auto_delete_at'] as String?,
       isDeleted: (json['is_deleted'] as bool?) ?? false,
       isDeletionPending: (json['is_deletion_pending'] as bool?) ?? false,
+      sampleDataSeeded: json['sample_data_seeded'] as bool?,
+      sampleDataError: json['sample_data_error'] as String?,
     );
   }
 

@@ -143,10 +143,18 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
+                  child: Scrollbar(
+                    thumbVisibility: false,
+                    thickness: 4,
+                    radius: const Radius.circular(4),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      primary: false,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
                         Padding(
                           padding: const EdgeInsetsDirectional.only(end: 6),
                           child: FilterChip(
@@ -186,6 +194,7 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                           ),
                         ),
                       ],
+                      ),
                     ),
                   ),
                 ),
@@ -193,10 +202,18 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
             ),
             if (path != null && path.isNotEmpty) ...[
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
+              Scrollbar(
+                thumbVisibility: false,
+                thickness: 4,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  primary: false,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                     TextButton(
                       onPressed: () => widget.onCategoryChanged(null),
                       child: Text(t.all),
@@ -244,6 +261,7 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                         ),
                     ],
                   ],
+                  ),
                 ),
               ),
             ],
@@ -259,10 +277,18 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                 ),
               ),
               const SizedBox(height: 4),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
+              Scrollbar(
+                thumbVisibility: false,
+                thickness: 4,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  primary: false,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                     for (final c in childLevel)
                       Padding(
                         padding: const EdgeInsetsDirectional.only(end: 6),
@@ -278,6 +304,7 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                         ),
                       ),
                   ],
+                  ),
                 ),
               ),
             ],

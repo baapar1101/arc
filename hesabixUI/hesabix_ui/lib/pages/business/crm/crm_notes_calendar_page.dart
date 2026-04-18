@@ -12,6 +12,8 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
+enum _CalViewMode { week, month }
+
 /// تقویم یادداشت‌های CRM با هماهنگی شمسی/میلادی اپ و API
 class CrmNotesCalendarPage extends StatefulWidget {
   final int businessId;
@@ -30,6 +32,8 @@ class CrmNotesCalendarPage extends StatefulWidget {
 }
 
 class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
+  static const double _kNarrowBreakpoint = 560;
+
   final CrmService _crm = CrmService(apiClient: ApiClient());
   late DateTime _monthStartLocal;
 
@@ -40,10 +44,72 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
   String? _error;
   DateTime? _selectedDay;
 
+  _CalViewMode _calView = _CalViewMode.week;
+
   static DateTime _onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
 
   static bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// شنبه = ستون اول (با الگوی سربرگ هفته در گرید ماه)
+  DateTime _saturdayWeekStart(DateTime d) {
+    final dt = _onlyDate(d);
+    final wd = dt.weekday;
+    final fromSat = (wd + 1) % 7;
+    return dt.subtract(Duration(days: fromSat));
+  }
+
+  void _onSelectDay(DateTime day) {
+    final n = _onlyDate(day);
+    final monthChanged = _monthStartLocal.year != n.year || _monthStartLocal.month != n.month;
+    setState(() {
+      _selectedDay = n;
+      if (monthChanged) {
+        _monthStartLocal = _firstOfMonth(n);
+      }
+    });
+    if (monthChanged) {
+      _loadMonth();
+    }
+  }
+
+  void _shiftWeek(int delta) {
+    final base = _selectedDay ?? DateTime.now();
+    final nw = base.add(Duration(days: 7 * delta));
+    _onSelectDay(nw);
+  }
+
+  Future<void> _pickDay() async {
+    final isJ = widget.calendarController.isJalali;
+    DateTime? picked;
+    if (isJ) {
+      picked = await showJalaliDatePicker(
+        context: context,
+        initialDate: _selectedDay ?? DateTime.now(),
+        firstDate: DateTime(DateTime.now().year - 5),
+        lastDate: DateTime(DateTime.now().year + 5),
+      );
+    } else {
+      picked = await showDatePicker(
+        context: context,
+        initialDate: _selectedDay ?? DateTime.now(),
+        firstDate: DateTime(DateTime.now().year - 5),
+        lastDate: DateTime(DateTime.now().year + 5),
+        locale: const Locale('en', 'GB'),
+      );
+    }
+    if (picked != null && mounted) {
+      _onSelectDay(picked);
+    }
+  }
+
+  String _weekRangeLabel() {
+    final isJ = widget.calendarController.isJalali;
+    final sel = _selectedDay ?? DateTime.now();
+    final start = _saturdayWeekStart(sel);
+    final end = start.add(const Duration(days: 6));
+    return '${HesabixDateUtils.formatForDisplay(start, isJ)} — ${HesabixDateUtils.formatForDisplay(end, isJ)}';
+  }
 
   @override
   void initState() {
@@ -101,8 +167,9 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
 
   void _goToday() {
     setState(() {
-      _monthStartLocal = _firstOfMonth(DateTime.now());
-      _selectedDay = DateTime.now();
+      final now = DateTime.now();
+      _monthStartLocal = _firstOfMonth(now);
+      _selectedDay = _onlyDate(now);
     });
     _loadMonth();
   }
@@ -256,8 +323,11 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
       );
     }
     if (picked != null && mounted) {
-      final month = picked;
-      setState(() => _monthStartLocal = _firstOfMonth(month));
+      final DateTime p = picked;
+      setState(() {
+        _monthStartLocal = _firstOfMonth(p);
+        _selectedDay = _onlyDate(p);
+      });
       _loadMonth();
     }
   }
@@ -454,6 +524,254 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     );
   }
 
+  Widget _buildMonthGrid(
+    BuildContext context, {
+    required int blanks,
+    required int dim,
+    required double aspect,
+    required AppLocalizations t,
+    required ThemeData theme,
+    required ColorScheme cs,
+  }) {
+    final lang = Localizations.localeOf(context).languageCode;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: _weekdayHeaders(lang)
+              .map(
+                (wd) => Expanded(
+                  child: Center(
+                    child: Text(
+                      wd,
+                      style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 11),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 4),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            childAspectRatio: aspect,
+          ),
+          itemCount: blanks + dim,
+          itemBuilder: (context, index) {
+            if (index < blanks) {
+              return const SizedBox.shrink();
+            }
+            final dayNum = index - blanks + 1;
+            final cell = _cellDate(dayNum);
+            final k = _dayKey(cell);
+            final n = _countByDay[k] ?? 0;
+            final sel = _selectedDay != null && _dayKey(_selectedDay!) == k;
+            final isToday = _sameDay(cell, DateTime.now());
+            final isFriday = cell.weekday == DateTime.friday;
+            Color? cellBg;
+            if (sel) {
+              cellBg = cs.primaryContainer.withValues(alpha: 0.5);
+            } else if (isFriday) {
+              cellBg = cs.surfaceContainerHighest.withValues(alpha: 0.4);
+            }
+            final borderColor = isToday ? cs.primary : cs.outlineVariant.withValues(alpha: 0.55);
+            final borderW = isToday ? 2.0 : 1.0;
+            final tip = isToday ? '${t.crmNotesToday} · $dayNum' : '$dayNum';
+            return Tooltip(
+              message: tip,
+              child: Material(
+                color: cellBg,
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => _onSelectDay(cell),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor, width: borderW),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$dayNum',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 13,
+                            color: isToday ? cs.primary : null,
+                          ),
+                        ),
+                        if (n > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: cs.primary,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$n',
+                                style: TextStyle(color: cs.onPrimary, fontSize: 9, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekStrip(BuildContext context, AppLocalizations t) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final lang = Localizations.localeOf(context).languageCode;
+    final headers = _weekdayHeaders(lang);
+    final sel = _selectedDay ?? DateTime.now();
+    final start = _saturdayWeekStart(sel);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: List.generate(7, (i) {
+            return Expanded(
+              child: Center(
+                child: Text(
+                  headers[i],
+                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 10),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 46,
+          child: Row(
+            children: List.generate(7, (i) {
+              final cell = start.add(Duration(days: i));
+              final k = _dayKey(cell);
+              final n = _countByDay[k] ?? 0;
+              final selected = _selectedDay != null && _dayKey(_selectedDay!) == k;
+              final isToday = _sameDay(cell, DateTime.now());
+              final borderColor = isToday ? cs.primary : cs.outlineVariant.withValues(alpha: 0.55);
+              final borderW = isToday ? 2.0 : 1.0;
+              Color? bg;
+              if (selected) {
+                bg = cs.primaryContainer.withValues(alpha: 0.55);
+              } else if (cell.weekday == DateTime.friday) {
+                bg = cs.surfaceContainerHighest.withValues(alpha: 0.35);
+              }
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Tooltip(
+                    message: HesabixDateUtils.formatForDisplay(cell, widget.calendarController.isJalali),
+                    child: Material(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(8),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _onSelectDay(cell),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor, width: borderW),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${cell.day}',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                  fontSize: 13,
+                                  color: isToday ? cs.primary : null,
+                                ),
+                              ),
+                              if (n > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$n',
+                                      style: TextStyle(color: cs.onPrimary, fontSize: 8, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelectedDayCard(BuildContext context, AppLocalizations t) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final d = _selectedDay;
+    if (d == null) return const SizedBox.shrink();
+    return Material(
+      color: cs.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: _pickDay,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.edit_calendar_outlined, color: cs.primary, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.crmNotesPickDayTooltip,
+                      style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    Text(
+                      HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali),
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: t.crmNotesPickDayTooltip,
+                onPressed: _pickDay,
+                icon: const Icon(Icons.calendar_month_outlined),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(BuildContext context, AppLocalizations t) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -497,8 +815,6 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     if (!widget.authStore.canReadSection('crm')) {
       return AccessDeniedPage(message: t.accessDenied);
     }
-    final blanks = _leadingBlanksForMonthStart();
-    final dim = _daysInShownMonth();
 
     return Scaffold(
       appBar: AppBar(
@@ -526,18 +842,67 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
               ? _buildErrorState(context, t)
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final w = constraints.maxWidth - 24;
-                    final aspect = w < 340 ? 0.85 : (w < 480 ? 0.98 : 1.12);
+                    final narrow = constraints.maxWidth < _kNarrowBreakpoint;
+                    final padW = constraints.maxWidth - 24;
+                    final monthAspect = padW < 340 ? 1.56 : (padW < 480 ? 1.68 : 1.78);
+                    final blanks = _leadingBlanksForMonthStart();
+                    final dim = _daysInShownMonth();
                     final theme = Theme.of(context);
                     final cs = theme.colorScheme;
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
+
+                    final toggle = Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SegmentedButton<_CalViewMode>(
+                        segments: [
+                          ButtonSegment(
+                            value: _CalViewMode.week,
+                            label: Text(t.crmNotesViewWeek),
+                            icon: const Icon(Icons.view_week_outlined, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: _CalViewMode.month,
+                            label: Text(t.crmNotesViewMonth),
+                            icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                          ),
+                        ],
+                        selected: {_calView},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (s) {
+                          if (s.isEmpty) return;
+                          setState(() => _calView = s.first);
+                        },
+                      ),
+                    );
+
+                    final navRow = _calView == _CalViewMode.week
+                        ? Row(
                             children: [
-                              IconButton(onPressed: () => _shiftMonth(-1), tooltip: t.crmNotesMonthPrev, icon: const Icon(Icons.chevron_left)),
+                              IconButton(
+                                onPressed: () => _shiftWeek(-1),
+                                tooltip: t.crmNotesWeekPrev,
+                                icon: const Icon(Icons.chevron_left),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _weekRangeLabel(),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _shiftWeek(1),
+                                tooltip: t.crmNotesWeekNext,
+                                icon: const Icon(Icons.chevron_right),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => _shiftMonth(-1),
+                                tooltip: t.crmNotesMonthPrev,
+                                icon: const Icon(Icons.chevron_left),
+                              ),
                               Expanded(
                                 child: InkWell(
                                   onTap: _pickMonth,
@@ -548,99 +913,69 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
                                   ),
                                 ),
                               ),
-                              IconButton(onPressed: () => _shiftMonth(1), tooltip: t.crmNotesMonthNext, icon: const Icon(Icons.chevron_right)),
+                              IconButton(
+                                onPressed: () => _shiftMonth(1),
+                                tooltip: t.crmNotesMonthNext,
+                                icon: const Icon(Icons.chevron_right),
+                              ),
                             ],
-                          ),
+                          );
+
+                    final notes = Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_selectedDay != null) ..._buildDaySection(context, t),
+                      ],
+                    );
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          toggle,
+                          navRow,
                           const SizedBox(height: 8),
-                          Row(
-                            children: _weekdayHeaders(Localizations.localeOf(context).languageCode)
-                                .map(
-                                  (wd) => Expanded(
-                                    child: Center(
-                                      child: Text(wd, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              childAspectRatio: aspect,
+                          if (_calView == _CalViewMode.week) ...[
+                            _buildWeekStrip(context, t),
+                            const SizedBox(height: 12),
+                          ],
+                          if (!narrow && _calView == _CalViewMode.month) ...[
+                            _buildMonthGrid(
+                              context,
+                              blanks: blanks,
+                              dim: dim,
+                              aspect: monthAspect,
+                              t: t,
+                              theme: theme,
+                              cs: cs,
                             ),
-                            itemCount: blanks + dim,
-                            itemBuilder: (context, index) {
-                              if (index < blanks) {
-                                return const SizedBox.shrink();
-                              }
-                              final dayNum = index - blanks + 1;
-                              final cell = _cellDate(dayNum);
-                              final k = _dayKey(cell);
-                              final n = _countByDay[k] ?? 0;
-                              final sel = _selectedDay != null && _dayKey(_selectedDay!) == k;
-                              final isToday = _sameDay(cell, DateTime.now());
-                              final isFriday = cell.weekday == DateTime.friday;
-                              Color? cellBg;
-                              if (sel) {
-                                cellBg = cs.primaryContainer.withValues(alpha: 0.5);
-                              } else if (isFriday) {
-                                cellBg = cs.surfaceContainerHighest.withValues(alpha: 0.4);
-                              }
-                              final borderColor = isToday ? cs.primary : cs.outlineVariant.withValues(alpha: 0.55);
-                              final borderW = isToday ? 2.0 : 1.0;
-                              final tip = isToday ? '${t.crmNotesToday} · $dayNum' : '$dayNum';
-                              return Tooltip(
-                                message: tip,
-                                child: Material(
-                                  color: cellBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    onTap: () {
-                                      setState(() => _selectedDay = DateTime(cell.year, cell.month, cell.day));
-                                    },
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: borderColor, width: borderW),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '$dayNum',
-                                            style: theme.textTheme.titleSmall?.copyWith(
-                                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                              color: isToday ? cs.primary : null,
-                                            ),
-                                          ),
-                                          if (n > 0)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 3),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: cs.primary,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  '$n',
-                                                  style: TextStyle(color: cs.onPrimary, fontSize: 10, fontWeight: FontWeight.w600),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (narrow && _calView == _CalViewMode.month) ...[
+                            _buildSelectedDayCard(context, t),
+                            const SizedBox(height: 12),
+                          ],
+                          notes,
+                          if (narrow && _calView == _CalViewMode.month) ...[
+                            const SizedBox(height: 8),
+                            ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              title: Text(t.crmNotesMonthCalendarExpandTitle),
+                              childrenPadding: const EdgeInsets.only(bottom: 8),
+                              children: [
+                                _buildMonthGrid(
+                                  context,
+                                  blanks: blanks,
+                                  dim: dim,
+                                  aspect: monthAspect + 0.06,
+                                  t: t,
+                                  theme: theme,
+                                  cs: cs,
                                 ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          if (_selectedDay != null) ..._buildDaySection(context, t),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     );

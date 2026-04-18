@@ -1661,6 +1661,24 @@ abstract class AppLocalizations {
   /// **'Basic Business Information'**
   String get businessBasicInfo;
 
+  /// No description provided for @includeSampleDataLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sample data for a quick start'**
+  String get includeSampleDataLabel;
+
+  /// No description provided for @includeSampleDataSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creates sample customers, product, warehouse, and cash/bank accounts (not used when restoring from a .hbx backup).'**
+  String get includeSampleDataSubtitle;
+
+  /// No description provided for @sampleDataSeedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Business created but sample data could not be completed'**
+  String get sampleDataSeedWarning;
+
   /// No description provided for @businessContactInfo.
   ///
   /// In en, this message translates to:
@@ -17458,6 +17476,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Today'**
   String get crmNotesToday;
+
+  /// No description provided for @crmNotesViewWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get crmNotesViewWeek;
+
+  /// No description provided for @crmNotesViewMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get crmNotesViewMonth;
+
+  /// No description provided for @crmNotesWeekPrev.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous week'**
+  String get crmNotesWeekPrev;
+
+  /// No description provided for @crmNotesWeekNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next week'**
+  String get crmNotesWeekNext;
+
+  /// No description provided for @crmNotesMonthCalendarExpandTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full month calendar'**
+  String get crmNotesMonthCalendarExpandTitle;
+
+  /// No description provided for @crmNotesPickDayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose day'**
+  String get crmNotesPickDayTooltip;
 
   /// No description provided for @crmNotesDayNotes.
   ///

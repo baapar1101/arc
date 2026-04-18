@@ -67,6 +67,14 @@ class Business(Base):
     invoice_profit_overhead_type: Mapped[str | None] = mapped_column(String(30), nullable=True, default="none", server_default="none", comment="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
     invoice_profit_overhead_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, default=0, server_default="0", comment="درصد هزینه‌های سربار (در صورت انتخاب custom_percent)")
     invoice_profit_calculation_type: Mapped[str | None] = mapped_column(String(20), nullable=True, default="gross", server_default="gross", comment="نوع محاسبه سود: gross, net, both")
+    # شناسایی سود/بهای تمام‌شده قطعی (دفتر) در برابر محاسبه تحلیلی
+    invoice_profit_ledger_recognition_basis: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="warehouse_document_posting",
+        server_default="warehouse_document_posting",
+        comment="زمان شناسایی بهای تمام‌شده قطعی: warehouse_document_posting | sales_invoice_document",
+    )
     
     # به‌روزرسانی قیمت پایه کالا از فاکتور قطعی (ارز کالا = ارز پیش‌فرض کسب‌وکار)
     invoice_sync_update_sales_price_enabled: Mapped[bool] = mapped_column(

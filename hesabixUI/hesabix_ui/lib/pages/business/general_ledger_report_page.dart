@@ -271,6 +271,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       },
       defaultSortBy: 'document_date',
       defaultSortDesc: false,
+      expandBodyHeightToFitRows: true,
     );
   }
 
@@ -547,7 +548,8 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
-    
+    final isMobile = ResponsiveHelper.isMobile(context);
+
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -564,13 +566,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final viewportHeight = constraints.maxHeight;
-          final isMobile = ResponsiveHelper.isMobile(context);
-          final tableHeight = (viewportHeight * 0.55).clamp(320.0, 800.0);
-
-          return SingleChildScrollView(
+      body: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -622,11 +618,11 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                   _buildSummaryCards(context, cs, isMobile),
                   const SizedBox(height: 12),
                 ],
-                // جدول با ارتفاع بر اساس viewport
-                SizedBox(
-                  height: tableHeight,
-                  child: _selectedAccounts.isEmpty
-                      ? Center(
+                // جدول؛ اسکرول عمودی با کل صفحه
+                _selectedAccounts.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48),
+                        child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -642,22 +638,20 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                               ),
                             ],
                           ),
-                        )
-                      : DataTableWidget<Map<String, dynamic>>(
-                          key: ValueKey(
-                            'general_ledger_${_selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
-                          ),
-                          config: _buildTableConfig(t),
-                          fromJson: (json) => Map<String, dynamic>.from(json),
-                          calendarController: widget.calendarController,
-                          onRefresh: _fetchSummary,
                         ),
-                ),
+                      )
+                    : DataTableWidget<Map<String, dynamic>>(
+                        key: ValueKey(
+                          'general_ledger_${_selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
+                        ),
+                        config: _buildTableConfig(t),
+                        fromJson: (json) => Map<String, dynamic>.from(json),
+                        calendarController: widget.calendarController,
+                        onRefresh: _fetchSummary,
+                      ),
               ],
             ),
-          );
-        },
-      ),
+          ),
     );
   }
 }
