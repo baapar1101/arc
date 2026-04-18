@@ -143,6 +143,15 @@ class HesabixDateUtils {
   }
 
   /// Parse date from API (always Gregorian)
+  /// جایگزینی تاریخ‌های `YYYY-MM-DD` در یک متن با قالب نمایش شمسی/میلادی (برای پیام‌های خطای سرور).
+  static String formatIsoDatesInPlainText(String text, bool isJalali) {
+    return text.replaceAllMapped(RegExp(r'\b\d{4}-\d{2}-\d{2}\b'), (Match m) {
+      final parsed = parseFromAPI(m.group(0));
+      if (parsed == null) return m.group(0)!;
+      return formatForDisplay(parsed, isJalali);
+    });
+  }
+
   static DateTime? parseFromAPI(String? apiString) {
     if (apiString == null || apiString.isEmpty) return null;
     

@@ -16,6 +16,9 @@ import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
+import '../../core/api_client.dart';
+import '../../core/date_utils.dart';
 
 class WarehouseDocumentFormDialog extends StatefulWidget {
   final int businessId;
@@ -1878,10 +1881,17 @@ class _WarehouseDocumentFormDialogState
       }
     } catch (e) {
       if (!mounted) return;
-      final errorMessage = e.toString().contains('Exception:')
-          ? e.toString().split('Exception:').last.trim()
-          : 'خطا در ذخیره حواله. لطفاً دوباره تلاش کنید.';
-      SnackBarHelper.show(context, message: errorMessage);
+      final extracted = ErrorExtractor.extractErrorMessage(e);
+      final cc =
+          _calendarController ??
+          widget.calendarController ??
+          ApiClient.getCalendarController();
+      final isJalali = cc?.isJalali ?? true;
+      final errorMessage = HesabixDateUtils.formatIsoDatesInPlainText(
+        extracted,
+        isJalali,
+      );
+      SnackBarHelper.showError(context, message: errorMessage);
     } finally {
       if (mounted) {
         setState(() => _saving = false);

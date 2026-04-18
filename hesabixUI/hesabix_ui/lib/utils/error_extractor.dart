@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart' as dio;
 
+import '../services/errors/api_error.dart';
+
 /// کلاس کمکی برای استخراج پیام خطا از exception
 class ErrorExtractor {
   /// استخراج پیام خطا از response.data (پشتیبانی از Map و bytes)
@@ -36,6 +38,13 @@ class ErrorExtractor {
   /// استخراج پیام خطا از exception
   static String extractErrorMessage(Object e) {
     if (e is dio.DioException) {
+      // خطای ساختاریافتهٔ API (پس از interceptor در ApiClient)
+      final inner = e.error;
+      if (inner is ApiErrorDetails) {
+        final m = inner.message;
+        if (m != null && m.isNotEmpty) return m;
+      }
+
       final response = e.response;
       if (response != null && response.data != null) {
         final msg = _extractFromResponseData(response.data);
