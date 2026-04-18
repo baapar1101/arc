@@ -664,6 +664,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
         processDefs: _processDefs,
         leadSources: _leadSources,
         crmService: _crmService,
+        calendarController: widget.calendarController,
         onSaved: () => _load(resetPage: true),
       ),
     );
@@ -677,6 +678,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
         processDefs: _processDefs,
         leadSources: _leadSources,
         crmService: _crmService,
+        calendarController: widget.calendarController,
         initial: item,
         onSaved: () => _load(resetPage: true),
       ),
@@ -971,6 +973,7 @@ class _LeadFormDialog extends StatefulWidget {
   final CrmService crmService;
   final Map<String, dynamic>? initial;
   final VoidCallback onSaved;
+  final CalendarController? calendarController;
 
   const _LeadFormDialog({
     required this.businessId,
@@ -979,6 +982,7 @@ class _LeadFormDialog extends StatefulWidget {
     required this.crmService,
     this.initial,
     required this.onSaved,
+    this.calendarController,
   });
 
   @override
