@@ -10,6 +10,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../widgets/jalali_date_picker.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../core/calendar_controller.dart';
 
@@ -292,11 +293,15 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     filled: true,
                                   ),
                                   controller: TextEditingController(
-                                    text: DateFormat('yyyy-MM-dd').format(selectedDate),
+                                    text: HesabixDateUtils.formatForDisplay(
+                                      selectedDate,
+                                      _calendarCtrl?.isJalali ?? true,
+                                    ),
                                   ),
                                   onTap: () async {
-                                    final picked = await showDatePicker(
+                                    final picked = await showAdaptiveDatePicker(
                                       context: ctx,
+                                      calendarController: _calendarCtrl,
                                       initialDate: selectedDate,
                                       firstDate: DateTime(2020),
                                       lastDate: DateTime.now().add(const Duration(days: 1)),

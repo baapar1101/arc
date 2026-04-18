@@ -60,6 +60,17 @@ class _WarehousesPageState extends State<WarehousesPage> {
           columns: [
             ActionColumn('actions', 'عملیات', actions: [
               DataTableAction(
+                icon: Icons.account_tree_outlined,
+                label: 'چیدمان محل‌ها',
+                onTap: (item) {
+                  if (item is! Warehouse) return;
+                  final id = item.id;
+                  if (id == null) return;
+                  if (!mounted) return;
+                  context.push('/business/${widget.businessId}/warehouses/$id/locations');
+                },
+              ),
+              DataTableAction(
                 icon: Icons.edit_outlined,
                 label: 'ویرایش',
                 onTap: (item) {

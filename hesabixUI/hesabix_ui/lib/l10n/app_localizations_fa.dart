@@ -8684,6 +8684,194 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warrantyManage => 'مدیریت گارانتی';
 
   @override
+  String get customerClubTitle => 'باشگاه مشتریان';
+
+  @override
+  String get customerClubMenu => 'باشگاه مشتریان';
+
+  @override
+  String get customerClubTabLedger => 'تراکنش‌ها';
+
+  @override
+  String get customerClubTabSettings => 'تنظیمات';
+
+  @override
+  String get customerClubTabAdjust => 'اصلاح امتیاز';
+
+  @override
+  String get customerClubLedgerTotal => 'تعداد تراکنش';
+
+  @override
+  String get customerClubLoadMore => 'بیشتر';
+
+  @override
+  String get customerClubBalanceAfter => 'مانده بعد از تراکنش';
+
+  @override
+  String get customerClubPerson => 'شخص';
+
+  @override
+  String get customerClubEnabled => 'فعال بودن باشگاه در این کسب‌وکار';
+
+  @override
+  String get customerClubEarnMode => 'شیوهٔ محاسبهٔ امتیاز';
+
+  @override
+  String get customerClubEarnPercent => 'درصد از مبلغ مبنا';
+
+  @override
+  String get customerClubEarnPerCurrency => 'امتیاز به ازای بازهٔ مبلغی';
+
+  @override
+  String get customerClubAmountBasis => 'مبنای مبلغ فاکتور';
+
+  @override
+  String get customerClubBasisNet => 'خالص بدون مالیات (جمع خطوط)';
+
+  @override
+  String get customerClubBasisTotal => 'جمع با مالیات';
+
+  @override
+  String get customerClubPercentOfBasis => 'درصد از مبنا';
+
+  @override
+  String get customerClubPercentHint => 'مثلاً ۱ به معنای یک درصد از مبلغ مبنا';
+
+  @override
+  String get customerClubStepAmount =>
+      'بازهٔ مبلغ (در حالت امتیاز به ازای بازه)';
+
+  @override
+  String get customerClubPointsPerStep => 'امتیاز به ازای هر بازه';
+
+  @override
+  String get customerClubRounding => 'نوع گرد کردن امتیاز';
+
+  @override
+  String get customerClubMaxPointsInvoice => 'سقف امتیاز هر فاکتور (اختیاری)';
+
+  @override
+  String get customerClubMinBasis => 'حداقل مبلغ مبنا برای اعطای امتیاز';
+
+  @override
+  String get customerClubRedemptionSection => 'مصرف امتیاز و انقضا';
+
+  @override
+  String get customerClubCurrencyValuePerPoint =>
+      'مبلغ تخفیف به ازای هر امتیاز (ارز فاکتور)';
+
+  @override
+  String get customerClubCurrencyValuePerPointHint =>
+      'هر امتیاز معادل چند واحد پول از تخفیف در فاکتور فروش؛ مثلاً ۵۰۰۰ به معنای ۵۰۰۰ واحد ارز فاکتور به ازای هر امتیاز.';
+
+  @override
+  String get customerClubMaxRedeemPerInvoice =>
+      'حداکثر امتیاز قابل مصرف در هر فاکتور فروش (اختیاری)';
+
+  @override
+  String get customerClubPointsExpireAfterDays =>
+      'اعتبار امتیاز از تاریخ اعطا (روز)';
+
+  @override
+  String get customerClubPointsExpireAfterDaysHint =>
+      'خالی بگذارید تا امتیازها منقضی نشوند.';
+
+  @override
+  String get customerClubRequireCustomerType => 'فقط اشخاص با نقش مشتری';
+
+  @override
+  String get customerClubSettingsSaved => 'تنظیمات باشگاه ذخیره شد.';
+
+  @override
+  String get customerClubInvalidPersonId => 'شناسهٔ شخص معتبر نیست.';
+
+  @override
+  String get customerClubInvalidDelta => 'مقدار امتیاز نامعتبر است.';
+
+  @override
+  String get customerClubDescriptionRequired => 'توضیح الزامی است.';
+
+  @override
+  String get customerClubAdjustmentSaved => 'اصلاح امتیاز ثبت شد.';
+
+  @override
+  String get customerClubNoAdjustPermission =>
+      'مجوز اصلاح دستی امتیاز را ندارید.';
+
+  @override
+  String get customerClubAdjustIntro =>
+      'برای افزایش یا کسر امتیاز دستی از فرم زیر استفاده کنید. عدد دلتا می‌تواند منفی باشد.';
+
+  @override
+  String get customerClubPersonId => 'شناسهٔ شخص (person_id)';
+
+  @override
+  String get customerClubDeltaPoints => 'امتیاز دلتا (+/-)';
+
+  @override
+  String get customerClubSubmitAdjustment => 'ثبت اصلاحی';
+
+  @override
+  String get customerClubSettingsSubtitle =>
+      'قوانین امتیاز، تراکنش‌ها و اصلاح ماندهٔ مشتریان';
+
+  @override
+  String get customerClubRoundingFloor => 'گرد کردن به پایین (floor)';
+
+  @override
+  String get customerClubRoundingCeil => 'گرد کردن به بالا (ceil)';
+
+  @override
+  String get customerClubRoundingRound => 'گرد کردن معمولی';
+
+  @override
+  String get customerClubReferenceDocument => 'سند';
+
+  @override
+  String get customerClubPointsShort => 'امتیاز';
+
+  @override
+  String get customerClubTxnAdjustment => 'اصلاح دستی';
+
+  @override
+  String get customerClubTxnRedeem => 'مصرف امتیاز';
+
+  @override
+  String get customerClubTxnRedeemVoid => 'برگشت مصرف امتیاز';
+
+  @override
+  String get customerClubTxnInvoiceSync => 'همگام‌سازی با فاکتور';
+
+  @override
+  String get customerClubTxnInvoiceDeleteReversal =>
+      'حذف فاکتور — برگشت امتیاز';
+
+  @override
+  String get customerClubTxnInvoiceDeleteReversalRedeem =>
+      'حذف فاکتور — برگشت مصرف';
+
+  @override
+  String customerClubPermissionManageSettings(String title) {
+    return 'مدیریت تنظیمات ($title)';
+  }
+
+  @override
+  String customerClubPermissionAdjustManual(String title) {
+    return 'اصلاح دستی امتیاز ($title)';
+  }
+
+  @override
+  String customerClubPermissionRedeemInvoice(String title) {
+    return 'مصرف امتیاز در فاکتور فروش ($title)';
+  }
+
+  @override
+  String get customerClubActionAdjust => 'اصلاح';
+
+  @override
+  String get customerClubActionRedeem => 'مصرف امتیاز';
+
+  @override
   String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
 
   @override

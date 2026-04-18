@@ -70,6 +70,28 @@ def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
 	return f"WH-{max_id + 1:05d}"
 
 
+def _optional_line_int(value: Any) -> Optional[int]:
+	if value is None or value == "":
+		return None
+	try:
+		return int(value)
+	except Exception:
+		return None
+
+
+def _warehouse_location_id_from_payload(ln: Dict[str, Any]) -> Optional[int]:
+	v = ln.get("warehouse_location_id")
+	if v is None and isinstance(ln.get("extra_info"), dict):
+		v = ln["extra_info"].get("warehouse_location_id")
+	return _optional_line_int(v)
+
+
+def _transfer_location_pair_from_payload(ln: Dict[str, Any]) -> tuple[Optional[int], Optional[int]]:
+	o = ln.get("warehouse_location_id_from") or ln.get("warehouse_location_out")
+	i = ln.get("warehouse_location_id_to") or ln.get("warehouse_location_in")
+	return _optional_line_int(o), _optional_line_int(i)
+
+
 def invoice_lines_have_trackable_inventory_products(
 	db: Session,
 	business_id: int,
@@ -350,10 +372,14 @@ def create_from_invoice(
 				if instance_count > int(qty):
 					raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط با product_id {pid}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
 
+		line_wh_loc = _warehouse_location_id_from_payload(
+			{"warehouse_location_id": ln.get("warehouse_location_id"), "extra_info": extra}
+		)
 		wline = WarehouseDocumentLine(
 			warehouse_document_id=wh.id,
 			product_id=int(pid),
 			warehouse_id=warehouse_id,
+			warehouse_location_id=line_wh_loc,
 			movement=str(mv),
 			quantity=qty,
 			extra_info=extra,
@@ -657,11 +683,14 @@ def create_manual_warehouse_document(
 			if final_instance_ids:
 				extra_info_transfer["instance_ids"] = final_instance_ids
 			
+			loc_from, loc_to = _transfer_location_pair_from_payload(ln)
+
 			# ایجاد خط خروج از مبدا
 			wline_out = WarehouseDocumentLine(
 				warehouse_document_id=wh.id,
 				product_id=int(pid),
 				warehouse_id=int(line_wh_from),
+				warehouse_location_id=loc_from,
 				movement="out",
 				quantity=qty,
 				extra_info=extra_info_transfer,
@@ -674,6 +703,7 @@ def create_manual_warehouse_document(
 				warehouse_document_id=wh.id,
 				product_id=int(pid),
 				warehouse_id=int(line_wh_to),
+				warehouse_location_id=loc_to,
 				movement="in",
 				quantity=qty,
 				extra_info=extra_info_transfer,
@@ -728,10 +758,12 @@ def create_manual_warehouse_document(
 					if instance_count > int(qty):
 						raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط {i}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
 			
+			line_wh_loc = _warehouse_location_id_from_payload(ln)
 			wline = WarehouseDocumentLine(
 				warehouse_document_id=wh.id,
 				product_id=int(pid),
 				warehouse_id=int(line_wh),
+				warehouse_location_id=line_wh_loc,
 				movement=movement,
 				quantity=qty,
 				extra_info=extra_info,
@@ -1442,10 +1474,12 @@ def update_warehouse_document(
 					if isinstance(final_instance_ids, list):
 						all_new_instance_ids.extend([int(x) for x in final_instance_ids if x is not None])
 				
+				line_wh_loc = _warehouse_location_id_from_payload(ln)
 				wline = WarehouseDocumentLine(
 					warehouse_document_id=wh.id,
 					product_id=int(pid),
 					warehouse_id=int(line_wh),
+					warehouse_location_id=line_wh_loc,
 					movement=movement,
 					quantity=qty,
 					extra_info=extra_info,
@@ -1571,6 +1605,21 @@ def update_warehouse_document_line(
 	
 	if "extra_info" in data:
 		wline.extra_info = data.get("extra_info")
+
+	if "warehouse_location_id" in data:
+		from app.services.warehouse_placement_sync import validate_warehouse_location_for_line
+
+		raw_loc = data.get("warehouse_location_id")
+		if raw_loc is None or raw_loc == "":
+			wline.warehouse_location_id = None
+		else:
+			try:
+				lid = int(raw_loc)
+			except Exception:
+				raise ApiError("INVALID_LOCATION", "شناسه محل انبار نامعتبر است", http_status=400)
+			if wline.warehouse_id:
+				validate_warehouse_location_for_line(db, business_id, int(wline.warehouse_id), lid)
+			wline.warehouse_location_id = lid
 	
 	wh.touch()
 	db.flush()
@@ -1692,6 +1741,11 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 							# در صورت خطا، ادامه بده
 							pass
 	
+	# همگام‌سازی قرارگیری فیزیکی با خطوط دارای محل انبار (قبل از قطعی شدن سند)
+	from app.services.warehouse_placement_sync import apply_placement_effects_for_posted_document
+
+	apply_placement_effects_for_posted_document(db, int(wh.business_id), wh, lines)
+
 	# دریافت اطلاعات قبل از تغییر status برای invalidation
 	old_status = wh.status
 	business_id = wh.business_id
@@ -1897,6 +1951,7 @@ def _get_line_dict_with_instances(db: Session, ln: WarehouseDocumentLine, busine
 		"id": ln.id,
 		"product_id": ln.product_id,
 		"warehouse_id": ln.warehouse_id,
+		"warehouse_location_id": getattr(ln, "warehouse_location_id", None),
 		"movement": ln.movement,
 		"quantity": float(ln.quantity),
 		"extra_info": ln.extra_info,
@@ -2369,6 +2424,10 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله خطی ندارد", http_status=400)
+
+	from app.services.warehouse_placement_sync import reverse_placement_effects_for_cancelled_document
+
+	reverse_placement_effects_for_cancelled_document(db, business_id, lines)
 	
 	fy = _get_current_fiscal_year(db, business_id)
 	code = _generate_warehouse_document_code(db, business_id, wh.document_date)

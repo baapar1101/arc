@@ -7,9 +7,12 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_import_dialog.dart';
+import '../../widgets/person/person_list_group_filter_bar.dart';
 import '../../widgets/person/person_groups_manage_dialog.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../models/person_model.dart';
+import '../../models/person_group_model.dart';
+import '../../services/person_group_service.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
@@ -45,10 +48,15 @@ class PersonsPage extends StatefulWidget {
 
 class _PersonsPageState extends State<PersonsPage> {
   final _personService = PersonService();
+  final _personGroupService = PersonGroupService();
   final GlobalKey _personsTableKey = GlobalKey();
   final MarketplaceService _marketplaceService = MarketplaceService();
   List<Map<String, dynamic>> _businessPlugins = [];
   bool _pluginsLoaded = false;
+
+  List<PersonGroup> _personGroupsForFilter = const [];
+  bool _personGroupsLoading = false;
+  int? _quickPersonGroupFilterId;
 
   @override
   void initState() {
@@ -56,6 +64,36 @@ class _PersonsPageState extends State<PersonsPage> {
     // Register this page instance for external refresh access
     PersonsPage._pageStates[widget.businessId] = this;
     _loadBusinessPlugins();
+    _loadPersonGroupsForFilter();
+  }
+
+  Future<void> _loadPersonGroupsForFilter() async {
+    setState(() => _personGroupsLoading = true);
+    try {
+      final list = await _personGroupService.listGroups(
+        businessId: widget.businessId,
+        skip: 0,
+        take: 500,
+        activeOnly: false,
+        rootOnly: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _personGroupsForFilter = list;
+        _personGroupsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _personGroupsLoading = false);
+      }
+    }
+  }
+
+  void _onQuickPersonGroupFilterChanged(int? groupId) {
+    setState(() => _quickPersonGroupFilterId = groupId);
+    try {
+      (_personsTableKey.currentState as dynamic)?.applyPersonGroupIdFilter(groupId);
+    } catch (_) {}
   }
   
   @override
@@ -114,10 +152,24 @@ class _PersonsPageState extends State<PersonsPage> {
     }
 
     return Scaffold(
-      body: DataTableWidget<Person>(
-        key: _personsTableKey,
-        config: _buildDataTableConfig(t),
-        fromJson: Person.fromJson,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PersonListGroupFilterBar(
+            groups: _personGroupsForFilter,
+            loading: _personGroupsLoading,
+            selectedGroupId: _quickPersonGroupFilterId,
+            onGroupChanged: _onQuickPersonGroupFilterChanged,
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: DataTableWidget<Person>(
+              key: _personsTableKey,
+              config: _buildDataTableConfig(t),
+              fromJson: Person.fromJson,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -489,9 +541,14 @@ class _PersonsPageState extends State<PersonsPage> {
       filterFields: [
         'person_type',
         'person_types',
+        'person_group_id',
         'country',
         'province',
       ],
+      onAllFiltersCleared: () {
+        if (!mounted) return;
+        setState(() => _quickPersonGroupFilterId = null);
+      },
       defaultPageSize: 20,
       // انتقال دکمه افزودن به اکشن‌های هدر جدول با کنترل دسترسی
       customHeaderActions: [
@@ -518,7 +575,9 @@ class _PersonsPageState extends State<PersonsPage> {
                 showDialog<void>(
                   context: context,
                   builder: (ctx) => PersonGroupsManageDialog(businessId: widget.businessId),
-                );
+                ).then((_) {
+                  if (mounted) _loadPersonGroupsForFilter();
+                });
               },
               icon: const Icon(Icons.group_work_outlined),
             ),

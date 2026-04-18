@@ -12,15 +12,17 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
-import 'package:intl/intl.dart';
 
 /// صفحه لیست سرنخ‌های CRM
 class CrmLeadsPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
-  final dynamic calendarController;
+  final CalendarController? calendarController;
 
   const CrmLeadsPage({
     super.key,
@@ -1261,7 +1263,12 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
                       title: Text(
                         _nextFollowUpAt == null
                             ? 'یادآور پیگیری: تعیین نشده'
-                            : 'یادآور پیگیری: ${DateFormat('yyyy/MM/dd HH:mm').format(_nextFollowUpAt!)}',
+                            : 'یادآور پیگیری: ${HesabixDateUtils.formatDateTime(
+                                _nextFollowUpAt,
+                                widget.calendarController?.isJalali ??
+                                    ApiClient.getCalendarController()?.isJalali ??
+                                    true,
+                              )}',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       trailing: Row(
@@ -1269,8 +1276,9 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
                         children: [
                           TextButton(
                             onPressed: () async {
-                              final date = await showDatePicker(
+                              final date = await showAdaptiveDatePicker(
                                 context: context,
+                                calendarController: widget.calendarController,
                                 initialDate: _nextFollowUpAt ?? DateTime.now(),
                                 firstDate: DateTime.now(),
                                 lastDate: DateTime.now().add(const Duration(days: 365)),

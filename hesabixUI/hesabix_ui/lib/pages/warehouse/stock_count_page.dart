@@ -8,6 +8,9 @@ import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/data_table/data_table.dart';
+import '../../core/api_client.dart';
+import '../../core/date_utils.dart';
+import '../../widgets/jalali_date_picker.dart';
 
 String _rowKey(int? productId, int? warehouseId) => '${productId ?? 0}:${warehouseId ?? 0}';
 
@@ -579,12 +582,18 @@ class _StockCountPageState extends State<StockCountPage> {
             readOnly: true,
             controller: TextEditingController(
               text: _asOfDate != null
-                  ? '${_asOfDate!.year}-${_asOfDate!.month.toString().padLeft(2, '0')}-${_asOfDate!.day.toString().padLeft(2, '0')}'
+                  ? HesabixDateUtils.formatForDisplay(
+                      _asOfDate,
+                      widget.calendarController?.isJalali ??
+                          ApiClient.getCalendarController()?.isJalali ??
+                          true,
+                    )
                   : '',
             ),
             onTap: () async {
-              final date = await showDatePicker(
+              final date = await showAdaptiveDatePicker(
                 context: context,
+                calendarController: widget.calendarController,
                 initialDate: _asOfDate ?? DateTime.now(),
                 firstDate: DateTime(2000),
                 lastDate: DateTime(2100),

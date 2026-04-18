@@ -2317,6 +2317,23 @@ def create_invoice(
     if totals_missing:
         totals = _extract_totals_from_lines(lines_input)
 
+    try:
+        from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
+
+        maybe_apply_loyalty_redemption_to_invoice_payload(
+            db,
+            business_id,
+            invoice_type,
+            bool(data.get("is_proforma", False)),
+            int(person_id) if person_id else None,
+            totals,
+            header_extra,
+            data,
+            user_id,
+        )
+    except ApiError:
+        raise
+
     # Inventory posting is decoupled; no stock validation here
     post_inventory: bool = _is_inventory_posting_enabled(data)
     movement_hint, _ = _movement_from_type(invoice_type)
@@ -3023,6 +3040,14 @@ def create_invoice(
             from app.services.invoice_product_price_sync_service import apply_invoice_product_price_sync
             apply_invoice_product_price_sync(db, _biz_ps, document, invoice_type)
 
+    if not document.is_proforma:
+        try:
+            from app.services.customer_club_service import commit_loyalty_redemption_for_sales_invoice
+
+            commit_loyalty_redemption_for_sales_invoice(db, document, user_id)
+        except ApiError:
+            raise
+
     # Persist invoice first
     db.commit()
     db.refresh(document)
@@ -3214,6 +3239,17 @@ def create_invoice(
             from app.services.invoice_profit_ledger_service import on_sales_invoice_document_finalized
 
             on_sales_invoice_document_finalized(db, int(document.id))
+            try:
+                from app.services.customer_club_service import sync_customer_club_for_invoice
+
+                sync_customer_club_for_invoice(db, int(document.id))
+            except Exception as club_ex:
+                logger.warning(
+                    "customer_club sync on create failed doc_id=%s err=%s",
+                    document.id,
+                    club_ex,
+                    exc_info=True,
+                )
             db.commit()
         except Exception as ledger_ex:
             logger.warning(
@@ -3474,10 +3510,51 @@ def update_invoice(
     if not document.is_proforma:
         header_for_accounts: Dict[str, Any] = {"invoice_type": inv_type, **(data or {"extra_info": document.extra_info})}
         accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
-        header_extra = data.get("extra_info") or document.extra_info or {}
-        totals = (header_extra.get("totals") or {})
+        header_extra = dict(data.get("extra_info") or document.extra_info or {})
+        totals = dict(header_extra.get("totals") or {})
         if not totals:
             totals = _extract_totals_from_lines(lines_input)
+        header_extra["totals"] = totals
+        if data.get("loyalty_redemption_points") is None:
+            cc_prev = dict(header_extra.get("customer_club") or {})
+            cc_prev.pop("redeem_points_requested", None)
+            cc_prev.pop("redeem_discount_amount", None)
+            if cc_prev:
+                header_extra["customer_club"] = cc_prev
+            else:
+                header_extra.pop("customer_club", None)
+        try:
+            from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
+
+            pid_for_club = _person_id_from_header({"extra_info": header_extra})
+            maybe_apply_loyalty_redemption_to_invoice_payload(
+                db,
+                int(document.business_id),
+                inv_type,
+                bool(document.is_proforma),
+                int(pid_for_club) if pid_for_club else None,
+                totals,
+                header_extra,
+                data,
+                user_id,
+            )
+        except ApiError:
+            raise
+        ex_merge = dict(document.extra_info or {})
+        ex_merge["totals"] = totals
+        if "customer_club" in header_extra:
+            ex_merge["customer_club"] = header_extra["customer_club"]
+        elif "customer_club" in ex_merge and data.get("loyalty_redemption_points") is None:
+            cc_m = dict(ex_merge.get("customer_club") or {})
+            cc_m.pop("redeem_points_requested", None)
+            cc_m.pop("redeem_discount_amount", None)
+            if cc_m:
+                ex_merge["customer_club"] = cc_m
+            else:
+                ex_merge.pop("customer_club", None)
+        document.extra_info = _normalize_document_extra_info_for_storage(ex_merge)
+        flag_modified(document, "extra_info")
+
         gross = Decimal(str(totals.get("gross", 0)))
         discount = Decimal(str(totals.get("discount", 0)))
         net = gross - discount
@@ -4080,6 +4157,27 @@ def update_invoice(
                 exc_info=True,
             )
 
+    if not document.is_proforma:
+        try:
+            from app.services.customer_club_service import commit_loyalty_redemption_for_sales_invoice
+
+            commit_loyalty_redemption_for_sales_invoice(db, document, user_id)
+        except ApiError:
+            raise
+
+    if not document.is_proforma:
+        try:
+            from app.services.customer_club_service import sync_customer_club_for_invoice
+
+            sync_customer_club_for_invoice(db, int(document.id))
+        except Exception as club_ex:
+            logger.warning(
+                "customer_club sync on update failed doc_id=%s err=%s",
+                document.id,
+                club_ex,
+                exc_info=True,
+            )
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -4358,6 +4456,19 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         document_type = document.document_type
         project_id = document.project_id
         
+        # برگشت امتیاز باشگاه مشتریان (قبل از حذف سند)
+        try:
+            from app.services.customer_club_service import reverse_customer_club_on_invoice_delete
+
+            reverse_customer_club_on_invoice_delete(db, int(document_id), int(business_id))
+        except Exception as club_ex:
+            logger.warning(
+                "[DELETE_INVOICE] customer_club reversal failed for %s: %s",
+                document_id,
+                club_ex,
+                exc_info=True,
+            )
+
         # حذف سند فاکتور
         db.delete(document)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")

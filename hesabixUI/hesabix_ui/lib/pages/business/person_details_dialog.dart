@@ -122,23 +122,14 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Future<DateTime?> _pickActivityDate(BuildContext pickerContext, DateTime initial) async {
     await _ensureCalendarController();
     if (!mounted) return null;
-    final useJalali = _calendarController?.isJalali ?? true;
     final firstDate = DateTime(2000);
     final lastDate = DateTime(2100);
-    if (useJalali) {
-      return showJalaliDatePicker(
-        context: pickerContext,
-        initialDate: initial,
-        firstDate: firstDate,
-        lastDate: lastDate,
-      );
-    }
-    return showDatePicker(
+    return showAdaptiveDatePicker(
       context: pickerContext,
+      calendarController: _calendarController,
       initialDate: initial,
       firstDate: firstDate,
       lastDate: lastDate,
-      locale: const Locale('en', 'US'),
     );
   }
 

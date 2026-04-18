@@ -13,6 +13,7 @@ import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
@@ -446,8 +447,9 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   }
 
   Future<void> _pickDateTimeFull() async {
-    final picked = await showDatePicker(
+    final picked = await showAdaptiveDatePicker(
       context: context,
+      calendarController: widget.calendarController,
       initialDate: _activityDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),

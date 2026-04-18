@@ -16463,6 +16463,348 @@ abstract class AppLocalizations {
   /// **'Manage Warranty'**
   String get warrantyManage;
 
+  /// No description provided for @customerClubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Club'**
+  String get customerClubTitle;
+
+  /// No description provided for @customerClubMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Club'**
+  String get customerClubMenu;
+
+  /// No description provided for @customerClubTabLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get customerClubTabLedger;
+
+  /// No description provided for @customerClubTabSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get customerClubTabSettings;
+
+  /// No description provided for @customerClubTabAdjust.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust Points'**
+  String get customerClubTabAdjust;
+
+  /// No description provided for @customerClubLedgerTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions count'**
+  String get customerClubLedgerTotal;
+
+  /// No description provided for @customerClubLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get customerClubLoadMore;
+
+  /// No description provided for @customerClubBalanceAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance after'**
+  String get customerClubBalanceAfter;
+
+  /// No description provided for @customerClubPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get customerClubPerson;
+
+  /// No description provided for @customerClubEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable loyalty program'**
+  String get customerClubEnabled;
+
+  /// No description provided for @customerClubEarnMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Earning rule'**
+  String get customerClubEarnMode;
+
+  /// No description provided for @customerClubEarnPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentage of basis amount'**
+  String get customerClubEarnPercent;
+
+  /// No description provided for @customerClubEarnPerCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Points per currency bracket'**
+  String get customerClubEarnPerCurrency;
+
+  /// No description provided for @customerClubAmountBasis.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice amount basis'**
+  String get customerClubAmountBasis;
+
+  /// No description provided for @customerClubBasisNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net excluding tax'**
+  String get customerClubBasisNet;
+
+  /// No description provided for @customerClubBasisTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total including tax'**
+  String get customerClubBasisTotal;
+
+  /// No description provided for @customerClubPercentOfBasis.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent of basis'**
+  String get customerClubPercentOfBasis;
+
+  /// No description provided for @customerClubPercentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: 1 means 1% of basis amount'**
+  String get customerClubPercentHint;
+
+  /// No description provided for @customerClubStepAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Bracket amount (currency)'**
+  String get customerClubStepAmount;
+
+  /// No description provided for @customerClubPointsPerStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Points per bracket'**
+  String get customerClubPointsPerStep;
+
+  /// No description provided for @customerClubRounding.
+  ///
+  /// In en, this message translates to:
+  /// **'Rounding mode'**
+  String get customerClubRounding;
+
+  /// No description provided for @customerClubMaxPointsInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Max points per invoice (optional)'**
+  String get customerClubMaxPointsInvoice;
+
+  /// No description provided for @customerClubMinBasis.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum basis amount to earn points'**
+  String get customerClubMinBasis;
+
+  /// No description provided for @customerClubRedemptionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Redemption & expiry'**
+  String get customerClubRedemptionSection;
+
+  /// No description provided for @customerClubCurrencyValuePerPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount amount per loyalty point (invoice currency)'**
+  String get customerClubCurrencyValuePerPoint;
+
+  /// No description provided for @customerClubCurrencyValuePerPointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'How much invoice discount one point buys, in invoice currency.'**
+  String get customerClubCurrencyValuePerPointHint;
+
+  /// No description provided for @customerClubMaxRedeemPerInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum points redeemable per sales invoice (optional)'**
+  String get customerClubMaxRedeemPerInvoice;
+
+  /// No description provided for @customerClubPointsExpireAfterDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Points validity from grant date (days)'**
+  String get customerClubPointsExpireAfterDays;
+
+  /// No description provided for @customerClubPointsExpireAfterDaysHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty so points never expire.'**
+  String get customerClubPointsExpireAfterDaysHint;
+
+  /// No description provided for @customerClubRequireCustomerType.
+  ///
+  /// In en, this message translates to:
+  /// **'Only contacts marked as Customer'**
+  String get customerClubRequireCustomerType;
+
+  /// No description provided for @customerClubSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Club settings saved.'**
+  String get customerClubSettingsSaved;
+
+  /// No description provided for @customerClubInvalidPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid person id.'**
+  String get customerClubInvalidPersonId;
+
+  /// No description provided for @customerClubInvalidDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid delta points.'**
+  String get customerClubInvalidDelta;
+
+  /// No description provided for @customerClubDescriptionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Description is required.'**
+  String get customerClubDescriptionRequired;
+
+  /// No description provided for @customerClubAdjustmentSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment recorded.'**
+  String get customerClubAdjustmentSaved;
+
+  /// No description provided for @customerClubNoAdjustPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot perform manual adjustments.'**
+  String get customerClubNoAdjustPermission;
+
+  /// No description provided for @customerClubAdjustIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase or decrease points manually. Delta may be negative.'**
+  String get customerClubAdjustIntro;
+
+  /// No description provided for @customerClubPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Person ID'**
+  String get customerClubPersonId;
+
+  /// No description provided for @customerClubDeltaPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Delta points (+/-)'**
+  String get customerClubDeltaPoints;
+
+  /// No description provided for @customerClubSubmitAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit adjustment'**
+  String get customerClubSubmitAdjustment;
+
+  /// No description provided for @customerClubSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Points rules, transactions and manual balances'**
+  String get customerClubSettingsSubtitle;
+
+  /// No description provided for @customerClubRoundingFloor.
+  ///
+  /// In en, this message translates to:
+  /// **'Round down (floor)'**
+  String get customerClubRoundingFloor;
+
+  /// No description provided for @customerClubRoundingCeil.
+  ///
+  /// In en, this message translates to:
+  /// **'Round up (ceil)'**
+  String get customerClubRoundingCeil;
+
+  /// No description provided for @customerClubRoundingRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Round to nearest'**
+  String get customerClubRoundingRound;
+
+  /// No description provided for @customerClubReferenceDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get customerClubReferenceDocument;
+
+  /// No description provided for @customerClubPointsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'pts'**
+  String get customerClubPointsShort;
+
+  /// No description provided for @customerClubTxnAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual adjustment'**
+  String get customerClubTxnAdjustment;
+
+  /// No description provided for @customerClubTxnRedeem.
+  ///
+  /// In en, this message translates to:
+  /// **'Points redemption'**
+  String get customerClubTxnRedeem;
+
+  /// No description provided for @customerClubTxnRedeemVoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Redemption reversal'**
+  String get customerClubTxnRedeemVoid;
+
+  /// No description provided for @customerClubTxnInvoiceSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice points sync'**
+  String get customerClubTxnInvoiceSync;
+
+  /// No description provided for @customerClubTxnInvoiceDeleteReversal.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice deleted — points reversal'**
+  String get customerClubTxnInvoiceDeleteReversal;
+
+  /// No description provided for @customerClubTxnInvoiceDeleteReversalRedeem.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice deleted — redemption reversal'**
+  String get customerClubTxnInvoiceDeleteReversalRedeem;
+
+  /// No description provided for @customerClubPermissionManageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage club settings ({title})'**
+  String customerClubPermissionManageSettings(String title);
+
+  /// No description provided for @customerClubPermissionAdjustManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual points adjustment ({title})'**
+  String customerClubPermissionAdjustManual(String title);
+
+  /// No description provided for @customerClubPermissionRedeemInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem points on sales invoice ({title})'**
+  String customerClubPermissionRedeemInvoice(String title);
+
+  /// No description provided for @customerClubActionAdjust.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust'**
+  String get customerClubActionAdjust;
+
+  /// No description provided for @customerClubActionRedeem.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem'**
+  String get customerClubActionRedeem;
+
   /// No description provided for @identityInquiryTitle.
   ///
   /// In en, this message translates to:

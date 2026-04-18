@@ -108,6 +108,7 @@ import 'pages/business/repair_shop/repair_order_form_page.dart';
 import 'pages/business/repair_shop/repair_order_detail_page.dart';
 import 'pages/business/repair_shop/repair_technicians_page.dart';
 import 'pages/business/repair_shop/repair_settings_page.dart';
+import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -126,6 +127,7 @@ import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
 import 'pages/business/documents_page.dart';
 import 'pages/business/warehouses_page.dart';
+import 'pages/business/warehouse_locations_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/warehouse/warehouse_document_details_page.dart';
 import 'pages/warehouse/stock_count_page.dart';
@@ -1767,6 +1769,20 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/customer-club',
+              name: 'business_customer_club',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CustomerClubMainPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/notification-templates',
               name: 'business_notification_templates',
               pageBuilder: (context, state) {
@@ -2907,6 +2923,20 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/warehouses/:warehouse_id/locations',
+              name: 'business_warehouse_locations',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final warehouseId = int.parse(state.pathParameters['warehouse_id']!);
+                return NoTransitionPage(
+                  child: WarehouseLocationsPage(
+                    businessId: businessId,
+                    warehouseId: warehouseId,
                   ),
                 );
               },

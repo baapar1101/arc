@@ -1787,33 +1787,19 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     final firstDate = DateTime(now.year - 2);
     final lastDate = DateTime(now.year + 2);
     final initialDate = parsedDate ?? now;
-    final cal = ApiClient.getCalendarController();
-    final isJalali = cal?.isJalali ?? true;
 
-    DateTime? picked;
-    if (isJalali) {
-      picked = await showJalaliDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: _formatKey(key),
-      );
-    } else {
-      picked = await showDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: _formatKey(key),
-        locale: const Locale('en', 'US'),
-      );
-    }
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: ApiClient.getCalendarController(),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: _formatKey(key),
+    );
 
     if (picked != null && mounted) {
-      final dt = picked!;
       setState(() {
-        _config[key] = date_utils.HesabixDateUtils.formatForApiDate(dt);
+        _config[key] = date_utils.HesabixDateUtils.formatForApiDate(picked);
         _disposeWorkflowTextController(key);
       });
     }

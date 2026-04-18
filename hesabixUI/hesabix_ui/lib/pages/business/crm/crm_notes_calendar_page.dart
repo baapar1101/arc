@@ -80,24 +80,13 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
   }
 
   Future<void> _pickDay() async {
-    final isJ = widget.calendarController.isJalali;
-    DateTime? picked;
-    if (isJ) {
-      picked = await showJalaliDatePicker(
-        context: context,
-        initialDate: _selectedDay ?? DateTime.now(),
-        firstDate: DateTime(DateTime.now().year - 5),
-        lastDate: DateTime(DateTime.now().year + 5),
-      );
-    } else {
-      picked = await showDatePicker(
-        context: context,
-        initialDate: _selectedDay ?? DateTime.now(),
-        firstDate: DateTime(DateTime.now().year - 5),
-        lastDate: DateTime(DateTime.now().year + 5),
-        locale: const Locale('en', 'GB'),
-      );
-    }
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: _selectedDay ?? DateTime.now(),
+      firstDate: DateTime(DateTime.now().year - 5),
+      lastDate: DateTime(DateTime.now().year + 5),
+    );
     if (picked != null && mounted) {
       _onSelectDay(picked);
     }
@@ -304,24 +293,13 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
   }
 
   Future<void> _pickMonth() async {
-    final isJ = widget.calendarController.isJalali;
-    DateTime? picked;
-    if (isJ) {
-      picked = await showJalaliDatePicker(
-        context: context,
-        initialDate: _monthStartLocal,
-        firstDate: DateTime(DateTime.now().year - 5),
-        lastDate: DateTime(DateTime.now().year + 5),
-      );
-    } else {
-      picked = await showDatePicker(
-        context: context,
-        initialDate: _monthStartLocal,
-        firstDate: DateTime(DateTime.now().year - 5),
-        lastDate: DateTime(DateTime.now().year + 5),
-        locale: const Locale('en', 'GB'),
-      );
-    }
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: _monthStartLocal,
+      firstDate: DateTime(DateTime.now().year - 5),
+      lastDate: DateTime(DateTime.now().year + 5),
+    );
     if (picked != null && mounted) {
       final DateTime p = picked;
       setState(() {

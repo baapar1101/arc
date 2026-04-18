@@ -467,6 +467,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isCustomerClubPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'customer_club',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -931,6 +943,14 @@ class _BusinessShellState extends State<BusinessShell> {
         path: '/business/${widget.businessId}/repair-shop',
         type: _MenuItemType.simple,
         hasAddButton: true,
+      ),
+      _MenuItem(
+        label: t.customerClubMenu,
+        icon: Icons.card_giftcard_outlined,
+        selectedIcon: Icons.card_giftcard,
+        path: '/business/${widget.businessId}/customer-club',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         label: 'استعلامات',
@@ -2167,6 +2187,13 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    // باشگاه مشتریان
+    if (section == 'customer_club') {
+      if (!_isCustomerClubPluginActive()) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -2256,6 +2283,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.pluginMarketplace) return 'marketplace';
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
+    if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

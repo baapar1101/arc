@@ -610,3 +610,64 @@ msgstr "وضعیت نامعتبر است"
 
 msgid "CRM_NOTE_DATE_RANGE_INVALID"
 msgstr "بازه تاریخ نامعتبر است"
+
+# Customer club / loyalty
+msgid "CUSTOMER_CLUB_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه باشگاه مشتریان برای این کسب‌وکار فعال نیست."
+
+msgid "CUSTOMER_CLUB_DISABLED"
+msgstr "باشگاه مشتریان برای این کسب‌وکار غیرفعال است."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_PERSON_REQUIRED"
+msgstr "شناسه شخص (person_id) الزامی است."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_DELTA_REQUIRED"
+msgstr "مقدار دلتا امتیاز (delta_points) الزامی است."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_DESCRIPTION_REQUIRED"
+msgstr "توضیح الزامی است."
+
+msgid "CUSTOMER_CLUB_TIERS_LIST_REQUIRED"
+msgstr "ارسال آرایهٔ سطوح (tiers) الزامی است."
+
+msgid "CUSTOMER_CLUB_INVALID_EARN_MODE"
+msgstr "شیوهٔ محاسبهٔ امتیاز (earn_mode) نامعتبر است."
+
+msgid "CUSTOMER_CLUB_INVALID_AMOUNT_BASIS"
+msgstr "مبنای مبلغ فاکتور (amount_basis) نامعتبر است."
+
+msgid "CUSTOMER_CLUB_INVALID_ROUNDING_MODE"
+msgstr "نوع گرد کردن امتیاز (rounding_mode) نامعتبر است."
+
+msgid "CUSTOMER_CLUB_TIER_NAME_REQUIRED"
+msgstr "نام سطح الزامی است."
+
+msgid "CUSTOMER_CLUB_TIER_MULTIPLIER_INVALID"
+msgstr "ضریب کسب امتیاز (earn_multiplier) باید مثبت باشد."
+
+msgid "CUSTOMER_CLUB_PERSON_NOT_FOUND"
+msgstr "شخص یافت نشد."
+
+msgid "INVALID_LOYALTY_POINTS"
+msgstr "مقدار مصرف امتیاز (loyalty_redemption_points) نامعتبر است."
+
+msgid "LOYALTY_REDEEM_NOT_ALLOWED"
+msgstr "مصرف امتیاز فقط برای فاکتور فروش قطعی مجاز است."
+
+msgid "LOYALTY_REDEEM_NO_PERSON"
+msgstr "برای مصرف امتیاز، انتخاب شخص در فاکتور الزامی است."
+
+msgid "LOYALTY_REDEEM_PERMISSION"
+msgstr "مجوز مصرف امتیاز در فاکتور (customer_club.redeem) را ندارید."
+
+msgid "LOYALTY_RATE_MISSING"
+msgstr "مبلغ هر امتیاز در تنظیمات باشگاه (currency_value_per_point) تعریف نشده است."
+
+msgid "LOYALTY_INSUFFICIENT_BALANCE"
+msgstr "ماندهٔ امتیاز مشتری کافی نیست."
+
+msgid "LOYALTY_INSUFFICIENT_BALANCE_AT_COMMIT"
+msgstr "در لحظهٔ ثبت، ماندهٔ امتیاز کافی نیست."
+
+msgid "LOYALTY_DISCOUNT_TOO_HIGH"
+msgstr "تخفیف امتیازی از مبلغ خالص فاکتور بیشتر است."

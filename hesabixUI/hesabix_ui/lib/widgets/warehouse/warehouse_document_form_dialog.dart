@@ -6,6 +6,7 @@ import '../../services/product_attribute_service.dart';
 import '../../services/invoice_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import 'warehouse_location_dropdown.dart';
 import '../../widgets/date_input_field.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
@@ -233,15 +234,25 @@ class _WarehouseDocumentFormDialogState
 
       // برای transfer، از انبار سطح حواله استفاده می‌کنیم
       if (_docType == 'transfer') {
-        return {
+        final splitLine = line['movement'] != null &&
+            (line['movement'] as String).isNotEmpty;
+        final row = <String, dynamic>{
           'product_id': line['product_id'],
           'warehouse_id_from': warehouseResolved['warehouse_id_from'],
           'warehouse_id_to': warehouseResolved['warehouse_id_to'],
           'quantity': line['quantity'],
-          'instance_data': instanceData, // برای حواله ورود
-          'instance_ids': instanceIds, // برای حواله خروج
+          'instance_data': instanceData,
+          'instance_ids': instanceIds,
           'extra_info': extra,
         };
+        if (!splitLine) {
+          row['warehouse_location_id_from'] =
+              line['warehouse_location_id_from'];
+          row['warehouse_location_id_to'] = line['warehouse_location_id_to'];
+        } else {
+          row['warehouse_location_id'] = line['warehouse_location_id'];
+        }
+        return row;
       }
 
       return {
@@ -249,12 +260,116 @@ class _WarehouseDocumentFormDialogState
         'warehouse_id': warehouseResolved['warehouse_id'],
         'movement': movement,
         'quantity': line['quantity'],
+        'warehouse_location_id': line['warehouse_location_id'],
         'instance_data':
             instanceData, // برای حواله ورود (receipt/production_in)
         'instance_ids': instanceIds, // برای حواله خروج (issue/production_out)
         'extra_info': extra,
       };
     }).toList();
+  }
+
+  /// انتخاب محل فیزیکی برای هر خط؛ در انتقال ترکیبی دو فیلد مبدا/مقصد، در خط جدا شدهٔ انتقال یک فیلد.
+  Widget _buildLineLocationSection(BuildContext context, int index) {
+    final line = _lines[index];
+
+    if (_isPosted) {
+      final loc = line['warehouse_location_id'] as int?;
+      final lf = line['warehouse_location_id_from'] as int?;
+      final lt = line['warehouse_location_id_to'] as int?;
+      String? text;
+      if (_docType == 'transfer') {
+        final mov = line['movement'] as String?;
+        final split = mov != null && mov.isNotEmpty;
+        if (!split && (lf != null || lt != null)) {
+          text = 'محل مبدا: ${lf ?? '—'} ، محل مقصد: ${lt ?? '—'}';
+        } else if (split && loc != null) {
+          text = 'محل (${mov == 'out' ? 'مبدا' : 'مقصد'}): #$loc';
+        }
+      } else if (loc != null) {
+        text = 'محل انبار: #$loc';
+      }
+      if (text == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+    }
+
+    if (_docType == 'transfer') {
+      final movement = line['movement'] as String?;
+      final resolved = _resolveLineWarehouse(line, movement ?? 'out');
+      final wf = resolved['warehouse_id_from'] as int?;
+      final wt = resolved['warehouse_id_to'] as int?;
+      final splitLine = movement != null && movement.isNotEmpty;
+
+      if (!splitLine) {
+        if (wf == null && wt == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wf != null)
+                WarehouseLocationDropdown(
+                  businessId: widget.businessId,
+                  warehouseId: wf,
+                  selectedLocationId:
+                      line['warehouse_location_id_from'] as int?,
+                  label: 'محل مبدا',
+                  onChanged: (v) =>
+                      _updateLine(index, {'warehouse_location_id_from': v}),
+                ),
+              if (wf != null && wt != null) const SizedBox(height: 8),
+              if (wt != null)
+                WarehouseLocationDropdown(
+                  businessId: widget.businessId,
+                  warehouseId: wt,
+                  selectedLocationId: line['warehouse_location_id_to'] as int?,
+                  label: 'محل مقصد',
+                  onChanged: (v) =>
+                      _updateLine(index, {'warehouse_location_id_to': v}),
+                ),
+            ],
+          ),
+        );
+      }
+
+      final widForLoc = movement == 'out' ? wf : wt;
+      if (widForLoc == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: WarehouseLocationDropdown(
+          businessId: widget.businessId,
+          warehouseId: widForLoc,
+          selectedLocationId: line['warehouse_location_id'] as int?,
+          label: movement == 'out' ? 'محل مبدا' : 'محل مقصد',
+          onChanged: (v) => _updateLine(index, {'warehouse_location_id': v}),
+        ),
+      );
+    }
+
+    final movement =
+        (line['movement'] as String?) ?? _movementForDocType(_docType);
+    final resolved = _resolveLineWarehouse(line, movement);
+    final wid = resolved['warehouse_id'] as int?;
+    if (wid == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: WarehouseLocationDropdown(
+        businessId: widget.businessId,
+        warehouseId: wid,
+        selectedLocationId: line['warehouse_location_id'] as int?,
+        label: 'محل انبار',
+        onChanged: (v) => _updateLine(index, {'warehouse_location_id': v}),
+      ),
+    );
   }
 
   Widget _buildQuantityRow(
@@ -1414,13 +1529,27 @@ class _WarehouseDocumentFormDialogState
 
   void _addLine() {
     setState(() {
-      _lines.add({
-        'product_id': null,
-        'warehouse_id': null,
-        'movement': _movementForDocType(_docType),
-        'quantity': 0.0,
-        'extra_info': <String, dynamic>{},
-      });
+      if (_docType == 'transfer') {
+        _lines.add({
+          'product_id': null,
+          'movement': null,
+          'warehouse_id_from': null,
+          'warehouse_id_to': null,
+          'warehouse_location_id_from': null,
+          'warehouse_location_id_to': null,
+          'quantity': 0.0,
+          'extra_info': <String, dynamic>{},
+        });
+      } else {
+        _lines.add({
+          'product_id': null,
+          'warehouse_id': null,
+          'movement': _movementForDocType(_docType),
+          'warehouse_location_id': null,
+          'quantity': 0.0,
+          'extra_info': <String, dynamic>{},
+        });
+      }
     });
   }
 
@@ -2617,6 +2746,8 @@ class _WarehouseDocumentFormDialogState
                 );
               },
             ),
+            const SizedBox(height: 8),
+            _buildLineLocationSection(context, index),
           ],
         ),
       ),

@@ -593,7 +593,7 @@ PY
   return 0
 }
 
-# Save deployment config for hesabix -update and install /usr/local/bin/hesabix
+# Save deployment config for hesabix CLI (-update, -services, …) and install /usr/local/bin/hesabix
 install_hesabix_command() {
   mkdir -p "${APP_ROOT}"
   local env_file="${APP_ROOT}/.deploy_env"
@@ -609,39 +609,154 @@ ENV
   local bin_hesabix="/usr/local/bin/hesabix"
   cat > "${bin_hesabix}" <<'HESABIX_SCRIPT'
 #!/usr/bin/env bash
-# Hesabix CLI – update from repo and rebuild (run after deploy.sh at least once).
+# Hesabix CLI – update from repo / control systemd units (after deploy.sh at least once).
 set -euo pipefail
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
 if [[ $EUID -ne 0 ]]; then
-  echo "Run as root (e.g. sudo hesabix -update)" >&2
+  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -services start)" >&2
   exit 1
 fi
 if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
   echo "Hesabix not deployed yet. Run deploy.sh first." >&2
   exit 1
 fi
+
+# Core application units (order: start forward, stop reverse). pgadmin4 is optional if installed.
+run_hesabix_services() {
+  local action="$1"
+  local -a core=( hesabix-api hesabix-rq-worker hesabix-notification-moderation )
+  local u
+
+  for u in "${core[@]}"; do
+    if [[ "$(systemctl show "${u}.service" -p LoadState --value 2>/dev/null)" != "loaded" ]]; then
+      echo "Expected systemd unit is missing or not loaded: ${u}.service (re-run deploy.sh backend step)" >&2
+      exit 1
+    fi
+  done
+
+  local -a extra=()
+  if [[ "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
+    extra+=( pgadmin4 )
+  fi
+
+  case "${action}" in
+    start)
+      for u in "${core[@]}"; do
+        systemctl start "${u}.service"
+      done
+      for u in "${extra[@]}"; do
+        systemctl start "${u}.service"
+      done
+      echo "Started Hesabix services."
+      ;;
+    stop)
+      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do
+        systemctl stop "${extra[i]}.service"
+      done
+      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do
+        systemctl stop "${core[i]}.service"
+      done
+      echo "Stopped Hesabix services."
+      ;;
+    restart)
+      for u in "${core[@]}"; do
+        systemctl restart "${u}.service"
+      done
+      for u in "${extra[@]}"; do
+        systemctl restart "${u}.service"
+      done
+      echo "Restarted Hesabix services."
+      ;;
+    status)
+      for u in "${core[@]}"; do
+        echo "======== ${u}.service ========"
+        systemctl --no-pager -l status "${u}.service" || true
+      done
+      for u in "${extra[@]}"; do
+        echo "======== ${u}.service ========"
+        systemctl --no-pager -l status "${u}.service" || true
+      done
+      ;;
+    *)
+      echo "Invalid action: ${action}. Use: start|stop|restart|status" >&2
+      exit 1
+      ;;
+  esac
+}
+
 UPDATE_MODE=""
+SERVICES_ACTION=""
 SOURCE_URL=""
 BRANCH_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -update) UPDATE_MODE=1 ;;
-    -source) SOURCE_URL="${2:-}"; shift ;;
-    -branch) BRANCH_OVERRIDE="${2:-}"; shift ;;
+    -update) UPDATE_MODE=1; shift ;;
+    -source)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "-source requires a repository URL." >&2
+        exit 1
+      fi
+      SOURCE_URL="$2"
+      shift 2
+      ;;
+    -branch)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "-branch requires a branch name." >&2
+        exit 1
+      fi
+      BRANCH_OVERRIDE="$2"
+      shift 2
+      ;;
+    -services)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -services requires an action: start|stop|restart|status" >&2
+        exit 1
+      fi
+      SERVICES_ACTION="$2"
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: hesabix -update [-source REPO_URL] [-branch BRANCH]"
-      echo "  -update         Run update (pull, migrate, restart, rebuild frontend, reload nginx)"
-      echo "  -source URL     Override repo URL (default: from initial deploy)"
-      echo "  -branch NAME    Override branch (default: from initial deploy)"
-      exit 0 ;;
-    *) echo "Unknown option: $1. Use -h for help." >&2; exit 1 ;;
+      echo "Usage:"
+      echo "  hesabix -update [-source REPO_URL] [-branch BRANCH]"
+      echo "  hesabix -services {start|stop|restart|status}"
+      echo ""
+      echo "  -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)"
+      echo "  -source URL       Override repo URL (default: from initial deploy)"
+      echo "  -branch NAME      Override branch (default: from initial deploy)"
+      echo "  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker;"
+      echo "                    pgadmin4 too if installed)"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1. Use -h for help." >&2
+      exit 1
+      ;;
   esac
-  shift
 done
-if [[ -z "${UPDATE_MODE}" ]]; then
-  echo "Usage: hesabix -update [-source REPO_URL] [-branch BRANCH]. Use -h for help."
+
+if [[ -n "${UPDATE_MODE}" && -n "${SERVICES_ACTION}" ]]; then
+  echo "Use either -update or -services, not both." >&2
+  exit 1
+fi
+
+if [[ -n "${SERVICES_ACTION}" ]]; then
+  case "${SERVICES_ACTION}" in
+    start|stop|restart|status) ;;
+    *)
+      echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status" >&2
+      exit 1
+      ;;
+  esac
+  run_hesabix_services "${SERVICES_ACTION}"
   exit 0
 fi
+
+if [[ -z "${UPDATE_MODE}" ]]; then
+  echo "Usage: hesabix -update …  or  hesabix -services {start|stop|restart|status}"
+  echo "Try: hesabix -h"
+  exit 0
+fi
+
 set -a
 # shellcheck source=/dev/null
 source "${APP_ROOT}/.deploy_env"
@@ -656,7 +771,7 @@ fi
 exec bash "${APP_ROOT}/app/update.sh"
 HESABIX_SCRIPT
   chmod 755 "${bin_hesabix}"
-  log_success "Command installed: hesabix (e.g. sudo hesabix -update)"
+  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -services restart)"
 }
 
 reset_deployment_state() {
@@ -2705,6 +2820,12 @@ main() {
   log_info "To update (pull, migrate, rebuild, restart):"
   echo "  sudo hesabix -update"
   echo "  sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git   # override repo"
+  echo
+  log_info "To start/stop/restart all Hesabix app services (systemd):"
+  echo "  sudo hesabix -services start"
+  echo "  sudo hesabix -services stop"
+  echo "  sudo hesabix -services restart"
+  echo "  sudo hesabix -services status"
   echo
   log_info "To re-run deploy (resume from last step or full upgrade):"
   echo "  BRANCH=${BRANCH} API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN} sudo -E bash deploy.sh"

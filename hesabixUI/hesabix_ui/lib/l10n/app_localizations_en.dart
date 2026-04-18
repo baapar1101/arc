@@ -8728,6 +8728,195 @@ class AppLocalizationsEn extends AppLocalizations {
   String get warrantyManage => 'Manage Warranty';
 
   @override
+  String get customerClubTitle => 'Customer Club';
+
+  @override
+  String get customerClubMenu => 'Customer Club';
+
+  @override
+  String get customerClubTabLedger => 'Transactions';
+
+  @override
+  String get customerClubTabSettings => 'Settings';
+
+  @override
+  String get customerClubTabAdjust => 'Adjust Points';
+
+  @override
+  String get customerClubLedgerTotal => 'Transactions count';
+
+  @override
+  String get customerClubLoadMore => 'Load more';
+
+  @override
+  String get customerClubBalanceAfter => 'Balance after';
+
+  @override
+  String get customerClubPerson => 'Person';
+
+  @override
+  String get customerClubEnabled => 'Enable loyalty program';
+
+  @override
+  String get customerClubEarnMode => 'Earning rule';
+
+  @override
+  String get customerClubEarnPercent => 'Percentage of basis amount';
+
+  @override
+  String get customerClubEarnPerCurrency => 'Points per currency bracket';
+
+  @override
+  String get customerClubAmountBasis => 'Invoice amount basis';
+
+  @override
+  String get customerClubBasisNet => 'Net excluding tax';
+
+  @override
+  String get customerClubBasisTotal => 'Total including tax';
+
+  @override
+  String get customerClubPercentOfBasis => 'Percent of basis';
+
+  @override
+  String get customerClubPercentHint => 'Example: 1 means 1% of basis amount';
+
+  @override
+  String get customerClubStepAmount => 'Bracket amount (currency)';
+
+  @override
+  String get customerClubPointsPerStep => 'Points per bracket';
+
+  @override
+  String get customerClubRounding => 'Rounding mode';
+
+  @override
+  String get customerClubMaxPointsInvoice =>
+      'Max points per invoice (optional)';
+
+  @override
+  String get customerClubMinBasis => 'Minimum basis amount to earn points';
+
+  @override
+  String get customerClubRedemptionSection => 'Redemption & expiry';
+
+  @override
+  String get customerClubCurrencyValuePerPoint =>
+      'Discount amount per loyalty point (invoice currency)';
+
+  @override
+  String get customerClubCurrencyValuePerPointHint =>
+      'How much invoice discount one point buys, in invoice currency.';
+
+  @override
+  String get customerClubMaxRedeemPerInvoice =>
+      'Maximum points redeemable per sales invoice (optional)';
+
+  @override
+  String get customerClubPointsExpireAfterDays =>
+      'Points validity from grant date (days)';
+
+  @override
+  String get customerClubPointsExpireAfterDaysHint =>
+      'Leave empty so points never expire.';
+
+  @override
+  String get customerClubRequireCustomerType =>
+      'Only contacts marked as Customer';
+
+  @override
+  String get customerClubSettingsSaved => 'Club settings saved.';
+
+  @override
+  String get customerClubInvalidPersonId => 'Invalid person id.';
+
+  @override
+  String get customerClubInvalidDelta => 'Invalid delta points.';
+
+  @override
+  String get customerClubDescriptionRequired => 'Description is required.';
+
+  @override
+  String get customerClubAdjustmentSaved => 'Adjustment recorded.';
+
+  @override
+  String get customerClubNoAdjustPermission =>
+      'You cannot perform manual adjustments.';
+
+  @override
+  String get customerClubAdjustIntro =>
+      'Increase or decrease points manually. Delta may be negative.';
+
+  @override
+  String get customerClubPersonId => 'Person ID';
+
+  @override
+  String get customerClubDeltaPoints => 'Delta points (+/-)';
+
+  @override
+  String get customerClubSubmitAdjustment => 'Submit adjustment';
+
+  @override
+  String get customerClubSettingsSubtitle =>
+      'Points rules, transactions and manual balances';
+
+  @override
+  String get customerClubRoundingFloor => 'Round down (floor)';
+
+  @override
+  String get customerClubRoundingCeil => 'Round up (ceil)';
+
+  @override
+  String get customerClubRoundingRound => 'Round to nearest';
+
+  @override
+  String get customerClubReferenceDocument => 'Document';
+
+  @override
+  String get customerClubPointsShort => 'pts';
+
+  @override
+  String get customerClubTxnAdjustment => 'Manual adjustment';
+
+  @override
+  String get customerClubTxnRedeem => 'Points redemption';
+
+  @override
+  String get customerClubTxnRedeemVoid => 'Redemption reversal';
+
+  @override
+  String get customerClubTxnInvoiceSync => 'Invoice points sync';
+
+  @override
+  String get customerClubTxnInvoiceDeleteReversal =>
+      'Invoice deleted — points reversal';
+
+  @override
+  String get customerClubTxnInvoiceDeleteReversalRedeem =>
+      'Invoice deleted — redemption reversal';
+
+  @override
+  String customerClubPermissionManageSettings(String title) {
+    return 'Manage club settings ($title)';
+  }
+
+  @override
+  String customerClubPermissionAdjustManual(String title) {
+    return 'Manual points adjustment ($title)';
+  }
+
+  @override
+  String customerClubPermissionRedeemInvoice(String title) {
+    return 'Redeem points on sales invoice ($title)';
+  }
+
+  @override
+  String get customerClubActionAdjust => 'Adjust';
+
+  @override
+  String get customerClubActionRedeem => 'Redeem';
+
+  @override
   String get identityInquiryTitle => 'Identity Inquiry';
 
   @override

@@ -1840,47 +1840,24 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   Future<(String, String)?> _pickCustomRange(BuildContext context) async {
     if (!context.mounted) return null;
     final ctx = context;
-    final isJalali = widget.calendarController?.isJalali == true;
-    if (isJalali) {
-      try {
-        final now = DateTime.now();
-        final from = await showJalaliDatePicker(
-          context: ctx,
-          initialDate: now,
-          firstDate: DateTime(now.year - 10, 1, 1),
-          lastDate: DateTime(now.year + 10, 12, 31),
-          helpText: 'انتخاب تاریخ شروع',
-        );
-        if (from == null) return null;
-        if (!ctx.mounted) return null;
-        final to = await showJalaliDatePicker(
-          context: ctx,
-          initialDate: from,
-          firstDate: from,
-          lastDate: DateTime(now.year + 10, 12, 31),
-          helpText: 'انتخاب تاریخ پایان',
-        );
-        if (to == null) return null;
-        final a = from.isBefore(to) ? from : to;
-        final b = from.isBefore(to) ? to : from;
-        return (_isoDate(a), _isoDate(b));
-      } catch (_) {/* fallback below */}
-    }
-    // Gregorian fallback
-    if (!ctx.mounted) return null;
-    DateTime? from = await showDatePicker(
+    final now = DateTime.now();
+    final from = await showAdaptiveDatePicker(
       context: ctx,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      calendarController: widget.calendarController,
+      initialDate: now,
+      firstDate: DateTime(now.year - 10, 1, 1),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      helpText: 'انتخاب تاریخ شروع',
     );
     if (from == null) return null;
     if (!ctx.mounted) return null;
-    DateTime? to = await showDatePicker(
+    final to = await showAdaptiveDatePicker(
       context: ctx,
+      calendarController: widget.calendarController,
       initialDate: from,
       firstDate: from,
-      lastDate: DateTime(2100),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      helpText: 'انتخاب تاریخ پایان',
     );
     if (to == null) return null;
     final a = from.isBefore(to) ? from : to;

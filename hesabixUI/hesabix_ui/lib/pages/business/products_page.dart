@@ -26,6 +26,8 @@ import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../core/date_utils.dart';
+import '../../widgets/jalali_date_picker.dart';
 
 class ProductsPage extends StatefulWidget {
   final int businessId;
@@ -1795,12 +1797,16 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _stockAsOfDate != null
-                                ? '${_stockAsOfDate!.year}-${_stockAsOfDate!.month.toString().padLeft(2, '0')}-${_stockAsOfDate!.day.toString().padLeft(2, '0')}'
+                                ? HesabixDateUtils.formatForDisplay(
+                                    _stockAsOfDate,
+                                    ApiClient.getCalendarController()?.isJalali ?? true,
+                                  )
                                 : '',
                           ),
                           onTap: () async {
-                            final date = await showDatePicker(
+                            final date = await showAdaptiveDatePicker(
                               context: context,
+                              calendarController: ApiClient.getCalendarController(),
                               initialDate: _stockAsOfDate ?? DateTime.now(),
                               firstDate: DateTime(2000),
                               lastDate: DateTime(2100),

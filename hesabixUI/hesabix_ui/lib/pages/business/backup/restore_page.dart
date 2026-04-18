@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import '../../../utils/job_status_utils.dart';
 import '../../../utils/snackbar_helper.dart';
 
 
@@ -182,31 +184,42 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
       try {
         final st = await _service.getJobStatus(_currentJobId!);
         if (!ctx.mounted) return;
+        final prog = JobStatusUtils.readProgress(st, _jobProgress);
+        final rawMsg = JobStatusUtils.readRawMessage(st);
         setState(() {
-          _jobProgress = (st['progress'] as int?) ?? _jobProgress;
-          final rawMessage = (st['message'] as String?) ?? _jobMessage;
-          _jobMessage = _translateJobMessage(rawMessage);
+          _jobProgress = prog;
+          _jobMessage = _translateJobMessage(rawMsg ?? _jobMessage);
         });
         final state = (st['state'] as String?) ?? '';
-        if (state == 'succeeded') {
+        if (JobStatusUtils.isSuccessState(state)) {
           timer.cancel();
+          if (!ctx.mounted) return;
           setState(() {
             _jobRunning = false;
+            _jobProgress = 100;
+            _jobMessage = AppLocalizations.of(ctx).restoreCompleted;
           });
           await _load();
           if (!ctx.mounted) return;
           _showSnackBar(AppLocalizations.of(ctx).operationSuccessful);
-        } else if (state == 'failed') {
+        } else if (JobStatusUtils.isFailedState(state)) {
           timer.cancel();
+          if (!ctx.mounted) return;
           setState(() {
             _jobRunning = false;
           });
-          if (!ctx.mounted) return;
-          final err = (st['error'] as String?) ?? AppLocalizations.of(ctx).error;
-          final errorMessage = _parseJobError(err);
-          _showSnackBar(errorMessage);
+          final errRaw = st['error'];
+          final errorMessage = JobStatusUtils.stringifyError(
+            errRaw,
+            AppLocalizations.of(ctx).errorRestoreFailed,
+          );
+          _showSnackBar(_getUserFriendlyError(errorMessage));
         }
-      } catch (_) {}
+      } catch (e, stack) {
+        if (kDebugMode) {
+          debugPrint('restore job poll error: $e\n$stack');
+        }
+      }
     });
   }
 

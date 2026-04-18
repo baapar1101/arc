@@ -51,6 +51,8 @@ from .cash_register import CashRegister  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
+from .warehouse_location import WarehouseLocation  # noqa: F401
+from .warehouse_product_placement import WarehouseProductPlacement  # noqa: F401
 from .warehouse_document import WarehouseDocument  # noqa: F401
 from .warehouse_document_line import WarehouseDocumentLine  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
@@ -124,4 +126,11 @@ from .crm import (  # noqa: F401
     CrmNoteAclUser,
     CrmNoteComment,
     CrmNoteAuditEvent,
+)
+from .customer_club import (  # noqa: F401
+	CustomerClubSettings,
+	CustomerClubBalance,
+	CustomerClubLedger,
+	CustomerClubInvoiceSnapshot,
+	CustomerClubTier,
 )

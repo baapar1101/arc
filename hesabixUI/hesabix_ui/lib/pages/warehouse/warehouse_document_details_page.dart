@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../widgets/warehouse/warehouse_location_dropdown.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
@@ -229,6 +230,52 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('انبار به‌روزرسانی شد')),
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا: $e')),
+      );
+    }
+  }
+
+  /// انبار مؤثر برای اعتبارسنجی/لیست محل‌ها (خط یا سطح سند، مشابه فرم حواله).
+  int? _resolveLineWarehouseIdForLocation(
+    Map<String, dynamic> doc,
+    Map<String, dynamic> lineMap,
+  ) {
+    final docType = doc['doc_type'] as String?;
+    final movement = (lineMap['movement'] as String?)?.toLowerCase();
+    final wid = lineMap['warehouse_id'] as int?;
+
+    if (docType == 'transfer') {
+      final wf = doc['warehouse_id_from'] as int?;
+      final wt = doc['warehouse_id_to'] as int?;
+      if (movement == 'out') return wid ?? wf;
+      if (movement == 'in') return wid ?? wt;
+      return wid ?? wf ?? wt;
+    }
+    if (docType == 'issue' || docType == 'production_out') {
+      return wid ?? doc['warehouse_id_from'] as int?;
+    }
+    if (docType == 'receipt' || docType == 'production_in') {
+      return wid ?? doc['warehouse_id_to'] as int?;
+    }
+    return wid;
+  }
+
+  Future<void> _updateLineLocation(int lineId, int? warehouseLocationId) async {
+    try {
+      await _svc.updateLine(
+        businessId: widget.businessId,
+        docId: widget.documentId,
+        lineId: lineId,
+        payload: {'warehouse_location_id': warehouseLocationId},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('محل انبار به‌روزرسانی شد')),
       );
       _load();
     } catch (e) {
@@ -598,6 +645,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                         columns: const [
                           DataColumn(label: Text('محصول')),
                           DataColumn(label: Text('انبار')),
+                          DataColumn(label: Text('محل انبار')),
                           DataColumn(label: Text('نوع حرکت')),
                           DataColumn(label: Text('تعداد')),
                         ],
@@ -608,6 +656,31 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                           final warehouseId = lineMap['warehouse_id'] as int?;
                           final movement = lineMap['movement'] as String?;
                           final quantity = lineMap['quantity'] as num?;
+                          final locationId =
+                              lineMap['warehouse_location_id'] as int?;
+                          final resolvedWh =
+                              _resolveLineWarehouseIdForLocation(doc, lineMap);
+
+                          Widget locationCell;
+                          if (isDraft &&
+                              lineId != null &&
+                              resolvedWh != null) {
+                            locationCell = SizedBox(
+                              width: 220,
+                              child: WarehouseLocationDropdown(
+                                businessId: widget.businessId,
+                                warehouseId: resolvedWh,
+                                selectedLocationId: locationId,
+                                label: 'محل',
+                                onChanged: (v) =>
+                                    _updateLineLocation(lineId, v),
+                              ),
+                            );
+                          } else if (locationId != null) {
+                            locationCell = Text('#$locationId');
+                          } else {
+                            locationCell = const Text('—');
+                          }
 
                           return DataRow(
                             cells: [
@@ -627,6 +700,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                                       )
                                     : Text(warehouseId?.toString() ?? '-'),
                               ),
+                              DataCell(locationCell),
                               DataCell(Text(movement == 'in' ? 'ورود' : 'خروج')),
                               DataCell(Text(quantity?.toString() ?? '-')),
                             ],

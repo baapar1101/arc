@@ -8,6 +8,8 @@ import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:hesabix_ui/services/business_ftp_backup_service.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import '../../../utils/job_status_utils.dart';
 import '../../../utils/snackbar_helper.dart';
 
 
@@ -123,40 +125,39 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
       try {
         final st = await _service.getJobStatus(_currentJobId!);
         if (!ctx.mounted) return;
-        final meta = st['meta'];
-        int? prog;
-        String? rawMessage;
-        if (meta is Map) {
-          prog = meta['progress'] as int?;
-          rawMessage = meta['message'] as String?;
-        }
-        prog ??= st['progress'] as int?;
-        rawMessage ??= st['message'] as String?;
+        final prog = JobStatusUtils.readProgress(st, _jobProgress);
+        final rawMessage = JobStatusUtils.readRawMessage(st);
         if (!ctx.mounted) return;
         setState(() {
-          _jobProgress = prog ?? _jobProgress;
+          _jobProgress = prog;
           if (rawMessage != null) {
             _jobMessage = _translateJobMessage(rawMessage);
           }
         });
         final state = (st['state'] as String?) ?? '';
-        if (state == 'succeeded' || state == 'finished') {
+        if (JobStatusUtils.isSuccessState(state)) {
           timer.cancel();
+          if (!ctx.mounted) return;
           setState(() {
             _jobRunning = false;
+            _jobProgress = 100;
+            _jobMessage = AppLocalizations.of(ctx).backupCompleted;
           });
           await _load();
           if (ctx.mounted) {
             _showSnackBar(AppLocalizations.of(ctx).operationSuccessful);
           }
-        } else if (state == 'failed') {
+        } else if (JobStatusUtils.isFailedState(state)) {
           timer.cancel();
           setState(() {
             _jobRunning = false;
           });
           if (!ctx.mounted) return;
-          final err = (st['error'] as String?) ?? AppLocalizations.of(ctx).error;
-          // بررسی اینکه آیا خطا مربوط به فضای ذخیره‌سازی است
+          final errRaw = st['error'];
+          final errStr = JobStatusUtils.stringifyError(
+            errRaw,
+            AppLocalizations.of(ctx).backupFailed,
+          );
           final errorData = st['error_data'];
           if (errorData is Map) {
             final errorCode = errorData['error'] as String?;
@@ -165,9 +166,13 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
               return;
             }
           }
-          _showSnackBar(err);
+          _showSnackBar(errStr);
         }
-      } catch (_) {}
+      } catch (e, stack) {
+        if (kDebugMode) {
+          debugPrint('backup job poll error: $e\n$stack');
+        }
+      }
     });
   }
 

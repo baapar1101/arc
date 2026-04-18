@@ -16,7 +16,9 @@ import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
@@ -1013,12 +1015,20 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
                     title: Text('تاریخ پیش‌بینی بسته شدن'),
                     subtitle: Text(
-                      _expectedCloseDate != null ? DateFormat('y/MM/dd').format(_expectedCloseDate!) : 'انتخاب نشده',
+                      _expectedCloseDate != null
+                          ? HesabixDateUtils.formatForDisplay(
+                              _expectedCloseDate,
+                              widget.calendarController?.isJalali ??
+                                  ApiClient.getCalendarController()?.isJalali ??
+                                  true,
+                            )
+                          : 'انتخاب نشده',
                     ),
                     trailing: TextButton.icon(
                       onPressed: () async {
-                        final picked = await showDatePicker(
+                        final picked = await showAdaptiveDatePicker(
                           context: context,
+                          calendarController: widget.calendarController,
                           initialDate: _expectedCloseDate ?? DateTime.now(),
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
@@ -1036,7 +1046,12 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                   title: Text(
                     _nextFollowUpAt == null
                         ? 'یادآور پیگیری: تعیین نشده'
-                        : 'یادآور پیگیری: ${DateFormat('y/MM/dd HH:mm').format(_nextFollowUpAt!)}',
+                        : 'یادآور پیگیری: ${HesabixDateUtils.formatDateTime(
+                            _nextFollowUpAt,
+                            widget.calendarController?.isJalali ??
+                                ApiClient.getCalendarController()?.isJalali ??
+                                true,
+                          )}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   trailing: Row(
@@ -1044,8 +1059,9 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                     children: [
                       TextButton(
                         onPressed: () async {
-                          final date = await showDatePicker(
+                          final date = await showAdaptiveDatePicker(
                             context: context,
+                            calendarController: widget.calendarController,
                             initialDate: _nextFollowUpAt ?? DateTime.now(),
                             firstDate: DateTime.now(),
                             lastDate: DateTime.now().add(const Duration(days: 365)),

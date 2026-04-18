@@ -4,6 +4,9 @@ import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/snackbar_helper.dart';
+import '../../core/api_client.dart';
+import '../../core/date_utils.dart';
+import '../../widgets/jalali_date_picker.dart';
 
 class StockReportPage extends StatefulWidget {
   final int businessId;
@@ -97,11 +100,14 @@ class _StockReportPageState extends State<StockReportPage> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _asOfDate != null
-                                ? '${_asOfDate!.year}-${_asOfDate!.month.toString().padLeft(2, '0')}-${_asOfDate!.day.toString().padLeft(2, '0')}'
+                                ? HesabixDateUtils.formatForDisplay(
+                                    _asOfDate,
+                                    ApiClient.getCalendarController()?.isJalali ?? true,
+                                  )
                                 : '',
                           ),
                           onTap: () async {
-                            final date = await showDatePicker(
+                            final date = await showAdaptiveDatePicker(
                               context: context,
                               initialDate: _asOfDate ?? DateTime.now(),
                               firstDate: DateTime(2000),

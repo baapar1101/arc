@@ -973,26 +973,14 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
     final lastDate = widget.lastDate ?? DateTime(now.year + 10, 12, 31);
     final initialDate = _selectedDate ?? now;
 
-    DateTime? selectedDate;
-
-    if (widget.calendarController.isJalali == true) {
-      selectedDate = await showJalaliDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: widget.labelText ?? AppLocalizations.of(context).datePickerSelectDate,
-      );
-    } else {
-      selectedDate = await showDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: widget.labelText ?? AppLocalizations.of(context).datePickerSelectDate,
-        locale: const Locale('en', 'US'),
-      );
-    }
+    final selectedDate = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: widget.labelText ?? AppLocalizations.of(context).datePickerSelectDate,
+    );
 
     if (selectedDate != null) {
       setState(() {

@@ -123,7 +123,11 @@ class ApiError(HTTPException):
 		details: dict[str, Any] | None = None,
 	) -> None:
 		if translator:
-			translated_message = translator.t(code) if hasattr(translator, "t") else message
+			translated_message = (
+				translator.t(code, default=message)
+				if hasattr(translator, "t")
+				else message
+			)
 		else:
 			translated_message = message
 

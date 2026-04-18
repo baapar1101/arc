@@ -93,26 +93,14 @@ class _DateInputFieldState extends State<DateInputField> {
     final lastDate = widget.lastDate ?? DateTime(now.year + 2);
     final initialDate = widget.value ?? now;
 
-    DateTime? selectedDate;
-    
-    if (widget.calendarController.isJalali == true) {
-      selectedDate = await showJalaliDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: widget.helpText,
-      );
-    } else {
-      selectedDate = await showDatePicker(
-        context: context,
-        initialDate: initialDate,
-        firstDate: firstDate,
-        lastDate: lastDate,
-        helpText: widget.helpText,
-        locale: const Locale('en', 'US'),
-      );
-    }
+    final selectedDate = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: widget.helpText,
+    );
 
     if (selectedDate != null) {
       widget.onChanged?.call(selectedDate);

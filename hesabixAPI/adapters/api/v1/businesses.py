@@ -310,20 +310,27 @@ async def import_business_from_backup(
                     jm.update(job_id, 40, f"Business created (ID: {new_business_id})")
                     
                     # ایمپورت داده‌های سایر جداول
-                    from sqlalchemy import inspect
-                    from adapters.api.v1.business_backups import _discover_scoped_tables
+                    from sqlalchemy import inspect as sa_inspect
+
+                    from adapters.api.v1.business_backups import (
+                        _discover_scoped_tables,
+                        _sort_tables_for_insert_by_fks,
+                        _try_set_session_replication_role_replica,
+                        _reset_session_replication_role,
+                        _build_insert_params_for_restore,
+                        _pk_columns_to_omit_for_new_business,
+                    )
                     
                     jm.update(job_id, 50, "Importing data")
                     
                     tables_info = _discover_scoped_tables(db)
                     target_tables = [t for t in tables_info.keys() if t != "businesses"]
+                    target_tables = _sort_tables_for_insert_by_fks(db.get_bind(), target_tables)
                     
                     conn = db.connection()
-                    # PostgreSQL: غیرفعال کردن foreign key checks (موقت)
-                    try:
-                        conn.execute(text("SET session_replication_role = 'replica'"))  # PostgreSQL equivalent
-                    except Exception:
-                        pass
+                    replica_role_ok = _try_set_session_replication_role_replica(conn)
+                    schema_inspector = sa_inspect(db.get_bind())
+                    json_cols_cache: dict[str, set[str]] = {}
                     
                     # Insert data for other tables
                     for table in target_tables:
@@ -334,10 +341,11 @@ async def import_business_from_backup(
                         
                         col_list = tables_info[table]["columns"]
                         
-                        # حذف id برای auto-increment
+                        pk_omit = _pk_columns_to_omit_for_new_business(schema_inspector, table)
                         insert_col_list = col_list.copy()
-                        if "id" in insert_col_list:
-                            insert_col_list.remove("id")
+                        for _pkc in pk_omit:
+                            if _pkc in insert_col_list:
+                                insert_col_list.remove(_pkc)
                         
                         placeholders = ", ".join([f":{c}" for c in insert_col_list])
                         columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])  # PostgreSQL uses double quotes
@@ -354,11 +362,17 @@ async def import_business_from_backup(
                                 if "business_id" in rec:
                                     rec["business_id"] = new_business_id
                                 
-                                # حذف id برای auto-increment
-                                if "id" in rec:
-                                    del rec["id"]
+                                for _pkc in pk_omit:
+                                    if _pkc in rec:
+                                        del rec[_pkc]
                                 
-                                params = {c: rec.get(c) for c in insert_col_list}
+                                params = _build_insert_params_for_restore(
+                                    schema_inspector,
+                                    table,
+                                    insert_col_list,
+                                    rec,
+                                    json_cols_cache,
+                                )
                                 batch.append(params)
                                 if len(batch) >= 500:
                                     # هر batch در یک transaction جداگانه
@@ -398,11 +412,7 @@ async def import_business_from_backup(
                                         raise
                                     logger.warning(f"Error inserting final batch into {table}, retry {retry_count}/{max_retries}: {e}")
                     
-                    # فعال کردن دوباره foreign key checks
-                    try:
-                        conn.execute(text("SET session_replication_role = 'origin'"))  # PostgreSQL equivalent
-                    except Exception:
-                        pass
+                    _reset_session_replication_role(conn, replica_role_ok)
                     
                     zf.close()
                     

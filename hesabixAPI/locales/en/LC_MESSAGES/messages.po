@@ -587,3 +587,64 @@ msgstr "Invalid status"
 
 msgid "CRM_NOTE_DATE_RANGE_INVALID"
 msgstr "Invalid date range"
+
+# Customer club / loyalty
+msgid "CUSTOMER_CLUB_PLUGIN_NOT_ACTIVE"
+msgstr "Customer club add-on is not active for this business."
+
+msgid "CUSTOMER_CLUB_DISABLED"
+msgstr "Customer club is disabled for this business."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_PERSON_REQUIRED"
+msgstr "person_id is required."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_DELTA_REQUIRED"
+msgstr "delta_points is required."
+
+msgid "CUSTOMER_CLUB_ADJUSTMENT_DESCRIPTION_REQUIRED"
+msgstr "description is required."
+
+msgid "CUSTOMER_CLUB_TIERS_LIST_REQUIRED"
+msgstr "A list of tiers is required."
+
+msgid "CUSTOMER_CLUB_INVALID_EARN_MODE"
+msgstr "earn_mode must be percent_basis or points_per_currency."
+
+msgid "CUSTOMER_CLUB_INVALID_AMOUNT_BASIS"
+msgstr "amount_basis must be net or total_with_tax."
+
+msgid "CUSTOMER_CLUB_INVALID_ROUNDING_MODE"
+msgstr "rounding_mode must be floor, ceil, or round."
+
+msgid "CUSTOMER_CLUB_TIER_NAME_REQUIRED"
+msgstr "Tier name is required."
+
+msgid "CUSTOMER_CLUB_TIER_MULTIPLIER_INVALID"
+msgstr "earn_multiplier must be positive."
+
+msgid "CUSTOMER_CLUB_PERSON_NOT_FOUND"
+msgstr "Person not found."
+
+msgid "INVALID_LOYALTY_POINTS"
+msgstr "loyalty_redemption_points is invalid."
+
+msgid "LOYALTY_REDEEM_NOT_ALLOWED"
+msgstr "Loyalty redemption is only allowed on finalized sales invoices."
+
+msgid "LOYALTY_REDEEM_NO_PERSON"
+msgstr "Invoice must have a person to redeem loyalty points."
+
+msgid "LOYALTY_REDEEM_PERMISSION"
+msgstr "You do not have permission to redeem loyalty points."
+
+msgid "LOYALTY_RATE_MISSING"
+msgstr "currency_value_per_point is not set in customer club settings."
+
+msgid "LOYALTY_INSUFFICIENT_BALANCE"
+msgstr "Customer does not have enough loyalty points."
+
+msgid "LOYALTY_INSUFFICIENT_BALANCE_AT_COMMIT"
+msgstr "Insufficient loyalty points at save time."
+
+msgid "LOYALTY_DISCOUNT_TOO_HIGH"
+msgstr "Loyalty discount exceeds the invoice net amount."

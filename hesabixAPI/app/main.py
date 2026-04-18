@@ -75,6 +75,7 @@ from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
 from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
+from adapters.api.v1.customer_club import router as customer_club_router
 from adapters.api.v1.repair_shop import router as repair_shop_router
 from adapters.api.v1.business_notifications import router as business_notifications_router
 from adapters.api.v1.ping_pong import router as ping_pong_router
@@ -988,6 +989,8 @@ def create_app() -> FastAPI:
     application.include_router(warehouse_reports_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouses import router as warehouses_router
     application.include_router(warehouses_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.warehouse_locations import router as warehouse_locations_router
+    application.include_router(warehouse_locations_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.boms import router as boms_router
     application.include_router(boms_router, prefix=settings.api_v1_prefix)
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
@@ -1028,6 +1031,7 @@ def create_app() -> FastAPI:
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
+    application.include_router(customer_club_router, prefix=settings.api_v1_prefix)
     application.include_router(repair_shop_router, prefix=settings.api_v1_prefix)
     # Business Notifications
     application.include_router(business_notifications_router, prefix=settings.api_v1_prefix)

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'data_table_config.dart';
 import 'helpers/data_table_utils.dart';
@@ -180,8 +179,10 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
   }
 
   List<Widget> _buildDateRangeContent(AppLocalizations t, ThemeData theme) {
-    final isJalali = widget.calendarController?.isJalali ?? false;
-    
+    final isJalali = widget.calendarController?.isJalali ??
+        ApiClient.getCalendarController()?.isJalali ??
+        true;
+
     return [
       // From date
       ListTile(
@@ -190,7 +191,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         subtitle: Text(_fromDate != null 
             ? HesabixDateUtils.formatForDisplay(_fromDate!, isJalali)
             : t.selectDate),
-        onTap: () => _selectFromDate(t, isJalali),
+        onTap: () => _selectFromDate(t),
       ),
       // To date
       ListTile(
@@ -199,7 +200,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         subtitle: Text(_toDate != null 
             ? HesabixDateUtils.formatForDisplay(_toDate!, isJalali)
             : t.selectDate),
-        onTap: () => _selectToDate(t, isJalali),
+        onTap: () => _selectToDate(t),
       ),
     ];
   }
@@ -379,24 +380,16 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
             context.pop();
   }
 
-  Future<void> _selectFromDate(AppLocalizations t, bool isJalali) async {
+  Future<void> _selectFromDate(AppLocalizations t) async {
     final currentContext = context;
-    final date = isJalali 
-        ? await showJalaliDatePicker(
-            // ignore: use_build_context_synchronously
-            context: currentContext,
-            initialDate: _fromDate ?? DateTime.now(),
-            firstDate: DateTime(2000),
-            lastDate: DateTime.now().add(const Duration(days: 365)),
-            helpText: t.dateFrom,
-          )
-        : await showDatePicker(
-            // ignore: use_build_context_synchronously
-            context: currentContext,
-            initialDate: _fromDate ?? DateTime.now(),
-            firstDate: DateTime(2000),
-            lastDate: DateTime.now().add(const Duration(days: 365)),
-          );
+    final date = await showAdaptiveDatePicker(
+      context: currentContext,
+      calendarController: widget.calendarController,
+      initialDate: _fromDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: t.dateFrom,
+    );
     if (date != null && mounted) {
       setState(() {
         _fromDate = date;
@@ -404,24 +397,16 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
     }
   }
 
-  Future<void> _selectToDate(AppLocalizations t, bool isJalali) async {
+  Future<void> _selectToDate(AppLocalizations t) async {
     final currentContext = context;
-    final date = isJalali 
-        ? await showJalaliDatePicker(
-            // ignore: use_build_context_synchronously
-            context: currentContext,
-            initialDate: _toDate ?? _fromDate ?? DateTime.now(),
-            firstDate: _fromDate ?? DateTime(2000),
-            lastDate: DateTime.now().add(const Duration(days: 365)),
-            helpText: t.dateTo,
-          )
-        : await showDatePicker(
-            // ignore: use_build_context_synchronously
-            context: currentContext,
-            initialDate: _toDate ?? _fromDate ?? DateTime.now(),
-            firstDate: _fromDate ?? DateTime(2000),
-            lastDate: DateTime.now().add(const Duration(days: 365)),
-          );
+    final date = await showAdaptiveDatePicker(
+      context: currentContext,
+      calendarController: widget.calendarController,
+      initialDate: _toDate ?? _fromDate ?? DateTime.now(),
+      firstDate: _fromDate ?? DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: t.dateTo,
+    );
     if (date != null && mounted) {
       setState(() {
         _toDate = date;
@@ -481,10 +466,13 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
             leading: const Icon(Icons.calendar_today),
             title: Text(t.dateFrom),
             subtitle: Text(_fromDate != null 
-                ? DateFormat('yyyy/MM/dd').format(_fromDate!)
+                ? HesabixDateUtils.formatForDisplay(
+                    _fromDate!,
+                    ApiClient.getCalendarController()?.isJalali ?? true,
+                  )
                 : t.selectDate),
             onTap: () async {
-              final date = await showDatePicker(
+              final date = await showAdaptiveDatePicker(
                 context: context,
                 initialDate: _fromDate ?? DateTime.now(),
                 firstDate: DateTime(2000),
@@ -502,10 +490,13 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
             leading: const Icon(Icons.calendar_today),
             title: Text(t.dateTo),
             subtitle: Text(_toDate != null 
-                ? DateFormat('yyyy/MM/dd').format(_toDate!)
+                ? HesabixDateUtils.formatForDisplay(
+                    _toDate!,
+                    ApiClient.getCalendarController()?.isJalali ?? true,
+                  )
                 : t.selectDate),
             onTap: () async {
-              final date = await showDatePicker(
+              final date = await showAdaptiveDatePicker(
                 context: context,
                 initialDate: _toDate ?? _fromDate ?? DateTime.now(),
                 firstDate: _fromDate ?? DateTime(2000),

@@ -208,28 +208,14 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
 
   Future<DateTime?> _pickDate(BuildContext ctx, DateTime initial) async {
     if (!ctx.mounted) return null;
-    final isJalali = _calendarController?.isJalali == true;
-    if (isJalali) {
-      try {
-        final now = DateTime.now();
-        final picked = await showJalaliDatePicker(
-          context: ctx,
-          initialDate: initial,
-          firstDate: DateTime(now.year - 10, 1, 1),
-          lastDate: DateTime(now.year + 10, 12, 31),
-          helpText: 'انتخاب تاریخ',
-        );
-        return picked;
-      } catch (_) {
-        // fallback to Gregorian
-      }
-    }
-    if (!ctx.mounted) return null;
-    return await showDatePicker(
+    final now = DateTime.now();
+    return showAdaptiveDatePicker(
       context: ctx,
+      calendarController: _calendarController,
       initialDate: initial,
-      firstDate: DateTime(initial.year - 10, 1, 1),
-      lastDate: DateTime(initial.year + 10, 12, 31),
+      firstDate: DateTime(now.year - 10, 1, 1),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      helpText: 'انتخاب تاریخ',
     );
   }
 

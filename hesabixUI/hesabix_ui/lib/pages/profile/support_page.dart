@@ -10,6 +10,7 @@ import 'package:hesabix_ui/models/saved_filter.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/date_utils.dart';
+import '../../widgets/jalali_date_picker.dart';
 import '../../utils/date_formatters.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'create_ticket_page.dart';
@@ -428,10 +429,10 @@ class _SupportPageState extends State<SupportPage> {
 
   String _formatTicketDate(DateTime dateTime) {
     try {
-      if (widget.calendarController != null) {
-        return HesabixDateUtils.formatDateTime(dateTime, widget.calendarController!.isJalali);
-      }
-      return DateFormatters.formatServerDateTime(dateTime.toIso8601String());
+      final isJalali = widget.calendarController?.isJalali ??
+          ApiClient.getCalendarController()?.isJalali ??
+          true;
+      return HesabixDateUtils.formatDateTime(dateTime, isJalali);
     } catch (_) {
       return DateFormatters.formatServerDateTime(dateTime.toIso8601String());
     }
@@ -936,8 +937,9 @@ class _SupportPageState extends State<SupportPage> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final date = await showDatePicker(
+                        final date = await showAdaptiveDatePicker(
                           context: context,
+                          calendarController: widget.calendarController,
                           initialDate: _dateFrom ?? DateTime.now(),
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now(),
@@ -959,8 +961,9 @@ class _SupportPageState extends State<SupportPage> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final date = await showDatePicker(
+                        final date = await showAdaptiveDatePicker(
                           context: context,
+                          calendarController: widget.calendarController,
                           initialDate: _dateTo ?? DateTime.now(),
                           firstDate: _dateFrom ?? DateTime(2020),
                           lastDate: DateTime.now(),

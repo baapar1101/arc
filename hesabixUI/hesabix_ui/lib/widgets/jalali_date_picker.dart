@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
+import '../core/api_client.dart';
+import '../core/calendar_controller.dart';
+
 /// DatePicker سفارشی برای تقویم شمسی
 class JalaliDatePicker extends StatefulWidget {
   final DateTime? initialDate;
@@ -161,6 +164,44 @@ Future<DateTime?> showJalaliDatePicker({
       lastDate: lastDate,
       helpText: helpText,
     ),
+  );
+}
+
+/// انتخاب تاریخ متناسب با تقویم انتخاب‌شده کاربر (شمسی یا میلادی).
+///
+/// اگر [calendarController] نباشد، از [ApiClient.getCalendarController] و در نهایت
+/// [CalendarController.load] استفاده می‌شود.
+Future<DateTime?> showAdaptiveDatePicker({
+  required BuildContext context,
+  CalendarController? calendarController,
+  DateTime? initialDate,
+  DateTime? firstDate,
+  DateTime? lastDate,
+  String? helpText,
+}) async {
+  final cal = calendarController ?? ApiClient.getCalendarController();
+  final controller = cal ?? await CalendarController.load();
+  final now = DateTime.now();
+  final initial = initialDate ?? now;
+  final first = firstDate ?? DateTime(now.year - 10);
+  final last = lastDate ?? DateTime(now.year + 10);
+
+  if (controller.isJalali) {
+    return showJalaliDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+      helpText: helpText,
+    );
+  }
+  return showDatePicker(
+    context: context,
+    initialDate: initial,
+    firstDate: first,
+    lastDate: last,
+    helpText: helpText,
+    locale: const Locale('en', 'US'),
   );
 }
 

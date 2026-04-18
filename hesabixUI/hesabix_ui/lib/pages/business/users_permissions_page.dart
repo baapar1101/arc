@@ -1085,6 +1085,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete ?? 'حذف'} ${t.warranty ?? 'گارانتی'}',
         'manage': '${t.manage ?? 'مدیریت'} ${t.warranty ?? 'گارانتی'}',
       },
+      'customer_club': {
+        'view': '${t.view} ${t.customerClubTitle}',
+        'manage': t.customerClubPermissionManageSettings(t.customerClubTitle),
+        'adjust': t.customerClubPermissionAdjustManual(t.customerClubTitle),
+        'redeem': t.customerClubPermissionRedeemInvoice(t.customerClubTitle),
+      },
       'crm': {
         'view': '${t.view ?? 'مشاهده'} CRM',
         'write': '${t.edit ?? 'ویرایش'} / ${t.add ?? 'افزودن'} CRM',
@@ -1377,6 +1383,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'icon': Icons.verified_user,
         'sections': ['warranty'],
       },
+      {
+        'title': 'باشگاه مشتریان',
+        'icon': Icons.card_giftcard,
+        'sections': ['customer_club'],
+      },
     ];
     
     for (int i = 0; i < sectionConfigs.length; i++) {
@@ -1485,6 +1496,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
 
   /// دریافت عنوان بخش بر اساس کلید
   String _getSectionTitle(String sectionKey) {
+    final t = AppLocalizations.of(context);
     final titles = {
       'people': 'اشخاص',
       'people_receipts': 'دریافت از اشخاص',
@@ -1514,6 +1526,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'reports': 'گزارش‌ها',
       'fiscal_years': 'سال‌های مالی',
       'warranty': 'گارانتی',
+      'customer_club': t.customerClubMenu,
       'crm': 'CRM',
     };
     
@@ -1557,6 +1570,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return 'برگشت';
       case 'export':
         return t.export ?? 'خروجی';
+      case 'manage':
+        return t.manage ?? 'مدیریت';
+      case 'adjust':
+        return t.customerClubActionAdjust;
+      case 'redeem':
+        return t.customerClubActionRedeem;
       default:
         return action;
     }

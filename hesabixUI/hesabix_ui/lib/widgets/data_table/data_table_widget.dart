@@ -231,6 +231,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _fetchData();
   }
 
+  /// فیلتر سریع گروه اشخاص (نوار بالای لیست اشخاص) — با [personGroupId] برابر null یعنی بدون فیلتر (همه).
+  void applyPersonGroupIdFilter(int? personGroupId) {
+    setState(() {
+      if (personGroupId == null) {
+        _columnMultiSelectValues.remove('person_group_id');
+      } else {
+        _columnMultiSelectValues['person_group_id'] = [personGroupId.toString()];
+      }
+    });
+    _page = 1;
+    _fetchData();
+  }
+
   // Public helpers for external widgets (via GlobalKey)
   List<int> getSelectedRowIndices() {
     return _selectedRows.toList();

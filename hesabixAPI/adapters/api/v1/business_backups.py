@@ -9,6 +9,8 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from psycopg2.extras import Json
+
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -149,6 +151,140 @@ def _json_default(o: Any):
     if isinstance(o, Decimal):
         return str(o)
     return str(o)
+
+
+def _try_set_session_replication_role_replica(conn) -> bool:
+    """
+    تلاش برای SET session_replication_role=replica (غیرفعال موقت بررسی FK در PG).
+
+    اگر کاربر دیتابیس مجوز ندارد، خطا تراکنش را abort می‌کند؛ با SAVEPOINT + ROLLBACK TO SAVEPOINT
+    تراکنش را سالم نگه می‌داریم تا بازیابی ادامه یابد (با FK فعال).
+    """
+    conn.execute(text("SAVEPOINT sp_hesabix_replica_role"))
+    try:
+        conn.execute(text("SET session_replication_role = 'replica'"))
+        conn.execute(text("RELEASE SAVEPOINT sp_hesabix_replica_role"))
+        return True
+    except Exception as e:
+        conn.execute(text("ROLLBACK TO SAVEPOINT sp_hesabix_replica_role"))
+        logger.warning(
+            "SET session_replication_role=replica denied or failed; continuing with FK checks enabled: %s",
+            e,
+        )
+        return False
+
+
+def _reset_session_replication_role(conn, had_replica: bool) -> None:
+    """بازگرداندن نقش سشن به origin فقط اگر قبلاً replica ست شده بود."""
+    if not had_replica:
+        return
+    try:
+        conn.execute(text("SET session_replication_role = 'origin'"))
+    except Exception as e:
+        logger.warning("SET session_replication_role=origin failed: %s", e)
+
+
+def _sort_tables_for_insert_by_fks(engine, table_names: List[str]) -> List[str]:
+    """
+    ترتیب INSERT طوری که جداول ارجاع‌شده توسط FK قبل از جدول وابسته درج شوند.
+    وقتی session_replication_role=replica مجاز نیست، این ترتیب برای عبور از FK ضروری است.
+    """
+    inspector = inspect(engine)
+    names = list(dict.fromkeys(table_names))
+    tset = set(names)
+    deps: Dict[str, set[str]] = {t: set() for t in names}
+    for t in names:
+        try:
+            for fk in inspector.get_foreign_keys(t):
+                ref = fk["referred_table"]
+                if ref in tset and ref != t:
+                    deps[t].add(ref)
+        except Exception:
+            continue
+    done: set[str] = set()
+    out: List[str] = []
+    pending = set(names)
+    while pending:
+        layer = sorted(x for x in pending if deps[x] <= done)
+        if not layer:
+            logger.warning(
+                "Could not fully order tables by FKs (cycle or metadata); appending rest alphabetically: %s",
+                sorted(pending)[:30],
+            )
+            out.extend(sorted(pending))
+            break
+        for t in layer:
+            out.append(t)
+            done.add(t)
+            pending.remove(t)
+    return out
+
+
+def _build_insert_params_for_restore(
+    schema_inspector,
+    table: str,
+    insert_col_list: List[str],
+    rec: Dict[str, Any],
+    json_cols_cache: Dict[str, set[str]],
+) -> Dict[str, Any]:
+    """
+    مقادیر ستون‌های JSON/SQLAlchemy.JSON را برای raw SQL + psycopg2 به Json() می‌پیچد
+    تا خطای «can't adapt type 'dict'» در bulk insert رخ ندهد.
+    """
+    if table not in json_cols_cache:
+        json_col_names: set[str] = set()
+        try:
+            for col in schema_inspector.get_columns(table):
+                typ = col.get("type")
+                tn = type(typ).__name__ if typ is not None else ""
+                ts = str(typ) if typ is not None else ""
+                if "JSON" in tn or "JSON" in ts.upper():
+                    json_col_names.add(col["name"])
+        except Exception:
+            pass
+        json_cols_cache[table] = json_col_names
+
+    jc = json_cols_cache[table]
+    params: Dict[str, Any] = {}
+    for c in insert_col_list:
+        v = rec.get(c)
+        if v is None:
+            params[c] = None
+        elif c in jc and isinstance(v, (dict, list)):
+            params[c] = Json(v)
+        else:
+            params[c] = v
+    return params
+
+
+def _pk_columns_to_omit_for_new_business(inspector, table: str) -> List[str]:
+    """
+    در حالت new_business فقط ستون‌های PK خودکار (serial/identity) را از INSERT حذف می‌کنیم تا
+    دیتابیس مقدار جدید بدهد. PK از نوع رشته/UUID (مثل file_storage.id) باید از بکاپ حفظ شود.
+    برای PK مرکب فعلاً چیزی حذف نمی‌شود (نیاز به نگاشت شناسه‌ها).
+    """
+    try:
+        pk_cols = inspector.get_pk_constraint(table).get("constrained_columns") or []
+    except Exception:
+        return []
+    if len(pk_cols) != 1:
+        return []
+    pk_name = pk_cols[0]
+    for c in inspector.get_columns(table):
+        if c["name"] != pk_name:
+            continue
+        typ = c.get("type")
+        tn = type(typ).__name__ if typ is not None else ""
+        ts = str(typ).upper()
+        if "VARCHAR" in ts or "CHAR" in ts or "TEXT" in ts or "CITEXT" in ts:
+            return []
+        if "UUID" in tn.upper():
+            return []
+        if c.get("autoincrement"):
+            return [pk_name]
+        # Integer بدون autoincrement: احتمال PK غیرخودکار — مقدار بکاپ را نگه دار
+        return []
+    return []
 
 
 def _discover_scoped_tables(db: Session) -> Dict[str, Dict[str, Any]]:
@@ -703,9 +839,9 @@ async def restore_backup(
 ):
     """
     بازیابی داده‌ها از بکاپ.
-    - پشتیبانی شده: mode == "replace" → جایگزینی کامل داده‌های مرتبط با business_id جاری
-    - پشتیبانی نشده فعلاً: mode == "new_business"
-    
+    - mode == "replace": جایگزینی داده‌های مرتبط با business_id جاری
+    - mode == "new_business": ایجاد کسب‌وکار جدید از بکاپ (ترتیب INSERT بر اساس FK)
+
     می‌تواند به صورت JSON (با backup_id) یا form-data (با file) فراخوانی شود.
     """
     logger = logging.getLogger(__name__)
@@ -877,13 +1013,12 @@ async def restore_backup(
 
                         tables_info = _discover_scoped_tables(db)
                         target_tables = [t for t in tables_info.keys() if t != "businesses"]
+                        target_tables = _sort_tables_for_insert_by_fks(db.get_bind(), target_tables)
 
                         conn = db.connection()
-                        # PostgreSQL: غیرفعال کردن foreign key checks (موقت)
-                        try:
-                            conn.execute(text("SET session_replication_role = 'replica'"))  # PostgreSQL equivalent
-                        except Exception:
-                            pass
+                        replica_role_ok = _try_set_session_replication_role_replica(conn)
+                        schema_inspector = inspect(db.get_bind())
+                        json_cols_cache: Dict[str, set[str]] = {}
 
                         try:
                             # فقط برای mode replace باید داده‌های قبلی را پاک کنیم
@@ -929,11 +1064,16 @@ async def restore_backup(
                                     continue
                                 col_list = tables_info[table]["columns"]
                                 
-                                # برای mode new_business، id را حذف می‌کنیم تا auto-increment کار کند
-                                # و از INSERT IGNORE استفاده می‌کنیم تا از duplicate key errors جلوگیری کنیم
+                                # new_business: فقط PKهای عددی خودکار را حذف می‌کنیم؛ PK رشته/UUID حفظ می‌شود (مثل file_storage)
+                                pk_omit = (
+                                    _pk_columns_to_omit_for_new_business(schema_inspector, table)
+                                    if mode == "new_business"
+                                    else []
+                                )
                                 insert_col_list = col_list.copy()
-                                if mode == "new_business" and "id" in insert_col_list:
-                                    insert_col_list.remove("id")
+                                for _pkc in pk_omit:
+                                    if _pkc in insert_col_list:
+                                        insert_col_list.remove(_pkc)
                                 
                                 placeholders = ", ".join([f":{c}" for c in insert_col_list])
                                 columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])  # PostgreSQL uses double quotes
@@ -953,11 +1093,17 @@ async def restore_backup(
                                         if "business_id" in rec:
                                             rec["business_id"] = new_business_id
                                         
-                                        # برای mode new_business، id را حذف می‌کنیم
-                                        if mode == "new_business" and "id" in rec:
-                                            del rec["id"]
+                                        for _pkc in pk_omit:
+                                            if _pkc in rec:
+                                                del rec[_pkc]
                                         
-                                        params = {c: rec.get(c) for c in insert_col_list}
+                                        params = _build_insert_params_for_restore(
+                                            schema_inspector,
+                                            table,
+                                            insert_col_list,
+                                            rec,
+                                            json_cols_cache,
+                                        )
                                         batch.append(params)
                                         if len(batch) >= 500:
                                             try:
@@ -974,18 +1120,10 @@ async def restore_backup(
                                         logger.error(f"Error inserting final batch into {table}: {e}")
                                         raise
 
-                            # فعال کردن دوباره foreign key checks
-                            try:
-                                conn.execute(text("SET session_replication_role = 'origin'"))  # PostgreSQL equivalent
-                            except Exception:
-                                pass
+                            _reset_session_replication_role(conn, replica_role_ok)
                         except Exception as e:
                             db.rollback()
-                            # فعال کردن دوباره foreign key checks
-                            try:
-                                conn.execute(text("SET session_replication_role = 'origin'"))  # PostgreSQL equivalent
-                            except Exception:
-                                pass
+                            _reset_session_replication_role(conn, replica_role_ok)
                             raise
 
                     result_data = {"restored": True, "mode": mode, "business_id": new_business_id}

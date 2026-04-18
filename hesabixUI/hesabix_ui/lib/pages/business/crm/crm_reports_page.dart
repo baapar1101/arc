@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
@@ -241,17 +243,37 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: () async {
-                      final d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
                       if (d != null) setState(() { _pipelineFromDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
                     },
-                    child: Text(_pipelineFromDate ?? 'از'),
+                    child: Text(_pipelineFromDate != null && HesabixDateUtils.parseFromAPI(_pipelineFromDate) != null
+                        ? HesabixDateUtils.formatForDisplay(
+                            HesabixDateUtils.parseFromAPI(_pipelineFromDate),
+                            ApiClient.getCalendarController()?.isJalali ?? true,
+                          )
+                        : 'از'),
                   ),
                   TextButton(
                     onPressed: () async {
-                      final d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
                       if (d != null) setState(() { _pipelineToDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
                     },
-                    child: Text(_pipelineToDate ?? 'تا'),
+                    child: Text(_pipelineToDate != null && HesabixDateUtils.parseFromAPI(_pipelineToDate) != null
+                        ? HesabixDateUtils.formatForDisplay(
+                            HesabixDateUtils.parseFromAPI(_pipelineToDate),
+                            ApiClient.getCalendarController()?.isJalali ?? true,
+                          )
+                        : 'تا'),
                   ),
                   if (_pipelineFromDate != null || _pipelineToDate != null)
                     TextButton(
@@ -346,17 +368,37 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: () async {
-                      final d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
                       if (d != null) setState(() { _leadFunnelFromDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
                     },
-                    child: Text(_leadFunnelFromDate ?? 'از'),
+                    child: Text(_leadFunnelFromDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelFromDate) != null
+                        ? HesabixDateUtils.formatForDisplay(
+                            HesabixDateUtils.parseFromAPI(_leadFunnelFromDate),
+                            ApiClient.getCalendarController()?.isJalali ?? true,
+                          )
+                        : 'از'),
                   ),
                   TextButton(
                     onPressed: () async {
-                      final d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
                       if (d != null) setState(() { _leadFunnelToDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
                     },
-                    child: Text(_leadFunnelToDate ?? 'تا'),
+                    child: Text(_leadFunnelToDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelToDate) != null
+                        ? HesabixDateUtils.formatForDisplay(
+                            HesabixDateUtils.parseFromAPI(_leadFunnelToDate),
+                            ApiClient.getCalendarController()?.isJalali ?? true,
+                          )
+                        : 'تا'),
                   ),
                   if (_leadFunnelFromDate != null || _leadFunnelToDate != null)
                     TextButton(

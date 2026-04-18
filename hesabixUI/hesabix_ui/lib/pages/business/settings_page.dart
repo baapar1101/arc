@@ -140,6 +140,27 @@ class _SettingsPageState extends State<SettingsPage> {
     return authStore.hasBusinessPermission('settings', 'manage_ftp');
   }
 
+  bool _isCustomerClubPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'customer_club',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessCustomerClubSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (!_isCustomerClubPluginActive()) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('customer_club', 'view') ||
+        authStore.hasBusinessPermission('customer_club', 'manage');
+  }
+
   bool _canAccessRepairShopSettings() {
     final authStore = _authStore;
     if (authStore == null) return false;
@@ -332,6 +353,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                     subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
                                     icon: Icons.build_circle,
                                     onTap: () => context.go('/business/${widget.businessId}/repair-shop-settings'),
+                                  ),
+                                if (_canAccessCustomerClubSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.customerClubTitle,
+                                    subtitle: t.customerClubSettingsSubtitle,
+                                    icon: Icons.card_giftcard,
+                                    onTap: () => context.go('/business/${widget.businessId}/customer-club'),
                                   ),
                                 _buildSettingItem(
                                   context,
@@ -596,6 +625,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
                               icon: Icons.build_circle,
                               onTap: () => context.go('/business/${widget.businessId}/repair-shop-settings'),
+                            ),
+                          if (_canAccessCustomerClubSettings())
+                            _buildSettingItem(
+                              context,
+                              title: t.customerClubTitle,
+                              subtitle: t.customerClubSettingsSubtitle,
+                              icon: Icons.card_giftcard,
+                              onTap: () => context.go('/business/${widget.businessId}/customer-club'),
                             ),
                           _buildSettingItem(
                             context,

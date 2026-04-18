@@ -186,29 +186,16 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
   }
 
   Future<DateTime?> _pickMeetingDateTime({DateTime? initial}) async {
-    final isJ = widget.calendarController.isJalali;
     final base = initial ?? DateTime.now();
-    DateTime? day;
-    if (isJ) {
-      final p = await showJalaliDatePicker(
-        context: context,
-        initialDate: base,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
-      );
-      if (p == null || !mounted) return null;
-      day = DateTime(p.year, p.month, p.day);
-    } else {
-      final p = await showDatePicker(
-        context: context,
-        initialDate: base,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
-        locale: const Locale('en', 'GB'),
-      );
-      if (p == null || !mounted) return null;
-      day = DateTime(p.year, p.month, p.day);
-    }
+    final p = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: base,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (p == null || !mounted) return null;
+    final day = DateTime(p.year, p.month, p.day);
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial ?? day),
@@ -218,25 +205,14 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
   }
 
   Future<void> _pickDate() async {
-    final isJ = widget.calendarController.isJalali;
-    DateTime? p;
-    if (isJ) {
-      p = await showJalaliDatePicker(
-        context: context,
-        initialDate: _occursOn ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
-      );
-    } else {
-      p = await showDatePicker(
-        context: context,
-        initialDate: _occursOn ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
-        locale: const Locale('en', 'GB'),
-      );
-    }
-    if (p != null && mounted) setState(() => _occursOn = DateTime(p!.year, p.month, p.day));
+    final p = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: _occursOn ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (p != null && mounted) setState(() => _occursOn = DateTime(p.year, p.month, p.day));
   }
 
   Future<void> _openCreateNoteType() async {
