@@ -88,7 +88,8 @@ class BusinessRepository(BaseRepository[Business]):
         country: str | None = None,
         province: str | None = None,
         city: str | None = None,
-        postal_code: str | None = None
+        postal_code: str | None = None,
+        commit: bool = True,
         ) -> Business:
         """ایجاد کسب و کار جدید"""
         business = Business(
@@ -109,7 +110,10 @@ class BusinessRepository(BaseRepository[Business]):
             postal_code=postal_code
         )
         self.db.add(business)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(business)
         return business
     

@@ -179,8 +179,18 @@ def check_business_creation_permission(db: Session, user_id: int) -> tuple[bool,
     return True, None
 
 
-def create_business(db: Session, business_data, owner_id: int) -> Dict[str, Any]:
-    """ایجاد کسب و کار جدید"""
+def create_business(
+    db: Session,
+    business_data,
+    owner_id: int,
+    *,
+    defer_commit: bool = False,
+) -> Dict[str, Any]:
+    """ایجاد کسب و کار جدید.
+
+    defer_commit: اگر True باشد، هیچ commit انجام نمی‌شود (برای بازیابی در یک تراکنش واحد).
+    در این حالت hookهایی که بعد از commit به داده نیاز دارند اجرا نمی‌شوند.
+    """
     # Lazy import to avoid circular dependency
     from adapters.api.v1.schemas import BusinessCreateRequest
     from app.core.responses import ApiError
@@ -218,7 +228,8 @@ def create_business(db: Session, business_data, owner_id: int) -> Dict[str, Any]
         country=business_data.country,
         province=business_data.province,
         city=business_data.city,
-        postal_code=business_data.postal_code
+        postal_code=business_data.postal_code,
+        commit=not defer_commit,
     )
     
     # ایجاد سال‌های مالی اولیه (در صورت ارسال)
@@ -234,7 +245,8 @@ def create_business(db: Session, business_data, owner_id: int) -> Dict[str, Any]
                 title=fy.title,
                 start_date=fy.start_date,
                 end_date=fy.end_date,
-                is_last=(idx == last_true_index) if last_true_index is not None else (idx == len(business_data.fiscal_years) - 1)
+                is_last=(idx == last_true_index) if last_true_index is not None else (idx == len(business_data.fiscal_years) - 1),
+                commit=not defer_commit,
             )
 
     # مدیریت ارزها
@@ -257,28 +269,33 @@ def create_business(db: Session, business_data, owner_id: int) -> Dict[str, Any]
         for cid in currency_ids:
             bc = BusinessCurrency(business_id=created_business.id, currency_id=cid)
             db.add(bc)
-        db.commit()
+        if defer_commit:
+            db.flush()
+        else:
+            db.commit()
 
     # بررسی و اضافه کردن ارز کیف پول در صورت نیاز
     # اگر ارز پیشفرض کسب و کار با ارز کیف پول متفاوت باشد، ارز کیف پول را به ارزهای جانبی اضافه می‌کنیم
-    try:
-        ensure_wallet_currency_in_business(db, created_business.id)
-    except Exception as e:
-        # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
-        logger.warning("failed_to_add_wallet_currency", business_id=created_business.id, error=str(e))
+    if not defer_commit:
+        try:
+            ensure_wallet_currency_in_business(db, created_business.id)
+        except Exception as e:
+            # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
+            logger.warning("failed_to_add_wallet_currency", business_id=created_business.id, error=str(e))
 
     db.refresh(created_business)
 
     # اعمال خودکار سیاست‌های پیش‌فرض درآمدزایی اسناد
-    try:
-        # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
-        from app.services.document_monetization_service import apply_default_policies_to_business
-        apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
-    except Exception as e:
-        # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
-        import structlog
-        logger = structlog.get_logger()
-        logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
+    if not defer_commit:
+        try:
+            # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
+            from app.services.document_monetization_service import apply_default_policies_to_business
+            apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
+        except Exception as e:
+            # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
+            import structlog
+            logger = structlog.get_logger()
+            logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
 
     # تبدیل به response format
     return _business_to_dict(created_business)

@@ -481,6 +481,30 @@ def save_business_default_layout(
 WidgetResolver = Callable[[Session, int, int, Dict[str, Any]], Any]
 
 
+def _parse_fiscal_year_id(filters: Dict[str, Any]) -> int | None:
+    raw = filters.get("fiscal_year_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fiscal_year_dates_or_none(db: Session, business_id: int, fiscal_year_id: int | None) -> tuple[datetime.date | None, datetime.date | None]:
+    """بازهٔ تاریخ سال مالی انتخاب‌شده (متعلق به همین کسب‌وکار)."""
+    if fiscal_year_id is None:
+        return None, None
+    from adapters.db.models.fiscal_year import FiscalYear
+
+    fy = db.query(FiscalYear).filter(
+        and_(FiscalYear.id == fiscal_year_id, FiscalYear.business_id == business_id)
+    ).first()
+    if fy and getattr(fy, "start_date", None) and getattr(fy, "end_date", None):
+        return fy.start_date, fy.end_date
+    return None, None
+
+
 def _resolve_latest_sales_invoices(
     db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -492,6 +516,14 @@ def _resolve_latest_sales_invoices(
         limit = max(1, min(50, int(limit_raw)))
     except Exception:
         limit = 10
+
+    fy_id = _parse_fiscal_year_id(filters)
+    doc_filters = [
+        Document.business_id == business_id,
+        Document.document_type == INVOICE_SALES,
+    ]
+    if fy_id is not None:
+        doc_filters.append(Document.fiscal_year_id == fy_id)
 
     # Fetch last N documents with currency info
     q = (
@@ -505,12 +537,7 @@ def _resolve_latest_sales_invoices(
             Document.extra_info,
         )
         .outerjoin(Currency, Currency.id == Document.currency_id)
-        .filter(
-            and_(
-                Document.business_id == business_id,
-                Document.document_type == INVOICE_SALES,
-            )
-        )
+        .filter(and_(*doc_filters))
         .order_by(Document.created_at.desc())
         .limit(limit)
     )
@@ -567,7 +594,16 @@ def _resolve_top_selling_products(
     # بهینه‌سازی: استفاده از aggregation در SQL برای quantity
     # برای amount، از روش hybrid استفاده می‌کنیم (SQL برای quantity، Python برای amount)
     currency_id = filters.get("currency_id")
-    
+    fy_id = _parse_fiscal_year_id(filters)
+
+    doc_base_filters = [
+        Document.business_id == business_id,
+        Document.document_type == INVOICE_SALES,
+        Document.is_proforma == False,  # noqa: E712
+    ]
+    if fy_id is not None:
+        doc_base_filters.append(Document.fiscal_year_id == fy_id)
+
     # Query برای quantity aggregation در SQL (سریع‌تر)
     quantity_query = (
         db.query(
@@ -578,13 +614,7 @@ def _resolve_top_selling_products(
         )
         .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
         .join(Document, Document.id == InvoiceItemLine.document_id)
-        .filter(
-            and_(
-                Document.business_id == business_id,
-                Document.document_type == INVOICE_SALES,
-                Document.is_proforma == False,  # noqa: E712
-            )
-        )
+        .filter(and_(*doc_base_filters))
         .group_by(Product.id, Product.code, Product.name)
     )
     
@@ -615,6 +645,7 @@ def _resolve_top_selling_products(
         product_ids = [int(row.product_id) for row in quantity_rows]
         if product_ids:
             # خواندن extra_info فقط برای product های انتخاب شده
+            amount_filters = list(doc_base_filters) + [Product.id.in_(product_ids)]
             amount_query = (
                 db.query(
                     Product.id.label("product_id"),
@@ -622,14 +653,7 @@ def _resolve_top_selling_products(
                 )
                 .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
                 .join(Document, Document.id == InvoiceItemLine.document_id)
-                .filter(
-                    and_(
-                        Document.business_id == business_id,
-                        Document.document_type == INVOICE_SALES,
-                        Document.is_proforma == False,  # noqa: E712
-                        Product.id.in_(product_ids)
-                    )
-                )
+                .filter(and_(*amount_filters))
             )
             if currency_id is not None:
                 try:
@@ -796,6 +820,15 @@ def _resolve_latest_purchase_invoices(
         limit = max(1, min(50, int(limit_raw)))
     except Exception:
         limit = 10
+
+    fy_id = _parse_fiscal_year_id(filters)
+    doc_filters = [
+        Document.business_id == business_id,
+        Document.document_type == INVOICE_PURCHASE,
+    ]
+    if fy_id is not None:
+        doc_filters.append(Document.fiscal_year_id == fy_id)
+
     q = (
         db.query(
             Document.id,
@@ -807,12 +840,7 @@ def _resolve_latest_purchase_invoices(
             Document.extra_info,
         )
         .outerjoin(Currency, Currency.id == Document.currency_id)
-        .filter(
-            and_(
-                Document.business_id == business_id,
-                Document.document_type == INVOICE_PURCHASE,
-            )
-        )
+        .filter(and_(*doc_filters))
         .order_by(Document.created_at.desc())
         .limit(limit)
     )
@@ -971,6 +999,7 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
       - range: 'week' | 'month' | 'fiscal' | 'custom'
       - from: ISO date (YYYY-MM-DD)
       - to: ISO date
+      - fiscal_year_id: با هدر داشبورد؛ بازهٔ fiscal و فیلتر اسناد را هم‌تراز می‌کند.
     """
     from datetime import timedelta
     rng = str(filters.get("range") or "week").lower()
@@ -978,6 +1007,7 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
     today = datetime.utcnow().date()
     start_date: datetime.date
     end_date: datetime.date
+    fy_id = _parse_fiscal_year_id(filters)
 
     if rng == "week":
         # last 7 days including today
@@ -987,7 +1017,11 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
         end_date = today
         start_date = today.replace(day=1)
     elif rng == "fiscal":
-        start_date, end_date = _get_fiscal_range(db, business_id)
+        fs, fe = _fiscal_year_dates_or_none(db, business_id, fy_id)
+        if fs is not None and fe is not None:
+            start_date, end_date = fs, fe
+        else:
+            start_date, end_date = _get_fiscal_range(db, business_id)
     elif rng == "custom":
         from_s = str(filters.get("from") or "")
         to_s = str(filters.get("to") or "")
@@ -1002,20 +1036,22 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
         end_date = today
         start_date = today - timedelta(days=6)
 
+    doc_chart_filters = [
+        Document.business_id == business_id,
+        Document.document_type == INVOICE_SALES,
+        Document.is_proforma == False,  # noqa: E712
+        Document.document_date >= start_date,
+        Document.document_date <= end_date,
+    ]
+    if fy_id is not None:
+        doc_chart_filters.append(Document.fiscal_year_id == fy_id)
+
     q = (
         db.query(
             Document.document_date,
             Document.extra_info,
         )
-        .filter(
-            and_(
-                Document.business_id == business_id,
-                Document.document_type == INVOICE_SALES,
-                Document.is_proforma == False,  # noqa: E712
-                Document.document_date >= start_date,
-                Document.document_date <= end_date,
-            )
-        )
+        .filter(and_(*doc_chart_filters))
         .order_by(Document.document_date.asc())
     )
     rows = q.all()

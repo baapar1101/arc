@@ -861,10 +861,14 @@ async def restore_backup(
                                     check_credit_enabled_by_default=bool(original_business.get('check_credit_enabled_by_default', False)),
                                 )
                                 
-                                # ایجاد کسب‌وکار جدید
-                                new_business = create_business(db, business_create_data, ctx.get_user_id())
+                                # ایجاد کسب‌وکار جدید (بدون commit؛ کل بازیابی یک تراکنش واحد است)
+                                new_business = create_business(
+                                    db,
+                                    business_create_data,
+                                    ctx.get_user_id(),
+                                    defer_commit=True,
+                                )
                                 new_business_id = new_business['id']
-                                db.commit()
                                 jm.update(job_id, 30, f"New business created (ID: {new_business_id})")
                             except KeyError:
                                 raise ApiError("INVALID_BACKUP", "businesses.jsonl not found in backup")
@@ -956,42 +960,19 @@ async def restore_backup(
                                         params = {c: rec.get(c) for c in insert_col_list}
                                         batch.append(params)
                                         if len(batch) >= 500:
-                                            # هر batch در یک transaction جداگانه
-                                            max_retries = 3
-                                            retry_count = 0
-                                            while retry_count < max_retries:
-                                                try:
-                                                    conn.execute(insert_sql, batch)
-                                                    db.commit()
-                                                    break  # موفق شد
-                                                except Exception as e:
-                                                    db.rollback()
-                                                    # شروع transaction جدید
-                                                    db.begin()
-                                                    retry_count += 1
-                                                    if retry_count >= max_retries:
-                                                        logger.error(f"Error inserting batch into {table} after {max_retries} retries: {e}")
-                                                        raise
-                                                    logger.warning(f"Error inserting batch into {table}, retry {retry_count}/{max_retries}: {e}")
+                                            try:
+                                                conn.execute(insert_sql, batch)
+                                            except Exception as e:
+                                                logger.error(f"Error inserting batch into {table}: {e}")
+                                                raise
                                             batch.clear()
                                 
                                 if batch:
-                                    # آخرین batch
-                                    max_retries = 3
-                                    retry_count = 0
-                                    while retry_count < max_retries:
-                                        try:
-                                            conn.execute(insert_sql, batch)
-                                            db.commit()
-                                            break  # موفق شد
-                                        except Exception as e:
-                                            db.rollback()
-                                            db.begin()
-                                            retry_count += 1
-                                            if retry_count >= max_retries:
-                                                logger.error(f"Error inserting final batch into {table} after {max_retries} retries: {e}")
-                                                raise
-                                            logger.warning(f"Error inserting final batch into {table}, retry {retry_count}/{max_retries}: {e}")
+                                    try:
+                                        conn.execute(insert_sql, batch)
+                                    except Exception as e:
+                                        logger.error(f"Error inserting final batch into {table}: {e}")
+                                        raise
 
                             # فعال کردن دوباره foreign key checks
                             try:
@@ -1044,6 +1025,7 @@ async def restore_backup(
                         final_error = error_msg
                     
                     jm.fail(job_id, final_error, "Restore failed")
+                    raise
 
         background.add_task(task)
         return success_response({"job_id": job_id}, request=request, message="Restore started")

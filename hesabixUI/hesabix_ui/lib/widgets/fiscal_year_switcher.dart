@@ -25,7 +25,8 @@ class FiscalYearSwitcher extends StatelessWidget {
           );
         }).toList(),
         onChanged: (id) async {
-          await controller.setFiscalYearId(id);
+          if (id == null) return;
+          await controller.setFiscalYearId(id, userInitiated: true);
           onChanged?.call();
         },
         hint: const Text('سال مالی'),

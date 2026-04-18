@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/permission_guard.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -434,6 +435,13 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           _error = null;
           _previewData = null; // پاک کردن پیش‌نمایش قبلی
         });
+
+        final newFyRaw = newFiscalYear?['id'];
+        final int? newFyId = newFyRaw is int ? newFyRaw : int.tryParse('$newFyRaw');
+        if (newFyId != null) {
+          final fyCtrl = await FiscalYearController.load(widget.businessId);
+          await fyCtrl.applyAfterYearClosed(newFyId);
+        }
         
         // بارگذاری مجدد اطلاعات سال مالی جاری (که حالا سال مالی جدید است)
         await _loadCurrentFiscalYear();

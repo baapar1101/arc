@@ -55,7 +55,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   }
 
   Future<void> _init() async {
-    _fiscalController = await FiscalYearController.load();
+    _fiscalController = await FiscalYearController.load(widget.businessId);
+    final fiscalListSvc = BusinessDashboardService(ApiClient());
+    final fiscalYears = await fiscalListSvc.listFiscalYears(widget.businessId);
+    await _fiscalController.reconcileWithList(fiscalYears);
     _service = BusinessDashboardService(ApiClient(), fiscalYearController: _fiscalController);
     ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
     _fiscalController.addListener(() {

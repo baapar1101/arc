@@ -21,6 +21,7 @@ class FiscalYearRepository(BaseRepository[FiscalYear]):
         start_date: date,
         end_date: date,
         is_last: bool = True,
+        commit: bool = True,
     ) -> FiscalYear:
         fiscal_year = FiscalYear(
             business_id=business_id,
@@ -30,7 +31,10 @@ class FiscalYearRepository(BaseRepository[FiscalYear]):
             is_last=is_last,
         )
         self.db.add(fiscal_year)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(fiscal_year)
         return fiscal_year
 
