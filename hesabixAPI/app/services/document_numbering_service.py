@@ -179,6 +179,16 @@ def _get_default_setting_for_type(document_type: str) -> dict:
             "number_padding": 4,
             "reset_period": "never",
         },
+        "warehouse_location": {
+            "prefix": "LOC",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+            "separator": "-",
+            "start_number": 1,
+            "number_padding": 4,
+            "reset_period": "never",
+        },
     }
 
     default = defaults.get(
@@ -264,11 +274,15 @@ def _get_next_number(
     reset_period: Optional[str],
     document_date: date,
     calendar_type: str = "gregorian",
+    counter_scope_suffix: Optional[str] = None,
 ) -> str:
     """
-    دریافت شماره بعدی با استفاده از جدول شمارنده
+    دریافت شماره بعدی با استفاده از جدول شمارنده.
+    counter_scope_suffix: برای جدا کردن شمارنده (مثلاً به ازای هر انبار در کد محل).
     """
     bucket_key = _build_bucket_key(document_date, calendar_type, reset_period)
+    if counter_scope_suffix:
+        bucket_key = f"{bucket_key}|{counter_scope_suffix}"
 
     counter_query = db.query(DocumentNumberCounter).filter(
         and_(
@@ -377,4 +391,68 @@ def generate_document_code(
         return f"{prefix}{separator}{date_part}{separator}{number_part}"
     else:
         return f"{prefix}{separator}{number_part}"
+
+
+def generate_warehouse_location_code(
+    db: Session,
+    business_id: int,
+    warehouse_id: int,
+    document_date: date,
+) -> str:
+    """
+    تولید کد محل انبار بر اساس تنظیمات نوع warehouse_location؛ شمارنده جدا برای هر انبار.
+    """
+    document_type = "warehouse_location"
+    setting = (
+        db.query(BusinessDocumentNumberingSetting)
+        .filter(
+            and_(
+                BusinessDocumentNumberingSetting.business_id == business_id,
+                BusinessDocumentNumberingSetting.document_type == document_type,
+                BusinessDocumentNumberingSetting.is_active == True,
+            )
+        )
+        .first()
+    )
+
+    if not setting:
+        default_dict = _get_default_setting_for_type(document_type)
+        prefix = default_dict.get("prefix", "LOC")
+        separator = default_dict.get("separator", "-")
+        include_date = default_dict.get("include_date", True)
+        date_format = default_dict.get("date_format", "YYYYMMDD")
+        calendar_type = default_dict.get("calendar_type", "gregorian")
+        start_number = default_dict.get("start_number", 1)
+        number_padding = default_dict.get("number_padding", 4)
+        reset_period = default_dict.get("reset_period", "never")
+    else:
+        prefix = setting.prefix or "LOC"
+        separator = setting.separator or "-"
+        include_date = setting.include_date
+        date_format = setting.date_format or "YYYYMMDD"
+        calendar_type = setting.calendar_type or "gregorian"
+        start_number = setting.start_number or 1
+        number_padding = setting.number_padding or 4
+        reset_period = setting.reset_period
+
+    date_part = ""
+    if include_date:
+        date_part = _format_date(document_date, date_format, calendar_type)
+
+    scope_suffix = f"wh-{warehouse_id}"
+    number_part = _get_next_number(
+        db,
+        business_id,
+        document_type,
+        start_number,
+        number_padding,
+        reset_period,
+        document_date,
+        calendar_type,
+        scope_suffix,
+    )
+
+    if date_part:
+        return f"{prefix}{separator}{date_part}{separator}{number_part}"
+    return f"{prefix}{separator}{number_part}"
 

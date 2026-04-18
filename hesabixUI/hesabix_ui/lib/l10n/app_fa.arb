@@ -3450,7 +3450,30 @@
   },
   "customerClubActionAdjust": "اصلاح",
   "customerClubActionRedeem": "مصرف امتیاز",
-  
+  "customerClubLedgerEmpty": "هنوز تراکنش امتیازی ثبت نشده است.",
+  "customerClubLedgerShowingCount": "نمایش {shown} از {total}",
+  "@customerClubLedgerShowingCount": {
+    "placeholders": {
+      "shown": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "customerClubSettingsSectionActivation": "فعال‌سازی",
+  "customerClubSettingsSectionEarning": "محاسبه و اعطای امتیاز",
+  "customerClubSettingsSectionAccess": "محدودیت نقش شخص",
+  "customerClubSettingsSummaryTitle": "خلاصهٔ تنظیمات ذخیره‌شده",
+  "customerClubLedgerFilterPerson": "فیلتر لیست تراکنش‌ها بر اساس شخص",
+  "customerClubCurrentPointsBalance": "ماندهٔ فعلی امتیاز این شخص",
+  "customerClubViewLedgerAction": "تراکنش‌ها",
+  "customerClubAdjustmentLargeDeltaTitle": "تأیید تغییر بزرگ امتیاز",
+  "customerClubAdjustmentLargeDeltaBody": "مقدار دلتا «{delta}» امتیاز است. ثبت می‌کنید؟",
+  "@customerClubAdjustmentLargeDeltaBody": {
+    "placeholders": {
+      "delta": {"type": "String"}
+    }
+  },
+  "customerClubSummaryInactive": "باشگاه در این کسب‌وکار غیرفعال است.",
+
   "identityInquiryTitle": "استعلام اطلاعات هویتی",
   "identityInquirySubtitle": "لطفاً کد ملی و تاریخ تولد را وارد کنید",
   "nationalId": "کد ملی",

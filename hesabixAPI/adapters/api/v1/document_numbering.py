@@ -123,6 +123,12 @@ def _get_default_setting(document_type: str) -> dict:
             "calendar_type": "gregorian",
             "date_format": "YYYYMMDD",
         },
+        "warehouse_location": {
+            "prefix": "LOC",
+            "include_date": True,
+            "calendar_type": "gregorian",
+            "date_format": "YYYYMMDD",
+        },
     }
 
     default = defaults.get(

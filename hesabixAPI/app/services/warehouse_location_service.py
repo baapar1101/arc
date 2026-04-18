@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from adapters.api.v1.schema_models.warehouse_location import ALLOWED_LOCATION_KINDS
 from adapters.db.models.product import Product
@@ -109,10 +110,9 @@ def create_location(
 	payload: Dict[str, Any],
 ) -> Dict[str, Any]:
 	_assert_warehouse(db, business_id, warehouse_id)
-	code = (payload.get("code") or "").strip()
 	name = (payload.get("name") or "").strip()
-	if not code or not name:
-		raise ApiError("VALIDATION_ERROR", "کد و نام محل الزامی است", http_status=400)
+	if not name:
+		raise ApiError("VALIDATION_ERROR", "نام محل الزامی است", http_status=400)
 
 	parent_id = payload.get("parent_id")
 	if parent_id is not None:
@@ -131,6 +131,60 @@ def create_location(
 		if not parent:
 			raise ApiError("VALIDATION_ERROR", "محل والد یافت نشد", http_status=400)
 
+	auto_generate = bool(payload.get("auto_generate_code", False))
+	kind = _normalize_kind(payload.get("location_kind"))
+
+	def _finalize(loc: WarehouseLocation) -> Dict[str, Any]:
+		rows = (
+			db.query(WarehouseLocation)
+			.filter(and_(WarehouseLocation.business_id == business_id, WarehouseLocation.warehouse_id == warehouse_id))
+			.all()
+		)
+		path_map = _build_path_maps(rows)
+		return {"item": _location_to_dict(loc, path_map.get(loc.id, loc.code))}
+
+	if auto_generate:
+		from app.services.document_numbering_service import generate_warehouse_location_code
+
+		doc_date = datetime.utcnow().date()
+		max_attempts = 5
+		for attempt in range(max_attempts):
+			code = generate_warehouse_location_code(db, business_id, warehouse_id, doc_date)
+			now = datetime.utcnow()
+			loc = WarehouseLocation(
+				business_id=business_id,
+				warehouse_id=warehouse_id,
+				parent_id=parent_id,
+				code=code,
+				name=name,
+				location_kind=kind,
+				sort_order=int(payload.get("sort_order") or 0),
+				is_active=bool(payload.get("is_active", True)),
+				notes=payload.get("notes"),
+				created_at=now,
+				updated_at=now,
+			)
+			db.add(loc)
+			try:
+				db.commit()
+				db.refresh(loc)
+				return _finalize(loc)
+			except IntegrityError as exc:
+				db.rollback()
+				msg = str(getattr(exc.orig, "args", exc))
+				if "uq_warehouse_locations_wh_code" in msg or "Duplicate entry" in msg:
+					continue
+				raise
+		raise ApiError(
+			"DOCUMENT_CODE_RACE",
+			"تولید کد محل پس از چند تلاش ناموفق بود. دوباره تلاش کنید.",
+			http_status=409,
+		)
+
+	code = (payload.get("code") or "").strip()
+	if not code:
+		raise ApiError("VALIDATION_ERROR", "کد محل الزامی است", http_status=400)
+
 	dup = (
 		db.query(WarehouseLocation)
 		.filter(and_(WarehouseLocation.warehouse_id == warehouse_id, WarehouseLocation.code == code))
@@ -139,7 +193,6 @@ def create_location(
 	if dup:
 		raise ApiError("DUPLICATE_CODE", "این کد محل در همین انبار قبلاً ثبت شده است", http_status=409)
 
-	kind = _normalize_kind(payload.get("location_kind"))
 	now = datetime.utcnow()
 	loc = WarehouseLocation(
 		business_id=business_id,
@@ -158,13 +211,7 @@ def create_location(
 	db.commit()
 	db.refresh(loc)
 
-	rows = (
-		db.query(WarehouseLocation)
-		.filter(and_(WarehouseLocation.business_id == business_id, WarehouseLocation.warehouse_id == warehouse_id))
-		.all()
-	)
-	path_map = _build_path_maps(rows)
-	return {"item": _location_to_dict(loc, path_map.get(loc.id, loc.code))}
+	return _finalize(loc)
 
 
 def update_location(

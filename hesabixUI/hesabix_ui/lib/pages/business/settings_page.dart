@@ -360,7 +360,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: t.customerClubTitle,
                                     subtitle: t.customerClubSettingsSubtitle,
                                     icon: Icons.card_giftcard,
-                                    onTap: () => context.go('/business/${widget.businessId}/customer-club'),
+                                    onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
                                   ),
                                 _buildSettingItem(
                                   context,
@@ -632,7 +632,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: t.customerClubTitle,
                               subtitle: t.customerClubSettingsSubtitle,
                               icon: Icons.card_giftcard,
-                              onTap: () => context.go('/business/${widget.businessId}/customer-club'),
+                              onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
                             ),
                           _buildSettingItem(
                             context,

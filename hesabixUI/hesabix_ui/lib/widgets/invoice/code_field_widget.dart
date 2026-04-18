@@ -12,6 +12,11 @@ class CodeFieldWidget extends StatefulWidget {
   final bool autoGenerateCode;
   /// شماره سند فاکتور: حروف انگلیسی، اعداد، خط تیره و زیرخط (مثل INV-20240410-0001)
   final bool invoiceDocumentCode;
+  /// کد محل انبار: همان الگوی کاراکتر فاکتور، پیام‌های اعتبارسنجی متفاوت
+  final bool warehouseLocationCode;
+  final ValueChanged<bool>? onAutoGenerateChanged;
+  /// اگر false باشد، سوئیچ خودکار/دستی نمایش داده نمی‌شود (مثلاً در ویرایش).
+  final bool showAutoManualToggle;
 
   const CodeFieldWidget({
     super.key,
@@ -22,6 +27,9 @@ class CodeFieldWidget extends StatefulWidget {
     this.isRequired = false,
     this.autoGenerateCode = true,
     this.invoiceDocumentCode = false,
+    this.warehouseLocationCode = false,
+    this.onAutoGenerateChanged,
+    this.showAutoManualToggle = true,
   });
 
   @override
@@ -49,7 +57,8 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     
-    final List<TextInputFormatter> formatters = widget.invoiceDocumentCode
+    final useDocStyleCode = widget.invoiceDocumentCode || widget.warehouseLocationCode;
+    final List<TextInputFormatter> formatters = useDocStyleCode
         ? <TextInputFormatter>[
             const EnglishDigitsFormatter(),
             FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_]')),
@@ -58,36 +67,38 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
 
     return TextFormField(
       controller: _controller,
-      readOnly: _autoGenerateCode,
+      readOnly: widget.showAutoManualToggle && _autoGenerateCode,
       inputFormatters: formatters.isEmpty ? null : formatters,
       decoration: InputDecoration(
         labelText: widget.label ?? t.code,
         hintText: widget.hintText ?? t.uniqueCodeNumeric,
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // سویچ اتوماتیک/دستی
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: Tooltip(
-                message: _autoGenerateCode ? 'تولید خودکار کد فعال است' : 'تولید دستی کد فعال است',
-                child: Switch(
-                  value: _autoGenerateCode,
-                  onChanged: (value) {
-                    setState(() {
-                      _autoGenerateCode = value;
-                      if (_autoGenerateCode) {
-                        _controller.clear();
-                        widget.onChanged(null);
-                      }
-                    });
-                  },
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ),
-          ],
-        ),
+        suffixIcon: widget.showAutoManualToggle
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: Tooltip(
+                      message: _autoGenerateCode ? 'تولید خودکار کد فعال است' : 'تولید دستی کد فعال است',
+                      child: Switch(
+                        value: _autoGenerateCode,
+                        onChanged: (value) {
+                          setState(() {
+                            _autoGenerateCode = value;
+                            if (_autoGenerateCode) {
+                              _controller.clear();
+                              widget.onChanged(null);
+                            }
+                            widget.onAutoGenerateChanged?.call(_autoGenerateCode);
+                          });
+                        },
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : null,
       ),
       keyboardType: TextInputType.text,
       onChanged: (value) {
@@ -96,10 +107,13 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
       validator: (value) {
         if (widget.isRequired && !_autoGenerateCode) {
           if (value == null || value.trim().isEmpty) {
+            if (widget.warehouseLocationCode) {
+              return 'کد محل الزامی است';
+            }
             return widget.invoiceDocumentCode ? 'شماره فاکتور الزامی است' : t.personCodeRequired;
           }
           final trimmed = value.trim();
-          if (widget.invoiceDocumentCode) {
+          if (widget.invoiceDocumentCode || widget.warehouseLocationCode) {
             if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed)) {
               return 'فقط حروف انگلیسی، اعداد، خط تیره و زیرخط مجاز است';
             }

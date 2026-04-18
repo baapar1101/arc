@@ -8917,6 +8917,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customerClubActionRedeem => 'Redeem';
 
   @override
+  String get customerClubLedgerEmpty => 'No loyalty transactions yet.';
+
+  @override
+  String customerClubLedgerShowingCount(int shown, int total) {
+    return 'Showing $shown of $total';
+  }
+
+  @override
+  String get customerClubSettingsSectionActivation => 'Activation';
+
+  @override
+  String get customerClubSettingsSectionEarning => 'Earning rules';
+
+  @override
+  String get customerClubSettingsSectionAccess => 'Person role restriction';
+
+  @override
+  String get customerClubSettingsSummaryTitle => 'Saved rules summary';
+
+  @override
+  String get customerClubLedgerFilterPerson => 'Filter transactions by person';
+
+  @override
+  String get customerClubCurrentPointsBalance =>
+      'Current points balance for this person';
+
+  @override
+  String get customerClubViewLedgerAction => 'Transactions';
+
+  @override
+  String get customerClubAdjustmentLargeDeltaTitle =>
+      'Confirm large adjustment';
+
+  @override
+  String customerClubAdjustmentLargeDeltaBody(String delta) {
+    return 'Delta is $delta points. Continue?';
+  }
+
+  @override
+  String get customerClubSummaryInactive =>
+      'Customer club is disabled for this business.';
+
+  @override
   String get identityInquiryTitle => 'Identity Inquiry';
 
   @override

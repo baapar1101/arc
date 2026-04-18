@@ -3408,7 +3408,30 @@
   },
   "customerClubActionAdjust": "Adjust",
   "customerClubActionRedeem": "Redeem",
-  
+  "customerClubLedgerEmpty": "No loyalty transactions yet.",
+  "customerClubLedgerShowingCount": "Showing {shown} of {total}",
+  "@customerClubLedgerShowingCount": {
+    "placeholders": {
+      "shown": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "customerClubSettingsSectionActivation": "Activation",
+  "customerClubSettingsSectionEarning": "Earning rules",
+  "customerClubSettingsSectionAccess": "Person role restriction",
+  "customerClubSettingsSummaryTitle": "Saved rules summary",
+  "customerClubLedgerFilterPerson": "Filter transactions by person",
+  "customerClubCurrentPointsBalance": "Current points balance for this person",
+  "customerClubViewLedgerAction": "Transactions",
+  "customerClubAdjustmentLargeDeltaTitle": "Confirm large adjustment",
+  "customerClubAdjustmentLargeDeltaBody": "Delta is {delta} points. Continue?",
+  "@customerClubAdjustmentLargeDeltaBody": {
+    "placeholders": {
+      "delta": {"type": "String"}
+    }
+  },
+  "customerClubSummaryInactive": "Customer club is disabled for this business.",
+
   "identityInquiryTitle": "Identity Inquiry",
   "identityInquirySubtitle": "Please enter national ID and birth date",
   "nationalId": "National ID",

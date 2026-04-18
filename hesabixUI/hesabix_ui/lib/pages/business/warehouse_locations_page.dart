@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +8,7 @@ import '../../services/product_service.dart';
 import '../../services/warehouse_location_service.dart';
 import '../../services/warehouse_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/invoice/code_field_widget.dart';
 
 const _kLocationKinds = <String, String>{
   'zone': 'منطقه',
@@ -15,6 +18,23 @@ const _kLocationKinds = <String, String>{
   'bin': 'سلول / باکس',
   'other': 'سایر',
 };
+
+IconData _warehouseLocationKindIcon(String kind) {
+  switch (kind) {
+    case 'zone':
+      return Icons.map_outlined;
+    case 'aisle':
+      return Icons.alt_route_outlined;
+    case 'rack':
+      return Icons.view_week_outlined;
+    case 'shelf':
+      return Icons.view_agenda_outlined;
+    case 'bin':
+      return Icons.inventory_2_outlined;
+    default:
+      return Icons.place_outlined;
+  }
+}
 
 /// مدیریت سلسله‌مراتب محل‌ها و ثبت قرارگیری کالا برای یک انبار مشخص.
 class WarehouseLocationsPage extends StatefulWidget {
@@ -165,101 +185,324 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
     await _reloadPlacements();
   }
 
+  Widget _locationDialogSectionTitle(
+    BuildContext context,
+    String title,
+    IconData icon, {
+    bool first = false,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: EdgeInsets.only(top: first ? 0 : 16, bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: cs.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: tt.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showLocationDialog({Map<String, dynamic>? existing, int? parentId}) async {
-    final codeCtrl = TextEditingController(text: existing?['code']?.toString() ?? '');
+    final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: existing?['name']?.toString() ?? '');
     final notesCtrl = TextEditingController(text: existing?['notes']?.toString() ?? '');
+    final sortOrderCtrl = TextEditingController(text: '${existing?['sort_order'] ?? 0}');
     String kind = (existing?['location_kind']?.toString() ?? 'zone');
     if (!_kLocationKinds.containsKey(kind)) kind = 'zone';
-    int sortOrder = int.tryParse('${existing?['sort_order'] ?? 0}') ?? 0;
     bool active = existing?['is_active'] != false;
+    var autoGenerateLocationCode = existing == null;
+    String? manualLocationCode = existing?['code']?.toString();
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setLocal) {
-            return AlertDialog(
-              title: Text(existing == null ? 'محل جدید' : 'ویرایش محل'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: codeCtrl,
-                      decoration: const InputDecoration(labelText: 'کد محل (یکتا در این انبار)'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'نام نمایشی'),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey(kind),
-                      initialValue: kind,
-                      decoration: const InputDecoration(labelText: 'نوع'),
-                      items: _kLocationKinds.entries
-                          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                          .toList(),
-                      onChanged: (v) => setLocal(() => kind = v ?? 'zone'),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(labelText: 'ترتیب نمایش'),
-                            keyboardType: TextInputType.number,
-                            controller: TextEditingController(text: '$sortOrder'),
-                            onChanged: (v) => sortOrder = int.tryParse(v) ?? 0,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('فعال'),
-                            value: active,
-                            onChanged: (v) => setLocal(() => active = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                    TextField(
-                      controller: notesCtrl,
-                      decoration: const InputDecoration(labelText: 'یادداشت'),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (ok != true || !mounted) return;
-
-    final payload = <String, dynamic>{
-      'code': codeCtrl.text.trim(),
-      'name': nameCtrl.text.trim(),
-      'location_kind': kind,
-      'sort_order': sortOrder,
-      'is_active': active,
-      'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-    };
-
-    if (existing == null && parentId != null) {
-      payload['parent_id'] = parentId;
+    String? parentSummary;
+    if (parentId != null) {
+      try {
+        final p = _flat.firstWhere((e) => e['id'] == parentId);
+        parentSummary = '${p['path_codes'] ?? p['code']} — ${p['name']}';
+      } catch (_) {
+        parentSummary = null;
+      }
     }
 
     try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (ctx, setLocal) {
+              final cs = Theme.of(ctx).colorScheme;
+              final tt = Theme.of(ctx).textTheme;
+              final screenW = MediaQuery.sizeOf(ctx).width;
+              final dialogMaxW = math.min(screenW - 40, 460.0);
+
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                constraints: BoxConstraints(maxWidth: dialogMaxW),
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                titlePadding: const EdgeInsets.fromLTRB(24, 24, 16, 8),
+                contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                actionsAlignment: MainAxisAlignment.end,
+                title: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: cs.primaryContainer,
+                      foregroundColor: cs.onPrimaryContainer,
+                      child: Icon(
+                        existing == null ? Icons.add_location_alt_outlined : Icons.edit_location_alt_outlined,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            existing == null ? 'محل جدید' : 'ویرایش محل',
+                            style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _warehouse?.name ?? 'انبار',
+                            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          if (parentSummary != null) ...[
+                            const SizedBox(height: 10),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.subdirectory_arrow_right, size: 20, color: cs.primary),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'افزودن به عنوان زیرمجموعه',
+                                            style: tt.labelSmall?.copyWith(color: cs.primary),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(parentSummary!, style: tt.bodySmall),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                content: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _locationDialogSectionTitle(ctx, 'شناسه و نام', Icons.tag_outlined, first: true),
+                        CodeFieldWidget(
+                          key: ValueKey<Object?>(
+                            existing == null ? 'loc_new' : 'loc_edit_${existing['id']}',
+                          ),
+                          initialValue: existing?['code']?.toString(),
+                          autoGenerateCode: existing == null,
+                          warehouseLocationCode: true,
+                          showAutoManualToggle: existing == null,
+                          isRequired: true,
+                          label: 'کد محل',
+                          hintText: 'مثال: LOC-20260419-0001',
+                          onChanged: (v) => manualLocationCode = v,
+                          onAutoGenerateChanged: existing == null
+                              ? (auto) {
+                                  autoGenerateLocationCode = auto;
+                                  setLocal(() {});
+                                }
+                              : null,
+                        ),
+                        if (existing == null && autoGenerateLocationCode)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'کد از تنظیمات «کد محل انبار» در شماره‌گذاری اسناد تولید می‌شود.',
+                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: nameCtrl,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: 'نام نمایشی',
+                            hintText: 'مثال: ردیف الف — قفسه ۳',
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'نام نمایشی الزامی است';
+                            }
+                            return null;
+                          },
+                        ),
+                        _locationDialogSectionTitle(ctx, 'نوع محل', Icons.category_outlined),
+                        DropdownButtonFormField<String>(
+                          key: ValueKey(kind),
+                          initialValue: kind,
+                          decoration: InputDecoration(
+                            labelText: 'نوع در سلسله‌مراتب',
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: _kLocationKinds.entries
+                              .map(
+                                (e) => DropdownMenuItem<String>(
+                                  value: e.key,
+                                  child: Row(
+                                    children: [
+                                      Icon(_warehouseLocationKindIcon(e.key), size: 20, color: cs.primary),
+                                      const SizedBox(width: 10),
+                                      Text(e.value),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) => setLocal(() => kind = v ?? 'zone'),
+                        ),
+                        _locationDialogSectionTitle(ctx, 'نمایش و وضعیت', Icons.tune_outlined),
+                        Material(
+                          color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextFormField(
+                                  controller: sortOrderCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'ترتیب نمایش در درخت',
+                                    hintText: 'عدد کوچکتر = بالاتر (مثلاً ۰، ۱، ۲)',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return null;
+                                    if (int.tryParse(v.trim()) == null) {
+                                      return 'عدد معتبر وارد کنید';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 4),
+                                SwitchListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                  title: const Text('فعال در سیستم'),
+                                  subtitle: Text(
+                                    active
+                                        ? 'در لیست محل‌ها و انتخاب‌ها دیده می‌شود.'
+                                        : 'نامعتبر؛ در انتخاب‌های جدید پیشنهاد نمی‌شود.',
+                                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                  ),
+                                  value: active,
+                                  onChanged: (v) => setLocal(() => active = v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        _locationDialogSectionTitle(ctx, 'یادداشت', Icons.notes_outlined),
+                        TextField(
+                          controller: notesCtrl,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            hintText: 'اختیاری — برای راهنمای پرسنل انبار',
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            alignLabelWithHint: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('انصراف'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      if (!formKey.currentState!.validate()) return;
+                      Navigator.pop(ctx, true);
+                    },
+                    icon: const Icon(Icons.save_outlined, size: 20),
+                    label: const Text('ذخیره'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      if (ok != true || !mounted) return;
+
+      final payload = <String, dynamic>{
+        'name': nameCtrl.text.trim(),
+        'location_kind': kind,
+        'sort_order': int.tryParse(sortOrderCtrl.text.trim()) ?? 0,
+        'is_active': active,
+        'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+      };
+
+      if (existing == null) {
+        if (autoGenerateLocationCode) {
+          payload['auto_generate_code'] = true;
+        } else {
+          payload['code'] = (manualLocationCode ?? '').trim();
+          payload['auto_generate_code'] = false;
+        }
+      } else {
+        payload['code'] = (manualLocationCode ?? '').trim();
+      }
+
+      if (existing == null && parentId != null) {
+        payload['parent_id'] = parentId;
+      }
+
       if (existing == null) {
         await _locService.createLocation(
           businessId: widget.businessId,
@@ -280,6 +523,10 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: '$e');
+    } finally {
+      nameCtrl.dispose();
+      notesCtrl.dispose();
+      sortOrderCtrl.dispose();
     }
   }
 

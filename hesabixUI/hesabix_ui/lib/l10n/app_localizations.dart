@@ -16805,6 +16805,78 @@ abstract class AppLocalizations {
   /// **'Redeem'**
   String get customerClubActionRedeem;
 
+  /// No description provided for @customerClubLedgerEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No loyalty transactions yet.'**
+  String get customerClubLedgerEmpty;
+
+  /// No description provided for @customerClubLedgerShowingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total}'**
+  String customerClubLedgerShowingCount(int shown, int total);
+
+  /// No description provided for @customerClubSettingsSectionActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Activation'**
+  String get customerClubSettingsSectionActivation;
+
+  /// No description provided for @customerClubSettingsSectionEarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Earning rules'**
+  String get customerClubSettingsSectionEarning;
+
+  /// No description provided for @customerClubSettingsSectionAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Person role restriction'**
+  String get customerClubSettingsSectionAccess;
+
+  /// No description provided for @customerClubSettingsSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved rules summary'**
+  String get customerClubSettingsSummaryTitle;
+
+  /// No description provided for @customerClubLedgerFilterPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter transactions by person'**
+  String get customerClubLedgerFilterPerson;
+
+  /// No description provided for @customerClubCurrentPointsBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Current points balance for this person'**
+  String get customerClubCurrentPointsBalance;
+
+  /// No description provided for @customerClubViewLedgerAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get customerClubViewLedgerAction;
+
+  /// No description provided for @customerClubAdjustmentLargeDeltaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm large adjustment'**
+  String get customerClubAdjustmentLargeDeltaTitle;
+
+  /// No description provided for @customerClubAdjustmentLargeDeltaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Delta is {delta} points. Continue?'**
+  String customerClubAdjustmentLargeDeltaBody(String delta);
+
+  /// No description provided for @customerClubSummaryInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer club is disabled for this business.'**
+  String get customerClubSummaryInactive;
+
   /// No description provided for @identityInquiryTitle.
   ///
   /// In en, this message translates to:

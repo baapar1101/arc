@@ -3,20 +3,29 @@ from __future__ import annotations
 from typing import Optional
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 ALLOWED_LOCATION_KINDS = frozenset({"zone", "aisle", "rack", "shelf", "bin", "other"})
 
 
 class WarehouseLocationCreateRequest(BaseModel):
-	code: str = Field(..., min_length=1, max_length=64)
+	code: Optional[str] = Field(default=None, max_length=64)
 	name: str = Field(..., min_length=1, max_length=255)
 	parent_id: Optional[int] = Field(default=None)
 	location_kind: str = Field(default="zone", max_length=32)
 	sort_order: int = Field(default=0)
 	is_active: bool = Field(default=True)
 	notes: Optional[str] = Field(default=None, max_length=4000)
+	auto_generate_code: bool = Field(default=False, description="تولید کد با سامانهٔ شماره‌گذاری warehouse_location")
+
+	@model_validator(mode="after")
+	def validate_code_or_auto(self) -> "WarehouseLocationCreateRequest":
+		if not self.auto_generate_code:
+			c = (self.code or "").strip()
+			if not c:
+				raise ValueError("کد محل الزامی است یا گزینهٔ تولید خودکار را فعال کنید")
+		return self
 
 
 class WarehouseLocationUpdateRequest(BaseModel):

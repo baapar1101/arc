@@ -8872,6 +8872,48 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubActionRedeem => 'مصرف امتیاز';
 
   @override
+  String get customerClubLedgerEmpty => 'هنوز تراکنش امتیازی ثبت نشده است.';
+
+  @override
+  String customerClubLedgerShowingCount(int shown, int total) {
+    return 'نمایش $shown از $total';
+  }
+
+  @override
+  String get customerClubSettingsSectionActivation => 'فعال‌سازی';
+
+  @override
+  String get customerClubSettingsSectionEarning => 'محاسبه و اعطای امتیاز';
+
+  @override
+  String get customerClubSettingsSectionAccess => 'محدودیت نقش شخص';
+
+  @override
+  String get customerClubSettingsSummaryTitle => 'خلاصهٔ تنظیمات ذخیره‌شده';
+
+  @override
+  String get customerClubLedgerFilterPerson =>
+      'فیلتر لیست تراکنش‌ها بر اساس شخص';
+
+  @override
+  String get customerClubCurrentPointsBalance => 'ماندهٔ فعلی امتیاز این شخص';
+
+  @override
+  String get customerClubViewLedgerAction => 'تراکنش‌ها';
+
+  @override
+  String get customerClubAdjustmentLargeDeltaTitle => 'تأیید تغییر بزرگ امتیاز';
+
+  @override
+  String customerClubAdjustmentLargeDeltaBody(String delta) {
+    return 'مقدار دلتا «$delta» امتیاز است. ثبت می‌کنید؟';
+  }
+
+  @override
+  String get customerClubSummaryInactive =>
+      'باشگاه در این کسب‌وکار غیرفعال است.';
+
+  @override
   String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
 
   @override

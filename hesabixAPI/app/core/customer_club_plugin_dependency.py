@@ -31,8 +31,12 @@ def check_customer_club_plugin_active(db: Session, business_id: int) -> bool:
 	)
 	if not license_row:
 		return False
-	if license_row.ends_at and license_row.ends_at < datetime.utcnow():
-		return False
+	if license_row.ends_at:
+		ea = license_row.ends_at
+		ends_at_val = ea.date() if isinstance(ea, datetime) else ea
+		now_val = datetime.utcnow().date()
+		if ends_at_val < now_val:
+			return False
 	return True
 
 

@@ -109,6 +109,7 @@ import 'pages/business/repair_shop/repair_order_detail_page.dart';
 import 'pages/business/repair_shop/repair_technicians_page.dart';
 import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
+import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -2673,6 +2674,34 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: CreditSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/customer-club',
+              name: 'business_settings_customer_club',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                final isOwner = _authStore!.currentBusiness?.id == businessId &&
+                    _authStore!.currentBusiness?.isOwner == true;
+                final canAccess = isOwner ||
+                    _authStore!.hasBusinessPermission('customer_club', 'view') ||
+                    _authStore!.hasBusinessPermission('customer_club', 'manage');
+                if (!canAccess) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: CustomerClubSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
                 );
               },
             ),
