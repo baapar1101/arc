@@ -752,6 +752,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                                               onChanged: (wid) {
                                                 _updateLineWarehouse(lineId, wid);
                                               },
+                                              selectDefaultWhenUnset: true,
                                             ),
                                           )
                                         : ConstrainedBox(

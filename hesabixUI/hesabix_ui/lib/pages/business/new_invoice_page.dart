@@ -2810,6 +2810,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             label: 'انبار کلی (سطح سند)',
                             hintText: 'انتخاب انبار (اختیاری)',
                             isRequired: false,
+                            selectDefaultWhenUnset: true,
                           ),
                         ),
                         Padding(

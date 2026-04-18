@@ -2187,6 +2187,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
             label: 'انبار اقلام',
             hintText: 'انتخاب انبار برای اقلام فاکتور',
             isRequired: _enableWarehouseDocument, // اگر حواله فعال باشد، انبار لازم است
+            selectDefaultWhenUnset: true,
           ),
         ],
       ),

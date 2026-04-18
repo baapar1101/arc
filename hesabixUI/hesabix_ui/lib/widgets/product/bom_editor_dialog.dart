@@ -1103,6 +1103,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
               label: 'انبار پیشنهادی',
               hintText: 'انتخاب انبار',
               onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+              selectDefaultWhenUnset: true,
             ),
             SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
             Row(
@@ -1252,6 +1253,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 label: 'انبار پیشنهادی',
                 hintText: 'انتخاب انبار',
                 onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+                selectDefaultWhenUnset: true,
               ),
             ),
           ),

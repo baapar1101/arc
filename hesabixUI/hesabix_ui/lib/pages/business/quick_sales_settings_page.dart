@@ -233,6 +233,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                 },
                                 label: 'انبار پیش‌فرض',
                                 hintText: 'انتخاب انبار برای فروش سریع',
+                                selectDefaultWhenUnset: true,
                               ),
                               const SizedBox(height: 16),
                               CashRegisterComboboxWidget(

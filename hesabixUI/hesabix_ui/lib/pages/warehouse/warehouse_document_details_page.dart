@@ -622,6 +622,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                                           onChanged: (wid) {
                                             _updateLineWarehouse(lineId, wid);
                                           },
+                                          selectDefaultWhenUnset: true,
                                         ),
                                       )
                                     : Text(warehouseId?.toString() ?? '-'),

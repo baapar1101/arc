@@ -139,14 +139,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
     }
     _setupSearchListener();
-    _loadColumnSettings();
     _loadDensityPreference();
     _loadExportCalendarPreference();
     if (widget.config.persistPageSize) {
       _loadingList = true;
       unawaited(_bootstrapInitialFetch());
     } else {
-      _fetchData();
+      unawaited(_bootstrapWithoutPersistedPageSize());
     }
   }
 
@@ -184,8 +183,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     } catch (_) {}
   }
 
+  /// بارگذاری تنظیمات ستون باید قبل از اولین فچ و [ _maybeAutoFitColumns ] تمام شود؛
+  /// وگرنه auto-fit با پیش‌فرض ذخیره می‌کند و تنظیمات کاربر را روی دیسک بازنویسی می‌کند.
   Future<void> _bootstrapInitialFetch() async {
+    await _loadColumnSettings();
+    if (!mounted) return;
     await _loadPageSizePreference();
+    if (!mounted) return;
+    await _fetchData();
+  }
+
+  Future<void> _bootstrapWithoutPersistedPageSize() async {
+    await _loadColumnSettings();
     if (!mounted) return;
     await _fetchData();
   }
@@ -614,6 +623,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final identityChanged =
         oldWidget.config.effectiveTableId != widget.config.effectiveTableId;
     if (identityChanged) {
+      _autoFitApplied = false;
       if (widget.config.persistPageSize) {
         setState(() {
           _loadingList = true;
@@ -625,7 +635,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _limit = widget.config.defaultPageSize;
           _page = 1;
         });
-        _fetchData();
+        unawaited(_bootstrapWithoutPersistedPageSize());
       }
       return;
     }
@@ -640,6 +650,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // - Feature enabled
     // - We have items to sample
     // - Apply only once per widget lifecycle
+    if (_isLoadingColumnSettings) {
+      return;
+    }
     if (!_autoFitApplied &&
         widget.config.enableColumnSettings &&
         widget.config.autoFitColumnsOnFirstLoad &&

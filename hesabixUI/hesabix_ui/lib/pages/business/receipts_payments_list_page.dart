@@ -646,60 +646,60 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   }
 
   /// حذف سند
-  void _onDelete(ReceiptPaymentDocument document) {
-    showDialog(
+  ///
+  /// تأیید را با [Navigator.pop(ctx, bool)] تمام می‌کنیم و بعد از بسته‌شدن کامل دیالوگ، حذف را اجرا می‌کنیم؛
+  /// باز کردن بلافاصلهٔ دیالوگ لودینگ داخل `onPressed` همزمان با بسته‌شدن دیالوگ تأیید باعث ناسازگاری پشتهٔ [Navigator] و صفحهٔ سفید می‌شود.
+  Future<void> _onDelete(ReceiptPaymentDocument document) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأیید حذف'),
         content: Text('حذف سند ${document.code} غیرقابل بازگشت است. آیا ادامه می‌دهید؟'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('انصراف'),
           ),
           FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _performDelete(document);
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف'),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+    await _performDelete(document);
   }
 
   /// انجام عملیات حذف
   Future<void> _performDelete(ReceiptPaymentDocument document) async {
     if (!mounted) return;
-    
-    // نمایش لودینگ هنگام حذف
-    showDialog(
+
+    // لودینگ روی root navigator همان‌جایی که showDialog پیش‌فرض قرار می‌گیرد؛ بستن با context صفحه گاهی نزدیک‌ترین Navigator را می‌پَکد و به‌اشتباه مسیر GoRouter را برمی‌دارد (صفحهٔ سفید).
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
+      useRootNavigator: true,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final success = await _service.delete(document.id);
       if (!mounted) return;
-      
-      // بستن لودینگ
-      Navigator.pop(context);
-      
+
       if (success) {
         // پاک‌سازی شمارنده انتخاب
         setState(() {
           _selectedCount = 0;
         });
-        
+
         // تازه‌سازی داده‌ها بعد از بستن دیالوگ
         Future.microtask(() {
           if (mounted) {
             _refreshData();
           }
         });
-        
+
         // نمایش پیام موفقیت
         SnackBarHelper.showSuccess(context, message: 'سند ${document.code} با موفقیت حذف شد');
       } else {
@@ -707,11 +707,6 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      
-      // بستن لودینگ در صورت بروز خطا
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
 
       String message = 'خطا در حذف سند';
       int? statusCode;
@@ -754,6 +749,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       }
 
       SnackBarHelper.showError(context, message: message);
+    } finally {
+      if (mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
     }
   }
 
@@ -808,40 +808,31 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (confirmed != true) return;
     if (!mounted) return;
 
-    // نمایش لودینگ
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
+      useRootNavigator: true,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       await _service.deleteMultiple(ids);
       if (!mounted) return;
-      
-      // بستن لودینگ
-      Navigator.pop(context);
-      
-      // پاک‌سازی شمارنده انتخاب
+
       setState(() {
         _selectedCount = 0;
       });
-      
-      // تازه‌سازی داده‌ها بعد از بستن دیالوگ
+
       Future.microtask(() {
         if (mounted) {
           _refreshData();
         }
       });
-      
-      // نمایش پیام موفقیت
+
       SnackBarHelper.showSuccess(context, message: '${ids.length} سند با موفقیت حذف شد');
     } catch (e) {
       if (!mounted) return;
-      
-      // بستن لودینگ در صورت بروز خطا
-      Navigator.pop(context);
-      
+
       String message = 'خطا در حذف اسناد';
       if (e is DioException) {
         message = e.message ?? message;
@@ -849,6 +840,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         message = e.toString();
       }
       SnackBarHelper.showError(context, message: message);
+    } finally {
+      if (mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
     }
   }
 }
@@ -2051,64 +2047,74 @@ class _PersonsPanelState extends State<_PersonsPanel> {
     final t = AppLocalizations.of(context);
     final padding = ResponsiveHelper.getPadding(context);
     final spacing = ResponsiveHelper.getGridSpacing(context);
-    
+
     return Padding(
       padding: EdgeInsets.all(padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // داخل SingleChildScrollView ارتفاع نامحدود است؛ Expanded اینجا ارتفاع صفر می‌دهد.
+          final bool hasBoundedHeight = constraints.maxHeight < double.infinity;
+
+          final listContent = widget.lines.isEmpty
+              ? Center(child: Text(t.noDataFound))
+              : ListView.separated(
+                  shrinkWrap: !hasBoundedHeight,
+                  physics: hasBoundedHeight ? null : const NeverScrollableScrollPhysics(),
+                  itemCount: widget.lines.length,
+                  separatorBuilder: (_, _) => SizedBox(height: spacing),
+                  itemBuilder: (ctx, i) {
+                    final line = widget.lines[i];
+                    return _PersonLineTile(
+                      businessId: widget.businessId,
+                      line: line,
+                      onChanged: (l) {
+                        debugPrint('🔴 [PersonsPanel] onChanged called - index: $i, old amount: ${line.amount}, new amount: ${l.amount}');
+                        final newLines = List<_PersonLine>.from(widget.lines);
+                        newLines[i] = l;
+                        debugPrint('🔴 [PersonsPanel] calling widget.onChanged with ${newLines.length} lines');
+                        widget.onChanged(newLines);
+                      },
+                      onDelete: () {
+                        final newLines = List<_PersonLine>.from(widget.lines);
+                        newLines.removeAt(i);
+                        widget.onChanged(newLines);
+                      },
+                      apiClient: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.apiClient,
+                      calendarController: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.calendarController,
+                      selectedCurrencyId: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!._selectedCurrencyId,
+                      isReceipt: widget.isReceipt,
+                    );
+                  },
+                );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: hasBoundedHeight ? MainAxisSize.max : MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  t.people,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              IconButton(
-                onPressed: () {
-                  final newLines = List<_PersonLine>.from(widget.lines);
-                  newLines.add(_PersonLine.empty());
-                  widget.onChanged(newLines);
-                },
-                icon: const Icon(Icons.add),
-                tooltip: t.add,
-              ),
-            ],
-          ),
-          SizedBox(height: spacing),
-          Expanded(
-            child: widget.lines.isEmpty
-                ? Center(child: Text(t.noDataFound))
-                : ListView.separated(
-                    itemCount: widget.lines.length,
-                    separatorBuilder: (_, _) => SizedBox(height: spacing),
-                    itemBuilder: (ctx, i) {
-                      final line = widget.lines[i];
-                      return _PersonLineTile(
-                        businessId: widget.businessId,
-                        line: line,
-                        onChanged: (l) {
-                          debugPrint('🔴 [PersonsPanel] onChanged called - index: $i, old amount: ${line.amount}, new amount: ${l.amount}');
-                          final newLines = List<_PersonLine>.from(widget.lines);
-                          newLines[i] = l;
-                          debugPrint('🔴 [PersonsPanel] calling widget.onChanged with ${newLines.length} lines');
-                          widget.onChanged(newLines);
-                        },
-                        onDelete: () {
-                          final newLines = List<_PersonLine>.from(widget.lines);
-                          newLines.removeAt(i);
-                          widget.onChanged(newLines);
-                        },
-                        apiClient: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.apiClient,
-                        calendarController: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.calendarController,
-                        selectedCurrencyId: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!._selectedCurrencyId,
-                        isReceipt: widget.isReceipt,
-                      );
-                    },
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.people,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-          ),
-        ],
+                  IconButton(
+                    onPressed: () {
+                      final newLines = List<_PersonLine>.from(widget.lines);
+                      newLines.add(_PersonLine.empty());
+                      widget.onChanged(newLines);
+                    },
+                    icon: const Icon(Icons.add),
+                    tooltip: t.add,
+                  ),
+                ],
+              ),
+              SizedBox(height: spacing),
+              if (hasBoundedHeight) Expanded(child: listContent) else listContent,
+            ],
+          );
+        },
       ),
     );
   }

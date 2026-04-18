@@ -909,6 +909,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                       child: WarehouseComboboxWidget(
                         businessId: widget.businessId,
                         selectedWarehouseId: m['warehouseId'] as int?,
+                        selectDefaultWhenUnset: true,
                         onChanged: (wid) {
                           final product = m['product'] as Map<String, dynamic>?;
                           final pid = product?['id'] as int?;

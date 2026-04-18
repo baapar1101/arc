@@ -23,6 +23,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/warranty/warranty_code_details_dialog.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../utils/snackbar_helper.dart';
@@ -58,6 +59,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   bool _uploadingFile = false;
   CalendarController? _calendarController;
   bool _loadingCalendar = false;
+  Future<void>? _calendarLoadInFlight;
   double? _summaryDebit;
   double? _summaryCredit;
   double? _summaryBalance;
@@ -100,14 +102,49 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<void> _ensureCalendarController() async {
-    if (_calendarController != null || _loadingCalendar) return;
-    _loadingCalendar = true;
-    final controller = await CalendarController.load();
-    if (!mounted) return;
-    setState(() {
-      _calendarController = controller;
-      _loadingCalendar = false;
-    });
+    if (_calendarController != null) return;
+    _calendarLoadInFlight ??= () async {
+      _loadingCalendar = true;
+      try {
+        final controller = await CalendarController.load();
+        if (!mounted) return;
+        setState(() {
+          _calendarController = controller;
+        });
+      } finally {
+        _loadingCalendar = false;
+        _calendarLoadInFlight = null;
+      }
+    }();
+    await _calendarLoadInFlight;
+  }
+
+  Future<DateTime?> _pickActivityDate(BuildContext pickerContext, DateTime initial) async {
+    await _ensureCalendarController();
+    if (!mounted) return null;
+    final useJalali = _calendarController?.isJalali ?? true;
+    const firstDate = DateTime(2000);
+    const lastDate = DateTime(2100);
+    if (useJalali) {
+      return showJalaliDatePicker(
+        context: pickerContext,
+        initialDate: initial,
+        firstDate: firstDate,
+        lastDate: lastDate,
+      );
+    }
+    return showDatePicker(
+      context: pickerContext,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      locale: const Locale('en', 'US'),
+    );
+  }
+
+  String _activityDateDisplayLabel(DateTime date) {
+    final isJalali = _calendarController?.isJalali ?? true;
+    return HesabixDateUtils.formatForDisplay(date.toLocal(), isJalali);
   }
 
   Future<void> _initFinancialContext() async {
@@ -1269,6 +1306,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<void> _showAddActivityDialog(int personId, CrmService crmService, VoidCallback onSaved) async {
+    await _ensureCalendarController();
+    if (!mounted) return;
     List<Map<String, dynamic>> activityTypes = [];
     try {
       final result = await crmService.listProcessDefinitions(
@@ -1340,15 +1379,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  title: Text('تاریخ: ${selectedDate.toLocal().toString().split(' ')[0]}'),
+                  title: Text('تاریخ: ${_activityDateDisplayLabel(selectedDate)}'),
                   trailing: TextButton(
                     onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
+                      final picked = await _pickActivityDate(context, selectedDate);
                       if (picked != null) setState(() => selectedDate = picked);
                     },
                     child: const Text('تغییر'),
@@ -1387,6 +1421,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<void> _showEditActivityDialog(int personId, CrmService crmService, Map<String, dynamic> a, VoidCallback onSaved) async {
+    await _ensureCalendarController();
+    if (!mounted) return;
     final activityId = (a['id'] as num?)?.toInt();
     if (activityId == null) return;
     final subjectController = TextEditingController(text: a['subject']?.toString() ?? '');
@@ -1420,10 +1456,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 TextField(controller: descController, decoration: const InputDecoration(labelText: 'توضیحات'), maxLines: 3),
                 const SizedBox(height: 12),
                 ListTile(
-                  title: Text('تاریخ: ${selectedDate.toLocal().toString().split(' ')[0]}'),
+                  title: Text('تاریخ: ${_activityDateDisplayLabel(selectedDate)}'),
                   trailing: TextButton(
                     onPressed: () async {
-                      final picked = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(2000), lastDate: DateTime(2100));
+                      final picked = await _pickActivityDate(context, selectedDate);
                       if (picked != null) setState(() => selectedDate = picked);
                     },
                     child: const Text('تغییر'),

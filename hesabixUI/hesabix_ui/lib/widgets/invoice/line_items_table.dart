@@ -1019,6 +1019,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         ),
                         const SizedBox(height: 4),
                         WarehouseComboboxWidget(
+                          key: ValueKey('inv_wh_${index}_${item.productId}_${item.trackInventory}'),
                           businessId: widget.businessId,
                           selectedWarehouseId: item.warehouseId,
                           onChanged: (wid) {
@@ -1028,6 +1029,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                           hintText: 'انتخاب انبار',
                           isRequired: item.trackInventory,
                           height: fieldHeight,
+                          selectDefaultWhenUnset: item.trackInventory,
                         ),
                       ],
                     ),
@@ -1308,6 +1310,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 Expanded(
                   flex: 2,
                   child: WarehouseComboboxWidget(
+                    key: ValueKey('inv_wh_${index}_${item.productId}_${item.trackInventory}'),
                     businessId: widget.businessId,
                     selectedWarehouseId: item.warehouseId,
                     onChanged: (wid) {
@@ -1317,6 +1320,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     hintText: 'انتخاب انبار',
                     isRequired: item.trackInventory,
                     height: fieldHeight,
+                    selectDefaultWhenUnset: item.trackInventory,
                   ),
                 ),
               if (widget.postInventory) const SizedBox(width: 8),

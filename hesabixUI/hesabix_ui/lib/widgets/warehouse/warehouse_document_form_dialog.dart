@@ -635,6 +635,7 @@ class _WarehouseDocumentFormDialogState
                 ? (_) {}
                 : (id) => setState(() => _warehouseIdFrom = id),
             label: 'انبار مبدا *',
+            selectDefaultWhenUnset: true,
           ),
           const SizedBox(height: 12),
           WarehouseComboboxWidget(
@@ -644,6 +645,7 @@ class _WarehouseDocumentFormDialogState
                 ? (_) {}
                 : (id) => setState(() => _warehouseIdTo = id),
             label: 'انبار مقصد *',
+            selectDefaultWhenUnset: false,
           ),
         ];
       }
@@ -658,6 +660,7 @@ class _WarehouseDocumentFormDialogState
                     ? (_) {}
                     : (id) => setState(() => _warehouseIdFrom = id),
                 label: 'انبار مبدا *',
+                selectDefaultWhenUnset: true,
               ),
             ),
             const SizedBox(width: 12),
@@ -669,6 +672,7 @@ class _WarehouseDocumentFormDialogState
                     ? (_) {}
                     : (id) => setState(() => _warehouseIdTo = id),
                 label: 'انبار مقصد *',
+                selectDefaultWhenUnset: false,
               ),
             ),
           ],
@@ -683,6 +687,7 @@ class _WarehouseDocumentFormDialogState
               ? (_) {}
               : (id) => setState(() => _warehouseIdFrom = id),
           label: 'انبار *',
+          selectDefaultWhenUnset: true,
         ),
       ];
     } else if (_docType == 'receipt' || _docType == 'production_in') {
@@ -694,6 +699,7 @@ class _WarehouseDocumentFormDialogState
               ? (_) {}
               : (id) => setState(() => _warehouseIdTo = id),
           label: 'انبار *',
+          selectDefaultWhenUnset: true,
         ),
       ];
     }
@@ -2512,6 +2518,7 @@ class _WarehouseDocumentFormDialogState
                                     _updateLine(index, {'warehouse_id': id}),
                           label: 'انبار',
                           isRequired: true,
+                          selectDefaultWhenUnset: true,
                         ),
                         const SizedBox(height: 8),
                       ],
@@ -2577,6 +2584,7 @@ class _WarehouseDocumentFormDialogState
                                     _updateLine(index, {'warehouse_id': id}),
                           label: 'انبار',
                           isRequired: true,
+                          selectDefaultWhenUnset: true,
                         ),
                       ),
                       const SizedBox(width: 8),

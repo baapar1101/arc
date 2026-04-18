@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/warehouse_service.dart';
 import '../../models/warehouse_model.dart';
@@ -13,6 +12,11 @@ class WarehouseComboboxWidget extends StatefulWidget {
   final bool isRequired;
   final double? height; // ارتفاع اختیاری برای هماهنگی با سایر فیلدها
 
+  /// اگر true باشد، پس از بارگذاری لیست انبارها و وقتی هنوز انباری انتخاب نشده،
+  /// نخستین انباری که در API با [Warehouse.isDefault] مشخص شده انتخاب و به [onChanged] اعلام می‌شود.
+  /// برای فیلتر گزارش‌ها که null یعنی «همه انبارها» است، باید false بماند.
+  final bool selectDefaultWhenUnset;
+
   const WarehouseComboboxWidget({
     super.key,
     required this.businessId,
@@ -22,6 +26,7 @@ class WarehouseComboboxWidget extends StatefulWidget {
     this.hintText = 'انتخاب انبار',
     this.isRequired = false,
     this.height,
+    this.selectDefaultWhenUnset = false,
   });
 
   @override
@@ -33,6 +38,7 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
   List<Warehouse> _items = const <Warehouse>[];
   bool _loading = false;
   int? _selectedValue;
+  bool _resolvedInitialDefault = false;
 
   @override
   void initState() {
@@ -44,9 +50,47 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
   @override
   void didUpdateWidget(WarehouseComboboxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _resolvedInitialDefault = false;
+      _selectedValue = widget.selectedWarehouseId;
+      _load();
+      return;
+    }
     if (oldWidget.selectedWarehouseId != widget.selectedWarehouseId) {
       _selectedValue = widget.selectedWarehouseId;
     }
+    if (oldWidget.selectDefaultWhenUnset != widget.selectDefaultWhenUnset) {
+      _resolvedInitialDefault = false;
+    }
+  }
+
+  int? _firstDefaultWarehouseId(List<Warehouse> items) {
+    for (final w in items) {
+      if (w.isDefault && w.id != null) {
+        return w.id;
+      }
+    }
+    return null;
+  }
+
+  void _applyInitialDefaultIfNeeded(List<Warehouse> items) {
+    if (_resolvedInitialDefault || !widget.selectDefaultWhenUnset) {
+      _resolvedInitialDefault = true;
+      return;
+    }
+    if (widget.selectedWarehouseId != null || _selectedValue != null) {
+      _resolvedInitialDefault = true;
+      return;
+    }
+    final defId = _firstDefaultWarehouseId(items);
+    if (defId != null) {
+      _selectedValue = defId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onChanged(defId);
+      });
+    }
+    _resolvedInitialDefault = true;
   }
 
   Future<void> _load() async {
@@ -54,10 +98,16 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
     try {
       final items = await _service.listWarehouses(businessId: widget.businessId);
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = items;
+        _applyInitialDefaultIfNeeded(items);
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _items = const <Warehouse>[]);
+      setState(() {
+        _items = const <Warehouse>[];
+        _resolvedInitialDefault = true;
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -18,6 +18,8 @@ import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/services/person_service.dart';
+import '../../main.dart' show navigatorKey;
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/warehouse/warehouse_document_details_dialog.dart';
@@ -117,6 +119,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   final AttachedFilesWidgetKey _attachedFilesKey = AttachedFilesWidgetKey();
 
   final InvoiceService _invoiceService = InvoiceService();
+  final PersonService _personService = PersonService();
+  /// در صورت موفقیت، جزئیات کامل طرف حساب از API اشخاص (مکمل فیلدهای ناقص سند).
+  Person? _counterpartyPerson;
   /// فقط وقتی روی فاکتور `extra_info.installment_plan` وجود دارد.
   bool _showInstallmentsTab = false;
   Map<String, dynamic>? _installmentPlanPayload;
@@ -420,6 +425,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _counterpartyPerson = null;
     });
 
     try {
@@ -516,6 +522,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       // بارگذاری تراکنش‌های پرداخت برای فاکتورها
       if (doc.documentType.startsWith('invoice')) {
         await _loadPaymentDocuments(doc);
+        await _loadCounterpartyPersonDetails(doc);
       }
     } catch (e) {
       if (mounted) {
@@ -957,7 +964,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   return ListTile(
                     dense: true,
                     title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
-                    subtitle: Text(it['document_date'] ?? ''),
+                    subtitle: Text(_formatRelatedWarehouseDocumentDate(it['document_date'])),
                     onTap: () {
                       showDialog(
                         context: context,
@@ -1014,6 +1021,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
+  /// تاریخ حواله در API به‌صورت میلادی است؛ نمایش مطابق تقویم انتخاب‌شدهٔ کاربر.
+  String _formatRelatedWarehouseDocumentDate(dynamic raw) {
+    if (raw == null) return '-';
+    final s = raw.toString().trim();
+    if (s.isEmpty) return '-';
+    try {
+      final d = DateTime.parse(s.split('T').first);
+      return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
+    } catch (_) {
+      return s;
+    }
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1022,6 +1042,67 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
       ),
     );
+  }
+
+  int? _personIdFromDynamic(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
+  /// شناسهٔ شخص طرف حساب برای لینک کاردکس و بارگذاری جزئیات.
+  int? _resolvedCounterpartyPersonId(DocumentModel document) {
+    final extra = document.extraInfo;
+    if (extra != null) {
+      final id = _personIdFromDynamic(extra['person_id']);
+      if (id != null) return id;
+    }
+    final raw = _rawDocumentData;
+    if (raw != null) {
+      final id = _personIdFromDynamic(raw['person_id']);
+      if (id != null) return id;
+      final ei = raw['extra_info'];
+      if (ei is Map<String, dynamic>) {
+        final id2 = _personIdFromDynamic(ei['person_id']);
+        if (id2 != null) return id2;
+      }
+    }
+    if (document.lines != null) {
+      for (final line in document.lines!) {
+        final id = _personIdFromDynamic(line.personId);
+        if (id != null) return id;
+      }
+    }
+    final s = _extractCounterpartyInfo(document)['id'];
+    if (s != null && s.isNotEmpty) return int.tryParse(s);
+    return null;
+  }
+
+  Future<void> _loadCounterpartyPersonDetails(DocumentModel doc) async {
+    final personId = _resolvedCounterpartyPersonId(doc);
+    if (personId == null || personId <= 0) return;
+    try {
+      final p = await _personService.getPerson(personId);
+      if (!mounted) return;
+      setState(() => _counterpartyPerson = p);
+    } catch (_) {
+      /* نمایش با فیلدهای جاسازی‌شده در سند */
+    }
+  }
+
+  void _openPersonKardex(DocumentModel document) {
+    final id = _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
+    if (id == null) return;
+    final bid = document.businessId;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      ctx.go('/business/$bid/reports/kardex', extra: <String, dynamic>{
+        'person_ids': [id],
+      });
+    });
   }
 
   /// استخراج اطلاعات طرف حساب از سند
@@ -1033,13 +1114,51 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     String? personMobile;
     String? personEmail;
     int? personId;
+    String? personNationalId;
+    String? personCompanyName;
+    String? personAliasName;
+    String? personPhone;
+    String? personAddress;
+    String? personProvince;
+    String? personCity;
+    String? personPostalCode;
+    String? personEconomicId;
+    String? personRegistrationNumber;
+    String? personGroupName;
+
+    Map<String, dynamic>? rawExtra(Map<String, dynamic>? root) {
+      final ei = root?['extra_info'];
+      return ei is Map<String, dynamic> ? ei : null;
+    }
+
+    String? pickStr(dynamic v) {
+      if (v == null) return null;
+      final s = v.toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
+    void mergeExtra(Map<String, dynamic>? m) {
+      if (m == null) return;
+      personNationalId ??= pickStr(m['national_id']) ?? pickStr(m['person_national_id']);
+      personCompanyName ??= pickStr(m['company_name']) ?? pickStr(m['person_company_name']);
+      personAliasName ??= pickStr(m['alias_name']) ?? pickStr(m['person_alias_name']);
+      personPhone ??= pickStr(m['phone']) ?? pickStr(m['person_phone']);
+      personAddress ??= pickStr(m['address']) ?? pickStr(m['person_address']);
+      personProvince ??= pickStr(m['province']);
+      personCity ??= pickStr(m['city']);
+      personPostalCode ??= pickStr(m['postal_code']);
+      personEconomicId ??= pickStr(m['economic_id']);
+      personRegistrationNumber ??= pickStr(m['registration_number']);
+      personGroupName ??= pickStr(m['person_group_name']);
+    }
 
     if (extraInfo != null) {
-      personId = extraInfo['person_id'] as int?;
+      personId = _personIdFromDynamic(extraInfo['person_id']);
       personName = extraInfo['person_name'] as String?;
-      personCode = extraInfo['person_code'] as String?;
+      personCode = extraInfo['person_code']?.toString();
       personMobile = extraInfo['person_mobile'] as String?;
       personEmail = extraInfo['person_email'] as String?;
+      mergeExtra(extraInfo);
     }
 
     // اگر از extraInfo پیدا نشد، از خطوط سند بررسی کن
@@ -1047,7 +1166,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       for (final line in document.lines!) {
         if (line.personName != null && line.personName!.isNotEmpty) {
           personName = line.personName;
-          personId = line.personId;
+          personId = _personIdFromDynamic(line.personId);
           break;
         }
       }
@@ -1062,7 +1181,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             final pName = line['person_name'] as String?;
             if (pName != null && pName.isNotEmpty) {
               personName = pName;
-              personId = line['person_id'] as int?;
+              personId = _personIdFromDynamic(line['person_id']);
               break;
             }
           }
@@ -1073,10 +1192,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     // اگر هنوز پیدا نشد، از _rawDocumentData مستقیم بررسی کن
     if (personName == null && _rawDocumentData != null) {
       personName = _rawDocumentData!['person_name'] as String?;
-      personId = _rawDocumentData!['person_id'] as int?;
-      personCode = _rawDocumentData!['person_code'] as String?;
+      personId = _personIdFromDynamic(_rawDocumentData!['person_id']);
+      personCode = _rawDocumentData!['person_code']?.toString();
       personMobile = _rawDocumentData!['person_mobile'] as String?;
       personEmail = _rawDocumentData!['person_email'] as String?;
+    }
+
+    if (_rawDocumentData != null) {
+      mergeExtra(rawExtra(_rawDocumentData));
     }
 
     return {
@@ -1085,22 +1208,126 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       'mobile': personMobile,
       'email': personEmail,
       'id': personId?.toString(),
+      'national_id': personNationalId,
+      'company_name': personCompanyName,
+      'alias_name': personAliasName,
+      'phone': personPhone,
+      'address': personAddress,
+      'province': personProvince,
+      'city': personCity,
+      'postal_code': personPostalCode,
+      'economic_id': personEconomicId,
+      'registration_number': personRegistrationNumber,
+      'person_group_name': personGroupName,
     };
+  }
+
+  List<_InfoRow> _counterpartyDetailRows(Map<String, String?> extracted, Person? loaded) {
+    final rows = <_InfoRow>[];
+    final p = loaded;
+    if (p != null) {
+      rows.add(_InfoRow('نام', p.displayName));
+      if (p.aliasName.trim().isNotEmpty) {
+        rows.add(_InfoRow('نام مستعار', p.aliasName));
+      }
+      if (p.code != null) {
+        rows.add(_InfoRow('کد', '${p.code}'));
+      }
+      if (p.personGroupName != null && p.personGroupName!.trim().isNotEmpty) {
+        rows.add(_InfoRow('گروه اشخاص', p.personGroupName!));
+      }
+      if (p.personTypes.isNotEmpty) {
+        rows.add(_InfoRow('نوع', p.personTypes.map((e) => e.persianName).join('، ')));
+      }
+      if (p.companyName != null && p.companyName!.trim().isNotEmpty) {
+        rows.add(_InfoRow('شرکت', p.companyName!));
+      }
+      if (p.nationalId != null && p.nationalId!.trim().isNotEmpty) {
+        rows.add(_InfoRow('کد ملی / شناسه ملی', p.nationalId!));
+      }
+      if (p.economicId != null && p.economicId!.trim().isNotEmpty) {
+        rows.add(_InfoRow('شماره اقتصادی', p.economicId!));
+      }
+      if (p.registrationNumber != null && p.registrationNumber!.trim().isNotEmpty) {
+        rows.add(_InfoRow('شماره ثبت', p.registrationNumber!));
+      }
+      if (p.phone != null && p.phone!.trim().isNotEmpty) {
+        rows.add(_InfoRow('تلفن', p.phone!));
+      }
+      if (p.mobile != null && p.mobile!.trim().isNotEmpty) {
+        rows.add(_InfoRow('موبایل', p.mobile!));
+      }
+      if (p.fax != null && p.fax!.trim().isNotEmpty) {
+        rows.add(_InfoRow('فکس', p.fax!));
+      }
+      if (p.email != null && p.email!.trim().isNotEmpty) {
+        rows.add(_InfoRow('ایمیل', p.email!));
+      }
+      final addrParts = <String>[];
+      if (p.province != null && p.province!.trim().isNotEmpty) addrParts.add(p.province!);
+      if (p.city != null && p.city!.trim().isNotEmpty) addrParts.add(p.city!);
+      if (p.address != null && p.address!.trim().isNotEmpty) addrParts.add(p.address!);
+      if (p.postalCode != null && p.postalCode!.trim().isNotEmpty) {
+        addrParts.add('کدپستی: ${p.postalCode}');
+      }
+      if (addrParts.isNotEmpty) {
+        rows.add(_InfoRow('آدرس', addrParts.join('، ')));
+      }
+      if (p.balance != null) {
+        rows.add(_InfoRow(
+          'مانده حساب',
+          formatWithThousands(p.balance!, decimalPlaces: (p.balance! % 1 == 0) ? 0 : 2),
+        ));
+      }
+      if (p.status != null && p.status!.trim().isNotEmpty) {
+        rows.add(_InfoRow('وضعیت مالی', p.status!));
+      }
+      return rows;
+    }
+
+    final name = extracted['name'];
+    if (name != null && name.isNotEmpty) rows.add(_InfoRow('نام', name));
+    void add(String label, String? k) {
+      final v = extracted[k];
+      if (v != null && v.trim().isNotEmpty) rows.add(_InfoRow(label, v));
+    }
+
+    add('نام مستعار', 'alias_name');
+    add('کد', 'code');
+    add('گروه اشخاص', 'person_group_name');
+    add('شرکت', 'company_name');
+    add('کد ملی / شناسه ملی', 'national_id');
+    add('شماره اقتصادی', 'economic_id');
+    add('شماره ثبت', 'registration_number');
+    add('تلفن', 'phone');
+    add('موبایل', 'mobile');
+    add('ایمیل', 'email');
+    final addrParts = <String>[];
+    final prov = extracted['province'];
+    final city = extracted['city'];
+    final addr = extracted['address'];
+    final pc = extracted['postal_code'];
+    if (prov != null && prov.trim().isNotEmpty) addrParts.add(prov);
+    if (city != null && city.trim().isNotEmpty) addrParts.add(city);
+    if (addr != null && addr.trim().isNotEmpty) addrParts.add(addr);
+    if (pc != null && pc.trim().isNotEmpty) addrParts.add('کدپستی: $pc');
+    if (addrParts.isNotEmpty) rows.add(_InfoRow('آدرس', addrParts.join('، ')));
+    return rows;
   }
 
   /// ساخت کارت اطلاعات طرف حساب
   Widget _buildCounterpartyInfoCard(ThemeData theme, DocumentModel document) {
     final counterpartyInfo = _extractCounterpartyInfo(document);
-    final personName = counterpartyInfo['name'];
-    
-    // اگر اطلاعات طرف حساب وجود نداشت، چیزی نمایش نده
-    if (personName == null || personName.isEmpty) {
+    final personIdNav = _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
+    final hasName = counterpartyInfo['name'] != null && counterpartyInfo['name']!.trim().isNotEmpty;
+    if (!hasName && personIdNav == null) {
       return const SizedBox.shrink();
     }
 
     // تعیین نوع طرف حساب بر اساس نوع فاکتور
     final isSales = document.documentType.contains('sales');
     final counterpartyType = isSales ? 'مشتری' : 'فروشنده';
+    final detailRows = _counterpartyDetailRows(counterpartyInfo, _counterpartyPerson);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -1117,24 +1344,24 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'اطلاعات $counterpartyType',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'اطلاعات $counterpartyType',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+                if (personIdNav != null)
+                  FilledButton.tonalIcon(
+                    onPressed: () => _openPersonKardex(document),
+                    icon: const Icon(Icons.table_chart_outlined, size: 18),
+                    label: const Text('کارت حساب'),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoGrid([
-              _InfoRow('نام', personName),
-              if (counterpartyInfo['code'] != null && counterpartyInfo['code']!.isNotEmpty)
-                _InfoRow('کد', counterpartyInfo['code']!),
-              if (counterpartyInfo['mobile'] != null && counterpartyInfo['mobile']!.isNotEmpty)
-                _InfoRow('موبایل', counterpartyInfo['mobile']!),
-              if (counterpartyInfo['email'] != null && counterpartyInfo['email']!.isNotEmpty)
-                _InfoRow('ایمیل', counterpartyInfo['email']!),
-            ]),
+            _buildInfoGrid(detailRows),
           ],
         ),
       ),

@@ -950,10 +950,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     
     if (confirmed != true || nameController.text.trim().isEmpty) return;
     
-    // نمایش loading indicator
+    // نمایش loading indicator (روی root navigator تا با ShellRoute تداخل نگیرد)
     if (!mounted) return;
-    showDialog(
+    showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
@@ -964,7 +965,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       final workflowData = _editorState.toBackendFormat();
       final templateData = {
         'name': templateName,
-        'workflow': workflowData,
+        'workflow_data': workflowData,
         'created_at': DateTime.now().toIso8601String(),
       };
       
@@ -979,13 +980,13 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       await prefs.setString(templatesKey, jsonEncode(templates));
       
       if (mounted) {
-        Navigator.pop(context); // بستن loading indicator
+        Navigator.of(context, rootNavigator: true).pop(); // بستن loading indicator
         SnackBarHelper.show(context, message: t.workflowTemplateSaved(templateName));
       }
     } catch (e) {
       debugPrint('خطا در ذخیره template: $e');
       if (mounted) {
-        Navigator.pop(context); // بستن loading indicator
+        Navigator.of(context, rootNavigator: true).pop(); // بستن loading indicator
         SnackBarHelper.showError(context, message: '${t.workflowErrorSaveTemplate}: ${e.toString()}');
       }
     }
@@ -993,16 +994,17 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
   Future<void> _loadTemplate() async {
     final t = AppLocalizations.of(context);
-    // نمایش loading indicator
     if (!mounted) return;
-    showDialog(
+    final rootNav = Navigator.of(context, rootNavigator: true);
+    var loadingOpen = true;
+    showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
     
     try {
-      final t = AppLocalizations.of(context);
       final builtInTemplates = WorkflowTemplates.getLocalizedTemplates(t);
       
       // دریافت قالب‌های ذخیره شده کاربر
@@ -1010,12 +1012,17 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       final templatesKey = 'workflow_templates_${widget.businessId}';
       final templatesJson = prefs.getString(templatesKey) ?? '[]';
       final savedTemplates = List<Map<String, dynamic>>.from(
-        jsonDecode(templatesJson).map((t) => Map<String, dynamic>.from(t))
+        jsonDecode(templatesJson).map((e) => Map<String, dynamic>.from(e as Map))
       );
+      
+      if (!mounted) return;
+      rootNav.pop();
+      loadingOpen = false;
       
       // نمایش لیست قالب‌ها
       final selectedTemplate = await showDialog<Map<String, dynamic>>(
         context: context,
+        useRootNavigator: true,
         builder: (context) => _TemplateSelectorDialog(
           builtInTemplates: builtInTemplates,
           savedTemplates: savedTemplates,
@@ -1029,14 +1036,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       );
       
       if (selectedTemplate != null) {
+        final raw = selectedTemplate['workflow_data'] ?? selectedTemplate['workflow'];
         Map<String, dynamic>? workflowData;
-        
-        // اگر از قالب‌های آماده است
-        if (selectedTemplate['is_builtin'] == true) {
-          workflowData = selectedTemplate['workflow_data'] as Map<String, dynamic>?;
-        } else {
-          // قالب ذخیره شده کاربر
-          workflowData = selectedTemplate['workflow_data'] as Map<String, dynamic>?;
+        if (raw is Map<String, dynamic>) {
+          workflowData = raw;
+        } else if (raw is Map) {
+          workflowData = Map<String, dynamic>.from(raw.map((k, v) => MapEntry(k.toString(), v)));
         }
         
         if (workflowData != null) {
@@ -1049,6 +1054,9 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     } catch (e) {
       debugPrint('خطا در بارگذاری template: $e');
       if (mounted) {
+        if (loadingOpen) {
+          rootNav.pop();
+        }
         SnackBarHelper.show(context, message: '${t.workflowErrorLoadTemplate}: $e');
       }
     }
@@ -1168,7 +1176,8 @@ class _TemplateSelectorDialog extends StatelessWidget {
                                 onTap: () => Navigator.pop(context, {
                                   'is_builtin': false,
                                   'name': template['name'],
-                                  'workflow_data': template['workflow_data'],
+                                  'workflow_data':
+                                      template['workflow_data'] ?? template['workflow'],
                                 }),
                               );
                             },

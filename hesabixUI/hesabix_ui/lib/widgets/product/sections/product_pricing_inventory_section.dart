@@ -234,6 +234,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             label: 'انبار پیش‌فرض',
             hintText: 'انتخاب انبار پیش‌فرض',
             isRequired: false,
+            selectDefaultWhenUnset: true,
           ),
           const SizedBox(height: 16),
           Builder(
