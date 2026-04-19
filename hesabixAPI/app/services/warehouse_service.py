@@ -42,6 +42,18 @@ def _generate_warehouse_document_code(db: Session, business_id: int, document_da
 	return generate_document_code(db, business_id, "warehouse_document", document_date)
 
 
+def _is_duplicate_warehouse_document_code_error(exc: IntegrityError) -> bool:
+	"""تشخیص برخورد یکتایی روی کد حواله انبار (PostgreSQL و MySQL، قبل/بعد از migration ترکیبی)."""
+	text = f"{exc} {getattr(exc, 'orig', '')}".lower()
+	if "uq_warehouse_documents_business_id_code" in text:
+		return True
+	if "ix_warehouse_documents_code" in text:
+		return True
+	if "duplicate entry" in text and ("warehouse_documents.code" in text or "`code`" in text):
+		return True
+	return False
+
+
 def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
 	"""تولید کد خودکار برای انبار: WH-00001, WH-00002, ..."""
 	from sqlalchemy import func, select
@@ -187,9 +199,7 @@ def create_from_invoice(
 				db.flush()
 			break
 		except IntegrityError as e:
-			# برخورد روی code: دوباره تولید می‌کنیم و تلاش می‌کنیم
-			err_msg = str(getattr(e, "orig", e))
-			if ("Duplicate entry" in err_msg) and ("warehouse_documents.code" in err_msg) and (attempt < 9):
+			if _is_duplicate_warehouse_document_code_error(e) and attempt < 9:
 				continue
 			raise
 
@@ -493,8 +503,7 @@ def create_manual_warehouse_document(
 				db.flush()
 			break
 		except IntegrityError as e:
-			err_msg = str(getattr(e, "orig", e))
-			if ("Duplicate entry" in err_msg) and ("warehouse_documents.code" in err_msg) and (attempt < 9):
+			if _is_duplicate_warehouse_document_code_error(e) and attempt < 9:
 				continue
 			raise
 
@@ -2430,8 +2439,7 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 	reverse_placement_effects_for_cancelled_document(db, business_id, lines)
 	
 	fy = _get_current_fiscal_year(db, business_id)
-	code = _generate_warehouse_document_code(db, business_id, wh.document_date)
-	
+
 	# تعیین نوع حواله معکوس
 	reverse_doc_type = wh.doc_type
 	if wh.doc_type == "receipt":
@@ -2439,27 +2447,40 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 	elif wh.doc_type == "issue":
 		reverse_doc_type = "receipt"
 	# برای transfer و adjustment همان نوع باقی می‌ماند
-	
-	cancel_wh = WarehouseDocument(
-		business_id=business_id,
-		fiscal_year_id=fy.id,
-		code=code,
-		document_date=wh.document_date,
-		status="draft",  # حواله معکوس به صورت draft ایجاد می‌شود
-		doc_type=reverse_doc_type,
-		warehouse_id_from=wh.warehouse_id_to,  # معکوس
-		warehouse_id_to=wh.warehouse_id_from,  # معکوس
-		source_type="manual",
-		source_document_id=wh.id,  # لینک به حواله اصلی
-		created_by_user_id=user_id,
-		extra_info={
-			"cancels_warehouse_document_id": wh.id,
-			"cancellation_reason": "لغو حواله",
-		},
-	)
-	db.add(cancel_wh)
-	db.flush()
-	
+
+	cancel_wh: Optional[WarehouseDocument] = None
+	for attempt in range(10):
+		code = _generate_warehouse_document_code(db, business_id, wh.document_date)
+		try:
+			with db.begin_nested():
+				cancel_wh = WarehouseDocument(
+					business_id=business_id,
+					fiscal_year_id=fy.id,
+					code=code,
+					document_date=wh.document_date,
+					status="draft",  # حواله معکوس به صورت draft ایجاد می‌شود
+					doc_type=reverse_doc_type,
+					warehouse_id_from=wh.warehouse_id_to,  # معکوس
+					warehouse_id_to=wh.warehouse_id_from,  # معکوس
+					source_type="manual",
+					source_document_id=wh.id,  # لینک به حواله اصلی
+					created_by_user_id=user_id,
+					extra_info={
+						"cancels_warehouse_document_id": wh.id,
+						"cancellation_reason": "لغو حواله",
+					},
+				)
+				db.add(cancel_wh)
+				db.flush()
+			break
+		except IntegrityError as e:
+			if _is_duplicate_warehouse_document_code_error(e) and attempt < 9:
+				continue
+			raise
+
+	if cancel_wh is None:
+		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
+
 	# ایجاد خطوط معکوس
 	for ln in lines:
 		reverse_movement = "in" if ln.movement == "out" else "out"
@@ -2809,8 +2830,7 @@ def create_stock_count_adjustment(
 ) -> WarehouseDocument:
 	"""ایجاد حواله تعدیل از تفاوت‌های انبار گردانی."""
 	fy = _get_current_fiscal_year(db, business_id)
-	code = _generate_warehouse_document_code(db, business_id, stock_count_date)
-	
+
 	# فیلتر کردن فقط آیتم‌هایی که تفاوت دارند
 	adjustment_items = [item for item in items if item.get("difference", 0) != 0]
 	
@@ -2818,27 +2838,40 @@ def create_stock_count_adjustment(
 		raise ApiError("NO_DIFFERENCES", "هیچ تفاوتی برای ایجاد حواله تعدیل وجود ندارد", http_status=400)
 	
 	# ایجاد حواله تعدیل
-	wh = WarehouseDocument(
-		business_id=business_id,
-		fiscal_year_id=fy.id,
-		code=code,
-		document_date=stock_count_date,
-		status="draft",
-		doc_type="adjustment",
-		warehouse_id_from=None,
-		warehouse_id_to=None,
-		source_type="manual",
-		source_document_id=None,
-		created_by_user_id=user_id,
-		extra_info={
-			"stock_count_code": stock_count_code,
-			"stock_count_date": stock_count_date.isoformat(),
-			"notes": notes,
-		},
-	)
-	db.add(wh)
-	db.flush()
-	
+	wh: Optional[WarehouseDocument] = None
+	for attempt in range(10):
+		code = _generate_warehouse_document_code(db, business_id, stock_count_date)
+		try:
+			with db.begin_nested():
+				wh = WarehouseDocument(
+					business_id=business_id,
+					fiscal_year_id=fy.id,
+					code=code,
+					document_date=stock_count_date,
+					status="draft",
+					doc_type="adjustment",
+					warehouse_id_from=None,
+					warehouse_id_to=None,
+					source_type="manual",
+					source_document_id=None,
+					created_by_user_id=user_id,
+					extra_info={
+						"stock_count_code": stock_count_code,
+						"stock_count_date": stock_count_date.isoformat(),
+						"notes": notes,
+					},
+				)
+				db.add(wh)
+				db.flush()
+			break
+		except IntegrityError as e:
+			if _is_duplicate_warehouse_document_code_error(e) and attempt < 9:
+				continue
+			raise
+
+	if wh is None:
+		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
+
 	# ایجاد خطوط حواله
 	for item in adjustment_items:
 		product_id = item.get("product_id")

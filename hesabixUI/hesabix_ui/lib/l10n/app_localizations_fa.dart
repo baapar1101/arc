@@ -9976,4 +9976,94 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get workflowMarketplaceError => 'خطا در مخزن ورک‌فلو';
+
+  @override
+  String get distributionMenu => 'پخش مویرگی';
+
+  @override
+  String get distributionTabDashboard => 'داشبورد';
+
+  @override
+  String get distributionTabToday => 'برنامه امروز';
+
+  @override
+  String get distributionTabRoutes => 'مسیرها';
+
+  @override
+  String get distributionTabVisits => 'ویزیت‌ها';
+
+  @override
+  String get distributionTabReturns => 'مرجوعی';
+
+  @override
+  String get distributionPermissionOperate =>
+      'عملیات میدانی (شروع/پایان ویزیت، مرجوعی)';
+
+  @override
+  String get distributionPermissionManage =>
+      'تعریف مسیر، توقف، تخصیص و تأیید مرجوعی';
+
+  @override
+  String get distributionPermissionReportsTeam =>
+      'گزارش و برنامهٔ کاربران دیگر';
+
+  @override
+  String get distributionSelectDate => 'انتخاب تاریخ';
+
+  @override
+  String get distributionVisitsToday => 'ویزیت امروز';
+
+  @override
+  String get distributionCompletedToday => 'تکمیل‌شده امروز';
+
+  @override
+  String get distributionPendingReturns => 'مرجوعی در انتظار';
+
+  @override
+  String get distributionActiveRoutes => 'مسیرهای فعال';
+
+  @override
+  String get distributionNoPlan => 'برنامه‌ای برای این روز ثبت نشده است.';
+
+  @override
+  String get distributionStartVisit => 'شروع ویزیت';
+
+  @override
+  String get distributionCompleteVisit => 'پایان ویزیت';
+
+  @override
+  String get distributionOutcomeOrder => 'سفارش / فاکتور';
+
+  @override
+  String get distributionOutcomeNoOrder => 'بدون سفارش';
+
+  @override
+  String get distributionOutcomeCancelled => 'لغو ویزیت';
+
+  @override
+  String get distributionDocumentIdHint =>
+      'شناسه سند (پیش‌فاکتور/فاکتور) اختیاری';
+
+  @override
+  String get distributionDealIdHint => 'شناسه فرصت فروش CRM اختیاری';
+
+  @override
+  String get distributionNoOrderReason => 'دلیل عدم سفارش';
+
+  @override
+  String get distributionLinesJson => 'اقلام مرجوعی (شناسه کالا، تعداد، دلیل)';
+
+  @override
+  String get distributionReturnCreate => 'ثبت درخواست مرجوعی';
+
+  @override
+  String get distributionRefresh => 'به‌روزرسانی';
+
+  @override
+  String get distributionPluginInactive =>
+      'افزونه پخش مویرگی فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+
+  @override
+  String get distributionSettingsSubtitle =>
+      'مسیرها، برنامه روز، ویزیت میدانی و مرجوعی';
 }

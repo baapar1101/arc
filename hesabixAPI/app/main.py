@@ -1032,6 +1032,8 @@ def create_app() -> FastAPI:
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
     application.include_router(customer_club_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.distribution import router as distribution_router
+    application.include_router(distribution_router, prefix=settings.api_v1_prefix)
     application.include_router(repair_shop_router, prefix=settings.api_v1_prefix)
     # Business Notifications
     application.include_router(business_notifications_router, prefix=settings.api_v1_prefix)

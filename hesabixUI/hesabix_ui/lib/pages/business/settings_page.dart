@@ -161,6 +161,26 @@ class _SettingsPageState extends State<SettingsPage> {
         authStore.hasBusinessPermission('customer_club', 'manage');
   }
 
+  bool _isDistributionPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'distribution',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessDistributionModule() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (!_isDistributionPluginActive()) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('distribution', 'view');
+  }
+
   bool _canAccessRepairShopSettings() {
     final authStore = _authStore;
     if (authStore == null) return false;
@@ -341,7 +361,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 if (_canAccessWarrantySettings())
                                   _buildSettingItem(
                                     context,
-                                    title: t.warrantySettings ?? 'تنظیمات گارانتی',
+                                    title: t.warrantySettings,
                                     subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
                                     icon: Icons.verified_user,
                                     onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
@@ -361,6 +381,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                     subtitle: t.customerClubSettingsSubtitle,
                                     icon: Icons.card_giftcard,
                                     onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
+                                  ),
+                                if (_canAccessDistributionModule())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.distributionMenu,
+                                    subtitle: t.distributionSettingsSubtitle,
+                                    icon: Icons.local_shipping_outlined,
+                                    onTap: () => context.go('/business/${widget.businessId}/distribution'),
                                   ),
                                 _buildSettingItem(
                                   context,
@@ -613,7 +641,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           if (_canAccessWarrantySettings())
                             _buildSettingItem(
                               context,
-                              title: t.warrantySettings ?? 'تنظیمات گارانتی',
+                              title: t.warrantySettings,
                               subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
                               icon: Icons.verified_user,
                               onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
@@ -633,6 +661,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               subtitle: t.customerClubSettingsSubtitle,
                               icon: Icons.card_giftcard,
                               onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
+                            ),
+                          if (_canAccessDistributionModule())
+                            _buildSettingItem(
+                              context,
+                              title: t.distributionMenu,
+                              subtitle: t.distributionSettingsSubtitle,
+                              icon: Icons.local_shipping_outlined,
+                              onTap: () => context.go('/business/${widget.businessId}/distribution'),
                             ),
                           _buildSettingItem(
                             context,

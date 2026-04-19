@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, JSON, Enum
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -9,11 +9,14 @@ from adapters.db.session import Base
 
 class WarehouseDocument(Base):
 	__tablename__ = "warehouse_documents"
+	__table_args__ = (
+		UniqueConstraint("business_id", "code", name="uq_warehouse_documents_business_id_code"),
+	)
 
 	id = Column(Integer, primary_key=True, autoincrement=True)
 	business_id = Column(Integer, nullable=False, index=True)
 	fiscal_year_id = Column(Integer, nullable=True, index=True)
-	code = Column(String(64), nullable=False, unique=True, index=True)
+	code = Column(String(64), nullable=False, index=True)
 	document_date = Column(Date, nullable=False, index=True)
 	status = Column(String(16), nullable=False, default="draft")  # draft|posted|cancelled
 	doc_type = Column(String(32), nullable=False)  # receipt|issue|transfer|production_in|production_out|adjustment

@@ -1097,6 +1097,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'reports': '${t.view ?? 'مشاهده'} گزارشات CRM',
         'reports_team': 'گزارش عملکرد کارمندان (همه تیم)',
       },
+      'distribution': {
+        'view': '${t.view} ${t.distributionMenu}',
+        'manage': t.distributionPermissionManage,
+        'operate': t.distributionPermissionOperate,
+        'reports_team': t.distributionPermissionReportsTeam,
+      },
     };
   }
 
@@ -1163,6 +1169,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     }
     if (section == 'crm' && action == 'reports' && value == false) {
       permissions[section]['reports_team'] = false;
+    }
+
+    if (section == 'distribution' && action == 'reports_team' && value == true) {
+      permissions[section]['view'] = true;
     }
 
     // دیگر mirroring به کلیدهای قدیمی انجام نمی‌شود
@@ -1388,6 +1398,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'icon': Icons.card_giftcard,
         'sections': ['customer_club'],
       },
+      {
+        'title': t.distributionMenu,
+        'icon': Icons.local_shipping_outlined,
+        'sections': ['distribution'],
+      },
     ];
     
     for (int i = 0; i < sectionConfigs.length; i++) {
@@ -1527,6 +1542,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'fiscal_years': 'سال‌های مالی',
       'warranty': 'گارانتی',
       'customer_club': t.customerClubMenu,
+      'distribution': t.distributionMenu,
       'crm': 'CRM',
     };
     
@@ -1576,6 +1592,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.customerClubActionAdjust;
       case 'redeem':
         return t.customerClubActionRedeem;
+      case 'operate':
+        return t.distributionPermissionOperate;
+      case 'reports_team':
+        return t.distributionPermissionReportsTeam;
       default:
         return action;
     }

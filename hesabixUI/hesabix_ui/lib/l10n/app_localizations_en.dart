@@ -10026,4 +10026,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workflowMarketplaceError => 'Repository error';
+
+  @override
+  String get distributionMenu => 'Field distribution';
+
+  @override
+  String get distributionTabDashboard => 'Dashboard';
+
+  @override
+  String get distributionTabToday => 'Daily plan';
+
+  @override
+  String get distributionTabRoutes => 'Routes';
+
+  @override
+  String get distributionTabVisits => 'Visits';
+
+  @override
+  String get distributionTabReturns => 'Returns';
+
+  @override
+  String get distributionPermissionOperate =>
+      'Field work (start/end visit, returns)';
+
+  @override
+  String get distributionPermissionManage =>
+      'Routes, stops, assignments, approve returns';
+
+  @override
+  String get distributionPermissionReportsTeam =>
+      'Team reports and plans for other users';
+
+  @override
+  String get distributionSelectDate => 'Select date';
+
+  @override
+  String get distributionVisitsToday => 'Visits today';
+
+  @override
+  String get distributionCompletedToday => 'Completed today';
+
+  @override
+  String get distributionPendingReturns => 'Pending returns';
+
+  @override
+  String get distributionActiveRoutes => 'Active routes';
+
+  @override
+  String get distributionNoPlan => 'No route plan for this date.';
+
+  @override
+  String get distributionStartVisit => 'Start visit';
+
+  @override
+  String get distributionCompleteVisit => 'Complete visit';
+
+  @override
+  String get distributionOutcomeOrder => 'Order / invoice';
+
+  @override
+  String get distributionOutcomeNoOrder => 'No order';
+
+  @override
+  String get distributionOutcomeCancelled => 'Visit cancelled';
+
+  @override
+  String get distributionDocumentIdHint =>
+      'Document ID (proforma/invoice), optional';
+
+  @override
+  String get distributionDealIdHint => 'CRM deal ID, optional';
+
+  @override
+  String get distributionNoOrderReason => 'Reason for no order';
+
+  @override
+  String get distributionLinesJson => 'Return lines (product id, qty, reason)';
+
+  @override
+  String get distributionReturnCreate => 'Submit return request';
+
+  @override
+  String get distributionRefresh => 'Refresh';
+
+  @override
+  String get distributionPluginInactive =>
+      'Field distribution add-on is not active. Enable it from the marketplace.';
+
+  @override
+  String get distributionSettingsSubtitle =>
+      'Routes, daily plan, field visits and returns';
 }

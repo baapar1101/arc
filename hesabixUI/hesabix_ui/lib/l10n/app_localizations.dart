@@ -18844,6 +18844,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Repository error'**
   String get workflowMarketplaceError;
+
+  /// No description provided for @distributionMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Field distribution'**
+  String get distributionMenu;
+
+  /// No description provided for @distributionTabDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get distributionTabDashboard;
+
+  /// No description provided for @distributionTabToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily plan'**
+  String get distributionTabToday;
+
+  /// No description provided for @distributionTabRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes'**
+  String get distributionTabRoutes;
+
+  /// No description provided for @distributionTabVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Visits'**
+  String get distributionTabVisits;
+
+  /// No description provided for @distributionTabReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Returns'**
+  String get distributionTabReturns;
+
+  /// No description provided for @distributionPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Field work (start/end visit, returns)'**
+  String get distributionPermissionOperate;
+
+  /// No description provided for @distributionPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes, stops, assignments, approve returns'**
+  String get distributionPermissionManage;
+
+  /// No description provided for @distributionPermissionReportsTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Team reports and plans for other users'**
+  String get distributionPermissionReportsTeam;
+
+  /// No description provided for @distributionSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get distributionSelectDate;
+
+  /// No description provided for @distributionVisitsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Visits today'**
+  String get distributionVisitsToday;
+
+  /// No description provided for @distributionCompletedToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed today'**
+  String get distributionCompletedToday;
+
+  /// No description provided for @distributionPendingReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending returns'**
+  String get distributionPendingReturns;
+
+  /// No description provided for @distributionActiveRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Active routes'**
+  String get distributionActiveRoutes;
+
+  /// No description provided for @distributionNoPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'No route plan for this date.'**
+  String get distributionNoPlan;
+
+  /// No description provided for @distributionStartVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Start visit'**
+  String get distributionStartVisit;
+
+  /// No description provided for @distributionCompleteVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete visit'**
+  String get distributionCompleteVisit;
+
+  /// No description provided for @distributionOutcomeOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order / invoice'**
+  String get distributionOutcomeOrder;
+
+  /// No description provided for @distributionOutcomeNoOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'No order'**
+  String get distributionOutcomeNoOrder;
+
+  /// No description provided for @distributionOutcomeCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit cancelled'**
+  String get distributionOutcomeCancelled;
+
+  /// No description provided for @distributionDocumentIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Document ID (proforma/invoice), optional'**
+  String get distributionDocumentIdHint;
+
+  /// No description provided for @distributionDealIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM deal ID, optional'**
+  String get distributionDealIdHint;
+
+  /// No description provided for @distributionNoOrderReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for no order'**
+  String get distributionNoOrderReason;
+
+  /// No description provided for @distributionLinesJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Return lines (product id, qty, reason)'**
+  String get distributionLinesJson;
+
+  /// No description provided for @distributionReturnCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit return request'**
+  String get distributionReturnCreate;
+
+  /// No description provided for @distributionRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get distributionRefresh;
+
+  /// No description provided for @distributionPluginInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Field distribution add-on is not active. Enable it from the marketplace.'**
+  String get distributionPluginInactive;
+
+  /// No description provided for @distributionSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes, daily plan, field visits and returns'**
+  String get distributionSettingsSubtitle;
 }
 
 class _AppLocalizationsDelegate

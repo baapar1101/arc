@@ -479,6 +479,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isDistributionPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'distribution',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -949,6 +961,14 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.card_giftcard_outlined,
         selectedIcon: Icons.card_giftcard,
         path: '/business/${widget.businessId}/customer-club',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.distributionMenu,
+        icon: Icons.local_shipping_outlined,
+        selectedIcon: Icons.local_shipping,
+        path: '/business/${widget.businessId}/distribution',
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -2194,6 +2214,13 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    // پخش مویرگی
+    if (section == 'distribution') {
+      if (!_isDistributionPluginActive()) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -2284,6 +2311,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
+    if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

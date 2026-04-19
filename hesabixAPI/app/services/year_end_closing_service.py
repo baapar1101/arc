@@ -893,9 +893,14 @@ async def close_fiscal_year(
             result['opening_balance_created'] = True
             result['opening_balance_document'] = doc_repo.get_document_details(opening_balance_doc.id) or {}
             result['opening_balance_note'] = f'تراز افتتاحیه سال جدید با کد {opening_balance_doc.code} ایجاد شد'
+        except ApiError:
+            raise
         except Exception as e:
-            result['opening_balance_created'] = False
-            result['opening_balance_note'] = f'خطا در ایجاد تراز افتتاحیه: {str(e)}'
+            raise ApiError(
+                "OPENING_BALANCE_CREATION_FAILED",
+                f"ایجاد تراز افتتاحیه سال جدید ناموفق بود: {str(e)}",
+                http_status=500,
+            ) from e
     
     return result
 
@@ -1183,13 +1188,15 @@ def _create_opening_balance_for_new_fiscal_year(
 ) -> Document:
     """
     ایجاد سند تراز افتتاحیه برای سال مالی جدید
-    
-    این تابع:
-    1. مانده تمام حساب‌های دائمی (گروه 1، 2، 3) را از سال قبل می‌گیرد
-    2. مانده اشخاص (بدهکاران و بستانکاران) را می‌گیرد
-    3. مانده حساب‌های بانکی و صندوق را می‌گیرد
-    4. موجودی کالا را می‌گیرد
-    5. همه این‌ها را در سند افتتاحیه سال جدید ثبت می‌کند
+
+    برای جلوگیری از دوبارشماری در دفتر کل، هر مانده فقط یک بار منتقل می‌شود:
+    - مانده تجمیعی حساب‌های کنترلی بدهکاران/بستانکاران (13101، 21101) در حلقهٔ ماندهٔ دائمی
+      لحاظ نمی‌شود؛ فقط سطرهای ریز به تفکیک شخص ثبت می‌شوند.
+    - حساب‌هایی که سطرشان دارای بانک/صندوق/تنخواه است از ماندهٔ تجمیعی کنار گذاشته می‌شوند و
+      فقط به صورت ریز (با همان شناسه‌های فرعی) منتقل می‌شوند.
+    - اگر برای موجودی، ارزش ریالی از محاسبهٔ انبار (خطوط موجودی) داشته باشیم، ماندهٔ تجمیعی
+      12101 از حلقهٔ دائمی حذف می‌شود و «upsert_opening_balance» همان ارزش را یک‌جا بدهکار می‌کند
+      (همراه با خطوط کالا؛ دیگر بدهکار تک‌تک به ازای کالا تکرار نمی‌شود).
     """
     old_fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == old_fiscal_year_id).first()
     new_fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == new_fiscal_year_id).first()
@@ -1199,6 +1206,30 @@ def _create_opening_balance_for_new_fiscal_year(
     
     # تاریخ پایان سال مالی قبلی
     date_to = old_fiscal_year.end_date
+
+    ar_account = _get_fixed_account_by_code(db, "13101")
+    ap_account = _get_fixed_account_by_code(db, "21101")
+    inventory_account_fixed = _get_fixed_account_by_code(db, "12101")
+
+    # حساب‌های کلّی که حداقل یک سطر آن‌ها دارای بانک / صندوق / تنخواه است (تا مانده تجمیعی تکرار نشود)
+    gl_ids_with_cash_bank_subledger_rows = db.query(DocumentLine.account_id).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.fiscal_year_id == old_fiscal_year_id,
+            Document.document_date <= date_to,
+            Document.is_proforma == False,
+            or_(
+                DocumentLine.bank_account_id.isnot(None),
+                DocumentLine.cash_register_id.isnot(None),
+                DocumentLine.petty_cash_id.isnot(None),
+            ),
+        )
+    ).distinct().all()
+    bank_cash_gl_account_ids = {
+        int(row[0]) for row in gl_ids_with_cash_bank_subledger_rows if row[0] is not None
+    }
     
     # دریافت تمام حساب‌های دائمی (گروه 1، 2، 3)
     permanent_accounts = db.query(Account).filter(
@@ -1217,10 +1248,70 @@ def _create_opening_balance_for_new_fiscal_year(
     
     account_lines: List[Dict[str, Any]] = []
     inventory_lines: List[Dict[str, Any]] = []
-    
-    # محاسبه مانده حساب‌های دائمی
+
+    # موجودی از انبار (خطوط کالا؛ ارزش ریالی مانند upsert_opening_balance فقط با cost_price > 0 جمع می‌شود)
+    inventory_monetary_total = Decimal(0)
+    products = db.query(Product).filter(
+        and_(
+            Product.business_id == business_id,
+            Product.track_inventory == True,
+        )
+    ).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+    valuation_method = old_fiscal_year.inventory_valuation_method or "FIFO"
+
+    for product in products:
+        for warehouse in warehouses:
+            stock, cost_price = _calculate_remaining_inventory_cost(
+                db=db,
+                business_id=business_id,
+                product_id=product.id,
+                warehouse_id=warehouse.id,
+                up_to_date=date_to,
+                valuation_method=valuation_method,
+            )
+
+            if stock <= 0:
+                continue
+
+            if cost_price <= 0:
+                cost_price = Decimal(str(product.purchase_price or 0))
+                if cost_price <= 0:
+                    extra_info = product.extra_info or {}
+                    cost_price = Decimal(str(extra_info.get('cost_price', 0) or 0))
+
+            if cost_price <= 0:
+                cost_price = Decimal(0)
+
+            inventory_value = stock * cost_price
+
+            inventory_lines.append({
+                'product_id': product.id,
+                'quantity': float(stock),
+                'description': f'موجودی ابتدای دوره - {product.name}',
+                'extra_info': {
+                    'movement': 'in',
+                    'warehouse_id': warehouse.id,
+                    'cost_price': float(cost_price),
+                },
+            })
+
+            if cost_price > 0:
+                inventory_monetary_total += inventory_value
+
+    omit_inventory_gl_aggregate = inventory_monetary_total > 0
+
+    # محاسبه مانده حساب‌های دائمی (بدون دوباره‌کاری با سطرهای ریز اشخاص، بانک/صندوق و موجودی)
     for account in permanent_accounts:
         if not _is_permanent_account(account.code):
+            continue
+
+        acc_id = account.id
+        if acc_id == ar_account.id or acc_id == ap_account.id:
+            continue
+        if acc_id in bank_cash_gl_account_ids:
+            continue
+        if omit_inventory_gl_aggregate and acc_id == inventory_account_fixed.id:
             continue
             
         # محاسبه مانده حساب تا پایان سال مالی قبلی (از تمام اسناد)
@@ -1294,11 +1385,7 @@ def _create_opening_balance_for_new_fiscal_year(
             continue
         
         # حساب کنترل اشخاص (مدل Person فیلد account_id ندارد؛ از حساب‌های ثابت نمودار استفاده می‌شود)
-        if person_balance > 0:
-            person_account = _get_fixed_account_by_code(db, "13101")
-        else:
-            person_account = _get_fixed_account_by_code(db, "21101")
-        person_account_id = person_account.id
+        person_account_id = ar_account.id if person_balance > 0 else ap_account.id
 
         # اضافه کردن به خطوط سند
         if person_balance > 0:
@@ -1377,68 +1464,6 @@ def _create_opening_balance_for_new_fiscal_year(
         
         account_lines.append(line_data)
     
-    # محاسبه موجودی کالا
-    products = db.query(Product).filter(
-        and_(
-            Product.business_id == business_id,
-            Product.track_inventory == True,
-        )
-    ).all()
-    
-    warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
-    
-    inventory_account = _get_fixed_account_by_code(db, "12101")  # موجودی کالا
-    
-    # دریافت روش ارزیابی انبار سال مالی قبلی
-    valuation_method = old_fiscal_year.inventory_valuation_method or "FIFO"
-    
-    for product in products:
-        for warehouse in warehouses:
-            # محاسبه موجودی و قیمت تمام شده بر اساس روش ارزیابی انبار
-            stock, cost_price = _calculate_remaining_inventory_cost(
-                db=db,
-                business_id=business_id,
-                product_id=product.id,
-                warehouse_id=warehouse.id,
-                up_to_date=date_to,
-                valuation_method=valuation_method,
-            )
-            
-            if stock <= 0:
-                continue
-            
-            # اگر قیمت تمام شده صفر است، از قیمت خرید محصول استفاده می‌کنیم (fallback)
-            if cost_price <= 0:
-                cost_price = Decimal(str(product.purchase_price or 0))
-                if cost_price <= 0:
-                    extra_info = product.extra_info or {}
-                    cost_price = Decimal(str(extra_info.get('cost_price', 0) or 0))
-            
-            if cost_price <= 0:
-                cost_price = Decimal(0)
-            
-            inventory_value = stock * cost_price
-            
-            # اضافه کردن به خطوط موجودی
-            inventory_lines.append({
-                'product_id': product.id,
-                'quantity': float(stock),
-                'description': f'موجودی ابتدای دوره - {product.name}',
-                'extra_info': {
-                    'movement': 'in',
-                    'warehouse_id': warehouse.id,
-                    'cost_price': float(cost_price),
-                },
-            })
-            
-            # اضافه کردن به خطوط حساب (بدهکار حساب موجودی کالا)
-            account_lines.append({
-                'account_id': inventory_account.id,
-                'debit': float(inventory_value),
-                'credit': 0.0,
-                'description': f'موجودی ابتدای دوره - {product.name}',
-            })
-    
     # ایجاد سند تراز افتتاحیه
     opening_balance_data = {
         'fiscal_year_id': new_fiscal_year_id,
@@ -1447,7 +1472,7 @@ def _create_opening_balance_for_new_fiscal_year(
         'description': f'تراز افتتاحیه سال مالی {new_fiscal_year.title}',
         'account_lines': account_lines,
         'inventory_lines': inventory_lines,
-        'inventory_account_id': inventory_account.id if inventory_lines else None,
+        'inventory_account_id': inventory_account_fixed.id if inventory_lines else None,
         'auto_balance_to_equity': True,
         'equity_account_id': _get_fixed_account_by_code(db, "30106").id,  # سود یا زیان انباشته
     }

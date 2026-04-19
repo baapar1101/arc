@@ -745,3 +745,38 @@ def run_scheduled_workflow_fire(
         logger.error("run_scheduled_workflow_fire failed wf=%s: %s", workflow_id, e, exc_info=True)
         return 0
 
+
+def trigger_distribution_visit_completed(
+    db: Session,
+    business_id: int,
+    visit_id: int,
+    user_id: Optional[int] = None,
+) -> int:
+    """فراخوانی ورک‌فلوها پس از تکمیل ویزیت میدانی (افزونه پخش مویرگی)."""
+    try:
+        from adapters.db.models.distribution import DistributionFieldVisit
+
+        visit = (
+            db.query(DistributionFieldVisit)
+            .filter(DistributionFieldVisit.id == int(visit_id), DistributionFieldVisit.business_id == int(business_id))
+            .first()
+        )
+        if not visit:
+            return 0
+        trigger_data: Dict[str, Any] = {
+            "visit_id": int(visit.id),
+            "person_id": int(visit.person_id),
+            "user_id": int(visit.user_id),
+            "route_id": int(visit.route_id) if visit.route_id else None,
+            "status": visit.status,
+            "outcome": visit.outcome,
+            "document_id": int(visit.document_id) if visit.document_id else None,
+            "deal_id": int(visit.deal_id) if visit.deal_id else None,
+            "started_at": visit.started_at.isoformat() if visit.started_at else None,
+            "ended_at": visit.ended_at.isoformat() if visit.ended_at else None,
+        }
+        return trigger_workflows(db, business_id, "distribution.visit.completed", trigger_data, user_id)
+    except Exception as e:
+        logger.warning("trigger_distribution_visit_completed failed: %s", e, exc_info=True)
+        return 0
+

@@ -119,3 +119,7 @@ class TriggerRegistry:
         self.register("crm.deal.assigned", DealAssignedTrigger())
         self.register("crm.activity.created", ActivityCreatedTrigger())
 
+        from app.services.workflow.triggers.distribution_triggers import DistributionVisitCompletedTrigger
+
+        self.register("distribution.visit.completed", DistributionVisitCompletedTrigger())
+
