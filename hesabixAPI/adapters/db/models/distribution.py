@@ -12,6 +12,7 @@ from sqlalchemy import (
 	ForeignKey,
 	Integer,
 	JSON,
+	Numeric,
 	String,
 	Text,
 	UniqueConstraint,
@@ -19,6 +20,26 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
+
+
+
+
+class DistributionBusinessSettings(Base):
+	"""تنظیمات افزونه پخش مویرگی در سطح کسب‌وکار."""
+
+	__tablename__ = "distribution_business_settings"
+
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), primary_key=True)
+	shared_routing_catalog: Mapped[bool] = mapped_column(
+		Boolean, nullable=False, default=False,
+		comment="اگر False باشد ویزیتور عادی فقط مسیرهای تخصیص‌داده‌شده به خود را می‌بیند.",
+	)
+	require_visit_in_daily_plan: Mapped[bool] = mapped_column(
+		Boolean, nullable=False, default=False,
+		comment="شروع ویزیت فقط برای اشخاص موجود در برنامهٔ روز.",
+	)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class DistributionTerritory(Base):
@@ -124,6 +145,8 @@ class DistributionFieldVisit(Base):
 	deal_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crm_deals.id", ondelete="SET NULL"), nullable=True)
 	crm_activity_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crm_activities.id", ondelete="SET NULL"), nullable=True)
 	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+	start_latitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+	start_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

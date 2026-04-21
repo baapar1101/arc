@@ -749,7 +749,6 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     );
 
     if (isMobile) {
-      // موبایل: Column layout (سال مالی مخفی است)
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -763,6 +762,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
               ),
               editToggleButton,
             ],
+          ),
+          SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: fiscalYearWidget,
           ),
           if (editButtons.isNotEmpty) ...[
             SizedBox(height: 8),

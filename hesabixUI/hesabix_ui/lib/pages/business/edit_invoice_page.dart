@@ -763,11 +763,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             isRequired: false,
                             label: 'طرف حساب',
                             hintText: _selectedCustomer?.name ?? 'انتخاب طرف حساب',
+                            showFinancialBalance: true,
                           ),
                         if (_selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
                           const SizedBox(height: 16),
                           PersonComboboxWidget(
                             businessId: widget.businessId,
+                            showFinancialBalance: true,
                             selectedPerson: _selectedSupplier,
                             onChanged: (p) => setState(() => _selectedSupplier = p),
                             isRequired: false,
@@ -1153,8 +1155,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
     
-    // افزودن تراکنش‌های پرداخت (فقط برای فاکتورهای قطعی)
-    if (!_isProforma && _transactions.isNotEmpty) {
+    // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود
+    if (!_isProforma) {
       payload['payments'] = _transactions.map((t) => t.toJson()).toList();
     }
 

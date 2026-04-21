@@ -119,6 +119,56 @@ def _document_type_label(doc_type: Optional[str]) -> str:
     return DOCUMENT_TYPE_TITLES.get(doc_type, doc_type.replace("_", " "))
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _public_invoice_financials_from_extra_info(extra_info: Any) -> Dict[str, float]:
+    """
+    مبالغ نمایشی فاکتور: ساختار استاندارد در extra_info.totals
+    (gross, discount, tax, net)؛ در غیر این صورت کلیدهای قدیمی ریشه extra_info.
+    """
+    if not isinstance(extra_info, dict):
+        extra_info = {}
+    totals = extra_info.get("totals")
+    if isinstance(totals, dict):
+        gross = _safe_float(totals.get("gross"))
+        discount = _safe_float(totals.get("discount"))
+        tax = _safe_float(totals.get("tax"))
+        net = _safe_float(totals.get("net"))
+        if not net and (gross or discount):
+            net = gross - discount
+        total_final = net + tax
+        return {
+            "subtotal": gross,
+            "discount_amount": discount,
+            "tax_amount": tax,
+            "total": total_final,
+        }
+    tax_amount = _safe_float(extra_info.get("tax_amount"))
+    discount_amount = _safe_float(extra_info.get("discount_amount"))
+    subtotal = _safe_float(extra_info.get("subtotal"))
+    if subtotal or discount_amount or tax_amount:
+        total = subtotal - discount_amount + tax_amount
+        return {
+            "subtotal": subtotal,
+            "discount_amount": discount_amount,
+            "tax_amount": tax_amount,
+            "total": total,
+        }
+    return {
+        "subtotal": 0.0,
+        "discount_amount": 0.0,
+        "tax_amount": 0.0,
+        "total": 0.0,
+    }
+
+
 def get_active_share_link_for_person(
     db: Session, business_id: int, person_id: int
 ) -> Optional[PersonShareLink]:
@@ -417,7 +467,8 @@ def _fetch_invoice_items(
     for row in rows:
         total_debit = float(getattr(row, "total_debit", 0) or 0)
         total_credit = float(getattr(row, "total_credit", 0) or 0)
-        net_amount = total_credit - total_debit
+        # برای فاکتور فروش سطر شخص معمولاً بدهکار است؛ مبلغ نمایشی مثبت می‌خواهیم
+        net_amount = abs(total_credit - total_debit)
         extra_info = getattr(row, "extra_info", {}) or {}
         items.append(
             {
@@ -568,23 +619,14 @@ def get_public_invoice_details(db: Session, code: str, document_id: int) -> Dict
             http_status=403,
         )
 
-    # دریافت جزئیات کامل فاکتور
-    details = invoice_document_to_dict(db, document)
+    # دریافت جزئیات کامل فاکتور (بدون commit جانبی برای پاکسازی لینک‌ها)
+    details = invoice_document_to_dict(db, document, persist_link_cleanup=False)
 
-    # محاسبه مالیات و تخفیف از extra_info
-    extra_info = document.extra_info or {}
-    tax_amount = extra_info.get("tax_amount") or 0.0
-    discount_amount = extra_info.get("discount_amount") or 0.0
-    subtotal = extra_info.get("subtotal") or 0.0
-
-    # اضافه کردن اطلاعات مالیات و تخفیف
-    details["tax_amount"] = float(tax_amount) if tax_amount else 0.0
-    details["discount_amount"] = float(discount_amount) if discount_amount else 0.0
-    details["subtotal"] = float(subtotal) if subtotal else 0.0
-
-    # محاسبه جمع کل
-    total = subtotal - discount_amount + tax_amount
-    details["total"] = float(total) if total else 0.0
+    fin = _public_invoice_financials_from_extra_info(document.extra_info)
+    details["tax_amount"] = fin["tax_amount"]
+    details["discount_amount"] = fin["discount_amount"]
+    details["subtotal"] = fin["subtotal"]
+    details["total"] = fin["total"]
 
     return details
 

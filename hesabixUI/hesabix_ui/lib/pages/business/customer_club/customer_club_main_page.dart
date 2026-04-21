@@ -9,6 +9,7 @@ import '../../../models/person_model.dart';
 import '../../../services/customer_club_service.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import 'customer_club_analytics_tab.dart';
 
 /// صفحهٔ اصلی باشگاه مشتریان (تراکنش‌ها و در صورت مجوز اصلاح دستی). تنظیمات در مسیر جدا است.
 class CustomerClubMainPage extends StatefulWidget {
@@ -30,7 +31,7 @@ class CustomerClubMainPage extends StatefulWidget {
 class _CustomerClubMainPageState extends State<CustomerClubMainPage> with SingleTickerProviderStateMixin {
   static const double _largeDeltaThreshold = 500;
 
-  TabController? _tabController;
+  late TabController _tabController;
 
   bool _showAdjustTab = false;
 
@@ -55,12 +56,10 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
   void initState() {
     super.initState();
     _showAdjustTab = _computeCanAdjust();
-    if (_showAdjustTab) {
-      _tabController = TabController(length: 2, vsync: this);
-      _tabController!.addListener(() {
-        if (mounted) setState(() {});
-      });
-    }
+    _tabController = TabController(length: 2 + (_showAdjustTab ? 1 : 0), vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     widget.calendarController?.addListener(_onCalendarChanged);
     _loadLedger(reset: true);
   }
@@ -77,7 +76,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
   @override
   void dispose() {
     widget.calendarController?.removeListener(_onCalendarChanged);
-    _tabController?.dispose();
+    _tabController.dispose();
     _adjustDeltaCtl.dispose();
     _adjustDescCtl.dispose();
     super.dispose();
@@ -240,7 +239,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
         action: SnackBarAction(
           label: t.customerClubViewLedgerAction,
           onPressed: () {
-            _tabController?.animateTo(0);
+            _tabController.animateTo(0);
           },
         ),
       );
@@ -258,31 +257,29 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
     final t = AppLocalizations.of(context);
 
     final ledgerView = _buildLedgerTab(Theme.of(context), t);
+    final theme = Theme.of(context);
 
-    if (!_showAdjustTab) {
-      return Scaffold(
-        appBar: AppBar(title: Text(t.customerClubTitle)),
-        body: ledgerView,
-      );
-    }
-
-    final tc = _tabController!;
     return Scaffold(
       appBar: AppBar(
         title: Text(t.customerClubTitle),
         bottom: TabBar(
-          controller: tc,
+          controller: _tabController,
           tabs: [
             Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.customerClubTabLedger),
-            Tab(icon: const Icon(Icons.edit_note_outlined), text: t.customerClubTabAdjust),
+            Tab(icon: const Icon(Icons.insights_outlined), text: t.customerClubTabAnalytics),
+            if (_showAdjustTab) Tab(icon: const Icon(Icons.edit_note_outlined), text: t.customerClubTabAdjust),
           ],
         ),
       ),
       body: TabBarView(
-        controller: tc,
+        controller: _tabController,
         children: [
           ledgerView,
-          _buildAdjustTab(Theme.of(context), t),
+          CustomerClubAnalyticsTab(
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+          ),
+          if (_showAdjustTab) _buildAdjustTab(theme, t),
         ],
       ),
     );

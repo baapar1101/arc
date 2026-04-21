@@ -51,6 +51,9 @@ class ReceiptPaymentListService {
     String? documentType,
     DateTime? fromDate,
     DateTime? toDate,
+    int? fiscalYearId,
+    int? projectId,
+    int? personId,
     String? sortBy,
     bool? sortDesc,
     int page = 1,
@@ -66,6 +69,9 @@ class ReceiptPaymentListService {
         'document_type': documentType,
         'from_date': fromDate?.toIso8601String(),
         'to_date': toDate?.toIso8601String(),
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+        if (projectId != null) 'project_id': projectId,
+        if (personId != null) 'person_id': personId,
       };
 
       // حذف پارامترهای null
@@ -132,6 +138,9 @@ class ReceiptPaymentListService {
     required int businessId,
     DateTime? fromDate,
     DateTime? toDate,
+    int? fiscalYearId,
+    int? projectId,
+    int? personId,
   }) async {
     try {
       final queryParams = <String, dynamic>{
@@ -139,6 +148,9 @@ class ReceiptPaymentListService {
         'skip': 0,
         'from_date': fromDate?.toIso8601String(),
         'to_date': toDate?.toIso8601String(),
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+        if (projectId != null) 'project_id': projectId,
+        if (personId != null) 'person_id': personId,
       };
 
       queryParams.removeWhere((key, value) => value == null);

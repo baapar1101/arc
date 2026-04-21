@@ -84,6 +84,7 @@ import 'pages/business/bank_accounts_turnover_report_page.dart';
 import 'pages/business/cash_petty_turnover_report_page.dart';
 import 'pages/business/activity_logs_page.dart';
 import 'pages/business/daily_sales_report_page.dart';
+import 'pages/business/distribution_reports_dashboard_page.dart';
 import 'pages/business/monthly_sales_report_page.dart';
 import 'pages/business/top_customers_report_page.dart';
 import 'pages/business/daily_purchases_report_page.dart';
@@ -493,6 +494,10 @@ class _MyAppState extends State<MyApp> {
         calendarController: calendarController,
       );
       DailySalesReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      DistributionReportsDashboardPage(
         businessId: dummyBusinessId,
         calendarController: calendarController,
       );
@@ -2350,6 +2355,19 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: CashPettyTurnoverReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/distribution-dashboard',
+              name: 'business_reports_distribution_dashboard',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: DistributionReportsDashboardPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

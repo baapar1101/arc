@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Optional, List, Dict, Any
 from copy import deepcopy
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, and_, or_, func, desc, asc
+from sqlalchemy import select, and_, or_, func, desc, asc, exists
 from datetime import date
 
 from adapters.db.models.document import Document
@@ -142,15 +142,79 @@ class DocumentRepository:
         if filters.get("is_proforma") is not None:
             query = query.filter(Document.is_proforma == filters["is_proforma"])
 
+        if filters.get("project_id") is not None:
+            try:
+                query = query.filter(Document.project_id == int(filters["project_id"]))
+            except (TypeError, ValueError):
+                pass
+
+        pers_id = filters.get("person_id")
+        if pers_id is not None:
+            try:
+                pid_person = int(pers_id)
+                query = query.filter(
+                    exists().where(
+                        and_(
+                            DocumentLine.document_id == Document.id,
+                            DocumentLine.person_id == pid_person,
+                        )
+                    )
+                )
+            except (TypeError, ValueError):
+                pass
+
+        for raw in filters.get("filters") or []:
+            if not isinstance(raw, dict):
+                continue
+            prop = raw.get("property")
+            operator = str(raw.get("operator") or "").strip().lower()
+            val = raw.get("value")
+            if prop == "project_name" and operator == "in" and val:
+                ids: List[int] = []
+                for x in (val if isinstance(val, list) else [val]):
+                    try:
+                        ids.append(int(x))
+                    except (TypeError, ValueError):
+                        continue
+                if ids:
+                    query = query.filter(Document.project_id.in_(ids))
+            elif prop == "project_name" and operator == "=" and val not in (None, ""):
+                try:
+                    query = query.filter(Document.project_id == int(val))
+                except (TypeError, ValueError):
+                    pass
+
         # جستجو
         if filters.get("search"):
             search_term = f"%{filters['search']}%"
-            query = query.filter(
-                or_(
-                    Document.code.ilike(search_term),
-                    Document.description.ilike(search_term),
+            sf = filters.get("search_fields")
+            if not sf or not isinstance(sf, list):
+                query = query.filter(
+                    or_(
+                        Document.code.ilike(search_term),
+                        Document.description.ilike(search_term),
+                    )
                 )
-            )
+            else:
+                sf_set = {str(x) for x in sf}
+                parts = []
+                if "code" in sf_set:
+                    parts.append(Document.code.ilike(search_term))
+                if "description" in sf_set:
+                    parts.append(Document.description.ilike(search_term))
+                if "created_by_name" in sf_set:
+                    parts.append(
+                        (User.first_name + " " + User.last_name).ilike(search_term)
+                    )
+                if parts:
+                    query = query.filter(or_(*parts))
+                else:
+                    query = query.filter(
+                        or_(
+                            Document.code.ilike(search_term),
+                            Document.description.ilike(search_term),
+                        )
+                    )
 
         # شمارش کل
         total_count = query.count()

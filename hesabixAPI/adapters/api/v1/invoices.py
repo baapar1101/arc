@@ -78,6 +78,29 @@ def _format_line_custom_attributes_for_pdf(extra_info: Any) -> Optional[str]:
     return "؛ ".join(parts)
 
 
+def _invoice_line_unit_display_for_pdf(pl: Dict[str, Any]) -> str:
+    """
+    متن واحد برای چاپ PDF: extra_info.unit می‌تواند main/secondary (ایمپورت) یا نام واحد (UI) باشد.
+    """
+    info = pl.get("extra_info") or {}
+    if not isinstance(info, dict):
+        info = {}
+    raw = info.get("unit")
+    main_u = str(pl.get("product_main_unit") or "").strip()
+    sec_u = str(pl.get("product_secondary_unit") or "").strip()
+    if isinstance(raw, str):
+        key = raw.strip().lower()
+        if key == "main":
+            return main_u or "-"
+        if key == "secondary":
+            return sec_u or "-"
+    if raw is not None:
+        s = str(raw).strip()
+        if s:
+            return s
+    return main_u or "-"
+
+
 router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد خرید"])
 
 
@@ -1261,6 +1284,7 @@ async def export_single_invoice_pdf(
                     "description": pl.get("description"),
                     "quantity": qty,
                     "quantity_display": qty_display,
+                    "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
                     "unit_price": unit_price,
                     "discount": line_discount,
                     "tax_amount": tax_amount,

@@ -22,6 +22,7 @@ LEDGER_BASIS_SALES_INVOICE_DOCUMENT = "sales_invoice_document"
 
 LEDGER_EVENT_WAREHOUSE_DOCUMENT_POSTING = "warehouse_document_posting"
 LEDGER_EVENT_SALES_INVOICE_DOCUMENT = "sales_invoice_document"
+LEDGER_EVENT_INVENTORY_CHAIN_REFRESH = "inventory_chain_refresh"
 
 
 def normalize_invoice_profit_ledger_basis(value: Optional[str]) -> str:
@@ -143,6 +144,117 @@ def apply_recognized_profit_to_invoice_lines(
 
     db.flush()
     return True
+
+
+def sync_ledger_profit_from_analytical_for_document(
+    db: Session,
+    business_id: int,
+    document_id: int,
+) -> bool:
+    """
+    هم‌رسانی ستون‌های ledger_* با محاسبهٔ تحلیلی جاری، بدون محدودیت مبنای شناسایی اولیه.
+    پس از تغییر زنجیرهٔ خرید/موجودی برای به‌روز نگه‌داشتن سود قطعی ثبت‌شده روی خطوط فروش قبلی فراخوانی می‌شود.
+    """
+    from adapters.db.models.business import Business
+    from adapters.db.models.document import Document
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+    from app.services.invoice_service import _calculate_invoice_profit
+
+    biz = db.query(Business).filter(Business.id == int(business_id)).first()
+    if not biz or getattr(biz, "invoice_profit_calculation_method", None) == "disabled":
+        return False
+
+    doc = db.query(Document).filter(Document.id == int(document_id)).first()
+    if not doc or doc.business_id != int(business_id):
+        return False
+    if doc.is_proforma:
+        return False
+    if doc.document_type not in PROFIT_RECOGNITION_DOCUMENT_TYPES:
+        return False
+
+    overhead_pct = Decimal(str(getattr(biz, "invoice_profit_overhead_percent", 0) or 0))
+
+    profit_data = _calculate_invoice_profit(
+        db,
+        int(business_id),
+        int(document_id),
+        biz.invoice_profit_calculation_method or "automatic",
+        biz.invoice_profit_calculation_basis or "purchase_price",
+        bool(getattr(biz, "invoice_profit_include_overhead", False)),
+        biz.invoice_profit_overhead_type or "none",
+        overhead_pct if getattr(biz, "invoice_profit_overhead_percent", None) else None,
+        biz.invoice_profit_calculation_type or "gross",
+    )
+
+    line_profits: List[Dict[str, Any]] = profit_data.get("line_profits") or []
+    if not line_profits:
+        return False
+
+    recognized_at = datetime.utcnow()
+
+    for lp in line_profits:
+        lid = lp.get("line_id")
+        if lid is None:
+            continue
+        row = db.query(InvoiceItemLine).filter(
+            InvoiceItemLine.id == int(lid),
+            InvoiceItemLine.document_id == int(document_id),
+        ).first()
+        if not row:
+            continue
+        row.ledger_unit_cogs = Decimal(str(lp.get("cost_per_unit", 0) or 0))
+        row.ledger_line_cogs = Decimal(str(lp.get("total_cost", 0) or 0))
+        row.ledger_line_gross_profit = Decimal(str(lp.get("gross_profit", 0) or 0))
+        row.ledger_recognized_at = recognized_at
+        row.ledger_recognition_event = LEDGER_EVENT_INVENTORY_CHAIN_REFRESH
+
+    db.flush()
+    return True
+
+
+def refresh_sales_ledgers_after_inventory_invoice_change(
+    db: Session,
+    business_id: int,
+    product_ids: List[int],
+    *,
+    fiscal_year_id: Optional[int] = None,
+) -> int:
+    """پس از ثبت یا ویرایش فاکتور خرید / برگشت از خرید، ledger اسناد فروش و تولید مرتبط را هم‌رسانی می‌کند."""
+    from adapters.db.models.document import Document
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+    ids = sorted({int(x) for x in product_ids if x is not None})
+    if not ids:
+        return 0
+
+    q = (
+        db.query(Document.id)
+        .join(InvoiceItemLine, InvoiceItemLine.document_id == Document.id)
+        .filter(
+            Document.business_id == int(business_id),
+            Document.document_type.in_(PROFIT_RECOGNITION_DOCUMENT_TYPES),
+            Document.is_proforma == False,  # noqa: E712
+            InvoiceItemLine.product_id.in_(ids),
+        )
+    )
+    if fiscal_year_id is not None:
+        q = q.filter(Document.fiscal_year_id == int(fiscal_year_id))
+
+    doc_ids = [int(r[0]) for r in q.distinct().all()]
+    updated = 0
+    for did in doc_ids:
+        try:
+            if sync_ledger_profit_from_analytical_for_document(db, business_id, did):
+                updated += 1
+        except Exception as e:
+            logger.warning(
+                "ledger refresh failed doc_id=%s business_id=%s err=%s",
+                did,
+                business_id,
+                e,
+                exc_info=True,
+            )
+    return updated
 
 
 def on_warehouse_document_posted(db: Session, warehouse_document_id: int) -> None:

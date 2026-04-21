@@ -3238,6 +3238,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get inventoryControl => 'کنترل موجودی';
 
   @override
+  String get inventoryControlHelpSubtitle =>
+      'روشن: رهگیری موجودی و درج این کالا در حواله‌های مرتبط با فاکتور. خاموش: این قلم در حوالهٔ خودکار فاکتور نمی‌آید.';
+
+  @override
+  String get inventoryControlHelpDetail =>
+      'خاموش کردن این گزینه به‌معنای «اجازهٔ قطعی حواله با کمبود موجودی» نیست. اگر باید گاهی با موجودی کمتر از صفر حواله قطعی شود، در تنظیمات کسب‌وکار بخش «کنترل کسری / موجودی منفی» را بررسی کنید.';
+
+  @override
+  String get inventoryUniqueModeRequiresTrack =>
+      'برای استفاده از حالت یونیک، باید «کنترل موجودی» را فعال کنید';
+
+  @override
   String get reorderPoint => 'نقطه سفارش';
 
   @override
@@ -7989,6 +8001,54 @@ class AppLocalizationsFa extends AppLocalizations {
   String get collapseAllCategories => 'بستن همه';
 
   @override
+  String get categoryTreeShowProductsInCategory => 'نمایش کالاهای این دسته';
+
+  @override
+  String get categoryTreeActionsMenuTooltip => 'عملیات';
+
+  @override
+  String get categoryTreeMoreActionsTooltip => 'بیشتر';
+
+  @override
+  String categoryLoadProductsError(String error) {
+    return 'خطا در بارگذاری کالاها: $error';
+  }
+
+  @override
+  String get categoryTreeNoProductsInCategory =>
+      'کالایی در این دسته‌بندی یافت نشد';
+
+  @override
+  String get categoryDescriptionHint => 'توضیحات اختیاری دسته‌بندی';
+
+  @override
+  String get categorySortOrderLabel => 'ترتیب نمایش';
+
+  @override
+  String get categorySortOrderHint => 'عدد ترتیب نمایش (کمتر = بالاتر)';
+
+  @override
+  String get categorySortOrderRequired => 'ترتیب نمایش الزامی است';
+
+  @override
+  String get categorySortOrderInvalidNumber => 'لطفاً یک عدد معتبر وارد کنید';
+
+  @override
+  String get categoryParentFieldLabel => 'والد (دسته‌بندی مادر)';
+
+  @override
+  String get productCategoryFilterBrowseAll => 'همه دسته‌ها';
+
+  @override
+  String get productCategorySubcategoriesLabel => 'زیردسته';
+
+  @override
+  String get categoryPickerSearchEmpty => 'دسته‌ای یافت نشد';
+
+  @override
+  String get categoryTreeAllCategoriesOption => 'همه دسته‌بندی‌ها';
+
+  @override
   String get noSettingsFound => 'هیچ تنظیماتی یافت نشد';
 
   @override
@@ -8914,6 +8974,170 @@ class AppLocalizationsFa extends AppLocalizations {
       'باشگاه در این کسب‌وکار غیرفعال است.';
 
   @override
+  String get customerClubTabAnalytics => 'تحلیل RFM / CLV';
+
+  @override
+  String get customerClubAnalyticsTitle => 'تحلیل و سگمنت مشتری';
+
+  @override
+  String get customerClubAnalyticsRecalculate => 'بازمحاسبه';
+
+  @override
+  String get customerClubAnalyticsRecalculating => 'در حال محاسبه…';
+
+  @override
+  String get customerClubAnalyticsNoData =>
+      'داده‌ای برای نمایش نیست. اگر تحلیل RFM یا CLV را در تنظیمات فعال کرده‌اید، بازمحاسبه را بزنید.';
+
+  @override
+  String get customerClubAnalyticsDisabled =>
+      'برای استفاده، «تحلیل RFM» و/یا «ارزش طول عمر (CLV)» را در تنظیمات باشگاه فعال کنید.';
+
+  @override
+  String customerClubAnalyticsWindow(String start, String end, int months) {
+    return 'پنجره: $start تا $end ($months ماه)';
+  }
+
+  @override
+  String get customerClubAnalyticsTotalPersons => 'مشتریان در گزارش';
+
+  @override
+  String get customerClubAnalyticsLastRun => 'آخرین محاسبه';
+
+  @override
+  String get customerClubAnalyticsSearch => 'جستجوی نام، شرکت یا کد';
+
+  @override
+  String get customerClubAnalyticsFilterSegment => 'سگمنت';
+
+  @override
+  String get customerClubAnalyticsAllSegments => 'همه';
+
+  @override
+  String get customerClubAnalyticsR => 'R (تازگی)';
+
+  @override
+  String get customerClubAnalyticsF => 'F (تکرار)';
+
+  @override
+  String get customerClubAnalyticsM => 'M (مبلغ)';
+
+  @override
+  String get customerClubAnalyticsCell => 'سلول RFM';
+
+  @override
+  String get customerClubAnalyticsCLV => 'CLV';
+
+  @override
+  String get customerClubAnalyticsMonetary => 'مبلغ (پنجره)';
+
+  @override
+  String get customerClubAnalyticsRecency => 'روز از آخرین خرید';
+
+  @override
+  String get customerClubAnalyticsFrequency => 'تعداد خرید';
+
+  @override
+  String get customerClubAnalyticsSegment => 'سگمنت';
+
+  @override
+  String get customerClubAnalyticsLoyaltyBalance => 'مانده امتیاز';
+
+  @override
+  String get customerClubCompositeScore => 'امتیاز ترکیبی';
+
+  @override
+  String get customerClubAnalyticsRefresh => 'به‌روزرسانی';
+
+  @override
+  String get customerClubAnalyticsLoadMore => 'بیشتر';
+
+  @override
+  String get customerClubAnalyticsSortLabel => 'مرتب‌سازی';
+
+  @override
+  String get customerClubAnalyticsSortMonetary => 'مبلغ';
+
+  @override
+  String get customerClubAnalyticsSortRecency => 'تازگی';
+
+  @override
+  String get customerClubAnalyticsSortFrequency => 'تکرار';
+
+  @override
+  String get customerClubAnalyticsSortClv => 'CLV';
+
+  @override
+  String get customerClubAnalyticsSortSegment => 'سگمنت';
+
+  @override
+  String get customerClubAnalyticsSortComposite => 'ترکیبی';
+
+  @override
+  String get customerClubAnalyticsRecalculateDone =>
+      'محاسبه با موفقیت انجام شد.';
+
+  @override
+  String get customerClubSettingsSectionAnalytics =>
+      'تحلیل RFM و ارزش طول عمر (CLV)';
+
+  @override
+  String get customerClubRfmEnabled =>
+      'فعال‌سازی تحلیل RFM (تازگی، تکرار، مبلغ)';
+
+  @override
+  String get customerClubClvEnabled =>
+      'فعال‌سازی تخمین ارزش طول عمر مشتری (CLV)';
+
+  @override
+  String get customerClubRfmWindowMonths => 'طول پنجره زمانی تحلیل (ماه)';
+
+  @override
+  String get customerClubRfmMonetaryBasisLabel => 'مبنای مبلغ برای M';
+
+  @override
+  String get customerClubRfmScoringLabel => 'شیوهٔ امتیازدهی';
+
+  @override
+  String get customerClubRfmScoringQuintiles => 'چندک‌ها (کلاسیک)';
+
+  @override
+  String get customerClubRfmScoringWeighted => 'وزن‌دار (ترکیبی)';
+
+  @override
+  String get customerClubRfmWeightR => 'وزن تازگی (R)';
+
+  @override
+  String get customerClubRfmWeightF => 'وزن تکرار (F)';
+
+  @override
+  String get customerClubRfmWeightM => 'وزن مبلغ (M)';
+
+  @override
+  String get customerClubClvFormulaLabel => 'فرمول CLV';
+
+  @override
+  String get customerClubClvFormulaHistorical => 'مجموع خرید در پنجره';
+
+  @override
+  String get customerClubClvFormulaProjection =>
+      'میانگین سفارش × فرکانس سالانه × عمر تخمینی';
+
+  @override
+  String get customerClubClvLifespanYears =>
+      'عمر مشتری تخمینی (سال) — برای فرمول پیش‌بینی';
+
+  @override
+  String get customerClubAnalyticsHint =>
+      'پس از تغییر تنظیمات، یک‌بار بازمحاسبه را از تب تحلیل بزنید.';
+
+  @override
+  String get customerClubSortAsc => 'صعودی';
+
+  @override
+  String get customerClubSortDesc => 'نزولی';
+
+  @override
   String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
 
   @override
@@ -9313,7 +9537,11 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get invoiceWarehouseReleaseBusinessSubtitle =>
-      'اگر در API یا ایمپورت، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
+      'اگر در API یا ایمپорт، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
+
+  @override
+  String get invoiceWarehouseReleaseStockHint =>
+      'در حالت «قطعی فوری»، حواله با ثبت فاکتور قطعی می‌شود و همان قوانین کسری و موجودی منفیِ همین صفحه (بخش پایین) اعمال می‌شود؛ پیش‌نویس فقط روی کاغذ مانده تا خودتان بعداً قطعی کنید.';
 
   @override
   String get ftpBackupSettingsTitle => 'مقصد FTP بکاپ';
@@ -9867,7 +10095,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get inventoryNegativePolicyIntro =>
-      'پیش‌فرض سیستم مانع قطعی حوالهٔ خروج می‌شود اگر موجودی کافی نباشد. با گزینه‌های زیر می‌توانید به‌صورت تفکیک‌شده برای کالای فله‌ای یا یونیک استثنا بگذارید. حواله‌های انتقال را می‌توان همیشه سخت‌گیرانه نگه داشت.';
+      'این بخش با «کنترل موجودی» در فرم کالا متفاوت است؛ آنجا تعیین می‌کنید اصلاً برای آن کالا رهگیری انبار بشود یا نه، اینجا تصمیم می‌گیرید هنگام قطعی حوالهٔ خروج، در صورت کمبود، آیا اجازهٔ موجودی منفی بدهید. پیش‌فرض قطعی بدون موجودی کافی ممکن نیست؛ با دو سوئیچ زیر برای فله و یونیک می‌توانید استثنا قائل شوید. حوالهٔ انتقال را می‌توان جداگانه همیشه سخت‌گیرانه نگه دارید.';
 
   @override
   String get inventoryNegativePolicyBulkTitle =>
@@ -10066,4 +10294,36 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get distributionSettingsSubtitle =>
       'مسیرها، برنامه روز، ویزیت میدانی و مرجوعی';
+
+  @override
+  String get distributionSharedRoutingCatalog =>
+      'کاتالوگ مشترک مسیرها برای همهٔ ویزیتورها';
+
+  @override
+  String get distributionSharedRoutingCatalogHint =>
+      'اگر خاموش باشد هر ویزیتور فقط مسیرهای تخصیص‌داده‌شده به خود را می‌بیند.';
+
+  @override
+  String get distributionRequireVisitInDailyPlan =>
+      'شروع ویزیت فقط از برنامهٔ روز';
+
+  @override
+  String get distributionRequireVisitInDailyPlanHint =>
+      'شخص باید در برنامهٔ همان روز ویزیتور باشد.';
+
+  @override
+  String get distributionSettingsSaved => 'تنظیمات ذخیره شد.';
+
+  @override
+  String get distributionNotesLabel => 'یادداشت';
+
+  @override
+  String get reportsDistributionSection => 'پخش و ویزیت میدانی';
+
+  @override
+  String get reportsDistributionDashboardTitle => 'خلاصه عملکرد ویزیت و مرجوعی';
+
+  @override
+  String get reportsDistributionDashboardSubtitle =>
+      'آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی';
 }

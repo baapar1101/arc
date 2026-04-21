@@ -15,7 +15,7 @@ import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, exists
 from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
@@ -1276,6 +1276,68 @@ def get_receipt_payment(db: Session, document_id: int) -> Optional[Dict[str, Any
     return result
 
 
+def _apply_receipt_payment_extra_filters(db: Session, q, query: Dict[str, Any]):
+    """فیلترهای پیشرفته ستون‌ها (مثل چندانتخابی پروژه در جدول)."""
+    filters_raw = query.get("filters") or []
+    if not filters_raw:
+        return q
+    for raw in filters_raw:
+        if not isinstance(raw, dict):
+            continue
+        prop = raw.get("property")
+        operator = str(raw.get("operator") or "").strip().lower()
+        val = raw.get("value")
+        if prop == "project_name" and operator == "in" and val:
+            ids: List[int] = []
+            iterable = val if isinstance(val, list) else [val]
+            for x in iterable:
+                try:
+                    ids.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            if ids:
+                q = q.filter(Document.project_id.in_(ids))
+        elif prop == "project_name" and operator == "=" and val not in (None, ""):
+            try:
+                q = q.filter(Document.project_id == int(val))
+            except (TypeError, ValueError):
+                pass
+    return q
+
+
+def _apply_receipt_payment_search(db: Session, q, query: Dict[str, Any]):
+    """جستجو بر اساس کد، شرح یا نام ایجادکننده وقتی search_fields ارسال شده باشد."""
+    search = query.get("search")
+    if not search:
+        return q
+    pattern = f"%{search}%"
+    search_fields = query.get("search_fields")
+    if not search_fields or not isinstance(search_fields, list):
+        return q.filter(Document.code.ilike(pattern))
+    sf_set = {str(x) for x in search_fields}
+    parts = []
+    if "code" in sf_set:
+        parts.append(Document.code.ilike(pattern))
+    if "description" in sf_set:
+        parts.append(Document.description.ilike(pattern))
+    if "created_by_name" in sf_set:
+        uid_rows = db.query(User.id).filter(
+            or_(
+                func.concat(User.first_name, " ", User.last_name).ilike(pattern),
+                User.first_name.ilike(pattern),
+                User.last_name.ilike(pattern),
+            )
+        ).all()
+        uid_list = [row[0] for row in uid_rows if row[0] is not None]
+        if uid_list:
+            parts.append(Document.created_by_user_id.in_(uid_list))
+        else:
+            parts.append(Document.id == -1)
+    if not parts:
+        return q.filter(Document.code.ilike(pattern))
+    return q.filter(or_(*parts))
+
+
 def list_receipts_payments(
     db: Session,
     business_id: int,
@@ -1335,12 +1397,36 @@ def list_receipts_payments(
         except Exception as e:
             logger.warning(f"خطا در پردازش تاریخ تا: {to_date}, خطا: {e}")
             pass
-    
-    # جستجو
-    search = query.get("search")
-    if search:
-        q = q.filter(Document.code.ilike(f"%{search}%"))
-    
+
+    # فیلتر پروژه (صفحه یا پارامتر صریح)
+    pid = query.get("project_id")
+    if pid is not None:
+        try:
+            q = q.filter(Document.project_id == int(pid))
+        except (TypeError, ValueError):
+            pass
+
+    # فیلتر شخص — وجود حداقل یک خط سند با person_id
+    pers_id = query.get("person_id")
+    if pers_id is not None:
+        try:
+            pid_person = int(pers_id)
+            q = q.filter(
+                exists().where(
+                    and_(
+                        DocumentLine.document_id == Document.id,
+                        DocumentLine.person_id == pid_person,
+                    )
+                )
+            )
+        except (TypeError, ValueError):
+            pass
+
+    q = _apply_receipt_payment_extra_filters(db, q, query)
+
+    # جستجو (پشتیبانی از چند فیلد)
+    q = _apply_receipt_payment_search(db, q, query)
+
     # مرتب‌سازی (sort چندستونه در اولویت، وگرنه sort_by/sort_desc)
     from app.services.document_list_sort import apply_document_dynamic_ordering_from_dict
 

@@ -5,9 +5,9 @@ import '../../services/product_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/responsive_helper.dart';
 import 'category_picker_field.dart';
 import '../../utils/snackbar_helper.dart';
-
 
 class CategoryTreeDialog extends StatefulWidget {
   final int businessId;
@@ -26,8 +26,8 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   String? _error;
   List<Map<String, dynamic>> _tree = const <Map<String, dynamic>>[];
   final Set<int> _expandedNodes = <int>{};
-  bool _showProducts = false; // سوئیچ نمایش کالاها
-  int? _selectedCategoryForProducts; // دسته‌بندی انتخاب شده برای نمایش کالاها
+  bool _showProducts = false;
+  int? _selectedCategoryForProducts;
   bool _loadingProducts = false;
   List<Map<String, dynamic>> _categoryProducts = const <Map<String, dynamic>>[];
 
@@ -58,17 +58,15 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
   }
 
-  /// جمع‌آوری تمام ID های نودهایی که فرزند دارند
   Set<int> _collectAllNodeIdsWithChildren(List<Map<String, dynamic>> nodes) {
     final Set<int> ids = {};
     for (final node in nodes) {
       final id = node['id'] as int?;
       if (id == null) continue;
-      
-      final children = (node['children'] as List?)?.cast<dynamic>()
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList() ?? const <Map<String, dynamic>>[];
-      
+
+      final children = (node['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+          const <Map<String, dynamic>>[];
+
       if (children.isNotEmpty) {
         ids.add(id);
         ids.addAll(_collectAllNodeIdsWithChildren(children));
@@ -77,14 +75,12 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     return ids;
   }
 
-  /// باز کردن همه نودهای درخت
   void _expandAll() {
     setState(() {
       _expandedNodes.addAll(_collectAllNodeIdsWithChildren(_tree));
     });
   }
 
-  /// بستن همه نودهای درخت
   void _collapseAll() {
     setState(() {
       _expandedNodes.clear();
@@ -95,112 +91,224 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   bool get _canEdit => widget.authStore.hasBusinessPermission('categories', 'edit');
   bool get _canDelete => widget.authStore.hasBusinessPermission('categories', 'delete');
 
+  double get _indentStep => ResponsiveHelper.isMobile(context) ? 16.0 : 24.0;
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Header
-            Row(
-              children: [
-                Icon(
-                  Icons.category,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  t.categoriesDialogTitle,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const Spacer(),
-                // دکمه‌های باز/بسته کردن همه
-                IconButton(
-                  tooltip: 'باز کردن همه',
-                  onPressed: _expandAll,
-                  icon: const Icon(Icons.unfold_more),
-                ),
-                IconButton(
-                  tooltip: 'بستن همه',
-                  onPressed: _collapseAll,
-                  icon: const Icon(Icons.unfold_less),
-                ),
-                const SizedBox(width: 8),
-                if (_canAdd)
-                  IconButton(
-                    tooltip: t.addCategory,
-                    onPressed: () => _showEditDialog(isRoot: true),
-                    icon: const Icon(Icons.add),
-                  ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 16),
+    final theme = Theme.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final padding = ResponsiveHelper.getPadding(context);
 
-            // سوئیچ نمایش کالاها
-            Card(
-              elevation: 0,
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: Theme.of(context).dividerColor),
-              ),
-              child: SwitchListTile(
-                title: const Text('نمایش کالاهای دسته‌بندی'),
-                subtitle: const Text('با فعال کردن این گزینه، با کلیک روی هر دسته‌بندی کالاهای آن نمایش داده می‌شود'),
-                value: _showProducts,
-                onChanged: (value) {
-                  setState(() {
-                    _showProducts = value;
-                    if (!value) {
-                      _selectedCategoryForProducts = null;
-                      _categoryProducts = const [];
-                    }
-                  });
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_selectedCategoryForProducts == null) _buildModeSelector(context, t, padding),
+        Expanded(child: _buildBody(t)),
+      ],
+    );
+
+    if (isMobile) {
+      return Dialog(
+        insetPadding: EdgeInsets.zero,
+        backgroundColor: theme.colorScheme.surface,
+        clipBehavior: Clip.antiAlias,
+        child: Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          appBar: AppBar(
+            centerTitle: false,
+            titleSpacing: 8,
+            title: Text(
+              t.categoriesDialogTitle,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            actions: [
+              if (_canAdd)
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.add_rounded),
+                  tooltip: t.addCategory,
+                  onPressed: () => _showEditDialog(isRoot: true),
+                ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded),
+                tooltip: t.categoryTreeActionsMenuTooltip,
+                onSelected: (value) {
+                  switch (value) {
+                    case 'expand':
+                      _expandAll();
+                      break;
+                    case 'collapse':
+                      _collapseAll();
+                      break;
+                    case 'add':
+                      if (_canAdd) _showEditDialog(isRoot: true);
+                      break;
+                  }
                 },
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'expand',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.unfold_more_rounded),
+                      title: Text(t.expandAllCategories),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'collapse',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.unfold_less_rounded),
+                      title: Text(t.collapseAllCategories),
+                    ),
+                  ),
+                  if (_canAdd)
+                    PopupMenuItem(
+                      value: 'add',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.add_rounded),
+                        title: Text(t.addCategory),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
+            ],
+          ),
+          body: body,
+        ),
+      );
+    }
 
-            // Content
-            Expanded(child: _buildBody(t)),
-          ],
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      child: Material(
+        elevation: 6,
+        shadowColor: theme.shadowColor.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        color: theme.colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 720,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 12, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.category_rounded, color: theme.colorScheme.primary, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        t.categoriesDialogTitle,
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: t.expandAllCategories,
+                      onPressed: _expandAll,
+                      icon: const Icon(Icons.unfold_more_rounded),
+                    ),
+                    IconButton(
+                      tooltip: t.collapseAllCategories,
+                      onPressed: _collapseAll,
+                      icon: const Icon(Icons.unfold_less_rounded),
+                    ),
+                    if (_canAdd)
+                      IconButton.filledTonal(
+                        tooltip: t.addCategory,
+                        onPressed: () => _showEditDialog(isRoot: true),
+                        icon: const Icon(Icons.add_rounded),
+                      ),
+                    IconButton(
+                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              if (_selectedCategoryForProducts == null) _buildModeSelector(context, t, 20),
+              Expanded(child: _buildBody(t)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-
-  // تب‌ها حذف شده‌اند
+  Widget _buildModeSelector(BuildContext context, AppLocalizations t, double horizontalPadding) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 8),
+      child: SegmentedButton<int>(
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          visualDensity: VisualDensity.comfortable,
+          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+        ),
+        segments: <ButtonSegment<int>>[
+          ButtonSegment<int>(
+            value: 0,
+            label: Text(t.categories),
+            icon: const Icon(Icons.account_tree_outlined, size: 18),
+          ),
+          ButtonSegment<int>(
+            value: 1,
+            label: Text(t.products),
+            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+          ),
+        ],
+        selected: <int>{_showProducts ? 1 : 0},
+        onSelectionChanged: (Set<int> next) {
+          final v = next.first;
+          setState(() {
+            _showProducts = v == 1;
+            if (!_showProducts) {
+              _selectedCategoryForProducts = null;
+              _categoryProducts = const [];
+            }
+          });
+        },
+      ),
+    );
+  }
 
   Widget _buildBody(AppLocalizations t) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return Center(child: Text(_error!));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_error!, textAlign: TextAlign.center),
+        ),
+      );
     }
-    
-    // اگر نمایش کالاها فعال است و دسته‌بندی انتخاب شده، لیست کالاها را نمایش بده
+
     if (_showProducts && _selectedCategoryForProducts != null) {
       return _buildProductsList(t);
     }
-    
+
     return RefreshIndicator(
       onRefresh: _fetch,
       child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(
+          vertical: 8,
+          horizontal: ResponsiveHelper.getPadding(context),
+        ),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: _buildTreeNodes(_tree, t, 0),
       ),
     );
@@ -208,64 +316,180 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
 
   List<Widget> _buildTreeNodes(List<Map<String, dynamic>> items, AppLocalizations t, int level) {
     final List<Widget> widgets = [];
-    
+
     for (final item in items) {
       final id = item['id'] as int?;
       final label = (item['label'] ?? item['title'] ?? item['name'] ?? '').toString();
       final description = (item['description'] as String?);
-      final children = (item['children'] as List?)?.cast<dynamic>()
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList() ?? const <Map<String, dynamic>>[];
+      final children = (item['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+          const <Map<String, dynamic>>[];
       final isExpanded = id != null && _expandedNodes.contains(id);
       final hasChildren = children.isNotEmpty;
 
       widgets.add(
         _CategoryTreeNodeWidget(
-          id: id,
           label: label,
           description: description,
           level: level,
+          indentStep: _indentStep,
           isExpanded: isExpanded,
           hasChildren: hasChildren,
+          showProductsMode: _showProducts,
           canAdd: _canAdd,
           canEdit: _canEdit,
           canDelete: _canDelete,
-          onToggleExpand: hasChildren ? () {
-            setState(() {
-              if (isExpanded) {
-                _expandedNodes.remove(id);
-              } else {
-                _expandedNodes.add(id!);
-              }
-            });
-          } : null,
-          onAddChild: _canAdd ? () => _showEditDialog(parentId: id) : null,
-          onEdit: _canEdit ? () {
-            final sortOrder = (item['sort_order'] as num?)?.toInt();
-            final currentParentId = (item['parent_id'] as num?)?.toInt();
-            _showEditDialog(
-              categoryId: id,
-              initialLabel: label,
-              initialDescription: description,
-              initialSortOrder: sortOrder,
-              initialParentId: currentParentId,
-            );
-          } : null,
-          onDelete: _canDelete ? () => _confirmDelete(id) : null,
-          onShowProducts: _showProducts ? () => _loadCategoryProducts(id) : null,
+          onToggleExpand: hasChildren
+              ? () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedNodes.remove(id);
+                    } else {
+                      _expandedNodes.add(id!);
+                    }
+                  });
+                }
+              : null,
+          onPrimaryContentTap: () {
+            if (_showProducts) {
+              _loadCategoryProducts(id);
+              return;
+            }
+            if (hasChildren) {
+              setState(() {
+                if (isExpanded) {
+                  _expandedNodes.remove(id);
+                } else {
+                  _expandedNodes.add(id!);
+                }
+              });
+            } else if (_canAdd || _canEdit || _canDelete) {
+              _openNodeActionsSheet(t, item);
+            }
+          },
+          onMorePressed: () => _openNodeActionsSheet(t, item),
           t: t,
         ),
       );
-      
+
       if (isExpanded && hasChildren) {
         widgets.addAll(_buildTreeNodes(children, t, level + 1));
       }
     }
-    
+
     return widgets;
   }
 
-  /// فیلتر کردن درخت برای حذف یک دسته‌بندی و تمام فرزندانش
+  void _openNodeActionsSheet(AppLocalizations t, Map<String, dynamic> item) {
+    final id = item['id'] as int?;
+    final label = (item['label'] ?? item['title'] ?? item['name'] ?? '').toString();
+    final description = item['description'] as String?;
+    final sortOrder = (item['sort_order'] as num?)?.toInt();
+    final currentParentId = (item['parent_id'] as num?)?.toInt();
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        final theme = Theme.of(sheetCtx);
+        final bottomInset = MediaQuery.paddingOf(sheetCtx).bottom;
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(left: 16, right: 16, bottom: bottomInset + 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        foregroundColor: theme.colorScheme.onPrimaryContainer,
+                        child: const Icon(Icons.category_rounded),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if (description != null && description.isNotEmpty)
+                              Text(
+                                description,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (_showProducts && id != null)
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      tileColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                      leading: Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary),
+                      title: Text(t.categoryTreeShowProductsInCategory),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _loadCategoryProducts(id);
+                      },
+                    ),
+                  if (_canAdd && id != null)
+                    ListTile(
+                      leading: const Icon(Icons.add_circle_outline_rounded),
+                      title: Text(t.addChildCategory),
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showEditDialog(parentId: id);
+                      },
+                    ),
+                  if (_canEdit && id != null)
+                    ListTile(
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(t.renameCategory),
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showEditDialog(
+                          categoryId: id,
+                          initialLabel: label,
+                          initialDescription: description,
+                          initialSortOrder: sortOrder,
+                          initialParentId: currentParentId,
+                        );
+                      },
+                    ),
+                  if (_canDelete && id != null)
+                    ListTile(
+                      leading: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+                      title: Text(t.deleteCategory, style: TextStyle(color: theme.colorScheme.error)),
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _confirmDelete(id);
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   List<Map<String, dynamic>> _filterTreeExcludingCategory(
     List<Map<String, dynamic>> tree,
     int excludeId,
@@ -274,12 +498,10 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     for (final node in tree) {
       final id = (node['id'] as num?)?.toInt();
       if (id == excludeId) {
-        // این نود و تمام فرزندانش را حذف می‌کنیم
         continue;
       }
-      final children = (node['children'] as List?)?.cast<dynamic>()
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList() ?? const <Map<String, dynamic>>[];
+      final children = (node['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+          const <Map<String, dynamic>>[];
       final filteredChildren = _filterTreeExcludingCategory(children, excludeId);
       final newNode = Map<String, dynamic>.from(node);
       newNode['children'] = filteredChildren;
@@ -288,17 +510,15 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     return result;
   }
 
-  /// باز کردن مسیر تا یک نود خاص
   void _expandToNode(int targetId) {
     bool findAndExpand(List<Map<String, dynamic>> nodes, int targetId, List<int> path) {
       for (final node in nodes) {
         final id = node['id'] as int?;
         if (id == null) continue;
-        
+
         final currentPath = [...path, id];
-        
+
         if (id == targetId) {
-          // پیدا شد - باز کردن تمام مسیر
           setState(() {
             for (final pathId in currentPath) {
               _expandedNodes.add(pathId);
@@ -306,14 +526,12 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
           });
           return true;
         }
-        
-        final children = (node['children'] as List?)?.cast<dynamic>()
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList() ?? const <Map<String, dynamic>>[];
-        
+
+        final children = (node['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+            const <Map<String, dynamic>>[];
+
         if (children.isNotEmpty) {
           if (findAndExpand(children, targetId, currentPath)) {
-            // باز کردن نود فعلی چون در مسیر است
             setState(() {
               _expandedNodes.add(id);
             });
@@ -323,45 +541,40 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       }
       return false;
     }
-    
+
     findAndExpand(_tree, targetId, []);
   }
 
-  /// پیدا کردن یک نود در درخت بر اساس ID
   Map<String, dynamic>? findNode(List<Map<String, dynamic>> nodes, int targetId) {
     for (final node in nodes) {
       if ((node['id'] as int?) == targetId) {
         return node;
       }
-      final children = (node['children'] as List?)?.cast<dynamic>()
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList() ?? const <Map<String, dynamic>>[];
+      final children = (node['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+          const <Map<String, dynamic>>[];
       final found = findNode(children, targetId);
       if (found != null) return found;
     }
     return null;
   }
 
-  /// جمع‌آوری تمام ID های فرزندان یک نود
   Set<int> _collectAllDescendantIds(Map<String, dynamic> node) {
     final Set<int> ids = {};
     final id = node['id'] as int?;
     if (id != null) {
       ids.add(id);
     }
-    final children = (node['children'] as List?)?.cast<dynamic>()
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList() ?? const <Map<String, dynamic>>[];
+    final children = (node['children'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+        const <Map<String, dynamic>>[];
     for (final child in children) {
       ids.addAll(_collectAllDescendantIds(child));
     }
     return ids;
   }
 
-  /// بارگذاری کالاهای یک دسته‌بندی و زیرمجموعه‌هایش
   Future<void> _loadCategoryProducts(int? categoryId) async {
     if (categoryId == null) return;
-    
+
     setState(() {
       _selectedCategoryForProducts = categoryId;
       _loadingProducts = true;
@@ -369,7 +582,6 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     });
 
     try {
-      // جمع‌آوری تمام ID های فرزندان این دسته‌بندی
       final node = findNode(_tree, categoryId);
       final categoryIds = <int>[categoryId];
       if (node != null) {
@@ -377,7 +589,6 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         categoryIds.addAll(allDescendantIds);
       }
 
-      // دریافت کالاهای این دسته‌بندی و زیرمجموعه‌هایش
       final filters = [
         {
           'property': 'category_id',
@@ -389,7 +600,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
         filters: filters,
-        limit: 1000, // دریافت حداکثر 1000 کالا
+        limit: 1000,
         skip: 0,
       );
 
@@ -401,71 +612,70 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final loc = AppLocalizations.of(context);
         setState(() {
           _loadingProducts = false;
-          _error = 'خطا در بارگذاری کالاها: $e';
+          _error = loc.categoryLoadProductsError(e.toString());
         });
       }
     }
   }
 
-  /// ساخت ویجت لیست کالاها
   Widget _buildProductsList(AppLocalizations t) {
     final theme = Theme.of(context);
-    // پیدا کردن نام دسته‌بندی
-    String categoryName = 'دسته‌بندی';
+    final isMobile = ResponsiveHelper.isMobile(context);
+    String categoryName = t.category;
     final node = findNode(_tree, _selectedCategoryForProducts!);
     if (node != null) {
-      categoryName = (node['label'] ?? node['title'] ?? node['name'] ?? 'دسته‌بندی').toString();
+      categoryName = (node['label'] ?? node['title'] ?? node['name'] ?? t.category).toString();
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // هدر با نام دسته‌بندی و دکمه بازگشت
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            border: Border(
-              bottom: BorderSide(color: theme.dividerColor),
+        Material(
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.65),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 4),
+            child: Row(
+              children: [
+                IconButton(
+                  style: IconButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                  ),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  onPressed: () {
+                    setState(() {
+                      _selectedCategoryForProducts = null;
+                      _categoryProducts = const [];
+                    });
+                  },
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        categoryName,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${_categoryProducts.length} ${t.products}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  setState(() {
-                    _selectedCategoryForProducts = null;
-                    _categoryProducts = const [];
-                  });
-                },
-                tooltip: 'بازگشت به درخت دسته‌بندی',
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'کالاهای دسته‌بندی: $categoryName',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${_categoryProducts.length} کالا',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
-        // لیست کالاها
         Expanded(
           child: _loadingProducts
               ? const Center(child: CircularProgressIndicator())
@@ -477,20 +687,29 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                           Icon(
                             Icons.inventory_2_outlined,
                             size: 64,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            'کالایی در این دسته‌بندی یافت نشد',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              t.categoryTreeNoProductsInCategory,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: EdgeInsets.fromLTRB(
+                        ResponsiveHelper.getPadding(context),
+                        12,
+                        ResponsiveHelper.getPadding(context),
+                        24,
+                      ),
                       itemCount: _categoryProducts.length,
                       itemBuilder: (context, index) {
                         final product = _categoryProducts[index];
@@ -499,72 +718,91 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                         final itemType = product['item_type']?.toString() ?? '-';
                         final salesPrice = product['base_sales_price'];
                         final purchasePrice = product['base_purchase_price'];
-                        final categoryName = product['category_name']?.toString();
+                        final categoryNameProduct = product['category_name']?.toString();
 
                         return Card(
                           elevation: 0,
-                          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          margin: const EdgeInsets.only(bottom: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: theme.dividerColor),
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                           ),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                              child: Icon(
-                                Icons.inventory_2,
-                                color: theme.colorScheme.onPrimaryContainer,
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(
-                              name,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Column(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    const Text('کد: '),
-                                    Directionality(
-                                      textDirection: TextDirection.ltr,
-                                      child: Text(
-                                        code,
-                                        style: const TextStyle(fontFamily: 'monospace'),
-                                      ),
-                                    ),
-                                  ],
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: theme.colorScheme.primaryContainer,
+                                  child: Icon(
+                                    Icons.inventory_2_rounded,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    size: 22,
+                                  ),
                                 ),
-                                if (categoryName != null && categoryName.isNotEmpty)
-                                  Text('دسته‌بندی: $categoryName'),
-                                Text('نوع: $itemType'),
-                                if (salesPrice != null || purchasePrice != null)
-                                  Row(
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      if (salesPrice != null)
-                                        Text(
-                                          'قیمت فروش: ${_formatNumber(salesPrice)}',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: theme.colorScheme.primary,
-                                          ),
+                                      Text(
+                                        name,
+                                        style: theme.textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                      if (salesPrice != null && purchasePrice != null)
-                                        const Text(' • '),
-                                      if (purchasePrice != null)
-                                        Text(
-                                          'قیمت خرید: ${_formatNumber(purchasePrice)}',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: theme.colorScheme.secondary,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        children: [
+                                          _ProductMetaChip(
+                                            icon: Icons.tag_rounded,
+                                            label: code,
+                                            monospace: true,
                                           ),
+                                          _ProductMetaChip(
+                                            icon: Icons.label_outline_rounded,
+                                            label: itemType,
+                                          ),
+                                          if (categoryNameProduct != null && categoryNameProduct.isNotEmpty)
+                                            _ProductMetaChip(
+                                              icon: Icons.category_outlined,
+                                              label: categoryNameProduct,
+                                            ),
+                                        ],
+                                      ),
+                                      if (salesPrice != null || purchasePrice != null) ...[
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 12,
+                                          runSpacing: 4,
+                                          children: [
+                                            if (salesPrice != null)
+                                              Text(
+                                                '${t.sales}: ${_formatNumber(salesPrice)}',
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: theme.colorScheme.primary,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            if (purchasePrice != null)
+                                              Text(
+                                                '${t.buy}: ${_formatNumber(purchasePrice)}',
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: theme.colorScheme.tertiary,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                          ],
                                         ),
+                                      ],
                                     ],
                                   ),
+                                ),
                               ],
                             ),
-                            isThreeLine: true,
                           ),
                         );
                       },
@@ -581,8 +819,6 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
     return value.toString();
   }
-
-  // _buildNodeTile حذف شد؛ از TreeView استفاده می‌کنیم
 
   Future<void> _confirmDelete(int? id) async {
     if (id == null) return;
@@ -617,175 +853,261 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     final labelCtrl = TextEditingController(text: initialLabel ?? '');
     final descriptionCtrl = TextEditingController(text: initialDescription ?? '');
     final sortOrderCtrl = TextEditingController(text: (initialSortOrder ?? 0).toString());
-    int? selectedParentId = categoryId != null ? (initialParentId) : (isRoot ? null : parentId);
-    
-    final result = await showDialog<Map<String, dynamic>?>(
-      context: context,
-      builder: (ctx) => Dialog(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 500,
-            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+    int? selectedParentId = categoryId != null ? initialParentId : (isRoot ? null : parentId);
+    final isMobile = ResponsiveHelper.isMobile(context);
+
+    void disposeCtrls() {
+      labelCtrl.dispose();
+      descriptionCtrl.dispose();
+      sortOrderCtrl.dispose();
+    }
+
+    void submitForm(BuildContext ctx) {
+      if (formKey.currentState?.validate() != true) return;
+      final sortOrder = categoryId != null ? int.tryParse(sortOrderCtrl.text.trim()) : null;
+      Navigator.pop(ctx, {
+        'label': labelCtrl.text.trim(),
+        'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+        'sort_order': sortOrder,
+        'parent_id': categoryId != null ? selectedParentId : null,
+      });
+    }
+
+    Widget formFields(BuildContext ctx) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: labelCtrl,
+            decoration: InputDecoration(
+              labelText: t.categoryName,
+              hintText: t.categoryNameHint,
+              prefixIcon: const Icon(Icons.category_outlined),
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            ),
+            textInputAction: TextInputAction.next,
+            autofocus: !isMobile,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return t.categoryNameRequired;
+              }
+              return null;
+            },
           ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header
-                  Row(
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: descriptionCtrl,
+            decoration: InputDecoration(
+              labelText: t.description,
+              hintText: t.categoryDescriptionHint,
+              prefixIcon: const Icon(Icons.description_outlined),
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            ),
+            maxLines: 3,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 16),
+          if (categoryId != null)
+            TextFormField(
+              controller: sortOrderCtrl,
+              decoration: InputDecoration(
+                labelText: t.categorySortOrderLabel,
+                hintText: t.categorySortOrderHint,
+                prefixIcon: const Icon(Icons.sort_rounded),
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              ),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return t.categorySortOrderRequired;
+                }
+                final intValue = int.tryParse(value.trim());
+                if (intValue == null) {
+                  return t.categorySortOrderInvalidNumber;
+                }
+                return null;
+              },
+            ),
+          if (categoryId != null) const SizedBox(height: 16),
+          if (categoryId != null)
+            CategoryPickerField(
+              businessId: widget.businessId,
+              categoriesTree: _filterTreeExcludingCategory(_tree, categoryId),
+              initialValue: selectedParentId,
+              onChanged: (value) {
+                selectedParentId = value;
+              },
+              label: t.categoryParentFieldLabel,
+            ),
+        ],
+      );
+    }
+
+    Map<String, dynamic>? result;
+    try {
+      if (isMobile) {
+        result = await showModalBottomSheet<Map<String, dynamic>?>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) {
+          final bottomViewInset = MediaQuery.viewInsetsOf(ctx).bottom;
+          final padBottom = MediaQuery.paddingOf(ctx).bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomViewInset),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + padBottom),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        categoryId == null ? Icons.add_circle_outline : Icons.edit_outlined,
-                        color: Theme.of(ctx).primaryColor,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          categoryId == null ? t.createCategory : t.updateCategory,
-                          style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Icon(
+                            categoryId == null ? Icons.add_circle_outline_rounded : Icons.edit_outlined,
+                            color: Theme.of(ctx).colorScheme.primary,
+                            size: 28,
                           ),
-                        ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              categoryId == null ? t.createCategory : t.updateCategory,
+                              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx, null),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx, null),
-                        icon: const Icon(Icons.close),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      const SizedBox(height: 16),
+                      formFields(ctx),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx, null),
+                              child: Text(t.cancel),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () => submitForm(ctx),
+                              icon: Icon(categoryId == null ? Icons.add_rounded : Icons.save_rounded),
+                              label: Text(categoryId == null ? t.createCategory : t.updateCategory),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  
-                  // Category Name Field
-                  TextFormField(
-                    controller: labelCtrl,
-                    decoration: InputDecoration(
-                      labelText: t.categoryName,
-                      hintText: t.categoryNameHint,
-                      prefixIcon: const Icon(Icons.category_outlined),
-                      border: const OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Theme.of(ctx).colorScheme.surface,
-                    ),
-                    textInputAction: TextInputAction.next,
-                    autofocus: true,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return t.categoryNameRequired;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Description Field
-                  TextFormField(
-                    controller: descriptionCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'توضیحات',
-                      hintText: 'توضیحات اختیاری دسته‌بندی',
-                      prefixIcon: const Icon(Icons.description_outlined),
-                      border: const OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Theme.of(ctx).colorScheme.surface,
-                    ),
-                    maxLines: 3,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Sort Order Field (only for edit mode)
-                  if (categoryId != null)
-                    TextFormField(
-                      controller: sortOrderCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'ترتیب نمایش',
-                        hintText: 'عدد ترتیب نمایش (کمتر = بالاتر)',
-                        prefixIcon: const Icon(Icons.sort),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Theme.of(ctx).colorScheme.surface,
-                      ),
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.next,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'ترتیب نمایش الزامی است';
-                        }
-                        final intValue = int.tryParse(value.trim());
-                        if (intValue == null) {
-                          return 'لطفاً یک عدد معتبر وارد کنید';
-                        }
-                        return null;
-                      },
-                    ),
-                  if (categoryId != null) const SizedBox(height: 16),
-                  
-                  // Parent Selection Field (only for edit mode)
-                  if (categoryId != null)
-                    CategoryPickerField(
-                      businessId: widget.businessId,
-                      categoriesTree: _filterTreeExcludingCategory(_tree, categoryId),
-                      initialValue: selectedParentId,
-                      onChanged: (value) {
-                        selectedParentId = value;
-                      },
-                      label: 'والد (دسته‌بندی مادر)',
-                    ),
-                  if (categoryId != null) const SizedBox(height: 24),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Actions
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+      } else {
+        result = await showDialog<Map<String, dynamic>?>(
+        context: context,
+        builder: (ctx) => Dialog(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 500,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, null),
-                        child: Text(t.cancel),
+                      Row(
+                        children: [
+                          Icon(
+                            categoryId == null ? Icons.add_circle_outline : Icons.edit_outlined,
+                            color: Theme.of(ctx).colorScheme.primary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              categoryId == null ? t.createCategory : t.updateCategory,
+                              style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx, null),
+                            icon: const Icon(Icons.close),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: () {
-                          if (formKey.currentState!.validate()) {
-                            final sortOrder = categoryId != null ? int.tryParse(sortOrderCtrl.text.trim()) : null;
-                            Navigator.pop(ctx, {
-                              'label': labelCtrl.text.trim(),
-                              'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
-                              'sort_order': sortOrder,
-                              'parent_id': categoryId != null ? selectedParentId : null,
-                            });
-                          }
-                        },
-                        icon: Icon(categoryId == null ? Icons.add : Icons.save),
-                        label: Text(categoryId == null ? t.createCategory : t.updateCategory),
+                      const SizedBox(height: 24),
+                      formFields(ctx),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, null),
+                            child: Text(t.cancel),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: () => submitForm(ctx),
+                            icon: Icon(categoryId == null ? Icons.add : Icons.save),
+                            label: Text(categoryId == null ? t.createCategory : t.updateCategory),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  ],
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    
+      );
+      }
+    } finally {
+      disposeCtrls();
+    }
+
     if (result == null) return;
-    
+
     final label = result['label'] as String?;
     if (label == null || label.isEmpty) return;
     final description = result['description'] as String?;
     final sortOrder = result['sort_order'] as int?;
     final newParentId = result['parent_id'] as int?;
-    
+
     int? newCategoryId;
     try {
       if (categoryId == null) {
@@ -809,10 +1131,8 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         );
       }
       await _fetch();
-      
-      // اگر آیتم جدید اضافه شده، مسیر تا آن را باز کن
+
       if (newCategoryId != null) {
-        // کمی تأخیر برای اطمینان از اینکه درخت به‌روزرسانی شده
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _expandToNode(newCategoryId!);
         });
@@ -825,185 +1145,186 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   }
 }
 
-/// ویجت نمایش یک نود دسته‌بندی در درخت
+class _ProductMetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool monospace;
+
+  const _ProductMetaChip({
+    required this.icon,
+    required this.label,
+    this.monospace = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+      ),
+        child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Directionality(
+            textDirection: monospace ? TextDirection.ltr : Directionality.of(context),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontFamily: monospace ? 'monospace' : null,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CategoryTreeNodeWidget extends StatelessWidget {
-  final int? id;
   final String label;
   final String? description;
   final int level;
+  final double indentStep;
   final bool isExpanded;
   final bool hasChildren;
+  final bool showProductsMode;
   final bool canAdd;
   final bool canEdit;
   final bool canDelete;
   final VoidCallback? onToggleExpand;
-  final VoidCallback? onAddChild;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final VoidCallback? onShowProducts;
+  final VoidCallback onPrimaryContentTap;
+  final VoidCallback onMorePressed;
   final AppLocalizations t;
 
   const _CategoryTreeNodeWidget({
-    required this.id,
     required this.label,
     this.description,
     required this.level,
+    required this.indentStep,
     required this.isExpanded,
     required this.hasChildren,
+    required this.showProductsMode,
     required this.canAdd,
     required this.canEdit,
     required this.canDelete,
     this.onToggleExpand,
-    this.onAddChild,
-    this.onEdit,
-    this.onDelete,
-    this.onShowProducts,
+    required this.onPrimaryContentTap,
+    required this.onMorePressed,
     required this.t,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final indent = level * 24.0;
-    final lineColor = theme.colorScheme.outline.withValues(alpha: 0.3);
-    
-    return Stack(
-      children: [
-        // خطوط اتصال درخت
-        if (level > 0)
-          Positioned(
-            right: indent - 12,
-            top: 0,
-            bottom: 0,
-            child: Container(
-              width: 1,
-              color: lineColor,
-            ),
-          ),
-        InkWell(
-          onTap: onToggleExpand,
-          child: Container(
-            padding: EdgeInsets.only(
-              right: indent + 12,
-              left: 12,
-              top: 8,
-              bottom: 8,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              border: Border(
-                right: level > 0
-                    ? BorderSide(
-                        color: lineColor,
-                        width: 1,
-                      )
-                    : BorderSide.none,
+    final indent = level * indentStep;
+    final lineColor = theme.colorScheme.outline.withValues(alpha: 0.28);
+    final showMore = canAdd || canEdit || canDelete || showProductsMode;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Stack(
+        children: [
+          if (level > 0)
+            Positioned(
+              right: indent - indentStep * 0.5,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 1,
+                color: lineColor,
               ),
             ),
-            child: Row(
-              children: [
-                // آیکون باز/بسته کردن
-                SizedBox(
-                  width: 24,
-                  child: hasChildren
-                      ? IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          iconSize: 20,
-                          onPressed: onToggleExpand,
-                          icon: Icon(
-                            isExpanded ? Icons.expand_more : Icons.chevron_left,
-                            color: theme.colorScheme.onSurface,
+          Material(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPrimaryContentTap,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: indent + 8,
+                  left: 4,
+                  top: 6,
+                  bottom: 6,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 36,
+                      child: hasChildren
+                          ? IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              iconSize: 22,
+                              onPressed: onToggleExpand,
+                              icon: AnimatedRotation(
+                                turns: isExpanded ? 0.25 : 0,
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeOutCubic,
+                                child: Icon(
+                                  Icons.chevron_left_rounded,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            )
+                          : const SizedBox(width: 8),
+                    ),
+                    Icon(
+                      hasChildren ? Icons.folder_rounded : Icons.category_rounded,
+                      size: 22,
+                      color: hasChildren ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: hasChildren ? FontWeight.w600 : FontWeight.w500,
+                            ),
                           ),
-                        )
-                      : const SizedBox(width: 24),
-                ),
-                
-                const SizedBox(width: 8),
-                
-                // آیکون دسته‌بندی
-                Icon(
-                  hasChildren ? Icons.folder : Icons.category,
-                  size: 20,
-                  color: hasChildren
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                
-                const SizedBox(width: 12),
-                
-                // نام دسته‌بندی و توضیحات
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: hasChildren ? FontWeight.w600 : FontWeight.normal,
-                          color: theme.colorScheme.onSurface,
+                          if (description != null && description!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                description!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (showMore)
+                      IconButton(
+                        icon: const Icon(Icons.more_vert_rounded),
+                        tooltip: t.categoryTreeMoreActionsTooltip,
+                        onPressed: onMorePressed,
+                        style: IconButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      if (description != null && description!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            description!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-                
-                const SizedBox(width: 8),
-                
-                // دکمه نمایش کالاها (اگر فعال باشد)
-                if (onShowProducts != null)
-                  IconButton(
-                    icon: const Icon(Icons.inventory_2_outlined, size: 20),
-                    tooltip: 'نمایش کالاهای این دسته‌بندی',
-                    onPressed: onShowProducts,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                // دکمه‌های عملیات
-                if (canAdd)
-                  IconButton(
-                    tooltip: t.addChildCategory,
-                    icon: const Icon(Icons.add_circle_outline, size: 20),
-                    onPressed: onAddChild,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                if (canEdit)
-                  IconButton(
-                    tooltip: t.renameCategory,
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                    onPressed: onEdit,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                if (canDelete)
-                  IconButton(
-                    tooltip: t.deleteCategory,
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    color: theme.colorScheme.error,
-                  ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
-

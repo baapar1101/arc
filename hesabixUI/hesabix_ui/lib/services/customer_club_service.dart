@@ -88,4 +88,55 @@ class CustomerClubService {
     }
     return const {};
   }
+
+  Future<Map<String, dynamic>> getRfmSummary({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/analytics/rfm/summary',
+    );
+    final body = res.data;
+    if (body is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(body['data'] as Map? ?? const {});
+    }
+    return const {};
+  }
+
+  Future<Map<String, dynamic>> listRfmPersons({
+    required int businessId,
+    int skip = 0,
+    int limit = 50,
+    String? segmentLabel,
+    String? q,
+    String sort = 'monetary_total',
+    String sortDir = 'desc',
+  }) async {
+    final query = <String, dynamic>{
+      'skip': '$skip',
+      'limit': '$limit',
+      'sort': sort,
+      'sort_dir': sortDir,
+      if (segmentLabel != null && segmentLabel.trim().isNotEmpty) 'segment_label': segmentLabel.trim(),
+      if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/analytics/rfm/persons',
+      query: query,
+    );
+    final body = res.data;
+    if (body is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(body['data'] as Map? ?? const {});
+    }
+    return const {};
+  }
+
+  Future<Map<String, dynamic>> recalculateRfm({required int businessId}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/analytics/rfm/recalculate',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data;
+    if (body is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(body['data'] as Map? ?? const {});
+    }
+    return const {};
+  }
 }

@@ -58,13 +58,13 @@ def list_territories(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response({"items": dist_svc.list_territories(db, business_id)}, request)
+	return success_response({"items": dist_svc.list_territories(db, business_id, ctx)}, request)
 
 
 @router.post("/business/{business_id}/territories")
@@ -121,13 +121,13 @@ def list_routes(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response({"items": dist_svc.list_routes(db, business_id)}, request)
+	return success_response({"items": dist_svc.list_routes(db, business_id, ctx)}, request)
 
 
 @router.post("/business/{business_id}/routes")
@@ -169,13 +169,13 @@ def list_stops(
 	business_id: int = Path(..., gt=0),
 	route_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.list_route_stops(db, business_id, route_id)
+	data = dist_svc.list_route_stops(db, business_id, route_id, ctx)
 	return success_response({"items": data}, request)
 
 
@@ -219,13 +219,13 @@ def list_assignments(
 	business_id: int = Path(..., gt=0),
 	route_id: Optional[int] = Query(None),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.list_assignments(db, business_id, route_id)
+	data = dist_svc.list_assignments(db, business_id, route_id, ctx)
 	return success_response({"items": data}, request)
 
 
@@ -440,4 +440,55 @@ def resolve_return(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	data = dist_svc.resolve_return_request(db, business_id, uid, request_id, payload)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/settings")
+def get_distribution_settings(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
+	return success_response(data, request)
+
+
+@router.put("/business/{business_id}/settings")
+def put_distribution_settings(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = dist_svc.update_distribution_settings(db, business_id, payload)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/reports/dashboard")
+def distribution_reports_dashboard(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	from_date: str = Query(..., description="YYYY-MM-DD"),
+	to_date: str = Query(..., description="YYYY-MM-DD"),
+	target_user_id: Optional[int] = Query(None),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	fd = date.fromisoformat(from_date[:10])
+	td = date.fromisoformat(to_date[:10])
+	data = dist_svc.get_distribution_reports_dashboard(db, business_id, ctx, fd, td, target_user_id)
 	return success_response(data, request)

@@ -841,6 +841,22 @@ class _ReportsPageState extends State<ReportsPage> {
         ],
       ),
       _ReportSection(
+        id: 'distribution',
+        title: t.reportsDistributionSection,
+        icon: Icons.local_shipping_outlined,
+        items: [
+          _ReportLink(
+            key: 'distribution_dashboard',
+            title: t.reportsDistributionDashboardTitle,
+            subtitle: t.reportsDistributionDashboardSubtitle,
+            icon: Icons.analytics_outlined,
+            route: '/business/$b/reports/distribution-dashboard',
+            keywords: const ['ویزیت', 'پخش', 'مرجوعی', 'distribution'],
+            permissionSection: 'distribution',
+          ),
+        ],
+      ),
+      _ReportSection(
         id: 'products',
         title: t.reportsProductsSection,
         icon: Icons.inventory_2_outlined,

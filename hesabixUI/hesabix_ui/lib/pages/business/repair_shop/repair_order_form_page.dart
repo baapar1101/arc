@@ -137,6 +137,7 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                     // انتخاب مشتری
                     PersonComboboxWidget(
                       businessId: widget.businessId,
+                      showFinancialBalance: true,
                       selectedPerson: _selectedCustomer,
                       onChanged: (person) {
                         setState(() => _selectedCustomer = person);

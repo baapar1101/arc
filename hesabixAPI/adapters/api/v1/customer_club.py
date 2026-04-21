@@ -12,6 +12,7 @@ from app.core.customer_club_plugin_dependency import check_customer_club_plugin_
 from app.core.i18n import locale_dependency
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import ApiError, format_datetime_fields, success_response
+from app.services import customer_club_analytics_service as analytics_svc
 from app.services import customer_club_service as svc
 
 router = APIRouter(prefix="/customer-club", tags=["customer-club"])
@@ -187,3 +188,77 @@ def replace_tiers_endpoint(
 	except ValueError as e:
 		raise ApiError("VALIDATION_ERROR", str(e), http_status=400)
 	return success_response({"items": items}, request)
+
+
+@router.get("/business/{business_id}/analytics/rfm/summary")
+def rfm_summary_endpoint(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_ensure_plugin(db, business_id)
+	data = analytics_svc.get_rfm_summary(db, business_id)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/analytics/rfm/persons")
+def rfm_persons_endpoint(
+	request: Request,
+	business_id: int,
+	skip: int = Query(0, ge=0),
+	limit: int = Query(50, ge=1, le=200),
+	segment_label: Optional[str] = Query(None),
+	q: Optional[str] = Query(None, description="Search in person name/code"),
+	sort: str = Query("monetary_total"),
+	sort_dir: str = Query("desc"),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_ensure_plugin(db, business_id)
+	if sort not in (
+		"monetary_total",
+		"recency_days",
+		"frequency_count",
+		"clv_estimate",
+		"segment_label",
+		"composite_score",
+	):
+		raise ApiError("INVALID_SORT", "Invalid sort field.", http_status=400)
+	if sort_dir not in ("asc", "desc"):
+		raise ApiError("INVALID_SORT_DIR", "sort_dir must be asc or desc.", http_status=400)
+	items, total = analytics_svc.list_rfm_persons(
+		db,
+		business_id,
+		skip=skip,
+		limit=limit,
+		segment_label=segment_label,
+		search=q,
+		sort=sort,
+		sort_dir=sort_dir,
+	)
+	return success_response({"items": items, "total": total}, request)
+
+
+@router.post("/business/{business_id}/analytics/rfm/recalculate")
+def rfm_recalculate_endpoint(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_ensure_plugin(db, business_id)
+	try:
+		data = analytics_svc.recalculate_rfm_snapshots(db, business_id)
+	except ApiError:
+		raise
+	return success_response(data, request)

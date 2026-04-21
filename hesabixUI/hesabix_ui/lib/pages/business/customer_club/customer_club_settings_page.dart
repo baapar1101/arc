@@ -40,6 +40,17 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
   String _rounding = 'floor';
   bool _requireCustomerType = true;
 
+  bool _rfmAnalyticsEnabled = false;
+  bool _clvAnalyticsEnabled = false;
+  final TextEditingController _rfmWindowMonthsCtl = TextEditingController(text: '12');
+  String _rfmMonetaryBasis = 'net';
+  String _rfmScoringMethod = 'quintiles';
+  final TextEditingController _rfmWeightRCtl = TextEditingController();
+  final TextEditingController _rfmWeightFCtl = TextEditingController();
+  final TextEditingController _rfmWeightMCtl = TextEditingController();
+  String _clvFormula = 'historical_total';
+  final TextEditingController _clvLifespanCtl = TextEditingController(text: '3');
+
   bool _computeCanManage() {
     return widget.authStore.currentBusiness?.isOwner == true ||
         widget.authStore.hasBusinessPermission('customer_club', 'manage');
@@ -61,6 +72,11 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
     _currencyValuePerPointCtl.dispose();
     _maxRedeemPerInvCtl.dispose();
     _pointsExpireDaysCtl.dispose();
+    _rfmWindowMonthsCtl.dispose();
+    _rfmWeightRCtl.dispose();
+    _rfmWeightFCtl.dispose();
+    _rfmWeightMCtl.dispose();
+    _clvLifespanCtl.dispose();
     super.dispose();
   }
 
@@ -85,6 +101,16 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         _pointsExpireDaysCtl.text = exp == null ? '' : exp.toString();
         _rounding = (data['rounding_mode'] ?? 'floor').toString();
         _requireCustomerType = data['require_customer_person_type'] != false;
+        _rfmAnalyticsEnabled = data['rfm_analytics_enabled'] == true;
+        _clvAnalyticsEnabled = data['clv_analytics_enabled'] == true;
+        _rfmWindowMonthsCtl.text = '${data['rfm_analysis_window_months'] ?? 12}';
+        _rfmMonetaryBasis = (data['rfm_monetary_basis'] ?? 'net').toString();
+        _rfmScoringMethod = (data['rfm_scoring_method'] ?? 'quintiles').toString();
+        _rfmWeightRCtl.text = _fmtNum(data['rfm_weight_recency']);
+        _rfmWeightFCtl.text = _fmtNum(data['rfm_weight_frequency']);
+        _rfmWeightMCtl.text = _fmtNum(data['rfm_weight_monetary']);
+        _clvFormula = (data['clv_formula'] ?? 'historical_total').toString();
+        _clvLifespanCtl.text = _fmtNum(data['clv_avg_lifespan_years']);
       });
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: '$e');
@@ -185,6 +211,16 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         'currency_value_per_point': _parseDoubleOrNull(_currencyValuePerPointCtl.text),
         'max_redeem_points_per_invoice': _parseDoubleOrNull(_maxRedeemPerInvCtl.text),
         'points_expire_after_days': _parseOptionalIntNull(_pointsExpireDaysCtl.text),
+        'rfm_analytics_enabled': _rfmAnalyticsEnabled,
+        'clv_analytics_enabled': _clvAnalyticsEnabled,
+        'rfm_analysis_window_months': int.tryParse(_rfmWindowMonthsCtl.text.trim().replaceAll(',', '')) ?? 12,
+        'rfm_monetary_basis': _rfmMonetaryBasis,
+        'rfm_scoring_method': _rfmScoringMethod,
+        'rfm_weight_recency': _parseDoubleOrNull(_rfmWeightRCtl.text),
+        'rfm_weight_frequency': _parseDoubleOrNull(_rfmWeightFCtl.text),
+        'rfm_weight_monetary': _parseDoubleOrNull(_rfmWeightMCtl.text),
+        'clv_formula': _clvFormula,
+        'clv_avg_lifespan_years': _parseDoubleOrNull(_clvLifespanCtl.text),
       };
       await _svc.updateSettings(businessId: widget.businessId, payload: payload);
       if (!mounted) return;
@@ -292,6 +328,12 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
                   const SizedBox(height: 24),
                   _sectionCard(
                     theme: theme,
+                    title: t.customerClubSettingsSectionAnalytics,
+                    children: _analyticsFields(t, canManage),
+                  ),
+                  const SizedBox(height: 24),
+                  _sectionCard(
+                    theme: theme,
                     title: t.customerClubSettingsSectionAccess,
                     children: [
                       SwitchListTile(
@@ -391,6 +433,113 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         readOnly: !canManage,
         onChanged: (_) => setState(() {}),
+      ),
+    ];
+  }
+
+  List<Widget> _analyticsFields(AppLocalizations t, bool canManage) {
+    return [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(t.customerClubRfmEnabled),
+        value: _rfmAnalyticsEnabled,
+        onChanged: canManage ? (v) => setState(() => _rfmAnalyticsEnabled = v) : null,
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(t.customerClubClvEnabled),
+        value: _clvAnalyticsEnabled,
+        onChanged: canManage ? (v) => setState(() => _clvAnalyticsEnabled = v) : null,
+      ),
+      TextField(
+        controller: _rfmWindowMonthsCtl,
+        decoration: InputDecoration(labelText: t.customerClubRfmWindowMonths),
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        readOnly: !canManage,
+        onChanged: (_) => setState(() {}),
+      ),
+      DropdownButtonFormField<String>(
+        decoration: InputDecoration(labelText: t.customerClubRfmMonetaryBasisLabel),
+        value: _rfmMonetaryBasis,
+        items: [
+          DropdownMenuItem(value: 'net', child: Text(t.customerClubBasisNet)),
+          DropdownMenuItem(value: 'total_with_tax', child: Text(t.customerClubBasisTotal)),
+        ],
+        onChanged: canManage
+            ? (v) {
+                if (v != null) setState(() => _rfmMonetaryBasis = v);
+              }
+            : null,
+      ),
+      DropdownButtonFormField<String>(
+        decoration: InputDecoration(labelText: t.customerClubRfmScoringLabel),
+        value: _rfmScoringMethod,
+        items: [
+          DropdownMenuItem(value: 'quintiles', child: Text(t.customerClubRfmScoringQuintiles)),
+          DropdownMenuItem(value: 'weighted', child: Text(t.customerClubRfmScoringWeighted)),
+        ],
+        onChanged: canManage
+            ? (v) {
+                if (v != null) setState(() => _rfmScoringMethod = v);
+              }
+            : null,
+      ),
+      if (_rfmScoringMethod == 'weighted') ...[
+        TextField(
+          controller: _rfmWeightRCtl,
+          decoration: InputDecoration(labelText: t.customerClubRfmWeightR),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: !canManage,
+        ),
+        TextField(
+          controller: _rfmWeightFCtl,
+          decoration: InputDecoration(labelText: t.customerClubRfmWeightF),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: !canManage,
+        ),
+        TextField(
+          controller: _rfmWeightMCtl,
+          decoration: InputDecoration(labelText: t.customerClubRfmWeightM),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: !canManage,
+        ),
+      ],
+      DropdownButtonFormField<String>(
+        decoration: InputDecoration(labelText: t.customerClubClvFormulaLabel),
+        value: _clvFormula,
+        items: [
+          DropdownMenuItem(value: 'historical_total', child: Text(t.customerClubClvFormulaHistorical)),
+          DropdownMenuItem(value: 'avg_order_projection', child: Text(t.customerClubClvFormulaProjection)),
+        ],
+        onChanged: canManage
+            ? (v) {
+                if (v != null) setState(() => _clvFormula = v);
+              }
+            : null,
+      ),
+      TextField(
+        controller: _clvLifespanCtl,
+        decoration: InputDecoration(
+          labelText: t.customerClubClvLifespanYears,
+        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        readOnly: !canManage,
+      ),
+      Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(child: Text(t.customerClubAnalyticsHint, style: Theme.of(context).textTheme.bodySmall)),
+            ],
+          ),
+        ),
       ),
     ];
   }

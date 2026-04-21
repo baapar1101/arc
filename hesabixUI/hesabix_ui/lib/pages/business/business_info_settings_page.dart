@@ -1292,9 +1292,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
           children: [
             Text(
               t.inventoryNegativePolicyIntro,
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             SwitchListTile(
               title: Text(t.inventoryNegativePolicyBulkTitle),
               subtitle: Text(t.inventoryNegativePolicyBulkSubtitle),
@@ -1330,6 +1330,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
             Text(
               t.invoiceWarehouseReleaseBusinessSubtitle,
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              t.invoiceWarehouseReleaseStockHint,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 16),
             SegmentedButton<String>(

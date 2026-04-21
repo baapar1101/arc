@@ -1,8 +1,10 @@
+from datetime import datetime
 from decimal import Decimal
 
 from app.services.invoice_service import (
     _build_cost_layers_from_movements,
     _consume_cost_layers_for_quantity,
+    _movement_sort_key,
     _normalize_invoice_profit_basis,
     _normalize_invoice_profit_method,
     _normalize_invoice_profit_overhead_type,
@@ -49,6 +51,30 @@ def test_consume_layers_fallback_to_last_known_cost() -> None:
     layers = _build_cost_layers_from_movements(movements, reverse=False)
     unit_cost = _consume_cost_layers_for_quantity(layers, Decimal("5"))
     assert unit_cost == Decimal("15")
+
+
+def test_movement_sort_same_day_registered_at_before_document_id() -> None:
+    """در یک روز، زمان ثبت سند از شناسهٔ سند برای ترتیب FIFO مهم‌تر است."""
+    later_id_earlier_time = {
+        "document_date": "2026-01-01",
+        "registered_at": datetime(2026, 1, 1, 9, 0, 0),
+        "document_id": 99,
+        "invoice_item_line_id": 1,
+        "movement": "in",
+        "quantity": Decimal("1"),
+        "cost_price": Decimal("150"),
+    }
+    earlier_id_later_time = {
+        "document_date": "2026-01-01",
+        "registered_at": datetime(2026, 1, 1, 11, 0, 0),
+        "document_id": 50,
+        "invoice_item_line_id": 1,
+        "movement": "in",
+        "quantity": Decimal("1"),
+        "cost_price": Decimal("999"),
+    }
+    ordered = sorted([earlier_id_later_time, later_id_earlier_time], key=_movement_sort_key)
+    assert ordered[0]["document_id"] == 99
 
 
 def test_profit_setting_normalizers() -> None:

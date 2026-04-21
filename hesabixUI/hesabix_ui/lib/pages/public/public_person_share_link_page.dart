@@ -2,10 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/date_utils.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
-import '../../utils/snackbar_helper.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
   final String code;
@@ -21,6 +21,13 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
   bool _loading = true;
   String? _error;
   PublicPersonSharePayload? _payload;
+  /// نمایش عمومی: پیش‌فرض شمسی (بدون وابستگی به CalendarController اپ اصلی)
+  bool _useJalaliCalendar = true;
+
+  String _formatDate(DateTime? date) =>
+      HesabixDateUtils.formatForDisplay(date, _useJalaliCalendar);
+
+  NumberFormat _numberFormat() => NumberFormat('#,##0', 'fa_IR');
 
   @override
   void initState() {
@@ -109,12 +116,14 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
     }
 
     final data = _payload!;
-    final formatter = NumberFormat('#,##0');
+    final formatter = _numberFormat();
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildCalendarToggle(theme),
+          const SizedBox(height: 12),
           _buildHeader(theme, data),
           const SizedBox(height: 16),
           _buildBusinessCard(theme, data),
@@ -134,6 +143,22 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarToggle(ThemeData theme) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: SegmentedButton<bool>(
+        segments: const [
+          ButtonSegment<bool>(value: true, label: Text('شمسی'), icon: Icon(Icons.calendar_month, size: 18)),
+          ButtonSegment<bool>(value: false, label: Text('میلادی'), icon: Icon(Icons.event, size: 18)),
+        ],
+        selected: {_useJalaliCalendar},
+        onSelectionChanged: (set) {
+          setState(() => _useJalaliCalendar = set.first);
+        },
       ),
     );
   }
@@ -319,21 +344,33 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                   if (docType != null && docType.isNotEmpty) {
                     subtitleParts.add(docType);
                   }
-                  final dateText = item.formattedDate();
+                  final dateText = _formatDate(item.documentDate);
                   if (dateText.isNotEmpty) {
                     subtitleParts.add(dateText);
                   }
                   final subtitleText = subtitleParts.join(' • ');
+                  final desc = item.description?.trim();
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
+                    isThreeLine: desc != null && desc.isNotEmpty,
                     leading: CircleAvatar(
                       backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                       child: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
                     ),
                     title: Text(item.documentCode ?? '-', style: theme.textTheme.titleMedium),
-                    subtitle: Text(
-                      subtitleText.isEmpty ? '-' : subtitleText,
-                      style: theme.textTheme.bodySmall,
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          subtitleText.isEmpty ? '-' : subtitleText,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        if (desc != null && desc.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(desc, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                          ),
+                      ],
                     ),
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -378,21 +415,33 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                   if (docType != null && docType.isNotEmpty) {
                     subtitleParts.add(docType);
                   }
-                  final dateText = item.formattedDate();
+                  final dateText = _formatDate(item.documentDate);
                   if (dateText.isNotEmpty) {
                     subtitleParts.add(dateText);
                   }
                   final subtitleText = subtitleParts.join(' • ');
+                  final invDesc = item.description?.trim();
                   return InkWell(
                     onTap: item.documentId != null
                         ? () => _showInvoiceDetails(context, theme, item.documentId!)
                         : null,
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
+                      isThreeLine: invDesc != null && invDesc.isNotEmpty,
                       title: Text(item.documentCode ?? '-', style: theme.textTheme.titleMedium),
-                      subtitle: Text(
-                        subtitleText.isEmpty ? '-' : subtitleText,
-                        style: theme.textTheme.bodySmall,
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            subtitleText.isEmpty ? '-' : subtitleText,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          if (invDesc != null && invDesc.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(invDesc, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                            ),
+                        ],
                       ),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -429,7 +478,11 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 
       showDialog(
         context: context,
-        builder: (context) => _InvoiceDetailsDialog(theme: theme, details: details),
+        builder: (context) => _InvoiceDetailsDialog(
+          theme: theme,
+          details: details,
+          useJalali: _useJalaliCalendar,
+        ),
       );
     } on DioException catch (e) {
       if (!mounted) return;
@@ -479,15 +532,17 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 class _InvoiceDetailsDialog extends StatelessWidget {
   final ThemeData theme;
   final PublicInvoiceDetails details;
+  final bool useJalali;
 
   const _InvoiceDetailsDialog({
     required this.theme,
     required this.details,
+    required this.useJalali,
   });
 
   @override
   Widget build(BuildContext context) {
-    final formatter = NumberFormat('#,##0');
+    final formatter = NumberFormat('#,##0', 'fa_IR');
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
@@ -546,7 +601,9 @@ class _InvoiceDetailsDialog extends StatelessWidget {
                       'اطلاعات کلی',
                       [
                         _buildInfoRow('نوع فاکتور', details.documentType ?? '-'),
-                        _buildInfoRow('تاریخ فاکتور', details.formattedDate()),
+                        _buildInfoRow('تاریخ فاکتور', details.formattedDate(jalali: useJalali)),
+                        if ((details.currencyCode ?? '').isNotEmpty)
+                          _buildInfoRow('ارز', details.currencyCode!),
                         if (details.description != null)
                           _buildInfoRow('توضیحات', details.description!),
                       ],
@@ -558,33 +615,110 @@ class _InvoiceDetailsDialog extends StatelessWidget {
                         theme,
                         'کالاها',
                         [
-                          Table(
-                            columnWidths: const {
-                              0: FlexColumnWidth(2),
-                              1: FlexColumnWidth(1),
-                              2: FlexColumnWidth(1),
-                            },
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surfaceContainerHighest,
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(2.2),
+                                1: FlexColumnWidth(1),
+                                2: FlexColumnWidth(1),
+                                3: FlexColumnWidth(1),
+                                4: FlexColumnWidth(1),
+                                5: FlexColumnWidth(1.2),
+                              },
+                              children: [
+                                TableRow(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest,
+                                  ),
+                                  children: [
+                                    _buildTableCell(theme, 'نام کالا', isHeader: true),
+                                    _buildTableCell(theme, 'تعداد', isHeader: true),
+                                    _buildTableCell(theme, 'فی', isHeader: true),
+                                    _buildTableCell(theme, 'تخفیف', isHeader: true),
+                                    _buildTableCell(theme, 'مالیات', isHeader: true),
+                                    _buildTableCell(theme, 'جمع ردیف', isHeader: true),
+                                  ],
                                 ),
-                                children: [
-                                  _buildTableCell(theme, 'نام کالا', isHeader: true),
-                                  _buildTableCell(theme, 'تعداد', isHeader: true),
-                                  _buildTableCell(theme, 'توضیحات', isHeader: true),
-                                ],
-                              ),
-                              ...details.productLines.map((line) => TableRow(
+                                ...details.productLines.map((line) {
+                                  String money(double? v) =>
+                                      v != null ? formatter.format(v) : '-';
+                                  final lineTotal = line.lineTotal ??
+                                      ((line.quantity != null && line.unitPrice != null)
+                                          ? (line.quantity! * line.unitPrice!) -
+                                              (line.lineDiscount ?? 0) +
+                                              (line.taxAmount ?? 0)
+                                          : null);
+                                  return TableRow(
                                     children: [
                                       _buildTableCell(theme, line.productName ?? '-'),
-                                      _buildTableCell(theme, line.quantity != null
-                                          ? formatter.format(line.quantity)
-                                          : '-'),
-                                      _buildTableCell(theme, line.description ?? '-'),
+                                      _buildTableCell(
+                                        theme,
+                                        line.quantity != null ? formatter.format(line.quantity) : '-',
+                                      ),
+                                      _buildTableCell(theme, money(line.unitPrice)),
+                                      _buildTableCell(theme, money(line.lineDiscount)),
+                                      _buildTableCell(theme, money(line.taxAmount)),
+                                      _buildTableCell(theme, money(lineTotal)),
                                     ],
-                                  )),
-                            ],
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                          if (details.productLines.any((l) => l.unitPrice == null && l.lineTotal == null))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'برای برخی ردیف‌ها جزئیات قیمت در سند ذخیره نشده است.',
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    if (details.accountLines.isNotEmpty) ...[
+                      _buildInfoSection(
+                        theme,
+                        'سطرهای حساب (خلاصه)',
+                        [
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(2.5),
+                                1: FlexColumnWidth(1.2),
+                                2: FlexColumnWidth(1.2),
+                              },
+                              children: [
+                                TableRow(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest,
+                                  ),
+                                  children: [
+                                    _buildTableCell(theme, 'حساب', isHeader: true),
+                                    _buildTableCell(theme, 'بدهکار', isHeader: true),
+                                    _buildTableCell(theme, 'بستانکار', isHeader: true),
+                                  ],
+                                ),
+                                ...details.accountLines.map(
+                                  (line) => TableRow(
+                                    children: [
+                                      _buildTableCell(
+                                        theme,
+                                        [
+                                          line.accountName ?? '-',
+                                          if ((line.accountCode ?? '').isNotEmpty) ' (${line.accountCode})',
+                                        ].join(),
+                                      ),
+                                      _buildTableCell(theme, formatter.format(line.debit)),
+                                      _buildTableCell(theme, formatter.format(line.credit)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -595,7 +729,7 @@ class _InvoiceDetailsDialog extends StatelessWidget {
                       theme,
                       'خلاصه مالی',
                       [
-                        _buildInfoRow('جمع کل', formatter.format(details.subtotal)),
+                        _buildInfoRow('جمع قبل از تخفیف', formatter.format(details.subtotal)),
                         if (details.discountAmount > 0)
                           _buildInfoRow(
                             'تخفیف',

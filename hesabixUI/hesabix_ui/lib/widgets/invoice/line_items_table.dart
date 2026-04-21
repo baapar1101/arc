@@ -17,7 +17,7 @@ import './invoice_line_attributes_dialog.dart';
 import '../../services/product_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
-import 'package:reorderables/reorderables.dart';
+import '../../utils/invoice_line_preferences.dart';
 
 void _invoiceLineAttrsLog(String message) {
   if (kDebugMode) {
@@ -61,7 +61,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final Set<int> _invoiceLineAttrsNoCacheLogged = {};
   final Set<int> _invoiceLineAttrsLoggedUniquePid = {};
   final Set<int> _invoiceLineAttrsLoggedNoAttrPid = {};
-  final Map<int, Map<String, FocusNode>> _focusNodes = {}; // مدیریت فوکوس برای navigation
+  /// فوکوس به‌ازای [InvoiceLineItem.lineKey]؛ با جابه‌جایی ردیف نیازی به بازچین‌شدن نیست
+  final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
 
   void _notify() => widget.onChanged?.call(List<InvoiceLineItem>.from(_rows));
   
@@ -82,10 +83,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
   }
   
-  /// ایجاد FocusNode برای یک ردیف
-  void _ensureFocusNodes(int index) {
-    if (!_focusNodes.containsKey(index)) {
-      _focusNodes[index] = {
+  /// ایجاد FocusNode برای یک ردیف (بر اساس lineKey پایدار)
+  void _ensureFocusNodesForLine(String lineKey) {
+    if (!_focusNodesByLineKey.containsKey(lineKey)) {
+      _focusNodesByLineKey[lineKey] = {
         'product': FocusNode(),
         'quantity': FocusNode(),
         'warehouse': FocusNode(),
@@ -96,10 +97,15 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       };
     }
   }
+
+  Map<String, FocusNode>? _focusNodesForLine(String lineKey) {
+    _ensureFocusNodesForLine(lineKey);
+    return _focusNodesByLineKey[lineKey];
+  }
   
   /// پاک کردن FocusNode های یک ردیف
-  void _disposeFocusNodes(int index) {
-    final nodes = _focusNodes.remove(index);
+  void _disposeFocusNodesForLine(String lineKey) {
+    final nodes = _focusNodesByLineKey.remove(lineKey);
     if (nodes != null) {
       for (final node in nodes.values) {
         node.dispose();
@@ -109,17 +115,18 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   
   /// پاک کردن همه FocusNode ها
   void _disposeAllFocusNodes() {
-    for (final nodes in _focusNodes.values) {
+    for (final nodes in _focusNodesByLineKey.values) {
       for (final node in nodes.values) {
         node.dispose();
       }
     }
-    _focusNodes.clear();
+    _focusNodesByLineKey.clear();
   }
   
   /// حرکت به فیلد بعدی
   void _moveToNextField(int index, String currentField) {
-    final nodes = _focusNodes[index];
+    final item = _rows[index];
+    final nodes = _focusNodesForLine(item.lineKey);
     if (nodes == null) return;
     
     final fieldOrder = ['product', 'quantity', 'warehouse', 'unitPrice', 'description', 'discount', 'tax'];
@@ -131,9 +138,9 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         nextNode.requestFocus();
       }
     } else if (currentIndex == fieldOrder.length - 1 && index < _rows.length - 1) {
-      // اگر آخرین فیلد آخرین ردیف بود، به ردیف بعدی برو
-      _ensureFocusNodes(index + 1);
-      final nextRowNodes = _focusNodes[index + 1];
+      final nextItem = _rows[index + 1];
+      _ensureFocusNodesForLine(nextItem.lineKey);
+      final nextRowNodes = _focusNodesByLineKey[nextItem.lineKey];
       if (nextRowNodes != null) {
         nextRowNodes['product']?.requestFocus();
       }
@@ -379,39 +386,31 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   }
 
   void _addRow() {
-    setState(() {
-      final newIndex = _rows.length;
-      _rows.add(InvoiceLineItem(
-        taxRate: _getDefaultTaxRateForInvoiceType(),
-      ));
-      _ensureFocusNodes(newIndex);
-      // فوکوس به فیلد کالای ردیف جدید
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final nodes = _focusNodes[newIndex];
-        if (nodes != null && mounted) {
-          nodes['product']?.requestFocus();
-        }
+    InvoiceLinePreferences.getDefaultDiscountType().then((discountType) {
+      if (!mounted) return;
+      setState(() {
+        final newLine = InvoiceLineItem(
+          taxRate: _getDefaultTaxRateForInvoiceType(),
+          discountType: discountType,
+        );
+        _rows.add(newLine);
+        _ensureFocusNodesForLine(newLine.lineKey);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final nodes = _focusNodesByLineKey[newLine.lineKey];
+          if (nodes != null && mounted) {
+            nodes['product']?.requestFocus();
+          }
+        });
       });
+      _notify();
     });
-    _notify();
   }
 
   void _removeRow(int index) {
     setState(() {
-      _disposeFocusNodes(index);
+      final lineKey = _rows[index].lineKey;
+      _disposeFocusNodesForLine(lineKey);
       _rows.removeAt(index);
-      // به‌روزرسانی index های focus nodes
-      final keysToUpdate = _focusNodes.keys.where((k) => k > index).toList()..sort();
-      final newFocusNodes = <int, Map<String, FocusNode>>{};
-      for (final oldKey in _focusNodes.keys) {
-        if (oldKey < index) {
-          newFocusNodes[oldKey] = _focusNodes[oldKey]!;
-        } else if (oldKey > index) {
-          newFocusNodes[oldKey - 1] = _focusNodes[oldKey]!;
-        }
-      }
-      _focusNodes.clear();
-      _focusNodes.addAll(newFocusNodes);
     });
     _notify();
   }
@@ -424,22 +423,6 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       }
       final item = _rows.removeAt(oldIndex);
       _rows.insert(newIndex, item);
-      
-      // به‌روزرسانی focus nodes
-      final newFocusNodes = <int, Map<String, FocusNode>>{};
-      for (final entry in _focusNodes.entries) {
-        int newKey = entry.key;
-        if (entry.key == oldIndex) {
-          newKey = newIndex;
-        } else if (entry.key > oldIndex && entry.key <= newIndex) {
-          newKey = entry.key - 1;
-        } else if (entry.key < oldIndex && entry.key >= newIndex) {
-          newKey = entry.key + 1;
-        }
-        newFocusNodes[newKey] = entry.value;
-      }
-      _focusNodes.clear();
-      _focusNodes.addAll(newFocusNodes);
     });
     _notify();
   }
@@ -453,7 +436,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       _rows.addAll(widget.initialRows!);
       // ایجاد focus nodes برای ردیف‌های اولیه
       for (int i = 0; i < _rows.length; i++) {
-        _ensureFocusNodes(i);
+        _ensureFocusNodesForLine(_rows[i].lineKey);
       }
       // بارگذاری اطلاعات کالاها برای بررسی یونیک بودن
       _loadProductInfosForInitialRows();
@@ -494,10 +477,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       if (_rows.isEmpty) {
         _invoiceLineAttrsLog('didUpdateWidget: merge initialRows (was empty) count=${widget.initialRows!.length}');
         // اگر جدول خالی است، همه ردیف‌ها را اضافه کن
+        _disposeAllFocusNodes();
         _rows.clear();
         _rows.addAll(widget.initialRows!);
         for (int i = 0; i < _rows.length; i++) {
-          _ensureFocusNodes(i);
+          _ensureFocusNodesForLine(_rows[i].lineKey);
         }
         _loadProductInfosForInitialRows();
         _notify();
@@ -507,10 +491,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         );
         // اگر ردیف‌های جدید اضافه شده، همه ردیف‌ها را جایگزین کن
         // (کاربر می‌تواند بعداً ردیف‌ها را ویرایش کند)
+        _disposeAllFocusNodes();
         _rows.clear();
         _rows.addAll(widget.initialRows!);
         for (int i = 0; i < _rows.length; i++) {
-          _ensureFocusNodes(i);
+          _ensureFocusNodesForLine(_rows[i].lineKey);
         }
         _loadProductInfosForInitialRows();
         _notify();
@@ -596,6 +581,22 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return (trimmedSales != null && trimmedSales.isNotEmpty) ? trimmedSales : null;
   }
 
+  /// اگر یادداشت فروش/خرید (متناسب با نوع فاکتور) خالی باشد، از [productDescription] تعریف کالا استفاده می‌شود.
+  String? _autoDescriptionForProductLine(
+    String invoiceType, {
+    String? salesNote,
+    String? purchaseNote,
+    String? productDescription,
+  }) {
+    final note = _noteForInvoiceType(
+      invoiceType,
+      salesNote: salesNote,
+      purchaseNote: purchaseNote,
+    );
+    if (note != null) return note;
+    return _cleanNote(productDescription);
+  }
+
   String? _cleanNote(dynamic value) {
     if (value == null) return null;
     final text = value.toString().trim();
@@ -613,6 +614,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     InvoiceLineItem item, {
     String? salesNote,
     String? purchaseNote,
+    String? productDescription,
   }) {
     final metadata = Map<String, dynamic>.from(item.extraInfo ?? const {});
     if (salesNote != null) {
@@ -625,6 +627,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     } else {
       metadata.remove('_local_purchase_note');
     }
+    if (productDescription != null) {
+      metadata['_local_product_description'] = productDescription;
+    } else {
+      metadata.remove('_local_product_description');
+    }
     return metadata;
   }
 
@@ -633,13 +640,18 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     for (var i = 0; i < _rows.length; i++) {
       final item = _rows[i];
       final metadata = Map<String, dynamic>.from(item.extraInfo ?? const {});
-      final salesNote = metadata['_local_sales_note']?.toString();
-      final purchaseNote = metadata['_local_purchase_note']?.toString();
+      final salesNote = _cleanNote(metadata['_local_sales_note']);
+      final purchaseNote = _cleanNote(metadata['_local_purchase_note']);
+      final storedProductDesc = _cleanNote(metadata['_local_product_description']);
+      final pid = item.productId;
+      final cachedDesc = pid != null ? _cleanNote(_productCache[pid]?['description']) : null;
+      final productDesc = storedProductDesc ?? cachedDesc;
       final previousAuto = metadata['_local_auto_description']?.toString();
-      final newAuto = _noteForInvoiceType(
+      final newAuto = _autoDescriptionForProductLine(
         widget.invoiceType,
         salesNote: salesNote,
         purchaseNote: purchaseNote,
+        productDescription: productDesc,
       );
 
       bool metadataChanged = false;
@@ -732,6 +744,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isMobile = ResponsiveHelper.isMobile(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -745,8 +758,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ),
               child: Column(
                 children: [
-                  _buildHeader(context),
-                  const Divider(height: 1),
+                  // هدر ستون‌ها فقط برای دسکتاپ؛ در موبایل هر فیلد در کارت برچسب دارد
+                  if (!isMobile) ...[
+                    _buildHeader(context),
+                    const Divider(height: 1),
+                  ],
                   if (_rows.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(16),
@@ -891,10 +907,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
     final fieldHeight = _getFieldHeight(context);
-    _ensureFocusNodes(index);
+    _ensureFocusNodesForLine(item.lineKey);
     
     return Card(
-      key: ValueKey('row_$index'),
+      key: ValueKey(item.lineKey),
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12, left: 8, right: 8),
       child: Padding(
@@ -902,39 +918,82 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // هدر ردیف با شماره و دکمه‌های جابجایی
+            // هدر ردیف: عنوان در Expanded تا دکمه‌ها در یک خط بمانند (بدون رفتن زیر فیلد بعدی)
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.drag_handle, color: theme.colorScheme.onSurfaceVariant),
-                const SizedBox(width: 8),
-                Text(
-                  'ردیف ${index + 1}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Icon(
+                  Icons.drag_handle,
+                  size: 22,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'ردیف ${index + 1}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
-                // دکمه‌های جابجایی
-                if (index > 0)
-                  IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_up),
-                    onPressed: () => _reorderRows(index, index - 1),
-                    tooltip: 'جابجایی به بالا',
-                    iconSize: 20,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (index > 0)
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_up),
+                          onPressed: () => _reorderRows(index, index - 1),
+                          tooltip: 'جابجایی به بالا',
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      if (index < _rows.length - 1)
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_down),
+                          onPressed: () => _reorderRows(index, index + 1),
+                          tooltip: 'جابجایی به پایین',
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _removeRow(index),
+                        tooltip: 'حذف',
+                        iconSize: 20,
+                        color: Colors.red,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        style: IconButton.styleFrom(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                   ),
-                if (index < _rows.length - 1)
-                  IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    onPressed: () => _reorderRows(index, index + 1),
-                    tooltip: 'جابجایی به پایین',
-                    iconSize: 20,
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _removeRow(index),
-                  tooltip: 'حذف',
-                  iconSize: 20,
-                  color: Colors.red,
                 ),
               ],
             ),
@@ -964,7 +1023,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   await _handleProductChange(index, item, p);
                   // بعد از انتخاب کالا، فوکوس به تعداد
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final nodes = _focusNodes[index];
+                    final nodes = _focusNodesForLine(item.lineKey);
                     if (nodes != null && mounted) {
                       nodes['quantity']?.requestFocus();
                     }
@@ -999,7 +1058,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                             setState(() => _rows[index] = priced);
                             _notify();
                           },
-                          focusNode: _focusNodes[index]?['quantity'],
+                          focusNode: _focusNodesForLine(item.lineKey)?['quantity'],
                           onFieldSubmitted: () => _moveToNextField(index, 'quantity'),
                         ),
                       ),
@@ -1019,7 +1078,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         ),
                         const SizedBox(height: 4),
                         WarehouseComboboxWidget(
-                          key: ValueKey('inv_wh_${index}_${item.productId}_${item.trackInventory}'),
+                          key: ValueKey('inv_wh_${item.lineKey}_${item.productId}_${item.trackInventory}'),
                           businessId: widget.businessId,
                           selectedWarehouseId: item.warehouseId,
                           onChanged: (wid) {
@@ -1059,7 +1118,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   },
                   resolver: () => _resolveUnitPrice(item, preferManual: true),
                   unitTitleResolver: (u) => _unitTitle(item, u),
-                  focusNode: _focusNodes[index]?['unitPrice'],
+                  focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
                   onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
                 ),
               ),
@@ -1099,7 +1158,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             SizedBox(
               height: fieldHeight,
               child: TextFormField(
-                focusNode: _focusNodes[index]?['description'],
+                key: ValueKey('line_desc_${item.lineKey}'),
+                focusNode: _focusNodesForLine(item.lineKey)?['description'],
                 initialValue: item.description ?? '',
                 onChanged: (v) {
                   _updateRow(index, item.copyWith(description: v));
@@ -1113,57 +1173,36 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ),
             ),
             const SizedBox(height: 12),
-            // تخفیف و مالیات
-            Row(
+            // تخفیف: در موبایل تمام عرض (جدا از مالیات)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.discountTypeAndValue,
-                        style: theme.textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        height: fieldHeight,
-                        child: _DiscountCell(
-                          value: item.discountValue,
-                          type: item.discountType,
-                          onChanged: (type, value) {
-                            _updateRow(index, item.copyWith(discountType: type, discountValue: value));
-                          },
-                          focusNode: _focusNodes[index]?['discount'],
-                          onFieldSubmitted: () => _moveToNextField(index, 'discount'),
-                        ),
-                      ),
-                    ],
+                Text(
+                  t.discountTypeAndValue,
+                  style: theme.textTheme.labelMedium,
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: fieldHeight,
+                  child: _DiscountCell(
+                    value: item.discountValue,
+                    type: item.discountType,
+                    onChanged: (type, value) {
+                      _updateRow(index, item.copyWith(discountType: type, discountValue: value));
+                    },
+                    focusNode: _focusNodesForLine(item.lineKey)?['discount'],
+                    onFieldSubmitted: () => _moveToNextField(index, 'discount'),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.taxPercentAndAmount,
-                        style: theme.textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        height: fieldHeight,
-                        child: _TaxCell(
-                          rate: item.taxRate,
-                          taxAmount: item.taxAmount,
-                          onRateChanged: (r) {
-                            _updateRow(index, item.copyWith(taxRate: r));
-                          },
-                          focusNode: _focusNodes[index]?['tax'],
-                          onFieldSubmitted: () => _moveToNextField(index, 'tax'),
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+                _TaxCell(
+                  rate: item.taxRate,
+                  taxAmount: item.taxAmount,
+                  onRateChanged: (r) {
+                    _updateRow(index, item.copyWith(taxRate: r));
+                  },
+                  focusNode: _focusNodesForLine(item.lineKey)?['tax'],
+                  onFieldSubmitted: () => _moveToNextField(index, 'tax'),
                 ),
               ],
             ),
@@ -1228,10 +1267,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
     final fieldHeight = _getFieldHeight(context);
-    _ensureFocusNodes(index);
+    _ensureFocusNodesForLine(item.lineKey);
     
     return Container(
-      key: ValueKey('row_$index'),
+      key: ValueKey(item.lineKey),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Column(
         children: [
@@ -1273,7 +1312,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       await _handleProductChange(index, item, p);
                       // بعد از انتخاب کالا، فوکوس به تعداد
                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        final nodes = _focusNodes[index];
+                        final nodes = _focusNodesForLine(item.lineKey);
                         if (nodes != null && mounted) {
                           nodes['quantity']?.requestFocus();
                         }
@@ -1299,7 +1338,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       setState(() => _rows[index] = priced);
                       _notify();
                     },
-                    focusNode: _focusNodes[index]?['quantity'],
+                    focusNode: _focusNodesForLine(item.lineKey)?['quantity'],
                     onFieldSubmitted: () => _moveToNextField(index, 'quantity'),
                   ),
                 ),
@@ -1310,7 +1349,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 Expanded(
                   flex: 2,
                   child: WarehouseComboboxWidget(
-                    key: ValueKey('inv_wh_${index}_${item.productId}_${item.trackInventory}'),
+                    key: ValueKey('inv_wh_${item.lineKey}_${item.productId}_${item.trackInventory}'),
                     businessId: widget.businessId,
                     selectedWarehouseId: item.warehouseId,
                     onChanged: (wid) {
@@ -1342,7 +1381,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       },
                       resolver: () => _resolveUnitPrice(item, preferManual: true),
                       unitTitleResolver: (u) => _unitTitle(item, u),
-                      focusNode: _focusNodes[index]?['unitPrice'],
+                      focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
                       onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
                     ),
                   ),
@@ -1396,7 +1435,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: fieldHeight,
                   child: TextFormField(
-                    focusNode: _focusNodes[index]?['description'],
+                    key: ValueKey('line_desc_${item.lineKey}'),
+                    focusNode: _focusNodesForLine(item.lineKey)?['description'],
                     initialValue: item.description ?? '',
                     onChanged: (v) {
                       _updateRow(index, item.copyWith(description: v));
@@ -1422,7 +1462,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     onChanged: (type, value) {
                       _updateRow(index, item.copyWith(discountType: type, discountValue: value));
                     },
-                    focusNode: _focusNodes[index]?['discount'],
+                    focusNode: _focusNodesForLine(item.lineKey)?['discount'],
                     onFieldSubmitted: () => _moveToNextField(index, 'discount'),
                   ),
                 ),
@@ -1439,7 +1479,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     onRateChanged: (r) {
                       _updateRow(index, item.copyWith(taxRate: r));
                     },
-                    focusNode: _focusNodes[index]?['tax'],
+                    focusNode: _focusNodesForLine(item.lineKey)?['tax'],
                     onFieldSubmitted: () => _moveToNextField(index, 'tax'),
                   ),
                 ),
@@ -1550,16 +1590,19 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final defaultWarehouseId = _toInt(p['default_warehouse_id']);
     final salesNote = _cleanNote(p['base_sales_note']);
     final purchaseNote = _cleanNote(p['base_purchase_note']);
+    final productDesc = _cleanNote(p['description']);
     final previousAuto = item.extraInfo?['_local_auto_description']?.toString();
-    final autoDescription = _noteForInvoiceType(
+    final autoDescription = _autoDescriptionForProductLine(
       widget.invoiceType,
       salesNote: salesNote,
       purchaseNote: purchaseNote,
+      productDescription: productDesc,
     );
     final metadata = _mergeExtraInfoWithNotes(
       item,
       salesNote: salesNote,
       purchaseNote: purchaseNote,
+      productDescription: productDesc,
     );
     if (autoDescription?.isNotEmpty == true) {
       metadata['_local_auto_description'] = autoDescription;
@@ -1721,8 +1764,8 @@ class _DiscountCellState extends State<_DiscountCell> {
   void didUpdateWidget(covariant _DiscountCell oldWidget) {
     super.didUpdateWidget(oldWidget);
     _type = widget.type;
-    // فقط وقتی مقدار از بیرون عوض شده (نه نتیجهٔ تایپ کاربر) متن فیلد را همگام کن
-    if (widget.value != _lastSentValue) {
+    // مقدار یا نوع (درصد/مبلغ) از بیرون؛ اگر فقط عدد یکسان باشد و نوع عوض شده باشد هم باید همگام شود
+    if (widget.value != _lastSentValue || oldWidget.type != widget.type) {
       _lastSentValue = widget.value;
       _ctrl.text = _formatDisplayValue(widget.value, _type);
     }
@@ -1753,75 +1796,85 @@ class _DiscountCellState extends State<_DiscountCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
     final fieldHeight = ResponsiveHelper.responsiveValue(
       context,
       mobile: 56.0,
       tablet: 52.0,
       desktop: 48.0,
     );
-    final fieldPadding = ResponsiveHelper.isMobile(context)
+    final fieldPadding = isMobile
         ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
     String typeLabel(String tp) => tp == 'percent' ? t.percent : t.amount;
-    return SizedBox(
-      height: fieldHeight,
-      child: TextFormField(
-        focusNode: widget.focusNode,
-        controller: _ctrl,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
-          EnglishDigitsFormatter(),
-          ThousandsSeparatorInputFormatter(allowDecimal: _type != 'percent'),
-          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
-        ],
-        onChanged: _onDiscountChanged,
-        onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-        textInputAction: TextInputAction.next,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          contentPadding: fieldPadding,
-          suffix: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_type == 'percent')
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 4),
-                  child: Text('%', style: theme.textTheme.bodySmall),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 4),
-                  child: Text(typeLabel(_type), style: theme.textTheme.bodySmall),
-                ),
-              PopupMenuButton<String>(
-                tooltip: t.discountType,
-                padding: EdgeInsets.zero,
-                itemBuilder: (c) => [
-                  PopupMenuItem<String>(
-                    value: 'amount',
-                    child: Text(t.amount),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'percent',
-                    child: Text(t.percent),
-                  ),
-                ],
-                onSelected: (nv) {
-                  final parsed = parseFormattedNumber(_ctrl.text) ?? 0;
-                  final value = nv == 'percent' ? parsed.clamp(0, 100) : parsed;
-                  setState(() {
-                    _type = nv;
-                    _lastSentValue = value;
-                    _ctrl.text = _formatDisplayValue(value, nv);
-                  });
-                  widget.onChanged(nv, value);
-                },
-                child: const Icon(Icons.arrow_drop_down, size: 20),
+    final field = TextFormField(
+      focusNode: widget.focusNode,
+      controller: _ctrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        EnglishDigitsFormatter(),
+        ThousandsSeparatorInputFormatter(allowDecimal: _type != 'percent'),
+        FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+      ],
+      onChanged: _onDiscountChanged,
+      onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        contentPadding: fieldPadding,
+        hintText: isMobile ? null : t.discountTypeAndValue,
+        suffix: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_type == 'percent')
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 4),
+                child: Text('%', style: theme.textTheme.bodySmall),
+              )
+            else
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 4),
+                child: Text(typeLabel(_type), style: theme.textTheme.bodySmall),
               ),
-            ],
-          ),
+            PopupMenuButton<String>(
+              tooltip: t.discountType,
+              padding: EdgeInsets.zero,
+              itemBuilder: (c) => [
+                PopupMenuItem<String>(
+                  value: 'amount',
+                  child: Text(t.amount),
+                ),
+                PopupMenuItem<String>(
+                  value: 'percent',
+                  child: Text(t.percent),
+                ),
+              ],
+              onSelected: (nv) {
+                final parsed = parseFormattedNumber(_ctrl.text) ?? 0;
+                final value = nv == 'percent' ? parsed.clamp(0, 100) : parsed;
+                setState(() {
+                  _type = nv;
+                  _lastSentValue = value;
+                  _ctrl.text = _formatDisplayValue(value, nv);
+                });
+                widget.onChanged(nv, value);
+                InvoiceLinePreferences.setDefaultDiscountType(nv);
+              },
+              child: const Icon(Icons.arrow_drop_down, size: 20),
+            ),
+          ],
         ),
       ),
+    );
+    return SizedBox(
+      height: fieldHeight,
+      child: isMobile
+          ? field
+          : Tooltip(
+              message: t.discountTypeAndValue,
+              waitDuration: const Duration(milliseconds: 400),
+              child: field,
+            ),
     );
   }
 }
@@ -1878,45 +1931,113 @@ class _TaxCellState extends State<_TaxCell> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final fieldHeight = ResponsiveHelper.responsiveValue(
       context,
       mobile: 56.0,
       tablet: 52.0,
       desktop: 48.0,
     );
-    final fieldPadding = ResponsiveHelper.isMobile(context)
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final fieldPadding = isMobile
         ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
-    
+
+    final rateField = TextFormField(
+      focusNode: widget.focusNode,
+      controller: _controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        EnglishDigitsFormatter(),
+        FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+      ],
+      onChanged: (v) {
+        _isUserTyping = true;
+        widget.onRateChanged(num.tryParse(v) ?? 0);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _isUserTyping = false;
+          }
+        });
+      },
+      onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        contentPadding: fieldPadding,
+        suffixText: '%',
+      ),
+    );
+
+    final amountField = TextFormField(
+      controller: _amountCtrl,
+      readOnly: true,
+      enableInteractiveSelection: false,
+      textAlign: TextAlign.right,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        contentPadding: fieldPadding,
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            t.percent,
+            style: theme.textTheme.labelMedium,
+          ),
+          const SizedBox(height: 4),
+          SizedBox(height: fieldHeight, child: rateField),
+          const SizedBox(height: 12),
+          Text(
+            t.workflowFieldTaxAmount,
+            style: theme.textTheme.labelMedium,
+          ),
+          const SizedBox(height: 4),
+          SizedBox(height: fieldHeight, child: amountField),
+        ],
+      );
+    }
+
+    final taxRateTooltip = '${t.tax} (${t.percent})';
+    final taxAmountTooltip = t.workflowFieldTaxAmount;
+
     return Row(
       children: [
         SizedBox(
           width: 70,
           height: fieldHeight,
-          child: TextFormField(
-            focusNode: widget.focusNode,
-            controller: _controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              EnglishDigitsFormatter(),
-              FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
-            ],
-            onChanged: (v) {
-              _isUserTyping = true;
-              widget.onRateChanged(num.tryParse(v) ?? 0);
-              // بعد از یک فریم، فلگ را ریست کن
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  _isUserTyping = false;
-                }
-              });
-            },
-            onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              contentPadding: fieldPadding,
-              suffixText: '%',
+          child: Tooltip(
+            message: taxRateTooltip,
+            waitDuration: const Duration(milliseconds: 400),
+            child: TextFormField(
+              focusNode: widget.focusNode,
+              controller: _controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+              ],
+              onChanged: (v) {
+                _isUserTyping = true;
+                widget.onRateChanged(num.tryParse(v) ?? 0);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _isUserTyping = false;
+                  }
+                });
+              },
+              onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                contentPadding: fieldPadding,
+                hintText: t.percent,
+                suffixText: '%',
+              ),
             ),
           ),
         ),
@@ -1924,14 +2045,19 @@ class _TaxCellState extends State<_TaxCell> {
         Expanded(
           child: SizedBox(
             height: fieldHeight,
-            child: TextFormField(
-              controller: _amountCtrl,
-              readOnly: true,
-              enableInteractiveSelection: false,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                contentPadding: fieldPadding,
+            child: Tooltip(
+              message: taxAmountTooltip,
+              waitDuration: const Duration(milliseconds: 400),
+              child: TextFormField(
+                controller: _amountCtrl,
+                readOnly: true,
+                enableInteractiveSelection: false,
+                textAlign: TextAlign.right,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  contentPadding: fieldPadding,
+                  hintText: t.workflowFieldTaxAmount,
+                ),
               ),
             ),
           ),
@@ -1986,6 +2112,11 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   void didUpdateWidget(covariant _UnitPriceCell oldWidget) {
     super.didUpdateWidget(oldWidget);
     // فقط اگر کاربر در حال تایپ نیست، مقدار را به‌روزرسانی کن
+    final lineChanged = oldWidget.item.lineKey != widget.item.lineKey;
+    if (lineChanged && !_isUserTyping) {
+      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0);
+      return;
+    }
     if ((oldWidget.item.unitPrice != widget.item.unitPrice || oldWidget.item.unitPriceSource != widget.item.unitPriceSource) &&
         !_isUserTyping) {
       _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0);
@@ -2210,31 +2341,35 @@ class _QuantityWithUnitField extends StatefulWidget {
 class _QuantityWithUnitFieldState extends State<_QuantityWithUnitField> {
   late TextEditingController _controller;
   String? _currentUnit;
+  bool _isUserTyping = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
     _currentUnit = widget.item.selectedUnit ?? widget.item.mainUnit;
-    _updateController();
+    _syncFromItem(force: true);
   }
 
   @override
   void didUpdateWidget(_QuantityWithUnitField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.quantity != widget.item.quantity || 
-        oldWidget.item.selectedUnit != widget.item.selectedUnit) {
+    final lineChanged = oldWidget.item.lineKey != widget.item.lineKey;
+    final productChanged = oldWidget.item.productId != widget.item.productId;
+    final qtyChanged = oldWidget.item.quantity != widget.item.quantity;
+    final unitChanged = oldWidget.item.selectedUnit != widget.item.selectedUnit;
+    if (lineChanged || productChanged || qtyChanged || unitChanged) {
       _currentUnit = widget.item.selectedUnit ?? widget.item.mainUnit;
-      _updateController();
+      if (!_isUserTyping || lineChanged || productChanged) {
+        _syncFromItem(force: lineChanged || productChanged);
+      }
     }
   }
 
-  void _updateController() {
-    // فقط مقدار عددی را در فیلد نگه می‌داریم؛ واحد به‌صورت لیبل در suffix نمایش داده می‌شود
-    // فقط اگر کاربر در حال تایپ نیست، کنترلر را به‌روزرسانی کن
-    if (!_controller.text.isNotEmpty) {
-      _controller.text = widget.item.quantity.toString();
-    }
+  /// همگام با مدل؛ پس از جابه‌جایی ردیف یا تغییر کالا باید اعمال شود.
+  void _syncFromItem({bool force = false}) {
+    if (!force && _isUserTyping) return;
+    _controller.text = widget.item.quantity.toString();
   }
 
   @override
@@ -2266,10 +2401,14 @@ class _QuantityWithUnitFieldState extends State<_QuantityWithUnitField> {
           FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
         ],
         onChanged: (v) {
+          _isUserTyping = true;
           // فقط عدد ورودی کاربر را می‌خوانیم
           final cleaned = v.replaceAll(',', '');
           final q = num.tryParse(cleaned) ?? 0;
           widget.onQuantityChanged(q);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _isUserTyping = false;
+          });
         },
         onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
         textInputAction: TextInputAction.next,

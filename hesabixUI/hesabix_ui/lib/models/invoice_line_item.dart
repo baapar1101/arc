@@ -1,4 +1,9 @@
+import 'package:uuid/uuid.dart';
+
 class InvoiceLineItem {
+  /// شناسهٔ پایدار برای UI (جابه‌جایی ردیف، فوکوس، State ویجت‌ها)
+  final String lineKey;
+
   final int? productId;
   final String? productCode;
   final String? productName;
@@ -40,7 +45,10 @@ class InvoiceLineItem {
   // extra info for API payload
   final Map<String, dynamic>? extraInfo;
 
+  static final _uuid = Uuid();
+
   InvoiceLineItem({
+    String? lineKey,
     this.productId,
     this.productCode,
     this.productName,
@@ -52,7 +60,7 @@ class InvoiceLineItem {
     this.unitPriceSource = 'base',
     this.unitPrice = 0,
     this.quantity = 1,
-    this.discountType = 'amount',
+    this.discountType = 'percent',
     this.discountValue = 0,
     this.taxRate = 0,
     this.baseSalesPriceMainUnit,
@@ -62,9 +70,10 @@ class InvoiceLineItem {
     this.warehouseId,
     this.selectedInstanceIds,
     this.extraInfo,
-  });
+  }) : lineKey = lineKey ?? _uuid.v4();
 
   InvoiceLineItem copyWith({
+    String? lineKey,
     int? productId,
     String? productCode,
     String? productName,
@@ -88,6 +97,7 @@ class InvoiceLineItem {
     Map<String, dynamic>? extraInfo,
   }) {
     return InvoiceLineItem(
+      lineKey: lineKey ?? this.lineKey,
       productId: productId ?? this.productId,
       productCode: productCode ?? this.productCode,
       productName: productName ?? this.productName,

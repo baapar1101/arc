@@ -190,6 +190,26 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
 
   Widget _buildHeaderRow(ThemeData theme) {
     final isDesktop = _isDesktop(context);
+    final showFillRemaining =
+        widget.invoiceTotal != null && widget.invoiceTotal! > 0;
+
+    Widget fillRemainingIconButton() {
+      if (!showFillRemaining) return const SizedBox.shrink();
+      final enabled = _canFillRemainingBalance;
+      return IconButton(
+        onPressed: enabled ? _fillRemainingBalance : null,
+        icon: const Icon(Icons.price_change_outlined),
+        tooltip: enabled
+            ? 'پر کردن ماندهٔ باقی‌مانده در تراکنش (ردیف با مبلغ صفر یا تراکنش جدید)'
+            : 'ماندهٔ مثبت برای پر کردن وجود ندارد',
+        style: IconButton.styleFrom(
+          foregroundColor: enabled
+              ? theme.colorScheme.secondary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+      );
+    }
+
     return Row(
       children: [
         Icon(
@@ -198,13 +218,18 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           size: 24,
         ),
         const SizedBox(width: 8),
-        Text(
-          'تراکنش‌ها',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            'تراکنش‌ها',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        const Spacer(),
+        fillRemainingIconButton(),
+        if (showFillRemaining) const SizedBox(width: 4),
         if (isDesktop)
           ElevatedButton.icon(
             onPressed: _canAddTransaction ? _addTransaction : null,
@@ -717,111 +742,52 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
               ],
             ),
             const SizedBox(height: 20),
-            // در دسکتاپ: نمایش عمودی (یک ستون)
-            // در موبایل: نمایش دو ستونه
-            if (isDesktop) ...[
-              _buildBalanceRow(
-                theme,
-                'مبلغ کل فاکتور:',
-                formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
-                theme.colorScheme.onSurface,
-                isDesktop: true,
-              ),
-              const SizedBox(height: 16),
-              _buildBalanceRow(
-                theme,
-                'مجموع تراکنش‌ها:',
-                formatWithThousands(_totalPaid, decimalPlaces: 0),
-                theme.colorScheme.onSurface,
-                isDesktop: true,
-              ),
-              const SizedBox(height: 16),
-              Divider(color: theme.colorScheme.outline.withOpacity(0.2)),
-              const SizedBox(height: 16),
-              _buildBalanceRow(
-                theme,
-                'مانده فاکتور:',
-                formatWithThousands(_remainingBalance, decimalPlaces: 0),
-                remainingColor,
-                isBold: true,
-                isDesktop: true,
-              ),
-              const SizedBox(height: 12),
-              _buildBalanceRow(
-                theme,
-                'درصد مانده:',
-                '${_remainingPercentage.toStringAsFixed(1)}%',
-                remainingColor,
-                isBold: true,
-                isDesktop: true,
-                showCurrency: false,
-              ),
-              const SizedBox(height: 12),
-              _buildBalanceRow(
-                theme,
-                'درصد پرداخت شده:',
-                '${_paidPercentage.toStringAsFixed(1)}%',
-                theme.colorScheme.onSurface,
-                isDesktop: true,
-                showCurrency: false,
-              ),
-            ] else ...[
-              // موبایل: دو ستونه
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceRow(
-                      theme,
-                      'مبلغ کل فاکتور:',
-                      formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
-                      theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildBalanceRow(
-                      theme,
-                      'مجموع تراکنش‌ها:',
-                      formatWithThousands(_totalPaid, decimalPlaces: 0),
-                      theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceRow(
-                      theme,
-                      'مانده فاکتور:',
-                      formatWithThousands(_remainingBalance, decimalPlaces: 0),
-                      remainingColor,
-                      isBold: true,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildBalanceRow(
-                      theme,
-                      'درصد مانده:',
-                      '${_remainingPercentage.toStringAsFixed(1)}%',
-                      remainingColor,
-                      isBold: true,
-                      showCurrency: false,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _buildBalanceRow(
-                theme,
-                'درصد پرداخت شده:',
-                '${_paidPercentage.toStringAsFixed(1)}%',
-                theme.colorScheme.onSurface,
-                showCurrency: false,
-              ),
-            ],
+            // یک ستون تمام‌عرض در موبایل و دسکتاپ (جلوگیری از فشردگی و به‌هم‌ریختگی)
+            _buildBalanceRow(
+              theme,
+              'مبلغ کل فاکتور:',
+              formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
+              theme.colorScheme.onSurface,
+              isDesktop: isDesktop,
+            ),
+            SizedBox(height: isDesktop ? 16 : 12),
+            _buildBalanceRow(
+              theme,
+              'مجموع تراکنش‌ها:',
+              formatWithThousands(_totalPaid, decimalPlaces: 0),
+              theme.colorScheme.onSurface,
+              isDesktop: isDesktop,
+            ),
+            SizedBox(height: isDesktop ? 16 : 12),
+            Divider(color: theme.colorScheme.outline.withOpacity(0.2)),
+            SizedBox(height: isDesktop ? 16 : 12),
+            _buildBalanceRow(
+              theme,
+              'مانده فاکتور:',
+              formatWithThousands(_remainingBalance, decimalPlaces: 0),
+              remainingColor,
+              isBold: true,
+              isDesktop: isDesktop,
+            ),
+            SizedBox(height: isDesktop ? 12 : 8),
+            _buildBalanceRow(
+              theme,
+              'درصد مانده:',
+              '${_remainingPercentage.toStringAsFixed(1)}%',
+              remainingColor,
+              isBold: true,
+              isDesktop: isDesktop,
+              showCurrency: false,
+            ),
+            SizedBox(height: isDesktop ? 12 : 8),
+            _buildBalanceRow(
+              theme,
+              'درصد پرداخت شده:',
+              '${_paidPercentage.toStringAsFixed(1)}%',
+              theme.colorScheme.onSurface,
+              isDesktop: isDesktop,
+              showCurrency: false,
+            ),
             // هشدار در صورت مانده مثبت
             if (hasRemaining) ...[
               const SizedBox(height: 12),
@@ -924,17 +890,6 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ),
               ),
             ],
-            if (widget.invoiceTotal != null && widget.invoiceTotal! > 0) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _canFillRemainingBalance ? _fillRemainingBalance : null,
-                  icon: const Icon(Icons.price_change_outlined, size: 20),
-                  label: const Text('پر کردن مانده در تراکنش'),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -958,7 +913,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: isDesktop ? 150 : 120,
+          width: isDesktop ? 150 : 130,
           child: Text(
             label,
             style: (isDesktop 
@@ -979,7 +934,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
               color: valueColor,
               fontSize: isDesktop && isBold ? 18 : null,
             ),
-            textAlign: TextAlign.left,
+            textAlign: TextAlign.start,
           ),
         ),
       ],
@@ -1573,6 +1528,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
     return PersonComboboxWidget(
       businessId: widget.businessId,
+      showFinancialBalance: true,
       selectedPerson: selectedPerson,
       onChanged: (person) {
         setState(() {

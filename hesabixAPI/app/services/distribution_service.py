@@ -9,6 +9,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
+	DistributionBusinessSettings,
 	DistributionFieldVisit,
 	DistributionReturnRequest,
 	DistributionRoute,
@@ -43,6 +44,70 @@ def _scope_visit_user_id(ctx: AuthContext, business_id: int) -> Optional[int]:
 	return ctx.get_user_id()
 
 
+def _can_see_full_distribution_catalog(ctx: AuthContext, business_id: int) -> bool:
+	if ctx.is_superadmin():
+		return True
+	if ctx.db and ctx.is_business_owner(business_id):
+		return True
+	if ctx.has_business_permission("distribution", "manage"):
+		return True
+	if ctx.has_business_permission("distribution", "reports_team"):
+		return True
+	return False
+
+
+def get_or_create_distribution_settings(db: Session, business_id: int) -> DistributionBusinessSettings:
+	row = db.query(DistributionBusinessSettings).filter(DistributionBusinessSettings.business_id == business_id).first()
+	if row:
+		return row
+	row = DistributionBusinessSettings(
+		business_id=business_id,
+		shared_routing_catalog=False,
+		require_visit_in_daily_plan=False,
+		created_at=datetime.utcnow(),
+		updated_at=datetime.utcnow(),
+	)
+	db.add(row)
+	db.commit()
+	db.refresh(row)
+	return row
+
+
+def settings_to_dict(s: DistributionBusinessSettings) -> Dict[str, Any]:
+	return {
+		"shared_routing_catalog": bool(s.shared_routing_catalog),
+		"require_visit_in_daily_plan": bool(s.require_visit_in_daily_plan),
+	}
+
+
+def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthContext) -> bool:
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		return False
+	s = get_or_create_distribution_settings(db, business_id)
+	return not bool(s.shared_routing_catalog)
+
+
+def _assigned_route_ids_for_user(db: Session, business_id: int, user_id: int) -> List[int]:
+	rows = (
+		db.query(DistributionRouteAssignment.route_id)
+		.filter(DistributionRouteAssignment.business_id == business_id, DistributionRouteAssignment.user_id == user_id)
+		.distinct()
+		.all()
+	)
+	return [int(r[0]) for r in rows]
+
+
+def _ensure_route_allowed_for_strict(db: Session, business_id: int, ctx: AuthContext, route_id: int) -> None:
+	if not _use_strict_catalog_for_field_user(db, business_id, ctx):
+		return
+	uid = ctx.get_user_id()
+	if uid is None:
+		return
+	if route_id not in _assigned_route_ids_for_user(db, business_id, uid):
+		raise ApiError("FORBIDDEN", "مسیر به شما تخصیص داده نشده است.", http_status=403)
+
+
+
 def territory_to_dict(t: DistributionTerritory) -> Dict[str, Any]:
 	return {
 		"id": t.id,
@@ -70,6 +135,14 @@ def route_to_dict(r: DistributionRoute, territory_name: Optional[str] = None) ->
 
 
 def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) -> Dict[str, Any]:
+	def _num(val: Any) -> Any:
+		if val is None:
+			return None
+		try:
+			return float(val)
+		except Exception:
+			return val
+
 	return {
 		"id": v.id,
 		"person_id": v.person_id,
@@ -86,6 +159,9 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 		"deal_id": v.deal_id,
 		"crm_activity_id": v.crm_activity_id,
 		"notes": v.notes,
+		"extra_info": v.extra_info,
+		"start_latitude": _num(getattr(v, "start_latitude", None)),
+		"start_longitude": _num(getattr(v, "start_longitude", None)),
 	}
 
 
@@ -126,29 +202,59 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 			.scalar()
 		)
 
-	routes_active = (
-		db.query(func.count(DistributionRoute.id))
-		.filter(DistributionRoute.business_id == business_id, DistributionRoute.is_active == True)  # noqa: E712
-		.scalar()
-	)
+	strict_cat = _use_strict_catalog_for_field_user(db, business_id, ctx)
+	uid_summary = ctx.get_user_id()
+	if strict_cat and uid_summary is not None:
+		assigned = _assigned_route_ids_for_user(db, business_id, uid_summary)
+		if assigned:
+			routes_active = (
+				db.query(func.count(DistributionRoute.id))
+				.filter(
+					DistributionRoute.business_id == business_id,
+					DistributionRoute.is_active == True,  # noqa: E712
+					DistributionRoute.id.in_(assigned),
+				)
+				.scalar()
+			)
+		else:
+			routes_active = 0
+	else:
+		routes_active = (
+			db.query(func.count(DistributionRoute.id))
+			.filter(DistributionRoute.business_id == business_id, DistributionRoute.is_active == True)  # noqa: E712
+			.scalar()
+		)
 
 	return {
 		"visits_today": visits_today,
 		"completed_visits_today": completed_today,
 		"pending_return_requests": int(pending_returns or 0),
 		"active_routes": int(routes_active or 0),
+		"distribution_settings": settings_to_dict(get_or_create_distribution_settings(db, business_id)),
 	}
 
 
-def list_territories(db: Session, business_id: int) -> List[Dict[str, Any]]:
+def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
-	rows = (
-		db.query(DistributionTerritory)
-		.filter(DistributionTerritory.business_id == business_id)
-		.order_by(DistributionTerritory.code.asc())
-		.all()
-	)
-	return [territory_to_dict(t) for t in rows]
+	q = db.query(DistributionTerritory).filter(DistributionTerritory.business_id == business_id)
+	if _use_strict_catalog_for_field_user(db, business_id, ctx):
+		uid = ctx.get_user_id()
+		if uid is None:
+			return []
+		route_ids = _assigned_route_ids_for_user(db, business_id, uid)
+		if not route_ids:
+			return []
+		tids = (
+			db.query(DistributionRoute.territory_id)
+			.filter(DistributionRoute.business_id == business_id, DistributionRoute.id.in_(route_ids))
+			.distinct()
+			.all()
+		)
+		tid_list = [int(x[0]) for x in tids if x[0] is not None]
+		if not tid_list:
+			return []
+		q = q.filter(DistributionTerritory.id.in_(tid_list))
+	return [territory_to_dict(t) for t in q.order_by(DistributionTerritory.code.asc()).all()]
 
 
 def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -212,15 +318,22 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	db.commit()
 
 
-def list_routes(db: Session, business_id: int) -> List[Dict[str, Any]]:
+def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
-	rows = (
+	q = (
 		db.query(DistributionRoute)
 		.options(joinedload(DistributionRoute.territory))
 		.filter(DistributionRoute.business_id == business_id)
-		.order_by(DistributionRoute.code.asc())
-		.all()
 	)
+	if _use_strict_catalog_for_field_user(db, business_id, ctx):
+		uid = ctx.get_user_id()
+		if uid is None:
+			return []
+		route_ids = _assigned_route_ids_for_user(db, business_id, uid)
+		if not route_ids:
+			return []
+		q = q.filter(DistributionRoute.id.in_(route_ids))
+	rows = q.order_by(DistributionRoute.code.asc()).all()
 	out = []
 	for r in rows:
 		tname = r.territory.name if r.territory else None
@@ -294,11 +407,12 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	return route_to_dict(row, tname)
 
 
-def list_route_stops(db: Session, business_id: int, route_id: int) -> List[Dict[str, Any]]:
+def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	_ensure_route_allowed_for_strict(db, business_id, ctx, route_id)
 	stops = (
 		db.query(DistributionRouteStop)
 		.filter(DistributionRouteStop.route_id == route_id)
@@ -388,11 +502,16 @@ def delete_route_stop(db: Session, business_id: int, route_id: int, stop_id: int
 	db.commit()
 
 
-def list_assignments(db: Session, business_id: int, route_id: Optional[int]) -> List[Dict[str, Any]]:
+def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
 	q = db.query(DistributionRouteAssignment).filter(DistributionRouteAssignment.business_id == business_id)
 	if route_id:
 		q = q.filter(DistributionRouteAssignment.route_id == route_id)
+	if _use_strict_catalog_for_field_user(db, business_id, ctx):
+		uid = ctx.get_user_id()
+		if uid is None:
+			return []
+		q = q.filter(DistributionRouteAssignment.user_id == uid)
 	rows = q.order_by(DistributionRouteAssignment.valid_from.desc()).all()
 	out = []
 	for a in rows:
@@ -536,8 +655,25 @@ def start_visit(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	settings_sv = get_or_create_distribution_settings(db, business_id)
+	if settings_sv.require_visit_in_daily_plan:
+		_plan = get_daily_plan(db, business_id, user_id, datetime.utcnow().date())
+		_allowed_pids = {int(it["person_id"]) for it in _plan["items"]}
+		if person_id not in _allowed_pids:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				"این شخص در برنامهٔ روز ویزیت شما نیست.",
+				http_status=400,
+			)
 	route_id = payload.get("route_id")
 	route_stop_id = payload.get("route_stop_id")
+	_lat = payload.get("start_latitude")
+	_lng = payload.get("start_longitude")
+	_slat = float(_lat) if _lat is not None and str(_lat).strip() != "" else None
+	_slng = float(_lng) if _lng is not None and str(_lng).strip() != "" else None
+	_extra = payload.get("extra_info")
+	if _extra is not None and not isinstance(_extra, dict):
+		raise ApiError("VALIDATION_ERROR", "extra_info must be an object", http_status=400)
 	v = DistributionFieldVisit(
 		business_id=business_id,
 		person_id=person_id,
@@ -547,6 +683,9 @@ def start_visit(
 		status="in_progress",
 		started_at=datetime.utcnow(),
 		notes=payload.get("notes"),
+		start_latitude=_slat,
+		start_longitude=_slng,
+		extra_info=_extra if isinstance(_extra, dict) else None,
 	)
 	db.add(v)
 	db.commit()
@@ -584,6 +723,13 @@ def complete_visit(
 		v.deal_id = int(payload["deal_id"])
 	if payload.get("notes"):
 		v.notes = str(payload["notes"])
+	if "extra_info" in payload:
+		_ex = payload.get("extra_info")
+		if _ex is not None and not isinstance(_ex, dict):
+			raise ApiError("VALIDATION_ERROR", "extra_info must be an object", http_status=400)
+		_base = dict(v.extra_info or {})
+		_base.update(_ex or {})
+		v.extra_info = _base
 	v.updated_at = datetime.utcnow()
 
 	summary_parts = [f"ویزیت میدانی — نتیجه: {outcome}"]
@@ -711,6 +857,9 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 	lines = payload.get("lines") or []
 	if not isinstance(lines, list) or not lines:
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
+	for _i, _ln in enumerate(lines):
+		if not isinstance(_ln, dict):
+			raise ApiError("VALIDATION_ERROR", f"lines[{_i}] must be object", http_status=400)
 	vid = payload.get("visit_id")
 	row = DistributionReturnRequest(
 		business_id=business_id,
@@ -793,4 +942,102 @@ def resolve_return_request(
 		"status": row.status,
 		"resolved_document_id": row.resolved_document_id,
 		"resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
+	}
+
+
+def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	row = get_or_create_distribution_settings(db, business_id)
+	if "shared_routing_catalog" in payload:
+		row.shared_routing_catalog = bool(payload["shared_routing_catalog"])
+	if "require_visit_in_daily_plan" in payload:
+		row.require_visit_in_daily_plan = bool(payload["require_visit_in_daily_plan"])
+	row.updated_at = datetime.utcnow()
+	db.commit()
+	db.refresh(row)
+	return settings_to_dict(row)
+
+
+def get_distribution_reports_dashboard(
+	db: Session,
+	business_id: int,
+	ctx: AuthContext,
+	from_date: date,
+	to_date: date,
+	target_user_id: Optional[int],
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	if target_user_id is not None and not _can_see_full_distribution_catalog(ctx, business_id):
+		raise ApiError("FORBIDDEN", "Only managers can filter by visitor user", http_status=403)
+	vq = db.query(DistributionFieldVisit).filter(DistributionFieldVisit.business_id == business_id)
+	vq = vq.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
+	vq = vq.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
+	scope_uid = _scope_visit_user_id(ctx, business_id)
+	if target_user_id is not None:
+		vq = vq.filter(DistributionFieldVisit.user_id == int(target_user_id))
+	elif scope_uid is not None:
+		vq = vq.filter(DistributionFieldVisit.user_id == scope_uid)
+
+	total_visits = vq.count()
+	completed = vq.filter(DistributionFieldVisit.status == "completed").count()
+	cancelled_vis = vq.filter(DistributionFieldVisit.status == "cancelled").count()
+	inprog = vq.filter(DistributionFieldVisit.status == "in_progress").count()
+
+	out_rows = (
+		db.query(DistributionFieldVisit.outcome, func.count(DistributionFieldVisit.id))
+		.filter(DistributionFieldVisit.business_id == business_id)
+		.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
+		.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
+	)
+	if target_user_id is not None:
+		out_rows = out_rows.filter(DistributionFieldVisit.user_id == int(target_user_id))
+	elif scope_uid is not None:
+		out_rows = out_rows.filter(DistributionFieldVisit.user_id == scope_uid)
+	out_rows = out_rows.group_by(DistributionFieldVisit.outcome).all()
+	by_outcome: Dict[str, int] = {}
+	for oc, cnt in out_rows:
+		key = oc if oc else "unset"
+		by_outcome[str(key)] = int(cnt)
+
+	by_user: Optional[List[Dict[str, Any]]] = None
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		uq = (
+			db.query(DistributionFieldVisit.user_id, func.count(DistributionFieldVisit.id))
+			.filter(DistributionFieldVisit.business_id == business_id)
+			.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
+			.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
+		)
+		if target_user_id is not None:
+			uq = uq.filter(DistributionFieldVisit.user_id == int(target_user_id))
+		uq = uq.group_by(DistributionFieldVisit.user_id).all()
+		by_user = [{"user_id": int(uid), "visit_count": int(c)} for uid, c in uq]
+
+	rq = db.query(DistributionReturnRequest).filter(DistributionReturnRequest.business_id == business_id)
+	rq = rq.filter(func.date(DistributionReturnRequest.created_at) >= from_date)
+	rq = rq.filter(func.date(DistributionReturnRequest.created_at) <= to_date)
+	if target_user_id is not None:
+		rq = rq.filter(DistributionReturnRequest.created_by_user_id == int(target_user_id))
+	elif scope_uid is not None:
+		rq = rq.filter(DistributionReturnRequest.created_by_user_id == scope_uid)
+
+	def _cnt(st: str) -> int:
+		return int(rq.filter(DistributionReturnRequest.status == st).count())
+
+	return {
+		"from_date": from_date.isoformat(),
+		"to_date": to_date.isoformat(),
+		"target_user_id": target_user_id,
+		"visits": {
+			"total_records": total_visits,
+			"completed": completed,
+			"cancelled": cancelled_vis,
+			"in_progress": inprog,
+			"by_outcome": by_outcome,
+		},
+		"by_user": by_user,
+		"returns": {
+			"pending": _cnt("pending"),
+			"approved": _cnt("approved"),
+			"rejected": _cnt("rejected"),
+		},
 	}

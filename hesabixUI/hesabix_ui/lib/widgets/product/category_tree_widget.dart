@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/responsive_helper.dart';
 
 class CategoryNode {
   final int id;
@@ -100,18 +102,11 @@ class _CategoryTreeWidgetState extends State<CategoryTreeWidget> {
     });
   }
 
-  List<int> _getAllChildCategoryIds(CategoryNode node) {
-    final List<int> ids = [node.id];
-    for (final child in node.children) {
-      ids.addAll(_getAllChildCategoryIds(child));
-    }
-    return ids;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
 
     return ListView(
       children: [
@@ -120,7 +115,7 @@ class _CategoryTreeWidgetState extends State<CategoryTreeWidget> {
             context: context,
             theme: theme,
             colorScheme: colorScheme,
-            label: 'همه دسته‌بندی‌ها',
+            label: t.categoryTreeAllCategoriesOption,
             icon: Icons.category_outlined,
             isSelected: widget.selectedCategoryId == null,
             onTap: () => widget.onCategorySelected(null),
@@ -191,12 +186,14 @@ class _CategoryTreeWidgetState extends State<CategoryTreeWidget> {
     required VoidCallback? onToggleExpand,
     required int level,
   }) {
+    final step = ResponsiveHelper.isMobile(context) ? 18.0 : 24.0;
+    final basePad = ResponsiveHelper.getPadding(context);
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.only(
-          left: 16 + (level * 24),
-          right: 16,
+          left: basePad + (level * step),
+          right: basePad,
           top: 8,
           bottom: 8,
         ),
@@ -216,7 +213,7 @@ class _CategoryTreeWidgetState extends State<CategoryTreeWidget> {
                 icon: Icon(
                   isExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,
-                  color: colorScheme.onSurface.withOpacity(0.6),
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 onPressed: onToggleExpand,
                 padding: EdgeInsets.zero,
@@ -230,7 +227,7 @@ class _CategoryTreeWidgetState extends State<CategoryTreeWidget> {
               size: 18,
               color: isSelected
                   ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurface.withOpacity(0.7),
+                  : colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 8),
             Expanded(

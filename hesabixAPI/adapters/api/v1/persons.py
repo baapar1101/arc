@@ -891,8 +891,22 @@ async def get_person_endpoint(
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
-    
-    result = get_person_by_id(db, person_id, person.business_id)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(FiscalYear.business_id == person.business_id, FiscalYear.is_last == True)
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+
+    result = get_person_by_id(db, person_id, person.business_id, fiscal_year_id=fiscal_year_id)
     if not result:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     

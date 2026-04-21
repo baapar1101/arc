@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -18,6 +19,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/project/project_selector_widget.dart';
+import '../../widgets/invoice/invoice_list_document_type_filter_bar.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -75,6 +77,39 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   bool _showDesktopFilters = false;
   int _selectedCount = 0;
 
+  String get _invoiceDocumentTypePrefsKey => 'invoices_list_document_type_${widget.businessId}';
+
+  Future<void> _persistInvoiceDocumentType(String? type) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (type == null || type.isEmpty) {
+        await prefs.remove(_invoiceDocumentTypePrefsKey);
+      } else {
+        await prefs.setString(_invoiceDocumentTypePrefsKey, type);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadSavedInvoiceDocumentType() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_invoiceDocumentTypePrefsKey);
+      if (!mounted) return;
+      if (saved != null && saved.isNotEmpty && isKnownInvoiceDocumentType(saved)) {
+        setState(() => _selectedInvoiceType = saved);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _refreshData();
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _onInvoiceTypeFilterChanged(String? v) {
+    setState(() => _selectedInvoiceType = v);
+    _persistInvoiceDocumentType(v);
+    _refreshData();
+  }
+
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
     // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
@@ -104,6 +139,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     InvoicesListPage._pageStates[widget.businessId] = this;
     _loadFiscalYears();
     _loadProjects();
+    _loadSavedInvoiceDocumentType();
   }
   
   @override
@@ -185,6 +221,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(t, isMobile),
+              InvoiceListDocumentTypeFilterBar(
+                selectedDocumentType: _selectedInvoiceType,
+                onDocumentTypeChanged: _onInvoiceTypeFilterChanged,
+              ),
+              const Divider(height: 1),
               _buildFilters(t, isMobile),
               Padding(
                 padding: EdgeInsets.fromLTRB(
@@ -336,10 +377,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               fromDate: _fromDate,
               toDate: _toDate,
               isProforma: _isProforma,
-              onInvoiceTypeChanged: (v) {
-                setState(() => _selectedInvoiceType = v);
-                _refreshData();
-              },
+              onInvoiceTypeChanged: (v) => _onInvoiceTypeFilterChanged(v),
               onFiscalYearChanged: (v) {
                 setState(() => _selectedFiscalYearId = v);
                 _refreshData();
@@ -392,6 +430,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       _selectedProjectId = null;
       // Fiscal year is typically important; keep it unless explicitly cleared by user.
     });
+    _persistInvoiceDocumentType(null);
     _refreshData();
   }
 
@@ -456,26 +495,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     return chips;
   }
 
-  String _invoiceTypeLabel(AppLocalizations t, String? type) {
-    switch (type) {
-      case 'invoice_sales':
-        return t.invoiceTypeSales;
-      case 'invoice_purchase':
-        return t.invoiceTypePurchase;
-      case 'invoice_sales_return':
-        return t.invoiceTypeSalesReturn;
-      case 'invoice_purchase_return':
-        return t.invoiceTypePurchaseReturn;
-      case 'invoice_production':
-        return t.invoiceTypeProduction;
-      case 'invoice_direct_consumption':
-        return t.invoiceTypeDirectConsumption;
-      case 'invoice_waste':
-        return t.invoiceTypeWaste;
-      default:
-        return t.all;
-    }
-  }
+  String _invoiceTypeLabel(AppLocalizations t, String? type) => invoiceDocumentTypeLabel(t, type);
 
   Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
     String? invoiceType = _selectedInvoiceType;
@@ -535,7 +555,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                         fromDate: fromDate,
                         toDate: toDate,
                         isProforma: isProforma,
-                        onInvoiceTypeChanged: (v) => setModalState(() => invoiceType = v),
+                        onInvoiceTypeChanged: (v) => setModalState(() {
+                          invoiceType = v;
+                        }),
                         onFiscalYearChanged: (v) => setModalState(() => fiscalYearId = v),
                         onProjectChanged: (v) => setModalState(() => projectId = v),
                         onFromDateChanged: (v) => setModalState(() => fromDate = v),
@@ -574,6 +596,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _toDate = toDate;
         _isProforma = isProforma;
       });
+      _persistInvoiceDocumentType(invoiceType);
       _refreshData();
     }
   }
@@ -606,13 +629,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             ),
             segments: [
               ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
-              ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
-              ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
-              ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
-              ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
-              ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
-              ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
-              ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
+              ...kInvoiceDocumentTypeOptions.map(
+                (o) => ButtonSegment<String?>(
+                  value: o.documentTypeValue,
+                  label: Text(o.label(t)),
+                  icon: Icon(o.icon),
+                ),
+              ),
             ],
             selected: invoiceType != null ? {invoiceType} : <String?>{},
             onSelectionChanged: (set) => onInvoiceTypeChanged(set.isEmpty ? null : set.first),

@@ -1190,6 +1190,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 Expanded(
                   child: PersonComboboxWidget(
                     businessId: widget.businessId,
+                    showFinancialBalance: true,
                     selectedPerson: widget.line.personId != null 
                         ? Person(
                             id: int.tryParse(widget.line.personId!),
@@ -1344,26 +1345,28 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         );
                       }).toList(),
                 selectedItemBuilder: (context) {
-                  // نمایش کد فاکتور انتخاب شده در dropdown
-                  if (widget.line.invoiceId == null) {
+                  // طول لیست باید با items یکی باشد (یک ویجت به ازای هر آیتم منو).
+                  if (_loadingInvoices) {
                     return [
-                      const Text(
-                        'انتخاب فاکتور',
-                        overflow: TextOverflow.ellipsis,
-                      )
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
                     ];
                   }
-                  final selectedInvoice = _invoices.firstWhere(
-                    (inv) => (inv['id'] as num?)?.toInt() == widget.line.invoiceId,
-                    orElse: () => <String, dynamic>{},
-                  );
-                  final code = selectedInvoice['code']?.toString() ?? '';
-                  return [
-                    Text(
-                      code.isNotEmpty ? code : 'انتخاب فاکتور',
+                  return _invoices.map((inv) {
+                    final code = inv['code']?.toString() ?? '';
+                    return Text(
+                      code.isNotEmpty ? code : 'فاکتور',
                       overflow: TextOverflow.ellipsis,
-                    )
-                  ];
+                    );
+                  }).toList();
                 },
                 onChanged: (invoiceId) {
                   final invoice = _invoices.firstWhere(

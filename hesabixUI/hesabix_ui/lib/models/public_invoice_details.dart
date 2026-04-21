@@ -1,4 +1,4 @@
-import 'package:intl/intl.dart';
+import '../core/date_utils.dart';
 
 class PublicInvoiceDetails {
   final int id;
@@ -49,9 +49,9 @@ class PublicInvoiceDetails {
 
   factory PublicInvoiceDetails.fromJson(Map<String, dynamic> json) {
     return PublicInvoiceDetails(
-      id: json['id'] as int,
+      id: (json['id'] as num).toInt(),
       code: json['code']?.toString(),
-      businessId: json['business_id'] as int,
+      businessId: (json['business_id'] as num).toInt(),
       documentType: json['document_type']?.toString(),
       documentDate: _parseDate(json['document_date']),
       registeredAt: _parseDate(json['registered_at']),
@@ -77,9 +77,9 @@ class PublicInvoiceDetails {
     );
   }
 
-  String formattedDate() {
+  String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return DateFormat('yyyy/MM/dd').format(documentDate!);
+    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 
@@ -90,6 +90,10 @@ class PublicInvoiceProductLine {
   final double? quantity;
   final String? description;
   final Map<String, dynamic>? extraInfo;
+  final double? unitPrice;
+  final double? lineDiscount;
+  final double? taxAmount;
+  final double? lineTotal;
 
   const PublicInvoiceProductLine({
     required this.id,
@@ -98,16 +102,30 @@ class PublicInvoiceProductLine {
     required this.quantity,
     required this.description,
     required this.extraInfo,
+    required this.unitPrice,
+    required this.lineDiscount,
+    required this.taxAmount,
+    required this.lineTotal,
   });
 
   factory PublicInvoiceProductLine.fromJson(Map<String, dynamic> json) {
+    final ex = json['extra_info'];
+    final Map<String, dynamic>? extraMap = ex is Map<String, dynamic> ? ex : null;
+    double? pick(String key) =>
+        _toDouble(json[key]) ??
+        (extraMap != null ? _toDouble(extraMap[key]) : null);
+
     return PublicInvoiceProductLine(
-      id: json['id'] as int,
-      productId: json['product_id'] as int?,
+      id: (json['id'] as num).toInt(),
+      productId: (json['product_id'] as num?)?.toInt(),
       productName: json['product_name']?.toString(),
       quantity: _toDouble(json['quantity']),
       description: json['description']?.toString(),
-      extraInfo: json['extra_info'] as Map<String, dynamic>?,
+      extraInfo: extraMap,
+      unitPrice: pick('unit_price'),
+      lineDiscount: pick('line_discount'),
+      taxAmount: pick('tax_amount'),
+      lineTotal: pick('line_total'),
     );
   }
 }
@@ -137,7 +155,7 @@ class PublicInvoiceAccountLine {
 
   factory PublicInvoiceAccountLine.fromJson(Map<String, dynamic> json) {
     return PublicInvoiceAccountLine(
-      id: json['id'] as int,
+      id: (json['id'] as num).toInt(),
       accountId: json['account_id'] as int?,
       accountName: json['account_name']?.toString(),
       accountCode: json['account_code']?.toString(),

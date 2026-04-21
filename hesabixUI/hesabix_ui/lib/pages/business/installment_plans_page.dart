@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
 
 class InstallmentPlansPage extends StatefulWidget {
@@ -617,6 +619,7 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
 
   Widget _buildPreviewTable(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isJalali = ApiClient.getCalendarController()?.isJalali ?? true;
     final amount = double.tryParse(_previewAmountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final n = int.tryParse(_numController.text.trim()) ?? 0;
     final periodDays = int.tryParse(_periodDaysController.text.trim()) ?? 30;
@@ -635,13 +638,14 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
     for (int i = 0; i < showCount; i++) {
       final due = DateTime.now().add(Duration(days: periodDays * i));
       final total = perPrincipal + perInterest;
+      final dueDisplay = HesabixDateUtils.formatForDisplay(due.toLocal(), isJalali);
       previewRows.add(
         Row(
           children: [
             Expanded(child: Text('#${i + 1}')),
             Expanded(
               flex: 2,
-              child: Text('${t.firstInstallmentDueDate}: ${due.toLocal().toString().split(' ').first}'),
+              child: Text('${t.firstInstallmentDueDate}: $dueDisplay'),
             ),
             Expanded(child: Text('${t.lineTotalAmount}: ${total.toStringAsFixed(0)}')),
           ],

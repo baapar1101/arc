@@ -1287,6 +1287,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: PersonComboboxWidget(
                 businessId: widget.businessId,
+                showFinancialBalance: true,
                 selectedPerson: widget.line.personId != null 
                     ? Person(
                         id: int.tryParse(widget.line.personId!),

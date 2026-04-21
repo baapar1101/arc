@@ -14,7 +14,11 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';
 import 'package:hesabix_ui/pages/business/documents_mobile_view.dart';
 import '../../utils/snackbar_helper.dart';
-
+import '../../utils/responsive_helper.dart';
+import '../../services/business_dashboard_service.dart';
+import '../../models/person_model.dart';
+import '../../widgets/project/project_selector_widget.dart';
+import '../../widgets/invoice/person_combobox_widget.dart';
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
 class DocumentsPage extends StatefulWidget {
@@ -50,9 +54,22 @@ class DocumentsPage extends StatefulWidget {
 
 class _DocumentsPageState extends State<DocumentsPage> {
   late DocumentService _service;
+  late final BusinessDashboardService _dashboardService =
+      BusinessDashboardService(widget.apiClient);
+
   String? _selectedDocumentType;
   DateTime? _fromDate;
   DateTime? _toDate;
+
+  int? _selectedFiscalYearId;
+  List<Map<String, dynamic>> _fiscalYears = [];
+  bool _fiscalYearsResolved = false;
+
+  int? _selectedProjectId;
+  Person? _filterPerson;
+
+  bool _showDesktopFilters = false;
+
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0;
   List<FilterOption> _projectFilterOptions = [];
@@ -84,6 +101,27 @@ class _DocumentsPageState extends State<DocumentsPage> {
     _service = DocumentService(widget.apiClient);
     widget.calendarController.addListener(_onCalendarChanged);
     _loadProjects();
+    _loadFiscalYears();
+  }
+
+  Future<void> _loadFiscalYears() async {
+    try {
+      final items = await _dashboardService.listFiscalYears(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _fiscalYears = items;
+        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
+          final current = _fiscalYears.firstWhere(
+            (fy) => fy['is_current'] == true,
+            orElse: () => _fiscalYears.first,
+          );
+          _selectedFiscalYearId = current['id'] as int?;
+        }
+        _fiscalYearsResolved = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _fiscalYearsResolved = true);
+    }
   }
 
   @override
@@ -148,13 +186,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final contentPadding = ResponsiveHelper.getPadding(context);
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 600;
+        final isMobile = constraints.maxWidth < ResponsiveHelper.mobileBreakpoint;
         if (isMobile) {
           return DocumentsMobileView(
             businessId: widget.businessId,
             calendarController: widget.calendarController,
+            authStore: widget.authStore,
+            apiClient: widget.apiClient,
             service: _service,
             onCreateNew: _createNewDocument,
             onShowDetails: _showDocumentDetails,
@@ -171,15 +213,29 @@ class _DocumentsPageState extends State<DocumentsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildFiltersResponsive(t, constraints.maxWidth),
+                  _buildDesktopHeader(t),
+                  _buildFilters(t),
                   Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: DataTableWidget<DocumentModel>(
-                      key: _tableKey,
-                      config: _buildTableConfig(t),
-                      fromJson: (json) => DocumentModel.fromJson(json),
-                      calendarController: widget.calendarController,
+                    padding: EdgeInsets.fromLTRB(
+                      contentPadding,
+                      8,
+                      contentPadding,
+                      8,
                     ),
+                    child: _fiscalYearsResolved
+                        ? DataTableWidget<DocumentModel>(
+                            key: _tableKey,
+                            config: _buildTableConfig(t),
+                            fromJson: (json) =>
+                                DocumentModel.fromJson(json),
+                            calendarController: widget.calendarController,
+                          )
+                        : const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -190,205 +246,323 @@ class _DocumentsPageState extends State<DocumentsPage> {
     );
   }
 
-  /// ساخت فیلترها
-  Widget _buildFiltersResponsive(AppLocalizations t, double maxWidth) {
-    final isCompact = maxWidth < 900;
-    return isCompact ? _buildFiltersWrap(t) : _buildFiltersRow(t);
-  }
-
-  Widget _buildFiltersRow(AppLocalizations t) {
+  Widget _buildDesktopHeader(AppLocalizations t) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
-        ),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        8,
       ),
       child: Row(
         children: [
-          // فیلتر نوع سند
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<String?>(
-              initialValue: _selectedDocumentType,
-              decoration: const InputDecoration(
-                labelText: 'نوع سند',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.accountingDocuments,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-                isDense: true,
-              ),
-              items: _documentTypes.entries.map((entry) {
-                return DropdownMenuItem<String?>(
-                  value: entry.key == 'all' ? null : entry.key,
-                  child: Text(entry.value),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedDocumentType = value;
-                });
-                _refreshData();
-              },
+                const SizedBox(height: 4),
+                Text(
+                  t.presetDocumentsList,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-
-          // فیلتر از تاریخ
-          Expanded(
-            child: DateInputField(
-              calendarController: widget.calendarController,
-              value: _fromDate,
-              onChanged: (date) {
-                setState(() => _fromDate = date);
-                _refreshData();
-              },
-              labelText: 'از تاریخ',
-              hintText: 'انتخاب تاریخ شروع',
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // فیلتر تا تاریخ
-          Expanded(
-            child: DateInputField(
-              calendarController: widget.calendarController,
-              value: _toDate,
-              onChanged: (date) {
-                setState(() => _toDate = date);
-                _refreshData();
-              },
-              labelText: 'تا تاریخ',
-              hintText: 'انتخاب تاریخ پایان',
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // دکمه پاک کردن فیلترها
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _selectedDocumentType = null;
-                _fromDate = null;
-                _toDate = null;
-              });
-              _refreshData();
-            },
-            icon: const Icon(Icons.clear),
-            tooltip: 'پاک کردن فیلتر',
-          ),
-          const Spacer(),
-
-          // دکمه افزودن سند جدید
-          ElevatedButton.icon(
+          FilledButton.icon(
             onPressed: _createNewDocument,
             icon: const Icon(Icons.add),
-            label: const Text('سند جدید'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
+            label: Text(t.add),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFiltersWrap(AppLocalizations t) {
+  Widget _buildFilters(AppLocalizations t) {
+    final padding = ResponsiveHelper.getPadding(context);
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 240,
-            child: DropdownButtonFormField<String?>(
-              initialValue: _selectedDocumentType,
-              decoration: const InputDecoration(
-                labelText: 'نوع سند',
-                border: OutlineInputBorder(),
-                isDense: true,
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _buildExternalFilterChips(t),
+                  ),
+                ),
               ),
-              items: _documentTypes.entries.map((entry) {
-                return DropdownMenuItem<String?>(
-                  value: entry.key == 'all' ? null : entry.key,
-                  child: Text(entry.value),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() => _selectedDocumentType = value);
-                _refreshData();
-              },
-            ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    setState(() => _showDesktopFilters = !_showDesktopFilters),
+                icon:
+                    Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
+                label:
+                    Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+              ),
+              if (_hasExternalFiltersActive()) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _clearExternalFilters,
+                  icon: const Icon(Icons.clear_all),
+                  tooltip: t.clear,
+                ),
+              ],
+            ],
           ),
-          SizedBox(
-            width: 240,
-            child: DateInputField(
-              calendarController: widget.calendarController,
-              value: _fromDate,
-              onChanged: (date) {
-                setState(() => _fromDate = date);
-                _refreshData();
-              },
-              labelText: 'از تاریخ',
-              hintText: 'انتخاب تاریخ شروع',
-            ),
-          ),
-          SizedBox(
-            width: 240,
-            child: DateInputField(
-              calendarController: widget.calendarController,
-              value: _toDate,
-              onChanged: (date) {
-                setState(() => _toDate = date);
-                _refreshData();
-              },
-              labelText: 'تا تاریخ',
-              hintText: 'انتخاب تاریخ پایان',
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _selectedDocumentType = null;
-                _fromDate = null;
-                _toDate = null;
-              });
-              _refreshData();
-            },
-            icon: const Icon(Icons.clear),
-            tooltip: 'پاک کردن فیلتر',
-          ),
-          ElevatedButton.icon(
-            onPressed: _createNewDocument,
-            icon: const Icon(Icons.add),
-            label: const Text('سند جدید'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
+          if (_showDesktopFilters) ...[
+            const SizedBox(height: 10),
+            _buildFiltersForm(t),
+          ],
         ],
       ),
+    );
+  }
+
+  bool _hasExternalFiltersActive() {
+    return _selectedDocumentType != null ||
+        _fromDate != null ||
+        _toDate != null ||
+        _selectedFiscalYearId != null ||
+        _selectedProjectId != null ||
+        _filterPerson != null;
+  }
+
+  void _clearExternalFilters() {
+    setState(() {
+      _selectedDocumentType = null;
+      _fromDate = null;
+      _toDate = null;
+      _selectedProjectId = null;
+      _filterPerson = null;
+    });
+    _refreshData();
+  }
+
+  List<Widget> _buildExternalFilterChips(AppLocalizations t) {
+    final chips = <Widget>[];
+
+    if (_selectedDocumentType != null) {
+      chips.add(Chip(
+        label: Text(
+            _documentTypes[_selectedDocumentType] ?? _selectedDocumentType!),
+        avatar: const Icon(Icons.category_outlined, size: 16),
+      ));
+    } else {
+      chips.add(Chip(
+        label: Text(t.all),
+        avatar: const Icon(Icons.all_inclusive, size: 16),
+      ));
+    }
+
+    if (_selectedFiscalYearId != null && _fiscalYears.isNotEmpty) {
+      final fy = _fiscalYears
+          .where((e) => (e['id'] as int?) == _selectedFiscalYearId)
+          .toList();
+      final title = fy.isNotEmpty ? (fy.first['title'] ?? '').toString() : '';
+      chips.add(Chip(
+        label: Text(title.isNotEmpty
+            ? title
+            : '${t.fiscalYear}: $_selectedFiscalYearId'),
+        avatar: const Icon(Icons.event_note, size: 16),
+      ));
+    }
+
+    if (_selectedProjectId != null) {
+      final label = _projectFilterOptions
+          .where((o) => o.value == _selectedProjectId.toString())
+          .map((o) => o.label)
+          .cast<String?>()
+          .firstWhere((e) => e != null && e!.isNotEmpty, orElse: () => null);
+      chips.add(Chip(
+        label: Text(label ?? 'پروژه: $_selectedProjectId'),
+        avatar: const Icon(Icons.folder_open, size: 16),
+      ));
+    }
+
+    if (_filterPerson != null) {
+      chips.add(Chip(
+        label: Text(_filterPerson!.displayName),
+        avatar: const Icon(Icons.person_outline, size: 16),
+      ));
+    }
+
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _fromDate!, widget.calendarController.isJalali)
+          : '—';
+      final to = _toDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _toDate!, widget.calendarController.isJalali)
+          : '—';
+      chips.add(Chip(
+        label: Text('${t.documentDate}: $from → $to'),
+        avatar: const Icon(Icons.date_range, size: 16),
+      ));
+    }
+
+    if (chips.isEmpty) {
+      chips.add(Chip(label: Text(t.all)));
+    }
+    return chips;
+  }
+
+  Widget _buildFiltersForm(AppLocalizations t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: DropdownButtonFormField<String?>(
+            value: _selectedDocumentType,
+            decoration: InputDecoration(
+              labelText: 'نوع سند',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            ),
+            items: _documentTypes.entries.map((entry) {
+              return DropdownMenuItem<String?>(
+                value: entry.key == 'all' ? null : entry.key,
+                child: Text(entry.value),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() => _selectedDocumentType = value);
+              _refreshData();
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (_fiscalYears.isNotEmpty)
+              SizedBox(
+                width: 280,
+                child: DropdownButtonFormField<int>(
+                  value: _selectedFiscalYearId,
+                  decoration: InputDecoration(
+                    labelText: t.fiscalYear,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                  ),
+                  items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                    final id = fy['id'] as int?;
+                    final title = (fy['title'] ?? '').toString();
+                    return DropdownMenuItem<int>(
+                      value: id,
+                      child: Text(
+                        title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedFiscalYearId = v);
+                    _refreshData();
+                  },
+                ),
+              ),
+            SizedBox(
+              width: 280,
+              child: ProjectSelectorWidget(
+                businessId: widget.businessId,
+                apiClient: widget.apiClient,
+                selectedProjectId: _selectedProjectId,
+                onChanged: (v) {
+                  setState(() => _selectedProjectId = v);
+                  _refreshData();
+                },
+                authStore: widget.authStore,
+                calendarController: widget.calendarController,
+                allowNull: true,
+                labelText: 'پروژه',
+              ),
+            ),
+            SizedBox(
+              width: 280,
+              child: PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: _filterPerson,
+                onChanged: (person) {
+                  setState(() => _filterPerson = person);
+                  _refreshData();
+                },
+                label: 'شخص',
+                hintText: 'همه اشخاص',
+                searchHint: 'جست‌وجو در اشخاص...',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DateInputField(
+                calendarController: widget.calendarController,
+                value: _fromDate,
+                onChanged: (date) {
+                  setState(() => _fromDate = date);
+                  _refreshData();
+                },
+                labelText: t.dateFrom,
+                hintText: t.selectDate,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DateInputField(
+                calendarController: widget.calendarController,
+                value: _toDate,
+                onChanged: (date) {
+                  setState(() => _toDate = date);
+                  _refreshData();
+                },
+                labelText: t.dateTo,
+                hintText: t.selectDate,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _fromDate = null;
+                  _toDate = null;
+                });
+                _refreshData();
+              },
+              icon: const Icon(Icons.clear),
+              tooltip: t.clearDateFilter,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -433,7 +607,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   DataTableConfig<DocumentModel> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<DocumentModel>(
       endpoint: '/businesses/${widget.businessId}/documents',
-      title: 'اسناد حسابداری',
+      title: t.accountingDocuments,
       excelEndpoint: '/businesses/${widget.businessId}/documents/export/excel',
       customHeaderActions: [
         if (_selectedCount > 0)
@@ -452,9 +626,13 @@ class _DocumentsPageState extends State<DocumentsPage> {
       ],
       getExportParams: () => {
         'business_id': widget.businessId,
-        'document_type': _selectedDocumentType,
+        if (_selectedDocumentType != null)
+          'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
       },
       additionalParams: {
         if (_selectedDocumentType != null)
@@ -463,6 +641,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
           'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null)
           'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
       },
       columns: [
         // شماره سند
@@ -610,7 +791,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           ],
         ),
       ],
-      searchFields: ['code', 'description'],
+      searchFields: ['code', 'description', 'created_by_name'],
       filterFields: ['document_type'],
       dateRangeField: 'document_date',
       showSearch: true,

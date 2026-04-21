@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, date
 from decimal import Decimal
 import logging
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func, exists
 from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
@@ -334,6 +334,39 @@ def get_transfer(db: Session, document_id: int) -> Optional[Dict[str, Any]]:
     return transfer_document_to_dict(db, document)
 
 
+def _apply_transfer_search(db: Session, q, query: Dict[str, Any]):
+    """جستجو بر اساس کد، شرح یا نام ایجادکننده وقتی search_fields ارسال شده باشد."""
+    search = query.get("search")
+    if not search:
+        return q
+    pattern = f"%{search}%"
+    search_fields = query.get("search_fields")
+    if not search_fields or not isinstance(search_fields, list):
+        return q.filter(Document.code.ilike(pattern))
+    sf_set = {str(x) for x in search_fields}
+    parts = []
+    if "code" in sf_set:
+        parts.append(Document.code.ilike(pattern))
+    if "description" in sf_set:
+        parts.append(Document.description.ilike(pattern))
+    if "created_by_name" in sf_set:
+        uid_rows = db.query(User.id).filter(
+            or_(
+                func.concat(User.first_name, " ", User.last_name).ilike(pattern),
+                User.first_name.ilike(pattern),
+                User.last_name.ilike(pattern),
+            )
+        ).all()
+        uid_list = [row[0] for row in uid_rows if row[0] is not None]
+        if uid_list:
+            parts.append(Document.created_by_user_id.in_(uid_list))
+        else:
+            parts.append(Document.id == -1)
+    if not parts:
+        return q.filter(Document.code.ilike(pattern))
+    return q.filter(or_(*parts))
+
+
 def list_transfers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
     q = db.query(Document).filter(
         and_(
@@ -372,6 +405,58 @@ def list_transfers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict
         except Exception:
             pass
 
+    project_id_raw = query.get("project_id")
+    if project_id_raw is not None:
+        try:
+            q = q.filter(Document.project_id == int(project_id_raw))
+        except (TypeError, ValueError):
+            pass
+
+    ba_f = query.get("bank_account_id")
+    if ba_f is not None:
+        try:
+            bid = int(ba_f)
+            q = q.filter(
+                exists().where(
+                    and_(
+                        DocumentLine.document_id == Document.id,
+                        DocumentLine.bank_account_id == bid,
+                    )
+                )
+            )
+        except (TypeError, ValueError):
+            pass
+
+    cr_f = query.get("cash_register_id")
+    if cr_f is not None:
+        try:
+            cid = int(cr_f)
+            q = q.filter(
+                exists().where(
+                    and_(
+                        DocumentLine.document_id == Document.id,
+                        DocumentLine.cash_register_id == cid,
+                    )
+                )
+            )
+        except (TypeError, ValueError):
+            pass
+
+    pc_f = query.get("petty_cash_id")
+    if pc_f is not None:
+        try:
+            pid_pc = int(pc_f)
+            q = q.filter(
+                exists().where(
+                    and_(
+                        DocumentLine.document_id == Document.id,
+                        DocumentLine.petty_cash_id == pid_pc,
+                    )
+                )
+            )
+        except (TypeError, ValueError):
+            pass
+
     # Apply advanced filters (e.g., DataTable date range filters)
     filters = query.get("filters")
     if filters and isinstance(filters, (list, tuple)):
@@ -393,12 +478,24 @@ def list_transfers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict
                                 q = q.filter(col <= dt)
                         except Exception:
                             pass
+                elif prop == "project_name" and str(op).strip().lower() == "in" and val:
+                    ids: List[int] = []
+                    for x in (val if isinstance(val, list) else [val]):
+                        try:
+                            ids.append(int(x))
+                        except (TypeError, ValueError):
+                            continue
+                    if ids:
+                        q = q.filter(Document.project_id.in_(ids))
+                elif prop == "project_name" and str(op).strip().lower() == "=" and val not in (None, ""):
+                    try:
+                        q = q.filter(Document.project_id == int(val))
+                    except (TypeError, ValueError):
+                        pass
             except Exception:
                 pass
 
-    search = query.get("search")
-    if search:
-        q = q.filter(Document.code.ilike(f"%{search}%"))
+    q = _apply_transfer_search(db, q, query)
 
     from app.services.document_list_sort import apply_document_dynamic_ordering_from_dict
 

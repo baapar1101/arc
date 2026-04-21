@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, String
 from adapters.db.models.person import Person, PersonBankAccount, PersonType
 from adapters.db.models.business import Business
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.api.v1.schema_models.person import (
@@ -229,8 +230,13 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
     )
 
 
-def get_person_by_id(db: Session, person_id: int, business_id: int) -> Optional[Dict[str, Any]]:
-    """دریافت شخص بر اساس شناسه"""
+def get_person_by_id(
+    db: Session,
+    person_id: int,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """دریافت شخص بر اساس شناسه (همراه با تراز و وضعیت مالی در سال مالی انتخاب‌شده یا جاری)"""
     person = (
         db.query(Person)
         .options(joinedload(Person.person_group))
@@ -241,7 +247,19 @@ def get_person_by_id(db: Session, person_id: int, business_id: int) -> Optional[
     if not person:
         return None
     
-    return _person_to_dict(person)
+    data = _person_to_dict(person)
+
+    fy_id = fiscal_year_id
+    if not fy_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(FiscalYear.business_id == business_id, FiscalYear.is_last == True)
+        ).first()
+        fy_id = fiscal_year.id if fiscal_year else None
+
+    balance, status = calculate_person_balance(db, person_id, fiscal_year_id=fy_id)
+    data["balance"] = balance
+    data["status"] = status
+    return data
 
 
 def _person_sort_needs_balance_materialization(query_info: Dict[str, Any]) -> bool:

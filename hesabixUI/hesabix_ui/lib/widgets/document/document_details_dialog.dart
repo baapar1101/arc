@@ -2548,6 +2548,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     rows: productLines.asMap().entries.map((entry) {
                       final index = entry.key;
                       final line = entry.value as Map<String, dynamic>;
+                      final productName = line['product_name'] as String? ?? '-';
                       final extraInfo = line['extra_info'] as Map<String, dynamic>?;
                       final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
                       final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
@@ -2584,11 +2585,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             ),
                           ),
                           DataCell(
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                line['product_name'] as String? ?? '-',
-                                overflow: TextOverflow.ellipsis,
+                            Tooltip(
+                              message: productName,
+                              child: SizedBox(
+                                width: 200,
+                                child: Text(
+                                  productName,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
                           ),

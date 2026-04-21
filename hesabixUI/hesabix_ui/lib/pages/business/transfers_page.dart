@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
@@ -14,6 +15,11 @@ import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/transfer/transfer_details_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../services/business_dashboard_service.dart';
+import '../../widgets/project/project_selector_widget.dart';
+import '../../widgets/invoice/bank_account_combobox_widget.dart';
+import '../../widgets/invoice/cash_register_combobox_widget.dart';
+import '../../widgets/invoice/petty_cash_combobox_widget.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -49,10 +55,23 @@ class TransfersPage extends StatefulWidget {
 class _TransfersPageState extends State<TransfersPage> {
   // کنترل جدول برای دسترسی به refresh
   final GlobalKey _tableKey = GlobalKey();
+  late final BusinessDashboardService _dashboardService =
+      BusinessDashboardService(widget.apiClient);
+
   DateTime? _fromDate;
   DateTime? _toDate;
+
+  int? _selectedFiscalYearId;
+  List<Map<String, dynamic>> _fiscalYears = [];
+  bool _fiscalYearsResolved = false;
+
+  int? _selectedProjectId;
+  BankAccountOption? _filterBankAccount;
+  CashRegisterOption? _filterCashRegister;
+  PettyCashOption? _filterPettyCash;
+  bool _showDesktopFilters = false;
+
   List<FilterOption> _projectFilterOptions = [];
-  bool _loadingProjects = false;
 
   @override
   void initState() {
@@ -60,6 +79,29 @@ class _TransfersPageState extends State<TransfersPage> {
     // Register this page instance for external refresh access
     TransfersPage._pageStates[widget.businessId] = this;
     _loadProjects();
+    _loadFiscalYears();
+  }
+
+  Future<void> _loadFiscalYears() async {
+    try {
+      final items = await _dashboardService.listFiscalYears(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _fiscalYears = items;
+        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
+          final current = _fiscalYears.firstWhere(
+            (fy) => fy['is_current'] == true,
+            orElse: () => _fiscalYears.first,
+          );
+          _selectedFiscalYearId = current['id'] as int?;
+        }
+        _fiscalYearsResolved = true;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _fiscalYearsResolved = true);
+      }
+    }
   }
   
   @override
@@ -72,8 +114,6 @@ class _TransfersPageState extends State<TransfersPage> {
   /// بارگذاری لیست پروژه‌ها برای فیلتر
   Future<void> _loadProjects() async {
     if (!mounted) return;
-    setState(() => _loadingProjects = true);
-    
     try {
       final response = await widget.apiClient.post(
         '/businesses/${widget.businessId}/projects/search',
@@ -93,13 +133,11 @@ class _TransfersPageState extends State<TransfersPage> {
               label: p['name'] ?? 'پروژه ${p['id']}',
               description: p['code'],
             )).toList();
-            _loadingProjects = false;
           });
         }
       }
     } catch (e) {
       debugPrint('خطا در بارگذاری پروژه‌ها: $e');
-      if (mounted) setState(() => _loadingProjects = false);
     }
   }
 
@@ -124,6 +162,7 @@ class _TransfersPageState extends State<TransfersPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final contentPadding = ResponsiveHelper.getPadding(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -132,27 +171,51 @@ class _TransfersPageState extends State<TransfersPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(t),
-              _buildFilters(t),
+              _buildHeader(t, isMobile),
+              _buildFilters(t, isMobile),
               Padding(
-                padding: EdgeInsets.fromLTRB(contentPadding, 8, contentPadding, 8),
-                child: DataTableWidget<TransferDocument>(
-                  key: _tableKey,
-                  config: _buildTableConfig(t),
-                  fromJson: (json) => TransferDocument.fromJson(json),
-                  calendarController: widget.calendarController,
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  8,
+                  contentPadding,
+                  isMobile ? 88 : 8,
                 ),
+                child: _fiscalYearsResolved
+                    ? DataTableWidget<TransferDocument>(
+                        key: _tableKey,
+                        config: _buildTableConfig(t),
+                        fromJson: (json) => TransferDocument.fromJson(json),
+                        calendarController: widget.calendarController,
+                      )
+                    : const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
               ),
             ],
           ),
         ),
       ),
+      floatingActionButton: isMobile
+          ? FloatingActionButton.extended(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            )
+          : null,
     );
   }
 
-  Widget _buildHeader(AppLocalizations t) {
+  Widget _buildHeader(AppLocalizations t, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -173,69 +236,553 @@ class _TransfersPageState extends State<TransfersPage> {
               ],
             ),
           ),
-          Tooltip(
-            message: 'افزودن انتقال جدید',
-            child: FilledButton.icon(
-              onPressed: _onAddNew,
-              icon: const Icon(Icons.add),
-              label: Text(t.add),
+          if (!isMobile)
+            Tooltip(
+              message: 'افزودن انتقال جدید',
+              child: FilledButton.icon(
+                onPressed: _onAddNew,
+                icon: const Icon(Icons.add),
+                label: Text(t.add),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildFilters(AppLocalizations t) {
+  Widget _buildFilters(AppLocalizations t, bool isMobile) {
+    final padding = ResponsiveHelper.getPadding(context);
+
+    if (isMobile) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _buildExternalFilterChips(t),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => _openMobileFiltersSheet(t),
+              icon: const Icon(Icons.tune),
+              tooltip: 'فیلترها',
+            ),
+            if (_hasExternalFiltersActive()) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  _clearExternalFilters();
+                  _refreshData();
+                },
+                icon: const Icon(Icons.clear_all),
+                tooltip: t.clear,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: DateInputField(
-                    value: _fromDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _fromDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'از تاریخ',
-                    hintText: 'انتخاب تاریخ شروع',
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _buildExternalFilterChips(t),
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    setState(() => _showDesktopFilters = !_showDesktopFilters),
+                icon:
+                    Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
+                label:
+                    Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+              ),
+              if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
-                Expanded(
-                  child: DateInputField(
-                    value: _toDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _toDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'تا تاریخ',
-                    hintText: 'انتخاب تاریخ پایان',
-                  ),
-                ),
                 IconButton(
                   onPressed: () {
-                    setState(() {
-                      _fromDate = null;
-                      _toDate = null;
-                    });
+                    _clearExternalFilters();
                     _refreshData();
                   },
-                  icon: const Icon(Icons.clear),
-                  tooltip: 'پاک کردن فیلتر تاریخ',
+                  icon: const Icon(Icons.clear_all),
+                  tooltip: t.clear,
                 ),
               ],
-            ),
+            ],
           ),
+          if (_showDesktopFilters) ...[
+            const SizedBox(height: 10),
+            _buildFiltersForm(
+              t: t,
+              isMobileLayout: false,
+              fiscalYearId: _selectedFiscalYearId,
+              projectId: _selectedProjectId,
+              filterBankAccount: _filterBankAccount,
+              filterCashRegister: _filterCashRegister,
+              filterPettyCash: _filterPettyCash,
+              fromDate: _fromDate,
+              toDate: _toDate,
+              onFiscalYearChanged: (v) {
+                setState(() => _selectedFiscalYearId = v);
+                _refreshData();
+              },
+              onProjectChanged: (v) {
+                setState(() => _selectedProjectId = v);
+                _refreshData();
+              },
+              onBankAccountChanged: (v) {
+                setState(() => _filterBankAccount = v);
+                _refreshData();
+              },
+              onCashRegisterChanged: (v) {
+                setState(() => _filterCashRegister = v);
+                _refreshData();
+              },
+              onPettyCashChanged: (v) {
+                setState(() => _filterPettyCash = v);
+                _refreshData();
+              },
+              onFromDateChanged: (v) {
+                setState(() => _fromDate = v);
+                _refreshData();
+              },
+              onToDateChanged: (v) {
+                setState(() => _toDate = v);
+                _refreshData();
+              },
+              onClearDateRange: () {
+                setState(() {
+                  _fromDate = null;
+                  _toDate = null;
+                });
+                _refreshData();
+              },
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  List<Widget> _buildExternalFilterChips(AppLocalizations t) {
+    final chips = <Widget>[];
+
+    if (_selectedFiscalYearId != null && _fiscalYears.isNotEmpty) {
+      final fy = _fiscalYears
+          .where((e) => (e['id'] as int?) == _selectedFiscalYearId)
+          .toList();
+      final title = fy.isNotEmpty ? (fy.first['title'] ?? '').toString() : '';
+      chips.add(Chip(
+        label: Text(title.isNotEmpty
+            ? title
+            : '${t.fiscalYear}: $_selectedFiscalYearId'),
+        avatar: const Icon(Icons.event_note, size: 16),
+      ));
+    }
+
+    if (_selectedProjectId != null) {
+      final label = _projectFilterOptions
+          .where((o) => o.value == _selectedProjectId.toString())
+          .map((o) => o.label)
+          .firstWhere(
+            (e) => e.trim().isNotEmpty,
+            orElse: () => 'پروژه: $_selectedProjectId',
+          );
+      chips.add(Chip(
+        label: Text(label),
+        avatar: const Icon(Icons.folder_open, size: 16),
+      ));
+    }
+
+    if (_filterBankAccount != null) {
+      chips.add(Chip(
+        label: Text(_filterBankAccount!.name),
+        avatar: const Icon(Icons.account_balance, size: 16),
+      ));
+    }
+    if (_filterCashRegister != null) {
+      chips.add(Chip(
+        label: Text(_filterCashRegister!.name),
+        avatar: const Icon(Icons.point_of_sale, size: 16),
+      ));
+    }
+    if (_filterPettyCash != null) {
+      chips.add(Chip(
+        label: Text(_filterPettyCash!.name),
+        avatar: const Icon(Icons.work_outline, size: 16),
+      ));
+    }
+
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _fromDate!, widget.calendarController.isJalali)
+          : '—';
+      final to = _toDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _toDate!, widget.calendarController.isJalali)
+          : '—';
+      chips.add(Chip(
+        label: Text('${t.documentDate}: $from → $to'),
+        avatar: const Icon(Icons.date_range, size: 16),
+      ));
+    }
+
+    if (chips.isEmpty) {
+      chips.add(Chip(label: Text(t.all)));
+    }
+    return chips;
+  }
+
+  bool _hasExternalFiltersActive() {
+    return _fromDate != null ||
+        _toDate != null ||
+        _selectedFiscalYearId != null ||
+        _selectedProjectId != null ||
+        _filterBankAccount != null ||
+        _filterCashRegister != null ||
+        _filterPettyCash != null;
+  }
+
+  void _clearExternalFilters() {
+    setState(() {
+      _fromDate = null;
+      _toDate = null;
+      _selectedProjectId = null;
+      _filterBankAccount = null;
+      _filterCashRegister = null;
+      _filterPettyCash = null;
+    });
+    _refreshData();
+  }
+
+  Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
+    int? fiscalYearId = _selectedFiscalYearId;
+    int? projectId = _selectedProjectId;
+    BankAccountOption? filterBankAccount = _filterBankAccount;
+    CashRegisterOption? filterCashRegister = _filterCashRegister;
+    PettyCashOption? filterPettyCash = _filterPettyCash;
+    DateTime? fromDate = _fromDate;
+    DateTime? toDate = _toDate;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 8,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text('فیلترها',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            projectId = null;
+                            filterBankAccount = null;
+                            filterCashRegister = null;
+                            filterPettyCash = null;
+                            fromDate = null;
+                            toDate = null;
+                          });
+                        },
+                        child: Text(t.clear),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: _buildFiltersForm(
+                        t: t,
+                        isMobileLayout: true,
+                        fiscalYearId: fiscalYearId,
+                        projectId: projectId,
+                        filterBankAccount: filterBankAccount,
+                        filterCashRegister: filterCashRegister,
+                        filterPettyCash: filterPettyCash,
+                        fromDate: fromDate,
+                        toDate: toDate,
+                        onFiscalYearChanged: (v) =>
+                            setModalState(() => fiscalYearId = v),
+                        onProjectChanged: (v) =>
+                            setModalState(() => projectId = v),
+                        onBankAccountChanged: (v) =>
+                            setModalState(() => filterBankAccount = v),
+                        onCashRegisterChanged: (v) =>
+                            setModalState(() => filterCashRegister = v),
+                        onPettyCashChanged: (v) =>
+                            setModalState(() => filterPettyCash = v),
+                        onFromDateChanged: (v) =>
+                            setModalState(() => fromDate = v),
+                        onToDateChanged: (v) => setModalState(() => toDate = v),
+                        onClearDateRange: () => setModalState(() {
+                          fromDate = null;
+                          toDate = null;
+                        }),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.check),
+                      label: Text(t.confirm),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true && mounted) {
+      if (fromDate != null &&
+          toDate != null &&
+          fromDate!.isAfter(toDate!)) {
+        final swap = fromDate;
+        fromDate = toDate;
+        toDate = swap;
+      }
+      setState(() {
+        _selectedFiscalYearId = fiscalYearId;
+        _selectedProjectId = projectId;
+        _filterBankAccount = filterBankAccount;
+        _filterCashRegister = filterCashRegister;
+        _filterPettyCash = filterPettyCash;
+        _fromDate = fromDate;
+        _toDate = toDate;
+      });
+      _refreshData();
+    }
+  }
+
+  Widget _buildFiltersForm({
+    required AppLocalizations t,
+    required bool isMobileLayout,
+    required int? fiscalYearId,
+    required int? projectId,
+    required BankAccountOption? filterBankAccount,
+    required CashRegisterOption? filterCashRegister,
+    required PettyCashOption? filterPettyCash,
+    required DateTime? fromDate,
+    required DateTime? toDate,
+    required ValueChanged<int?> onFiscalYearChanged,
+    required ValueChanged<int?> onProjectChanged,
+    required ValueChanged<BankAccountOption?> onBankAccountChanged,
+    required ValueChanged<CashRegisterOption?> onCashRegisterChanged,
+    required ValueChanged<PettyCashOption?> onPettyCashChanged,
+    required ValueChanged<DateTime?> onFromDateChanged,
+    required ValueChanged<DateTime?> onToDateChanged,
+    required VoidCallback onClearDateRange,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (_fiscalYears.isNotEmpty)
+              SizedBox(
+                width: isMobileLayout ? double.infinity : 280,
+                child: DropdownButtonFormField<int>(
+                  value: fiscalYearId,
+                  decoration: InputDecoration(
+                    labelText: t.fiscalYear,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                  ),
+                  items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                    final id = fy['id'] as int?;
+                    final title = (fy['title'] ?? '').toString();
+                    return DropdownMenuItem<int>(
+                      value: id,
+                      child: Text(
+                        title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: onFiscalYearChanged,
+                ),
+              ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: ProjectSelectorWidget(
+                businessId: widget.businessId,
+                apiClient: widget.apiClient,
+                selectedProjectId: projectId,
+                onChanged: onProjectChanged,
+                authStore: widget.authStore,
+                calendarController: widget.calendarController,
+                allowNull: true,
+                labelText: 'پروژه',
+              ),
+            ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: BankAccountComboboxWidget(
+                businessId: widget.businessId,
+                selectedAccountId: filterBankAccount?.id,
+                onChanged: onBankAccountChanged,
+                label: 'بانک',
+                hintText: 'همه حساب‌های بانکی',
+              ),
+            ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: CashRegisterComboboxWidget(
+                businessId: widget.businessId,
+                selectedRegisterId: filterCashRegister?.id,
+                onChanged: onCashRegisterChanged,
+                label: 'صندوق',
+                hintText: 'همه صندوق‌ها',
+              ),
+            ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: PettyCashComboboxWidget(
+                businessId: widget.businessId,
+                selectedPettyCashId: filterPettyCash?.id,
+                onChanged: onPettyCashChanged,
+                label: 'تنخواه‌گردان',
+                hintText: 'همه تنخواه‌ها',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (isMobileLayout)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: DateInputField(
+                      value: fromDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onFromDateChanged,
+                      labelText: t.dateFrom,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DateInputField(
+                      value: toDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onToDateChanged,
+                      labelText: t.dateTo,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: onClearDateRange,
+                    icon: const Icon(Icons.clear),
+                    tooltip: t.clearDateFilter,
+                  ),
+                ],
+              ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DateInputField(
+                        value: fromDate,
+                        calendarController: widget.calendarController,
+                        onChanged: onFromDateChanged,
+                        labelText: t.dateFrom,
+                        hintText: t.selectDate,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DateInputField(
+                        value: toDate,
+                        calendarController: widget.calendarController,
+                        onChanged: onToDateChanged,
+                        labelText: t.dateTo,
+                        hintText: t.selectDate,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: onClearDateRange,
+                      icon: const Icon(Icons.clear),
+                      tooltip: t.clearDateFilter,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Map<String, dynamic> _transferTableExtraParams() {
+    final m = <String, dynamic>{
+      if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+      if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+    };
+    final ba = int.tryParse(_filterBankAccount?.id ?? '');
+    if (ba != null) m['bank_account_id'] = ba;
+    final cr = int.tryParse(_filterCashRegister?.id ?? '');
+    if (cr != null) m['cash_register_id'] = cr;
+    final pc = int.tryParse(_filterPettyCash?.id ?? '');
+    if (pc != null) m['petty_cash_id'] = pc;
+    return m;
   }
 
   DataTableConfig<TransferDocument> _buildTableConfig(AppLocalizations t) {
@@ -247,10 +794,7 @@ class _TransfersPageState extends State<TransfersPage> {
       businessId: widget.businessId,
       reportModuleKey: 'transfers',
       reportSubtype: 'list',
-      getExportParams: () => {
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
-      },
+      getExportParams: _transferTableExtraParams,
       columns: [
         TextColumn(
           'code',
@@ -320,7 +864,7 @@ class _TransfersPageState extends State<TransfersPage> {
           ],
         ),
       ],
-      searchFields: ['code', 'created_by_name', 'source', 'destination'],
+      searchFields: ['code', 'description', 'created_by_name', 'source', 'destination'],
       dateRangeField: 'document_date',
       showSearch: true,
       showFilters: true,
@@ -336,10 +880,7 @@ class _TransfersPageState extends State<TransfersPage> {
       defaultPageSize: 20,
       pageSizeOptions: [10, 20, 50, 100],
       // انتخاب سطرها در این صفحه استفاده خاصی ندارد
-      additionalParams: {
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
-      },
+      additionalParams: _transferTableExtraParams(),
       onRowTap: (item) => _onView(item as TransferDocument),
       onRowDoubleTap: (item) => _onEdit(item as TransferDocument),
       emptyStateMessage: 'هیچ سند انتقالی یافت نشد',

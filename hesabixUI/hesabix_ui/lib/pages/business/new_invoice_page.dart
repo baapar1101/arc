@@ -37,6 +37,7 @@ import '../../services/person_service.dart';
 import '../../services/report_template_service.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_line_item.dart';
+import '../../utils/invoice_line_preferences.dart';
 import '../../services/invoice_service.dart';
 import '../../services/credit_api_service.dart';
 import '../../models/credit_models.dart';import '../../utils/snackbar_helper.dart';
@@ -218,7 +219,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         quantity: 1,
         unitPrice: 0,
         unitPriceSource: 'manual',
-        discountType: 'amount',
         discountValue: 0,
         taxRate: 0,
       ),
@@ -234,6 +234,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // بارگذاری تنظیمات چاپ کسب‌وکار
     _loadPrintSettings();
     _loadPrintTemplates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applySavedInvoiceLineDiscountType();
+    });
+  }
+
+  /// آخرین نوع تخفیف ذخیره‌شده (درصدی/مقداری) را روی ردیف‌های اولیه اعمال می‌کند.
+  Future<void> _applySavedInvoiceLineDiscountType() async {
+    final dt = await InvoiceLinePreferences.getDefaultDiscountType();
+    if (!mounted) return;
+    setState(() {
+      if (_lineItems.isEmpty) return;
+      _lineItems[0] = _lineItems[0].copyWith(discountType: dt);
+    });
   }
 
   void _attachTabListener() {
@@ -1386,6 +1399,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             isRequired: false,
                             label: 'طرف حساب',
                             hintText: 'انتخاب طرف حساب',
+                            showFinancialBalance: true,
                           ),
                         // تامین‌کننده (فقط برای خرید و برگشت از خرید)
                         if (_selectedInvoiceType == InvoiceType.purchase || 
@@ -1393,6 +1407,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           const SizedBox(height: 16),
                           PersonComboboxWidget(
                             businessId: widget.businessId,
+                            showFinancialBalance: true,
                             selectedPerson: _selectedSupplier,
                             onChanged: (person) {
                               setState(() {
@@ -1677,11 +1692,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                           isRequired: false,
                                           label: 'طرف حساب',
                                           hintText: 'انتخاب طرف حساب',
+                                          showFinancialBalance: true,
                                         )
                                       : (_selectedInvoiceType == InvoiceType.purchase || 
                                           _selectedInvoiceType == InvoiceType.purchaseReturn)
                                           ? PersonComboboxWidget(
                                               businessId: widget.businessId,
+                                              showFinancialBalance: true,
                                               selectedPerson: _selectedSupplier,
                                               onChanged: (person) {
                                                 setState(() {
@@ -2460,7 +2477,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       item.extraInfo?['movement'] == 'out' || 
       item.extraInfo?['movement'] == 'in'
     );
-    
+    var insertedDefaultLineAfterProductionClear = false;
+
     setState(() {
       _selectedInvoiceType = newType;
       _hasUserCustomizedSettings = false;
@@ -2496,12 +2514,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         
         // اگر هیچ ردیفی باقی نماند، یک ردیف پیش‌فرض اضافه کن
         if (_lineItems.isEmpty) {
+          insertedDefaultLineAfterProductionClear = true;
           _lineItems = [
             InvoiceLineItem(
               quantity: 1,
               unitPrice: 0,
               unitPriceSource: 'manual',
-              discountType: 'amount',
               discountValue: 0,
               taxRate: 0,
             ),
@@ -2533,6 +2551,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         _attachTabListener();
       }
     });
+
+    if (insertedDefaultLineAfterProductionClear) {
+      InvoiceLinePreferences.getDefaultDiscountType().then((dt) {
+        if (!mounted) return;
+        setState(() {
+          if (_lineItems.length == 1) {
+            _lineItems[0] = _lineItems[0].copyWith(discountType: dt);
+          }
+        });
+      });
+    }
     
     // نمایش هشدار به کاربر در صورت وجود ردیف‌های BOM
     if (hasBomLines && newType != InvoiceType.production) {

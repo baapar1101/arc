@@ -6347,6 +6347,24 @@ abstract class AppLocalizations {
   /// **'Inventory control'**
   String get inventoryControl;
 
+  /// No description provided for @inventoryControlHelpSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On: stock is tracked and this product is included on invoice-linked warehouse documents. Off: the product is skipped when warehouse drafts are generated from invoices.'**
+  String get inventoryControlHelpSubtitle;
+
+  /// No description provided for @inventoryControlHelpDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Turning this off does not mean “allow posting issues with negative stock.” To sometimes post outgoing warehouse documents despite insufficient stock, use the shortage / negative-stock policy in business settings—that is separate from this switch.'**
+  String get inventoryControlHelpDetail;
+
+  /// No description provided for @inventoryUniqueModeRequiresTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'To use unique inventory mode, enable “inventory control” first'**
+  String get inventoryUniqueModeRequiresTrack;
+
   /// No description provided for @reorderPoint.
   ///
   /// In en, this message translates to:
@@ -15179,6 +15197,96 @@ abstract class AppLocalizations {
   /// **'Collapse All'**
   String get collapseAllCategories;
 
+  /// No description provided for @categoryTreeShowProductsInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Show products in this category'**
+  String get categoryTreeShowProductsInCategory;
+
+  /// No description provided for @categoryTreeActionsMenuTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get categoryTreeActionsMenuTooltip;
+
+  /// No description provided for @categoryTreeMoreActionsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get categoryTreeMoreActionsTooltip;
+
+  /// No description provided for @categoryLoadProductsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading products: {error}'**
+  String categoryLoadProductsError(String error);
+
+  /// No description provided for @categoryTreeNoProductsInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'No products in this category'**
+  String get categoryTreeNoProductsInCategory;
+
+  /// No description provided for @categoryDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional category description'**
+  String get categoryDescriptionHint;
+
+  /// No description provided for @categorySortOrderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Display order'**
+  String get categorySortOrderLabel;
+
+  /// No description provided for @categorySortOrderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort number (lower appears first)'**
+  String get categorySortOrderHint;
+
+  /// No description provided for @categorySortOrderRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Display order is required'**
+  String get categorySortOrderRequired;
+
+  /// No description provided for @categorySortOrderInvalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid number'**
+  String get categorySortOrderInvalidNumber;
+
+  /// No description provided for @categoryParentFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent category'**
+  String get categoryParentFieldLabel;
+
+  /// No description provided for @productCategoryFilterBrowseAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get productCategoryFilterBrowseAll;
+
+  /// No description provided for @productCategorySubcategoriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcategories'**
+  String get productCategorySubcategoriesLabel;
+
+  /// No description provided for @categoryPickerSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories found'**
+  String get categoryPickerSearchEmpty;
+
+  /// No description provided for @categoryTreeAllCategoriesOption.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get categoryTreeAllCategoriesOption;
+
   /// No description provided for @noSettingsFound.
   ///
   /// In en, this message translates to:
@@ -16877,6 +16985,312 @@ abstract class AppLocalizations {
   /// **'Customer club is disabled for this business.'**
   String get customerClubSummaryInactive;
 
+  /// No description provided for @customerClubTabAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM / CLV analytics'**
+  String get customerClubTabAnalytics;
+
+  /// No description provided for @customerClubAnalyticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer analytics & segments'**
+  String get customerClubAnalyticsTitle;
+
+  /// No description provided for @customerClubAnalyticsRecalculate.
+  ///
+  /// In en, this message translates to:
+  /// **'Recalculate'**
+  String get customerClubAnalyticsRecalculate;
+
+  /// No description provided for @customerClubAnalyticsRecalculating.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating…'**
+  String get customerClubAnalyticsRecalculating;
+
+  /// No description provided for @customerClubAnalyticsNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data yet. Enable RFM or CLV in settings, then tap Recalculate.'**
+  String get customerClubAnalyticsNoData;
+
+  /// No description provided for @customerClubAnalyticsDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable “RFM analytics” and/or “CLV” in customer club settings to use this tab.'**
+  String get customerClubAnalyticsDisabled;
+
+  /// No description provided for @customerClubAnalyticsWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Window: {start} to {end} ({months} mo)'**
+  String customerClubAnalyticsWindow(String start, String end, int months);
+
+  /// No description provided for @customerClubAnalyticsTotalPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers in report'**
+  String get customerClubAnalyticsTotalPersons;
+
+  /// No description provided for @customerClubAnalyticsLastRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Last computed'**
+  String get customerClubAnalyticsLastRun;
+
+  /// No description provided for @customerClubAnalyticsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name, company or code'**
+  String get customerClubAnalyticsSearch;
+
+  /// No description provided for @customerClubAnalyticsFilterSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Segment'**
+  String get customerClubAnalyticsFilterSegment;
+
+  /// No description provided for @customerClubAnalyticsAllSegments.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get customerClubAnalyticsAllSegments;
+
+  /// No description provided for @customerClubAnalyticsR.
+  ///
+  /// In en, this message translates to:
+  /// **'R (recency)'**
+  String get customerClubAnalyticsR;
+
+  /// No description provided for @customerClubAnalyticsF.
+  ///
+  /// In en, this message translates to:
+  /// **'F (frequency)'**
+  String get customerClubAnalyticsF;
+
+  /// No description provided for @customerClubAnalyticsM.
+  ///
+  /// In en, this message translates to:
+  /// **'M (monetary)'**
+  String get customerClubAnalyticsM;
+
+  /// No description provided for @customerClubAnalyticsCell.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM cell'**
+  String get customerClubAnalyticsCell;
+
+  /// No description provided for @customerClubAnalyticsCLV.
+  ///
+  /// In en, this message translates to:
+  /// **'CLV'**
+  String get customerClubAnalyticsCLV;
+
+  /// No description provided for @customerClubAnalyticsMonetary.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount (window)'**
+  String get customerClubAnalyticsMonetary;
+
+  /// No description provided for @customerClubAnalyticsRecency.
+  ///
+  /// In en, this message translates to:
+  /// **'Days since last purchase'**
+  String get customerClubAnalyticsRecency;
+
+  /// No description provided for @customerClubAnalyticsFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase count'**
+  String get customerClubAnalyticsFrequency;
+
+  /// No description provided for @customerClubAnalyticsSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Segment'**
+  String get customerClubAnalyticsSegment;
+
+  /// No description provided for @customerClubAnalyticsLoyaltyBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Points balance'**
+  String get customerClubAnalyticsLoyaltyBalance;
+
+  /// No description provided for @customerClubCompositeScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Composite score'**
+  String get customerClubCompositeScore;
+
+  /// No description provided for @customerClubAnalyticsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get customerClubAnalyticsRefresh;
+
+  /// No description provided for @customerClubAnalyticsLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get customerClubAnalyticsLoadMore;
+
+  /// No description provided for @customerClubAnalyticsSortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get customerClubAnalyticsSortLabel;
+
+  /// No description provided for @customerClubAnalyticsSortMonetary.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetary'**
+  String get customerClubAnalyticsSortMonetary;
+
+  /// No description provided for @customerClubAnalyticsSortRecency.
+  ///
+  /// In en, this message translates to:
+  /// **'Recency'**
+  String get customerClubAnalyticsSortRecency;
+
+  /// No description provided for @customerClubAnalyticsSortFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequency'**
+  String get customerClubAnalyticsSortFrequency;
+
+  /// No description provided for @customerClubAnalyticsSortClv.
+  ///
+  /// In en, this message translates to:
+  /// **'CLV'**
+  String get customerClubAnalyticsSortClv;
+
+  /// No description provided for @customerClubAnalyticsSortSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Segment'**
+  String get customerClubAnalyticsSortSegment;
+
+  /// No description provided for @customerClubAnalyticsSortComposite.
+  ///
+  /// In en, this message translates to:
+  /// **'Composite'**
+  String get customerClubAnalyticsSortComposite;
+
+  /// No description provided for @customerClubAnalyticsRecalculateDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Recalculation completed.'**
+  String get customerClubAnalyticsRecalculateDone;
+
+  /// No description provided for @customerClubSettingsSectionAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM & customer lifetime value (CLV)'**
+  String get customerClubSettingsSectionAnalytics;
+
+  /// No description provided for @customerClubRfmEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable RFM analytics (recency, frequency, monetary)'**
+  String get customerClubRfmEnabled;
+
+  /// No description provided for @customerClubClvEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable customer lifetime value (CLV) estimate'**
+  String get customerClubClvEnabled;
+
+  /// No description provided for @customerClubRfmWindowMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis window length (months)'**
+  String get customerClubRfmWindowMonths;
+
+  /// No description provided for @customerClubRfmMonetaryBasisLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetary basis for M'**
+  String get customerClubRfmMonetaryBasisLabel;
+
+  /// No description provided for @customerClubRfmScoringLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scoring method'**
+  String get customerClubRfmScoringLabel;
+
+  /// No description provided for @customerClubRfmScoringQuintiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Quintiles (classic)'**
+  String get customerClubRfmScoringQuintiles;
+
+  /// No description provided for @customerClubRfmScoringWeighted.
+  ///
+  /// In en, this message translates to:
+  /// **'Weighted composite'**
+  String get customerClubRfmScoringWeighted;
+
+  /// No description provided for @customerClubRfmWeightR.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight — recency (R)'**
+  String get customerClubRfmWeightR;
+
+  /// No description provided for @customerClubRfmWeightF.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight — frequency (F)'**
+  String get customerClubRfmWeightF;
+
+  /// No description provided for @customerClubRfmWeightM.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight — monetary (M)'**
+  String get customerClubRfmWeightM;
+
+  /// No description provided for @customerClubClvFormulaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'CLV formula'**
+  String get customerClubClvFormulaLabel;
+
+  /// No description provided for @customerClubClvFormulaHistorical.
+  ///
+  /// In en, this message translates to:
+  /// **'Sum of purchases in window'**
+  String get customerClubClvFormulaHistorical;
+
+  /// No description provided for @customerClubClvFormulaProjection.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg order × annual frequency × lifespan'**
+  String get customerClubClvFormulaProjection;
+
+  /// No description provided for @customerClubClvLifespanYears.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated customer lifespan (years) — for projection'**
+  String get customerClubClvLifespanYears;
+
+  /// No description provided for @customerClubAnalyticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After changing settings, run Recalculate from the analytics tab.'**
+  String get customerClubAnalyticsHint;
+
+  /// No description provided for @customerClubSortAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ascending'**
+  String get customerClubSortAsc;
+
+  /// No description provided for @customerClubSortDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Descending'**
+  String get customerClubSortDesc;
+
   /// No description provided for @identityInquiryTitle.
   ///
   /// In en, this message translates to:
@@ -17608,6 +18022,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.'**
   String get invoiceWarehouseReleaseBusinessSubtitle;
+
+  /// No description provided for @invoiceWarehouseReleaseStockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.'**
+  String get invoiceWarehouseReleaseStockHint;
 
   /// No description provided for @ftpBackupSettingsTitle.
   ///
@@ -18644,7 +19064,7 @@ abstract class AppLocalizations {
   /// No description provided for @inventoryNegativePolicyIntro.
   ///
   /// In en, this message translates to:
-  /// **'By default, outgoing warehouse documents cannot be posted if tracked stock is insufficient. Use the switches below to allow negative stock separately for bulk vs unique-tracked products. Transfers can always stay strict.'**
+  /// **'This is not the same as “inventory control” on each product—that toggle decides whether the item is tracked in stock at all. Here you decide whether posting an outgoing warehouse move can proceed when quantity on hand is insufficient (negative stock). By default posting is blocked; use the switches below for bulk vs unique items. Transfer documents can stay fully strict separately.'**
   String get inventoryNegativePolicyIntro;
 
   /// No description provided for @inventoryNegativePolicyBulkTitle.
@@ -19012,6 +19432,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Routes, daily plan, field visits and returns'**
   String get distributionSettingsSubtitle;
+
+  /// No description provided for @distributionSharedRoutingCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared route catalog for all visitors'**
+  String get distributionSharedRoutingCatalog;
+
+  /// No description provided for @distributionSharedRoutingCatalogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, each visitor only sees routes assigned to them.'**
+  String get distributionSharedRoutingCatalogHint;
+
+  /// No description provided for @distributionRequireVisitInDailyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Start visit only from daily plan'**
+  String get distributionRequireVisitInDailyPlan;
+
+  /// No description provided for @distributionRequireVisitInDailyPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The person must be on that visitor daily plan.'**
+  String get distributionRequireVisitInDailyPlanHint;
+
+  /// No description provided for @distributionSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved.'**
+  String get distributionSettingsSaved;
+
+  /// No description provided for @distributionNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get distributionNotesLabel;
+
+  /// No description provided for @reportsDistributionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution & field visits'**
+  String get reportsDistributionSection;
+
+  /// No description provided for @reportsDistributionDashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit & returns summary'**
+  String get reportsDistributionDashboardTitle;
+
+  /// No description provided for @reportsDistributionDashboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit and return statistics for a date range'**
+  String get reportsDistributionDashboardSubtitle;
 }
 
 class _AppLocalizationsDelegate

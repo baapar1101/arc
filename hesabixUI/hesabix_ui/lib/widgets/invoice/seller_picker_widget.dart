@@ -3,6 +3,7 @@ import '../../core/auth_store.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../person/person_financial_balance_banner.dart';
 
 class SellerPickerWidget extends StatefulWidget {
   final Person? selectedSeller;
@@ -12,6 +13,7 @@ class SellerPickerWidget extends StatefulWidget {
   final bool isRequired;
   final String label;
   final String hintText;
+  final bool showFinancialBalance;
 
   const SellerPickerWidget({
     super.key,
@@ -22,6 +24,7 @@ class SellerPickerWidget extends StatefulWidget {
     this.isRequired = false,
     this.label = 'فروشنده/بازاریاب',
     this.hintText = 'جست‌وجو و انتخاب فروشنده یا بازاریاب',
+    this.showFinancialBalance = true,
   });
 
   @override
@@ -172,39 +175,66 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final inlineBalance =
+        widget.showFinancialBalance && widget.selectedSeller?.id != null;
+
     return InkWell(
       onTap: _showSellerPicker,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+            color: colorScheme.outline.withValues(alpha: 0.5),
           ),
           borderRadius: BorderRadius.circular(8),
-          color: Theme.of(context).colorScheme.surface,
+          color: colorScheme.surface,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               Icons.person_search,
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
               size: 20,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: widget.selectedSeller != null
-                  ? Text(
-                      widget.selectedSeller!.displayName,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    )
+                  ? (inlineBalance
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.selectedSeller!.displayName,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: PersonFinancialBalanceBanner(
+                                selectedPerson: widget.selectedSeller,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          widget.selectedSeller!.displayName,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ))
                   : Text(
                       widget.hintText,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -219,7 +249,7 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
                   padding: const EdgeInsets.all(4),
                   child: Icon(
                     Icons.clear,
-                    color: Theme.of(context).colorScheme.error,
+                    color: colorScheme.error,
                     size: 18,
                   ),
                 ),
@@ -227,7 +257,7 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
             else
               Icon(
                 Icons.arrow_drop_down,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
               ),
           ],
         ),

@@ -3254,6 +3254,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryControl => 'Inventory control';
 
   @override
+  String get inventoryControlHelpSubtitle =>
+      'On: stock is tracked and this product is included on invoice-linked warehouse documents. Off: the product is skipped when warehouse drafts are generated from invoices.';
+
+  @override
+  String get inventoryControlHelpDetail =>
+      'Turning this off does not mean “allow posting issues with negative stock.” To sometimes post outgoing warehouse documents despite insufficient stock, use the shortage / negative-stock policy in business settings—that is separate from this switch.';
+
+  @override
+  String get inventoryUniqueModeRequiresTrack =>
+      'To use unique inventory mode, enable “inventory control” first';
+
+  @override
   String get reorderPoint => 'Reorder point';
 
   @override
@@ -8029,6 +8041,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get collapseAllCategories => 'Collapse All';
 
   @override
+  String get categoryTreeShowProductsInCategory =>
+      'Show products in this category';
+
+  @override
+  String get categoryTreeActionsMenuTooltip => 'Actions';
+
+  @override
+  String get categoryTreeMoreActionsTooltip => 'More';
+
+  @override
+  String categoryLoadProductsError(String error) {
+    return 'Error loading products: $error';
+  }
+
+  @override
+  String get categoryTreeNoProductsInCategory => 'No products in this category';
+
+  @override
+  String get categoryDescriptionHint => 'Optional category description';
+
+  @override
+  String get categorySortOrderLabel => 'Display order';
+
+  @override
+  String get categorySortOrderHint => 'Sort number (lower appears first)';
+
+  @override
+  String get categorySortOrderRequired => 'Display order is required';
+
+  @override
+  String get categorySortOrderInvalidNumber => 'Please enter a valid number';
+
+  @override
+  String get categoryParentFieldLabel => 'Parent category';
+
+  @override
+  String get productCategoryFilterBrowseAll => 'All categories';
+
+  @override
+  String get productCategorySubcategoriesLabel => 'Subcategories';
+
+  @override
+  String get categoryPickerSearchEmpty => 'No categories found';
+
+  @override
+  String get categoryTreeAllCategoriesOption => 'All categories';
+
+  @override
   String get noSettingsFound => 'No settings found';
 
   @override
@@ -8960,6 +9020,169 @@ class AppLocalizationsEn extends AppLocalizations {
       'Customer club is disabled for this business.';
 
   @override
+  String get customerClubTabAnalytics => 'RFM / CLV analytics';
+
+  @override
+  String get customerClubAnalyticsTitle => 'Customer analytics & segments';
+
+  @override
+  String get customerClubAnalyticsRecalculate => 'Recalculate';
+
+  @override
+  String get customerClubAnalyticsRecalculating => 'Calculating…';
+
+  @override
+  String get customerClubAnalyticsNoData =>
+      'No data yet. Enable RFM or CLV in settings, then tap Recalculate.';
+
+  @override
+  String get customerClubAnalyticsDisabled =>
+      'Enable “RFM analytics” and/or “CLV” in customer club settings to use this tab.';
+
+  @override
+  String customerClubAnalyticsWindow(String start, String end, int months) {
+    return 'Window: $start to $end ($months mo)';
+  }
+
+  @override
+  String get customerClubAnalyticsTotalPersons => 'Customers in report';
+
+  @override
+  String get customerClubAnalyticsLastRun => 'Last computed';
+
+  @override
+  String get customerClubAnalyticsSearch => 'Search name, company or code';
+
+  @override
+  String get customerClubAnalyticsFilterSegment => 'Segment';
+
+  @override
+  String get customerClubAnalyticsAllSegments => 'All';
+
+  @override
+  String get customerClubAnalyticsR => 'R (recency)';
+
+  @override
+  String get customerClubAnalyticsF => 'F (frequency)';
+
+  @override
+  String get customerClubAnalyticsM => 'M (monetary)';
+
+  @override
+  String get customerClubAnalyticsCell => 'RFM cell';
+
+  @override
+  String get customerClubAnalyticsCLV => 'CLV';
+
+  @override
+  String get customerClubAnalyticsMonetary => 'Amount (window)';
+
+  @override
+  String get customerClubAnalyticsRecency => 'Days since last purchase';
+
+  @override
+  String get customerClubAnalyticsFrequency => 'Purchase count';
+
+  @override
+  String get customerClubAnalyticsSegment => 'Segment';
+
+  @override
+  String get customerClubAnalyticsLoyaltyBalance => 'Points balance';
+
+  @override
+  String get customerClubCompositeScore => 'Composite score';
+
+  @override
+  String get customerClubAnalyticsRefresh => 'Refresh';
+
+  @override
+  String get customerClubAnalyticsLoadMore => 'Load more';
+
+  @override
+  String get customerClubAnalyticsSortLabel => 'Sort by';
+
+  @override
+  String get customerClubAnalyticsSortMonetary => 'Monetary';
+
+  @override
+  String get customerClubAnalyticsSortRecency => 'Recency';
+
+  @override
+  String get customerClubAnalyticsSortFrequency => 'Frequency';
+
+  @override
+  String get customerClubAnalyticsSortClv => 'CLV';
+
+  @override
+  String get customerClubAnalyticsSortSegment => 'Segment';
+
+  @override
+  String get customerClubAnalyticsSortComposite => 'Composite';
+
+  @override
+  String get customerClubAnalyticsRecalculateDone => 'Recalculation completed.';
+
+  @override
+  String get customerClubSettingsSectionAnalytics =>
+      'RFM & customer lifetime value (CLV)';
+
+  @override
+  String get customerClubRfmEnabled =>
+      'Enable RFM analytics (recency, frequency, monetary)';
+
+  @override
+  String get customerClubClvEnabled =>
+      'Enable customer lifetime value (CLV) estimate';
+
+  @override
+  String get customerClubRfmWindowMonths => 'Analysis window length (months)';
+
+  @override
+  String get customerClubRfmMonetaryBasisLabel => 'Monetary basis for M';
+
+  @override
+  String get customerClubRfmScoringLabel => 'Scoring method';
+
+  @override
+  String get customerClubRfmScoringQuintiles => 'Quintiles (classic)';
+
+  @override
+  String get customerClubRfmScoringWeighted => 'Weighted composite';
+
+  @override
+  String get customerClubRfmWeightR => 'Weight — recency (R)';
+
+  @override
+  String get customerClubRfmWeightF => 'Weight — frequency (F)';
+
+  @override
+  String get customerClubRfmWeightM => 'Weight — monetary (M)';
+
+  @override
+  String get customerClubClvFormulaLabel => 'CLV formula';
+
+  @override
+  String get customerClubClvFormulaHistorical => 'Sum of purchases in window';
+
+  @override
+  String get customerClubClvFormulaProjection =>
+      'Avg order × annual frequency × lifespan';
+
+  @override
+  String get customerClubClvLifespanYears =>
+      'Estimated customer lifespan (years) — for projection';
+
+  @override
+  String get customerClubAnalyticsHint =>
+      'After changing settings, run Recalculate from the analytics tab.';
+
+  @override
+  String get customerClubSortAsc => 'Ascending';
+
+  @override
+  String get customerClubSortDesc => 'Descending';
+
+  @override
   String get identityInquiryTitle => 'Identity Inquiry';
 
   @override
@@ -9359,6 +9582,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get invoiceWarehouseReleaseBusinessSubtitle =>
       'When post_inventory / auto_post_warehouse are omitted (or null) in the API, this mode applies.';
+
+  @override
+  String get invoiceWarehouseReleaseStockHint =>
+      'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.';
 
   @override
   String get ftpBackupSettingsTitle => 'FTP backup destination';
@@ -9915,7 +10142,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inventoryNegativePolicyIntro =>
-      'By default, outgoing warehouse documents cannot be posted if tracked stock is insufficient. Use the switches below to allow negative stock separately for bulk vs unique-tracked products. Transfers can always stay strict.';
+      'This is not the same as “inventory control” on each product—that toggle decides whether the item is tracked in stock at all. Here you decide whether posting an outgoing warehouse move can proceed when quantity on hand is insufficient (negative stock). By default posting is blocked; use the switches below for bulk vs unique items. Transfer documents can stay fully strict separately.';
 
   @override
   String get inventoryNegativePolicyBulkTitle =>
@@ -10116,4 +10343,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get distributionSettingsSubtitle =>
       'Routes, daily plan, field visits and returns';
+
+  @override
+  String get distributionSharedRoutingCatalog =>
+      'Shared route catalog for all visitors';
+
+  @override
+  String get distributionSharedRoutingCatalogHint =>
+      'When off, each visitor only sees routes assigned to them.';
+
+  @override
+  String get distributionRequireVisitInDailyPlan =>
+      'Start visit only from daily plan';
+
+  @override
+  String get distributionRequireVisitInDailyPlanHint =>
+      'The person must be on that visitor daily plan.';
+
+  @override
+  String get distributionSettingsSaved => 'Settings saved.';
+
+  @override
+  String get distributionNotesLabel => 'Notes';
+
+  @override
+  String get reportsDistributionSection => 'Distribution & field visits';
+
+  @override
+  String get reportsDistributionDashboardTitle => 'Visit & returns summary';
+
+  @override
+  String get reportsDistributionDashboardSubtitle =>
+      'Visit and return statistics for a date range';
 }

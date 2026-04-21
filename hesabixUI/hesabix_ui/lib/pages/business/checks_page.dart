@@ -400,6 +400,7 @@ class _ChecksPageState extends State<ChecksPage> {
               width: 360,
               child: PersonComboboxWidget(
                 businessId: widget.businessId,
+                showFinancialBalance: true,
                 selectedPerson: selectedPerson,
                 onChanged: (p) {
                   setDialogState(() {

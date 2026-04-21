@@ -1,18 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/document_model.dart';
+import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
+import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 
 /// نمای موبایل برای لیست اسناد (نمایش کارت‌ها + فیلتر BottomSheet + سرچ + Load more)
 class DocumentsMobileView extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
+  final AuthStore authStore;
+  final ApiClient apiClient;
   final DocumentService service;
 
   final Future<void> Function() onCreateNew;
@@ -25,6 +33,8 @@ class DocumentsMobileView extends StatefulWidget {
     super.key,
     required this.businessId,
     required this.calendarController,
+    required this.authStore,
+    required this.apiClient,
     required this.service,
     required this.onCreateNew,
     required this.onShowDetails,
@@ -43,6 +53,9 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
 
   final ScrollController _scrollCtrl = ScrollController();
 
+  late final BusinessDashboardService _dashboardService =
+      BusinessDashboardService(widget.apiClient);
+
   // Query state
   bool _loading = false;
   bool _loadingMore = false;
@@ -56,6 +69,12 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
   DateTime? _fromDate;
   DateTime? _toDate;
 
+  int? _fiscalYearId;
+  List<Map<String, dynamic>> _fiscalYears = [];
+  int? _projectId;
+  Person? _filterPerson;
+  List<Map<String, dynamic>> _projectItems = [];
+
   final List<DocumentModel> _items = [];
 
   // Selection state
@@ -68,7 +87,43 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     _scrollCtrl.addListener(_onScroll);
     _searchCtrl.addListener(_onSearchChanged);
     widget.calendarController.addListener(_onCalendarChanged);
+    _loadFiscalYears();
+    _loadProjectLabels();
     _fetch(reset: true);
+  }
+
+  Future<void> _loadProjectLabels() async {
+    try {
+      final response = await widget.apiClient.post(
+        '/businesses/${widget.businessId}/projects/search',
+        data: {'take': 1000, 'skip': 0, 'is_active': true},
+      );
+      if (response.data['success'] == true) {
+        final items = response.data['data']['items'] as List? ?? [];
+        if (mounted) {
+          setState(() {
+            _projectItems = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadFiscalYears() async {
+    try {
+      final items = await _dashboardService.listFiscalYears(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _fiscalYears = items;
+        if (_fiscalYearId == null && _fiscalYears.isNotEmpty) {
+          final current = _fiscalYears.firstWhere(
+            (fy) => fy['is_current'] == true,
+            orElse: () => _fiscalYears.first,
+          );
+          _fiscalYearId = current['id'] as int?;
+        }
+      });
+    } catch (_) {}
   }
 
   void _onCalendarChanged() {
@@ -125,8 +180,11 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
       final res = await widget.service.listDocuments(
         businessId: widget.businessId,
         documentType: _documentType,
+        fiscalYearId: _fiscalYearId,
         fromDate: _fromDate == null ? null : HesabixDateUtils.formatForApiDate(_fromDate!),
         toDate: _toDate == null ? null : HesabixDateUtils.formatForApiDate(_toDate!),
+        projectId: _projectId,
+        personId: _filterPerson?.id,
         search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
         page: _page,
         perPage: _perPage,
@@ -167,6 +225,9 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     String? draftType = _documentType;
     DateTime? draftFrom = _fromDate;
     DateTime? draftTo = _toDate;
+    int? draftFiscal = _fiscalYearId;
+    int? draftProject = _projectId;
+    Person? draftPerson = _filterPerson;
 
     await showModalBottomSheet(
       context: context,
@@ -182,9 +243,11 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                 top: 8,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 16,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   Row(
                     children: [
                       Text('فیلترها', style: Theme.of(context).textTheme.titleMedium),
@@ -195,107 +258,135 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                             draftType = null;
                             draftFrom = null;
                             draftTo = null;
+                            draftProject = null;
+                            draftPerson = null;
                           });
                         },
                         child: Text(t.clear),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    value: draftType,
-                    decoration: const InputDecoration(
-                      labelText: 'نوع سند',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    items: const [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('همه'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'manual',
-                        child: Text('سند دستی'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'expense',
-                        child: Text('هزینه'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'income',
-                        child: Text('درآمد'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'receipt',
-                        child: Text('دریافت'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'payment',
-                        child: Text('پرداخت'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'transfer',
-                        child: Text('انتقال'),
-                      ),
-                      DropdownMenuItem<String?>(
-                        value: 'invoice',
-                        child: Text('فاکتور'),
-                      ),
-                    ],
-                    onChanged: (v) => setModalState(() => draftType = v),
-                  ),
-                  const SizedBox(height: 12),
-                  DateInputField(
-                    calendarController: widget.calendarController,
-                    onChanged: (d) => setModalState(() => draftFrom = d),
-                    labelText: 'از تاریخ',
-                    hintText: 'انتخاب تاریخ شروع',
-                    value: draftFrom,
-                  ),
-                  const SizedBox(height: 12),
-                  DateInputField(
-                    calendarController: widget.calendarController,
-                    onChanged: (d) => setModalState(() => draftTo = d),
-                    labelText: 'تا تاریخ',
-                    hintText: 'انتخاب تاریخ پایان',
-                    value: draftTo,
-                  ),
+                          DropdownButtonFormField<String?>(
+                            value: draftType,
+                            decoration: const InputDecoration(
+                              labelText: 'نوع سند',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: const [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('همه'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'manual',
+                                child: Text('سند دستی'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'expense',
+                                child: Text('هزینه'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'income',
+                                child: Text('درآمد'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'receipt',
+                                child: Text('دریافت'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'payment',
+                                child: Text('پرداخت'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'transfer',
+                                child: Text('انتقال'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'invoice',
+                                child: Text('فاکتور'),
+                              ),
+                            ],
+                            onChanged: (v) => setModalState(() => draftType = v),
+                          ),
+                          if (_fiscalYears.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<int>(
+                              value: draftFiscal,
+                              decoration: InputDecoration(
+                                labelText: t.fiscalYear,
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                                final id = fy['id'] as int?;
+                                final title = (fy['title'] ?? '').toString();
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text(
+                                    title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (v) => setModalState(() => draftFiscal = v),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          ProjectSelectorWidget(
+                            businessId: widget.businessId,
+                            apiClient: widget.apiClient,
+                            selectedProjectId: draftProject,
+                            onChanged: (v) => setModalState(() => draftProject = v),
+                            authStore: widget.authStore,
+                            calendarController: widget.calendarController,
+                            allowNull: true,
+                            labelText: 'پروژه',
+                          ),
+                          const SizedBox(height: 12),
+                          PersonComboboxWidget(
+                            businessId: widget.businessId,
+                            selectedPerson: draftPerson,
+                            onChanged: (v) => setModalState(() => draftPerson = v),
+                            label: 'شخص',
+                            hintText: 'همه اشخاص',
+                            searchHint: 'جست‌وجو در اشخاص...',
+                          ),
+                          const SizedBox(height: 12),
+                          DateInputField(
+                            calendarController: widget.calendarController,
+                            onChanged: (d) => setModalState(() => draftFrom = d),
+                            labelText: t.dateFrom,
+                            hintText: t.selectDate,
+                            value: draftFrom,
+                          ),
+                          const SizedBox(height: 12),
+                          DateInputField(
+                            calendarController: widget.calendarController,
+                            onChanged: (d) => setModalState(() => draftTo = d),
+                            labelText: t.dateTo,
+                            hintText: t.selectDate,
+                            value: draftTo,
+                          ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () {
-                            setState(() {
-                              _documentType = draftType;
-                              _fromDate = draftFrom;
-                              _toDate = draftTo;
-                            });
-                            Navigator.pop(context);
-                            _fetch(reset: true);
-                          },
-                          child: const Text('اعمال'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _documentType = null;
-                              _fromDate = null;
-                              _toDate = null;
-                            });
-                            Navigator.pop(context);
-                            _fetch(reset: true);
-                          },
-                          child: Text(t.clear),
-                        ),
-                      ),
-                    ],
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _documentType = draftType;
+                        _fromDate = draftFrom;
+                        _toDate = draftTo;
+                        _fiscalYearId = draftFiscal;
+                        _projectId = draftProject;
+                        _filterPerson = draftPerson;
+                      });
+                      Navigator.pop(context);
+                      _fetch(reset: true);
+                    },
+                    icon: const Icon(Icons.check),
+                    label: Text(t.confirm),
                   ),
                 ],
+                ),
               ),
             );
           },
@@ -347,6 +438,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
   }
 
   Widget _buildActiveFilterChips() {
+    final t = AppLocalizations.of(context);
     final chips = <Widget>[];
     if (_documentType != null) {
       chips.add(
@@ -359,12 +451,63 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
         ),
       );
     }
-    if (_fromDate != null || _toDate != null) {
-      final from = _fromDate?.toIso8601String().split('T').first;
-      final to = _toDate?.toIso8601String().split('T').first;
+    if (_fiscalYearId != null && _fiscalYears.isNotEmpty) {
+      final fy =
+          _fiscalYears.where((e) => (e['id'] as int?) == _fiscalYearId).toList();
+      final title = fy.isNotEmpty ? (fy.first['title'] ?? '').toString() : '';
       chips.add(
         InputChip(
-          label: Text('تاریخ: ${from ?? '...'} تا ${to ?? '...'}'),
+          label: Text(title.isNotEmpty
+              ? title
+              : '${t.fiscalYear}: $_fiscalYearId'),
+          onDeleted: () {
+            setState(() => _fiscalYearId = null);
+            _fetch(reset: true);
+          },
+        ),
+      );
+    }
+    if (_projectId != null) {
+      var lab = 'پروژه: $_projectId';
+      for (final p in _projectItems) {
+        if (p['id'] == _projectId) {
+          lab = p['name']?.toString() ?? lab;
+          break;
+        }
+      }
+      chips.add(
+        InputChip(
+          label: Text(lab),
+          onDeleted: () {
+            setState(() => _projectId = null);
+            _fetch(reset: true);
+          },
+        ),
+      );
+    }
+    if (_filterPerson != null) {
+      chips.add(
+        InputChip(
+          label: Text(_filterPerson!.displayName),
+          onDeleted: () {
+            setState(() => _filterPerson = null);
+            _fetch(reset: true);
+          },
+        ),
+      );
+    }
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _fromDate!, widget.calendarController.isJalali)
+          : '—';
+      final to = _toDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _toDate!, widget.calendarController.isJalali)
+          : '—';
+      chips.add(
+        InputChip(
+          label: Text('${t.documentDate}: $from → $to'),
           onDeleted: () {
             setState(() {
               _fromDate = null;

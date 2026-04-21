@@ -82,17 +82,28 @@ async def list_documents_endpoint(
     }
 
     # فیلترهای اضافی
-    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma"]:
+    for key in [
+        "document_type",
+        "from_date",
+        "to_date",
+        "currency_id",
+        "is_proforma",
+        "project_id",
+        "person_id",
+        "search_fields",
+        "filters",
+    ]:
         if key in body:
             query_dict[key] = body[key]
 
-    # سال مالی از header
+    # سال مالی: بدنهٔ درخواست اولویت دارد، سپس هدر
     try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
-        elif "fiscal_year_id" in body:
-            query_dict["fiscal_year_id"] = body["fiscal_year_id"]
+        if body.get("fiscal_year_id") is not None:
+            query_dict["fiscal_year_id"] = int(body["fiscal_year_id"])
+        else:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
     except Exception:
         pass
 
@@ -166,16 +177,27 @@ async def export_documents_pdf_endpoint(
     import datetime, json
     # فیلترهایی مشابه export_documents_excel
     filters = {}
-    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma"]:
+    for key in [
+        "document_type",
+        "from_date",
+        "to_date",
+        "currency_id",
+        "is_proforma",
+        "search",
+        "search_fields",
+        "filters",
+        "project_id",
+        "person_id",
+    ]:
         if key in body:
             filters[key] = body[key]
-    # سال مالی از header یا body
     try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            filters["fiscal_year_id"] = int(fy_header)
-        elif "fiscal_year_id" in body:
-            filters["fiscal_year_id"] = body["fiscal_year_id"]
+        if body.get("fiscal_year_id") is not None:
+            filters["fiscal_year_id"] = int(body["fiscal_year_id"])
+        else:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                filters["fiscal_year_id"] = int(fy_header)
     except Exception:
         pass
     # دریافت داده‌ها (شامل مرتب‌سازی چندستونه اگر ارسال شده باشد)
@@ -491,17 +513,31 @@ async def export_documents_excel_endpoint(
     filters = {}
     
     # فیلترها
-    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma", "sort_by", "sort_desc", "sort"]:
+    for key in [
+        "document_type",
+        "from_date",
+        "to_date",
+        "currency_id",
+        "is_proforma",
+        "sort_by",
+        "sort_desc",
+        "sort",
+        "search",
+        "search_fields",
+        "filters",
+        "project_id",
+        "person_id",
+    ]:
         if key in body:
             filters[key] = body[key]
-    
-    # سال مالی از header
+
     try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            filters["fiscal_year_id"] = int(fy_header)
-        elif "fiscal_year_id" in body:
-            filters["fiscal_year_id"] = body["fiscal_year_id"]
+        if body.get("fiscal_year_id") is not None:
+            filters["fiscal_year_id"] = int(body["fiscal_year_id"])
+        else:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                filters["fiscal_year_id"] = int(fy_header)
     except Exception:
         pass
     

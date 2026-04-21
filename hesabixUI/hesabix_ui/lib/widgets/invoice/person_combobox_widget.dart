@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../utils/snackbar_helper.dart';
 
 class _PersonPickerState {
@@ -42,6 +43,8 @@ class PersonComboboxWidget extends StatefulWidget {
   final bool isRequired;
   final List<String>? personTypes; // فیلتر بر اساس نوع شخص (مثل ['فروشنده', 'بازاریاب'])
   final String? searchHint;
+  /// نمایش مانده حساب و بدهکار/بستانکار زیر فیلد (برای فرم‌های مالی)
+  final bool showFinancialBalance;
 
   const PersonComboboxWidget({
     super.key,
@@ -53,6 +56,7 @@ class PersonComboboxWidget extends StatefulWidget {
     this.isRequired = false,
     this.personTypes,
     this.searchHint,
+    this.showFinancialBalance = false,
   });
 
   @override
@@ -317,8 +321,10 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     
     final displayText = widget.selectedPerson?.displayName ?? widget.hintText;
     final isSelected = widget.selectedPerson != null;
+    final bool inlineBalance =
+        widget.showFinancialBalance && widget.selectedPerson?.id != null;
 
-    return InkWell(
+    final field = InkWell(
       onTap: _showPersonPicker,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -330,6 +336,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           color: colorScheme.surface,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               Icons.person_search,
@@ -338,17 +345,41 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                displayText,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                  color: isSelected 
-                      ? colorScheme.onSurface 
-                      : colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+              child: inlineBalance
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          displayText,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                            color: isSelected
+                                ? colorScheme.onSurface
+                                : colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: PersonFinancialBalanceBanner(
+                            selectedPerson: widget.selectedPerson,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      displayText,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                        color: isSelected
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
             ),
             if (widget.selectedPerson != null)
               GestureDetector(
@@ -371,6 +402,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         ),
       ),
     );
+
+    return field;
   }
 }
 

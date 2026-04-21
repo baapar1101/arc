@@ -269,7 +269,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                   TextField(
                     controller: noteCtl,
                     maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'Notes'),
+                    decoration: InputDecoration(labelText: t.distributionNotesLabel),
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
@@ -734,6 +734,48 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           const SizedBox(height: 8),
           card(t.distributionActiveRoutes, '${_summary['active_routes'] ?? 0}', Icons.map_outlined),
           const SizedBox(height: 24),
+          if (_canManage && _summary['distribution_settings'] is Map<String, dynamic>) ...[
+            Builder(
+              builder: (ctx) {
+                final ds = _summary['distribution_settings'] as Map<String, dynamic>;
+                Future<void> persist(Map<String, dynamic> patch) async {
+                  try {
+                    await _svc.updateDistributionSettings(
+                      businessId: widget.businessId,
+                      payload: <String, dynamic>{
+                        'shared_routing_catalog': ds['shared_routing_catalog'] == true,
+                        'require_visit_in_daily_plan': ds['require_visit_in_daily_plan'] == true,
+                        ...patch,
+                      },
+                    );
+                    if (!mounted) return;
+                    SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
+                    await _refreshSummary();
+                  } catch (e) {
+                    if (mounted) SnackBarHelper.showError(context, message: '$e');
+                  }
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SwitchListTile(
+                      title: Text(t.distributionSharedRoutingCatalog),
+                      subtitle: Text(t.distributionSharedRoutingCatalogHint),
+                      value: ds['shared_routing_catalog'] == true,
+                      onChanged: (v) => persist({'shared_routing_catalog': v}),
+                    ),
+                    SwitchListTile(
+                      title: Text(t.distributionRequireVisitInDailyPlan),
+                      subtitle: Text(t.distributionRequireVisitInDailyPlanHint),
+                      value: ds['require_visit_in_daily_plan'] == true,
+                      onChanged: (v) => persist({'require_visit_in_daily_plan': v}),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
           Text(
             'CRM & Workflow',
             style: Theme.of(context).textTheme.titleSmall,

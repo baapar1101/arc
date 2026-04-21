@@ -315,6 +315,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                   // شخص (برای دریافتی و واگذار شده)
                   PersonComboboxWidget(
                     businessId: widget.businessId,
+                    showFinancialBalance: true,
                     selectedPerson: _selectedPerson,
                     onChanged: (p) => setState(() => _selectedPerson = p),
                     isRequired: true,

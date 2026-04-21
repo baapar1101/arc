@@ -12,6 +12,8 @@ from sqlalchemy import (
 	Boolean,
 	Text,
 	UniqueConstraint,
+	JSON,
+	SmallInteger,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -49,6 +51,18 @@ class CustomerClubSettings(Base):
 	)
 	max_redeem_points_per_invoice: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
 	points_expire_after_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+	rfm_analytics_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	clv_analytics_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	rfm_analysis_window_months: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
+	rfm_monetary_basis: Mapped[str] = mapped_column(String(40), nullable=False, default="net")
+	rfm_scoring_method: Mapped[str] = mapped_column(String(32), nullable=False, default="quintiles")
+	rfm_weight_recency: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
+	rfm_weight_frequency: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
+	rfm_weight_monetary: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
+	clv_formula: Mapped[str] = mapped_column(String(40), nullable=False, default="historical_total")
+	clv_avg_lifespan_years: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+	rfm_segment_labels_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(
@@ -175,3 +189,35 @@ class CustomerClubTier(Base):
 	updated_at: Mapped[datetime] = mapped_column(
 		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
 	)
+
+
+class CustomerClubRfmSnapshot(Base):
+	"""ذخیرهٔ نتیجهٔ تحلیل RFM/CLV برای هر شخص در یک کسب‌وکار."""
+
+	__tablename__ = "customer_club_rfm_snapshots"
+	__table_args__ = (UniqueConstraint("business_id", "person_id", name="uq_cc_rfm_snap_biz_person"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer,
+		ForeignKey("businesses.id", ondelete="CASCADE"),
+		nullable=False,
+		index=True,
+	)
+	person_id: Mapped[int] = mapped_column(
+		Integer,
+		ForeignKey("persons.id", ondelete="CASCADE"),
+		nullable=False,
+		index=True,
+	)
+	recency_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	frequency_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	monetary_total: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	r_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+	f_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+	m_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+	rfm_cell: Mapped[str | None] = mapped_column(String(16), nullable=True)
+	segment_label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+	composite_score: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
+	clv_estimate: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+	computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -199,7 +199,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'برای استفاده از حالت یونیک، باید "کنترل موجودی" را فعال کنید',
+                            t.inventoryUniqueModeRequiresTrack,
                             style: TextStyle(
                               color: Colors.blue.shade800,
                               fontSize: 13,
@@ -222,6 +222,17 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
           value: widget.formData.trackInventory,
           onChanged: (value) => _updateFormData(widget.formData.copyWith(trackInventory: value)),
           title: Text(t.inventoryControl),
+          subtitle: Text(t.inventoryControlHelpSubtitle),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Text(
+            t.inventoryControlHelpDetail,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+          ),
         ),
         if (widget.formData.trackInventory) ...[
           const SizedBox(height: 16),

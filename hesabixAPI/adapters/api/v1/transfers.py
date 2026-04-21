@@ -181,25 +181,45 @@ async def list_transfers_endpoint(
         "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
         "search": query_info.search,
     }
-    try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            # Forward simple date range params
-            for key in ["from_date", "to_date", "sort", "sort_by", "sort_desc"]:
-                if key in body_json:
-                    query_dict[key] = body_json[key]
-            # Forward advanced filters from DataTable (e.g., document_date range)
-            if "filters" in body_json:
-                query_dict["filters"] = body_json.get("filters")
-    except Exception:
-        pass
+    if getattr(query_info, "search_fields", None):
+        query_dict["search_fields"] = list(query_info.search_fields)
+    if getattr(query_info, "filters", None):
+        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
 
+    body_json: Dict[str, Any] = {}
     try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
+        raw = await request.json()
+        if isinstance(raw, dict):
+            body_json = raw
     except Exception:
-        pass
+        body_json = {}
+
+    merge_keys = (
+        "from_date",
+        "to_date",
+        "sort",
+        "sort_by",
+        "sort_desc",
+        "fiscal_year_id",
+        "project_id",
+        "bank_account_id",
+        "cash_register_id",
+        "petty_cash_id",
+        "search_fields",
+        "filters",
+        "search",
+    )
+    for key in merge_keys:
+        if key in body_json:
+            query_dict[key] = body_json[key]
+
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
 
     # کش نتایج لیست انتقال‌ها
     cache = get_cache()
@@ -1196,6 +1216,24 @@ async def export_transfers_excel(
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
     }
+    for key in (
+        "fiscal_year_id",
+        "project_id",
+        "bank_account_id",
+        "cash_register_id",
+        "petty_cash_id",
+        "filters",
+        "search_fields",
+    ):
+        if key in body:
+            query_dict[key] = body[key]
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
 
     result = list_transfers(db, business_id, query_dict)
     items = result.get('items', [])
@@ -1430,6 +1468,24 @@ async def export_transfers_pdf(
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
     }
+    for key in (
+        "fiscal_year_id",
+        "project_id",
+        "bank_account_id",
+        "cash_register_id",
+        "petty_cash_id",
+        "filters",
+        "search_fields",
+    ):
+        if key in body:
+            query_dict[key] = body[key]
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
     result = list_transfers(db, business_id, query_dict)
     items = result.get('items', [])
     items = [format_datetime_fields(item, request) for item in items]

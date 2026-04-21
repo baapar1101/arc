@@ -5,6 +5,7 @@ import '../../services/customer_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../models/person_model.dart';
 
 class _CustomerPickerState {
@@ -47,6 +48,8 @@ class CustomerComboboxWidget extends StatefulWidget {
   final bool isRequired;
   final String? label;
   final String? hintText;
+  /// مانده طرف حساب زیر نام داخل همان فیلد (شناسه مشتری همان شخص است)
+  final bool showFinancialBalance;
 
   const CustomerComboboxWidget({
     super.key,
@@ -57,6 +60,7 @@ class CustomerComboboxWidget extends StatefulWidget {
     this.isRequired = false,
     this.label = 'طرف حساب',
     this.hintText = 'انتخاب طرف حساب',
+    this.showFinancialBalance = false,
   });
 
   @override
@@ -383,6 +387,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final inlineBalance =
+        widget.showFinancialBalance && widget.selectedCustomer != null;
+
+    Person? balancePerson;
+    if (inlineBalance) {
+      final c = widget.selectedCustomer!;
+      balancePerson = Person(
+        id: c.id,
+        businessId: widget.businessId,
+        aliasName: c.name,
+        personTypes: const [PersonType.customer],
+        createdAt: c.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+
     return InkWell(
       onTap: _showCustomerPicker,
       child: Container(
@@ -395,6 +415,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
           color: colorScheme.surface,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               Icons.person_search,
@@ -404,14 +425,35 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             const SizedBox(width: 12),
             Expanded(
               child: widget.selectedCustomer != null
-                  ? Text(
-                      widget.selectedCustomer!.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    )
+                  ? (inlineBalance
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.selectedCustomer!.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: PersonFinancialBalanceBanner(
+                                selectedPerson: balancePerson,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          widget.selectedCustomer!.name,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ))
                   : Text(
                       widget.hintText!,
                       style: theme.textTheme.bodyMedium?.copyWith(

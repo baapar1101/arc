@@ -217,4 +217,40 @@ class DistributionService {
     );
     return _dataMap(res.data);
   }
+
+  Future<Map<String, dynamic>> getDistributionSettings({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/settings',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> updateDistributionSettings({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/settings',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getReportsDashboard({
+    required int businessId,
+    required String fromDate,
+    required String toDate,
+    int? targetUserId,
+  }) async {
+    final q = <String, dynamic>{
+      'from_date': fromDate,
+      'to_date': toDate,
+      if (targetUserId != null) 'target_user_id': '$targetUserId',
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/reports/dashboard',
+      query: q,
+    );
+    return _dataMap(res.data);
+  }
 }

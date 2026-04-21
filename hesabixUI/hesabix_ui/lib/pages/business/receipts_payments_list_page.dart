@@ -30,6 +30,7 @@ import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../services/business_dashboard_service.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -65,9 +66,22 @@ class ReceiptsPaymentsListPage extends StatefulWidget {
 
 class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   late ReceiptPaymentListService _service;
+  late final BusinessDashboardService _dashboardService =
+      BusinessDashboardService(widget.apiClient);
+
   String? _selectedDocumentType;
   DateTime? _fromDate;
   DateTime? _toDate;
+
+  int? _selectedFiscalYearId;
+  List<Map<String, dynamic>> _fiscalYears = [];
+  bool _fiscalYearsResolved = false;
+
+  int? _selectedProjectId;
+  Person? _filterPerson;
+
+  bool _showDesktopFilters = false;
+
   // کلید کنترل جدول برای دسترسی به selection و refresh
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
@@ -81,6 +95,29 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     ReceiptsPaymentsListPage._pageStates[widget.businessId] = this;
     _service = ReceiptPaymentListService(widget.apiClient);
     _loadProjects();
+    _loadFiscalYears();
+  }
+
+  Future<void> _loadFiscalYears() async {
+    try {
+      final items = await _dashboardService.listFiscalYears(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _fiscalYears = items;
+        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
+          final current = _fiscalYears.firstWhere(
+            (fy) => fy['is_current'] == true,
+            orElse: () => _fiscalYears.first,
+          );
+          _selectedFiscalYearId = current['id'] as int?;
+        }
+        _fiscalYearsResolved = true;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _fiscalYearsResolved = true);
+      }
+    }
   }
   
   @override
@@ -157,6 +194,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final contentPadding = ResponsiveHelper.getPadding(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -165,28 +203,53 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(t),
-              _buildFilters(t),
+              _buildHeader(t, isMobile),
+              _buildFilters(t, isMobile),
               Padding(
-                padding: EdgeInsets.fromLTRB(contentPadding, 8, contentPadding, 8),
-                child: DataTableWidget<ReceiptPaymentDocument>(
-                  key: _tableKey,
-                  config: _buildTableConfig(t),
-                  fromJson: (json) => ReceiptPaymentDocument.fromJson(json),
-                  calendarController: widget.calendarController,
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  8,
+                  contentPadding,
+                  isMobile ? 88 : 8,
                 ),
+                child: _fiscalYearsResolved
+                    ? DataTableWidget<ReceiptPaymentDocument>(
+                        key: _tableKey,
+                        config: _buildTableConfig(t),
+                        fromJson: (json) =>
+                            ReceiptPaymentDocument.fromJson(json),
+                        calendarController: widget.calendarController,
+                      )
+                    : const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
               ),
             ],
           ),
         ),
       ),
+      floatingActionButton: isMobile
+          ? FloatingActionButton.extended(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            )
+          : null,
     );
   }
 
   /// ساخت هدر صفحه
-  Widget _buildHeader(AppLocalizations t) {
+  Widget _buildHeader(AppLocalizations t, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -201,186 +264,535 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
                 Text(
                   'مدیریت اسناد دریافت و پرداخت',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ],
             ),
           ),
-          FilledButton.icon(
-            onPressed: _onAddNew,
-            icon: const Icon(Icons.add),
-            label: Text(t.add),
-          ),
+          if (!isMobile)
+            FilledButton.icon(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            ),
         ],
       ),
     );
   }
 
-  /// ساخت بخش فیلترها
-  Widget _buildFilters(AppLocalizations t) {
-    final width = MediaQuery.sizeOf(context).width;
-    final bool isSmall = width < 720;
+  Widget _buildFilters(AppLocalizations t, bool isMobile) {
+    final padding = ResponsiveHelper.getPadding(context);
 
-    final Widget typeFilter = Expanded(
-      flex: 2,
-      child: SegmentedButton<String?>(
-        segments: [
-          ButtonSegment<String?>(
-            value: null,
-            label: Text('همه'),
-            icon: const Icon(Icons.all_inclusive),
-          ),
-          ButtonSegment<String?>(
-            value: 'receipt',
-            label: Text(t.receipts),
-            icon: const Icon(Icons.download_done_outlined),
-          ),
-          ButtonSegment<String?>(
-            value: 'payment',
-            label: Text(t.payments),
-            icon: const Icon(Icons.upload_outlined),
-          ),
-        ],
-        selected: {_selectedDocumentType},
-        onSelectionChanged: (set) {
-          setState(() {
-            _selectedDocumentType = set.first;
-          });
-          // refresh data when filter changes
-          _refreshData();
-        },
-      ),
-    );
-
-    final Widget dateFilter = Expanded(
-      flex: 3,
-      child: Row(
-        children: [
-          Expanded(
-            child: DateInputField(
-              value: _fromDate,
-              calendarController: widget.calendarController,
-              onChanged: (date) {
-                setState(() => _fromDate = date);
-                _refreshData();
-              },
-              labelText: 'از تاریخ',
-              hintText: 'انتخاب تاریخ شروع',
+    if (isMobile) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _buildExternalFilterChips(t),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: DateInputField(
-              value: _toDate,
-              calendarController: widget.calendarController,
-              onChanged: (date) {
-                setState(() => _toDate = date);
-                _refreshData();
-              },
-              labelText: 'تا تاریخ',
-              hintText: 'انتخاب تاریخ پایان',
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => _openMobileFiltersSheet(t),
+              icon: const Icon(Icons.tune),
+              tooltip: 'فیلترها',
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _fromDate = null;
-                _toDate = null;
-              });
-              _refreshData();
-            },
-            icon: const Icon(Icons.clear),
-            tooltip: 'پاک کردن فیلتر تاریخ',
-          ),
-        ],
-      ),
-    );
+            if (_hasExternalFiltersActive()) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _clearExternalFilters,
+                icon: const Icon(Icons.clear_all),
+                tooltip: t.clear,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: isSmall
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SegmentedButton<String?>(
-                  segments: [
-                    ButtonSegment<String?>(
-                      value: null,
-                      label: Text('همه'),
-                      icon: const Icon(Icons.all_inclusive),
-                    ),
-                    ButtonSegment<String?>(
-                      value: 'receipt',
-                      label: Text(t.receipts),
-                      icon: const Icon(Icons.download_done_outlined),
-                    ),
-                    ButtonSegment<String?>(
-                      value: 'payment',
-                      label: Text(t.payments),
-                      icon: const Icon(Icons.upload_outlined),
-                    ),
-                  ],
-                  selected: {_selectedDocumentType},
-                  onSelectionChanged: (set) {
-                    setState(() {
-                      _selectedDocumentType = set.first;
-                    });
-                    _refreshData();
-                  },
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _buildExternalFilterChips(t),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    setState(() => _showDesktopFilters = !_showDesktopFilters),
+                icon:
+                    Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
+                label:
+                    Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+              ),
+              if (_hasExternalFiltersActive()) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _clearExternalFilters,
+                  icon: const Icon(Icons.clear_all),
+                  tooltip: t.clear,
+                ),
+              ],
+            ],
+          ),
+          if (_showDesktopFilters) ...[
+            const SizedBox(height: 10),
+            _buildFiltersForm(
+              t: t,
+              isMobileLayout: false,
+              documentType: _selectedDocumentType,
+              fiscalYearId: _selectedFiscalYearId,
+              projectId: _selectedProjectId,
+              filterPerson: _filterPerson,
+              fromDate: _fromDate,
+              toDate: _toDate,
+              onDocumentTypeChanged: (v) {
+                setState(() => _selectedDocumentType = v);
+                _refreshData();
+              },
+              onFiscalYearChanged: (v) {
+                setState(() => _selectedFiscalYearId = v);
+                _refreshData();
+              },
+              onProjectChanged: (v) {
+                setState(() => _selectedProjectId = v);
+                _refreshData();
+              },
+              onPersonChanged: (v) {
+                setState(() => _filterPerson = v);
+                _refreshData();
+              },
+              onFromDateChanged: (v) {
+                setState(() => _fromDate = v);
+                _refreshData();
+              },
+              onToDateChanged: (v) {
+                setState(() => _toDate = v);
+                _refreshData();
+              },
+              onClearDateRange: () {
+                setState(() {
+                  _fromDate = null;
+                  _toDate = null;
+                });
+                _refreshData();
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  bool _hasExternalFiltersActive() {
+    return _selectedDocumentType != null ||
+        _fromDate != null ||
+        _toDate != null ||
+        _selectedFiscalYearId != null ||
+        _selectedProjectId != null ||
+        _filterPerson != null;
+  }
+
+  void _clearExternalFilters() {
+    setState(() {
+      _selectedDocumentType = null;
+      _fromDate = null;
+      _toDate = null;
+      _selectedProjectId = null;
+      _filterPerson = null;
+    });
+    _refreshData();
+  }
+
+  List<Widget> _buildExternalFilterChips(AppLocalizations t) {
+    final chips = <Widget>[];
+    if (_selectedDocumentType != null) {
+      chips.add(Chip(
+        label: Text(_documentTypeChipLabel(t, _selectedDocumentType)),
+        avatar: Icon(
+          _selectedDocumentType == 'receipt'
+              ? Icons.download_done_outlined
+              : Icons.upload_outlined,
+          size: 16,
+        ),
+      ));
+    } else {
+      chips.add(Chip(
+        label: Text(t.all),
+        avatar: const Icon(Icons.all_inclusive, size: 16),
+      ));
+    }
+
+    if (_selectedFiscalYearId != null && _fiscalYears.isNotEmpty) {
+      final fy = _fiscalYears
+          .where((e) => (e['id'] as int?) == _selectedFiscalYearId)
+          .toList();
+      final title = fy.isNotEmpty ? (fy.first['title'] ?? '').toString() : '';
+      chips.add(Chip(
+        label: Text(title.isNotEmpty
+            ? title
+            : '${t.fiscalYear}: $_selectedFiscalYearId'),
+        avatar: const Icon(Icons.event_note, size: 16),
+      ));
+    }
+
+    if (_selectedProjectId != null) {
+      final label = _projectFilterOptions
+          .where((o) => o.value == _selectedProjectId.toString())
+          .map((o) => o.label)
+          .cast<String?>()
+          .firstWhere((e) => e != null && e!.isNotEmpty, orElse: () => null);
+      chips.add(Chip(
+        label: Text(label ?? 'پروژه: $_selectedProjectId'),
+        avatar: const Icon(Icons.folder_open, size: 16),
+      ));
+    }
+
+    if (_filterPerson != null) {
+      chips.add(Chip(
+        label: Text(_filterPerson!.displayName),
+        avatar: const Icon(Icons.person_outline, size: 16),
+      ));
+    }
+
+    if (_fromDate != null || _toDate != null) {
+      final from = _fromDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _fromDate!, widget.calendarController.isJalali)
+          : '—';
+      final to = _toDate != null
+          ? HesabixDateUtils.formatForDisplay(
+              _toDate!, widget.calendarController.isJalali)
+          : '—';
+      chips.add(Chip(
+        label: Text('${t.documentDate}: $from → $to'),
+        avatar: const Icon(Icons.date_range, size: 16),
+      ));
+    }
+
+    if (chips.isEmpty) {
+      chips.add(Chip(label: Text(t.all)));
+    }
+    return chips;
+  }
+
+  String _documentTypeChipLabel(AppLocalizations t, String? type) {
+    switch (type) {
+      case 'receipt':
+        return t.receipts;
+      case 'payment':
+        return t.payments;
+      default:
+        return t.all;
+    }
+  }
+
+  Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
+    String? documentType = _selectedDocumentType;
+    int? fiscalYearId = _selectedFiscalYearId;
+    int? projectId = _selectedProjectId;
+    Person? filterPerson = _filterPerson;
+    DateTime? fromDate = _fromDate;
+    DateTime? toDate = _toDate;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 8,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text('فیلترها',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            documentType = null;
+                            projectId = null;
+                            filterPerson = null;
+                            fromDate = null;
+                            toDate = null;
+                          });
+                        },
+                        child: Text(t.clear),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: _buildFiltersForm(
+                        t: t,
+                        isMobileLayout: true,
+                        documentType: documentType,
+                        fiscalYearId: fiscalYearId,
+                        projectId: projectId,
+                        filterPerson: filterPerson,
+                        fromDate: fromDate,
+                        toDate: toDate,
+                        onDocumentTypeChanged: (v) =>
+                            setModalState(() => documentType = v),
+                        onFiscalYearChanged: (v) =>
+                            setModalState(() => fiscalYearId = v),
+                        onProjectChanged: (v) =>
+                            setModalState(() => projectId = v),
+                        onPersonChanged: (v) =>
+                            setModalState(() => filterPerson = v),
+                        onFromDateChanged: (v) =>
+                            setModalState(() => fromDate = v),
+                        onToDateChanged: (v) => setModalState(() => toDate = v),
+                        onClearDateRange: () => setModalState(() {
+                          fromDate = null;
+                          toDate = null;
+                        }),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.check),
+                      label: Text(t.confirm),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true && mounted) {
+      setState(() {
+        _selectedDocumentType = documentType;
+        _selectedFiscalYearId = fiscalYearId;
+        _selectedProjectId = projectId;
+        _filterPerson = filterPerson;
+        _fromDate = fromDate;
+        _toDate = toDate;
+      });
+      _refreshData();
+    }
+  }
+
+  Widget _buildFiltersForm({
+    required AppLocalizations t,
+    required bool isMobileLayout,
+    required String? documentType,
+    required int? fiscalYearId,
+    required int? projectId,
+    required Person? filterPerson,
+    required DateTime? fromDate,
+    required DateTime? toDate,
+    required ValueChanged<String?> onDocumentTypeChanged,
+    required ValueChanged<int?> onFiscalYearChanged,
+    required ValueChanged<int?> onProjectChanged,
+    required ValueChanged<Person?> onPersonChanged,
+    required ValueChanged<DateTime?> onFromDateChanged,
+    required ValueChanged<DateTime?> onToDateChanged,
+    required VoidCallback onClearDateRange,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<String?>(
+            style: SegmentedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            segments: [
+              ButtonSegment<String?>(
+                value: null,
+                label: Text(t.all),
+                icon: const Icon(Icons.all_inclusive),
+              ),
+              ButtonSegment<String?>(
+                value: 'receipt',
+                label: Text(t.receipts),
+                icon: const Icon(Icons.download_done_outlined),
+              ),
+              ButtonSegment<String?>(
+                value: 'payment',
+                label: Text(t.payments),
+                icon: const Icon(Icons.upload_outlined),
+              ),
+            ],
+            selected:
+                documentType != null ? {documentType} : <String?>{},
+            onSelectionChanged: (set) =>
+                onDocumentTypeChanged(set.isEmpty ? null : set.first),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (_fiscalYears.isNotEmpty)
+              SizedBox(
+                width: isMobileLayout ? double.infinity : 280,
+                child: DropdownButtonFormField<int>(
+                  value: fiscalYearId,
+                  decoration: InputDecoration(
+                    labelText: t.fiscalYear,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                  ),
+                  items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                    final id = fy['id'] as int?;
+                    final title = (fy['title'] ?? '').toString();
+                    return DropdownMenuItem<int>(
+                      value: id,
+                      child: Text(
+                        title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: onFiscalYearChanged,
+                ),
+              ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: ProjectSelectorWidget(
+                businessId: widget.businessId,
+                apiClient: widget.apiClient,
+                selectedProjectId: projectId,
+                onChanged: onProjectChanged,
+                authStore: widget.authStore,
+                calendarController: widget.calendarController,
+                allowNull: true,
+                labelText: 'پروژه',
+              ),
+            ),
+            SizedBox(
+              width: isMobileLayout ? double.infinity : 280,
+              child: PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: filterPerson,
+                onChanged: onPersonChanged,
+                label: 'شخص',
+                hintText: 'همه اشخاص',
+                searchHint: 'جست‌وجو در اشخاص...',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (isMobileLayout)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: DateInputField(
+                      value: fromDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onFromDateChanged,
+                      labelText: t.dateFrom,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DateInputField(
+                      value: toDate,
+                      calendarController: widget.calendarController,
+                      onChanged: onToDateChanged,
+                      labelText: t.dateTo,
+                      hintText: t.selectDate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: onClearDateRange,
+                    icon: const Icon(Icons.clear),
+                    tooltip: t.clearDateFilter,
+                  ),
+                ],
+              ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Row(
                   children: [
                     Expanded(
                       child: DateInputField(
-                        value: _fromDate,
+                        value: fromDate,
                         calendarController: widget.calendarController,
-                        onChanged: (date) {
-                          setState(() => _fromDate = date);
-                          _refreshData();
-                        },
-                        labelText: 'از تاریخ',
-                        hintText: 'انتخاب تاریخ شروع',
+                        onChanged: onFromDateChanged,
+                        labelText: t.dateFrom,
+                        hintText: t.selectDate,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: DateInputField(
-                        value: _toDate,
+                        value: toDate,
                         calendarController: widget.calendarController,
-                        onChanged: (date) {
-                          setState(() => _toDate = date);
-                          _refreshData();
-                        },
-                        labelText: 'تا تاریخ',
-                        hintText: 'انتخاب تاریخ پایان',
+                        onChanged: onToDateChanged,
+                        labelText: t.dateTo,
+                        hintText: t.selectDate,
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _fromDate = null;
-                          _toDate = null;
-                        });
-                        _refreshData();
-                      },
+                      onPressed: onClearDateRange,
                       icon: const Icon(Icons.clear),
-                      tooltip: 'پاک کردن فیلتر تاریخ',
+                      tooltip: t.clearDateFilter,
                     ),
                   ],
                 ),
-              ],
-            )
-          : Row(
-              children: [
-                typeFilter,
-                const SizedBox(width: 16),
-                dateFilter,
-              ],
-            ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -411,10 +823,12 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       ],
       getExportParams: () => {
         'business_id': widget.businessId,
-        // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
       },
       columns: [
         // کد سند
@@ -547,10 +961,12 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         });
       },
       additionalParams: {
-        // همیشه document_type را ارسال کن، حتی اگر null باشد
         'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
       },
       onRowTap: (item) => _onView(item),
       onRowDoubleTap: (item) => _onEdit(item),
@@ -2686,6 +3102,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 Expanded(
                   child: PersonComboboxWidget(
                     businessId: widget.businessId,
+                    showFinancialBalance: true,
                     selectedPerson: widget.line.personId != null 
                         ? Person(
                             id: int.tryParse(widget.line.personId!),
@@ -2860,32 +3277,30 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         );
                       }).toList(),
                 selectedItemBuilder: (context) {
-                  // نمایش کد فاکتور انتخاب شده در dropdown
+                  // الزام Flutter: طول لیست برگشتی باید دقیقاً برابر items باشد؛
+                  // ویجت در ایندکس i وقتی نمایش داده می‌شود که items[i] انتخاب شده باشد.
                   debugPrint('🔄 [PersonLineTile] selectedItemBuilder - invoiceId: ${widget.line.invoiceId}, تعداد فاکتورها: ${_invoices.length}');
-                  if (widget.line.invoiceId == null) {
+                  if (_loadingInvoices) {
                     return [
-                      const Text(
-                        'انتخاب فاکتور',
-                        overflow: TextOverflow.ellipsis,
-                      )
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
                     ];
                   }
-                  final selectedInvoice = _invoices.firstWhere(
-                    (inv) => (inv['id'] as num?)?.toInt() == widget.line.invoiceId,
-                    orElse: () => <String, dynamic>{},
-                  );
-                  final code = selectedInvoice['code']?.toString() ?? '';
-                  debugPrint('🔄 [PersonLineTile] selectedItemBuilder - فاکتور پیدا شد: $code (خالی: ${code.isEmpty})');
-                  if (code.isEmpty) {
-                    debugPrint('⚠️ [PersonLineTile] selectedItemBuilder - فاکتور ${widget.line.invoiceId} در لیست نیست!');
-                    debugPrint('⚠️ [PersonLineTile] selectedItemBuilder - فاکتورهای موجود: ${_invoices.map((inv) => (inv['id'] as num?)?.toInt()).toList()}');
-                  }
-                  return [
-                    Text(
-                      code.isNotEmpty ? code : 'انتخاب فاکتور',
+                  return _invoices.map((inv) {
+                    final code = inv['code']?.toString() ?? '';
+                    return Text(
+                      code.isNotEmpty ? code : 'فاکتور',
                       overflow: TextOverflow.ellipsis,
-                    )
-                  ];
+                    );
+                  }).toList();
                 },
                 onChanged: (invoiceId) {
                   debugPrint('🔄 [PersonLineTile] onChanged - انتخاب فاکتور: $invoiceId');

@@ -186,10 +186,27 @@ def _normalize_invoice_profit_overhead_type(value: Optional[str]) -> str:
     return overhead_type
 
 
-def _movement_sort_key(mv: Dict[str, Any]) -> Tuple[Any, int, int]:
-    """ترتیب زمانی حرکات؛ در یک روز و یک سند، ترتیب اقلام فاکتور با invoice_item_line_id."""
+def _distinct_product_ids_for_invoice(db: Session, document_id: int) -> List[int]:
+    rows = (
+        db.query(InvoiceItemLine.product_id)
+        .filter(
+            InvoiceItemLine.document_id == int(document_id),
+            InvoiceItemLine.product_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return [int(r[0]) for r in rows]
+
+
+def _movement_sort_key(mv: Dict[str, Any]) -> Tuple[Any, Any, int, int]:
+    """ترتیب زمانی حرکات؛ در یک روز ابتدا زمان ثبت سند، سپس شناسه سند، سپس خط فاکتور."""
+    ra = mv.get("registered_at")
+    if ra is None:
+        ra = datetime.min
     return (
         mv["document_date"],
+        ra,
         int(mv["document_id"]),
         int(mv.get("invoice_item_line_id") or 0),
     )
@@ -611,7 +628,12 @@ def _iter_product_movements(
     )
     if exclude_document_id is not None:
         q = q.filter(Document.id != int(exclude_document_id))
-    rows = q.order_by(Document.document_date.asc(), Document.id.asc(), DocumentLine.id.asc()).all()
+    rows = q.order_by(
+        Document.document_date.asc(),
+        Document.registered_at.asc(),
+        Document.id.asc(),
+        DocumentLine.id.asc(),
+    ).all()
     movements = []
     for line, doc in rows:
         info = line.extra_info or {}
@@ -651,6 +673,7 @@ def _iter_product_movements(
         movements.append({
             "document_id": doc.id,
             "document_date": doc.document_date,
+            "registered_at": doc.registered_at,
             "product_id": line.product_id,
             "warehouse_id": wh_id,
             "movement": movement,
@@ -880,6 +903,7 @@ def _calculate_fifo_cogs_for_outgoing(
     # گردآوری حرکات تاریخی همه کالاهای موردنیاز
     product_ids = list({int(ln.get("product_id")) for ln in outgoing_lines})
     movements = _iter_product_movements(db, business_id, product_ids, None, document_date, exclude_document_id)
+    movements = sorted(movements, key=_movement_sort_key)
     # ساخت لایه‌های FIFO به تفکیک کالا/انبار
     from collections import defaultdict, deque
     layers: Dict[Tuple[int, Optional[int]], deque] = defaultdict(deque)
@@ -1636,7 +1660,12 @@ def _iter_profit_movements_from_invoice_lines(
                 InvoiceItemLine.product_id == int(product_id),
             )
         )
-        .order_by(Document.document_date.asc(), Document.id.asc(), InvoiceItemLine.id.asc())
+        .order_by(
+            Document.document_date.asc(),
+            Document.registered_at.asc(),
+            Document.id.asc(),
+            InvoiceItemLine.id.asc(),
+        )
         .all()
     )
     movements: List[Dict[str, Any]] = []
@@ -1679,6 +1708,7 @@ def _iter_profit_movements_from_invoice_lines(
             {
                 "document_id": int(doc.id),
                 "document_date": doc.document_date,
+                "registered_at": doc.registered_at,
                 "product_id": int(product_id),
                 "warehouse_id": wh_id,
                 "movement": movement,
@@ -1703,6 +1733,7 @@ def _calculate_fifo_cost(
 ) -> Decimal:
     """
     بهای تمام‌شده میانگین واحد با FIFO دائمی برای همان ردیف فاکتور (بلافاصله پیش از خروج این ردیف).
+    ترتیب حرکات: تاریخ سند، سپس registered_at، سپس شناسه سند، سپس خط فاکتور.
     بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
     """
     movements = _iter_profit_movements_from_invoice_lines(
@@ -3263,6 +3294,33 @@ def create_invoice(
             except Exception:
                 pass
 
+    # پس از خرید/برگشت از خرید: هم‌رسانی ledger فاکتورهای فروش/تولید همان کالاها (FIFO به‌روز)
+    if not document.is_proforma and invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+        try:
+            from app.services.invoice_profit_ledger_service import (
+                refresh_sales_ledgers_after_inventory_invoice_change,
+            )
+
+            _pids = _distinct_product_ids_for_invoice(db, int(document.id))
+            refresh_sales_ledgers_after_inventory_invoice_change(
+                db,
+                business_id,
+                _pids,
+                fiscal_year_id=int(document.fiscal_year_id),
+            )
+            db.commit()
+        except Exception as inv_chain_ex:
+            logger.warning(
+                "inventory-chain ledger refresh failed doc_id=%s err=%s",
+                document.id,
+                inv_chain_ex,
+                exc_info=True,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     # فراخوانی workflow triggers برای فاکتور ایجاد شده
     try:
         from app.services.workflow.workflow_trigger_service import (
@@ -3970,18 +4028,19 @@ def update_invoice(
 
     # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
     payment_docs: List[int] = []
-    payments = data.get("payments")
-    if payments and isinstance(payments, list) and not document.is_proforma:
+    payments_provided = "payments" in data and isinstance(data.get("payments"), list)
+    payments = list(data["payments"]) if payments_provided else []
+    if payments_provided and not document.is_proforma:
         try:
             # دریافت person_id از extra_info
             header_extra = data.get("extra_info") or document.extra_info or {}
             person_id = _person_id_from_header({"extra_info": header_extra})
-            
-            # Only when person is present
-            if person_id:
+
+            # اگر لیست تراکنش‌ها خالی است یا قرار است با تراکنش‌های جدید جایگزین شود، ابتدا اسناد قبلی حذف شوند.
+            # اگر payments ارسال نشود (کلید نباشد)، تراکنش‌های قبلی دست‌نخورده می‌مانند (سازگاری API قدیمی).
+            if (not payments) or person_id:
                 from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
-                
-                # حذف سندهای دریافت/پرداخت قدیمی مرتبط با این فاکتور
+
                 old_links = (document.extra_info or {}).get("links", {})
                 old_receipt_payment_ids = old_links.get("receipt_payment_document_ids") or []
                 for old_rp_id in old_receipt_payment_ids:
@@ -3990,7 +4049,15 @@ def update_invoice(
                         logger.info(f"Deleted old receipt/payment document {old_rp_id} for invoice {document.id}")
                     except Exception as ex:
                         logger.warning(f"Could not delete old receipt/payment document {old_rp_id}: {ex}")
-                
+
+            if not payments:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links.pop("receipt_payment_document_ids", None)
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            elif person_id:
                 # ایجاد سندهای جدید (مشابه create_invoice)
                 account_lines: List[Dict[str, Any]] = []
                 total_amount = Decimal(0)
@@ -4100,7 +4167,6 @@ def update_invoice(
                     links["receipt_payment_document_ids"] = payment_docs
                     extra["links"] = links
                     document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                    from sqlalchemy.orm.attributes import flag_modified
                     flag_modified(document, "extra_info")
         except Exception as ex:
             logger.exception("could not update receipt/payment for invoice: %s", ex)
@@ -4154,6 +4220,27 @@ def update_invoice(
                 "invoice profit ledger on update failed doc_id=%s err=%s",
                 document.id,
                 ledger_ex,
+                exc_info=True,
+            )
+
+    if not document.is_proforma and inv_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+        try:
+            from app.services.invoice_profit_ledger_service import (
+                refresh_sales_ledgers_after_inventory_invoice_change,
+            )
+
+            _pids_u = _distinct_product_ids_for_invoice(db, int(document.id))
+            refresh_sales_ledgers_after_inventory_invoice_change(
+                db,
+                int(document.business_id),
+                _pids_u,
+                fiscal_year_id=int(document.fiscal_year_id),
+            )
+        except Exception as inv_chain_u_ex:
+            logger.warning(
+                "inventory-chain ledger refresh on update failed doc_id=%s err=%s",
+                document.id,
+                inv_chain_u_ex,
                 exc_info=True,
             )
 
@@ -4629,21 +4716,35 @@ def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool
         return False
 
 
-def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
+def invoice_document_to_dict(
+    db: Session,
+    document: Document,
+    *,
+    persist_link_cleanup: bool = True,
+) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
     item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
     product_lines: List[Dict[str, Any]] = []
     for it in item_rows:
         product = db.query(Product).filter(Product.id == it.product_id).first()
+        line_extra = it.extra_info or {}
         row_dict: Dict[str, Any] = {
             "id": it.id,
             "product_id": it.product_id,
             "product_code": getattr(product, "code", None) if product else None,
             "product_name": getattr(product, "name", None),
+            "product_main_unit": getattr(product, "main_unit", None) if product else None,
+            "product_secondary_unit": getattr(product, "secondary_unit", None) if product else None,
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
             "extra_info": it.extra_info,
         }
+        for _key in ("unit_price", "line_total", "line_discount", "tax_amount"):
+            if line_extra.get(_key) is not None:
+                try:
+                    row_dict[_key] = float(line_extra[_key])
+                except (TypeError, ValueError):
+                    pass
         if getattr(it, "ledger_unit_cogs", None) is not None:
             row_dict["ledger_unit_cogs"] = float(it.ledger_unit_cogs)
         if getattr(it, "ledger_line_cogs", None) is not None:
@@ -4705,19 +4806,20 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             logger.warning(f"Error calculating invoice profit for document {document.id}: {e}")
             profit_data = {}
 
-    # پاک‌سازی لینک‌های مرده قبل از بازگرداندن نتیجه
-    try:
-        if _cleanup_dead_receipt_payment_links(db, document):
-            # commit تغییرات
-            db.commit()
-            db.refresh(document)
-    except Exception as e:
-        logger.warning(f"خطا در پاک‌سازی لینک‌های مرده در invoice_document_to_dict: {e}")
+    # پاک‌سازی لینک‌های مرده قبل از بازگرداندن نتیجه (در مسیرهای فقط‌خواندنی عمومی غیرفعال)
+    if persist_link_cleanup:
         try:
-            db.rollback()
-        except Exception:
-            pass
-    
+            if _cleanup_dead_receipt_payment_links(db, document):
+                # commit تغییرات
+                db.commit()
+                db.refresh(document)
+        except Exception as e:
+            logger.warning(f"خطا در پاک‌سازی لینک‌های مرده در invoice_document_to_dict: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     result = {
         "id": document.id,
         "code": document.code,

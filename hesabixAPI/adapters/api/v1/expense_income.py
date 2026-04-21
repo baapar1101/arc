@@ -70,24 +70,46 @@ async def list_expense_income_endpoint(
         "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
         "search": query_info.search,
     }
+    if getattr(query_info, "search_fields", None):
+        query_dict["search_fields"] = list(query_info.search_fields)
+    if getattr(query_info, "filters", None):
+        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
 
-    # Read extra body filters
+    body_json: Dict[str, Any] = {}
     try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date", "project_id", "sort", "sort_by", "sort_desc", "take", "skip", "search", "search_fields", "filters"]:
-                if key in body_json:
-                    query_dict[key] = body_json[key]
+        raw = await request.json()
+        if isinstance(raw, dict):
+            body_json = raw
     except Exception:
-        pass
+        body_json = {}
 
-    # Fiscal year from header
-    try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
-    except Exception:
-        pass
+    merge_keys = (
+        "document_type",
+        "from_date",
+        "to_date",
+        "sort",
+        "sort_by",
+        "sort_desc",
+        "take",
+        "skip",
+        "search",
+        "fiscal_year_id",
+        "project_id",
+        "account_id",
+        "search_fields",
+        "filters",
+    )
+    for key in merge_keys:
+        if key in body_json:
+            query_dict[key] = body_json[key]
+
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
 
     # کش نتایج لیست هزینه/درآمد
     cache = get_cache()
@@ -295,19 +317,20 @@ async def export_expense_income_excel_endpoint(
                 "document_type", "from_date", "to_date", "project_id",
                 "take", "skip", "sort_by", "sort_desc", "sort",
                 "search", "search_fields", "filters",
+                "fiscal_year_id", "account_id",
             ]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
     except Exception:
         pass
     
-    # سال مالی از هدر
-    try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
-    except Exception:
-        pass
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
     
     excel_data = export_expense_income_excel(db, business_id, query_dict)
     
@@ -356,14 +379,15 @@ async def export_expense_income_pdf_endpoint(
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
         "project_id": body.get("project_id"),
+        "account_id": body.get("account_id"),
     }
-    # سال مالی از هدر
     try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
-        elif body.get("fiscal_year_id") is not None:
+        if body.get("fiscal_year_id") is not None:
             query_dict["fiscal_year_id"] = int(body.get("fiscal_year_id"))
+        else:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
     except Exception:
         pass
     # دریافت داده‌ها

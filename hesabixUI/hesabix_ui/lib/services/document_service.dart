@@ -34,6 +34,8 @@ class DocumentService {
     String? toDate,
     int? currencyId,
     bool? isProforma,
+    int? projectId,
+    int? personId,
     String? search,
     String sortBy = 'document_date',
     bool sortDesc = true,
@@ -54,6 +56,8 @@ class DocumentService {
         if (toDate != null) 'to_date': toDate,
         if (currencyId != null) 'currency_id': currencyId,
         if (isProforma != null) 'is_proforma': isProforma,
+        if (projectId != null) 'project_id': projectId,
+        if (personId != null) 'person_id': personId,
         if (search != null && search.isNotEmpty) 'search': search,
       };
 

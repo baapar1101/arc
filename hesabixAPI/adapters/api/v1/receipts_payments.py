@@ -81,24 +81,46 @@ async def list_receipts_payments_endpoint(
         "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
         "search": query_info.search,
     }
-    
-    # دریافت پارامترهای اضافی از body
+    if getattr(query_info, "search_fields", None):
+        query_dict["search_fields"] = list(query_info.search_fields)
+    if getattr(query_info, "filters", None):
+        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
+
+    # ادغام کل بدنهٔ درخواست (فیلدهایی که در QueryInfo نیستند مثل fiscal_year_id، project_id، person_id)
+    body_json: Dict[str, Any] = {}
     try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date", "sort", "sort_by", "sort_desc"]:
-                if key in body_json:
-                    query_dict[key] = body_json[key]
+        raw = await request.json()
+        if isinstance(raw, dict):
+            body_json = raw
     except Exception:
-        pass
-    
-    # دریافت fiscal_year_id از هدر برای اولویت دادن به انتخاب کاربر
-    try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            query_dict["fiscal_year_id"] = int(fy_header)
-    except Exception:
-        pass
+        body_json = {}
+
+    merge_keys = (
+        "document_type",
+        "from_date",
+        "to_date",
+        "sort",
+        "sort_by",
+        "sort_desc",
+        "fiscal_year_id",
+        "project_id",
+        "person_id",
+        "search_fields",
+        "filters",
+        "search",
+    )
+    for key in merge_keys:
+        if key in body_json:
+            query_dict[key] = body_json[key]
+
+    # سال مالی: در صورت نبود در بدنه، از هدر استفاده کن (بدنه اولویت دارد)
+    if query_dict.get("fiscal_year_id") is None:
+        try:
+            fy_header = request.headers.get("X-Fiscal-Year-ID")
+            if fy_header:
+                query_dict["fiscal_year_id"] = int(fy_header)
+        except Exception:
+            pass
 
     # کش نتایج لیست دریافت/پرداخت
     cache = get_cache()
@@ -379,6 +401,9 @@ async def export_receipts_payments_excel(
         "document_type": body.get("document_type"),
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
+        "fiscal_year_id": body.get("fiscal_year_id"),
+        "project_id": body.get("project_id"),
+        "person_id": body.get("person_id"),
     }
 
     result = list_receipts_payments(db, business_id, query_dict)
@@ -787,6 +812,9 @@ async def export_receipts_payments_pdf(
         "document_type": body.get("document_type"),
         "from_date": body.get("from_date"),
         "to_date": body.get("to_date"),
+        "fiscal_year_id": body.get("fiscal_year_id"),
+        "project_id": body.get("project_id"),
+        "person_id": body.get("person_id"),
     }
 
     result = list_receipts_payments(db, business_id, query_dict)

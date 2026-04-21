@@ -379,6 +379,7 @@
                 <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
                 <th>{{ 'کالا / خدمت و توضیحات' if is_fa else 'Item & description' }}</th>
                 <th>{{ 'تعداد' if is_fa else 'Qty' }}</th>
+                <th>{{ 'واحد' if is_fa else 'Unit' }}</th>
                 <th>{{ 'فی' if is_fa else 'Price' }}</th>
                 {% if has_line_discount %}
                   <th>{{ 'تخفیف' if is_fa else 'Discount' }}</th>
@@ -411,6 +412,7 @@
                     {% endif %}
                   </td>
                   <td>{{ line.quantity_display | default('') | ltr | safe }}</td>
+                  <td>{{ line.unit_display | default('-') }}</td>
                   <td class="amount">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}</td>
                   {% if has_line_discount %}
                     <td class="amount">{{ (line.discount or 0) | format_amount(0) | ltr | safe }}</td>

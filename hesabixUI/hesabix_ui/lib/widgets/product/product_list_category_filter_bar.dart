@@ -61,31 +61,38 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final popScope = PopScope<Object?>(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) {
+            if (didPop) return;
+            Navigator.of(ctx).pop(_kCategoryPickerDismissed);
+          },
+          child: _CategoryBrowsePanel(
+            businessId: widget.businessId,
+            categories: widget.categories,
+            categoryService: _categoryService,
+            initialSelectedId: widget.selectedCategoryId,
+            searchHint: t.search,
+            title: t.categories,
+            cancelLabel: t.cancel,
+            allLabel: t.all,
+          ),
+        );
+        if (isMobile) {
+          return Dialog(
+            insetPadding: EdgeInsets.zero,
+            backgroundColor: theme.colorScheme.surface,
+            clipBehavior: Clip.antiAlias,
+            child: popScope,
+          );
+        }
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           clipBehavior: Clip.antiAlias,
-          child: PopScope<Object?>(
-            canPop: false,
-            onPopInvokedWithResult: (bool didPop, Object? result) {
-              if (didPop) return;
-              Navigator.of(ctx).pop(_kCategoryPickerDismissed);
-            },
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? double.infinity : 480,
-                maxHeight: isMobile ? MediaQuery.sizeOf(ctx).height * 0.85 : 560,
-              ),
-              child: _CategoryBrowsePanel(
-                businessId: widget.businessId,
-                categories: widget.categories,
-                categoryService: _categoryService,
-                initialSelectedId: widget.selectedCategoryId,
-                searchHint: t.search,
-                title: t.categories,
-                cancelLabel: t.cancel,
-                allLabel: t.all,
-              ),
-            ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480, maxHeight: 560),
+            child: popScope,
           ),
         );
       },
@@ -101,9 +108,8 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    final isFa = Localizations.localeOf(context).languageCode == 'fa';
-    final browseAllLabel = isFa ? 'همه دسته‌ها' : 'All categories';
-    final subLabel = isFa ? 'زیردسته' : 'Subcategories';
+    final browseAllLabel = t.productCategoryFilterBrowseAll;
+    final subLabel = t.productCategorySubcategoriesLabel;
 
     if (!widget.loading && widget.categories.isEmpty) {
       return const SizedBox.shrink();
@@ -398,13 +404,14 @@ class _CategoryBrowsePanelState extends State<_CategoryBrowsePanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final hPad = ResponsiveHelper.getPadding(context);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          padding: EdgeInsets.fromLTRB(hPad, isMobile ? 8 : 12, 8, 8),
           child: Row(
             children: [
               Expanded(
@@ -416,19 +423,22 @@ class _CategoryBrowsePanelState extends State<_CategoryBrowsePanel> {
               IconButton(
                 tooltip: widget.cancelLabel,
                 onPressed: () => Navigator.of(context).pop(_kCategoryPickerDismissed),
-                icon: const Icon(Icons.close),
+                icon: Icon(isMobile ? Icons.close_rounded : Icons.close),
               ),
             ],
           ),
         ),
+        Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
           child: TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
               hintText: widget.searchHint,
-              prefixIcon: const Icon(Icons.search),
-              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.search_rounded),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
               isDense: true,
             ),
             onChanged: (v) {
@@ -438,22 +448,19 @@ class _CategoryBrowsePanelState extends State<_CategoryBrowsePanel> {
             },
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 10 : 8),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: () => Navigator.of(context).pop<int?>(null),
-                icon: const Icon(Icons.clear_all_outlined, size: 18),
-                label: Text(widget.allLabel),
-              ),
-            ],
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton.tonalIcon(
+              onPressed: () => Navigator.of(context).pop<int?>(null),
+              icon: const Icon(Icons.clear_all_outlined, size: 18),
+              label: Text(widget.allLabel),
+            ),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 10 : 8),
         Expanded(
           child: _query.trim().isEmpty
               ? CategoryTreeWidget(
@@ -467,9 +474,7 @@ class _CategoryBrowsePanelState extends State<_CategoryBrowsePanel> {
                   : _searchHits.isEmpty
                       ? Center(
                           child: Text(
-                            Localizations.localeOf(context).languageCode == 'fa'
-                                ? 'دسته‌ای یافت نشد'
-                                : 'No categories found',
+                            AppLocalizations.of(context).categoryPickerSearchEmpty,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -494,8 +499,19 @@ class _CategoryBrowsePanelState extends State<_CategoryBrowsePanel> {
                           },
                         ),
         ),
-        const SizedBox(height: 8),
       ],
     );
+
+    if (isMobile) {
+      return SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 }

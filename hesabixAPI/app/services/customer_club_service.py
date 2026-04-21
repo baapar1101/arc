@@ -51,6 +51,23 @@ def _settings_to_dict(row: CustomerClubSettings) -> Dict[str, Any]:
 		"points_expire_after_days": int(row.points_expire_after_days)
 		if getattr(row, "points_expire_after_days", None) is not None
 		else None,
+		"rfm_analytics_enabled": bool(getattr(row, "rfm_analytics_enabled", False)),
+		"clv_analytics_enabled": bool(getattr(row, "clv_analytics_enabled", False)),
+		"rfm_analysis_window_months": int(getattr(row, "rfm_analysis_window_months", 12) or 12),
+		"rfm_monetary_basis": getattr(row, "rfm_monetary_basis", None) or "net",
+		"rfm_scoring_method": getattr(row, "rfm_scoring_method", None) or "quintiles",
+		"rfm_weight_recency": float(row.rfm_weight_recency) if getattr(row, "rfm_weight_recency", None) is not None else None,
+		"rfm_weight_frequency": float(row.rfm_weight_frequency)
+		if getattr(row, "rfm_weight_frequency", None) is not None
+		else None,
+		"rfm_weight_monetary": float(row.rfm_weight_monetary)
+		if getattr(row, "rfm_weight_monetary", None) is not None
+		else None,
+		"clv_formula": getattr(row, "clv_formula", None) or "historical_total",
+		"clv_avg_lifespan_years": float(row.clv_avg_lifespan_years)
+		if getattr(row, "clv_avg_lifespan_years", None) is not None
+		else None,
+		"rfm_segment_labels_json": getattr(row, "rfm_segment_labels_json", None),
 	}
 
 
@@ -67,6 +84,13 @@ def _default_settings_row(db: Session, business_id: int) -> CustomerClubSettings
 		max_points_per_invoice=None,
 		min_basis_amount=Decimal("0"),
 		require_customer_person_type=True,
+		rfm_analytics_enabled=False,
+		clv_analytics_enabled=False,
+		rfm_analysis_window_months=12,
+		rfm_monetary_basis="net",
+		rfm_scoring_method="quintiles",
+		clv_formula="historical_total",
+		clv_avg_lifespan_years=Decimal("3"),
 	)
 	db.add(row)
 	db.flush()
@@ -141,6 +165,61 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 	if "points_expire_after_days" in payload:
 		v = payload["points_expire_after_days"]
 		row.points_expire_after_days = int(v) if v is not None else None
+
+	if "rfm_analytics_enabled" in payload:
+		row.rfm_analytics_enabled = bool(payload["rfm_analytics_enabled"])
+	if "clv_analytics_enabled" in payload:
+		row.clv_analytics_enabled = bool(payload["clv_analytics_enabled"])
+	if "rfm_analysis_window_months" in payload:
+		wm = int(payload["rfm_analysis_window_months"])
+		if wm < 1 or wm > 120:
+			raise ApiError(
+				"CUSTOMER_CLUB_RFM_WINDOW_INVALID",
+				"rfm_analysis_window_months must be between 1 and 120.",
+				http_status=400,
+			)
+		row.rfm_analysis_window_months = wm
+	if "rfm_monetary_basis" in payload:
+		mb = str(payload["rfm_monetary_basis"]).strip()
+		if mb not in ("net", "total_with_tax"):
+			raise ApiError(
+				"CUSTOMER_CLUB_RFM_MONETARY_BASIS_INVALID",
+				"rfm_monetary_basis must be net or total_with_tax.",
+				http_status=400,
+			)
+		row.rfm_monetary_basis = mb
+	if "rfm_scoring_method" in payload:
+		sm = str(payload["rfm_scoring_method"]).strip()
+		if sm not in ("quintiles", "weighted"):
+			raise ApiError(
+				"CUSTOMER_CLUB_RFM_SCORING_INVALID",
+				"rfm_scoring_method must be quintiles or weighted.",
+				http_status=400,
+			)
+		row.rfm_scoring_method = sm
+	if "rfm_weight_recency" in payload:
+		v = payload["rfm_weight_recency"]
+		row.rfm_weight_recency = Decimal(str(v)) if v is not None else None
+	if "rfm_weight_frequency" in payload:
+		v = payload["rfm_weight_frequency"]
+		row.rfm_weight_frequency = Decimal(str(v)) if v is not None else None
+	if "rfm_weight_monetary" in payload:
+		v = payload["rfm_weight_monetary"]
+		row.rfm_weight_monetary = Decimal(str(v)) if v is not None else None
+	if "clv_formula" in payload:
+		cf = str(payload["clv_formula"]).strip()
+		if cf not in ("historical_total", "avg_order_projection"):
+			raise ApiError(
+				"CUSTOMER_CLUB_CLV_FORMULA_INVALID",
+				"clv_formula must be historical_total or avg_order_projection.",
+				http_status=400,
+			)
+		row.clv_formula = cf
+	if "clv_avg_lifespan_years" in payload:
+		v = payload["clv_avg_lifespan_years"]
+		row.clv_avg_lifespan_years = Decimal(str(v)) if v is not None else None
+	if "rfm_segment_labels_json" in payload:
+		row.rfm_segment_labels_json = payload["rfm_segment_labels_json"]
 
 	db.commit()
 	db.refresh(row)

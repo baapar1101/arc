@@ -133,8 +133,10 @@ from .customer_club import (  # noqa: F401
 	CustomerClubLedger,
 	CustomerClubInvoiceSnapshot,
 	CustomerClubTier,
+	CustomerClubRfmSnapshot,
 )
 from .distribution import (  # noqa: F401
+	DistributionBusinessSettings,
 	DistributionTerritory,
 	DistributionRoute,
 	DistributionRouteStop,
