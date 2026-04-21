@@ -607,171 +607,21 @@ ENV
   log_info "Saved deployment config to ${env_file}"
 
   local bin_hesabix="/usr/local/bin/hesabix"
-  cat > "${bin_hesabix}" <<'HESABIX_SCRIPT'
-#!/usr/bin/env bash
-# Hesabix CLI – update from repo / control systemd units (after deploy.sh at least once).
-set -euo pipefail
-APP_ROOT="${APP_ROOT:-/opt/hesabix}"
-if [[ $EUID -ne 0 ]]; then
-  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -services start)" >&2
-  exit 1
-fi
-if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
-  echo "Hesabix not deployed yet. Run deploy.sh first." >&2
-  exit 1
-fi
-
-# Core application units (order: start forward, stop reverse). pgadmin4 is optional if installed.
-run_hesabix_services() {
-  local action="$1"
-  local -a core=( hesabix-api hesabix-rq-worker hesabix-notification-moderation )
-  local u
-
-  for u in "${core[@]}"; do
-    if [[ "$(systemctl show "${u}.service" -p LoadState --value 2>/dev/null)" != "loaded" ]]; then
-      echo "Expected systemd unit is missing or not loaded: ${u}.service (re-run deploy.sh backend step)" >&2
-      exit 1
-    fi
-  done
-
-  local -a extra=()
-  if [[ "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
-    extra+=( pgadmin4 )
+  local cli_src="${APP_ROOT}/app/scripts/hesabix"
+  if [[ ! -f "${cli_src}" ]]; then
+    cli_src="$(pwd)/scripts/hesabix"
   fi
-
-  case "${action}" in
-    start)
-      for u in "${core[@]}"; do
-        systemctl start "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl start "${u}.service"
-      done
-      echo "Started Hesabix services."
-      ;;
-    stop)
-      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${extra[i]}.service"
-      done
-      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${core[i]}.service"
-      done
-      echo "Stopped Hesabix services."
-      ;;
-    restart)
-      for u in "${core[@]}"; do
-        systemctl restart "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl restart "${u}.service"
-      done
-      echo "Restarted Hesabix services."
-      ;;
-    status)
-      for u in "${core[@]}"; do
-        echo "======== ${u}.service ========"
-        systemctl --no-pager -l status "${u}.service" || true
-      done
-      for u in "${extra[@]}"; do
-        echo "======== ${u}.service ========"
-        systemctl --no-pager -l status "${u}.service" || true
-      done
-      ;;
-    *)
-      echo "Invalid action: ${action}. Use: start|stop|restart|status" >&2
-      exit 1
-      ;;
-  esac
-}
-
-UPDATE_MODE=""
-SERVICES_ACTION=""
-SOURCE_URL=""
-BRANCH_OVERRIDE=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -update) UPDATE_MODE=1; shift ;;
-    -source)
-      if [[ $# -lt 2 || -z "${2:-}" ]]; then
-        echo "-source requires a repository URL." >&2
-        exit 1
-      fi
-      SOURCE_URL="$2"
-      shift 2
-      ;;
-    -branch)
-      if [[ $# -lt 2 || -z "${2:-}" ]]; then
-        echo "-branch requires a branch name." >&2
-        exit 1
-      fi
-      BRANCH_OVERRIDE="$2"
-      shift 2
-      ;;
-    -services)
-      if [[ $# -lt 2 || -z "${2:-}" ]]; then
-        echo "hesabix -services requires an action: start|stop|restart|status" >&2
-        exit 1
-      fi
-      SERVICES_ACTION="$2"
-      shift 2
-      ;;
-    -h|--help)
-      echo "Usage:"
-      echo "  hesabix -update [-source REPO_URL] [-branch BRANCH]"
-      echo "  hesabix -services {start|stop|restart|status}"
-      echo ""
-      echo "  -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)"
-      echo "  -source URL       Override repo URL (default: from initial deploy)"
-      echo "  -branch NAME      Override branch (default: from initial deploy)"
-      echo "  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker;"
-      echo "                    pgadmin4 too if installed)"
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1. Use -h for help." >&2
-      exit 1
-      ;;
-  esac
-done
-
-if [[ -n "${UPDATE_MODE}" && -n "${SERVICES_ACTION}" ]]; then
-  echo "Use either -update or -services, not both." >&2
-  exit 1
-fi
-
-if [[ -n "${SERVICES_ACTION}" ]]; then
-  case "${SERVICES_ACTION}" in
-    start|stop|restart|status) ;;
-    *)
-      echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status" >&2
-      exit 1
-      ;;
-  esac
-  run_hesabix_services "${SERVICES_ACTION}"
-  exit 0
-fi
-
-if [[ -z "${UPDATE_MODE}" ]]; then
-  echo "Usage: hesabix -update …  or  hesabix -services {start|stop|restart|status}"
-  echo "Try: hesabix -h"
-  exit 0
-fi
-
-set -a
-# shellcheck source=/dev/null
-source "${APP_ROOT}/.deploy_env"
-set +a
-[[ -n "${SOURCE_URL}" ]] && export REPO_URL="${SOURCE_URL}"
-[[ -n "${BRANCH_OVERRIDE}" ]] && export BRANCH="${BRANCH_OVERRIDE}"
-export APP_ROOT
-if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
-  echo "Update script not found: ${APP_ROOT}/app/update.sh. Pull the latest repo and run deploy again." >&2
-  exit 1
-fi
-exec bash "${APP_ROOT}/app/update.sh"
-HESABIX_SCRIPT
-  chmod 755 "${bin_hesabix}"
-  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -services restart)"
+  if [[ ! -f "${cli_src}" ]]; then
+    log_error "CLI source not found: scripts/hesabix (expected at ${APP_ROOT}/app/scripts/hesabix)"
+    return 1
+  fi
+  if command -v install >/dev/null 2>&1; then
+    install -m 755 "${cli_src}" "${bin_hesabix}"
+  else
+    cp -f "${cli_src}" "${bin_hesabix}"
+    chmod 755 "${bin_hesabix}" 2>/dev/null || true
+  fi
+  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -services restart | sudo hesabix -cli reload)"
 }
 
 reset_deployment_state() {
@@ -2820,6 +2670,7 @@ main() {
   log_info "To update (pull, migrate, rebuild, restart):"
   echo "  sudo hesabix -update"
   echo "  sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git   # override repo"
+  echo "  sudo hesabix -cli reload                              # update /usr/local/bin/hesabix from repo"
   echo
   log_info "To start/stop/restart all Hesabix app services (systemd):"
   echo "  sudo hesabix -services start"
