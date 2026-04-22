@@ -14,17 +14,26 @@ from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
 	SendLoginOtpRequest, ChangePasswordRequest, UpdateMobileRequest, UpdateEmailRequest,
+	SendMobileVerificationRequest,
 	CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
 	SuccessResponse, CaptchaResponse, LoginResponse, ApiKeyResponse, 
 	ReferralStatsResponse, UserResponse
 )
+from app.core.settings import get_settings
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.api_key_service import list_personal_keys, create_personal_key, revoke_key
 from app.services.session_service import list_user_sessions, revoke_session, revoke_other_sessions
 from app.core.rate_limiter import rate_limit, get_client_ip
 
 
-router = APIRouter(prefix="/auth", tags=["احراز هویت"]) 
+router = APIRouter(prefix="/auth", tags=["احراز هویت"])
+
+
+def _otp_in_response(otp_code: str | None) -> dict:
+	"""فقط در حالت debug — در production مقدار OTP در پاسخ API برگردانده نمی‌شود."""
+	if get_settings().debug and (otp_code or ""):
+		return {"otp_code": otp_code}
+	return {}
 
 
 @router.post("/captcha", 
@@ -491,6 +500,12 @@ async def reset_password_endpoint(request: Request, payload: ResetPasswordReques
 		}
 	}
 )
+@rate_limit(
+	max_requests=5,
+	window_seconds=300,
+	key_func=lambda req: f"password_reset_send_otp:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.",
+)
 def send_password_reset_otp(
 	request: Request,
 	payload: ForgotPasswordRequest,
@@ -508,13 +523,13 @@ def send_password_reset_otp(
 	service = PasswordResetOtpService(db)
 	
 	try:
-		# در production نباید OTP برگردانده شود
 		otp_code = service.send_reset_otp(payload.identifier)
-		return success_response({
+		data = {
 			"ok": True,
 			"message": "کد بازیابی رمز عبور به شماره موبایل ارسال شد",
-			"otp_code": otp_code  # فقط برای تست - حذف در production
-		}, request)
+		}
+		data.update(_otp_in_response(otp_code))
+		return success_response(data, request)
 	except ApiError as e:
 		raise e
 	except Exception as e:
@@ -1554,19 +1569,29 @@ def resend_verification(
 		}
 	}
 )
+@rate_limit(
+	max_requests=8,
+	window_seconds=3600,
+	key_func=lambda req: f"send_mobile_verif:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های ارسال کد تایید موبایل بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
+)
 def send_mobile_verification(
 	request: Request,
-	mobile: str = Query(..., description="شماره موبایل برای تایید"),
+	payload: SendMobileVerificationRequest,
 	db: Session = Depends(get_db)
 ) -> dict:
-	"""ارسال کد OTP به شماره موبایل کاربر"""
+	"""ارسال کد OTP به شماره موبایل کاربر (همراه کپچا در بدنه)"""
 	from app.services.mobile_verification_service import MobileVerificationService
+	from app.services.captcha_service import validate_captcha
 	from adapters.db.repositories.user_repo import UserRepository
 	from app.services.auth_service import _normalize_mobile
 	from app.core.responses import ApiError
 	
-	# نرمال‌سازی شماره موبایل (استفاده از همان تابعی که در ثبت‌نام استفاده می‌شود)
-	normalized_mobile = _normalize_mobile(mobile)
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+		raise ApiError("INVALID_CAPTCHA", "کد کپچا نامعتبر است", http_status=400)
+	
+	# نرمال‌سازی شماره موبایل (همان مسیری که در ثبت‌نام است)
+	normalized_mobile = _normalize_mobile(payload.mobile)
 	if not normalized_mobile:
 		raise ApiError("INVALID_MOBILE", "شماره موبایل نامعتبر است", http_status=400)
 	
@@ -1578,16 +1603,11 @@ def send_mobile_verification(
 	
 	service = MobileVerificationService(db)
 	
-	# برای ارسال SMS، service خودش شماره را نرمال‌سازی می‌کند
-	# می‌توانیم شماره اصلی را به آن بدهیم
 	try:
-		# در production نباید OTP برگردانده شود
-		otp_code = service.create_mobile_verification(user.id, mobile)
-		# فقط برای تست - در production باید حذف شود
-		return success_response({
-			"message": "کد تایید به شماره موبایل ارسال شد",
-			"otp_code": otp_code  # فقط برای تست - حذف در production
-		}, request)
+		otp_code = service.create_mobile_verification(user.id, payload.mobile)
+		data = {"message": "کد تایید به شماره موبایل ارسال شد"}
+		data.update(_otp_in_response(otp_code))
+		return success_response(data, request)
 	except ApiError as e:
 		raise e
 	except Exception as e:
@@ -1669,6 +1689,12 @@ def verify_mobile(
 		}
 	}
 )
+@rate_limit(
+	max_requests=10,
+	window_seconds=3600,
+	key_func=lambda req: f"resend_mobile_verif:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های ارسال مجدد کد بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
+)
 def resend_mobile_verification(
 	request: Request,
 	ctx: AuthContext = Depends(get_current_user),
@@ -1680,13 +1706,10 @@ def resend_mobile_verification(
 	service = MobileVerificationService(db)
 	user_id = ctx.get_user_id()
 	
-	# در production نباید OTP برگردانده شود
 	otp_code = service.resend_otp(user_id)
-	
-	return success_response({
-		"message": "کد تایید مجدداً ارسال شد",
-		"otp_code": otp_code  # فقط برای تست - حذف در production
-	}, request)
+	data = {"message": "کد تایید مجدداً ارسال شد"}
+	data.update(_otp_in_response(otp_code))
+	return success_response(data, request)
 
 
 @router.post(
@@ -1745,7 +1768,8 @@ def update_mobile(
 			mobile=payload.mobile,
 			captcha_id=payload.captcha_id,
 			captcha_code=payload.captcha_code,
-			force_unverified=payload.force_unverified
+			force_unverified=payload.force_unverified,
+			send_verification_sms=payload.send_verification_sms,
 		)
 		
 		return success_response(

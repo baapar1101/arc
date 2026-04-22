@@ -303,6 +303,9 @@ class DataTableConfig<T> {
   // Refresh callback
   final VoidCallback? onRefresh;
 
+  /// وقتی دادهٔ **صفحهٔ جاری** (raw) از API یا حالت local به‌روز می‌شود؛ برای نگاشت ایندکس انتخاب به id و غیره
+  final void Function(List<Map<String, dynamic>> currentPageRawItems)? onTableDataChanged;
+
   /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
   final VoidCallback? onAllFiltersCleared;
   
@@ -407,6 +410,7 @@ class DataTableConfig<T> {
     this.headingRowHeight,
     this.dataRowHeight,
     this.onRefresh,
+    this.onTableDataChanged,
     this.onAllFiltersCleared,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,

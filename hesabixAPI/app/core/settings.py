@@ -71,6 +71,10 @@ class Settings(BaseSettings):
 	sms_sender: str | None = None
 	sms_provider_username: str | None = None  # برای behinsms
 	sms_provider_password: str | None = None  # برای behinsms
+	# سقف ارسال به هر شماره مقصد (مشترک بین همه worker؛ بدون Redis) — جلو ارسال از IPهای مختلف
+	sms_destination_rate_enabled: bool = True
+	sms_destination_rate_max_sends: int = 40  # حداکثر تعداد ارسال به همان شماره در پنجره
+	sms_destination_rate_window_minutes: int = 60  # طول پنجره (دقیقه)
 
 	# Share link / public card settings
 	share_link_code_length: int = 9
@@ -99,6 +103,10 @@ class Settings(BaseSettings):
 	redis_port: int = 6379
 	redis_db: int = 0
 	redis_password: str | None = None
+
+	# مانیتورینگ صف اعلان / پیامک (آستانه هشدار در پنل)
+	monitoring_outbox_due_retry_warn: int = 500
+	monitoring_outbox_sms_pending_warn: int = 50
 	
 	# Pagination
 	max_page_size: int = 100  # حداکثر تعداد آیتم در هر صفحه

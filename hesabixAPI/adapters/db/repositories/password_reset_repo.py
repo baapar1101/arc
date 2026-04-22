@@ -13,10 +13,13 @@ class PasswordResetRepository:
 	def __init__(self, db: Session) -> None:
 		self.db = db
 
-	def create(self, *, user_id: int, token_hash: str, expires_at: datetime) -> PasswordReset:
+	def create(self, *, user_id: int, token_hash: str, expires_at: datetime, commit: bool = True) -> PasswordReset:
 		obj = PasswordReset(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
 		self.db.add(obj)
-		self.db.commit()
+		if commit:
+			self.db.commit()
+		else:
+			self.db.flush()
 		self.db.refresh(obj)
 		return obj
 

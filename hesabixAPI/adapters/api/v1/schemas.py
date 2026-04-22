@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, Union, Generic, TypeVar
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, validator
+from typing import Any, Dict, List, Optional, Union, Generic, TypeVar, Literal
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, validator
 from enum import Enum
 from datetime import datetime, date
 
@@ -291,6 +291,15 @@ class ChangePasswordRequest(BaseModel):
 class UpdateMobileRequest(CaptchaSolve):
 	mobile: str = Field(..., min_length=10, max_length=32, description="شماره موبایل جدید")
 	force_unverified: bool = Field(default=False, description="اجازه تغییر شماره ثبت شده اما تایید نشده")
+	send_verification_sms: bool = Field(
+		default=True,
+		description="پس از ذخیرهٔ شماره، کد تایید به همان موبایل (از همان کپچا) ارسال شود",
+	)
+
+
+class SendMobileVerificationRequest(CaptchaSolve):
+	"""همراه با کپچا (بدن درخواست JSON) — از query param خالی برای جلوگیری از سوءاستفاده"""
+	mobile: str = Field(..., min_length=10, max_length=32, description="شماره موبایل برای ارسال کد تایید")
 
 
 class UpdateEmailRequest(CaptchaSolve):
@@ -438,13 +447,46 @@ class BulkResetPasswordRequest(BaseModel):
 		description="لیست شناسه‌های کاربران برای بازنشانی رمز عبور",
 		example=[1, 2, 3]
 	)
+	send_notification: bool = Field(
+		default=True,
+		description="برای هر کاربری که توکن ساخته شد، اعلان auth.password_reset ارسال شود",
+	)
 	
 	class Config:
 		json_schema_extra = {
 			"example": {
-				"user_ids": [1, 2, 3, 4, 5]
+				"user_ids": [1, 2, 3, 4, 5],
+				"send_notification": True,
 			}
 		}
+
+
+class AdminSetUserPasswordRequest(BaseModel):
+	"""تنظیم رمز توسط مدیر: مستقیم (انتخابی) یا تولید تصادفی (یک‌بار نمایش)."""
+	model_config = ConfigDict(extra="forbid")
+	mode: Literal["direct", "random"] = Field(
+		default="direct",
+		description="direct: new_password + confirm_password؛ random: تولید در سرور",
+	)
+	new_password: Optional[str] = Field(
+		default=None,
+		min_length=8,
+		max_length=128,
+		description="الزام در حالت direct",
+	)
+	confirm_password: Optional[str] = Field(
+		default=None,
+		min_length=8,
+		max_length=128,
+		description="الزام در حالت direct",
+	)
+
+	@model_validator(mode="after")
+	def _validate_mode(self) -> "AdminSetUserPasswordRequest":
+		if self.mode == "direct":
+			if not self.new_password or not self.confirm_password:
+				raise ValueError("برای حالت direct، new_password و confirm_password الزامی است")
+		return self
 
 
 # User Detail Response Models

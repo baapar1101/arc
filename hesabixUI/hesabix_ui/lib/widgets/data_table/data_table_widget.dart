@@ -217,6 +217,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _fetchData();
   }
 
+  void _notifyTableDataChanged() {
+    final cb = widget.config.onTableDataChanged;
+    if (cb == null) return;
+    cb(List<Map<String, dynamic>>.from(_rawItems));
+  }
+
   /// فیلتر سریع دسته (مثلاً از نوار بالای لیست کالاها) — همان منطق فیلتر درختی ستون دسته‌بندی
   void applyCategoryIdFilter(List<int> categoryIds) {
     setState(() {
@@ -500,6 +506,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             _lastSelectedRowIndex = null;
           });
         }
+        _notifyTableDataChanged();
         await _maybeAutoFitColumns();
         if (widget.onRefresh != null) {
           widget.onRefresh!();
@@ -630,6 +637,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _activeRowIndex = _items.isNotEmpty ? 0 : -1;
           _lastSelectedRowIndex = null;
         });
+        _notifyTableDataChanged();
       }
       
       // Auto-fit columns on first load if configured

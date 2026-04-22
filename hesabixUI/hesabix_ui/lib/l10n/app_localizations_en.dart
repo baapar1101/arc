@@ -1624,6 +1624,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get maintenanceSettings => 'Maintenance Settings';
 
   @override
+  String get smsDestinationRateSettings =>
+      'SMS rate limit (per destination number)';
+
+  @override
+  String get smsDestinationRateEnabled =>
+      'Enforce per-number send cap within a time window';
+
+  @override
+  String get smsDestinationRateMaxSends => 'Max sends per number in the window';
+
+  @override
+  String get smsDestinationRateWindowMinutes => 'Window length (minutes)';
+
+  @override
+  String get smsDestinationRateMaxSendsHelper =>
+      '0 means no cap (this per-number limit is off)';
+
+  @override
   String get initializing => 'Initializing...';
 
   @override

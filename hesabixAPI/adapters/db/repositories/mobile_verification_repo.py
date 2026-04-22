@@ -19,7 +19,8 @@ class MobileVerificationRepository:
 		user_id: int,
 		mobile: str,
 		otp_code_hash: str,
-		expires_at: datetime
+		expires_at: datetime,
+		commit: bool = True,
 	) -> MobileVerificationToken:
 		obj = MobileVerificationToken(
 			user_id=user_id,
@@ -29,7 +30,10 @@ class MobileVerificationRepository:
 			attempts=0,
 		)
 		self.db.add(obj)
-		self.db.commit()
+		if commit:
+			self.db.commit()
+		else:
+			self.db.flush()
 		self.db.refresh(obj)
 		return obj
 	

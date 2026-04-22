@@ -13,6 +13,7 @@ from adapters.db.repositories.mobile_verification_repo import MobileVerification
 from app.services.providers.sms_provider import SmsProvider
 from app.services.system_settings_service import get_effective_notifications_settings
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_sms_rate_lock
 from app.utils.phone_utils import normalize_phone_number
 from app.core.settings import get_settings
 
@@ -59,11 +60,6 @@ class MobileVerificationService:
 		Raises:
 			ApiError: در صورت خطا
 		"""
-		# بررسی Rate Limiting (حداکثر 3 بار در ساعت)
-		recent_count = self.repo.count_recent_by_user(user_id, hours=1)
-		if recent_count >= 3:
-			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست در ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
-		
 		# بررسی وجود کاربر
 		user = self.user_repo.get_by_id(user_id)
 		if not user:
@@ -79,11 +75,15 @@ class MobileVerificationService:
 		if not self.sms_provider.is_configured():
 			raise ApiError("SMS_NOT_CONFIGURED", "سرویس پیامک پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
 		
-		# تولید OTP
+		# سهمیه ۳/ساعت + جلوگیری از race
+		acquire_sms_rate_lock(self.db, f"mobile_ver_otp_user:{user_id}")
+		recent_count = self.repo.count_recent_by_user(user_id, hours=1)
+		if recent_count >= 3:
+			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست در ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
+		
+		# تولید OTP (پس از اطمینان از سهمیه)
 		otp_code = generate_otp()
 		otp_hash = _hash_otp(otp_code)
-		
-		# زمان انقضا: 10 دقیقه
 		expires_at = datetime.utcnow() + timedelta(minutes=10)
 		
 		# ذخیره در دیتابیس
@@ -91,8 +91,10 @@ class MobileVerificationService:
 			user_id=user_id,
 			mobile=normalized_mobile,
 			otp_code_hash=otp_hash,
-			expires_at=expires_at
+			expires_at=expires_at,
+			commit=False
 		)
+		self.db.commit()
 		
 		# ارسال پیامک
 		message = f"کد تایید شماره موبایل شما: {otp_code}\nاین کد تا 10 دقیقه اعتبار دارد."

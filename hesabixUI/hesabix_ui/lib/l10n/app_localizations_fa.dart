@@ -1614,6 +1614,25 @@ class AppLocalizationsFa extends AppLocalizations {
   String get maintenanceSettings => 'تنظیمات نگهداری';
 
   @override
+  String get smsDestinationRateSettings =>
+      'محدودیت ارسال پیامک (به‌ازای شماره مقصد)';
+
+  @override
+  String get smsDestinationRateEnabled =>
+      'اعمال سقف ارسال به هر شماره در بازه زمانی';
+
+  @override
+  String get smsDestinationRateMaxSends =>
+      'حداکثر ارسال در پنجره (برای هر شماره)';
+
+  @override
+  String get smsDestinationRateWindowMinutes => 'طول پنجره (دقیقه)';
+
+  @override
+  String get smsDestinationRateMaxSendsHelper =>
+      'صفر یعنی بدون سقف (این محدودیت تعداد غیرفعال است)';
+
+  @override
   String get initializing => 'در حال راه‌اندازی...';
 
   @override

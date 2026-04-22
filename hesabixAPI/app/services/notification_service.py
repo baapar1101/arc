@@ -25,6 +25,9 @@ from app.utils.phone_utils import normalize_phone_number
 
 logger = logging.getLogger(__name__)
 
+# حداکثر تلاش مجدد برای یک ردیف outbox (پس از آن abandoned می‌شود تا انفجار رکورد/فشار به SMS متوقف شود)
+OUTBOX_MAX_RETRY_COUNT = 12
+
 
 class NotificationService:
 	def __init__(self, db: Session) -> None:
@@ -107,13 +110,26 @@ class NotificationService:
 			# در صورت خطا، متن خام برمی‌گردانیم
 			return template_text
 
-	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None, broadcast_mode: bool = False) -> bool:
+	def send(
+		self,
+		*,
+		user_id: int,
+		event_key: str,
+		context: Dict[str, Any],
+		preferred_channels: Optional[Iterable[str]] = None,
+		locale: Optional[str] = None,
+		broadcast_mode: bool = False,
+		reuse_outbox: Optional[NotificationOutbox] = None,
+	) -> bool:
 		"""
 		Minimal synchronous sender with basic fallback:
 		- Try Telegram if linked and requested
 		- Else Email
 		- Else InApp
 		Also records outbox + attempts.
+
+		reuse_outbox: اگر set باشد (مثلاً از NotificationProcessor)، همان ردیف به‌روز می‌شود
+		و ردیف جدید در outbox ساخته نمی‌شود — از تکثیر میلیونی رکورد در retry جلوگیری می‌کند.
 		
 		Args:
 			user_id: شناسه کاربر
@@ -126,11 +142,27 @@ class NotificationService:
 		Returns:
 			True اگر ناتیفیکیشن با موفقیت ارسال شد، False در غیر این صورت
 		"""
+		if reuse_outbox is not None:
+			if reuse_outbox.retry_count >= OUTBOX_MAX_RETRY_COUNT:
+				reuse_outbox.status = "abandoned"
+				reuse_outbox.error_message = "max_retries_exceeded"
+				reuse_outbox.next_attempt_at = None
+				self.db.add(reuse_outbox)
+				self.db.commit()
+				return False
+			user_id = reuse_outbox.user_id
+			event_key = reuse_outbox.event_key
+			context = dict(reuse_outbox.payload) if reuse_outbox.payload else {}
+			locale = reuse_outbox.locale
+			channels = [reuse_outbox.channel]
+		else:
+			channels = list(preferred_channels) if preferred_channels else ["telegram", "bale", "sms", "email", "inapp"]
+
 		user = self.user_repo.db.get(self.user_repo.model_class, user_id)
 		if user is None:
 			return False
 
-		channels = list(preferred_channels) if preferred_channels else ["telegram", "bale", "sms", "email", "inapp"]
+		attempted_delivery = False
 
 		# Render templates با جایگزینی پارامترها (fallback به متن ساده)
 		def render_for(channel: str) -> tuple[str, str]:
@@ -185,7 +217,11 @@ class NotificationService:
 			# احترام به تنظیمات کاربر
 			if not is_channel_enabled(channel):
 				continue
-			outbox = self._create_outbox(user_id=user_id, channel=channel, event_key=event_key, payload=context, locale=locale)
+			if reuse_outbox is not None and channel == reuse_outbox.channel:
+				outbox = reuse_outbox
+			else:
+				outbox = self._create_outbox(user_id=user_id, channel=channel, event_key=event_key, payload=context, locale=locale)
+			attempted_delivery = True
 			if channel == "telegram":
 				# بررسی پیکربندی تلگرام
 				if not self.telegram.is_configured():
@@ -358,9 +394,16 @@ class NotificationService:
 				ok = self.inapp.notify(user_id=user_id, title=subject_inapp, body=body_inapp, level="info")
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "inapp_failed")
 				outbox.status = "sent" if ok else "failed"
+				if not ok:
+					outbox.retry_count = outbox.retry_count + 1
+					outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=5)
 				self.db.add(outbox)
 				self.db.commit()
 				# Persist as an announcement for visibility in UI even if realtime WS is not connected
+				# retry همان ردیف outbox: اعلان تکراری در DB نساز
+				if reuse_outbox is not None:
+					sent = ok
+					break
 				# اما برای اعلان‌های پشتیبانی باید audience_filters را به درستی تنظیم کنیم
 				try:
 					# اگر event_key مربوط به پشتیبانی است، audience_filters را تنظیم می‌کنیم
@@ -432,6 +475,13 @@ class NotificationService:
 				self.db.add(outbox)
 				self.db.commit()
 		
+		if reuse_outbox is not None and not sent and not attempted_delivery:
+			reuse_outbox.status = "abandoned"
+			reuse_outbox.error_message = "retry_aborted_no_eligible_channel"
+			reuse_outbox.next_attempt_at = None
+			self.db.add(reuse_outbox)
+			self.db.commit()
+
 		return sent
 
 	def notify_support_operators(

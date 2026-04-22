@@ -4,11 +4,19 @@ class MobileVerificationService {
   final ApiClient _api;
   MobileVerificationService(this._api);
 
-  /// ارسال کد تایید به شماره موبایل
-  Future<Map<String, dynamic>> sendMobileVerification(String mobile) async {
+  /// ارسال کد تایید به شماره موبایل (همراه کپچا)
+  Future<Map<String, dynamic>> sendMobileVerification({
+    required String mobile,
+    required String captchaId,
+    required String captchaCode,
+  }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/auth/send-mobile-verification',
-      query: {'mobile': mobile},
+      data: {
+        'mobile': mobile,
+        'captcha_id': captchaId,
+        'captcha_code': captchaCode,
+      },
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }

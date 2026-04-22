@@ -88,6 +88,9 @@ def validate_captcha(db: Session, captcha_id: str, code: str) -> bool:
 		return False
 	provided_hash = _hash_code(code.strip(), settings.captcha_secret)
 	if secrets.compare_digest(provided_hash, obj.code_hash):
+		# مصرف یک‌باره: جلوگیری از ارسال موازی/بازپخش با همان کپچا
+		db.delete(obj)
+		db.commit()
 		return True
 	obj.attempts += 1
 	db.add(obj)

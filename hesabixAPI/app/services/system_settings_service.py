@@ -35,6 +35,11 @@ NOTIFY_BALE_WEBHOOK_SECRET = "bale_webhook_secret"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 
+# SMS destination rate limit (optional DB overrides; base values from Settings / env)
+SMS_DESTINATION_RATE_ENABLED_KEY = "sms_destination_rate_enabled"
+SMS_DESTINATION_RATE_MAX_SENDS_KEY = "sms_destination_rate_max_sends"
+SMS_DESTINATION_RATE_WINDOW_MINUTES_KEY = "sms_destination_rate_window_minutes"
+
 # Zohal Service Configuration Keys
 ZOHAL_API_KEY = "zohal_api_key"
 ZOHAL_BASE_URL = "zohal_base_url"
@@ -303,6 +308,29 @@ def set_notifications_settings(
 		_upsert_setting_string(db, NOTIFY_TG_PROXY_API_KEY, telegram_proxy_api_key)
 	db.commit()
 	return get_notifications_settings(db)
+
+
+def get_sms_destination_rate_effective(db: Session) -> tuple[bool, int, int]:
+	"""
+	مقادیر مؤثر سقف نرخ ارسال SMS به یک شماره مقصد.
+	پایه از تنظیمات محیط؛ در صورت وجود در system_settings اولویت با DB است.
+	"""
+	env = get_settings()
+	enabled = bool(env.sms_destination_rate_enabled)
+	max_sends = int(env.sms_destination_rate_max_sends)
+	window_minutes = int(env.sms_destination_rate_window_minutes)
+
+	db_enabled = _get_setting_bool(db, SMS_DESTINATION_RATE_ENABLED_KEY)
+	if db_enabled is not None:
+		enabled = db_enabled
+	db_max = _get_setting_int(db, SMS_DESTINATION_RATE_MAX_SENDS_KEY)
+	if db_max is not None and db_max >= 0:
+		max_sends = db_max
+	db_win = _get_setting_int(db, SMS_DESTINATION_RATE_WINDOW_MINUTES_KEY)
+	if db_win is not None and db_win > 0:
+		window_minutes = db_win
+
+	return enabled, max_sends, window_minutes
 
 
 def get_share_link_settings(db: Session) -> Dict[str, Any]:

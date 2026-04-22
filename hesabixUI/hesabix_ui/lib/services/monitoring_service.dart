@@ -129,5 +129,42 @@ class MonitoringService {
       '/api/v1/admin/monitoring/alerts/$alertId/resolve',
     );
   }
+
+  // صف اعلان‌ها / پیامک (outbox)
+
+  Future<Map<String, dynamic>> getNotificationOutboxSummary() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/monitoring/notifications/outbox/summary',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> abandonNotificationOutbox({
+    required String confirmPhrase,
+    List<String> statuses = const ['failed'],
+    String? channel,
+    String? eventKey,
+    int? userId,
+    bool onlyRetryScheduled = true,
+    int maxRows = 50000,
+    String? adminNote,
+  }) async {
+    final body = <String, dynamic>{
+      'confirm_phrase': confirmPhrase,
+      'statuses': statuses,
+      'only_retry_scheduled': onlyRetryScheduled,
+      'max_rows': maxRows,
+    };
+    if (channel != null && channel.isNotEmpty) body['channel'] = channel;
+    if (eventKey != null && eventKey.isNotEmpty) body['event_key'] = eventKey;
+    if (userId != null) body['user_id'] = userId;
+    if (adminNote != null && adminNote.isNotEmpty) body['admin_note'] = adminNote;
+
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/monitoring/notifications/outbox/abandon',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
 }
 

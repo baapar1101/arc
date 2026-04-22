@@ -40,6 +40,7 @@ class VerificationService {
     required String captchaId,
     required String captchaCode,
     bool forceUnverified = false,
+    bool sendVerificationSms = true,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/auth/update-mobile',
@@ -48,6 +49,7 @@ class VerificationService {
         'captcha_id': captchaId,
         'captcha_code': captchaCode,
         'force_unverified': forceUnverified,
+        'send_verification_sms': sendVerificationSms,
       },
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
@@ -72,9 +74,17 @@ class VerificationService {
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 
-  /// ارسال کد تایید به شماره موبایل
-  Future<Map<String, dynamic>> sendMobileVerification(String mobile) async {
-    return await _mobileService.sendMobileVerification(mobile);
+  /// ارسال کد تایید به شماره موبایل (نیازمند کپچا؛ اگر موبایل را با [updateMobile] و sendVerificationSms عوض کرده‌اید، معمولاً لازم نیست)
+  Future<Map<String, dynamic>> sendMobileVerification({
+    required String mobile,
+    required String captchaId,
+    required String captchaCode,
+  }) async {
+    return _mobileService.sendMobileVerification(
+      mobile: mobile,
+      captchaId: captchaId,
+      captchaCode: captchaCode,
+    );
   }
 
   /// تایید شماره موبایل با کد OTP

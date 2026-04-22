@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import logging
 import inspect
+import threading
 from typing import Optional, Tuple, Callable
 from functools import wraps
 from fastapi import Request, HTTPException, status, Response
@@ -13,11 +14,65 @@ from app.core.responses import ApiError
 logger = logging.getLogger(__name__)
 
 
+class _MemoryRateWindow:
+	"""
+	نرخ‌سنجی درون‌پردازه وقتی Redis در دسترس نیست (نسبی برای چند worker).
+	"""
+	
+	def __init__(self) -> None:
+		self._lock = threading.RLock()
+		# key -> [window_start_ts, count]
+		self._counters: dict[str, list] = {}
+	
+	def _prune_old_windows(self, current_time: int, window_seconds: int) -> None:
+		"""جلوگیری از رشد بی‌پایان dict پنجره‌های قدیمی."""
+		if len(self._counters) < 8000:
+			return
+		max_age = max(3600, window_seconds * 4)
+		stale: list[str] = []
+		for k in self._counters:
+			try:
+				ws = int(k.rsplit(":", 1)[-1])
+				if current_time - ws > max_age:
+					stale.append(k)
+			except (ValueError, IndexError):
+				stale.append(k)
+		for k in stale[:5000]:
+			self._counters.pop(k, None)
+	
+	def check(
+		self,
+		key: str,
+		max_requests: int,
+		window_seconds: int,
+	) -> Tuple[bool, int, int]:
+		cache_key = f"rate_limit:{key}:{window_seconds}"
+		current_time = int(time.time())
+		window_start = current_time - (current_time % window_seconds)
+		window_id_key = f"{cache_key}:{window_start}"
+		with self._lock:
+			if (len(self._counters) > 8000 and hash(key) % 97 == 0) or len(self._counters) > 50_000:
+				self._prune_old_windows(current_time, window_seconds)
+			row = self._counters.get(window_id_key)
+			if not row or row[0] != window_start:
+				row = [window_start, 0]
+				self._counters[window_id_key] = row
+			if row[1] >= max_requests:
+				reset_after = window_seconds - (current_time % window_seconds)
+				return False, 0, reset_after
+			row[1] += 1
+			new_count = row[1]
+		remaining = max(0, max_requests - new_count)
+		reset_after = window_seconds - (current_time % window_seconds)
+		return True, remaining, reset_after
+
+
 class RateLimiter:
 	"""Rate limiter با استفاده از Redis"""
 	
 	def __init__(self, cache_service=None):
 		self.cache = cache_service or get_cache()
+		self._memory = _MemoryRateWindow()
 	
 	def check_rate_limit(
 		self,
@@ -40,8 +95,7 @@ class RateLimiter:
 			- reset_after: زمان باقیمانده تا reset (ثانیه)
 		"""
 		if not self.cache.enabled:
-			# اگر Redis غیرفعال باشد، rate limiting را skip می‌کنیم
-			return True, max_requests, window_seconds
+			return self._memory.check(key, max_requests, window_seconds)
 		
 		try:
 			cache_key = f"rate_limit:{key}:{window_seconds}"
@@ -71,9 +125,8 @@ class RateLimiter:
 			
 			return True, remaining, reset_after
 		except Exception as e:
-			logger.warning(f"Rate limit check error for key {key}: {e}")
-			# در صورت خطا، اجازه می‌دهیم (fail open)
-			return True, max_requests, window_seconds
+			logger.warning(f"Rate limit check error for key {key}: {e}, using in-memory limiter")
+			return self._memory.check(key, max_requests, window_seconds)
 	
 	def get_rate_limit_info(
 		self,

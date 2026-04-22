@@ -3179,6 +3179,36 @@ abstract class AppLocalizations {
   /// **'Maintenance Settings'**
   String get maintenanceSettings;
 
+  /// No description provided for @smsDestinationRateSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS rate limit (per destination number)'**
+  String get smsDestinationRateSettings;
+
+  /// No description provided for @smsDestinationRateEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enforce per-number send cap within a time window'**
+  String get smsDestinationRateEnabled;
+
+  /// No description provided for @smsDestinationRateMaxSends.
+  ///
+  /// In en, this message translates to:
+  /// **'Max sends per number in the window'**
+  String get smsDestinationRateMaxSends;
+
+  /// No description provided for @smsDestinationRateWindowMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Window length (minutes)'**
+  String get smsDestinationRateWindowMinutes;
+
+  /// No description provided for @smsDestinationRateMaxSendsHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'0 means no cap (this per-number limit is off)'**
+  String get smsDestinationRateMaxSendsHelper;
+
   /// No description provided for @initializing.
   ///
   /// In en, this message translates to:

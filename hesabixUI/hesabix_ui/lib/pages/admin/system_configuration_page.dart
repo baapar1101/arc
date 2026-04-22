@@ -32,11 +32,27 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _maxFileSize = 10;
   int _maxUsers = 0;
   String _businessCreationRequirement = 'none';
+  bool _smsDestinationRateEnabled = true;
+  int _smsDestinationRateMaxSends = 40;
+  int _smsDestinationRateWindowMinutes = 60;
 
   @override
   void initState() {
     super.initState();
     _loadConfiguration();
+  }
+
+  static int _asConfigInt(Object? v, int defaultValue) {
+    if (v == null) {
+      return defaultValue;
+    }
+    if (v is int) {
+      return v;
+    }
+    if (v is num) {
+      return v.round();
+    }
+    return int.tryParse(v.toString()) ?? defaultValue;
   }
 
   Future<void> _loadConfiguration() async {
@@ -68,6 +84,18 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
               const ['none', 'email_only', 'mobile_only', 'both', 'either'].contains(reqValue))
               ? reqValue
               : 'none';
+          _smsDestinationRateEnabled = data['sms_destination_rate_enabled'] as bool? ?? true;
+          _smsDestinationRateMaxSends = _asConfigInt(
+            data['sms_destination_rate_max_sends'],
+            40,
+          );
+          _smsDestinationRateWindowMinutes = _asConfigInt(
+            data['sms_destination_rate_window_minutes'],
+            60,
+          );
+          if (_smsDestinationRateWindowMinutes < 1) {
+            _smsDestinationRateWindowMinutes = 1;
+          }
         });
       }
     } catch (e) {
@@ -350,6 +378,38 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
+                  t.smsDestinationRateSettings,
+                  Icons.sms_outlined,
+                  [
+                    _buildSwitchField(
+                      label: t.smsDestinationRateEnabled,
+                      value: _smsDestinationRateEnabled,
+                      onChanged: (value) =>
+                          setState(() => _smsDestinationRateEnabled = value),
+                    ),
+                    _buildNumberField(
+                      label: t.smsDestinationRateMaxSends,
+                      value: _smsDestinationRateMaxSends,
+                      onChanged: (value) =>
+                          setState(() => _smsDestinationRateMaxSends = value),
+                      min: 0,
+                      max: 1000000,
+                      allowUnlimited: true,
+                      unlimitedLabel: t.smsDestinationRateMaxSendsHelper,
+                    ),
+                    _buildNumberField(
+                      label: t.smsDestinationRateWindowMinutes,
+                      value: _smsDestinationRateWindowMinutes,
+                      onChanged: (value) =>
+                          setState(() => _smsDestinationRateWindowMinutes = value),
+                      min: 1,
+                      max: 10080,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 32),
                 // دکمه ذخیره بزرگ و واضح در پایین صفحه
                 SizedBox(
@@ -567,6 +627,9 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,
         'business_creation_verification_requirement': _businessCreationRequirement,
+        'sms_destination_rate_enabled': _smsDestinationRateEnabled,
+        'sms_destination_rate_max_sends': _smsDestinationRateMaxSends,
+        'sms_destination_rate_window_minutes': _smsDestinationRateWindowMinutes,
       });
 
       if (mounted) {

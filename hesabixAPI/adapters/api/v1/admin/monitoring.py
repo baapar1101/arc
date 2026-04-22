@@ -1,7 +1,9 @@
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from fastapi import APIRouter, Depends, Request, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Request, Query, WebSocket, WebSocketDisconnect, Body
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -11,11 +13,75 @@ from app.services.monitoring_service import HardwareMonitoringService, ServiceMo
 from app.services.monitoring_realtime import monitoring_realtime_manager
 from app.services.alert_service import AlertService
 from app.core.monitoring import get_performance_monitor
+from app.services.notification_outbox_monitoring_service import (
+	get_notification_outbox_summary,
+	abandon_outbox_rows,
+)
 
 router = APIRouter(prefix="/admin/monitoring", tags=["admin-monitoring"])
 
 
+class AbandonNotificationOutboxBody(BaseModel):
+	confirm_phrase: str = Field(..., description="باید دقیقاً مقدار abandon_confirm_phrase از خلاصهٔ outbox باشد")
+	statuses: List[str] = Field(default_factory=lambda: ["failed"], description="فقط failed و/یا pending")
+	channel: Optional[str] = Field(None, description="مثلاً sms — خالی یعنی همه کانال‌ها")
+	event_key: Optional[str] = Field(None, description="مثلاً auth.password_reset")
+	user_id: Optional[int] = Field(None, description="محدود به یک کاربر")
+	only_retry_scheduled: bool = Field(True, description="فقط ردیف‌هایی که next_attempt_at دارند")
+	max_rows: int = Field(50_000, ge=1, le=500_000)
+	admin_note: Optional[str] = Field(None, max_length=120, description="یادداشت کوتاه در لاگ خطا")
+
+
 # Hardware Monitoring Endpoints
+
+@router.get(
+	"/notifications/outbox/summary",
+	summary="خلاصه صف اعلان‌ها و پیامک",
+	description="آمار outbox، آستانه‌ها، Redis و سقف SMS به‌ازای مقصد — برای مانیتورینگ توسط مدیر",
+)
+@require_app_permission("system_settings")
+def get_notification_outbox_summary_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	try:
+		data = get_notification_outbox_summary(db)
+		return success_response(data, request)
+	except Exception as e:
+		raise ApiError("INTERNAL_ERROR", f"خطا در خلاصه outbox: {str(e)}", http_status=500)
+
+
+@router.post(
+	"/notifications/outbox/abandon",
+	summary="رها کردن دسته‌ای ردیف‌های outbox",
+	description="خالی کردن صف retry/pending مطابق فیلتر؛ نیاز به عبارت تأیید از خلاصه outbox",
+)
+@require_app_permission("system_settings")
+def abandon_notification_outbox_endpoint(
+	request: Request,
+	payload: AbandonNotificationOutboxBody = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	try:
+		n = abandon_outbox_rows(
+			db,
+			confirm_phrase=payload.confirm_phrase,
+			statuses=payload.statuses,
+			channel=payload.channel,
+			event_key=payload.event_key,
+			user_id=payload.user_id,
+			only_retry_scheduled=payload.only_retry_scheduled,
+			max_rows=payload.max_rows,
+			admin_note=payload.admin_note,
+		)
+		return success_response({"abandoned_count": n, "message": f"{n} ردیف به وضعیت abandoned منتقل شد"}, request)
+	except ApiError:
+		raise
+	except Exception as e:
+		raise ApiError("INTERNAL_ERROR", f"خطا در abandon outbox: {str(e)}", http_status=500)
+
 
 @router.get(
 	"/hardware/current",
@@ -326,7 +392,6 @@ def get_alerts(
 ) -> Dict[str, Any]:
 	"""دریافت لیست هشدارها"""
 	from adapters.db.models.monitoring import MonitoringAlert
-	from sqlalchemy import and_
 	
 	try:
 		query = db.query(MonitoringAlert)

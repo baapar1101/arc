@@ -201,10 +201,7 @@ class _VerificationPageState extends State<VerificationPage> {
       await _loadUserInfo();
       
       SnackBarHelper.show(context, message: 'شماره موبایل با موفقیت به‌روزرسانی شد');
-      
-      // ارسال کد OTP
-      await _sendMobileVerification(iranianMobile);
-      
+      await _openMobileOtpDialog(iranianMobile);
     } on DioException catch (e) {
       if (!mounted) return;
       
@@ -260,7 +257,7 @@ class _VerificationPageState extends State<VerificationPage> {
             if (!mounted) return;
             await _loadUserInfo();
             SnackBarHelper.show(context, message: 'شماره موبایل با موفقیت به‌روزرسانی شد');
-            await _sendMobileVerification(iranianMobile);
+            await _openMobileOtpDialog(iranianMobile);
           } catch (e2) {
             if (mounted) {
               SnackBarHelper.showError(context, message: 'خطا: $e2');
@@ -283,13 +280,10 @@ class _VerificationPageState extends State<VerificationPage> {
     }
   }
 
-  Future<void> _sendMobileVerification(String mobile) async {
+  /// کد تایید از سمت سرور پس از update-mobile (send_verification_sms) ارسال می‌شود؛ فقط وارد کردن OTP را نمایش می‌دهد.
+  Future<void> _openMobileOtpDialog(String mobile) async {
     try {
-      await _service.sendMobileVerification(mobile);
-      
       if (!mounted) return;
-      
-      // نمایش Dialog برای وارد کردن OTP
       final verified = await showDialog<bool>(
         context: context,
         builder: (ctx) => OtpInputDialog(
@@ -326,7 +320,7 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ارسال کد: $e');
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     }
   }

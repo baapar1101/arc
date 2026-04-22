@@ -10,14 +10,19 @@ from adapters.db.repositories.password_reset_repo import PasswordResetRepository
 from adapters.api.v1.schemas import (
 	QueryInfo, SuccessResponse, UsersListResponse, UsersSummaryResponse, UserResponse,
 	BulkActivateRequest, BulkSuspendRequest, BulkResetPasswordRequest,
-	UserDetailResponse, BulkOperationResponse, BulkResetPasswordResponse
+	UserDetailResponse, BulkOperationResponse, BulkResetPasswordResponse,
+	AdminSetUserPasswordRequest,
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_user_management
 from app.core.cache import get_cache
 from app.services.file_storage_service import FileStorageService
-from app.services.auth_service import _hash_reset_token
+from app.services.auth_service import (
+	_hash_reset_token,
+	send_password_reset_notification,
+	admin_set_user_password,
+)
 from app.core.settings import get_settings
 from secrets import token_urlsafe
 from datetime import datetime, timedelta
@@ -1393,7 +1398,9 @@ def bulk_reset_password(
 					expires_at = datetime.utcnow() + timedelta(seconds=settings.reset_password_ttl_seconds)
 					pr_repo.create(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
 					tokens_created += 1
-				except:
+					if payload.send_notification:
+						send_password_reset_notification(db=db, user_id=user.id, token=token)
+				except Exception:
 					pass  # در صورت خطا ادامه می‌دهیم
 	
 	db.commit()
@@ -1610,13 +1617,14 @@ def activate_user(
 	### نکات:
 	- توکن به صورت خودکار منقضی می‌شود (بر اساس تنظیمات سیستم)
 	- کاربر باید ایمیل یا موبایل داشته باشد
-	- در محیط production، توکن نباید در response برگردانده شود
+	- اگر `send_notification=true` باشد (پیش‌فرض)، اعلان `auth.password_reset` برای کاربر ارسال می‌شود
+	- فیلد `token` فقط وقتی در پاسخ می‌آید که `app.debug` در تنظیمات API روشن باشد
 	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
 	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
 	
 	### مثال cURL:
 	```bash
-	curl -X POST "http://localhost:8000/api/v1/users/123/reset-password" \\
+	curl -X POST "http://localhost:8000/api/v1/users/123/reset-password?send_notification=true" \\
 		 -H "Authorization: Bearer sk_your_api_key"
 	```
 	""",
@@ -1692,38 +1700,81 @@ def reset_user_password(
 	user_id: int,
 	request: Request,
 	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db)
+	db: Session = Depends(get_db),
+	send_notification: bool = Query(
+		default=True,
+		description="ارسال اعلان بازیابی رمز (همان الگوی فراموشی رمز)",
+	),
 ):
-	"""بازنشانی رمز عبور یک کاربر"""
-	from app.services.auth_service import _hash_reset_token
+	"""بازنشانی رمز عبور یک کاربر (توکن + اختیار اعلان)"""
 	from adapters.db.repositories.password_reset_repo import PasswordResetRepository
-	from app.core.settings import get_settings
 	from secrets import token_urlsafe
 	from datetime import datetime, timedelta
-	
+
 	repo = UserRepository(db)
 	user = repo.get_by_id(user_id)
-	
+
 	if not user:
 		from fastapi import HTTPException
 		raise HTTPException(status_code=404, detail="کاربر یافت نشد")
-	
+
 	identifier = user.email or user.mobile
 	if not identifier:
 		from app.core.responses import ApiError
 		raise ApiError("NO_IDENTIFIER", "کاربر ایمیل یا موبایل ندارد", http_status=400)
-	
+
 	settings = get_settings()
 	pr_repo = PasswordResetRepository(db)
 	token = token_urlsafe(32)
 	token_hash = _hash_reset_token(token)
 	expires_at = datetime.utcnow() + timedelta(seconds=settings.reset_password_ttl_seconds)
 	pr_repo.create(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
-	db.commit()
-	
-	return success_response({
+	if send_notification:
+		send_password_reset_notification(db=db, user_id=user.id, token=token)
+	data: dict = {
 		"message": "توکن بازنشانی رمز عبور ایجاد شد",
-		"token": token  # در production نباید token برگردانده شود
-	}, request)
+		"send_notification": send_notification,
+	}
+	if settings.debug:
+		data["token"] = token
+	return success_response(data, request)
+
+
+@router.post(
+	"/{user_id}/set-password",
+	summary="تنظیم رمز توسط مدیر (انتخابی یا تصادفی)",
+	description="""
+	تنظیم مستقیم `password_hash` برای کاربر بدون توکن بازنشانی.
+
+	- `mode=direct`: `new_password` و `confirm_password` (۸ تا ۱۲۸ نویسه)
+	- `mode=random`: رمز امن تولید می‌شود و **فقط یک‌بار** در `plain_password` برمی‌گردد
+
+	نیاز به مجوز `user_management`.
+	""",
+	response_model=SuccessResponse,
+)
+@require_user_management()
+def admin_set_user_password_endpoint(
+	user_id: int,
+	request: Request,
+	payload: AdminSetUserPasswordRequest = Body(..., description="حالت و رمز"),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	result = admin_set_user_password(
+		db=db,
+		target_user_id=user_id,
+		mode=payload.mode,
+		new_password=payload.new_password,
+		confirm_password=payload.confirm_password,
+	)
+	out: dict = {
+		"message": "رمز عبور به‌روزرسانی شد",
+		"mode": payload.mode,
+	}
+	plain = result.get("plain_password")
+	if plain:
+		out["plain_password"] = plain
+	return success_response(out, request)
 
 

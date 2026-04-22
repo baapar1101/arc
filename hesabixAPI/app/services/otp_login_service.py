@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
 from adapters.db.models.user import User
+from adapters.db.models.otp_login_session import OtpLoginSession
 from adapters.db.repositories.user_repo import UserRepository
 from adapters.db.repositories.otp_login_repo import OtpLoginRepository
 from app.services.providers.sms_provider import SmsProvider
@@ -17,6 +18,7 @@ from app.services.providers.bale_provider import BaleProvider
 from app.services.system_settings_service import get_effective_notifications_settings
 from app.services.notification_service import NotificationService
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_sms_rate_lock
 from app.utils.phone_utils import normalize_phone_number
 from app.core.settings import get_settings
 from app.core.security import generate_api_key
@@ -282,28 +284,6 @@ class OtpLoginService:
 			except ValueError as e:
 				raise ApiError("INVALID_MOBILE", str(e), http_status=400)
 		
-		# بررسی Rate Limiting (حداکثر 3 بار در ساعت برای identifier)
-		recent_count = self.otp_login_repo.count_recent_by_identifier(
-			mobile=normalized_mobile,
-			email=email,
-			hours=1
-		)
-		if recent_count >= 3:
-			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست ورود با OTP در ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
-		
-		# اگر session_id وجود دارد (تغییر کانال)، بررسی rate limiting برای تغییر کانال
-		if session_id:
-			session = self.otp_login_repo.get_by_session_id(session_id)
-			if not session:
-				raise ApiError("SESSION_NOT_FOUND", "Session یافت نشد یا منقضی شده است", http_status=404)
-			
-			# بررسی حداقل زمان بین ارسال‌ها (30 ثانیه)
-			if session.last_otp_sent_at:
-				time_since_last = (datetime.utcnow() - session.last_otp_sent_at).total_seconds()
-				if time_since_last < 30:
-					remaining = int(30 - time_since_last)
-					raise ApiError("RATE_LIMIT_EXCEEDED", f"لطفاً {remaining} ثانیه صبر کنید قبل از ارسال مجدد", http_status=429)
-		
 		# بررسی کانال انتخابی
 		available_channels_info = self.get_available_channels(identifier)
 		if channel not in available_channels_info["available_channels"]:
@@ -334,6 +314,28 @@ class OtpLoginService:
 			if not self.bale_provider.is_configured():
 				raise ApiError("BALE_NOT_CONFIGURED", "سرویس بله پیکربندی نشده است", http_status=503)
 		
+		# سهمیه + جلوگیری از race: قفل دیتابیسی، سپس شمارش و ثبت session در همان تراکنش
+		rate_key = f"login_otp:{(normalized_mobile or (email or ''))[:4000]}"
+		acquire_sms_rate_lock(self.db, rate_key)
+		recent_count = self.otp_login_repo.count_recent_by_identifier(
+			mobile=normalized_mobile,
+			email=email,
+			hours=1
+		)
+		if recent_count >= 3:
+			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست ورود با OTP در ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
+		
+		otp_session: OtpLoginSession
+		if session_id:
+			otp_session = self.otp_login_repo.get_by_session_id(session_id)
+			if not otp_session:
+				raise ApiError("SESSION_NOT_FOUND", "Session یافت نشد یا منقضی شده است", http_status=404)
+			if otp_session.last_otp_sent_at:
+				time_since_last = (datetime.utcnow() - otp_session.last_otp_sent_at).total_seconds()
+				if time_since_last < 30:
+					remaining = int(30 - time_since_last)
+					raise ApiError("RATE_LIMIT_EXCEEDED", f"لطفاً {remaining} ثانیه صبر کنید قبل از ارسال مجدد", http_status=429)
+		
 		# تولید OTP
 		otp_code = generate_otp()
 		otp_hash = _hash_otp(otp_code)
@@ -341,24 +343,21 @@ class OtpLoginService:
 		# زمان انقضا: 5 دقیقه
 		expires_at = datetime.utcnow() + timedelta(minutes=5)
 		
-		# ایجاد یا به‌روزرسانی session
+		# ایجاد یا به‌روزرسانی session (قبل از ارسال، یک commit تا قفل و سهمیه معتبر بماند)
 		if session_id:
-			# تغییر کانال
-			session = self.otp_login_repo.get_by_session_id(session_id)
-			if not session:
-				raise ApiError("SESSION_NOT_FOUND", "Session یافت نشد", http_status=404)
-			self.otp_login_repo.update_channel(session, channel, otp_hash)
+			self.otp_login_repo.update_channel(otp_session, channel, otp_hash, commit=False)
 		else:
-			# ایجاد session جدید
-			session = self.otp_login_repo.create(
+			otp_session = self.otp_login_repo.create(
 				mobile=normalized_mobile,
 				email=email,
 				channel=channel,
 				otp_code_hash=otp_hash,
 				expires_at=expires_at,
 				ip_address=ip_address,
-				user_agent=user_agent
+				user_agent=user_agent,
+				commit=False
 			)
+		self.db.commit()
 		
 		# ارسال OTP از طریق کانال انتخابی با استفاده از NotificationService
 		success = False
@@ -423,13 +422,13 @@ class OtpLoginService:
 				if not success:
 					logger.error("bale_login_otp_send_failed", user_id=user.id, chat_id=user.bale_chat_id)
 		
-		# به‌روزرسانی last_otp_sent_at (اگر session موجود است)
-		if session:
-			session.last_otp_sent_at = datetime.utcnow()
-			self.db.add(session)
+		# به‌روزرسانی last_otp_sent_at پس از تلاش ارسال
+		if otp_session:
+			otp_session.last_otp_sent_at = datetime.utcnow()
+			self.db.add(otp_session)
 			self.db.commit()
 		
-		return success, session.session_id, available_channels_info
+		return success, otp_session.session_id, available_channels_info
 	
 	def verify_login_otp(
 		self,

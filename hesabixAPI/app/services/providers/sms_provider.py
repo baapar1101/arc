@@ -94,6 +94,12 @@ class SmsProvider:
 		except ValueError as e:
 			return False, None, f"فرمت شماره موبایل نامعتبر: {str(e)}"
 		
+		# سقف نرخ به‌ازای شماره مقصد (دیتابیس — مستقل از IP و Redis)
+		from app.services.sms_destination_rate_limit import check_and_record_destination_sms
+		dest_err = check_and_record_destination_sms(normalized_phone)
+		if dest_err:
+			return False, None, dest_err
+		
 		# بررسی متن پیامک
 		if not text or not text.strip():
 			return False, None, "متن پیامک خالی است"

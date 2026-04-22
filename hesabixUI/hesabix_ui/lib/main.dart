@@ -1155,7 +1155,9 @@ class _MyAppState extends State<MyApp> {
                     if (_authStore == null) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    final allowed = _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings') ||
+                        _authStore!.hasAppPermission('user_management');
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }

@@ -13,6 +13,7 @@ from adapters.db.repositories.password_reset_repo import PasswordResetRepository
 from app.services.providers.sms_provider import SmsProvider
 from app.services.system_settings_service import get_effective_notifications_settings
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_sms_rate_lock
 from app.utils.phone_utils import normalize_phone_number
 from app.core.settings import get_settings
 from app.core.security import hash_password, hash_api_key
@@ -90,20 +91,19 @@ class PasswordResetOtpService:
 		except ValueError as e:
 			raise ApiError("INVALID_MOBILE", str(e), http_status=400)
 		
-		# بررسی Rate Limiting (حداکثر 3 بار در 24 ساعت)
-		recent_resets = self.password_reset_repo.count_recent_by_user(user.id, hours=24)
-		if recent_resets >= 3:
-			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست بازیابی رمز عبور در 24 ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
-		
 		# بررسی اینکه SMS Provider پیکربندی شده باشد
 		if not self.sms_provider.is_configured():
 			raise ApiError("SMS_NOT_CONFIGURED", "سرویس پیامک پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
 		
-		# تولید OTP
+		# سهمیه ۳/۲۴ساعت + جلوگیری از race
+		acquire_sms_rate_lock(self.db, f"pwd_reset_otp_user:{user.id}")
+		recent_resets = self.password_reset_repo.count_recent_by_user(user.id, hours=24)
+		if recent_resets >= 3:
+			raise ApiError("RATE_LIMIT_EXCEEDED", "حداکثر 3 درخواست بازیابی رمز عبور در 24 ساعت امکان‌پذیر است. لطفاً بعداً تلاش کنید", http_status=429)
+		
+		# تولید OTP (پس از اطمینان از سهمیه)
 		otp_code = generate_otp()
 		otp_hash = _hash_otp(otp_code)
-		
-		# ایجاد token برای reset password (با OTP hash به جای token معمولی)
 		settings = get_settings()
 		expires_at = datetime.utcnow() + timedelta(minutes=15)  # 15 دقیقه برای OTP
 		
@@ -112,8 +112,10 @@ class PasswordResetOtpService:
 		self.password_reset_repo.create(
 			user_id=user.id,
 			token_hash=otp_hash,
-			expires_at=expires_at
+			expires_at=expires_at,
+			commit=False
 		)
+		self.db.commit()
 		
 		# ارسال پیامک
 		message = f"کد بازیابی کلمه عبور شما: {otp_code}\nاین کد تا 15 دقیقه اعتبار دارد."

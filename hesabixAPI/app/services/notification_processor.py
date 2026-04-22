@@ -7,7 +7,6 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.notification import NotificationOutbox
-from adapters.db.session import SessionLocal
 from app.services.notification_service import NotificationService
 
 
@@ -18,25 +17,37 @@ class NotificationProcessor:
 
 	def fetch_due(self, limit: int = 50) -> List[NotificationOutbox]:
 		now = datetime.utcnow()
-		stmt = select(NotificationOutbox).where(
-			and_(
-				NotificationOutbox.status == "failed",
-				NotificationOutbox.next_attempt_at.is_not(None),
-				NotificationOutbox.next_attempt_at <= now,
+		stmt = (
+			select(NotificationOutbox)
+			.where(
+				and_(
+					NotificationOutbox.status == "failed",
+					NotificationOutbox.next_attempt_at.is_not(None),
+					NotificationOutbox.next_attempt_at <= now,
+				)
 			)
-		).limit(limit)
+			.order_by(NotificationOutbox.next_attempt_at.asc())
+			.limit(limit)
+		)
 		return list(self.db.execute(stmt).scalars().all())
 
 	def process_once(self) -> int:
 		items = self.fetch_due(limit=50)
 		count = 0
 		for it in items:
-			# re-send using preferred single channel
+			# همان ردیف outbox به‌روز می‌شود؛ فراخوانی send بدون reuse_outbox هر بار ردیف جدید می‌ساخت
 			try:
-				self.svc.send(user_id=it.user_id, event_key=it.event_key, context=it.payload, preferred_channels=[it.channel], locale=it.locale)
+				self.svc.send(
+					user_id=it.user_id,
+					event_key=it.event_key,
+					context=it.payload,
+					preferred_channels=[it.channel],
+					locale=it.locale,
+					reuse_outbox=it,
+				)
 				count += 1
 			except Exception:
-				# ignore; will be retried later
+				# ignore; ردیف failed می‌ماند و در چرخه بعد دوباره بررسی می‌شود
 				pass
 		return count
 

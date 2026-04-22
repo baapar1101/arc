@@ -251,12 +251,23 @@ def create_password_reset(*, db: Session, identifier: str, captcha_id: str, capt
 	if not user:
 		return ""
 
+	from app.core.transaction_lock import acquire_sms_rate_lock
+
+	pr_repo = PasswordResetRepository(db)
+	acquire_sms_rate_lock(db, f"pwd_reset_link_user:{user.id}")
+	if pr_repo.count_recent_by_user(user.id, hours=24) >= 3:
+		from app.core.responses import ApiError
+		raise ApiError(
+			"RATE_LIMIT_EXCEEDED",
+			"حداکثر ۳ درخواست بازیابی رمز عبور در ۲۴ ساعت مجاز است. لطفاً بعداً تلاش کنید.",
+			http_status=429,
+		)
+
 	settings = get_settings()
 	from secrets import token_urlsafe
 	token = token_urlsafe(32)
 	token_hash = _hash_reset_token(token)
 	expires_at = datetime.utcnow() + timedelta(seconds=settings.reset_password_ttl_seconds)
-	pr_repo = PasswordResetRepository(db)
 	pr_repo.create(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
 	return token
 
@@ -348,6 +359,78 @@ def change_password(*, db: Session, user_id: int, current_password: str, new_pas
 		import logging
 		logger = logging.getLogger(__name__)
 		logger.warning(f"Failed to log password change activity: {e}")
+
+
+def send_password_reset_notification(*, db: Session, user_id: int, token: str) -> None:
+	"""ارسال اعلان‌های پیکربندی‌شده (مثلاً ایمیل/پیامک) برای رویداد auth.password_reset."""
+	import logging
+	logger = logging.getLogger(__name__)
+	try:
+		from app.services.notification_service import NotificationService
+		svc = NotificationService(db)
+		svc.send(user_id=user_id, event_key="auth.password_reset", context={"token": token})
+	except Exception as e:
+		logger.error("password_reset_notification_failed user_id=%s: %s", user_id, e, exc_info=True)
+
+
+def validate_new_password_policy(new_password: str) -> None:
+	"""قوانین حداقلی طول رمز (هم‌تراز با ثبت‌نام/تغییر رمز)."""
+	from app.core.responses import ApiError
+	if not new_password or len(new_password) < 8 or len(new_password) > 128:
+		raise ApiError("INVALID_PASSWORD", "رمز عبور باید بین ۸ تا ۱۲۸ نویسه باشد", http_status=400)
+
+
+def admin_set_user_password(
+	*,
+	db: Session,
+	target_user_id: int,
+	mode: str,
+	new_password: str | None = None,
+	confirm_password: str | None = None,
+) -> dict:
+	"""
+	تنظیم رمز توسط مدیر. mode: direct | random
+	خروجی: plain_password فقط در حالت random (برای نمایش یک‌باره به مدیر).
+	"""
+	from secrets import token_urlsafe
+	from adapters.db.models.user import User
+	from app.core.responses import ApiError
+
+	if mode not in ("direct", "random"):
+		raise ApiError("VALIDATION_ERROR", "mode باید direct یا random باشد", http_status=422)
+
+	user = db.get(User, target_user_id)
+	if not user:
+		raise ApiError("USER_NOT_FOUND", "کاربر یافت نشد", http_status=404)
+
+	plain_out: str | None = None
+	if mode == "direct":
+		if not new_password or not confirm_password:
+			raise ApiError("VALIDATION_ERROR", "رمز و تکرار آن الزامی است", http_status=400)
+		if new_password != confirm_password:
+			raise ApiError("PASSWORDS_DO_NOT_MATCH", "رمز و تکرار آن یکسان نیست", http_status=400)
+		validate_new_password_policy(new_password)
+		user.password_hash = hash_password(new_password)
+	else:
+		plain_out = token_urlsafe(16)
+		user.password_hash = hash_password(plain_out)
+
+	db.add(user)
+	db.commit()
+	try:
+		from app.services.activity_log_service import log_user_activity
+		log_user_activity(
+			db=db,
+			user_id=target_user_id,
+			action="admin_password_set",
+			description="تنظیم رمز عبور توسط مدیر سیستم",
+			entity_id=target_user_id,
+		)
+	except Exception:
+		import logging
+		logging.getLogger(__name__).warning("admin_set_user_password activity log failed", exc_info=True)
+
+	return {"plain_password": plain_out, "user_id": target_user_id}
 
 
 def referral_stats(*, db: Session, user_id: int, start: datetime | None = None, end: datetime | None = None) -> dict:
@@ -511,7 +594,8 @@ def update_user_mobile(
 	mobile: str,
 	captcha_id: str,
 	captcha_code: str,
-	force_unverified: bool = False
+	force_unverified: bool = False,
+	send_verification_sms: bool = False,
 ) -> dict:
 	"""
 	تغییر شماره موبایل کاربر
@@ -607,6 +691,11 @@ def update_user_mobile(
 	db.add(user)
 	db.commit()
 	db.refresh(user)
+	
+	if send_verification_sms and user.mobile:
+		from app.services.mobile_verification_service import MobileVerificationService
+		mobile_verify = MobileVerificationService(db)
+		mobile_verify.create_mobile_verification(user_id, user.mobile)
 	
 	return {
 		"mobile": user.mobile,

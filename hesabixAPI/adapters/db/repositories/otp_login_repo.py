@@ -27,7 +27,8 @@ class OtpLoginRepository:
 		otp_code_hash: str,
 		expires_at: datetime,
 		ip_address: Optional[str] = None,
-		user_agent: Optional[str] = None
+		user_agent: Optional[str] = None,
+		commit: bool = True,
 	) -> OtpLoginSession:
 		session_id = self.generate_session_id()
 		obj = OtpLoginSession(
@@ -42,7 +43,10 @@ class OtpLoginRepository:
 			user_agent=user_agent,
 		)
 		self.db.add(obj)
-		self.db.commit()
+		if commit:
+			self.db.commit()
+		else:
+			self.db.flush()
 		self.db.refresh(obj)
 		return obj
 	
@@ -90,13 +94,16 @@ class OtpLoginRepository:
 		stmt = select(OtpLoginSession).where(and_(*conditions))
 		return len(self.db.execute(stmt).scalars().all())
 	
-	def update_channel(self, session: OtpLoginSession, channel: str, otp_code_hash: str) -> None:
+	def update_channel(self, session: OtpLoginSession, channel: str, otp_code_hash: str, *, commit: bool = True) -> None:
 		"""به‌روزرسانی کانال و OTP برای session موجود"""
 		session.channel = channel
 		session.otp_code_hash = otp_code_hash
 		session.last_otp_sent_at = datetime.utcnow()
 		self.db.add(session)
-		self.db.commit()
+		if commit:
+			self.db.commit()
+		else:
+			self.db.flush()
 	
 	def increment_attempts(self, session: OtpLoginSession) -> None:
 		"""افزایش تعداد تلاش‌های ناموفق"""

@@ -5,6 +5,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 
+import 'admin_user_password_dialog.dart';
+
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
 
@@ -13,8 +15,10 @@ class UserManagementPage extends StatefulWidget {
 }
 
 class _UserManagementPageState extends State<UserManagementPage> {
+  final GlobalKey _usersTableKey = GlobalKey();
   CalendarController? _calendarController;
   Set<int> _selectedRowIndexes = const {};
+  List<Map<String, dynamic>> _tableRawItems = [];
 
   int get _selectedCount => _selectedRowIndexes.length;
 
@@ -52,6 +56,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
       body: SingleChildScrollView(
         child: DataTableWidget<Map<String, dynamic>>(
+          key: _usersTableKey,
           config: _buildTableConfig(theme),
           fromJson: (json) => Map<String, dynamic>.from(json),
           calendarController: _calendarController,
@@ -88,6 +93,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       onRowTap: (item) => _openUserDetailsDialog(item as Map<String, dynamic>),
       onRowSelectionChanged: (indexes) {
         setState(() => _selectedRowIndexes = {...indexes});
+      },
+      onTableDataChanged: (raw) {
+        setState(() => _tableRawItems = raw);
       },
       customHeaderActions: [
         Tooltip(
@@ -267,8 +275,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
             DataTableAction(
               icon: Icons.key,
-              label: 'بازنشانی رمز',
-              onTap: (item) => _resetUserPassword(item as Map<String, dynamic>),
+              label: 'مدیریت رمز',
+              onTap: (item) => _openUserPasswordManager(item as Map<String, dynamic>),
             ),
             DataTableAction(
               icon: Icons.pause_circle_outline,
@@ -282,32 +290,150 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+  List<int> _selectedUserIds() {
+    final out = <int>[];
+    for (final i in _selectedRowIndexes) {
+      if (i < 0 || i >= _tableRawItems.length) continue;
+      final id = _tableRawItems[i]['id'];
+      if (id is int) {
+        out.add(id);
+      } else if (id is num) {
+        out.add(id.toInt());
+      }
+    }
+    return out;
+  }
+
+  void _refreshTable() {
+    try {
+      (_usersTableKey.currentState as dynamic)?.refresh();
+    } catch (_) {}
+  }
+
   Future<void> _handleBulkAction(_BulkUserAction action) async {
     if (_selectedRowIndexes.isEmpty) return;
-    
-    final messenger = ScaffoldMessenger.of(context);
-    
-    // TODO: دریافت شناسه‌های واقعی کاربران از DataTableWidget
-    // برای حالا، یک پیام نمایش می‌دهیم
-    String message;
-    switch (action) {
-      case _BulkUserAction.activate:
-        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
-        break;
-      case _BulkUserAction.deactivate:
-        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
-        break;
-      case _BulkUserAction.resetPassword:
-        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
-        break;
+
+    final ids = _selectedUserIds();
+    if (ids.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('شناسهٔ معتبری در انتخاب فعلی یافت نشد. صفحه را تازه‌سازی کنید.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
     }
-    
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
+
+    final messenger = ScaffoldMessenger.of(context);
+    final api = ApiClient();
+
+    if (action == _BulkUserAction.resetPassword) {
+      var sendNotif = true;
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (c) => StatefulBuilder(
+          builder: (ctx, setSt) {
+            return AlertDialog(
+              title: Text('بازنشانی رمز برای ${ids.length} کاربر'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('برای هر کاربر که ایمیل یا موبایل داشته باشد، توکن بازنشانی ساخته می‌شود.'),
+                  SwitchListTile(
+                    value: sendNotif,
+                    onChanged: (v) => setSt(() => sendNotif = v),
+                    title: const Text('ارسال اعلان (auth.password_reset)'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
+                FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('ادامه')),
+              ],
+            );
+          },
+        ),
+      );
+      if (go != true || !mounted) return;
+      try {
+        final res = await api.post<Map<String, dynamic>>(
+          '/api/v1/users/bulk-reset-password',
+          data: {
+            'user_ids': ids,
+            'send_notification': sendNotif,
+          },
+        );
+        if (res.statusCode == 200) {
+          final data = res.data?['data'] as Map<String, dynamic>?;
+          final created = data?['tokens_created'] ?? 0;
+          messenger.showSnackBar(
+            SnackBar(content: Text('توکن ساخته‌شده: $created از ${ids.length}')),
+          );
+          setState(() => _selectedRowIndexes = const {});
+          _refreshTable();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        final err = Theme.of(context).colorScheme.error;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('خطا: $e'),
+            backgroundColor: err,
+          ),
+        );
+      }
+      return;
+    }
+
+    final title = action == _BulkUserAction.activate
+        ? 'فعال‌سازی ${ids.length} کاربر؟'
+        : 'تعلیق ${ids.length} کاربر؟';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(title),
+        content: const Text('این عملیات روی همهٔ شناسه‌های انتخاب‌شده (در همین صفحه) اعمال می‌شود.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('تأیید'),
+          ),
+        ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    final path = action == _BulkUserAction.activate
+        ? '/api/v1/users/bulk-activate'
+        : '/api/v1/users/bulk-suspend';
+    try {
+      final res = await api.post<Map<String, dynamic>>(
+        path,
+        data: {'user_ids': ids},
+      );
+      if (res.statusCode == 200) {
+        final data = res.data?['data'] as Map<String, dynamic>?;
+        final updated = data?['updated_count'] ?? 0;
+        messenger.showSnackBar(
+          SnackBar(content: Text('به‌روزشده: $updated')),
+        );
+        setState(() => _selectedRowIndexes = const {});
+        _refreshTable();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final err = Theme.of(context).colorScheme.error;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('خطا: $e'),
+          backgroundColor: err,
+        ),
+      );
+    }
   }
 
   Future<void> _openUserDetailsDialog(Map<String, dynamic> user) async {
@@ -389,52 +515,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
   }
   
-  Future<void> _resetUserPassword(Map<String, dynamic> user) async {
-    final userId = user['id'] as int?;
-    if (userId == null) return;
-    
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('بازنشانی رمز عبور'),
-        content: Text('آیا مطمئن هستید که می‌خواهید رمز عبور ${user['full_name'] ?? 'کاربر'} را بازنشانی کنید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('بازنشانی'),
-          ),
-        ],
-      ),
+  Future<void> _openUserPasswordManager(Map<String, dynamic> user) async {
+    await showAdminUserPasswordDialog(
+      context,
+      user: user,
+      onSuccess: _refreshTable,
     );
-    
-    if (confirmed != true) return;
-    
-    try {
-      final api = ApiClient();
-      final response = await api.post('/api/v1/users/$userId/reset-password');
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('توکن بازنشانی رمز عبور ایجاد شد')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بازنشانی رمز عبور: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
-  
+
   static String? _cleanMobileNumber(String? mobile) {
     if (mobile == null || mobile.isEmpty) return null;
     var cleaned = mobile.replaceAll('+', '').replaceAll(' ', '');
@@ -760,7 +848,7 @@ class _BusinessesTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       itemCount: businesses.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final business = businesses[index] as Map<String, dynamic>? ?? {};
         return Card(
