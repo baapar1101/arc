@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Union, Generic, TypeVar
+from typing import Any, Dict, List, Optional, Union, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, validator
 from enum import Enum
 from datetime import datetime, date
@@ -660,6 +660,65 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="اگر true باشد، حواله انتقال همیشه کنترل کسری کامل دارد",
 	)
+	invoice_global_discount_percent_basis: Optional[str] = Field(
+		default=None,
+		description=(
+			"مبنای درصد تخفیف کلی: subtotal_after_line_discount | gross_before_line_discount | "
+			"total_after_lines_including_tax"
+		),
+	)
+	invoice_global_discount_tax_mode: Optional[str] = Field(
+		default=None,
+		description="اثر تخفیف کلی بر مالیات: recalculate_tax_proportional | keep_line_taxes",
+	)
+	invoice_global_discount_max_percent: Optional[float] = Field(
+		default=None,
+		ge=0,
+		le=100,
+		description="سقف درصد تخفیف کلی نسبت به مبنا (اختیاری)",
+	)
+	invoice_global_discount_max_amount: Optional[float] = Field(
+		default=None,
+		ge=0,
+		description="سقف مبلغ تخفیف کلی (اختیاری)",
+	)
+	# تسعیر ارز فاکتور: as_of_source، document_date_effective، when_no_rate
+	fx_revaluation_policy: Optional[Dict[str, Any]] = Field(
+		default=None,
+		description="سیاست تسعیر ارز (JSON): document_date/registered_at، start/end of day، block یا allow_without_fx",
+	)
+
+	@validator("fx_revaluation_policy", pre=True)
+	def _validate_fx_revaluation_policy_field(cls, v):  # noqa: N805
+		if v is None:
+			return None
+		from app.services.invoice_fx_revaluation import validate_and_normalize_fx_revaluation_policy_payload
+		try:
+			return validate_and_normalize_fx_revaluation_policy_payload(v)
+		except ValueError as e:
+			raise ValueError(str(e))
+
+	@validator("invoice_global_discount_percent_basis")
+	def _validate_invoice_global_discount_percent_basis(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {
+			"subtotal_after_line_discount",
+			"gross_before_line_discount",
+			"total_after_lines_including_tax",
+		}
+		if v not in allowed:
+			raise ValueError("مبنای درصد تخفیف کلی نامعتبر است")
+		return v
+
+	@validator("invoice_global_discount_tax_mode")
+	def _validate_invoice_global_discount_tax_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		allowed = {"recalculate_tax_proportional", "keep_line_taxes"}
+		if v not in allowed:
+			raise ValueError("حالت مالیات تخفیف کلی نامعتبر است")
+		return v
 
 	@validator("invoice_warehouse_release_mode")
 	def _validate_invoice_warehouse_release_mode(cls, v):  # noqa: N805
@@ -797,6 +856,22 @@ class BusinessResponse(BaseModel):
 	warehouse_transfer_require_positive_stock: bool = Field(
 		default=True,
 		description="انتقال بین انبار همیشه نیاز به موجودی کافی",
+	)
+	invoice_global_discount_percent_basis: str = Field(
+		default="subtotal_after_line_discount",
+		description="مبنای درصد تخفیف کلی",
+	)
+	invoice_global_discount_tax_mode: str = Field(
+		default="recalculate_tax_proportional",
+		description="اثر تخفیف کلی بر مالیات",
+	)
+	invoice_global_discount_max_percent: Optional[float] = Field(
+		default=None,
+		description="سقف درصد تخفیف کلی",
+	)
+	invoice_global_discount_max_amount: Optional[float] = Field(
+		default=None,
+		description="سقف مبلغ تخفیف کلی",
 	)
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")

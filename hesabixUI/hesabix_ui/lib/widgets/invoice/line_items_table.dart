@@ -28,6 +28,8 @@ void _invoiceLineAttrsLog(String message) {
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
   final int? selectedCurrencyId; // از تب ارز فاکتور
+  /// تعداد اعشار نمایش/ورود مبلغ (از تنظیمات ارز؛ ۰ = مثل ریال).
+  final int currencyDecimalPlaces;
   final ValueChanged<List<InvoiceLineItem>>? onChanged;
   final String invoiceType; // sales | purchase | sales_return | purchase_return | ...
   final bool postInventory;
@@ -39,6 +41,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     super.key,
     required this.businessId,
     this.selectedCurrencyId,
+    this.currencyDecimalPlaces = 2,
     this.onChanged,
     this.invoiceType = 'sales',
     this.postInventory = true,
@@ -610,6 +613,13 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return trimmed == previousAuto;
   }
 
+  /// کلید [TextFormField] شرح: بدون اتکا به متن در حال تایپ (تا فوکوس و متن از بین نرود).
+  /// با تغییر کالا یا مقدار خودکار [extraInfo._local_auto_description] دوباره ساخته می‌شود تا [initialValue] اعمال گردد.
+  Key _lineDescriptionFormKey(InvoiceLineItem item) {
+    final auto = item.extraInfo?['_local_auto_description']?.toString() ?? '';
+    return ValueKey<Object>('line_desc_${item.lineKey}_p${item.productId}_a$auto');
+  }
+
   Map<String, dynamic> _mergeExtraInfoWithNotes(
     InvoiceLineItem item, {
     String? salesNote,
@@ -669,7 +679,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       final shouldReplace = _shouldReplaceDescription(currentDesc, previousAuto);
       InvoiceLineItem updated = item;
       if (shouldReplace && currentDesc != (newAuto ?? '')) {
-        updated = updated.copyWith(description: newAuto);
+        updated = updated.copyWith(description: newAuto ?? '');
         changed = true;
       }
       if (metadataChanged) {
@@ -1111,6 +1121,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   businessId: widget.businessId,
                   invoiceType: widget.invoiceType,
                   currencyId: widget.selectedCurrencyId,
+                  currencyDecimalPlaces: widget.currencyDecimalPlaces,
                   item: item,
                   onChanged: (src, price) {
                     final validatedPrice = price < 0 ? 0 : price;
@@ -1140,7 +1151,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     style: theme.textTheme.labelMedium,
                   ),
                   Text(
-                    formatWithThousands(item.total, decimalPlaces: 0),
+                    formatWithThousands(item.total, decimalPlaces: widget.currencyDecimalPlaces),
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -1158,7 +1169,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             SizedBox(
               height: fieldHeight,
               child: TextFormField(
-                key: ValueKey('line_desc_${item.lineKey}'),
+                key: _lineDescriptionFormKey(item),
                 focusNode: _focusNodesForLine(item.lineKey)?['description'],
                 initialValue: item.description ?? '',
                 onChanged: (v) {
@@ -1185,6 +1196,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 SizedBox(
                   height: fieldHeight,
                   child: _DiscountCell(
+                    currencyDecimalPlaces: widget.currencyDecimalPlaces,
                     value: item.discountValue,
                     type: item.discountType,
                     onChanged: (type, value) {
@@ -1196,6 +1208,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
                 const SizedBox(height: 12),
                 _TaxCell(
+                  currencyDecimalPlaces: widget.currencyDecimalPlaces,
                   rate: item.taxRate,
                   taxAmount: item.taxAmount,
                   onRateChanged: (r) {
@@ -1374,6 +1387,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       businessId: widget.businessId,
                       invoiceType: widget.invoiceType,
                       currencyId: widget.selectedCurrencyId,
+                      currencyDecimalPlaces: widget.currencyDecimalPlaces,
                       item: item,
                       onChanged: (src, price) {
                         final validatedPrice = price < 0 ? 0 : price;
@@ -1403,7 +1417,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Text(
-                          formatWithThousands(item.total, decimalPlaces: 0),
+                          formatWithThousands(item.total, decimalPlaces: widget.currencyDecimalPlaces),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                           ),
@@ -1435,7 +1449,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: fieldHeight,
                   child: TextFormField(
-                    key: ValueKey('line_desc_${item.lineKey}'),
+                    key: _lineDescriptionFormKey(item),
                     focusNode: _focusNodesForLine(item.lineKey)?['description'],
                     initialValue: item.description ?? '',
                     onChanged: (v) {
@@ -1457,6 +1471,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: fieldHeight,
                   child: _DiscountCell(
+                    currencyDecimalPlaces: widget.currencyDecimalPlaces,
                     value: item.discountValue,
                     type: item.discountType,
                     onChanged: (type, value) {
@@ -1474,6 +1489,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: fieldHeight,
                   child: _TaxCell(
+                    currencyDecimalPlaces: widget.currencyDecimalPlaces,
                     rate: item.taxRate,
                     taxAmount: item.taxAmount,
                     onRateChanged: (r) {
@@ -1637,7 +1653,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       trackInventory: p['track_inventory'] == true,
       warehouseId: item.warehouseId ?? defaultWarehouseId,
       extraInfo: metadata.isEmpty ? null : metadata,
-      description: shouldReplaceDescription ? autoDescription : item.description,
+      description: shouldReplaceDescription ? (autoDescription ?? '') : item.description,
     );
     final priced = await _resolveUnitPrice(updated, preferManual: false);
     setState(() => _rows[index] = priced);
@@ -1722,6 +1738,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 }
 
 class _DiscountCell extends StatefulWidget {
+  final int currencyDecimalPlaces;
   final String type; // percent | amount
   final num value;
   final void Function(String type, num value) onChanged;
@@ -1729,6 +1746,7 @@ class _DiscountCell extends StatefulWidget {
   final VoidCallback? onFieldSubmitted;
 
   const _DiscountCell({
+    required this.currencyDecimalPlaces,
     required this.type,
     required this.value,
     required this.onChanged,
@@ -1747,6 +1765,10 @@ class _DiscountCellState extends State<_DiscountCell> {
 
   String _formatDisplayValue(num value, String type) {
     if (type == 'amount') {
+      final dp = widget.currencyDecimalPlaces;
+      if (dp > 0) {
+        return formatNumberForInput(value, decimalPlaces: dp);
+      }
       return formatNumberForInput(value);
     }
     return value.toString();
@@ -1765,7 +1787,9 @@ class _DiscountCellState extends State<_DiscountCell> {
     super.didUpdateWidget(oldWidget);
     _type = widget.type;
     // مقدار یا نوع (درصد/مبلغ) از بیرون؛ اگر فقط عدد یکسان باشد و نوع عوض شده باشد هم باید همگام شود
-    if (widget.value != _lastSentValue || oldWidget.type != widget.type) {
+    if (widget.value != _lastSentValue ||
+        oldWidget.type != widget.type ||
+        oldWidget.currencyDecimalPlaces != widget.currencyDecimalPlaces) {
       _lastSentValue = widget.value;
       _ctrl.text = _formatDisplayValue(widget.value, _type);
     }
@@ -1880,6 +1904,7 @@ class _DiscountCellState extends State<_DiscountCell> {
 }
 
 class _TaxCell extends StatefulWidget {
+  final int currencyDecimalPlaces;
   final num rate; // editable percent
   final num taxAmount; // readonly
   final ValueChanged<num> onRateChanged;
@@ -1887,6 +1912,7 @@ class _TaxCell extends StatefulWidget {
   final VoidCallback? onFieldSubmitted;
 
   const _TaxCell({
+    required this.currencyDecimalPlaces,
     required this.rate,
     required this.taxAmount,
     required this.onRateChanged,
@@ -1907,7 +1933,9 @@ class _TaxCellState extends State<_TaxCell> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.rate.toString());
-    _amountCtrl = TextEditingController(text: formatWithThousands(widget.taxAmount, decimalPlaces: 0));
+    _amountCtrl = TextEditingController(
+      text: formatWithThousands(widget.taxAmount, decimalPlaces: widget.currencyDecimalPlaces),
+    );
   }
 
   @override
@@ -1917,8 +1945,9 @@ class _TaxCellState extends State<_TaxCell> {
     if (oldWidget.rate != widget.rate && !_isUserTyping) {
       _controller.text = widget.rate.toString();
     }
-    if (oldWidget.taxAmount != widget.taxAmount) {
-      _amountCtrl.text = formatWithThousands(widget.taxAmount, decimalPlaces: 0);
+    if (oldWidget.taxAmount != widget.taxAmount ||
+        oldWidget.currencyDecimalPlaces != widget.currencyDecimalPlaces) {
+      _amountCtrl.text = formatWithThousands(widget.taxAmount, decimalPlaces: widget.currencyDecimalPlaces);
     }
   }
 
@@ -2071,6 +2100,7 @@ class _UnitPriceCell extends StatefulWidget {
   final int businessId;
   final String invoiceType;
   final int? currencyId;
+  final int currencyDecimalPlaces;
   final InvoiceLineItem item;
   final void Function(String source, num price) onChanged;
   final Future<InvoiceLineItem> Function() resolver;
@@ -2082,6 +2112,7 @@ class _UnitPriceCell extends StatefulWidget {
     required this.businessId,
     required this.invoiceType,
     required this.currencyId,
+    required this.currencyDecimalPlaces,
     required this.item,
     required this.onChanged,
     required this.resolver,
@@ -2101,10 +2132,12 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   late FocusNode _focusNode;
   bool _isUserTyping = false;
 
+  int? get _priceFormatDp => widget.currencyDecimalPlaces > 0 ? widget.currencyDecimalPlaces : null;
+
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0));
+    _ctrl = TextEditingController(text: formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp));
     _focusNode = FocusNode();
   }
 
@@ -2113,13 +2146,16 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     super.didUpdateWidget(oldWidget);
     // فقط اگر کاربر در حال تایپ نیست، مقدار را به‌روزرسانی کن
     final lineChanged = oldWidget.item.lineKey != widget.item.lineKey;
+    final dpChanged = oldWidget.currencyDecimalPlaces != widget.currencyDecimalPlaces;
     if (lineChanged && !_isUserTyping) {
-      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0);
+      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp);
       return;
     }
-    if ((oldWidget.item.unitPrice != widget.item.unitPrice || oldWidget.item.unitPriceSource != widget.item.unitPriceSource) &&
-        !_isUserTyping) {
-      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0);
+    if (((oldWidget.item.unitPrice != widget.item.unitPrice ||
+            oldWidget.item.unitPriceSource != widget.item.unitPriceSource ||
+            dpChanged) &&
+        !_isUserTyping)) {
+      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp);
     }
   }
 
@@ -2216,10 +2252,10 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
                       final label = (opt['label'] as String?) ?? '';
                       return ListTile(
                         leading: const Icon(Icons.sell_outlined),
-                        title: Text(formatWithThousands(price, decimalPlaces: 0)),
+                        title: Text(formatWithThousands(price, decimalPlaces: widget.currencyDecimalPlaces)),
                         subtitle: label.isNotEmpty ? Text(label) : null,
                         onTap: () {
-                          _ctrl.text = price.toString();
+                          _ctrl.text = formatNumberForInput(price, decimalPlaces: _priceFormatDp);
                           widget.onChanged('manual', price);
                           Navigator.pop(ctx);
                         },

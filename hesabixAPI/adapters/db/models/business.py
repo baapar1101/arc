@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, Numeric, Boolean
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, Numeric, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -102,6 +102,35 @@ class Business(Base):
         comment="none | draft | posted",
     )
 
+    # تخفیف کلی فاکتور (در کنار تخفیف ردیف)
+    invoice_global_discount_percent_basis: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="subtotal_after_line_discount",
+        server_default="subtotal_after_line_discount",
+        comment=(
+            "مبنای درصد تخفیف کلی: subtotal_after_line_discount | gross_before_line_discount | "
+            "total_after_lines_including_tax"
+        ),
+    )
+    invoice_global_discount_tax_mode: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="recalculate_tax_proportional",
+        server_default="recalculate_tax_proportional",
+        comment="recalculate_tax_proportional | keep_line_taxes",
+    )
+    invoice_global_discount_max_percent: Mapped[float | None] = mapped_column(
+        Numeric(5, 2),
+        nullable=True,
+        comment="سقف درصد تخفیف کلی نسبت به مبنا (اختیاری)",
+    )
+    invoice_global_discount_max_amount: Mapped[float | None] = mapped_column(
+        Numeric(18, 2),
+        nullable=True,
+        comment="سقف مبلغ تخفیف کلی (اختیاری)",
+    )
+
     # کنترل کسری هنگام قطعی کردن حواله (خروج): پیش‌فرض سخت‌گیرانه
     allow_negative_inventory_for_bulk: Mapped[bool] = mapped_column(
         Boolean,
@@ -124,6 +153,8 @@ class Business(Base):
         server_default="1",
         comment="انتقال بین انبار همیشه نیاز به موجودی کافی (نادیده گرفتن اجازه منفی)",
     )
+    # سیاست تسعیر ارز روی فاکتور/اسناد (کلیدها در app.services.invoice_fx_revaluation)
+    fx_revaluation_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

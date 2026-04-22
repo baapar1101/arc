@@ -6,6 +6,7 @@ import '../../services/warranty_service.dart';
 import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class WarrantySettingsPage extends StatefulWidget {
   final int businessId;
@@ -129,6 +130,7 @@ class _WarrantySettingsPageState extends State<WarrantySettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.warrantySettings),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
       ),

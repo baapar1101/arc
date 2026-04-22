@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="fa" dir="rtl">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -25,7 +25,7 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="hesabix_ui">
+  <meta name="apple-mobile-web-app-title" content="Hesabix">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
@@ -41,11 +41,18 @@
   
   <!-- Preload critical resources for faster page loads -->
   <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <link rel="preload" href="assets/images/logo-light.svg" as="image" type="image/svg+xml">
   
   <!-- Initial Loading Screen Styles -->
   <style>
-    /* Loading screen که قبل از Flutter نمایش داده می‌شود */
+    /* پالت هماهنگ با گرادیان #0175C2 → #02579B (بدون تغییر رنگ پس‌زمینهٔ لودر) */
     #flutter-loading-screen {
+      --loader-fg: rgba(255, 255, 255, 0.96);
+      --loader-fg-muted: rgba(230, 245, 255, 0.88);
+      --loader-fg-subtle: rgba(200, 230, 255, 0.72);
+      --loader-ring: rgba(255, 255, 255, 0.22);
+      --loader-ring-accent: #E1F5FE;
+      --loader-glow: rgba(0, 40, 80, 0.35);
       position: fixed;
       top: 0;
       left: 0;
@@ -57,6 +64,9 @@
       align-items: center;
       justify-content: center;
       z-index: 9999;
+      box-sizing: border-box;
+      padding: 24px 20px;
+      text-align: center;
       transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
     }
     
@@ -65,30 +75,86 @@
       visibility: hidden;
       pointer-events: none;
     }
+
+    .loading-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      max-width: 22rem;
+    }
     
     .loading-logo {
-      width: 120px;
-      height: 120px;
-      margin-bottom: 32px;
-      animation: pulse 2s ease-in-out infinite;
+      display: block;
+      width: 112px;
+      height: 112px;
+      margin: 0 auto 18px;
+      object-fit: contain;
+      object-position: center;
+      filter: drop-shadow(0 4px 20px var(--loader-glow));
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    
+    .loading-title {
+      margin: 0 0 6px;
+      color: var(--loader-fg);
+      font-family: Tahoma, 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 2px var(--loader-glow);
+    }
+
+    .loading-subtitle {
+      margin: 0 0 1rem;
+      color: var(--loader-fg-subtle);
+      font-family: Tahoma, 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.55;
+    }
+
+    .loading-quote {
+      margin: 0 0 1.5rem;
+      max-width: 20rem;
+      color: var(--loader-fg-muted);
+      font-family: Tahoma, 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 0.82rem;
+      font-style: italic;
+      font-weight: 400;
+      line-height: 1.75;
+      text-align: center;
+      padding: 0.85rem 1.1rem 0.95rem;
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .loading-quote__mark {
+      color: rgba(200, 230, 255, 0.55);
+      font-style: normal;
+      font-size: 1.05em;
     }
     
     .loading-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #ffffff;
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--loader-ring);
+      border-top-color: var(--loader-ring-accent);
+      border-right-color: rgba(255, 255, 255, 0.45);
       border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 24px;
+      animation: spin 0.9s linear infinite;
+      margin-bottom: 20px;
     }
     
     .loading-text {
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-      font-size: 16px;
+      color: var(--loader-fg-muted);
+      font-family: Tahoma, 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 0.95rem;
       font-weight: 500;
-      opacity: 0.9;
+      margin: 0;
+      min-height: 1.4em;
     }
     
     @keyframes spin {
@@ -97,7 +163,21 @@
     
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.8; transform: scale(0.95); }
+      50% { opacity: 0.9; transform: scale(0.97); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #flutter-loading-screen {
+        transition: none;
+      }
+      .loading-logo,
+      .loading-spinner {
+        animation: none;
+      }
+      .loading-spinner {
+        border-right-color: var(--loader-ring);
+        opacity: 0.95;
+      }
     }
     
     /* تنظیم پایه‌ای ارتفاع صفحه برای هماهنگی بهتر با موبایل */
@@ -151,9 +231,25 @@
 </head>
 <body>
   <!-- Initial Loading Screen - نمایش داده می‌شود تا Flutter لود شود -->
-  <div id="flutter-loading-screen">
-    <div class="loading-spinner"></div>
-    <div class="loading-text">در حال بارگذاری...</div>
+  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="در حال بارگذاری حسابیکس">
+    <div class="loading-inner">
+      <!-- لوگو: همان web/assets/images/logo-light.svg (همگام با assets/images/logo-light.svg) -->
+      <img
+        class="loading-logo"
+        src="assets/images/logo-light.svg"
+        width="112"
+        height="112"
+        alt="Hesabix"
+        decoding="async"
+        fetchpriority="high" />
+      <div class="loading-title" role="heading" aria-level="1">Hesabix</div>
+      <p class="loading-subtitle">سامانه جامع مدیریت کسب و کار</p>
+      <p class="loading-quote" lang="fa">
+        <span class="loading-quote__mark" aria-hidden="true">«</span>با تعاون، جهان زیبا می‌شود…<span class="loading-quote__mark" aria-hidden="true">»</span>
+      </p>
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <p class="loading-text" id="loading-status">در حال بارگذاری...</p>
+    </div>
   </div>
   
   <script>
@@ -188,6 +284,7 @@
     function hideLoadingScreen() {
       const loadingScreen = document.getElementById('flutter-loading-screen');
       if (loadingScreen) {
+        loadingScreen.setAttribute('aria-busy', 'false');
         loadingScreen.classList.add('hidden');
         setTimeout(function() {
           loadingScreen.remove();

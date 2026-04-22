@@ -408,7 +408,7 @@ class _BusinessFtpBackupSettingsPageState extends State<BusinessFtpBackupSetting
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/business/${widget.businessId}/dashboard');
+              context.go('/business/${widget.businessId}/settings');
             }
           },
         ),

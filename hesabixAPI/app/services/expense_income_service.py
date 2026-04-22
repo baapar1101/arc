@@ -1195,7 +1195,7 @@ def update_expense_income(
     return result
 
 
-def delete_expense_income(db: Session, document_id: int) -> bool:
+def delete_expense_income(db: Session, document_id: int, *, commit: bool = True) -> bool:
     """حذف یک سند هزینه/درآمد"""
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
@@ -1232,29 +1232,35 @@ def delete_expense_income(db: Session, document_id: int) -> bool:
         
         # حذف سند
         db.delete(document)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         
-        # Invalidate cache بعد از حذف موفق سند هزینه/درآمد
-        invalidate_expense_income_cache(
-            business_id=business_id,
-            fiscal_year_id=fiscal_year_id,
-            document_id=document_id
-        )
-        
-        # همچنین اسناد عمومی را هم invalidate کن
-        from app.services.document_service import invalidate_documents_cache
-        invalidate_documents_cache(
-            business_id=business_id,
-            fiscal_year_id=fiscal_year_id,
-            document_id=document_id,
-            document_type=document_type
-        )
+        if commit:
+            invalidate_expense_income_cache(
+                business_id=business_id,
+                fiscal_year_id=fiscal_year_id,
+                document_id=document_id
+            )
+            
+            from app.services.document_service import invalidate_documents_cache
+            invalidate_documents_cache(
+                business_id=business_id,
+                fiscal_year_id=fiscal_year_id,
+                document_id=document_id,
+                document_type=document_type
+            )
         
         return True
+    except ApiError:
+        raise
     except Exception as e:
         logger.error(f"Error deleting expense/income document {document_id}: {e}")
-        db.rollback()
-        return False
+        if commit:
+            db.rollback()
+            return False
+        raise ApiError("DELETE_FAILED", str(e), http_status=500) from e
 
 
 def delete_multiple_expense_income(db: Session, document_ids: List[int]) -> bool:

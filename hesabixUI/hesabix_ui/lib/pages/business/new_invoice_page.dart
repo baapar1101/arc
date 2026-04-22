@@ -38,9 +38,13 @@ import '../../services/report_template_service.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_line_item.dart';
 import '../../utils/invoice_line_preferences.dart';
+import '../../utils/invoice_global_discount_calculator.dart';
 import '../../services/invoice_service.dart';
+import '../../services/business_currency_rate_service.dart';
 import '../../services/credit_api_service.dart';
-import '../../models/credit_models.dart';import '../../utils/snackbar_helper.dart';
+import '../../models/credit_models.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/invoice/invoice_fx_rate_field.dart';
 
 
 class NewInvoicePage extends StatefulWidget {
@@ -87,6 +91,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   DateTime? _invoiceDate;
   DateTime? _dueDate;
   int? _selectedCurrencyId;
+  int? _defaultBusinessCurrencyId;
+  int? _manualFxRateId;
+  List<Map<String, dynamic>> _fxRateRows = [];
+  bool _loadingFxRates = false;
+  List<Map<String, dynamic>>? _businessCurrenciesCache;
+  int _invoiceCurrencyDecimalPlaces = 2;
+  bool _invoiceCurrencyRoundMonetary = true;
   int? _selectedProjectId;
   String? _invoiceTitle;
   String? _invoiceReference;
@@ -95,6 +106,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   num _sumDiscount = 0;
   num _sumTax = 0;
   num _sumTotal = 0;
+  InvoiceGlobalDiscountPolicy _globalDiscountPolicy = const InvoiceGlobalDiscountPolicy();
+  String _globalDiscountType = 'percent';
+  final TextEditingController _globalDiscountValueController = TextEditingController();
   
   // تنظیمات چاپ و ارسال
   bool _printAfterSave = false;
@@ -197,6 +211,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     return newDebt > effectiveLimit + 0.01;
   }
 
+  bool get _canPickFxRate =>
+      widget.authStore.hasBusinessPermission('currency_revaluation', 'view');
+
+  bool get _showInvoiceFxField {
+    if (!_canPickFxRate) return false;
+    final b = _defaultBusinessCurrencyId;
+    final c = _selectedCurrencyId;
+    if (b == null || c == null) return false;
+    return c != b;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -206,10 +231,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     _selectedInvoiceType = InvoiceType.sales;
     // تنظیم ارز پیش‌فرض از AuthStore
     _selectedCurrencyId = widget.authStore.selectedCurrencyId;
-    // اگر ارز انتخاب نشده، ارز پیش‌فرض را بارگذاری کن
-    if (_selectedCurrencyId == null) {
-      _loadDefaultCurrency();
-    }
+    _loadBusinessCurrenciesAndMeta();
     // تنظیم تاریخ‌های پیش‌فرض
     _invoiceDate = DateTime.now();
     _dueDate = DateTime.now();
@@ -228,6 +250,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     _downPaymentController = TextEditingController();
     _interestRateController = TextEditingController();
     _installmentPeriodDaysController = TextEditingController();
+    _globalDiscountValueController.addListener(() {
+      if (mounted) setState(_recalculateTotalsFromLines);
+    });
     // بارگذاری پلن‌های فعال اقساط
     _loadInstallmentPlans();
     _loadLocalSettingsForCurrentType();
@@ -431,6 +456,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (!mounted) return;
       setState(() {
         _invoiceWarehouseReleaseMode = b.invoiceWarehouseReleaseMode;
+        _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(b);
+        _recalculateTotalsFromLines();
       });
     } catch (_) {
       // نادیده گرفتن؛ پیش‌فرض draft روی UI باقی می‌ماند
@@ -1112,11 +1139,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           spacing: 12,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Chip(label: Text('جمع اصل: ${formatWithThousands(sumPrincipal, decimalPlaces: 0)}')),
-                            Chip(label: Text('جمع سود: ${formatWithThousands(sumInterest, decimalPlaces: 0)}')),
-                            Chip(label: Text('جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: 0)}')),
+                            Chip(label: Text('جمع اصل: ${formatWithThousands(sumPrincipal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
+                            Chip(label: Text('جمع سود: ${formatWithThousands(sumInterest, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
+                            Chip(label: Text('جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
                             Chip(
-                              label: Text('اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: 0)}'),
+                              label: Text('اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: _invoiceCurrencyDecimalPlaces)}'),
                               backgroundColor: diffColor.withValues(alpha: 0.12),
                               labelStyle: TextStyle(color: diffColor),
                             ),
@@ -1133,23 +1160,96 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       ),
     );
   }
-  Future<void> _loadDefaultCurrency() async {
+  void _applyCurrencyMetaFromCache() {
+    final id = _selectedCurrencyId;
+    var dp = 2;
+    var rm = true;
+    final cache = _businessCurrenciesCache;
+    if (id != null && cache != null) {
+      for (final raw in cache) {
+        final c = Map<String, dynamic>.from(raw as Map);
+        if ((c['id'] as num?)?.toInt() == id) {
+          dp = (c['decimal_places'] as num?)?.toInt() ?? 2;
+          rm = c['round_monetary_amounts'] != false;
+          break;
+        }
+      }
+    }
+    _invoiceCurrencyDecimalPlaces = dp;
+    _invoiceCurrencyRoundMonetary = rm;
+  }
+
+  Future<void> _loadBusinessCurrenciesAndMeta() async {
     try {
       final currencyService = CurrencyService(ApiClient());
       final currencies = await currencyService.listBusinessCurrencies(businessId: widget.businessId);
-      if (currencies.isNotEmpty) {
-        // ارز پیش‌فرض را پیدا کن
-        final defaultCurrency = currencies.firstWhere(
-          (c) => c['is_default'] == true,
-          orElse: () => currencies.first,
-        );
-        setState(() {
-          _selectedCurrencyId = defaultCurrency['id'] as int;
-        });
-        // ارز پیش‌فرض بارگذاری شد
+      if (!mounted) return;
+      int? defId;
+      for (final raw in currencies) {
+        final c = Map<String, dynamic>.from(raw as Map);
+        if (c['is_default'] == true) {
+          defId = (c['id'] as num?)?.toInt();
+          break;
+        }
       }
-    } catch (e) {
-      // خطا در بارگذاری ارز پیش‌فرض
+      setState(() {
+        _businessCurrenciesCache = currencies;
+        _defaultBusinessCurrencyId = defId;
+        if (_selectedCurrencyId == null && currencies.isNotEmpty) {
+          final defaultCurrency = currencies.firstWhere(
+            (c) => c['is_default'] == true,
+            orElse: () => currencies.first,
+          );
+          _selectedCurrencyId = defaultCurrency['id'] as int;
+        }
+        _applyCurrencyMetaFromCache();
+      });
+      await _reloadFxRates();
+    } catch (_) {}
+  }
+
+  Future<void> _reloadFxRates() async {
+    if (!mounted) return;
+    if (!_canPickFxRate) {
+      setState(() {
+        _fxRateRows = [];
+        _loadingFxRates = false;
+      });
+      return;
+    }
+    final def = _defaultBusinessCurrencyId;
+    final cur = _selectedCurrencyId;
+    if (def == null || cur == null || cur == def) {
+      setState(() {
+        _fxRateRows = [];
+        _manualFxRateId = null;
+        _loadingFxRates = false;
+      });
+      return;
+    }
+    setState(() {
+      _loadingFxRates = true;
+    });
+    try {
+      final svc = BusinessCurrencyRateService(ApiClient());
+      final res = await svc.list(
+        businessId: widget.businessId,
+        take: 100,
+        currencyId: cur,
+      );
+      final items = (res['items'] as List<dynamic>?) ?? const [];
+      if (!mounted) return;
+      setState(() {
+        _fxRateRows = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _loadingFxRates = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _fxRateRows = [];
+          _loadingFxRates = false;
+        });
+      }
     }
   }
 
@@ -1177,9 +1277,41 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
            _selectedInvoiceType != InvoiceType.production;
   }
 
+  void _recalculateTotalsFromLines() {
+    final type = _selectedInvoiceType?.value;
+    final raw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+    num gv = 0;
+    if (raw.isNotEmpty) {
+      gv = num.tryParse(raw) ?? 0;
+    }
+    if (!invoiceTypeSupportsGlobalDiscount(type) || gv <= 0) {
+      _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
+      _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
+      _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
+      _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
+      return;
+    }
+    if (_globalDiscountType == 'percent' && gv > 100) {
+      gv = 100;
+    }
+    final r = computeInvoiceTotalsWithGlobalDiscount(
+      lines: _lineItems,
+      globalType: _globalDiscountType,
+      globalValue: gv,
+      policy: _globalDiscountPolicy,
+      decimalPlaces: _invoiceCurrencyDecimalPlaces,
+      roundMonetaryAmounts: _invoiceCurrencyRoundMonetary,
+    );
+    _sumSubtotal = r.sumSubtotal;
+    _sumDiscount = r.sumLineDiscount + r.globalDiscountAmount;
+    _sumTax = r.sumTax;
+    _sumTotal = r.sumTotal;
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
+    _globalDiscountValueController.dispose();
     // Dispose کردن Controller های اقساطی
     _numInstallmentsController.dispose();
     _downPaymentController.dispose();
@@ -1430,10 +1562,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onChanged: (currencyId) {
                             setState(() {
                               _selectedCurrencyId = currencyId;
+                              _manualFxRateId = null;
+                              _applyCurrencyMetaFromCache();
                             });
+                            _reloadFxRates();
                           },
                           label: 'ارز فاکتور',
                           hintText: 'انتخاب ارز فاکتور',
+                        ),
+                        const SizedBox(height: 12),
+                        InvoiceFxRateField(
+                          show: _showInvoiceFxField,
+                          loading: _loadingFxRates,
+                          manualRateId: _manualFxRateId,
+                          rateRows: _fxRateRows,
+                          onChanged: (v) => setState(() => _manualFxRateId = v),
                         ),
                         const SizedBox(height: 16),
                         
@@ -1728,7 +1871,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onChanged: (currencyId) {
                                   setState(() {
                                     _selectedCurrencyId = currencyId;
+                                    _manualFxRateId = null;
+                                    _applyCurrencyMetaFromCache();
                                   });
+                                  _reloadFxRates();
                                 },
                                 label: 'ارز فاکتور',
                                 hintText: 'انتخاب ارز فاکتور',
@@ -1784,7 +1930,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(child: SizedBox()), // جای خالی
+                            Expanded(
+                              child: InvoiceFxRateField(
+                                show: _showInvoiceFxField,
+                                loading: _loadingFxRates,
+                                manualRateId: _manualFxRateId,
+                                rateRows: _fxRateRows,
+                                onChanged: (v) => setState(() => _manualFxRateId = v),
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -2225,6 +2379,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
     }
 
+    final invTypeVal = _selectedInvoiceType?.value;
+    if (invoiceTypeSupportsGlobalDiscount(invTypeVal)) {
+      final graw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+      if (graw.isNotEmpty) {
+        final gv = num.tryParse(graw);
+        if (gv == null) return t.invoiceGlobalDiscountValueInvalid;
+        if (_globalDiscountType == 'percent' && (gv < 0 || gv > 100)) {
+          return t.invoiceGlobalDiscountPercentInvalid;
+        }
+        if (_globalDiscountType == 'amount' && gv < 0) {
+          return t.invoiceGlobalDiscountAmountInvalid;
+        }
+      }
+    }
+
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
     final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn;
     
@@ -2266,6 +2435,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     // نادیده گرفتن اعتبار مشتری (فقط در فروش معنادار است؛ اما در payload همیشه ارسال می‌شود)
     extraInfo['ignore_credit_check'] = _ignoreCreditCheck;
+    if (invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value)) {
+      final graw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+      if (graw.isNotEmpty) {
+        final gv = num.tryParse(graw) ?? 0;
+        if (gv > 0) {
+          extraInfo['global_discount'] = {
+            'type': _globalDiscountType,
+            'value': gv.toDouble(),
+          };
+        }
+      }
+    }
     // تاریخ سررسید سند (YYYY-MM-DD در extra_info)
     final dueForDoc = _dueDate ?? _invoiceDate;
     if (dueForDoc != null) {
@@ -2372,6 +2553,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'extra_info': extraInfo,
       if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
     
@@ -2482,7 +2664,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     setState(() {
       _selectedInvoiceType = newType;
       _hasUserCustomizedSettings = false;
-      
+      if (!invoiceTypeSupportsGlobalDiscount(newType.value)) {
+        _globalDiscountValueController.clear();
+      }
+
       // اگر نوع فاکتور از تولید به نوع دیگری تغییر می‌کند
       if (oldType == InvoiceType.production && newType != InvoiceType.production) {
         // پاک کردن bom_ids
@@ -2506,11 +2691,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           return false;
         });
         
-        // محاسبه مجدد جمع‌ها پس از حذف ردیف‌ها
-        _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
-        _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
-        _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
-        _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
+        _recalculateTotalsFromLines();
         
         // اگر هیچ ردیفی باقی نماند، یک ردیف پیش‌فرض اضافه کن
         if (_lineItems.isEmpty) {
@@ -2575,6 +2756,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Widget _buildProductsTab() {
+    final t = AppLocalizations.of(context);
+    final showGlobalDisc = invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value);
+    final lineDiscOnly = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -2594,11 +2778,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       _lineItems = [..._lineItems, ...newItems];
                       // افزودن bom_id به لیست
                       _bomIds.add(bomId);
-                      // محاسبه مجدد جمع‌ها
-                      _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
-                      _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
-                      _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
-                      _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
+                      _recalculateTotalsFromLines();
                     });
                   },
                 ),
@@ -2640,6 +2820,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 businessId: widget.businessId,
                 authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
+                currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
                 initialRows: _lineItems,
@@ -2659,13 +2840,70 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     _bomIds.removeWhere((bomId) => !bomIdsInRows.contains(bomId));
                     
                     _lineItems = rows;
-                    _sumSubtotal = rows.fold<num>(0, (acc, e) => acc + e.subtotal);
-                    _sumDiscount = rows.fold<num>(0, (acc, e) => acc + e.discountAmount);
-                    _sumTax = rows.fold<num>(0, (acc, e) => acc + e.taxAmount);
-                    _sumTotal = rows.fold<num>(0, (acc, e) => acc + e.total);
+                    _recalculateTotalsFromLines();
                   });
                 },
               ),
+              if (showGlobalDisc) ...[
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 12),
+                        SegmentedButton<String>(
+                          segments: [
+                            ButtonSegment<String>(
+                              value: 'percent',
+                              label: Text(t.invoiceGlobalDiscountTypePercent),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'amount',
+                              label: Text(t.invoiceGlobalDiscountTypeAmount),
+                            ),
+                          ],
+                          selected: {_globalDiscountType},
+                          onSelectionChanged: (s) {
+                            setState(() {
+                              _globalDiscountType = s.first;
+                              _recalculateTotalsFromLines();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _globalDiscountValueController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: t.invoiceGlobalDiscountValueLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          t.invoiceGlobalDiscountLineDiscountHint(
+                            formatWithThousands(lineDiscOnly, decimalPlaces: _invoiceCurrencyDecimalPlaces),
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (_sumDiscount > lineDiscOnly)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              t.invoiceGlobalDiscountAmountComputedHint(
+                                formatWithThousands(_sumDiscount - lineDiscOnly, decimalPlaces: _invoiceCurrencyDecimalPlaces),
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               // نوار خلاصه جمع‌ها در والد (برای همگام‌سازی با سایر بخش‌ها)
               Align(
@@ -2674,10 +2912,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   spacing: 16,
                   runSpacing: 8,
                   children: [
-                    Text('جمع مبلغ: ${formatWithThousands(_sumSubtotal, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('جمع تخفیف: ${formatWithThousands(_sumDiscount, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('جمع مالیات: ${formatWithThousands(_sumTax, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('جمع کل: ${formatWithThousands(_sumTotal, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                   ],
                 ),
               ),

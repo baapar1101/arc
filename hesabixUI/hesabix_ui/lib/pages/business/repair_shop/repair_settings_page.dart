@@ -3,6 +3,7 @@ import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_settings_model.dart';
 import '../../../core/api_client.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 
 /// صفحه تنظیمات تعمیرگاه
@@ -118,6 +119,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات تعمیرگاه'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (_isSaving)
             const Padding(

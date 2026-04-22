@@ -50,8 +50,8 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف اپراتور'),
-        content: Text('آیا مطمئن هستید که می‌خواهید دسترسی اپراتور را از $email لغو کنید؟'),
+        title: Text(t.supportOperatorsRemoveOperatorTitle),
+        content: Text(t.supportOperatorsRemoveOperatorConfirm(email)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -73,8 +73,8 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('دسترسی اپراتور با موفقیت لغو شد'),
+            SnackBar(
+              content: Text(t.supportOperatorsAccessRevokedSuccess),
               backgroundColor: Colors.green,
             ),
           );
@@ -98,7 +98,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('اپراتورهای پشتیبانی'),
+        title: Text(t.supportOperatorsPageTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -120,14 +120,14 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                         color: Colors.grey[400],
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'هیچ اپراتور پشتیبانی یافت نشد',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      Text(
+                        t.supportOperatorsEmpty,
+                        style: const TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'برای افزودن اپراتور، از صفحه مدیریت کاربران استفاده کنید',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      Text(
+                        t.supportOperatorsEmptyHint,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -175,8 +175,8 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                                 const SizedBox(width: 4),
                                 Text(
                                   telegramId != null
-                                      ? 'متصل به تلگرام'
-                                      : 'متصل نیست',
+                                      ? t.supportOperatorsTelegramConnected
+                                      : t.supportOperatorsTelegramNotConnected,
                                   style: TextStyle(
                                     color: telegramId != null
                                         ? Colors.blue
@@ -187,11 +187,11 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                               ],
                             ),
                             if (!isActive)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 4),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  'غیرفعال',
-                                  style: TextStyle(
+                                  t.supportOperatorsStatusInactive,
+                                  style: const TextStyle(
                                     color: Colors.red,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,

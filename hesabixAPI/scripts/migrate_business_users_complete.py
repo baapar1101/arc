@@ -157,6 +157,12 @@ def convert_permissions_to_json(old_permission: Dict[str, Any]) -> Dict[str, Any
 			"view": True,
 			"delete": old_permission.get('accounting') == 1
 		}
+		permissions["currency_revaluation"] = {
+			"add": old_permission.get('accounting') == 1,
+			"edit": old_permission.get('accounting') == 1,
+			"view": True,
+			"delete": old_permission.get('accounting') == 1
+		}
 		permissions["accounting_documents"] = {
 			"add": True,
 			"edit": old_permission.get('accounting') == 1,

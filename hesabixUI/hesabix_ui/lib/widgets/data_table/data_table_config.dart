@@ -317,6 +317,9 @@ class DataTableConfig<T> {
   // HTTP method for data fetching (default: POST)
   final String httpMethod;
 
+  /// برای درخواست GET: نام پارامتر اندازهٔ صفحه (پیش‌فرض `limit`). APIهایی مثل نرخ تسعیر از `take` استفاده می‌کنند.
+  final String? pageSizeQueryParam;
+
   /// اگر true باشد، ناحیهٔ بدنهٔ جدول به‌جای [Expanded] با ارتفاع محاسبه‌شده از تعداد سطرها
   /// اندازه می‌گیرد تا اسکرول عمودی داخل [DataTable2] حذف شود؛ خود [DataTableWidget] محتوای کارت را
   /// در [SingleChildScrollView] می‌پیچد تا با ارتفاع زیاد، صفحه اسکرول شود. پیش‌فرض: غیرفعال.
@@ -409,6 +412,7 @@ class DataTableConfig<T> {
     this.autoFitSampleRows = 50,
     this.autoFillAvailableWidth = true,
     this.httpMethod = 'POST',
+    this.pageSizeQueryParam,
     this.expandBodyHeightToFitRows = false,
   });
 
@@ -503,12 +507,25 @@ class DataTableResponse<T> {
     int total = pagination != null
         ? (pagination['total'] as num?)?.toInt() ?? 0
         : (data['total'] as num?)?.toInt() ?? 0;
-    int page = pagination != null
-        ? (pagination['page'] as num?)?.toInt() ?? 1
-        : (data['page'] as num?)?.toInt() ?? 1;
     int limit = pagination != null
         ? (pagination['per_page'] as num?)?.toInt() ?? 20
-        : (data['limit'] as num?)?.toInt() ?? (data['per_page'] as num?)?.toInt() ?? 20;
+        : (data['limit'] as num?)?.toInt() ??
+            (data['take'] as num?)?.toInt() ??
+            (data['per_page'] as num?)?.toInt() ??
+            20;
+    final int? rawPage = pagination != null
+        ? (pagination['page'] as num?)?.toInt()
+        : (data['page'] as num?)?.toInt();
+    int page;
+    if (rawPage != null && rawPage >= 1) {
+      page = rawPage;
+    } else if (data['skip'] != null && limit > 0) {
+      // پاسخ skip/take (مثلاً لیست نرخ تسعیر)
+      final sk = (data['skip'] as num).toInt();
+      page = (sk ~/ limit) + 1;
+    } else {
+      page = 1;
+    }
     int totalPages = pagination != null
         ? (pagination['total_pages'] as num?)?.toInt() ?? 0
         : (data['total_pages'] as num?)?.toInt() ?? 0;

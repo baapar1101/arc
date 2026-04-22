@@ -7,7 +7,9 @@ import '../../core/calendar_controller.dart';
 import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
-import '../../utils/responsive_helper.dart';import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 
 class UsersPermissionsPage extends StatefulWidget {
@@ -280,6 +282,8 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
               ),
               child: Row(
                 children: [
+                  businessSubpageBackLeading(context, int.parse(widget.businessId)),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -1035,6 +1039,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.chartOfAccounts}',
         'delete': '${t.delete} ${t.chartOfAccounts}',
       },
+      'currency_revaluation': {
+        'add': '${t.add} ${t.currencyRevaluation}',
+        'view': '${t.view} ${t.currencyRevaluation}',
+        'edit': '${t.edit} ${t.currencyRevaluation}',
+        'delete': '${t.delete} ${t.currencyRevaluation}',
+      },
       'opening_balance': {
         'view': '${t.view} ${t.openingBalance}',
         'edit': '${t.edit} ${t.openingBalance}',
@@ -1078,6 +1088,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       },
       'fiscal_years': {
         'view': '${t.view} ${t.fiscalYears ?? 'سال‌های مالی'}',
+        'edit': 'ویرایش سال مالی جاری',
+        'close': 'بستن سال مالی',
+        'rollback': 'برگشت از سال مالی جاری (عملیات خطرناک)',
       },
       'warranty': {
         'read': '${t.view ?? 'مشاهده'} ${t.warranty ?? 'گارانتی'}',
@@ -1366,7 +1379,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': 'حسابداری',
         'icon': Icons.calculate,
-        'sections': ['accounting_documents', 'chart_of_accounts', 'opening_balance'],
+        'sections': ['accounting_documents', 'chart_of_accounts', 'opening_balance', 'currency_revaluation'],
       },
       {
         'title': 'انبارداری',
@@ -1531,6 +1544,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'expenses_income': 'هزینه و درآمد',
       'accounting_documents': 'اسناد حسابداری',
       'chart_of_accounts': 'جدول حساب‌ها',
+      'currency_revaluation': t.currencyRevaluation,
       'opening_balance': 'تراز افتتاحیه',
       'warehouses': 'مدیریت انبارها',
       'warehouse_transfers': 'صدور حواله',

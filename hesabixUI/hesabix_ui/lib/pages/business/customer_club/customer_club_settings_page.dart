@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../core/auth_store.dart';
 import '../../../services/customer_club_service.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 /// تنظیمات قوانین باشگاه مشتریان (مسیر جدا از صفحهٔ تراکنش‌ها).
 class CustomerClubSettingsPage extends StatefulWidget {
@@ -50,6 +51,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
   final TextEditingController _rfmWeightMCtl = TextEditingController();
   String _clvFormula = 'historical_total';
   final TextEditingController _clvLifespanCtl = TextEditingController(text: '3');
+  String _loyaltyRfmIntegrationMode = 'decoupled';
 
   bool _computeCanManage() {
     return widget.authStore.currentBusiness?.isOwner == true ||
@@ -111,6 +113,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         _rfmWeightMCtl.text = _fmtNum(data['rfm_weight_monetary']);
         _clvFormula = (data['clv_formula'] ?? 'historical_total').toString();
         _clvLifespanCtl.text = _fmtNum(data['clv_avg_lifespan_years']);
+        _loyaltyRfmIntegrationMode = (data['loyalty_rfm_integration_mode'] ?? 'decoupled').toString();
       });
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: '$e');
@@ -221,6 +224,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         'rfm_weight_monetary': _parseDoubleOrNull(_rfmWeightMCtl.text),
         'clv_formula': _clvFormula,
         'clv_avg_lifespan_years': _parseDoubleOrNull(_clvLifespanCtl.text),
+        'loyalty_rfm_integration_mode': _loyaltyRfmIntegrationMode,
       };
       await _svc.updateSettings(businessId: widget.businessId, payload: payload);
       if (!mounted) return;
@@ -252,6 +256,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${t.customerClubMenu} — ${t.customerClubTabSettings}'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
       ),
       floatingActionButton: canManage
           ? FloatingActionButton.extended(
@@ -322,6 +327,45 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         readOnly: !canManage,
                         onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _sectionCard(
+                    theme: theme,
+                    title: t.customerClubSettingsSectionLoyaltyRfm,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: t.customerClubLoyaltyRfmMode,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
+                        ),
+                        value: _loyaltyRfmIntegrationMode == 'rfm_based_tiers' ? 'rfm_based_tiers' : 'decoupled',
+                        items: [
+                          DropdownMenuItem(value: 'decoupled', child: Text(t.customerClubLoyaltyRfmDecoupled)),
+                          DropdownMenuItem(value: 'rfm_based_tiers', child: Text(t.customerClubLoyaltyRfmTiers)),
+                        ],
+                        onChanged: canManage
+                            ? (v) {
+                                if (v != null) setState(() => _loyaltyRfmIntegrationMode = v);
+                              }
+                            : null,
+                      ),
+                      Material(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.link, size: 20, color: theme.colorScheme.primary),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(t.customerClubLoyaltyRfmHint, style: theme.textTheme.bodySmall)),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),

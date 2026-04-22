@@ -1779,6 +1779,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get yearEndClosing => 'بستن سال مالی';
 
   @override
+  String get currencyRevaluation => 'تسعیر و نرخ ارز';
+
+  @override
   String get accountingSettings => 'تنظیمات';
 
   @override
@@ -8318,6 +8321,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsWalletSettingsDescription => 'تعیین ارز پایه و سیاست‌ها';
 
   @override
+  String get settingsCurrenciesAdmin => 'مدیریت ارزها';
+
+  @override
+  String get settingsCurrenciesAdminDescription =>
+      'اعشار، گرد کردن مبالغ و افزودن یا حذف ارز';
+
+  @override
   String get settingsPaymentGateways => 'درگاه‌های پرداخت';
 
   @override
@@ -8350,6 +8360,65 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get settingsNotificationTemplatesDescription =>
       'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها';
+
+  @override
+  String get settingsSupportOperators => 'اپراتورهای پشتیبانی';
+
+  @override
+  String get settingsSupportOperatorsDescription =>
+      'اعطا یا لغو دسترسی اپراتور پشتیبانی برای کاربران';
+
+  @override
+  String get settingsNotificationModeration => 'بررسی قالب‌های نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationModerationDescription =>
+      'تایید یا رد قالب‌های ارسال‌شده توسط کسب‌وکارها';
+
+  @override
+  String get settingsNotificationSmsPricing => 'قیمت‌گذاری پیامک نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationSmsPricingDescription =>
+      'تنظیم قیمت هر پیامک برای نوتیفیکیشن‌های کسب‌وکارها';
+
+  @override
+  String get settingsSystemScripts => 'اسکریپت‌های سیستمی';
+
+  @override
+  String get settingsSystemScriptsDescription =>
+      'اجرای عملیات اصلاحی سراسری برای همه کسب‌وکارها';
+
+  @override
+  String get supportOperatorsPageTitle => 'اپراتورهای پشتیبانی';
+
+  @override
+  String get supportOperatorsRemoveOperatorTitle => 'حذف اپراتور';
+
+  @override
+  String supportOperatorsRemoveOperatorConfirm(String email) {
+    return 'آیا مطمئن هستید که می‌خواهید دسترسی اپراتور را از $email لغو کنید؟';
+  }
+
+  @override
+  String get supportOperatorsAccessRevokedSuccess =>
+      'دسترسی اپراتور با موفقیت لغو شد';
+
+  @override
+  String get supportOperatorsEmpty => 'هیچ اپراتور پشتیبانی یافت نشد';
+
+  @override
+  String get supportOperatorsEmptyHint =>
+      'برای افزودن اپراتور، از صفحه مدیریت کاربران استفاده کنید.';
+
+  @override
+  String get supportOperatorsTelegramConnected => 'متصل به تلگرام';
+
+  @override
+  String get supportOperatorsTelegramNotConnected => 'متصل نیست';
+
+  @override
+  String get supportOperatorsStatusInactive => 'غیرفعال';
 
   @override
   String get settingsAISettings => 'تنظیمات AI';
@@ -9130,6 +9199,49 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get customerClubAnalyticsHint =>
       'پس از تغییر تنظیمات، یک‌بار بازمحاسبه را از تب تحلیل بزنید.';
+
+  @override
+  String get customerClubSettingsSectionLoyaltyRfm =>
+      'ارتباط امتیاز وفاداری با RFM';
+
+  @override
+  String get customerClubLoyaltyRfmMode => 'حالت یکپارچگی';
+
+  @override
+  String get customerClubLoyaltyRfmDecoupled =>
+      'جدا: امتیاز از فاکتور؛ سطح از مانده امتیاز';
+
+  @override
+  String get customerClubLoyaltyRfmTiers =>
+      'سطح/ضریب از نمره RFM (نیاز به تحلیل RFM فعال)';
+
+  @override
+  String get customerClubLoyaltyRfmHint =>
+      'در حالت دوم، آستانه هر سطح را با فیلد «حداقل نمره RFM (۰–۱)» در API سطوح یا به‌صورت نسبی از حداقل امتیاز÷۱۰۰۰۰ تنظیم کنید. امتیاز مصرف در فاکتور همچنان از مانده فاکتور است.';
+
+  @override
+  String get customerClubAnalyticsSegmentsTitle => 'گروه‌ها';
+
+  @override
+  String get customerClubAnalyticsCampaignExport => 'خروجی کمپین';
+
+  @override
+  String get customerClubAnalyticsCampaignTitle => 'لیست مخاطبان برای کمپین';
+
+  @override
+  String get customerClubAnalyticsCampaignBody =>
+      'شناسه اشخاص مطابق فیلتر فعلی (سگمنت و جستجو). می‌توانید در ابزار پیامک/ایمیل خود وارد کنید.';
+
+  @override
+  String get customerClubAnalyticsCampaignCopyIds => 'کپی شناسه‌ها';
+
+  @override
+  String customerClubAnalyticsCampaignTruncated(int n) {
+    return 'فقط $n شناسه برگردانده شد؛ برای همه، محدودیت را در API بالا ببرید.';
+  }
+
+  @override
+  String get customerClubAnalyticsRfmNormalized => 'نمره نرمال RFM (۰–۱)';
 
   @override
   String get customerClubSortAsc => 'صعودی';
@@ -10326,4 +10438,333 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get reportsDistributionDashboardSubtitle =>
       'آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی';
+
+  @override
+  String get invoiceGlobalDiscountSection => 'تخفیف کلی فاکتور';
+
+  @override
+  String get invoiceGlobalDiscountTypePercent => 'درصدی';
+
+  @override
+  String get invoiceGlobalDiscountTypeAmount => 'مبلغ';
+
+  @override
+  String get invoiceGlobalDiscountValueLabel => 'مقدار تخفیف کلی';
+
+  @override
+  String invoiceGlobalDiscountLineDiscountHint(String amount) {
+    return 'جمع تخفیف ردیف‌ها: $amount';
+  }
+
+  @override
+  String invoiceGlobalDiscountAmountComputedHint(String amount) {
+    return 'تخفیف کلی اعمال‌شده: $amount';
+  }
+
+  @override
+  String get invoiceSummarySubtotal => 'جمع مبلغ';
+
+  @override
+  String get invoiceSummaryDiscount => 'جمع تخفیف';
+
+  @override
+  String get invoiceSummaryTax => 'جمع مالیات';
+
+  @override
+  String get invoiceSummaryTotal => 'جمع کل';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTitle =>
+      'تخفیف کلی فاکتور (محاسبه)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisLabel =>
+      'مبنای درصد تخفیف کلی';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines =>
+      'جمع خالص پس از تخفیف ردیف (پیش از مالیات)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines =>
+      'جمع ناخالص (قبل از تخفیف ردیف)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisTotalWithTax =>
+      'جمع ردیف‌ها شامل مالیات';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeLabel =>
+      'اثر بر مالیات';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeRecalculate =>
+      'بازمحاسبه مالیات به‌صورت متناسب';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeKeep =>
+      'ثابت نگه‌داشتن مالیات ردیف‌ها';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountMaxPercent =>
+      'سقف درصد (اختیاری)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountMaxAmount =>
+      'سقف مبلغ (اختیاری)';
+
+  @override
+  String get editInvoiceTitle => 'ویرایش فاکتور';
+
+  @override
+  String get saveChangesTooltip => 'ذخیره تغییرات';
+
+  @override
+  String get invoiceProductsTab => 'کالاها و خدمات';
+
+  @override
+  String get invoiceTransactionsTab => 'تراکنش‌ها';
+
+  @override
+  String get invoiceInstallmentsTab => 'اقساط';
+
+  @override
+  String get invoiceSettingsTab => 'تنظیمات';
+
+  @override
+  String get invoiceGlobalDiscountPercentInvalid =>
+      'درصد تخفیف کلی باید بین ۰ تا ۱۰۰ باشد';
+
+  @override
+  String get invoiceGlobalDiscountAmountInvalid =>
+      'مبلغ تخفیف کلی نمی‌تواند منفی باشد';
+
+  @override
+  String get invoiceGlobalDiscountValueInvalid => 'مقدار تخفیف کلی نامعتبر است';
+
+  @override
+  String get fiscalYearRollbackTitle => 'برگشت از سال مالی جاری';
+
+  @override
+  String get fiscalYearRollbackRetry => 'تلاش مجدد';
+
+  @override
+  String get fiscalYearRollbackTokenMissing =>
+      'کد تأیید موقت تولید نشده یا منقضی شده. دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید و دوباره تلاش کنید.';
+
+  @override
+  String get fiscalYearRollbackConfirmTitle => 'تأیید نهایی';
+
+  @override
+  String get fiscalYearRollbackConfirmWithBackupBody =>
+      'ابتدا پشتیبان کامل کسب‌وکار در سیستم ذخیره می‌شود، سپس سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
+
+  @override
+  String get fiscalYearRollbackConfirmWithoutBackupBody =>
+      'سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
+
+  @override
+  String get fiscalYearRollbackCancel => 'انصراف';
+
+  @override
+  String get fiscalYearRollbackConfirmDelete => 'حذف سال جاری';
+
+  @override
+  String get fiscalYearRollbackPhaseBackupStarting =>
+      'در حال ایجاد پشتیبان کامل در سیستم…';
+
+  @override
+  String get fiscalYearRollbackBackupStartFailed =>
+      'شروع پشتیبان‌گیری ناموفق بود.';
+
+  @override
+  String get fiscalYearRollbackBackupJobIdMissing =>
+      'شناسهٔ کار پشتیبان از سرور دریافت نشد.';
+
+  @override
+  String get fiscalYearRollbackPhasePreviewRefresh =>
+      'به‌روزرسانی پیش‌نمایش (کد تأیید جدید)…';
+
+  @override
+  String get fiscalYearRollbackAfterBackupBlocked =>
+      'پس از پشتیبان‌گیری، برگشت از سال مالی دیگر مجاز نیست. احتمالاً وضعیت کسب‌وکار تغییر کرده. پیش‌نمایش را بررسی و دوباره تلاش کنید.';
+
+  @override
+  String get fiscalYearRollbackTokenAfterBackupMissing =>
+      'کد تأیید پس از پشتیبان دریافت نشد. «به‌روزرسانی پیش‌نمایش» را بزنید.';
+
+  @override
+  String get fiscalYearRollbackTokenMissingGeneric => 'کد تأیید در دسترس نیست.';
+
+  @override
+  String get fiscalYearRollbackPhaseDeleting => 'در حال حذف سال مالی جاری…';
+
+  @override
+  String get fiscalYearRollbackSuccessFallback => 'با موفقیت انجام شد';
+
+  @override
+  String get fiscalYearRollbackWarningCard =>
+      'این عملیات تمام اسناد سال مالی جاری را حذف می‌کند و سال قبل را دوباره «جاری» می‌کند.';
+
+  @override
+  String get fiscalYearRollbackCurrentYearLabel => 'سال جاری (حذف می‌شود)';
+
+  @override
+  String fiscalYearRollbackYearIdSuffix(String id) {
+    return 'شناسه $id';
+  }
+
+  @override
+  String get fiscalYearRollbackNextCurrentLabel => 'سال بعدی جاری';
+
+  @override
+  String fiscalYearRollbackDocCountLabel(String count) {
+    return 'تعداد اسناد سال جاری: $count';
+  }
+
+  @override
+  String fiscalYearRollbackClosingDocsToDelete(String count) {
+    return 'اسناد بستن سال روی سال قبل که حذف می‌شوند: $count';
+  }
+
+  @override
+  String get fiscalYearRollbackBackupCheckboxTitle =>
+      'قبل از حذف سال، پشتیبان کامل بگیرم';
+
+  @override
+  String get fiscalYearRollbackBackupCheckboxSubtitle =>
+      'همان پشتیبان سیستمی (.hbx) از بخش تنظیمات؛ برای بازیابی در صورت نیاز.';
+
+  @override
+  String get fiscalYearRollbackOpenBackupPage => 'باز کردن صفحهٔ پشتیبان‌گیری';
+
+  @override
+  String get fiscalYearRollbackExecuteButton => 'اجرای حذف سال مالی جاری';
+
+  @override
+  String get fiscalYearRollbackBlockedTitle =>
+      'این عملیات الان مجاز نیست — دلایل:';
+
+  @override
+  String get fiscalYearRollbackBlockedHint =>
+      'پس از رفع موارد زیر، دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید.';
+
+  @override
+  String get fiscalYearRollbackRefreshPreview => 'به‌روزرسانی پیش‌نمایش';
+
+  @override
+  String fiscalYearRollbackBackupProgressPrefix(String detail) {
+    return 'پشتیبان: $detail';
+  }
+
+  @override
+  String get fiscalYearRollbackPreviewFailed =>
+      'پیش‌نمایش برگشت از سال مالی ناموفق بود.';
+
+  @override
+  String get fiscalYearRollbackNetworkUnreachable =>
+      'ارتباط با سرور برقرار نشد. اینترنت و وضعیت ورود را بررسی کنید.';
+
+  @override
+  String get fiscalYearRollbackExecuteFailed =>
+      'اجرای برگشت از سال مالی ناموفق بود.';
+
+  @override
+  String get fiscalYearRollbackExecuteFailedSupport =>
+      'اجرای عملیات با خطا مواجه شد. در صورت تکرار با پشتیبانی تماس بگیرید.';
+
+  @override
+  String get backupJobWaitTimeout =>
+      'پشتیبان‌گیری در زمان انتظار به پایان نرسید. از بخش «تنظیمات → پشتیبان‌گیری» وضعیت را بررسی کنید.';
+
+  @override
+  String get backupJobStorageLimitFallback =>
+      'پشتیبان به‌خاطر محدودیت ذخیره‌سازی ذخیره نشد. پکیج را فعال یا حجم را آزاد کنید.';
+
+  @override
+  String get settingsSideCurrenciesTitle => 'مدیریت ارزهای جانبی';
+
+  @override
+  String get settingsSideCurrenciesSubtitle =>
+      'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار';
+
+  @override
+  String get settingsInvoiceFxPolicyTitle => 'سیاست تسعیر فاکتور';
+
+  @override
+  String get settingsInvoiceFxPolicySubtitle =>
+      'لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)';
+
+  @override
+  String get fxRevaluationSettingsTitle => 'تسعیر فاکتور (سیاست)';
+
+  @override
+  String get fxRevaluationSettingsIntro =>
+      'این گزینه‌ها تعیین می‌کنند «لحظه مرجع» نرخ تسعیر (نسبت به ارز اصلی) برای فاکتورهای ارزی چگونه محاسبه شود و اگر نرخی نبود چه رفتاری انجام شود.';
+
+  @override
+  String get fxRevaluationAsOfSourceLabel => 'لحظه مرجع نرخ (as_of)';
+
+  @override
+  String get fxRevaluationAsOfSourceDocumentDate =>
+      'تاریخ سند (با ساعت طبق گزینه زیر)';
+
+  @override
+  String get fxRevaluationAsOfSourceRegisteredAt => 'زمان ثبت سند در سیستم';
+
+  @override
+  String get fxRevaluationDateEffectiveLabel => 'لحظه مؤثر در همان روز (UTC)';
+
+  @override
+  String get fxRevaluationTimeStartOfDay => 'شروع روز ۰۰:۰۰';
+
+  @override
+  String get fxRevaluationTimeNoon => 'میانه روز ۱۲:۰۰';
+
+  @override
+  String get fxRevaluationTimeEndOfDay =>
+      'پایان روز ۲۳:۵۹:۵۹ (چند نرخ در یک روز)';
+
+  @override
+  String get fxRevaluationWhenNoRateLabel =>
+      'اگر نرخ تسعیر برای لحظه مرجع نبود';
+
+  @override
+  String get fxRevaluationWhenNoRateBlock => 'جلوگیری از ثبت فاکتور';
+
+  @override
+  String get fxRevaluationWhenNoRateAllow =>
+      'اجازه ثبت بدون نرخ (ثبت سند fx به‌صورت ناقص)';
+
+  @override
+  String get fxRevaluationSettingsFooterNote =>
+      'کاربران بدون مجوز «تسعیر و نرخ ارز» نمی‌توانند ردیف نرخ خاصی انتخاب کنند؛ سیستم نزدیک‌ترین نرخ (آخرین نرخ مؤثر تا لحظه مرجع) را اعمال می‌کند.';
+
+  @override
+  String fxRevaluationSettingsLoadError(String error) {
+    return 'خطا در بارگذاری: $error';
+  }
+
+  @override
+  String fxRevaluationSettingsSaveError(String error) {
+    return 'ذخیره نشد: $error';
+  }
+
+  @override
+  String get invoiceFxRateFieldLabel => 'نرخ تسعیر (اختیاری)';
+
+  @override
+  String get invoiceFxRateAuto => 'خودکار (سیاست تنظیمات کسب‌وکار)';
+
+  @override
+  String get invoiceFxRateHelper =>
+      'برای ارز غیر اصلی؛ «خودکار» آخرین نرخ معتبر تا لحظهٔ مرجع سند است.';
+
+  @override
+  String get invoiceFxRateStoredOnDocument => 'نرخ ذخیره‌شده سند';
+
+  @override
+  String invoiceFxRateRow(String rate, String effective, String idPart) {
+    return 'نرخ $rate — $effective$idPart';
+  }
 }

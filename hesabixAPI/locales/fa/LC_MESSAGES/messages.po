@@ -671,3 +671,128 @@ msgstr "در لحظهٔ ثبت، ماندهٔ امتیاز کافی نیست."
 
 msgid "LOYALTY_DISCOUNT_TOO_HIGH"
 msgstr "تخفیف امتیازی از مبلغ خالص فاکتور بیشتر است."
+
+# Fiscal year rollback
+msgid "ROLLBACK_TOKEN_EMPTY"
+msgstr "توکن تأیید خالی است. از همان صفحهٔ پیش‌نمایش اجرا کنید یا پیش‌نمایش را دوباره بگیرید."
+
+msgid "ROLLBACK_TOKEN_MALFORMED"
+msgstr "توکن تأیید ناقص یا نامعتبر است. صفحه را ببندید، دوباره وارد شوید و پیش‌نمایش را از نو بگیرید."
+
+msgid "ROLLBACK_TOKEN_BAD_SIGNATURE"
+msgstr "امضای توکن تأیید معتبر نیست. احتمالاً تنظیمات سرور عوض شده؛ پیش‌نمایش را دوباره بگیرید."
+
+msgid "ROLLBACK_TOKEN_WRONG_BUSINESS"
+msgstr "این توکن تأیید مربوط به همین کسب‌وکار نیست. از همان کسب‌وکاری که پیش‌نمایش گرفتید اقدام کنید."
+
+msgid "ROLLBACK_TOKEN_WRONG_USER"
+msgstr "این توکن تأیید متعلق به کاربر دیگری است یا نشست شما عوض شده. دوباره وارد شوید و پیش‌نمایش را تازه کنید."
+
+msgid "ROLLBACK_TOKEN_INVALID_EXP"
+msgstr "توکن تأیید نامعتبر است. پیش‌نمایش را دوباره بگیرید."
+
+msgid "ROLLBACK_TOKEN_EXPIRED"
+msgstr "زمان اعتبار تأیید ({minutes} دقیقه) به پایان رسیده است. برای ادامه، پیش‌نمایش را دوباره بگیرید."
+
+msgid "ROLLBACK_TOKEN_PARSE_FAILED"
+msgstr "خواندن توکن تأیید ممکن نشد. پیش‌نمایش را دوباره بگیرید و بلافاصله اجرا را بزنید."
+
+msgid "ROLLBACK_NOT_ENOUGH_FISCAL_YEARS"
+msgstr "برای حذف سال مالی جاری و بازگشت به سال قبل، باید حداقل دو سال مالی در این کسب‌وکار ثبت شده باشد. اگر فقط یک سال دارید، این عملیات در دسترس نیست."
+
+msgid "NO_CURRENT_FISCAL_YEAR"
+msgstr "سال مالی «جاری» در سیستم مشخص نیست. ابتدا از تنظیمات سال مالی، وضعیت سال‌ها را اصلاح کنید یا با پشتیبانی تماس بگیرید."
+
+msgid "FISCAL_YEAR_MISMATCH"
+msgstr "سال مالی انتخاب‌شده متعلق به این کسب‌وکار نیست. دسترسی یا شناسه کسب‌وکار را بررسی کنید."
+
+msgid "FISCAL_YEAR_NOT_IN_LIST"
+msgstr "سال مالی جاری در فهرست سال‌های این کسب‌وکار دیده نمی‌شود؛ احتمالاً داده ناسازگار است. با پشتیبانی تماس بگیرید."
+
+msgid "ROLLBACK_NO_PREVIOUS_YEAR"
+msgstr "سال مالی «قبل» برای بازگشت پیدا نشد. باید حداقل یک سال مالی قدیمی‌تر از سال جاری وجود داشته باشد."
+
+msgid "ROLLBACK_SOURCE_DOCUMENT_MONETIZATION"
+msgstr "هزینه/اشتراک خدمات اسناد (سیستم)"
+
+msgid "ROLLBACK_SOURCE_STORAGE_INVOICE"
+msgstr "صورتحساب فضای ذخیره‌سازی (سیستم)"
+
+msgid "ROLLBACK_REASON_SYSTEM_DOC"
+msgstr "این سند جزو اسناد داخلی سیستم است ({label}). حذف آن باعث ناسازگاری کیف پول یا خدمات می‌شود."
+
+msgid "ROLLBACK_REASON_TAX_WORKSPACE"
+msgstr "این سند در کارپوشه سامانه مودیان است؛ تا زمانی که از کارپوشه خارج نشود، امکان حذف سال مالی جاری نیست."
+
+msgid "ROLLBACK_REASON_LOCKED"
+msgstr "سند قفل است؛ ابتدا قفل را بردارید یا از مسیر صحیح ابطال کنید."
+
+msgid "ROLLBACK_REASON_WALLET_PROTECTED_FALLBACK"
+msgstr "به این سند تراکنش کیف پول از نوع سیستمی وابسته است؛ برای حفظ یکپارچگی مالی، حذف سال جاری مجاز نیست."
+
+msgid "ROLLBACK_REASON_CHECK_LINES"
+msgstr "این سند دارای سطرهای مرتبط با چک است؛ ابتدا وضعیت چک‌ها را اصلاح کنید."
+
+msgid "ROLLBACK_REASON_AI_INVOICE"
+msgstr "این سند به صورتحساب/پرداخت هوش مصنوعی وصل است؛ قبل از برگشت سال، وضعیت اشتراک AI را با پشتیبانی هماهنگ کنید."
+
+msgid "ROLLBACK_PLUGIN_PURCHASE_BLOCK"
+msgstr "در بازهٔ همین سال مالی، خرید موفق افزونه از کیف پول ثبت شده است. حذف سال مالی جاری ممکن است گزارش مالی و لایسنس‌ها را ناسازگار کند؛ لطفاً با پشتیبانی هماهنگ کنید."
+
+msgid "ROLLBACK_BLOCK_DOC_LINE"
+msgstr "سند {code} (نوع: {doc_type}) — {reason}"
+
+msgid "ROLLBACK_BLOCK_PREV_YEAR_LINE"
+msgstr "سال قبل — سند {kind} ({code}) — {reason}"
+
+msgid "ROLLBACK_DOC_KIND_YEAR_END_CLOSING"
+msgstr "اختتامیه"
+
+msgid "ROLLBACK_DOC_KIND_PERSON_BALANCE"
+msgstr "توازن اشخاص"
+
+msgid "ROLLBACK_WAREHOUSE_PURGE_FAILED"
+msgstr "حذف حواله‌ها و اسناد انبار مرتبط با این سال مالی انجام نشد. اتصال پایگاه داده یا قفل رکورد را بررسی کنید و دوباره تلاش کنید. جزئیات: {detail}"
+
+msgid "ROLLBACK_REPAIR_PURGE_FAILED"
+msgstr "حذف سفارش‌های تعمیرگاه این سال مالی کامل نشد. اگر سفارش به اسناد دیگر وصل است، ابتدا آن‌ها را اصلاح کنید. جزئیات: {detail}"
+
+msgid "ROLLBACK_DELETE_RECEIPT_PAYMENT_FAILED"
+msgstr "سند دریافت/پرداخت «{code}» حذف نشد (ممکن است نوع سند یا وابستگی ناشناخته باشد). با پشتیبانی تماس بگیرید."
+
+msgid "ROLLBACK_DELETE_EXPENSE_INCOME_FAILED"
+msgstr "سند هزینه/درآمد «{code}» حذف نشد. اتصال یا محدودیت پایگاه داده را بررسی کنید."
+
+msgid "ROLLBACK_DOCUMENTS_REMAINING"
+msgstr "پس از تلاش برای حذف، هنوز {count} سند در همین سال مالی باقی مانده است. احتمالاً نوع سندی خارج از پوشش فعلی است؛ با پشتیبانی تماس بگیرید و شناسه سال مالی را اعلام کنید."
+
+msgid "ROLLBACK_BLOCKED"
+msgstr "به‌خاطر موارد امنیتی یا وابستگی‌های سیستمی، الان نمی‌توان سال مالی جاری را حذف کرد. فهرست «دلایل مسدود بودن» در پیش‌نمایش را ببینید، آن‌ها را برطرف کنید و دوباره پیش‌نمایش بگیرید."
+
+msgid "ROLLBACK_STALE_TOKEN"
+msgstr "بین گرفتن پیش‌نمایش و تأیید، سال مالی جاری یا سال قبل عوض شده است. برای ادامه حتماً یک پیش‌نمایش تازه بگیرید و بلافاصله اجرا کنید."
+
+msgid "ROLLBACK_FAILED"
+msgstr "عملیات برگشت از سال مالی نیمه‌تمام ماند و هیچ تغییری ذخیره نشد. اتصال شبکه، بار سرور یا خطای پایگاه داده را بررسی کنید و دوباره تلاش کنید. جزئیات: {detail}"
+
+msgid "ROLLBACK_SUCCESS_MESSAGE"
+msgstr "سال مالی جاری حذف شد؛ سال قبل اکنون «جاری» است و می‌توانید در همان سال اسناد جدید ثبت یا ویرایش کنید (مطابق قوانین سال جاری)."
+
+msgid "ROLLBACK_ACTIVITY_LOG"
+msgstr "حذف سال مالی {removed} و بازگشت جاری به {current}"
+
+msgid "ROLLBACK_PREVIEW_FAILED"
+msgstr "نمایش پیش‌نمایش برگشت از سال مالی با خطا مواجه شد. اتصال را بررسی کنید و دوباره تلاش کنید. ({error})"
+
+msgid "ROLLBACK_EXECUTE_FAILED"
+msgstr "اجرای برگشت از سال مالی به‌طور غیرمنتظره ناموفق بود. در صورت تکرار، با پشتیبانی تماس بگیرید. ({error})"
+
+# FX revaluation (invoices & currency rates)
+msgid "FX_RATE_MISMATCH"
+msgstr "نرخ انتخاب‌شده با ارز سند سازگار نیست"
+
+msgid "FX_RATE_INVALID"
+msgstr "زمان مؤثر نرخ انتخاب‌شده بعد از لحظه مرجع تسعیر سند است"
+
+msgid "FX_REVALUATION_ERROR"
+msgstr "خطا در محاسبه تسعیر ارز"

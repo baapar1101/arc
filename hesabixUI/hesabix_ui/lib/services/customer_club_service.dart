@@ -139,4 +139,27 @@ class CustomerClubService {
     }
     return const {};
   }
+
+  /// شناسه اشخاص برای کمپین/خروجی (همان فیلتر سگمنت و جستجو).
+  Future<Map<String, dynamic>> listRfmPersonIds({
+    required int businessId,
+    String? segmentLabel,
+    String? q,
+    int limit = 5000,
+  }) async {
+    final query = <String, dynamic>{
+      'limit': '$limit',
+      if (segmentLabel != null && segmentLabel.trim().isNotEmpty) 'segment_label': segmentLabel.trim(),
+      if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/analytics/rfm/person-ids',
+      query: query,
+    );
+    final body = res.data;
+    if (body is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(body['data'] as Map? ?? const {});
+    }
+    return const {};
+  }
 }

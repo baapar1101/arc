@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
-import 'package:hesabix_ui/core/api_client.dart';
 import 'package:dio/dio.dart';
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/job_status_utils.dart';
 
 class BackupService {
   final ApiClient _apiClient;
@@ -102,6 +104,42 @@ class BackupService {
   Future<Map<String, dynamic>> getJobStatus(String jobId) async {
     final res = await _apiClient.get<Map<String, dynamic>>('/jobs/$jobId');
     return (res.data?['data'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+  }
+
+  /// منتظر اتمام job پشتیبان/بازیابی می‌ماند؛ در خطا [Exception] با پیام قابل نمایش.
+  Future<void> waitForJobUntilDone(
+    String jobId,
+    AppLocalizations l10n, {
+    void Function(int progress, String? message)? onProgress,
+    Duration pollInterval = const Duration(seconds: 1),
+    Duration timeout = const Duration(minutes: 45),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    var lastProgress = 0;
+    while (DateTime.now().isBefore(deadline)) {
+      final st = await getJobStatus(jobId);
+      lastProgress = JobStatusUtils.readProgress(st, lastProgress);
+      onProgress?.call(lastProgress, JobStatusUtils.readRawMessage(st));
+      final state = (st['state'] as String?) ?? '';
+      if (JobStatusUtils.isSuccessState(state)) {
+        return;
+      }
+      if (JobStatusUtils.isFailedState(state)) {
+        final errorData = st['error_data'];
+        if (errorData is Map) {
+          final code = errorData['error'] as String?;
+          if (code == 'STORAGE_LIMIT_EXCEEDED' || code == 'NO_ACTIVE_STORAGE_PLAN') {
+            final msg =
+                errorData['message'] as String? ?? l10n.backupJobStorageLimitFallback;
+            throw Exception(msg);
+          }
+        }
+        final err = JobStatusUtils.stringifyError(st['error'], l10n.backupFailed);
+        throw Exception(err);
+      }
+      await Future.delayed(pollInterval);
+    }
+    throw Exception(l10n.backupJobWaitTimeout);
   }
 }
 

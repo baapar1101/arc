@@ -10,6 +10,22 @@ SUPPORTED_LOCALES: tuple[str, ...] = ("fa", "en")
 DEFAULT_LOCALE: str = "en"
 
 
+def apply_format(template: str, **kwargs: Any) -> str:
+	"""
+	جایگزینی متغیرها در رشتهٔ ترجمه‌شده. ابتدا str.format؛ در خطا (مثلاً براکت اضافی در متن)
+	یا ناسازگاری placeholder، با replace برای هر کلید.
+	"""
+	if not kwargs:
+		return template
+	try:
+		return template.format(**kwargs)
+	except (KeyError, ValueError, IndexError):
+		out = template
+		for k, v in kwargs.items():
+			out = out.replace("{" + k + "}", str(v))
+		return out
+
+
 def negotiate_locale(accept_language: str | None) -> str:
 	if not accept_language:
 		return DEFAULT_LOCALE
@@ -42,6 +58,15 @@ class Translator:
 
 
 async def locale_dependency(request: Request) -> Translator:
+	lang = negotiate_locale(request.headers.get("Accept-Language"))
+	return Translator(lang)
+
+
+def get_request_translator(request: Request) -> Translator:
+	"""همان مترجمی که میدلور و get_current_user روی request.state گذاشته‌اند (با fallback منطقی)."""
+	t = getattr(request.state, "translator", None)
+	if t is not None:
+		return t
 	lang = negotiate_locale(request.headers.get("Accept-Language"))
 	return Translator(lang)
 

@@ -8,10 +8,15 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
+from app.core.i18n import apply_format, get_request_translator
 from app.core.cache import get_cache
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
 from adapters.db.models.fiscal_year import FiscalYear
 from app.services.year_end_closing_service import preview_year_end_closing, close_fiscal_year
+from app.services.fiscal_year_rollback_service import (
+    preview_current_fiscal_year_rollback,
+    execute_current_fiscal_year_rollback,
+)
 
 
 router = APIRouter(prefix="/business", tags=["سال مالی", "حسابداری"])
@@ -214,6 +219,76 @@ async def close_fiscal_year_endpoint(
         raise e
     except Exception as e:
         raise ApiError("CLOSING_FAILED", f"خطا در بستن سال مالی: {str(e)}", http_status=500)
+
+
+class FiscalYearRollbackExecuteRequest(BaseModel):
+    confirmation_token: str = Field(..., min_length=10, description="توکن بازگشتی از پیش‌نمایش")
+
+
+@router.get("/{business_id}/fiscal-years/current/rollback/preview")
+@require_business_access("business_id")
+def preview_fiscal_year_rollback(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "rollback")),
+) -> Dict[str, Any]:
+    """پیش‌نمایش حذف سال مالی جاری و بازگشت به سال قبل"""
+    translator = get_request_translator(request)
+    try:
+        data = preview_current_fiscal_year_rollback(db, business_id, ctx.get_user_id(), translator)
+        return success_response(
+            data=format_datetime_fields(data, request),
+            request=request,
+            message="FISCAL_YEAR_ROLLBACK_PREVIEW",
+        )
+    except ApiError:
+        raise
+    except Exception as e:
+        template = translator.t(
+            "ROLLBACK_PREVIEW_FAILED",
+            default="Fiscal rollback preview failed. Check connectivity and try again. ({error})",
+        )
+        msg = apply_format(template, error=str(e))
+        raise ApiError("ROLLBACK_PREVIEW_FAILED", msg, http_status=500)
+
+
+@router.post("/{business_id}/fiscal-years/current/rollback/execute")
+@require_business_access("business_id")
+def execute_fiscal_year_rollback(
+    request: Request,
+    business_id: int,
+    body: FiscalYearRollbackExecuteRequest = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "rollback")),
+) -> Dict[str, Any]:
+    """اجرای حذف سال مالی جاری و بازگشت به سال قبل"""
+    translator = get_request_translator(request)
+    try:
+        data = execute_current_fiscal_year_rollback(
+            db,
+            business_id,
+            ctx.get_user_id(),
+            body.confirmation_token,
+            translator,
+            request=request,
+        )
+        return success_response(
+            data=format_datetime_fields(data, request),
+            request=request,
+            message="FISCAL_YEAR_ROLLBACK_DONE",
+        )
+    except ApiError:
+        raise
+    except Exception as e:
+        template = translator.t(
+            "ROLLBACK_EXECUTE_FAILED",
+            default="Fiscal rollback failed unexpectedly. If it persists, contact support. ({error})",
+        )
+        msg = apply_format(template, error=str(e))
+        raise ApiError("ROLLBACK_EXECUTE_FAILED", msg, http_status=500)
 
 
 class FiscalYearUpdateRequest(BaseModel):

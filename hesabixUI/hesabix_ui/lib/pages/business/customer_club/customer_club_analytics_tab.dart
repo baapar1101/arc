@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/auth_store.dart';
@@ -27,6 +28,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
   bool _loadingBoot = true;
   bool _loadingPersons = false;
   bool _recalculating = false;
+  bool _exportingCampaign = false;
 
   Map<String, dynamic>? _summary;
   List<Map<String, dynamic>> _rows = [];
@@ -124,6 +126,76 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
       if (mounted) SnackBarHelper.showError(context, message: '$e');
     } finally {
       if (mounted) setState(() => _loadingPersons = false);
+    }
+  }
+
+  Future<void> _onCampaignExport() async {
+    if (_analysisDisabled || _exportingCampaign) return;
+    setState(() => _exportingCampaign = true);
+    final t = AppLocalizations.of(context);
+    try {
+      final data = await _svc.listRfmPersonIds(
+        businessId: widget.businessId,
+        segmentLabel: _segmentFilter,
+        q: _searchCtl.text.trim().isEmpty ? null : _searchCtl.text.trim(),
+        limit: 8000,
+      );
+      if (!mounted) return;
+      final rawIds = data['person_ids'];
+      final ids = <int>[];
+      if (rawIds is List) {
+        for (final e in rawIds) {
+          final i = int.tryParse('$e');
+          if (i != null) ids.add(i);
+        }
+      }
+      final truncated = data['truncated'] == true;
+      final total = int.tryParse('${data['total'] ?? 0}') ?? 0;
+      final csv = ids.join(',');
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.customerClubAnalyticsCampaignTitle),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(t.customerClubAnalyticsCampaignBody),
+                if (truncated) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    t.customerClubAnalyticsCampaignTruncated(ids.length),
+                    style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text('${t.customerClubAnalyticsTotalPersons}: $total · ${t.customerClubAnalyticsFilterSegment}: ${_segmentFilter ?? t.customerClubAnalyticsAllSegments}'),
+                const SizedBox(height: 12),
+                SelectableText(csv.isEmpty ? '—' : csv, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+            TextButton(
+              onPressed: csv.isEmpty
+                  ? null
+                  : () async {
+                      await Clipboard.setData(ClipboardData(text: csv));
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) SnackBarHelper.showSuccess(context, message: t.copied);
+                    },
+              child: Text(t.customerClubAnalyticsCampaignCopyIds),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: '$e');
+    } finally {
+      if (mounted) setState(() => _exportingCampaign = false);
     }
   }
 
@@ -260,6 +332,13 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
                                 value: '${_summary?['computed_at'] ?? '—'}'.split('.').first,
                                 theme: theme,
                               ),
+                              if ((_summary?['loyalty_rfm_integration_mode'] ?? 'decoupled').toString() == 'rfm_based_tiers')
+                                _StatChip(
+                                  icon: Icons.stacked_line_chart,
+                                  label: t.customerClubLoyaltyRfmMode,
+                                  value: t.customerClubLoyaltyRfmTiers,
+                                  theme: theme,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -331,42 +410,43 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
                   const SizedBox(height: 12),
                   Align(
                     alignment: AlignmentDirectional.centerStart,
-                    child: Text(t.customerClubAnalyticsFilterSegment, style: theme.textTheme.labelLarge),
+                    child: Text(t.customerClubAnalyticsSegmentsTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   ),
                   const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(end: 8),
-                          child: FilterChip(
-                            label: Text(t.customerClubAnalyticsAllSegments),
-                            selected: _segmentFilter == null,
-                            onSelected: (_) {
-                              setState(() => _segmentFilter = null);
-                              _loadPersons(reset: true);
-                            },
-                          ),
-                        ),
-                        ..._segmentChipsData().map((seg) {
-                          final lab = seg['label']?.toString() ?? '';
-                          final cnt = seg['count'];
-                          final sel = _segmentFilter == lab;
-                          return Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 8),
-                            child: FilterChip(
-                              label: Text(lab.isEmpty ? '($cnt)' : '$lab ($cnt)'),
-                              selected: sel,
-                              onSelected: (_) {
-                                setState(() => _segmentFilter = lab.isEmpty ? null : lab);
-                                _loadPersons(reset: true);
-                              },
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _SegmentSummaryCard(
+                        theme: theme,
+                        title: t.customerClubAnalyticsAllSegments,
+                        countStr: '${_summary?['total_persons'] ?? _totalPersons}',
+                        subtitle: t.customerClubAnalyticsTotalPersons,
+                        selected: _segmentFilter == null,
+                        tint: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                        onTap: () {
+                          setState(() => _segmentFilter = null);
+                          _loadPersons(reset: true);
+                        },
+                      ),
+                      ..._segmentChipsData().map((seg) {
+                        final lab = seg['label']?.toString() ?? '';
+                        final cnt = seg['count'];
+                        final sel = _segmentFilter == lab;
+                        return _SegmentSummaryCard(
+                          theme: theme,
+                          title: lab.isEmpty ? '—' : lab,
+                          countStr: '$cnt',
+                          subtitle: t.customerClubAnalyticsSegment,
+                          selected: sel,
+                          tint: _segmentTint(lab, theme),
+                          onTap: () {
+                            setState(() => _segmentFilter = lab.isEmpty ? null : lab);
+                            _loadPersons(reset: true);
+                          },
+                        );
+                      }),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -375,6 +455,18 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
                         onPressed: _loadingPersons ? null : () => _loadPersons(reset: true),
                         icon: const Icon(Icons.refresh),
                         label: Text(t.customerClubAnalyticsRefresh),
+                      ),
+                      const Spacer(),
+                      FilledButton.tonalIcon(
+                        onPressed: _exportingCampaign ? null : _onCampaignExport,
+                        icon: _exportingCampaign
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.campaign_outlined, size: 20),
+                        label: Text(t.customerClubAnalyticsCampaignExport),
                       ),
                     ],
                   ),
@@ -451,6 +543,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
                                 _kv(theme, t.customerClubAnalyticsMonetary, _fmt(r['monetary_total'])),
                                 _kv(theme, t.customerClubAnalyticsCLV, _fmt(r['clv_estimate'])),
                                 _kv(theme, t.customerClubCompositeScore, _fmt(r['composite_score'])),
+                                _kv(theme, t.customerClubAnalyticsRfmNormalized, _fmt(r['rfm_normalized_score'])),
                                 _kv(theme, t.customerClubAnalyticsLoyaltyBalance, _fmt(r['loyalty_balance_points'])),
                                 _kv(theme, t.customerClubPerson, '${r['person_id'] ?? ''}'),
                               ],
@@ -486,6 +579,78 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
           ),
           Expanded(child: Text(v, style: theme.textTheme.bodyMedium)),
         ],
+      ),
+    );
+  }
+
+  Color _segmentTint(String label, ThemeData theme) {
+    if (label.isEmpty) {
+      return theme.colorScheme.secondaryContainer.withValues(alpha: 0.35);
+    }
+    final h = label.hashCode & 0x00ffffff;
+    return Color(0xff000000 | h).withValues(alpha: 0.16);
+  }
+}
+
+class _SegmentSummaryCard extends StatelessWidget {
+  final ThemeData theme;
+  final String title;
+  final String countStr;
+  final String subtitle;
+  final bool selected;
+  final Color tint;
+  final VoidCallback onTap;
+
+  const _SegmentSummaryCard({
+    required this.theme,
+    required this.title,
+    required this.countStr,
+    required this.subtitle,
+    required this.selected,
+    required this.tint,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: tint,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 168,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+              width: selected ? 2.2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                countStr,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                ),
+              ),
+              Text(subtitle, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+            ],
+          ),
+        ),
       ),
     );
   }

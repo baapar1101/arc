@@ -148,7 +148,7 @@ def get_document(db: Session, document_id: int) -> Optional[Dict[str, Any]]:
     return repo.get_document_details(document_id)
 
 
-def delete_document(db: Session, document_id: int) -> bool:
+def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bool:
     """
     حذف یک سند حسابداری
     
@@ -205,7 +205,7 @@ def delete_document(db: Session, document_id: int) -> bool:
     document_type = document.document_type
     
     # حذف سند
-    success = repo.delete_document(document_id)
+    success = repo.delete_document(document_id, commit=commit)
     if not success:
         raise ApiError(
             "DELETE_FAILED",
@@ -214,12 +214,13 @@ def delete_document(db: Session, document_id: int) -> bool:
         )
     
     # Invalidate cache بعد از حذف موفق سند
-    invalidate_documents_cache(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year_id,
-        document_id=document_id,
-        document_type=document_type
-    )
+    if commit:
+        invalidate_documents_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document_id,
+            document_type=document_type
+        )
     
     return True
 

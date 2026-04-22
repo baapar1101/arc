@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../services/distribution_service.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/jalali_date_picker.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 /// افزونه پخش مویرگی — داشبورد، برنامه روز، مسیرها، ویزیت، مرجوعی.
 class DistributionMainPage extends StatefulWidget {
@@ -653,7 +654,10 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     final t = AppLocalizations.of(context);
     if (!_canView) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.distributionMenu)),
+        appBar: AppBar(
+          title: Text(t.distributionMenu),
+          leading: businessSubpageBackLeading(context, widget.businessId),
+        ),
         body: Center(child: Text(t.accessDenied)),
       );
     }
@@ -661,6 +665,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(t.distributionMenu),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           IconButton(
             tooltip: t.distributionRefresh,

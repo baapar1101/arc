@@ -1453,7 +1453,7 @@ def list_receipts_payments(
     }
 
 
-def delete_receipt_payment(db: Session, document_id: int) -> bool:
+def delete_receipt_payment(db: Session, document_id: int, *, commit: bool = True) -> bool:
     """حذف سند دریافت/پرداخت"""
     document = db.query(Document).filter(Document.id == document_id).first()
     
@@ -1578,17 +1578,20 @@ def delete_receipt_payment(db: Session, document_id: int) -> bool:
     document_type = document.document_type
     
     db.delete(document)
-    db.commit()
-    
-    # Invalidate cache بعد از حذف موفق سند دریافت/پرداخت
-    from app.services.document_service import invalidate_documents_cache
-    invalidate_documents_cache(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year_id,
-        document_id=document_id,
-        document_type=document_type
-    )
-    
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+    if commit:
+        from app.services.document_service import invalidate_documents_cache
+        invalidate_documents_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document_id,
+            document_type=document_type
+        )
+
     return True
 
 

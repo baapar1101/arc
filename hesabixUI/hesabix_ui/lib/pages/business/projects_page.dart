@@ -10,6 +10,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// صفحه لیست پروژه‌ها
 class ProjectsPage extends StatefulWidget {
@@ -66,6 +67,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('مدیریت پروژه‌ها'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (!isMobile)
             Padding(

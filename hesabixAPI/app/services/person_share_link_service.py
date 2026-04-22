@@ -396,8 +396,9 @@ def _fetch_ledger_items(
     limit: int,
 ) -> list[Dict[str, Any]]:
     rows = (
-        db.query(DocumentLine, Document)
+        db.query(DocumentLine, Document, Currency)
         .join(Document, Document.id == DocumentLine.document_id)
+        .join(Currency, Currency.id == Document.currency_id)
         .filter(
             Document.business_id == business_id,
             DocumentLine.person_id == person_id,
@@ -412,7 +413,7 @@ def _fetch_ledger_items(
         .all()
     )
     items: list[Dict[str, Any]] = []
-    for line, doc in rows:
+    for line, doc, cur in rows:
         items.append(
             {
                 "line_id": line.id,
@@ -424,6 +425,7 @@ def _fetch_ledger_items(
                 "description": line.description,
                 "debit": float(line.debit or 0),
                 "credit": float(line.credit or 0),
+                "currency_code": getattr(cur, "code", None),
                 "extra_info": line.extra_info or {},
             }
         )

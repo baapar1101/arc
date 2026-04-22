@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -451,10 +452,10 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           final openingBalanceNote = result['opening_balance_note']?.toString() ?? '';
           final openingBalanceCreated = result['opening_balance_created'] as bool? ?? false;
           
-          await showDialog(
+          final leave = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
-            builder: (context) => AlertDialog(
+            builder: (dialogContext) => AlertDialog(
               title: Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 28),
@@ -544,14 +545,14 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(dialogContext).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.lightbulb_outline, 
-                            color: Theme.of(context).colorScheme.primary, 
+                            color: Theme.of(dialogContext).colorScheme.primary, 
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -569,19 +570,16 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
               ),
               actions: [
                 FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    // بازگشت به صفحه قبل
-                    if (mounted) {
-                      Navigator.of(context).pop(true);
-                    }
-                  },
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('بازگشت'),
                 ),
               ],
             ),
           );
+          if (leave == true && mounted) {
+            context.pop(true);
+          }
         }
       }
     } catch (e) {

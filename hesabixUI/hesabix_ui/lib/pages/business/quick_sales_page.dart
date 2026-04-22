@@ -17,6 +17,10 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
+import '../../utils/invoice_global_discount_calculator.dart';
+import '../../l10n/app_localizations.dart';
+import '../../services/business_api_service.dart';
+import '../../services/currency_service.dart';
 import '../../models/invoice_line_item.dart';
 import '../../models/invoice_transaction.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
@@ -80,6 +84,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   // تنظیمات
   int? _defaultWarehouseId;
   int? _defaultCurrencyId;
+  List<Map<String, dynamic>>? _businessCurrenciesCache;
+  int _invoiceCurrencyDecimalPlaces = 2;
+  bool _invoiceCurrencyRoundMonetary = true;
   int? _defaultPriceListId;
   bool _autoPrint = false;
   bool _enableWarehouseDocument = true;
@@ -91,6 +98,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   // تاریخ و شرح سند فاکتور
   DateTime _documentDate = DateTime.now();
   final TextEditingController _documentDescriptionController = TextEditingController();
+
+  InvoiceGlobalDiscountPolicy _globalDiscountPolicy = const InvoiceGlobalDiscountPolicy();
+  String _globalDiscountType = 'percent';
+  late final TextEditingController _globalDiscountValueController;
 
   // جستجوی محصول
   final TextEditingController _barcodeController = TextEditingController();
@@ -107,6 +118,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   @override
   void initState() {
     super.initState();
+    _globalDiscountValueController = TextEditingController();
+    _globalDiscountValueController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadSettings();
     _loadRecentProducts();
     _loadCategories();
@@ -214,9 +229,29 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     _searchDebounce?.cancel();
     _barcodeController.dispose();
     _documentDescriptionController.dispose();
+    _globalDiscountValueController.dispose();
     _barcodeFocus.dispose();
     _keyboardListenerFocus.dispose();
     super.dispose();
+  }
+
+  void _applyCurrencyMetaFromCache() {
+    final id = _defaultCurrencyId;
+    var dp = 2;
+    var rm = true;
+    final cache = _businessCurrenciesCache;
+    if (id != null && cache != null) {
+      for (final raw in cache) {
+        final c = Map<String, dynamic>.from(raw as Map);
+        if ((c['id'] as num?)?.toInt() == id) {
+          dp = (c['decimal_places'] as num?)?.toInt() ?? 2;
+          rm = c['round_monetary_amounts'] != false;
+          break;
+        }
+      }
+    }
+    _invoiceCurrencyDecimalPlaces = dp;
+    _invoiceCurrencyRoundMonetary = rm;
   }
 
   Future<void> _loadSettings() async {
@@ -253,6 +288,26 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       if (_showInventory && !previousShowInventory && _cartItems.isNotEmpty) {
         _refreshAllStocks();
       }
+
+      try {
+        final b = await BusinessApiService.getBusiness(widget.businessId);
+        if (mounted) {
+          setState(() {
+            _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(b);
+          });
+        }
+      } catch (_) {}
+
+      try {
+        final cs = CurrencyService(ApiClient());
+        final curList = await cs.listBusinessCurrencies(businessId: widget.businessId);
+        if (mounted) {
+          setState(() {
+            _businessCurrenciesCache = curList;
+            _applyCurrencyMetaFromCache();
+          });
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(context, message: 'خطا در بارگذاری تنظیمات: $e', isError: true);
@@ -888,6 +943,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _cartItems.clear();
         _productStocks.clear();
         _payment = null;
+        _globalDiscountValueController.clear();
       });
       _barcodeFocus.requestFocus();
       SnackBarHelper.show(context, message: 'سبد خرید پاک شد');
@@ -905,20 +961,47 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     }
   }
 
+  num get _lineDiscountOnly =>
+      _cartItems.fold<num>(0, (sum, item) => sum + item.discountAmount);
+
+  num? get _parsedGlobalDiscountValue {
+    final raw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+    if (raw.isEmpty) return null;
+    return num.tryParse(raw);
+  }
+
+  InvoiceGlobalDiscountTotals? get _totalsWithGlobal {
+    final gv = _parsedGlobalDiscountValue;
+    if (_cartItems.isEmpty || gv == null || gv <= 0) return null;
+    return computeInvoiceTotalsWithGlobalDiscount(
+      lines: _cartItems,
+      globalType: _globalDiscountType,
+      globalValue: gv,
+      policy: _globalDiscountPolicy,
+      decimalPlaces: _invoiceCurrencyDecimalPlaces,
+      roundMonetaryAmounts: _invoiceCurrencyRoundMonetary,
+    );
+  }
+
   num get _subtotalAmount {
-    return _cartItems.fold<num>(0, (sum, item) => sum + item.subtotal);
+    return _totalsWithGlobal?.sumSubtotal ??
+        _cartItems.fold<num>(0, (sum, item) => sum + item.subtotal);
   }
 
   num get _totalDiscount {
-    return _cartItems.fold<num>(0, (sum, item) => sum + item.discountAmount);
+    final g = _totalsWithGlobal;
+    if (g != null) return g.sumLineDiscount + g.globalDiscountAmount;
+    return _lineDiscountOnly;
   }
 
   num get _totalTax {
-    return _cartItems.fold<num>(0, (sum, item) => sum + item.taxAmount);
+    return _totalsWithGlobal?.sumTax ??
+        _cartItems.fold<num>(0, (sum, item) => sum + item.taxAmount);
   }
 
   num get _totalAmount {
-    return _cartItems.fold<num>(0, (sum, item) => sum + item.total);
+    return _totalsWithGlobal?.sumTotal ??
+        _cartItems.fold<num>(0, (sum, item) => sum + item.total);
   }
 
   Future<void> _saveInvoice({bool print = false}) async {
@@ -958,6 +1041,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         isError: true,
       );
       return;
+    }
+
+    final t = AppLocalizations.of(context);
+    final gv0 = _parsedGlobalDiscountValue;
+    if (gv0 != null && gv0 > 0) {
+      if (_globalDiscountType == 'percent' && (gv0 < 0 || gv0 > 100)) {
+        SnackBarHelper.show(context, message: t.invoiceGlobalDiscountPercentInvalid, isError: true);
+        return;
+      }
+      if (_globalDiscountType == 'amount' && gv0 < 0) {
+        SnackBarHelper.show(context, message: t.invoiceGlobalDiscountAmountInvalid, isError: true);
+        return;
+      }
     }
     
     setState(() {
@@ -1042,7 +1138,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
         'auto_post_warehouse': _enableWarehouseDocument && _warehouseDocumentType == 'posted', // آیا حواله قطعی شود؟
         'auto_create_payment_document': autoCreatePaymentDoc,
+        'totals': {
+          'gross': _subtotalAmount,
+          'discount': _totalDiscount,
+          'tax': _totalTax,
+          'net': _totalAmount,
+        },
       };
+
+      final gvSave = _parsedGlobalDiscountValue;
+      if (gvSave != null && gvSave > 0) {
+        extraInfo['global_discount'] = {
+          'type': _globalDiscountType,
+          'value': gvSave.toDouble(),
+        };
+      }
       
       if (_defaultWarehouseId != null) {
         extraInfo['warehouse_id'] = _defaultWarehouseId;
@@ -1091,6 +1201,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _productStocks.clear();
         _documentDate = DateTime.now();
         _documentDescriptionController.clear();
+        _globalDiscountValueController.clear();
       });
       
       _barcodeFocus.requestFocus();
@@ -1174,6 +1285,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       context: context,
       builder: (context) => _CartItemEditDialog(
         item: item,
+        currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
       ),
     );
     
@@ -2111,7 +2223,68 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     );
   }
 
+  Widget _buildGlobalDiscountSection(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    final g = _totalsWithGlobal;
+    final lineDisc = _lineDiscountOnly;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: [
+                ButtonSegment<String>(
+                  value: 'percent',
+                  label: Text(t.invoiceGlobalDiscountTypePercent),
+                ),
+                ButtonSegment<String>(
+                  value: 'amount',
+                  label: Text(t.invoiceGlobalDiscountTypeAmount),
+                ),
+              ],
+              selected: {_globalDiscountType},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _globalDiscountType = s.first;
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _globalDiscountValueController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: t.invoiceGlobalDiscountValueLabel,
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              t.invoiceGlobalDiscountLineDiscountHint(_formatNumber(lineDisc)),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            if (g != null && g.globalDiscountAmount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  t.invoiceGlobalDiscountAmountComputedHint(_formatNumber(g.globalDiscountAmount)),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInvoiceSummarySection(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -2126,12 +2299,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
             ),
           ),
           const SizedBox(height: 16),
+          if (_cartItems.isNotEmpty) _buildGlobalDiscountSection(cs),
           _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
-          _buildSummaryRow('جمع کل', _formatNumber(_subtotalAmount)),
-          if (_totalDiscount > 0) _buildSummaryRow('تخفیف', '-${_formatNumber(_totalDiscount)}'),
-          if (_totalTax > 0) _buildSummaryRow('مالیات', _formatNumber(_totalTax)),
+          _buildSummaryRow(t.invoiceSummarySubtotal, _formatNumber(_subtotalAmount)),
+          if (_totalDiscount > 0) _buildSummaryRow(t.invoiceSummaryDiscount, '-${_formatNumber(_totalDiscount)}'),
+          if (_totalTax > 0) _buildSummaryRow(t.invoiceSummaryTax, _formatNumber(_totalTax)),
           const Divider(),
-          _buildSummaryRow('مبلغ نهایی', _formatNumber(_totalAmount), isTotal: true),
+          _buildSummaryRow(t.invoiceSummaryTotal, _formatNumber(_totalAmount), isTotal: true),
           if (_payment != null && _payment!.amount < _totalAmount) ...[
             const SizedBox(height: 8),
             _buildSummaryRow('مبلغ پرداخت شده', _formatNumber(_payment!.amount), isWarning: true),
@@ -2412,19 +2586,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   }
 
   String _formatNumber(num value) {
-    return value.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+    return formatWithThousands(value, decimalPlaces: _invoiceCurrencyDecimalPlaces);
   }
 }
 
 /// Dialog برای ویرایش اقلام سبد خرید
 class _CartItemEditDialog extends StatefulWidget {
   final InvoiceLineItem item;
+  final int currencyDecimalPlaces;
 
   const _CartItemEditDialog({
     required this.item,
+    required this.currencyDecimalPlaces,
   });
 
   @override
@@ -2703,14 +2876,14 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                           const SizedBox(height: 16),
                           _buildSummaryRow(
                             'جمع کل',
-                            formatWithThousands(updatedItem.subtotal),
+                            formatWithThousands(updatedItem.subtotal, decimalPlaces: widget.currencyDecimalPlaces),
                             icon: Icons.summarize,
                           ),
                           if (updatedItem.discountValue > 0) ...[
                             const SizedBox(height: 8),
                             _buildSummaryRow(
                               'تخفیف',
-                              '-${formatWithThousands(updatedItem.discountAmount)}',
+                              '-${formatWithThousands(updatedItem.discountAmount, decimalPlaces: widget.currencyDecimalPlaces)}',
                               icon: Icons.discount,
                               isDiscount: true,
                             ),
@@ -2719,14 +2892,14 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                             const SizedBox(height: 8),
                             _buildSummaryRow(
                               'مالیات',
-                              formatWithThousands(updatedItem.taxAmount),
+                              formatWithThousands(updatedItem.taxAmount, decimalPlaces: widget.currencyDecimalPlaces),
                               icon: Icons.receipt,
                             ),
                           ],
                           const Divider(height: 24),
                           _buildSummaryRow(
                             'مبلغ نهایی',
-                            formatWithThousands(updatedItem.total),
+                            formatWithThousands(updatedItem.total, decimalPlaces: widget.currencyDecimalPlaces),
                             icon: Icons.payments,
                             isTotal: true,
                           ),

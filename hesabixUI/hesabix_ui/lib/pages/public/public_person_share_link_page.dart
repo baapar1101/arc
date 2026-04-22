@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -28,6 +30,39 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
       HesabixDateUtils.formatForDisplay(date, _useJalaliCalendar);
 
   NumberFormat _numberFormat() => NumberFormat('#,##0', 'fa_IR');
+
+  String _formatCurrencySuffix(String? code) {
+    final t = code?.trim();
+    if (t == null || t.isEmpty) return '';
+    return ' $t';
+  }
+
+  /// فقط طرف غیرصفر بدهکار/بستانکار + ارز سند
+  String _ledgerNetSideLine(PublicLedgerItem item, NumberFormat formatter) {
+    final d = item.debit ?? 0.0;
+    final c = item.credit ?? 0.0;
+    final cur = _formatCurrencySuffix(item.currencyCode);
+    if (d > 0 && c <= 0) {
+      return 'بدهکار: ${formatter.format(d)}$cur';
+    }
+    if (c > 0 && d <= 0) {
+      return 'بستانکار: ${formatter.format(c)}$cur';
+    }
+    if (d > 0 && c > 0) {
+      final net = d - c;
+      if (net > 0) {
+        return 'بدهکار: ${formatter.format(net)}$cur';
+      }
+      if (net < 0) {
+        return 'بستانکار: ${formatter.format(-net)}$cur';
+      }
+      return 'بالانس$cur';
+    }
+    if (d == 0 && c == 0) {
+      return '—$cur';
+    }
+    return '—$cur';
+  }
 
   @override
   void initState() {
@@ -372,13 +407,14 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                           ),
                       ],
                     ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('بدهکار: ${formatter.format(item.debit ?? 0)}', style: theme.textTheme.bodySmall),
-                        Text('بستانکار: ${formatter.format(item.credit ?? 0)}', style: theme.textTheme.bodySmall),
-                      ],
+                    trailing: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        _ledgerNetSideLine(item, formatter),
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.bodySmall,
+                        softWrap: true,
+                      ),
                     ),
                   );
                 },
@@ -409,7 +445,8 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemBuilder: (context, index) {
                   final item = items[index];
-                  final amount = formatter.format(item.amount ?? 0);
+                  final amount =
+                      '${formatter.format(item.amount ?? 0)}${_formatCurrencySuffix(item.currencyCode)}';
                   final subtitleParts = <String>[];
                   final docType = item.documentTypeName?.trim();
                   if (docType != null && docType.isNotEmpty) {
@@ -540,240 +577,110 @@ class _InvoiceDetailsDialog extends StatelessWidget {
     required this.useJalali,
   });
 
+  static const double _compactBreakpointWidth = 600;
+
+  String get _currencyLabel {
+    final c = details.currencyCode?.trim();
+    if (c == null || c.isEmpty) return '';
+    return c;
+  }
+
+  String _amountWithCurrency(NumberFormat formatter, double value, {bool negativePrefix = false}) {
+    final core = formatter.format(value);
+    final withCur = _currencyLabel.isEmpty ? core : '$core ${_currencyLabel}';
+    if (negativePrefix) return '- $withCur';
+    return withCur;
+  }
+
+  String _optionalAmountWithCurrency(NumberFormat formatter, double? value) {
+    if (value == null) return '-';
+    return _amountWithCurrency(formatter, value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat('#,##0', 'fa_IR');
+    final size = MediaQuery.sizeOf(context);
+    final isCompact = size.width < _compactBreakpointWidth;
+
+    final scrollBody = SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: _buildDetailSections(context, formatter),
+      ),
+    );
+
+    if (isCompact) {
+      // useSafeArea پیش‌فرض true است؛ بدون SafeArea اضافه تا پدینگ دوبل نشود
+      return Dialog.fullscreen(
+        child: Material(
+          color: theme.colorScheme.surface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context, roundedTop: false),
+              Expanded(child: scrollBody),
+              _buildFooter(context),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: theme.colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 880,
+            maxHeight: math.min(720, size.height * 0.9),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context, roundedTop: true),
+              Expanded(child: scrollBody),
+              _buildFooter(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, {required bool roundedTop}) {
+    return Material(
+      color: theme.colorScheme.primaryContainer,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, roundedTop ? 16 : 12, 8, 16),
+        child: Row(
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'جزئیات فاکتور',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (details.code != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'شماره فاکتور: ${details.code}',
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
-                      ],
+                  Text(
+                    'جزئیات فاکتور',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // اطلاعات کلی
-                    _buildInfoSection(
-                      theme,
-                      'اطلاعات کلی',
-                      [
-                        _buildInfoRow('نوع فاکتور', details.documentType ?? '-'),
-                        _buildInfoRow('تاریخ فاکتور', details.formattedDate(jalali: useJalali)),
-                        if ((details.currencyCode ?? '').isNotEmpty)
-                          _buildInfoRow('ارز', details.currencyCode!),
-                        if (details.description != null)
-                          _buildInfoRow('توضیحات', details.description!),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // کالاها
-                    if (details.productLines.isNotEmpty) ...[
-                      _buildInfoSection(
-                        theme,
-                        'کالاها',
-                        [
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Table(
-                              columnWidths: const {
-                                0: FlexColumnWidth(2.2),
-                                1: FlexColumnWidth(1),
-                                2: FlexColumnWidth(1),
-                                3: FlexColumnWidth(1),
-                                4: FlexColumnWidth(1),
-                                5: FlexColumnWidth(1.2),
-                              },
-                              children: [
-                                TableRow(
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest,
-                                  ),
-                                  children: [
-                                    _buildTableCell(theme, 'نام کالا', isHeader: true),
-                                    _buildTableCell(theme, 'تعداد', isHeader: true),
-                                    _buildTableCell(theme, 'فی', isHeader: true),
-                                    _buildTableCell(theme, 'تخفیف', isHeader: true),
-                                    _buildTableCell(theme, 'مالیات', isHeader: true),
-                                    _buildTableCell(theme, 'جمع ردیف', isHeader: true),
-                                  ],
-                                ),
-                                ...details.productLines.map((line) {
-                                  String money(double? v) =>
-                                      v != null ? formatter.format(v) : '-';
-                                  final lineTotal = line.lineTotal ??
-                                      ((line.quantity != null && line.unitPrice != null)
-                                          ? (line.quantity! * line.unitPrice!) -
-                                              (line.lineDiscount ?? 0) +
-                                              (line.taxAmount ?? 0)
-                                          : null);
-                                  return TableRow(
-                                    children: [
-                                      _buildTableCell(theme, line.productName ?? '-'),
-                                      _buildTableCell(
-                                        theme,
-                                        line.quantity != null ? formatter.format(line.quantity) : '-',
-                                      ),
-                                      _buildTableCell(theme, money(line.unitPrice)),
-                                      _buildTableCell(theme, money(line.lineDiscount)),
-                                      _buildTableCell(theme, money(line.taxAmount)),
-                                      _buildTableCell(theme, money(lineTotal)),
-                                    ],
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                          if (details.productLines.any((l) => l.unitPrice == null && l.lineTotal == null))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                'برای برخی ردیف‌ها جزئیات قیمت در سند ذخیره نشده است.',
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (details.accountLines.isNotEmpty) ...[
-                      _buildInfoSection(
-                        theme,
-                        'سطرهای حساب (خلاصه)',
-                        [
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Table(
-                              columnWidths: const {
-                                0: FlexColumnWidth(2.5),
-                                1: FlexColumnWidth(1.2),
-                                2: FlexColumnWidth(1.2),
-                              },
-                              children: [
-                                TableRow(
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest,
-                                  ),
-                                  children: [
-                                    _buildTableCell(theme, 'حساب', isHeader: true),
-                                    _buildTableCell(theme, 'بدهکار', isHeader: true),
-                                    _buildTableCell(theme, 'بستانکار', isHeader: true),
-                                  ],
-                                ),
-                                ...details.accountLines.map(
-                                  (line) => TableRow(
-                                    children: [
-                                      _buildTableCell(
-                                        theme,
-                                        [
-                                          line.accountName ?? '-',
-                                          if ((line.accountCode ?? '').isNotEmpty) ' (${line.accountCode})',
-                                        ].join(),
-                                      ),
-                                      _buildTableCell(theme, formatter.format(line.debit)),
-                                      _buildTableCell(theme, formatter.format(line.credit)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    // خلاصه مالی
-                    _buildInfoSection(
-                      theme,
-                      'خلاصه مالی',
-                      [
-                        _buildInfoRow('جمع قبل از تخفیف', formatter.format(details.subtotal)),
-                        if (details.discountAmount > 0)
-                          _buildInfoRow(
-                            'تخفیف',
-                            '- ${formatter.format(details.discountAmount)}',
-                            color: theme.colorScheme.error,
-                          ),
-                        if (details.taxAmount > 0)
-                          _buildInfoRow(
-                            'مالیات',
-                            formatter.format(details.taxAmount),
-                            color: theme.colorScheme.primary,
-                          ),
-                        const Divider(),
-                        _buildInfoRow(
-                          'جمع کل نهایی',
-                          formatter.format(details.total),
-                          isBold: true,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ],
+                  if (details.code != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'شماره فاکتور: ${details.code}',
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
-                ),
-              ),
-            ),
-            // Footer
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('بستن'),
-                  ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         ),
@@ -781,12 +688,222 @@ class _InvoiceDetailsDialog extends StatelessWidget {
     );
   }
 
+  Widget _buildFooter(BuildContext context) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('بستن'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDetailSections(BuildContext context, NumberFormat formatter) {
+    return [
+      _buildInfoSection(
+        theme,
+        'اطلاعات کلی',
+        [
+          _buildInfoRow('نوع فاکتور', details.documentType ?? '-'),
+          _buildInfoRow('تاریخ فاکتور', details.formattedDate(jalali: useJalali)),
+          _buildInfoRow(
+            'ارز فاکتور',
+            _currencyLabel.isEmpty ? 'نامشخص' : _currencyLabel,
+          ),
+          if (details.description != null)
+            _buildInfoRow('توضیحات', details.description!),
+        ],
+      ),
+      const SizedBox(height: 16),
+      if (details.productLines.isNotEmpty) ...[
+        _buildInfoSection(
+          theme,
+          'کالاها',
+          [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final minTableWidth = w.isFinite && w > 0 ? w : 320.0;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: minTableWidth),
+                    child: Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(2.2),
+                        1: FlexColumnWidth(1),
+                        2: FlexColumnWidth(1),
+                        3: FlexColumnWidth(1),
+                        4: FlexColumnWidth(1),
+                        5: FlexColumnWidth(1.2),
+                      },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          ),
+                          children: [
+                            _buildTableCell(theme, 'نام کالا', isHeader: true),
+                            _buildTableCell(theme, 'تعداد', isHeader: true),
+                            _buildTableCell(theme, 'فی', isHeader: true),
+                            _buildTableCell(theme, 'تخفیف', isHeader: true),
+                            _buildTableCell(theme, 'مالیات', isHeader: true),
+                            _buildTableCell(theme, 'جمع ردیف', isHeader: true),
+                          ],
+                        ),
+                        ...details.productLines.map((line) {
+                          String money(double? v) => _optionalAmountWithCurrency(formatter, v);
+                          final lineTotal = line.lineTotal ??
+                              ((line.quantity != null && line.unitPrice != null)
+                                  ? (line.quantity! * line.unitPrice!) -
+                                      (line.lineDiscount ?? 0) +
+                                      (line.taxAmount ?? 0)
+                                  : null);
+                          return TableRow(
+                            children: [
+                              _buildTableCell(theme, line.productName ?? '-'),
+                              _buildTableCell(
+                                theme,
+                                line.quantity != null ? formatter.format(line.quantity) : '-',
+                              ),
+                              _buildTableCell(theme, money(line.unitPrice)),
+                              _buildTableCell(theme, money(line.lineDiscount)),
+                              _buildTableCell(theme, money(line.taxAmount)),
+                              _buildTableCell(theme, money(lineTotal)),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (details.productLines.any((l) => l.unitPrice == null && l.lineTotal == null))
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'برای برخی ردیف‌ها جزئیات قیمت در سند ذخیره نشده است.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+      if (details.accountLines.isNotEmpty) ...[
+        _buildInfoSection(
+          theme,
+          'سطرهای حساب (خلاصه)',
+          [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final minTableWidth = w.isFinite && w > 0 ? w : 320.0;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: minTableWidth),
+                    child: Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(2.5),
+                        1: FlexColumnWidth(1.2),
+                        2: FlexColumnWidth(1.2),
+                      },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          ),
+                          children: [
+                            _buildTableCell(theme, 'حساب', isHeader: true),
+                            _buildTableCell(theme, 'بدهکار', isHeader: true),
+                            _buildTableCell(theme, 'بستانکار', isHeader: true),
+                          ],
+                        ),
+                        ...details.accountLines.map(
+                          (line) => TableRow(
+                            children: [
+                              _buildTableCell(
+                                theme,
+                                [
+                                  line.accountName ?? '-',
+                                  if ((line.accountCode ?? '').isNotEmpty) ' (${line.accountCode})',
+                                ].join(),
+                              ),
+                              _buildTableCell(
+                                theme,
+                                line.debit != 0
+                                    ? _amountWithCurrency(formatter, line.debit)
+                                    : '-',
+                              ),
+                              _buildTableCell(
+                                theme,
+                                line.credit != 0
+                                    ? _amountWithCurrency(formatter, line.credit)
+                                    : '-',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+      _buildInfoSection(
+        theme,
+        'خلاصه مالی',
+        [
+          _buildInfoRow(
+            'جمع قبل از تخفیف',
+            _amountWithCurrency(formatter, details.subtotal),
+          ),
+          if (details.discountAmount > 0)
+            _buildInfoRow(
+              'تخفیف',
+              _amountWithCurrency(formatter, details.discountAmount, negativePrefix: true),
+              color: theme.colorScheme.error,
+            ),
+          if (details.taxAmount > 0)
+            _buildInfoRow(
+              'مالیات',
+              _amountWithCurrency(formatter, details.taxAmount),
+              color: theme.colorScheme.primary,
+            ),
+          const Divider(),
+          _buildInfoRow(
+            'جمع کل نهایی',
+            _amountWithCurrency(formatter, details.total),
+            isBold: true,
+            color: theme.colorScheme.primary,
+          ),
+        ],
+      ),
+    ];
+  }
+
   Widget _buildInfoSection(ThemeData theme, String title, List<Widget> children) {
     return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               title,

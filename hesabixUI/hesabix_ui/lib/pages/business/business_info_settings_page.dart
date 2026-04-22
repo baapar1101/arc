@@ -11,6 +11,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
   final int businessId;
@@ -66,6 +67,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   String? _invoiceSyncPurchasePriceBasis;
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
+  String _invoiceGlobalDiscountPercentBasis = 'subtotal_after_line_discount';
+  String _invoiceGlobalDiscountTaxMode = 'recalculate_tax_proportional';
+  final _invoiceGlobalDiscountMaxPercentController = TextEditingController();
+  final _invoiceGlobalDiscountMaxAmountController = TextEditingController();
 
   // سیاست موجودی منفی هنگام قطعی حواله
   bool _allowNegativeInventoryForBulk = false;
@@ -109,6 +114,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _cityController.dispose();
     _defaultCreditLimitController.dispose();
     _invoiceProfitOverheadPercentController.dispose();
+    _invoiceGlobalDiscountMaxPercentController.dispose();
+    _invoiceGlobalDiscountMaxAmountController.dispose();
     super.dispose();
   }
 
@@ -149,6 +156,16 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
       _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
+      _invoiceGlobalDiscountPercentBasis = resp.invoiceGlobalDiscountPercentBasis;
+      _invoiceGlobalDiscountTaxMode = resp.invoiceGlobalDiscountTaxMode;
+      _invoiceGlobalDiscountMaxPercentController.text =
+          resp.invoiceGlobalDiscountMaxPercent != null
+              ? resp.invoiceGlobalDiscountMaxPercent!.toString()
+              : '';
+      _invoiceGlobalDiscountMaxAmountController.text =
+          resp.invoiceGlobalDiscountMaxAmount != null
+              ? resp.invoiceGlobalDiscountMaxAmount!.toStringAsFixed(0)
+              : '';
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
@@ -287,6 +304,24 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
       payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
+    }
+    if (_invoiceGlobalDiscountPercentBasis != orig.invoiceGlobalDiscountPercentBasis) {
+      payload['invoice_global_discount_percent_basis'] = _invoiceGlobalDiscountPercentBasis;
+    }
+    if (_invoiceGlobalDiscountTaxMode != orig.invoiceGlobalDiscountTaxMode) {
+      payload['invoice_global_discount_tax_mode'] = _invoiceGlobalDiscountTaxMode;
+    }
+    final maxPctStr = _invoiceGlobalDiscountMaxPercentController.text.trim();
+    final maxPctParsed = double.tryParse(maxPctStr.replaceAll(',', ''));
+    final origPct = orig.invoiceGlobalDiscountMaxPercent;
+    if ((maxPctParsed ?? -1) != (origPct ?? -1)) {
+      payload['invoice_global_discount_max_percent'] = maxPctParsed;
+    }
+    final maxAmtStr = _invoiceGlobalDiscountMaxAmountController.text.trim();
+    final maxAmtParsed = double.tryParse(maxAmtStr.replaceAll(',', ''));
+    final origAmt = orig.invoiceGlobalDiscountMaxAmount;
+    if ((maxAmtParsed ?? -1) != (origAmt ?? -1)) {
+      payload['invoice_global_discount_max_amount'] = maxAmtParsed;
     }
     if (_allowNegativeInventoryForBulk != orig.allowNegativeInventoryForBulk) {
       payload['allow_negative_inventory_for_bulk'] = _allowNegativeInventoryForBulk;
@@ -675,14 +710,20 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.businessSettings)),
+        appBar: AppBar(
+          title: Text(t.businessSettings),
+          leading: businessSubpageBackLeading(context, widget.businessId),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.businessSettings)),
+        appBar: AppBar(
+          title: Text(t.businessSettings),
+          leading: businessSubpageBackLeading(context, widget.businessId),
+        ),
         body: Center(child: Text(_error!)),
       );
     }
@@ -690,6 +731,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.businessSettings),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -943,6 +985,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildSectionTitle('به‌روزرسانی قیمت کالا از فاکتور', cs),
               const SizedBox(height: 8),
               _buildInvoicePriceSyncSettings(cs),
+
+              const SizedBox(height: 24),
+              _buildSectionTitle(AppLocalizations.of(context).businessSettingsInvoiceGlobalDiscountTitle, cs),
+              const SizedBox(height: 8),
+              _buildInvoiceGlobalDiscountBusinessSettings(cs),
 
               const SizedBox(height: 24),
               _buildSectionTitle(AppLocalizations.of(context).invoiceWarehouseReleaseBusinessTitle, cs),
@@ -1312,6 +1359,85 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               subtitle: Text(t.inventoryNegativePolicyTransferSubtitle),
               value: _warehouseTransferRequirePositiveStock,
               onChanged: (v) => setState(() => _warehouseTransferRequirePositiveStock = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceGlobalDiscountBusinessSettings(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<String>(
+              value: _invoiceGlobalDiscountPercentBasis,
+              decoration: InputDecoration(
+                labelText: t.businessSettingsInvoiceGlobalDiscountBasisLabel,
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'subtotal_after_line_discount',
+                  child: Text(t.businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines),
+                ),
+                DropdownMenuItem(
+                  value: 'gross_before_line_discount',
+                  child: Text(t.businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines),
+                ),
+                DropdownMenuItem(
+                  value: 'total_after_lines_including_tax',
+                  child: Text(t.businessSettingsInvoiceGlobalDiscountBasisTotalWithTax),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _invoiceGlobalDiscountPercentBasis = v);
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _invoiceGlobalDiscountTaxMode,
+              decoration: InputDecoration(
+                labelText: t.businessSettingsInvoiceGlobalDiscountTaxModeLabel,
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'recalculate_tax_proportional',
+                  child: Text(t.businessSettingsInvoiceGlobalDiscountTaxModeRecalculate),
+                ),
+                DropdownMenuItem(
+                  value: 'keep_line_taxes',
+                  child: Text(t.businessSettingsInvoiceGlobalDiscountTaxModeKeep),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _invoiceGlobalDiscountTaxMode = v);
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _invoiceGlobalDiscountMaxPercentController,
+              decoration: InputDecoration(
+                labelText: t.businessSettingsInvoiceGlobalDiscountMaxPercent,
+                border: const OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _invoiceGlobalDiscountMaxAmountController,
+              decoration: InputDecoration(
+                labelText: t.businessSettingsInvoiceGlobalDiscountMaxAmount,
+                border: const OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
           ],
         ),

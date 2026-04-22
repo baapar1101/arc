@@ -35,6 +35,10 @@ def list_currencies(request: Request, db: Session = Depends(get_db)) -> dict:
             "title": c.title,
             "symbol": c.symbol,
             "code": c.code,
+            "decimal_places": int(c.decimal_places) if getattr(c, "decimal_places", None) is not None else 2,
+            "round_monetary_amounts": bool(c.round_monetary_amounts)
+            if getattr(c, "round_monetary_amounts", None) is not None
+            else True,
         }
         for c in db.query(Currency).order_by(Currency.title.asc()).all()
     ]
@@ -87,6 +91,12 @@ def list_business_currencies(
                 "title": default_currency.title,
                 "symbol": default_currency.symbol,
                 "code": default_currency.code,
+                "decimal_places": int(default_currency.decimal_places)
+                if getattr(default_currency, "decimal_places", None) is not None
+                else 2,
+                "round_monetary_amounts": bool(default_currency.round_monetary_amounts)
+                if getattr(default_currency, "round_monetary_amounts", None) is not None
+                else True,
                 "is_default": True,
             })
             seen_ids.add(default_currency.id)
@@ -109,6 +119,10 @@ def list_business_currencies(
             "title": c.title,
             "symbol": c.symbol,
             "code": c.code,
+            "decimal_places": int(c.decimal_places) if getattr(c, "decimal_places", None) is not None else 2,
+            "round_monetary_amounts": bool(c.round_monetary_amounts)
+            if getattr(c, "round_monetary_amounts", None) is not None
+            else True,
             "is_default": False,
         })
         seen_ids.add(c.id)

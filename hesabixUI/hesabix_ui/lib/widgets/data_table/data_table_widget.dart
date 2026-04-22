@@ -534,8 +534,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final Response<Map<String, dynamic>> res;
       if (widget.config.httpMethod.toUpperCase() == 'GET') {
         // For GET requests, use simple query parameters
+        final sizeKey = widget.config.pageSizeQueryParam ?? 'limit';
         final queryParams = <String, dynamic>{
-          'limit': _limit,
+          sizeKey: _limit,
           'skip': (_page - 1) * _limit,
         };
         
@@ -584,7 +585,32 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
 
       final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
-      
+
+      // اگر بعد از حذف رکورد روی صفحه‌ای بعد از آخرین صفحه مانده‌ایم (مثلاً آخرین ردیف صفحهٔ دوم)،
+      // پاسخ خالی می‌آید؛ صفحه را به بازهٔ معتبر برگردان و دوباره بگیر.
+      if (response.items.isEmpty) {
+        final tp = response.totalPages;
+        final p = response.page;
+        if (response.total > 0 && tp > 0 && p > tp) {
+          if (mounted) {
+            setState(() {
+              _page = tp;
+            });
+          }
+          await _fetchData();
+          return;
+        }
+        if (response.total == 0 && p > 1) {
+          if (mounted) {
+            setState(() {
+              _page = 1;
+            });
+          }
+          await _fetchData();
+          return;
+        }
+      }
+
       // Extract summary from API response if available
       Map<String, dynamic>? summaryData;
       if (body['data'] is Map<String, dynamic>) {

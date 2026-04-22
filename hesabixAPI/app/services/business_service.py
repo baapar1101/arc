@@ -1364,6 +1364,25 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "warehouse_transfer_require_positive_stock": bool(
             getattr(business, "warehouse_transfer_require_positive_stock", True),
         ),
+        "invoice_global_discount_percent_basis": str(
+            getattr(business, "invoice_global_discount_percent_basis", None)
+            or "subtotal_after_line_discount",
+        ),
+        "invoice_global_discount_tax_mode": str(
+            getattr(business, "invoice_global_discount_tax_mode", None)
+            or "recalculate_tax_proportional",
+        ),
+        "invoice_global_discount_max_percent": (
+            float(business.invoice_global_discount_max_percent)
+            if getattr(business, "invoice_global_discount_max_percent", None) is not None
+            else None
+        ),
+        "invoice_global_discount_max_amount": (
+            float(business.invoice_global_discount_max_amount)
+            if getattr(business, "invoice_global_discount_max_amount", None) is not None
+            else None
+        ),
+        "fx_revaluation_policy": getattr(business, "fx_revaluation_policy", None),
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at,   # datetime object بماند
         # Soft Delete fields

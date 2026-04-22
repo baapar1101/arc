@@ -521,7 +521,7 @@ def list_transfers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict
     }
 
 
-def delete_transfer(db: Session, document_id: int) -> bool:
+def delete_transfer(db: Session, document_id: int, *, commit: bool = True) -> bool:
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type != DOCUMENT_TYPE_TRANSFER:
         return False
@@ -554,17 +554,20 @@ def delete_transfer(db: Session, document_id: int) -> bool:
     fiscal_year_id = document.fiscal_year_id
     
     db.delete(document)
-    db.commit()
-    
-    # Invalidate cache بعد از حذف موفق سند انتقال
-    from app.services.document_service import invalidate_documents_cache
-    invalidate_documents_cache(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year_id,
-        document_id=document.id,
-        document_type=DOCUMENT_TYPE_TRANSFER
-    )
-    
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+    if commit:
+        from app.services.document_service import invalidate_documents_cache
+        invalidate_documents_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document.id,
+            document_type=DOCUMENT_TYPE_TRANSFER
+        )
+
     return True
 
 

@@ -1789,6 +1789,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yearEndClosing => 'Year End Closing';
 
   @override
+  String get currencyRevaluation => 'FX rates & revaluation';
+
+  @override
   String get accountingSettings => 'Settings';
 
   @override
@@ -8360,6 +8363,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Set base currency and policies';
 
   @override
+  String get settingsCurrenciesAdmin => 'Currency management';
+
+  @override
+  String get settingsCurrenciesAdminDescription =>
+      'Decimal places, rounding, add or remove currencies';
+
+  @override
   String get settingsPaymentGateways => 'Payment Gateways';
 
   @override
@@ -8393,6 +8403,66 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsNotificationTemplatesDescription =>
       'Manage templates for channels and languages';
+
+  @override
+  String get settingsSupportOperators => 'Support operators';
+
+  @override
+  String get settingsSupportOperatorsDescription =>
+      'Grant or revoke support operator access for users';
+
+  @override
+  String get settingsNotificationModeration =>
+      'Notification template moderation';
+
+  @override
+  String get settingsNotificationModerationDescription =>
+      'Approve or reject notification templates submitted by businesses';
+
+  @override
+  String get settingsNotificationSmsPricing => 'Notification SMS pricing';
+
+  @override
+  String get settingsNotificationSmsPricingDescription =>
+      'Set the price per SMS for business notifications';
+
+  @override
+  String get settingsSystemScripts => 'System scripts';
+
+  @override
+  String get settingsSystemScriptsDescription =>
+      'Run global corrective operations for all businesses';
+
+  @override
+  String get supportOperatorsPageTitle => 'Support operators';
+
+  @override
+  String get supportOperatorsRemoveOperatorTitle => 'Remove operator';
+
+  @override
+  String supportOperatorsRemoveOperatorConfirm(String email) {
+    return 'Are you sure you want to revoke operator access for $email?';
+  }
+
+  @override
+  String get supportOperatorsAccessRevokedSuccess =>
+      'Operator access revoked successfully';
+
+  @override
+  String get supportOperatorsEmpty => 'No support operators found';
+
+  @override
+  String get supportOperatorsEmptyHint =>
+      'To add an operator, use the User Management page.';
+
+  @override
+  String get supportOperatorsTelegramConnected => 'Telegram linked';
+
+  @override
+  String get supportOperatorsTelegramNotConnected => 'Not linked';
+
+  @override
+  String get supportOperatorsStatusInactive => 'Inactive';
 
   @override
   String get settingsAISettings => 'AI Settings';
@@ -9175,6 +9245,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get customerClubAnalyticsHint =>
       'After changing settings, run Recalculate from the analytics tab.';
+
+  @override
+  String get customerClubSettingsSectionLoyaltyRfm => 'Loyalty points vs RFM';
+
+  @override
+  String get customerClubLoyaltyRfmMode => 'Integration mode';
+
+  @override
+  String get customerClubLoyaltyRfmDecoupled =>
+      'Separate: points from invoices; tiers use point balance';
+
+  @override
+  String get customerClubLoyaltyRfmTiers =>
+      'Tier multipliers follow RFM score (requires RFM analytics on)';
+
+  @override
+  String get customerClubLoyaltyRfmHint =>
+      'In RFM tier mode, set each tier’s min RFM score (0–1) via the tiers API field min_rfm_normalized, or rely on min_balance_points÷10000 as a fallback. Redemption still uses invoice-earned balance.';
+
+  @override
+  String get customerClubAnalyticsSegmentsTitle => 'Segments';
+
+  @override
+  String get customerClubAnalyticsCampaignExport => 'Campaign export';
+
+  @override
+  String get customerClubAnalyticsCampaignTitle =>
+      'Audience list for campaigns';
+
+  @override
+  String get customerClubAnalyticsCampaignBody =>
+      'Person IDs for the current filters (segment + search). Paste into your SMS/email tool.';
+
+  @override
+  String get customerClubAnalyticsCampaignCopyIds => 'Copy IDs';
+
+  @override
+  String customerClubAnalyticsCampaignTruncated(int n) {
+    return 'Only $n IDs returned; increase the API limit to fetch more.';
+  }
+
+  @override
+  String get customerClubAnalyticsRfmNormalized => 'RFM normalized score (0–1)';
 
   @override
   String get customerClubSortAsc => 'Ascending';
@@ -10375,4 +10488,337 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportsDistributionDashboardSubtitle =>
       'Visit and return statistics for a date range';
+
+  @override
+  String get invoiceGlobalDiscountSection => 'Invoice-level discount';
+
+  @override
+  String get invoiceGlobalDiscountTypePercent => 'Percent';
+
+  @override
+  String get invoiceGlobalDiscountTypeAmount => 'Amount';
+
+  @override
+  String get invoiceGlobalDiscountValueLabel => 'Invoice discount value';
+
+  @override
+  String invoiceGlobalDiscountLineDiscountHint(String amount) {
+    return 'Line discounts subtotal: $amount';
+  }
+
+  @override
+  String invoiceGlobalDiscountAmountComputedHint(String amount) {
+    return 'Applied invoice discount: $amount';
+  }
+
+  @override
+  String get invoiceSummarySubtotal => 'Subtotal';
+
+  @override
+  String get invoiceSummaryDiscount => 'Total discount';
+
+  @override
+  String get invoiceSummaryTax => 'Total tax';
+
+  @override
+  String get invoiceSummaryTotal => 'Grand total';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTitle =>
+      'Invoice-level discount (calculation)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisLabel =>
+      'Percent discount basis';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines =>
+      'Net after line discounts (pre-tax)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines =>
+      'Gross before line discounts';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountBasisTotalWithTax =>
+      'Sum of line totals including tax';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeLabel =>
+      'Effect on tax';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeRecalculate =>
+      'Recalculate tax proportionally';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountTaxModeKeep =>
+      'Keep per-line tax amounts';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountMaxPercent =>
+      'Max percent (optional)';
+
+  @override
+  String get businessSettingsInvoiceGlobalDiscountMaxAmount =>
+      'Max amount (optional)';
+
+  @override
+  String get editInvoiceTitle => 'Edit invoice';
+
+  @override
+  String get saveChangesTooltip => 'Save changes';
+
+  @override
+  String get invoiceProductsTab => 'Products & services';
+
+  @override
+  String get invoiceTransactionsTab => 'Transactions';
+
+  @override
+  String get invoiceInstallmentsTab => 'Installments';
+
+  @override
+  String get invoiceSettingsTab => 'Settings';
+
+  @override
+  String get invoiceGlobalDiscountPercentInvalid =>
+      'Invoice discount percent must be between 0 and 100';
+
+  @override
+  String get invoiceGlobalDiscountAmountInvalid =>
+      'Invoice discount amount cannot be negative';
+
+  @override
+  String get invoiceGlobalDiscountValueInvalid =>
+      'Invoice discount value is invalid';
+
+  @override
+  String get fiscalYearRollbackTitle => 'Revert current fiscal year';
+
+  @override
+  String get fiscalYearRollbackRetry => 'Try again';
+
+  @override
+  String get fiscalYearRollbackTokenMissing =>
+      'No confirmation code or it has expired. Tap “Refresh preview” and try again.';
+
+  @override
+  String get fiscalYearRollbackConfirmTitle => 'Final confirmation';
+
+  @override
+  String get fiscalYearRollbackConfirmWithBackupBody =>
+      'A full business backup will be saved in the system first, then the current fiscal year and all its documents will be removed. Closing documents on the previous year (if any) will also be removed. This cannot be undone in the app.';
+
+  @override
+  String get fiscalYearRollbackConfirmWithoutBackupBody =>
+      'The current fiscal year and all its documents will be removed. Closing documents on the previous year (if any) will also be removed. This cannot be undone in the app.';
+
+  @override
+  String get fiscalYearRollbackCancel => 'Cancel';
+
+  @override
+  String get fiscalYearRollbackConfirmDelete => 'Remove current year';
+
+  @override
+  String get fiscalYearRollbackPhaseBackupStarting =>
+      'Creating full system backup…';
+
+  @override
+  String get fiscalYearRollbackBackupStartFailed => 'Could not start backup.';
+
+  @override
+  String get fiscalYearRollbackBackupJobIdMissing =>
+      'Backup job id was not returned by the server.';
+
+  @override
+  String get fiscalYearRollbackPhasePreviewRefresh =>
+      'Refreshing preview (new confirmation code)…';
+
+  @override
+  String get fiscalYearRollbackAfterBackupBlocked =>
+      'After the backup, fiscal rollback is no longer allowed. The business state may have changed. Review the preview and try again.';
+
+  @override
+  String get fiscalYearRollbackTokenAfterBackupMissing =>
+      'No confirmation code after backup. Tap “Refresh preview”.';
+
+  @override
+  String get fiscalYearRollbackTokenMissingGeneric =>
+      'Confirmation code is not available.';
+
+  @override
+  String get fiscalYearRollbackPhaseDeleting => 'Removing current fiscal year…';
+
+  @override
+  String get fiscalYearRollbackSuccessFallback => 'Completed successfully';
+
+  @override
+  String get fiscalYearRollbackWarningCard =>
+      'This removes all documents in the current fiscal year and makes the previous year current.';
+
+  @override
+  String get fiscalYearRollbackCurrentYearLabel =>
+      'Current year (will be removed)';
+
+  @override
+  String fiscalYearRollbackYearIdSuffix(String id) {
+    return 'ID $id';
+  }
+
+  @override
+  String get fiscalYearRollbackNextCurrentLabel => 'Will become current';
+
+  @override
+  String fiscalYearRollbackDocCountLabel(String count) {
+    return 'Documents in current year: $count';
+  }
+
+  @override
+  String fiscalYearRollbackClosingDocsToDelete(String count) {
+    return 'Closing documents on the previous year to be removed: $count';
+  }
+
+  @override
+  String get fiscalYearRollbackBackupCheckboxTitle =>
+      'Take a full backup before removing the year';
+
+  @override
+  String get fiscalYearRollbackBackupCheckboxSubtitle =>
+      'Same system backup (.hbx) as in settings, for restore if needed.';
+
+  @override
+  String get fiscalYearRollbackOpenBackupPage => 'Open backup page';
+
+  @override
+  String get fiscalYearRollbackExecuteButton => 'Remove current fiscal year';
+
+  @override
+  String get fiscalYearRollbackBlockedTitle =>
+      'This action is not allowed right now — reasons:';
+
+  @override
+  String get fiscalYearRollbackBlockedHint =>
+      'After fixing the items below, tap “Refresh preview”.';
+
+  @override
+  String get fiscalYearRollbackRefreshPreview => 'Refresh preview';
+
+  @override
+  String fiscalYearRollbackBackupProgressPrefix(String detail) {
+    return 'Backup: $detail';
+  }
+
+  @override
+  String get fiscalYearRollbackPreviewFailed =>
+      'Fiscal rollback preview failed.';
+
+  @override
+  String get fiscalYearRollbackNetworkUnreachable =>
+      'Could not reach the server. Check your connection and sign-in.';
+
+  @override
+  String get fiscalYearRollbackExecuteFailed => 'Fiscal rollback failed.';
+
+  @override
+  String get fiscalYearRollbackExecuteFailedSupport =>
+      'The operation failed. If it keeps happening, contact support.';
+
+  @override
+  String get backupJobWaitTimeout =>
+      'Backup did not finish within the wait time. Check status under Settings → Backup.';
+
+  @override
+  String get backupJobStorageLimitFallback =>
+      'Backup could not be saved due to storage limits. Activate a plan or free space.';
+
+  @override
+  String get settingsSideCurrenciesTitle => 'Secondary currencies';
+
+  @override
+  String get settingsSideCurrenciesSubtitle =>
+      'Add and remove currencies available for this business';
+
+  @override
+  String get settingsInvoiceFxPolicyTitle => 'Invoice FX revaluation policy';
+
+  @override
+  String get settingsInvoiceFxPolicySubtitle =>
+      'Reference time for the rate and behavior when no rate exists (base vs. foreign currency)';
+
+  @override
+  String get fxRevaluationSettingsTitle => 'Invoice revaluation (policy)';
+
+  @override
+  String get fxRevaluationSettingsIntro =>
+      'These options define the reference time for the revaluation rate (against the base currency) for invoices in foreign currency, and what happens if no rate exists.';
+
+  @override
+  String get fxRevaluationAsOfSourceLabel =>
+      'Reference time for the rate (as_of)';
+
+  @override
+  String get fxRevaluationAsOfSourceDocumentDate =>
+      'Document date (time from the option below)';
+
+  @override
+  String get fxRevaluationAsOfSourceRegisteredAt =>
+      'When the document is registered in the system';
+
+  @override
+  String get fxRevaluationDateEffectiveLabel =>
+      'Effective time on that day (UTC)';
+
+  @override
+  String get fxRevaluationTimeStartOfDay => 'Start of day 00:00';
+
+  @override
+  String get fxRevaluationTimeNoon => 'Midday 12:00';
+
+  @override
+  String get fxRevaluationTimeEndOfDay =>
+      'End of day 23:59:59 (multiple rates per day)';
+
+  @override
+  String get fxRevaluationWhenNoRateLabel =>
+      'If no revaluation rate exists for the reference time';
+
+  @override
+  String get fxRevaluationWhenNoRateBlock => 'Block saving the invoice';
+
+  @override
+  String get fxRevaluationWhenNoRateAllow =>
+      'Allow saving without a rate (incomplete FX on the document)';
+
+  @override
+  String get fxRevaluationSettingsFooterNote =>
+      'Users without “Currency revaluation” permission cannot pick a specific rate row; the system uses the latest effective rate up to the reference time.';
+
+  @override
+  String fxRevaluationSettingsLoadError(String error) {
+    return 'Failed to load: $error';
+  }
+
+  @override
+  String fxRevaluationSettingsSaveError(String error) {
+    return 'Could not save: $error';
+  }
+
+  @override
+  String get invoiceFxRateFieldLabel => 'Revaluation rate (optional)';
+
+  @override
+  String get invoiceFxRateAuto => 'Automatic (business policy settings)';
+
+  @override
+  String get invoiceFxRateHelper =>
+      'For non-base currency; “Automatic” uses the latest valid rate up to the document reference time.';
+
+  @override
+  String get invoiceFxRateStoredOnDocument => 'Rate stored on this document';
+
+  @override
+  String invoiceFxRateRow(String rate, String effective, String idPart) {
+    return '$rate — $effective$idPart';
+  }
 }

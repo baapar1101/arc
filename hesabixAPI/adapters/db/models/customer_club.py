@@ -52,6 +52,11 @@ class CustomerClubSettings(Base):
 	max_redeem_points_per_invoice: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
 	points_expire_after_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+	# decoupled: سطح/ضریب از مانده امتیاز | rfm_based_tiers: ضریب از نمره نرمال‌شده RFM
+	loyalty_rfm_integration_mode: Mapped[str] = mapped_column(
+		String(32), nullable=False, default="decoupled"
+	)
+
 	rfm_analytics_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	clv_analytics_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	rfm_analysis_window_months: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
@@ -182,6 +187,7 @@ class CustomerClubTier(Base):
 	min_balance_points: Mapped[Decimal] = mapped_column(
 		Numeric(18, 6), nullable=False, default=Decimal("0")
 	)
+	min_rfm_normalized: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
 	earn_multiplier: Mapped[Decimal] = mapped_column(
 		Numeric(18, 6), nullable=False, default=Decimal("1")
 	)

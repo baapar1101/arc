@@ -6,7 +6,7 @@ from datetime import datetime, date
 import logging
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
@@ -2290,8 +2290,52 @@ def delete_warehouse(db: Session, business_id: int, warehouse_id: int) -> bool:
 	obj = db.get(Warehouse, warehouse_id)
 	if not obj or obj.business_id != business_id:
 		return False
+
+	# جلوگیری از حذف انباری که در هدر یا خطوط حواله انبار استفاده شده است
+	has_doc = (
+		db.query(WarehouseDocument.id)
+		.filter(
+			WarehouseDocument.business_id == business_id,
+			or_(
+				WarehouseDocument.warehouse_id_from == warehouse_id,
+				WarehouseDocument.warehouse_id_to == warehouse_id,
+			),
+		)
+		.first()
+	)
+	if has_doc is not None:
+		raise ApiError(
+			"WAREHOUSE_HAS_WAREHOUSE_DOCUMENTS",
+			"به‌دلیل وجود حواله انبار مرتبط با این انبار، حذف امکان‌پذیر نیست؛ ابتدا حواله‌ها را اصلاح یا حذف کنید.",
+			http_status=400,
+		)
+
+	has_line = (
+		db.query(WarehouseDocumentLine.id)
+		.join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
+		.filter(
+			WarehouseDocument.business_id == business_id,
+			WarehouseDocumentLine.warehouse_id == warehouse_id,
+		)
+		.first()
+	)
+	if has_line is not None:
+		raise ApiError(
+			"WAREHOUSE_HAS_LINE_MOVEMENTS",
+			"به‌دلیل وجود حواله انبار با ردیف‌های مرتبط با این انبار، حذف امکان‌پذیر نیست.",
+			http_status=400,
+		)
+
 	repo = WarehouseRepository(db)
-	result = repo.delete(warehouse_id)
+	try:
+		result = repo.delete(warehouse_id)
+	except IntegrityError:
+		db.rollback()
+		raise ApiError(
+			"WAREHOUSE_DELETE_CONFLICT",
+			"حذف انبار به‌دلیل وابستگی‌های دیگر در سیستم امکان‌پذیر نیست.",
+			http_status=400,
+		) from None
 	
 	# Invalidate cache بعد از حذف موفق انبار
 	if result:

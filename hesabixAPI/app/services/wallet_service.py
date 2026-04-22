@@ -1604,7 +1604,10 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 		"ai_usage",                 # استفاده از هوش مصنوعی
 		"customer_payment",         # پرداخت مشتری (پکیج‌ها)
 		"internal_service_charge",  # کسر سرویس داخلی
+		"document_usage_charge",    # درآمدزایی به ازای سند
+		"document_volume_charge",     # درآمدزایی حجمی اسناد
 		"zohal_service_charge",     # کسر سرویس زحل
+		"plugin_purchase",          # خرید افزونه (یکپارچگی کیف پول)
 		"refund",                   # بازگشت وجه
 		"fee",                      # کارمزد
 		"chargeback",               # برگشت تراکنش

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -7,6 +6,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 class ActivityLogsPage extends StatefulWidget {
   final int businessId;
@@ -264,10 +264,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         title: const Text('گزارش فعالیت‌های کاربران'),
         actions: [
           IconButton(

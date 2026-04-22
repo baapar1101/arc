@@ -21,7 +21,9 @@ adapters/api/v1/checks.py
 adapters/api/v1/credit.py
 adapters/api/v1/crm.py
 adapters/api/v1/currencies.py
+adapters/api/v1/customer_club.py
 adapters/api/v1/customers.py
+adapters/api/v1/distribution.py
 adapters/api/v1/document_numbering.py
 adapters/api/v1/documents.py
 adapters/api/v1/expense_income.py
@@ -63,6 +65,7 @@ adapters/api/v1/users.py
 adapters/api/v1/wallet.py
 adapters/api/v1/wallet_webhook.py
 adapters/api/v1/warehouse_docs.py
+adapters/api/v1/warehouse_locations.py
 adapters/api/v1/warehouse_reports.py
 adapters/api/v1/warehouses.py
 adapters/api/v1/warranty.py
@@ -74,6 +77,7 @@ adapters/api/v1/admin/ai_prompts.py
 adapters/api/v1/admin/ai_settings.py
 adapters/api/v1/admin/announcements.py
 adapters/api/v1/admin/businesses_admin.py
+adapters/api/v1/admin/currencies.py
 adapters/api/v1/admin/document_monetization.py
 adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
@@ -125,6 +129,7 @@ adapters/api/v1/schema_models/repair_shop.py
 adapters/api/v1/schema_models/tax_settings.py
 adapters/api/v1/schema_models/transfer.py
 adapters/api/v1/schema_models/warehouse.py
+adapters/api/v1/schema_models/warehouse_location.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/ai_tickets.py
 adapters/api/v1/support/categories.py
@@ -165,6 +170,8 @@ adapters/db/models/check.py
 adapters/db/models/credit.py
 adapters/db/models/crm.py
 adapters/db/models/currency.py
+adapters/db/models/customer_club.py
+adapters/db/models/distribution.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
 adapters/db/models/document_monetization.py
@@ -210,6 +217,8 @@ adapters/db/models/wallet.py
 adapters/db/models/warehouse.py
 adapters/db/models/warehouse_document.py
 adapters/db/models/warehouse_document_line.py
+adapters/db/models/warehouse_location.py
+adapters/db/models/warehouse_product_placement.py
 adapters/db/models/warranty.py
 adapters/db/models/workflow.py
 adapters/db/models/workflow_marketplace.py
@@ -272,7 +281,9 @@ app/core/batch_operations.py
 app/core/cache.py
 app/core/calendar.py
 app/core/calendar_middleware.py
+app/core/customer_club_plugin_dependency.py
 app/core/db_pool_monitor.py
+app/core/distribution_plugin_dependency.py
 app/core/error_handlers.py
 app/core/i18n.py
 app/core/i18n_catalog.py
@@ -319,6 +330,7 @@ app/services/business_ftp_access.py
 app/services/business_ftp_queue_jobs.py
 app/services/business_ftp_service.py
 app/services/business_notification_service.py
+app/services/business_sample_data_service.py
 app/services/business_service.py
 app/services/cache_invalidation_subscriber.py
 app/services/captcha_service.py
@@ -327,9 +339,14 @@ app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
 app/services/crm_calendar_note_service.py
+app/services/currency_admin_service.py
+app/services/currency_quant.py
+app/services/customer_club_analytics_service.py
+app/services/customer_club_service.py
 app/services/dashboard_widgets_service.py
 app/services/database_backup_service.py
 app/services/database_restore_service.py
+app/services/distribution_service.py
 app/services/document_list_sort.py
 app/services/document_monetization_background_jobs.py
 app/services/document_monetization_jobs.py
@@ -344,7 +361,9 @@ app/services/file_dependency_service.py
 app/services/file_storage_service.py
 app/services/file_storage_share_service.py
 app/services/general_ledger_service.py
+app/services/invoice_global_discount_service.py
 app/services/invoice_product_price_sync_service.py
+app/services/invoice_profit_ledger_service.py
 app/services/invoice_service.py
 app/services/invoice_warehouse_bulk_service.py
 app/services/job_manager.py
@@ -410,6 +429,8 @@ app/services/template_builder_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
 app/services/wallet_service.py
+app/services/warehouse_location_service.py
+app/services/warehouse_placement_sync.py
 app/services/warehouse_postal_label_service.py
 app/services/warehouse_reports_service.py
 app/services/warehouse_service.py
@@ -430,6 +451,7 @@ app/services/jobs/dashboard_job.py
 app/services/jobs/email_job.py
 app/services/jobs/export_job.py
 app/services/jobs/invoice_profit_job.py
+app/services/jobs/invoice_profit_ledger_backfill_job.py
 app/services/jobs/report_job.py
 app/services/jobs/tax_submission_job.py
 app/services/pdf/__init__.py
@@ -471,6 +493,7 @@ app/services/workflow/i18n/workflow_translations.py
 app/services/workflow/triggers/__init__.py
 app/services/workflow/triggers/base_trigger.py
 app/services/workflow/triggers/crm_triggers.py
+app/services/workflow/triggers/distribution_triggers.py
 app/services/workflow/triggers/document_triggers.py
 app/services/workflow/triggers/financial_triggers.py
 app/services/workflow/triggers/inventory_triggers.py
@@ -507,6 +530,19 @@ migrations/versions/20260416_000003_business_inventory_negative_policy.py
 migrations/versions/20260416_000004_person_name_prefix_legal_entity.py
 migrations/versions/20260417_000001_person_groups.py
 migrations/versions/20260417_000002_workflow_marketplace.py
+migrations/versions/20260418_000001_invoice_profit_ledger_recognition.py
+migrations/versions/20260418_000002_customer_club_tables.py
+migrations/versions/20260418_000003_warehouse_locations_and_placements.py
+migrations/versions/20260418_000004_warehouse_document_line_location.py
+migrations/versions/20260419_000001_customer_club_v2_enhancements.py
+migrations/versions/20260419_000002_seed_year_end_fixed_accounts.py
+migrations/versions/20260420_000001_distribution_field_sales_tables.py
+migrations/versions/20260420_000002_warehouse_document_code_per_business.py
+migrations/versions/20260421_000001_distribution_settings_visit_geo.py
+migrations/versions/20260422_000001_customer_club_rfm_analytics.py
+migrations/versions/20260423_000001_invoice_global_discount_settings.py
+migrations/versions/20260424_000001_customer_club_loyalty_rfm_integration.py
+migrations/versions/20260425_000001_currency_decimal_places.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

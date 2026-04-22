@@ -205,6 +205,30 @@ def rfm_summary_endpoint(
 	return success_response(data, request)
 
 
+@router.get("/business/{business_id}/analytics/rfm/person-ids")
+def rfm_person_ids_endpoint(
+	request: Request,
+	business_id: int,
+	segment_label: Optional[str] = Query(None),
+	q: Optional[str] = Query(None, description="Search in person name/code"),
+	limit: int = Query(5000, ge=1, le=10000),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_ensure_plugin(db, business_id)
+	data = analytics_svc.list_rfm_person_ids(
+		db,
+		business_id,
+		segment_label=segment_label,
+		search=q,
+		limit=limit,
+	)
+	return success_response(data, request)
+
+
 @router.get("/business/{business_id}/analytics/rfm/persons")
 def rfm_persons_endpoint(
 	request: Request,

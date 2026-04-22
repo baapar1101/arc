@@ -15,6 +15,7 @@ from adapters.db.models.customer_club import (
 	CustomerClubBalance,
 	CustomerClubInvoiceSnapshot,
 	CustomerClubLedger,
+	CustomerClubRfmSnapshot,
 	CustomerClubSettings,
 	CustomerClubTier,
 )
@@ -51,6 +52,7 @@ def _settings_to_dict(row: CustomerClubSettings) -> Dict[str, Any]:
 		"points_expire_after_days": int(row.points_expire_after_days)
 		if getattr(row, "points_expire_after_days", None) is not None
 		else None,
+		"loyalty_rfm_integration_mode": getattr(row, "loyalty_rfm_integration_mode", None) or "decoupled",
 		"rfm_analytics_enabled": bool(getattr(row, "rfm_analytics_enabled", False)),
 		"clv_analytics_enabled": bool(getattr(row, "clv_analytics_enabled", False)),
 		"rfm_analysis_window_months": int(getattr(row, "rfm_analysis_window_months", 12) or 12),
@@ -84,6 +86,7 @@ def _default_settings_row(db: Session, business_id: int) -> CustomerClubSettings
 		max_points_per_invoice=None,
 		min_basis_amount=Decimal("0"),
 		require_customer_person_type=True,
+		loyalty_rfm_integration_mode="decoupled",
 		rfm_analytics_enabled=False,
 		clv_analytics_enabled=False,
 		rfm_analysis_window_months=12,
@@ -220,10 +223,68 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 		row.clv_avg_lifespan_years = Decimal(str(v)) if v is not None else None
 	if "rfm_segment_labels_json" in payload:
 		row.rfm_segment_labels_json = payload["rfm_segment_labels_json"]
+	if "loyalty_rfm_integration_mode" in payload:
+		lm = str(payload["loyalty_rfm_integration_mode"]).strip()
+		if lm not in ("decoupled", "rfm_based_tiers"):
+			raise ApiError(
+				"CUSTOMER_CLUB_LOYALTY_RFM_MODE_INVALID",
+				"loyalty_rfm_integration_mode must be decoupled or rfm_based_tiers.",
+				http_status=400,
+			)
+		row.loyalty_rfm_integration_mode = lm
+
+	if (getattr(row, "loyalty_rfm_integration_mode", None) or "decoupled") == "rfm_based_tiers" and not getattr(
+		row, "rfm_analytics_enabled", False
+	):
+		raise ApiError(
+			"CUSTOMER_CLUB_RFM_REQUIRED_FOR_TIERS",
+			"Enable RFM analytics before using RFM-based tier multipliers.",
+			http_status=400,
+		)
 
 	db.commit()
 	db.refresh(row)
 	return _settings_to_dict(row)
+
+
+def rfm_normalized_from_snapshot(snap: Optional[CustomerClubRfmSnapshot]) -> Optional[Decimal]:
+	"""نمرهٔ ۰ تا ۱ برای مقایسه با آستانهٔ سطوح در حالت rfm_based_tiers."""
+	if snap is None:
+		return None
+	cs = getattr(snap, "composite_score", None)
+	if cs is not None:
+		v = Decimal(str(cs))
+		return max(Decimal("0"), min(Decimal("1"), v))
+	r = getattr(snap, "r_score", None)
+	f = getattr(snap, "f_score", None)
+	m = getattr(snap, "m_score", None)
+	if r is not None and f is not None and m is not None:
+		v = (Decimal(int(r)) + Decimal(int(f)) + Decimal(int(m))) / Decimal("15")
+		return max(Decimal("0"), min(Decimal("1"), v))
+	return None
+
+
+def _person_rfm_normalized_for_tiers(db: Session, business_id: int, person_id: int) -> Optional[Decimal]:
+	snap = (
+		db.query(CustomerClubRfmSnapshot)
+		.filter(
+			and_(
+				CustomerClubRfmSnapshot.business_id == int(business_id),
+				CustomerClubRfmSnapshot.person_id == int(person_id),
+			)
+		)
+		.first()
+	)
+	return rfm_normalized_from_snapshot(snap)
+
+
+def _tier_min_rfm_threshold(tier: CustomerClubTier) -> Decimal:
+	if getattr(tier, "min_rfm_normalized", None) is not None:
+		v = Decimal(str(tier.min_rfm_normalized))
+		return max(Decimal("0"), min(Decimal("1"), v))
+	mb = tier.min_balance_points or Decimal("0")
+	v = mb / Decimal("10000")
+	return max(Decimal("0"), min(Decimal("1"), v))
 
 
 def _person_is_customer(person: Person) -> bool:
@@ -400,6 +461,8 @@ def user_can_redeem_loyalty_points(db: Session, user_id: int, business_id: int) 
 
 
 def _earn_tier_multiplier(db: Session, business_id: int, person_id: int) -> Decimal:
+	settings_row = db.query(CustomerClubSettings).filter(CustomerClubSettings.business_id == int(business_id)).first()
+	mode = getattr(settings_row, "loyalty_rfm_integration_mode", None) or "decoupled" if settings_row else "decoupled"
 	rows = (
 		db.query(CustomerClubTier)
 		.filter(CustomerClubTier.business_id == int(business_id))
@@ -408,6 +471,17 @@ def _earn_tier_multiplier(db: Session, business_id: int, person_id: int) -> Deci
 	)
 	if not rows:
 		return Decimal("1")
+	if mode == "rfm_based_tiers":
+		rfm_val = _person_rfm_normalized_for_tiers(db, business_id, person_id)
+		if rfm_val is None:
+			return Decimal("1")
+		best = Decimal("1")
+		for t in rows:
+			if rfm_val >= _tier_min_rfm_threshold(t):
+				m = t.earn_multiplier or Decimal("1")
+				if m > 0:
+					best = m
+		return best
 	bal_row = (
 		db.query(CustomerClubBalance)
 		.filter(
@@ -828,7 +902,24 @@ def get_person_balance(db: Session, business_id: int, person_id: int) -> Dict[st
 		.first()
 	)
 	bal = row.balance_points if row else Decimal("0")
-	return {"person_id": person_id, "balance_points": float(bal)}
+	settings_row = db.query(CustomerClubSettings).filter(CustomerClubSettings.business_id == business_id).first()
+	mode = getattr(settings_row, "loyalty_rfm_integration_mode", None) or "decoupled" if settings_row else "decoupled"
+	snap = (
+		db.query(CustomerClubRfmSnapshot)
+		.filter(
+			and_(CustomerClubRfmSnapshot.business_id == business_id, CustomerClubRfmSnapshot.person_id == person_id)
+		)
+		.first()
+	)
+	rfm_n = rfm_normalized_from_snapshot(snap)
+	out: Dict[str, Any] = {
+		"person_id": person_id,
+		"balance_points": float(bal),
+		"loyalty_rfm_integration_mode": mode,
+	}
+	if rfm_n is not None:
+		out["rfm_normalized_score"] = float(rfm_n)
+	return out
 
 
 def list_ledger(
@@ -880,6 +971,7 @@ def list_tiers(db: Session, business_id: int) -> List[Dict[str, Any]]:
 			"sort_order": r.sort_order,
 			"name": r.name,
 			"min_balance_points": float(r.min_balance_points),
+			"min_rfm_normalized": float(r.min_rfm_normalized) if getattr(r, "min_rfm_normalized", None) is not None else None,
 			"earn_multiplier": float(r.earn_multiplier),
 		}
 		for r in rows
@@ -899,6 +991,14 @@ def replace_tiers(db: Session, business_id: int, items: List[Dict[str, Any]]) ->
 		sort_order = int(it.get("sort_order", i))
 		min_b = Decimal(str(it.get("min_balance_points", 0)))
 		mult = Decimal(str(it.get("earn_multiplier", 1)))
+		min_rfm_raw = it.get("min_rfm_normalized")
+		min_rfm: Decimal | None = Decimal(str(min_rfm_raw)) if min_rfm_raw is not None else None
+		if min_rfm is not None and (min_rfm < Decimal("0") or min_rfm > Decimal("1")):
+			raise ApiError(
+				"CUSTOMER_CLUB_TIER_RFM_THRESHOLD_INVALID",
+				"min_rfm_normalized must be between 0 and 1.",
+				http_status=400,
+			)
 		if mult <= 0:
 			raise ApiError(
 				"CUSTOMER_CLUB_TIER_MULTIPLIER_INVALID",
@@ -911,6 +1011,7 @@ def replace_tiers(db: Session, business_id: int, items: List[Dict[str, Any]]) ->
 				sort_order=sort_order,
 				name=name[:120],
 				min_balance_points=min_b,
+				min_rfm_normalized=min_rfm,
 				earn_multiplier=mult,
 			)
 		)

@@ -235,7 +235,7 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/business/${widget.businessId}/dashboard');
+              context.go('/business/${widget.businessId}/settings');
             }
           },
         ),

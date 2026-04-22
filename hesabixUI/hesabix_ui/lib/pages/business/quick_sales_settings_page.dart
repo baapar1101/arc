@@ -10,6 +10,7 @@ import '../../widgets/invoice/price_list_combobox_widget.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../models/customer_model.dart';
 import '../../models/cash_register.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class QuickSalesSettingsPage extends StatefulWidget {
   final int businessId;
@@ -161,6 +162,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات فروش سریع'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),

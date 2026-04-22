@@ -12,6 +12,7 @@ import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class DocumentMonetizationBusinessPage extends StatefulWidget {
   final int businessId;
@@ -225,6 +226,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     return Scaffold(
       appBar: AppBar(
         title: Text(t.documentMonetizationTitle),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           IconButton(
             tooltip: t.viewWallet,

@@ -729,6 +729,7 @@
   "chartOfAccounts": "جدول حساب",
   "openingBalance": "تراز افتتاحیه",
   "yearEndClosing": "بستن سال مالی",
+  "currencyRevaluation": "تسعیر و نرخ ارز",
   "reports": "گزارشات",
   "accountingSettings": "تنظیمات",
   "servicesAndPlugins": "سرویس‌ها و افزونه‌ها",
@@ -3242,6 +3243,8 @@
   "settingsMarketplacePluginsDescription": "مدیریت افزونه‌ها و پلن‌های بازار افزونه‌ها",
   "settingsWalletSettings": "تنظیمات کیف‌پول",
   "settingsWalletSettingsDescription": "تعیین ارز پایه و سیاست‌ها",
+  "settingsCurrenciesAdmin": "مدیریت ارزها",
+  "settingsCurrenciesAdminDescription": "اعشار، گرد کردن مبالغ و افزودن یا حذف ارز",
   "settingsPaymentGateways": "درگاه‌های پرداخت",
   "settingsPaymentGatewaysDescription": "مدیریت و پیکربندی درگاه‌ها",
   "settingsBusinessesManagement": "مدیریت کسب و کارها",
@@ -3252,6 +3255,28 @@
   "settingsNotificationsDescription": "فعال/غیرفعال‌سازی کانال‌ها و ارسال تست",
   "settingsNotificationTemplates": "قالب‌های نوتیفیکیشن",
   "settingsNotificationTemplatesDescription": "مدیریت قالب‌ها برای کانال‌ها و زبان‌ها",
+  "settingsSupportOperators": "اپراتورهای پشتیبانی",
+  "settingsSupportOperatorsDescription": "اعطا یا لغو دسترسی اپراتور پشتیبانی برای کاربران",
+  "settingsNotificationModeration": "بررسی قالب‌های نوتیفیکیشن",
+  "settingsNotificationModerationDescription": "تایید یا رد قالب‌های ارسال‌شده توسط کسب‌وکارها",
+  "settingsNotificationSmsPricing": "قیمت‌گذاری پیامک نوتیفیکیشن",
+  "settingsNotificationSmsPricingDescription": "تنظیم قیمت هر پیامک برای نوتیفیکیشن‌های کسب‌وکارها",
+  "settingsSystemScripts": "اسکریپت‌های سیستمی",
+  "settingsSystemScriptsDescription": "اجرای عملیات اصلاحی سراسری برای همه کسب‌وکارها",
+  "supportOperatorsPageTitle": "اپراتورهای پشتیبانی",
+  "supportOperatorsRemoveOperatorTitle": "حذف اپراتور",
+  "supportOperatorsRemoveOperatorConfirm": "آیا مطمئن هستید که می‌خواهید دسترسی اپراتور را از {email} لغو کنید؟",
+  "@supportOperatorsRemoveOperatorConfirm": {
+    "placeholders": {
+      "email": {"type": "String"}
+    }
+  },
+  "supportOperatorsAccessRevokedSuccess": "دسترسی اپراتور با موفقیت لغو شد",
+  "supportOperatorsEmpty": "هیچ اپراتور پشتیبانی یافت نشد",
+  "supportOperatorsEmptyHint": "برای افزودن اپراتور، از صفحه مدیریت کاربران استفاده کنید.",
+  "supportOperatorsTelegramConnected": "متصل به تلگرام",
+  "supportOperatorsTelegramNotConnected": "متصل نیست",
+  "supportOperatorsStatusInactive": "غیرفعال",
   "settingsAISettings": "تنظیمات AI",
   "settingsAISettingsDescription": "پیکربندی Provider، مدل و API Key",
   "settingsAIPlans": "پلن‌های AI",
@@ -3554,6 +3579,23 @@
   "customerClubClvFormulaProjection": "میانگین سفارش × فرکانس سالانه × عمر تخمینی",
   "customerClubClvLifespanYears": "عمر مشتری تخمینی (سال) — برای فرمول پیش‌بینی",
   "customerClubAnalyticsHint": "پس از تغییر تنظیمات، یک‌بار بازمحاسبه را از تب تحلیل بزنید.",
+  "customerClubSettingsSectionLoyaltyRfm": "ارتباط امتیاز وفاداری با RFM",
+  "customerClubLoyaltyRfmMode": "حالت یکپارچگی",
+  "customerClubLoyaltyRfmDecoupled": "جدا: امتیاز از فاکتور؛ سطح از مانده امتیاز",
+  "customerClubLoyaltyRfmTiers": "سطح/ضریب از نمره RFM (نیاز به تحلیل RFM فعال)",
+  "customerClubLoyaltyRfmHint": "در حالت دوم، آستانه هر سطح را با فیلد «حداقل نمره RFM (۰–۱)» در API سطوح یا به‌صورت نسبی از حداقل امتیاز÷۱۰۰۰۰ تنظیم کنید. امتیاز مصرف در فاکتور همچنان از مانده فاکتور است.",
+  "customerClubAnalyticsSegmentsTitle": "گروه‌ها",
+  "customerClubAnalyticsCampaignExport": "خروجی کمپین",
+  "customerClubAnalyticsCampaignTitle": "لیست مخاطبان برای کمپین",
+  "customerClubAnalyticsCampaignBody": "شناسه اشخاص مطابق فیلتر فعلی (سگمنت و جستجو). می‌توانید در ابزار پیامک/ایمیل خود وارد کنید.",
+  "customerClubAnalyticsCampaignCopyIds": "کپی شناسه‌ها",
+  "customerClubAnalyticsCampaignTruncated": "فقط {n} شناسه برگردانده شد؛ برای همه، محدودیت را در API بالا ببرید.",
+  "@customerClubAnalyticsCampaignTruncated": {
+    "placeholders": {
+      "n": {"type": "int"}
+    }
+  },
+  "customerClubAnalyticsRfmNormalized": "نمره نرمال RFM (۰–۱)",
   "customerClubSortAsc": "صعودی",
   "customerClubSortDesc": "نزولی",
 
@@ -4009,7 +4051,131 @@
   "distributionNotesLabel": "یادداشت",
   "reportsDistributionSection": "پخش و ویزیت میدانی",
   "reportsDistributionDashboardTitle": "خلاصه عملکرد ویزیت و مرجوعی",
-  "reportsDistributionDashboardSubtitle": "آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی"
+  "reportsDistributionDashboardSubtitle": "آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی",
+  "invoiceGlobalDiscountSection": "تخفیف کلی فاکتور",
+  "invoiceGlobalDiscountTypePercent": "درصدی",
+  "invoiceGlobalDiscountTypeAmount": "مبلغ",
+  "invoiceGlobalDiscountValueLabel": "مقدار تخفیف کلی",
+  "invoiceGlobalDiscountLineDiscountHint": "جمع تخفیف ردیف‌ها: {amount}",
+  "@invoiceGlobalDiscountLineDiscountHint": {"placeholders": {"amount": {"type": "String"}}},
+  "invoiceGlobalDiscountAmountComputedHint": "تخفیف کلی اعمال‌شده: {amount}",
+  "@invoiceGlobalDiscountAmountComputedHint": {"placeholders": {"amount": {"type": "String"}}},
+  "invoiceSummarySubtotal": "جمع مبلغ",
+  "invoiceSummaryDiscount": "جمع تخفیف",
+  "invoiceSummaryTax": "جمع مالیات",
+  "invoiceSummaryTotal": "جمع کل",
+  "businessSettingsInvoiceGlobalDiscountTitle": "تخفیف کلی فاکتور (محاسبه)",
+  "businessSettingsInvoiceGlobalDiscountBasisLabel": "مبنای درصد تخفیف کلی",
+  "businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines": "جمع خالص پس از تخفیف ردیف (پیش از مالیات)",
+  "businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines": "جمع ناخالص (قبل از تخفیف ردیف)",
+  "businessSettingsInvoiceGlobalDiscountBasisTotalWithTax": "جمع ردیف‌ها شامل مالیات",
+  "businessSettingsInvoiceGlobalDiscountTaxModeLabel": "اثر بر مالیات",
+  "businessSettingsInvoiceGlobalDiscountTaxModeRecalculate": "بازمحاسبه مالیات به‌صورت متناسب",
+  "businessSettingsInvoiceGlobalDiscountTaxModeKeep": "ثابت نگه‌داشتن مالیات ردیف‌ها",
+  "businessSettingsInvoiceGlobalDiscountMaxPercent": "سقف درصد (اختیاری)",
+  "businessSettingsInvoiceGlobalDiscountMaxAmount": "سقف مبلغ (اختیاری)",
+  "editInvoiceTitle": "ویرایش فاکتور",
+  "saveChangesTooltip": "ذخیره تغییرات",
+  "invoiceInfoTab": "اطلاعات فاکتور",
+  "invoiceProductsTab": "کالاها و خدمات",
+  "invoiceTransactionsTab": "تراکنش‌ها",
+  "invoiceInstallmentsTab": "اقساط",
+  "invoiceSettingsTab": "تنظیمات",
+  "invoiceGlobalDiscountPercentInvalid": "درصد تخفیف کلی باید بین ۰ تا ۱۰۰ باشد",
+  "invoiceGlobalDiscountAmountInvalid": "مبلغ تخفیف کلی نمی‌تواند منفی باشد",
+  "invoiceGlobalDiscountValueInvalid": "مقدار تخفیف کلی نامعتبر است",
+  "fiscalYearRollbackTitle": "برگشت از سال مالی جاری",
+  "fiscalYearRollbackRetry": "تلاش مجدد",
+  "fiscalYearRollbackTokenMissing": "کد تأیید موقت تولید نشده یا منقضی شده. دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید و دوباره تلاش کنید.",
+  "fiscalYearRollbackConfirmTitle": "تأیید نهایی",
+  "fiscalYearRollbackConfirmWithBackupBody": "ابتدا پشتیبان کامل کسب‌وکار در سیستم ذخیره می‌شود، سپس سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.",
+  "fiscalYearRollbackConfirmWithoutBackupBody": "سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.",
+  "fiscalYearRollbackCancel": "انصراف",
+  "fiscalYearRollbackConfirmDelete": "حذف سال جاری",
+  "fiscalYearRollbackPhaseBackupStarting": "در حال ایجاد پشتیبان کامل در سیستم…",
+  "fiscalYearRollbackBackupStartFailed": "شروع پشتیبان‌گیری ناموفق بود.",
+  "fiscalYearRollbackBackupJobIdMissing": "شناسهٔ کار پشتیبان از سرور دریافت نشد.",
+  "fiscalYearRollbackPhasePreviewRefresh": "به‌روزرسانی پیش‌نمایش (کد تأیید جدید)…",
+  "fiscalYearRollbackAfterBackupBlocked": "پس از پشتیبان‌گیری، برگشت از سال مالی دیگر مجاز نیست. احتمالاً وضعیت کسب‌وکار تغییر کرده. پیش‌نمایش را بررسی و دوباره تلاش کنید.",
+  "fiscalYearRollbackTokenAfterBackupMissing": "کد تأیید پس از پشتیبان دریافت نشد. «به‌روزرسانی پیش‌نمایش» را بزنید.",
+  "fiscalYearRollbackTokenMissingGeneric": "کد تأیید در دسترس نیست.",
+  "fiscalYearRollbackPhaseDeleting": "در حال حذف سال مالی جاری…",
+  "fiscalYearRollbackSuccessFallback": "با موفقیت انجام شد",
+  "fiscalYearRollbackWarningCard": "این عملیات تمام اسناد سال مالی جاری را حذف می‌کند و سال قبل را دوباره «جاری» می‌کند.",
+  "fiscalYearRollbackCurrentYearLabel": "سال جاری (حذف می‌شود)",
+  "fiscalYearRollbackYearIdSuffix": "شناسه {id}",
+  "@fiscalYearRollbackYearIdSuffix": {"placeholders": {"id": {"type": "String"}}},
+  "fiscalYearRollbackNextCurrentLabel": "سال بعدی جاری",
+  "fiscalYearRollbackDocCountLabel": "تعداد اسناد سال جاری: {count}",
+  "@fiscalYearRollbackDocCountLabel": {"placeholders": {"count": {"type": "String"}}},
+  "fiscalYearRollbackClosingDocsToDelete": "اسناد بستن سال روی سال قبل که حذف می‌شوند: {count}",
+  "@fiscalYearRollbackClosingDocsToDelete": {"placeholders": {"count": {"type": "String"}}},
+  "fiscalYearRollbackBackupCheckboxTitle": "قبل از حذف سال، پشتیبان کامل بگیرم",
+  "fiscalYearRollbackBackupCheckboxSubtitle": "همان پشتیبان سیستمی (.hbx) از بخش تنظیمات؛ برای بازیابی در صورت نیاز.",
+  "fiscalYearRollbackOpenBackupPage": "باز کردن صفحهٔ پشتیبان‌گیری",
+  "fiscalYearRollbackExecuteButton": "اجرای حذف سال مالی جاری",
+  "fiscalYearRollbackBlockedTitle": "این عملیات الان مجاز نیست — دلایل:",
+  "fiscalYearRollbackBlockedHint": "پس از رفع موارد زیر، دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید.",
+  "fiscalYearRollbackRefreshPreview": "به‌روزرسانی پیش‌نمایش",
+  "fiscalYearRollbackBackupProgressPrefix": "پشتیبان: {detail}",
+  "@fiscalYearRollbackBackupProgressPrefix": {"placeholders": {"detail": {"type": "String"}}},
+  "fiscalYearRollbackPreviewFailed": "پیش‌نمایش برگشت از سال مالی ناموفق بود.",
+  "fiscalYearRollbackNetworkUnreachable": "ارتباط با سرور برقرار نشد. اینترنت و وضعیت ورود را بررسی کنید.",
+  "fiscalYearRollbackExecuteFailed": "اجرای برگشت از سال مالی ناموفق بود.",
+  "fiscalYearRollbackExecuteFailedSupport": "اجرای عملیات با خطا مواجه شد. در صورت تکرار با پشتیبانی تماس بگیرید.",
+  "backupJobWaitTimeout": "پشتیبان‌گیری در زمان انتظار به پایان نرسید. از بخش «تنظیمات → پشتیبان‌گیری» وضعیت را بررسی کنید.",
+  "backupJobStorageLimitFallback": "پشتیبان به‌خاطر محدودیت ذخیره‌سازی ذخیره نشد. پکیج را فعال یا حجم را آزاد کنید.",
+  "settingsSideCurrenciesTitle": "مدیریت ارزهای جانبی",
+  "settingsSideCurrenciesSubtitle": "اضافه و حذف ارزهای قابل استفاده در کسب‌وکار",
+  "settingsInvoiceFxPolicyTitle": "سیاست تسعیر فاکتور",
+  "settingsInvoiceFxPolicySubtitle": "لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)",
+  "fxRevaluationSettingsTitle": "تسعیر فاکتور (سیاست)",
+  "fxRevaluationSettingsIntro": "این گزینه‌ها تعیین می‌کنند «لحظه مرجع» نرخ تسعیر (نسبت به ارز اصلی) برای فاکتورهای ارزی چگونه محاسبه شود و اگر نرخی نبود چه رفتاری انجام شود.",
+  "fxRevaluationAsOfSourceLabel": "لحظه مرجع نرخ (as_of)",
+  "fxRevaluationAsOfSourceDocumentDate": "تاریخ سند (با ساعت طبق گزینه زیر)",
+  "fxRevaluationAsOfSourceRegisteredAt": "زمان ثبت سند در سیستم",
+  "fxRevaluationDateEffectiveLabel": "لحظه مؤثر در همان روز (UTC)",
+  "fxRevaluationTimeStartOfDay": "شروع روز ۰۰:۰۰",
+  "fxRevaluationTimeNoon": "میانه روز ۱۲:۰۰",
+  "fxRevaluationTimeEndOfDay": "پایان روز ۲۳:۵۹:۵۹ (چند نرخ در یک روز)",
+  "fxRevaluationWhenNoRateLabel": "اگر نرخ تسعیر برای لحظه مرجع نبود",
+  "fxRevaluationWhenNoRateBlock": "جلوگیری از ثبت فاکتور",
+  "fxRevaluationWhenNoRateAllow": "اجازه ثبت بدون نرخ (ثبت سند fx به‌صورت ناقص)",
+  "fxRevaluationSettingsFooterNote": "کاربران بدون مجوز «تسعیر و نرخ ارز» نمی‌توانند ردیف نرخ خاصی انتخاب کنند؛ سیستم نزدیک‌ترین نرخ (آخرین نرخ مؤثر تا لحظه مرجع) را اعمال می‌کند.",
+  "fxRevaluationSettingsLoadError": "خطا در بارگذاری: {error}",
+  "@fxRevaluationSettingsLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "fxRevaluationSettingsSaveError": "ذخیره نشد: {error}",
+  "@fxRevaluationSettingsSaveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "invoiceFxRateFieldLabel": "نرخ تسعیر (اختیاری)",
+  "invoiceFxRateAuto": "خودکار (سیاست تنظیمات کسب‌وکار)",
+  "invoiceFxRateHelper": "برای ارز غیر اصلی؛ «خودکار» آخرین نرخ معتبر تا لحظهٔ مرجع سند است.",
+  "invoiceFxRateStoredOnDocument": "نرخ ذخیره‌شده سند",
+  "invoiceFxRateRow": "نرخ {rate} — {effective}{idPart}",
+  "@invoiceFxRateRow": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      },
+      "effective": {
+        "type": "String"
+      },
+      "idPart": {
+        "type": "String"
+      }
+    }
+  }
 }
 
 

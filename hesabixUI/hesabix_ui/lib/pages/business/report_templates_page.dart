@@ -16,6 +16,7 @@ import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
 import 'report_template_visual_editor_page.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
   final int businessId;
@@ -1164,6 +1165,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.templates),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (_canWrite) ...[
             Padding(

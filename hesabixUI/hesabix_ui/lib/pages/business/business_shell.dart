@@ -776,6 +776,14 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          _MenuItem(
+            label: t.currencyRevaluation,
+            icon: Icons.payments,
+            selectedIcon: Icons.payments,
+            path: '/business/${widget.businessId}/currency-revaluation',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
         ],
       ),
       _MenuItem(
@@ -2298,6 +2306,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.yearEndClosing) return 'fiscal_years';
     if (label == t.chartOfAccounts) return 'chart_of_accounts';
     if (label == t.openingBalance) return 'opening_balance';
+    if (label == t.currencyRevaluation) return 'currency_revaluation';
     if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
     if (label == 'حواله‌های انبار') return 'warehouse_transfers';

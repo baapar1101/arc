@@ -304,6 +304,8 @@ def get_business_info_with_permissions(
             "accounting_documents": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
             "chart_of_accounts": {"add": True, "edit": True, "view": True, "delete": True},
             "opening_balance": {"edit": True, "view": True},
+            "fiscal_years": {"view": True, "edit": True, "close": True, "rollback": True},
+            "currency_revaluation": {"add": True, "edit": True, "view": True, "delete": True},
             "settings": {"print": True, "users": True, "history": True, "business": True},
             "categories": {"add": True, "edit": True, "view": True, "delete": True},
             "product_attributes": {"add": True, "edit": True, "view": True, "delete": True},

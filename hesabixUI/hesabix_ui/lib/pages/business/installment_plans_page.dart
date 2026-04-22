@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class InstallmentPlansPage extends StatefulWidget {
   final int businessId;
@@ -93,6 +94,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context).installmentPlansTitle),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
         actions: [

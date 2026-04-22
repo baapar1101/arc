@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/document_numbering_models.dart';
 import 'package:hesabix_ui/services/document_numbering_api_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
 class DocumentNumberingSettingsPage extends StatefulWidget {
@@ -154,6 +155,7 @@ class _DocumentNumberingSettingsPageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات شماره‌گذاری اسناد'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),

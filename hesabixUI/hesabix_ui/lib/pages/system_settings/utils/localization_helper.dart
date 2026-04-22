@@ -27,6 +27,12 @@ class LocalizationHelper {
         return t.settingsMarketplacePlugins;
       case 'settingsWalletSettings':
         return t.settingsWalletSettings;
+      case 'settingsCurrenciesAdmin':
+        return t.settingsCurrenciesAdmin;
+      case 'settingsWalletPayoutsAdmin':
+        return t.settingsWalletPayoutsAdmin;
+      case 'settingsSupportOperators':
+        return t.settingsSupportOperators;
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
       case 'settingsBusinessesManagement':
@@ -37,6 +43,10 @@ class LocalizationHelper {
         return t.settingsNotifications;
       case 'settingsNotificationTemplates':
         return t.settingsNotificationTemplates;
+      case 'settingsNotificationModeration':
+        return t.settingsNotificationModeration;
+      case 'settingsNotificationSmsPricing':
+        return t.settingsNotificationSmsPricing;
       case 'settingsAISettings':
         return t.settingsAISettings;
       case 'settingsAIPlans':
@@ -55,6 +65,8 @@ class LocalizationHelper {
         return t.settingsServiceLogs;
       case 'settingsDatabaseBackup':
         return t.settingsDatabaseBackup;
+      case 'settingsSystemScripts':
+        return t.settingsSystemScripts;
       default:
         return key;
     }
@@ -85,6 +97,12 @@ class LocalizationHelper {
         return t.settingsMarketplacePluginsDescription;
       case 'settingsWalletSettingsDescription':
         return t.settingsWalletSettingsDescription;
+      case 'settingsCurrenciesAdminDescription':
+        return t.settingsCurrenciesAdminDescription;
+      case 'settingsWalletPayoutsAdminDescription':
+        return t.settingsWalletPayoutsAdminDescription;
+      case 'settingsSupportOperatorsDescription':
+        return t.settingsSupportOperatorsDescription;
       case 'settingsPaymentGatewaysDescription':
         return t.settingsPaymentGatewaysDescription;
       case 'settingsBusinessesManagementDescription':
@@ -95,6 +113,10 @@ class LocalizationHelper {
         return t.settingsNotificationsDescription;
       case 'settingsNotificationTemplatesDescription':
         return t.settingsNotificationTemplatesDescription;
+      case 'settingsNotificationModerationDescription':
+        return t.settingsNotificationModerationDescription;
+      case 'settingsNotificationSmsPricingDescription':
+        return t.settingsNotificationSmsPricingDescription;
       case 'settingsAISettingsDescription':
         return t.settingsAISettingsDescription;
       case 'settingsAIPlansDescription':
@@ -113,6 +135,8 @@ class LocalizationHelper {
         return t.settingsServiceLogsDescription;
       case 'settingsDatabaseBackupDescription':
         return t.settingsDatabaseBackupDescription;
+      case 'settingsSystemScriptsDescription':
+        return t.settingsSystemScriptsDescription;
       default:
         return key;
     }

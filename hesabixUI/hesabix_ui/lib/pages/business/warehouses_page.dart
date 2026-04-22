@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/errors/api_error.dart';
 import '../../services/warehouse_service.dart';
 import '../../models/warehouse_model.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -154,12 +156,12 @@ class _WarehousesPageState extends State<WarehousesPage> {
   Future<void> _delete(Warehouse w) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('حذف انبار'),
         content: Text('آیا از حذف «${w.name}» مطمئن هستید؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('حذف')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حذف')),
         ],
       ),
     );
@@ -172,7 +174,14 @@ class _WarehousesPageState extends State<WarehousesPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      var msg = e.toString();
+      if (e is DioException) {
+        final err = e.error;
+        if (err is ApiErrorDetails) {
+          msg = err.message ?? msg;
+        }
+      }
+      SnackBarHelper.showError(context, message: msg);
     }
   }
 }

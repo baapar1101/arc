@@ -220,6 +220,9 @@ class _SettingsPageState extends State<SettingsPage> {
                               currentBusiness.id == widget.businessId &&
                               !isOwner;
 
+    final canFiscalYearRollback =
+        isOwner || (authStore?.hasBusinessPermission('fiscal_years', 'rollback') ?? false);
+
     final businessTitle = currentBusiness?.name ?? t.settings;
     final businessSubtitle = currentBusiness != null
         ? (isOwner
@@ -271,70 +274,77 @@ class _SettingsPageState extends State<SettingsPage> {
                                   title: t.businessSettings,
                                   subtitle: t.businessSettingsDescription,
                                   icon: Icons.business,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/business'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/business'),
                                 ),
                                 _buildSettingItem(
                                   context,
-                                  title: 'مدیریت ارزهای جانبی',
-                                  subtitle: 'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار',
+                                  title: t.settingsSideCurrenciesTitle,
+                                  subtitle: t.settingsSideCurrenciesSubtitle,
                                   icon: Icons.currency_exchange,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/currencies'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/currencies'),
+                                ),
+                                _buildSettingItem(
+                                  context,
+                                  title: t.settingsInvoiceFxPolicyTitle,
+                                  subtitle: t.settingsInvoiceFxPolicySubtitle,
+                                  icon: Icons.tune,
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/fx-revaluation'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: 'ویرایش سال مالی جاری',
                                   subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
                                   icon: Icons.calendar_today,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/fiscal-year'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/fiscal-year'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.creditSettingsTitle,
                                   subtitle: t.creditSettingsSubtitle,
                                   icon: Icons.credit_score_outlined,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/credit'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: 'تنظیمات فروش سریع',
                                   subtitle: 'تنظیمات پیش‌فرض برای فروش سریع',
                                   icon: Icons.point_of_sale_outlined,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/quick-sales'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/quick-sales'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.installmentsTitle,
                                   subtitle: t.installmentsSettingsSubtitle,
                                   icon: Icons.dashboard_customize_outlined,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/installments'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/installments'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.usersAndPermissions,
                                   subtitle: t.usersAndPermissionsDescription,
                                   icon: Icons.people_outline,
-                                  onTap: () => context.go('/business/${widget.businessId}/users-permissions'),
+                                  onTap: () => context.push('/business/${widget.businessId}/users-permissions'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: 'مدیریت پروژه‌ها',
                                   subtitle: 'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها',
                                   icon: Icons.account_tree,
-                                  onTap: () => context.go('/business/${widget.businessId}/projects'),
+                                  onTap: () => context.push('/business/${widget.businessId}/projects'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: 'شماره‌گذاری اسناد',
                                   subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
                                   icon: Icons.numbers,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/document-numbering'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/document-numbering'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.printDocuments,
                                   subtitle: t.printDocumentsDescription,
                                   icon: Icons.print,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/print'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/print'),
                                 ),
                                 // Report Builder - Templates access
                                 _buildSettingItem(
@@ -342,21 +352,21 @@ class _SettingsPageState extends State<SettingsPage> {
                                   title: t.templates,
                                   subtitle: t.printDocumentsDescription,
                                   icon: Icons.picture_as_pdf,
-                                  onTap: () => context.go('/business/${widget.businessId}/report-templates'),
+                                  onTap: () => context.push('/business/${widget.businessId}/report-templates'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.documentMonetizationTitle,
                                   subtitle: t.documentMonetizationSubtitle,
                                   icon: Icons.receipt_long_outlined,
-                                  onTap: () => context.go('/business/${widget.businessId}/document-monetization'),
+                                  onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.taxIntegrationTitle,
                                   subtitle: t.taxIntegrationSubtitle,
                                   icon: Icons.cloud_sync_outlined,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/tax'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
                                 ),
                                 if (_canAccessWarrantySettings())
                                   _buildSettingItem(
@@ -364,7 +374,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: t.warrantySettings,
                                     subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
                                     icon: Icons.verified_user,
-                                    onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
+                                    onTap: () => context.push('/business/${widget.businessId}/warranty/settings'),
                                   ),
                                 if (_canAccessRepairShopSettings())
                                   _buildSettingItem(
@@ -372,7 +382,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: 'تنظیمات تعمیرگاه',
                                     subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
                                     icon: Icons.build_circle,
-                                    onTap: () => context.go('/business/${widget.businessId}/repair-shop-settings'),
+                                    onTap: () => context.push('/business/${widget.businessId}/repair-shop-settings'),
                                   ),
                                 if (_canAccessCustomerClubSettings())
                                   _buildSettingItem(
@@ -380,7 +390,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: t.customerClubTitle,
                                     subtitle: t.customerClubSettingsSubtitle,
                                     icon: Icons.card_giftcard,
-                                    onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
+                                    onTap: () => context.push('/business/${widget.businessId}/settings/customer-club'),
                                   ),
                                 if (_canAccessDistributionModule())
                                   _buildSettingItem(
@@ -388,14 +398,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: t.distributionMenu,
                                     subtitle: t.distributionSettingsSubtitle,
                                     icon: Icons.local_shipping_outlined,
-                                    onTap: () => context.go('/business/${widget.businessId}/distribution'),
+                                    onTap: () => context.push('/business/${widget.businessId}/distribution'),
                                   ),
                                 _buildSettingItem(
                                   context,
                                   title: 'قالب‌های نوتیفیکیشن',
                                   subtitle: 'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف',
                                   icon: Icons.notifications_active,
-                                  onTap: () => context.go('/business/${widget.businessId}/notification-templates'),
+                                  onTap: () => context.push('/business/${widget.businessId}/notification-templates'),
                                 ),
                               ],
                             ),
@@ -411,7 +421,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   title: t.dataBackup,
                                   subtitle: t.dataBackupDescription,
                                   icon: Icons.backup,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/backup'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/backup'),
                                 ),
                                 if (_canManageFtpBackupSettings())
                                   _buildSettingItem(
@@ -419,21 +429,21 @@ class _SettingsPageState extends State<SettingsPage> {
                                     title: t.ftpBackupSettingsTitle,
                                     subtitle: t.ftpBackupSettingsDescription,
                                     icon: Icons.cloud_upload_outlined,
-                                    onTap: () => context.go('/business/${widget.businessId}/settings/ftp-backup'),
+                                    onTap: () => context.push('/business/${widget.businessId}/settings/ftp-backup'),
                                   ),
                                 _buildSettingItem(
                                   context,
                                   title: t.dataRestore,
                                   subtitle: t.dataRestoreDescription,
                                   icon: Icons.restore,
-                                  onTap: () => context.go('/business/${widget.businessId}/settings/restore'),
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/restore'),
                                 ),
                                 _buildSettingItem(
                                   context,
                                   title: t.systemLogs,
                                   subtitle: t.systemLogsDescription,
                                   icon: Icons.assignment,
-                                  onTap: () => context.go('/business/${widget.businessId}/reports/activity-logs'),
+                                  onTap: () => context.push('/business/${widget.businessId}/reports/activity-logs'),
                                 ),
                               ],
                             ),
@@ -466,8 +476,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ],
                               ),
                             ],
-                            // بخش عملیات خطرناک (فقط برای مالک)
-                            if (isOwner) ...[
+                            // بخش عملیات خطرناک
+                            if (isOwner || canFiscalYearRollback) ...[
                               const SizedBox(height: 24),
                               _buildSection(
                                 context,
@@ -475,15 +485,27 @@ class _SettingsPageState extends State<SettingsPage> {
                                 icon: Icons.warning_amber_rounded,
                                 isDanger: true,
                                 children: [
-                                  _buildSettingItem(
-                                    context,
-                                    title: 'حذف کسب و کار',
-                                    subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
-                                    icon: Icons.delete_forever,
-                                  isDanger: true,
-                                    trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                    onTap: () => context.go('/business/${widget.businessId}/settings/delete'),
-                                  ),
+                                  if (isOwner)
+                                    _buildSettingItem(
+                                      context,
+                                      title: 'حذف کسب و کار',
+                                      subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
+                                      icon: Icons.delete_forever,
+                                      isDanger: true,
+                                      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                                      onTap: () => context.push('/business/${widget.businessId}/settings/delete'),
+                                    ),
+                                  if (canFiscalYearRollback)
+                                    _buildSettingItem(
+                                      context,
+                                      title: 'برگشت از سال مالی جاری',
+                                      subtitle: 'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)',
+                                      icon: Icons.restore_from_trash,
+                                      isDanger: true,
+                                      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                                      onTap: () =>
+                                          context.push('/business/${widget.businessId}/settings/fiscal-year-rollback'),
+                                    ),
                                 ],
                               ),
                             ],
@@ -551,70 +573,77 @@ class _SettingsPageState extends State<SettingsPage> {
                             title: t.businessSettings,
                             subtitle: t.businessSettingsDescription,
                             icon: Icons.business,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/business'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/business'),
                           ),
                           _buildSettingItem(
                             context,
-                            title: 'مدیریت ارزهای جانبی',
-                            subtitle: 'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار',
+                            title: t.settingsSideCurrenciesTitle,
+                            subtitle: t.settingsSideCurrenciesSubtitle,
                             icon: Icons.currency_exchange,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/currencies'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/currencies'),
+                          ),
+                          _buildSettingItem(
+                            context,
+                            title: t.settingsInvoiceFxPolicyTitle,
+                            subtitle: t.settingsInvoiceFxPolicySubtitle,
+                            icon: Icons.tune,
+                            onTap: () => context.push('/business/${widget.businessId}/settings/fx-revaluation'),
                           ),
                           _buildSettingItem(
                             context,
                             title: 'ویرایش سال مالی جاری',
                             subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
                             icon: Icons.calendar_today,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/fiscal-year'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/fiscal-year'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.creditSettingsTitle,
                             subtitle: t.creditSettingsSubtitle,
                             icon: Icons.credit_score_outlined,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/credit'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
                           ),
                           _buildSettingItem(
                             context,
                             title: 'تنظیمات فروش سریع',
                             subtitle: 'تنظیمات پیش‌فرض برای فروش سریع',
                             icon: Icons.point_of_sale_outlined,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/quick-sales'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/quick-sales'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.installmentsTitle,
                             subtitle: t.installmentsSettingsSubtitle,
                             icon: Icons.dashboard_customize_outlined,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/installments'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/installments'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.usersAndPermissions,
                             subtitle: t.usersAndPermissionsDescription,
                             icon: Icons.people_outline,
-                            onTap: () => context.go('/business/${widget.businessId}/users-permissions'),
+                            onTap: () => context.push('/business/${widget.businessId}/users-permissions'),
                           ),
                           _buildSettingItem(
                             context,
                             title: 'مدیریت پروژه‌ها',
                             subtitle: 'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها',
                             icon: Icons.account_tree,
-                            onTap: () => context.go('/business/${widget.businessId}/projects'),
+                            onTap: () => context.push('/business/${widget.businessId}/projects'),
                           ),
                           _buildSettingItem(
                             context,
                             title: 'شماره‌گذاری اسناد',
                             subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
                             icon: Icons.numbers,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/document-numbering'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/document-numbering'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.printDocuments,
                             subtitle: t.printDocumentsDescription,
                             icon: Icons.print,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/print'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/print'),
                           ),
                           // Report Builder - Templates access
                           _buildSettingItem(
@@ -622,21 +651,21 @@ class _SettingsPageState extends State<SettingsPage> {
                             title: t.templates,
                             subtitle: t.printDocumentsDescription,
                             icon: Icons.picture_as_pdf,
-                            onTap: () => context.go('/business/${widget.businessId}/report-templates'),
+                            onTap: () => context.push('/business/${widget.businessId}/report-templates'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.documentMonetizationTitle,
                             subtitle: t.documentMonetizationSubtitle,
                             icon: Icons.receipt_long_outlined,
-                            onTap: () => context.go('/business/${widget.businessId}/document-monetization'),
+                            onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.taxIntegrationTitle,
                             subtitle: t.taxIntegrationSubtitle,
                             icon: Icons.cloud_sync_outlined,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/tax'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
                           ),
                           if (_canAccessWarrantySettings())
                             _buildSettingItem(
@@ -644,7 +673,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: t.warrantySettings,
                               subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
                               icon: Icons.verified_user,
-                              onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
+                              onTap: () => context.push('/business/${widget.businessId}/warranty/settings'),
                             ),
                           if (_canAccessRepairShopSettings())
                             _buildSettingItem(
@@ -652,7 +681,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: 'تنظیمات تعمیرگاه',
                               subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
                               icon: Icons.build_circle,
-                              onTap: () => context.go('/business/${widget.businessId}/repair-shop-settings'),
+                              onTap: () => context.push('/business/${widget.businessId}/repair-shop-settings'),
                             ),
                           if (_canAccessCustomerClubSettings())
                             _buildSettingItem(
@@ -660,7 +689,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: t.customerClubTitle,
                               subtitle: t.customerClubSettingsSubtitle,
                               icon: Icons.card_giftcard,
-                              onTap: () => context.go('/business/${widget.businessId}/settings/customer-club'),
+                              onTap: () => context.push('/business/${widget.businessId}/settings/customer-club'),
                             ),
                           if (_canAccessDistributionModule())
                             _buildSettingItem(
@@ -668,14 +697,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: t.distributionMenu,
                               subtitle: t.distributionSettingsSubtitle,
                               icon: Icons.local_shipping_outlined,
-                              onTap: () => context.go('/business/${widget.businessId}/distribution'),
+                              onTap: () => context.push('/business/${widget.businessId}/distribution'),
                             ),
                           _buildSettingItem(
                             context,
                             title: 'قالب‌های نوتیفیکیشن',
                             subtitle: 'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف',
                             icon: Icons.notifications_active,
-                            onTap: () => context.go('/business/${widget.businessId}/notification-templates'),
+                            onTap: () => context.push('/business/${widget.businessId}/notification-templates'),
                           ),
                         ],
                       ),
@@ -727,7 +756,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             title: t.dataBackup,
                             subtitle: t.dataBackupDescription,
                             icon: Icons.backup,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/backup'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/backup'),
                           ),
                           if (_canManageFtpBackupSettings())
                             _buildSettingItem(
@@ -735,21 +764,21 @@ class _SettingsPageState extends State<SettingsPage> {
                               title: t.ftpBackupSettingsTitle,
                               subtitle: t.ftpBackupSettingsDescription,
                               icon: Icons.cloud_upload_outlined,
-                              onTap: () => context.go('/business/${widget.businessId}/settings/ftp-backup'),
+                              onTap: () => context.push('/business/${widget.businessId}/settings/ftp-backup'),
                             ),
                           _buildSettingItem(
                             context,
                             title: t.dataRestore,
                             subtitle: t.dataRestoreDescription,
                             icon: Icons.restore,
-                            onTap: () => context.go('/business/${widget.businessId}/settings/restore'),
+                            onTap: () => context.push('/business/${widget.businessId}/settings/restore'),
                           ),
                           _buildSettingItem(
                             context,
                             title: t.systemLogs,
                             subtitle: t.systemLogsDescription,
                             icon: Icons.assignment,
-                            onTap: () => context.go('/business/${widget.businessId}/reports/activity-logs'),
+                            onTap: () => context.push('/business/${widget.businessId}/reports/activity-logs'),
                           ),
                         ],
                       ),
@@ -782,8 +811,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ],
                         ),
                       ],
-                      // بخش عملیات خطرناک (فقط برای مالک)
-                      if (isOwner) ...[
+                      if (isOwner || canFiscalYearRollback) ...[
                         const SizedBox(height: 24),
                         _buildSection(
                           context,
@@ -791,15 +819,27 @@ class _SettingsPageState extends State<SettingsPage> {
                           icon: Icons.warning_amber_rounded,
                           isDanger: true,
                           children: [
-                            _buildSettingItem(
-                              context,
-                              title: 'حذف کسب و کار',
-                              subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
-                              icon: Icons.delete_forever,
-                              isDanger: true,
-                              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                              onTap: () => context.go('/business/${widget.businessId}/settings/delete'),
-                            ),
+                            if (isOwner)
+                              _buildSettingItem(
+                                context,
+                                title: 'حذف کسب و کار',
+                                subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
+                                icon: Icons.delete_forever,
+                                isDanger: true,
+                                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                                onTap: () => context.push('/business/${widget.businessId}/settings/delete'),
+                              ),
+                            if (canFiscalYearRollback)
+                              _buildSettingItem(
+                                context,
+                                title: 'برگشت از سال مالی جاری',
+                                subtitle: 'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)',
+                                icon: Icons.restore_from_trash,
+                                isDanger: true,
+                                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                                onTap: () =>
+                                    context.push('/business/${widget.businessId}/settings/fiscal-year-rollback'),
+                              ),
                           ],
                         ),
                       ],

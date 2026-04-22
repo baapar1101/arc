@@ -3509,6 +3509,12 @@ abstract class AppLocalizations {
   /// **'Year End Closing'**
   String get yearEndClosing;
 
+  /// No description provided for @currencyRevaluation.
+  ///
+  /// In en, this message translates to:
+  /// **'FX rates & revaluation'**
+  String get currencyRevaluation;
+
   /// No description provided for @accountingSettings.
   ///
   /// In en, this message translates to:
@@ -15773,6 +15779,18 @@ abstract class AppLocalizations {
   /// **'Set base currency and policies'**
   String get settingsWalletSettingsDescription;
 
+  /// No description provided for @settingsCurrenciesAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency management'**
+  String get settingsCurrenciesAdmin;
+
+  /// No description provided for @settingsCurrenciesAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Decimal places, rounding, add or remove currencies'**
+  String get settingsCurrenciesAdminDescription;
+
   /// No description provided for @settingsPaymentGateways.
   ///
   /// In en, this message translates to:
@@ -15832,6 +15850,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage templates for channels and languages'**
   String get settingsNotificationTemplatesDescription;
+
+  /// No description provided for @settingsSupportOperators.
+  ///
+  /// In en, this message translates to:
+  /// **'Support operators'**
+  String get settingsSupportOperators;
+
+  /// No description provided for @settingsSupportOperatorsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant or revoke support operator access for users'**
+  String get settingsSupportOperatorsDescription;
+
+  /// No description provided for @settingsNotificationModeration.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification template moderation'**
+  String get settingsNotificationModeration;
+
+  /// No description provided for @settingsNotificationModerationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve or reject notification templates submitted by businesses'**
+  String get settingsNotificationModerationDescription;
+
+  /// No description provided for @settingsNotificationSmsPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification SMS pricing'**
+  String get settingsNotificationSmsPricing;
+
+  /// No description provided for @settingsNotificationSmsPricingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the price per SMS for business notifications'**
+  String get settingsNotificationSmsPricingDescription;
+
+  /// No description provided for @settingsSystemScripts.
+  ///
+  /// In en, this message translates to:
+  /// **'System scripts'**
+  String get settingsSystemScripts;
+
+  /// No description provided for @settingsSystemScriptsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run global corrective operations for all businesses'**
+  String get settingsSystemScriptsDescription;
+
+  /// No description provided for @supportOperatorsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Support operators'**
+  String get supportOperatorsPageTitle;
+
+  /// No description provided for @supportOperatorsRemoveOperatorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove operator'**
+  String get supportOperatorsRemoveOperatorTitle;
+
+  /// No description provided for @supportOperatorsRemoveOperatorConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to revoke operator access for {email}?'**
+  String supportOperatorsRemoveOperatorConfirm(String email);
+
+  /// No description provided for @supportOperatorsAccessRevokedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator access revoked successfully'**
+  String get supportOperatorsAccessRevokedSuccess;
+
+  /// No description provided for @supportOperatorsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No support operators found'**
+  String get supportOperatorsEmpty;
+
+  /// No description provided for @supportOperatorsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To add an operator, use the User Management page.'**
+  String get supportOperatorsEmptyHint;
+
+  /// No description provided for @supportOperatorsTelegramConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram linked'**
+  String get supportOperatorsTelegramConnected;
+
+  /// No description provided for @supportOperatorsTelegramNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not linked'**
+  String get supportOperatorsTelegramNotConnected;
+
+  /// No description provided for @supportOperatorsStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get supportOperatorsStatusInactive;
 
   /// No description provided for @settingsAISettings.
   ///
@@ -17278,6 +17398,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'After changing settings, run Recalculate from the analytics tab.'**
   String get customerClubAnalyticsHint;
+
+  /// No description provided for @customerClubSettingsSectionLoyaltyRfm.
+  ///
+  /// In en, this message translates to:
+  /// **'Loyalty points vs RFM'**
+  String get customerClubSettingsSectionLoyaltyRfm;
+
+  /// No description provided for @customerClubLoyaltyRfmMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Integration mode'**
+  String get customerClubLoyaltyRfmMode;
+
+  /// No description provided for @customerClubLoyaltyRfmDecoupled.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate: points from invoices; tiers use point balance'**
+  String get customerClubLoyaltyRfmDecoupled;
+
+  /// No description provided for @customerClubLoyaltyRfmTiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Tier multipliers follow RFM score (requires RFM analytics on)'**
+  String get customerClubLoyaltyRfmTiers;
+
+  /// No description provided for @customerClubLoyaltyRfmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'In RFM tier mode, set each tier’s min RFM score (0–1) via the tiers API field min_rfm_normalized, or rely on min_balance_points÷10000 as a fallback. Redemption still uses invoice-earned balance.'**
+  String get customerClubLoyaltyRfmHint;
+
+  /// No description provided for @customerClubAnalyticsSegmentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Segments'**
+  String get customerClubAnalyticsSegmentsTitle;
+
+  /// No description provided for @customerClubAnalyticsCampaignExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Campaign export'**
+  String get customerClubAnalyticsCampaignExport;
+
+  /// No description provided for @customerClubAnalyticsCampaignTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audience list for campaigns'**
+  String get customerClubAnalyticsCampaignTitle;
+
+  /// No description provided for @customerClubAnalyticsCampaignBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Person IDs for the current filters (segment + search). Paste into your SMS/email tool.'**
+  String get customerClubAnalyticsCampaignBody;
+
+  /// No description provided for @customerClubAnalyticsCampaignCopyIds.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy IDs'**
+  String get customerClubAnalyticsCampaignCopyIds;
+
+  /// No description provided for @customerClubAnalyticsCampaignTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {n} IDs returned; increase the API limit to fetch more.'**
+  String customerClubAnalyticsCampaignTruncated(int n);
+
+  /// No description provided for @customerClubAnalyticsRfmNormalized.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM normalized score (0–1)'**
+  String get customerClubAnalyticsRfmNormalized;
 
   /// No description provided for @customerClubSortAsc.
   ///
@@ -19486,6 +19678,546 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Visit and return statistics for a date range'**
   String get reportsDistributionDashboardSubtitle;
+
+  /// No description provided for @invoiceGlobalDiscountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice-level discount'**
+  String get invoiceGlobalDiscountSection;
+
+  /// No description provided for @invoiceGlobalDiscountTypePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get invoiceGlobalDiscountTypePercent;
+
+  /// No description provided for @invoiceGlobalDiscountTypeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get invoiceGlobalDiscountTypeAmount;
+
+  /// No description provided for @invoiceGlobalDiscountValueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice discount value'**
+  String get invoiceGlobalDiscountValueLabel;
+
+  /// No description provided for @invoiceGlobalDiscountLineDiscountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Line discounts subtotal: {amount}'**
+  String invoiceGlobalDiscountLineDiscountHint(String amount);
+
+  /// No description provided for @invoiceGlobalDiscountAmountComputedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied invoice discount: {amount}'**
+  String invoiceGlobalDiscountAmountComputedHint(String amount);
+
+  /// No description provided for @invoiceSummarySubtotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtotal'**
+  String get invoiceSummarySubtotal;
+
+  /// No description provided for @invoiceSummaryDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total discount'**
+  String get invoiceSummaryDiscount;
+
+  /// No description provided for @invoiceSummaryTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tax'**
+  String get invoiceSummaryTax;
+
+  /// No description provided for @invoiceSummaryTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Grand total'**
+  String get invoiceSummaryTotal;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice-level discount (calculation)'**
+  String get businessSettingsInvoiceGlobalDiscountTitle;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountBasisLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent discount basis'**
+  String get businessSettingsInvoiceGlobalDiscountBasisLabel;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Net after line discounts (pre-tax)'**
+  String get businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross before line discounts'**
+  String get businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountBasisTotalWithTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Sum of line totals including tax'**
+  String get businessSettingsInvoiceGlobalDiscountBasisTotalWithTax;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountTaxModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Effect on tax'**
+  String get businessSettingsInvoiceGlobalDiscountTaxModeLabel;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountTaxModeRecalculate.
+  ///
+  /// In en, this message translates to:
+  /// **'Recalculate tax proportionally'**
+  String get businessSettingsInvoiceGlobalDiscountTaxModeRecalculate;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountTaxModeKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep per-line tax amounts'**
+  String get businessSettingsInvoiceGlobalDiscountTaxModeKeep;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountMaxPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Max percent (optional)'**
+  String get businessSettingsInvoiceGlobalDiscountMaxPercent;
+
+  /// No description provided for @businessSettingsInvoiceGlobalDiscountMaxAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Max amount (optional)'**
+  String get businessSettingsInvoiceGlobalDiscountMaxAmount;
+
+  /// No description provided for @editInvoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit invoice'**
+  String get editInvoiceTitle;
+
+  /// No description provided for @saveChangesTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get saveChangesTooltip;
+
+  /// No description provided for @invoiceProductsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & services'**
+  String get invoiceProductsTab;
+
+  /// No description provided for @invoiceTransactionsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get invoiceTransactionsTab;
+
+  /// No description provided for @invoiceInstallmentsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Installments'**
+  String get invoiceInstallmentsTab;
+
+  /// No description provided for @invoiceSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get invoiceSettingsTab;
+
+  /// No description provided for @invoiceGlobalDiscountPercentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice discount percent must be between 0 and 100'**
+  String get invoiceGlobalDiscountPercentInvalid;
+
+  /// No description provided for @invoiceGlobalDiscountAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice discount amount cannot be negative'**
+  String get invoiceGlobalDiscountAmountInvalid;
+
+  /// No description provided for @invoiceGlobalDiscountValueInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice discount value is invalid'**
+  String get invoiceGlobalDiscountValueInvalid;
+
+  /// No description provided for @fiscalYearRollbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert current fiscal year'**
+  String get fiscalYearRollbackTitle;
+
+  /// No description provided for @fiscalYearRollbackRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get fiscalYearRollbackRetry;
+
+  /// No description provided for @fiscalYearRollbackTokenMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No confirmation code or it has expired. Tap “Refresh preview” and try again.'**
+  String get fiscalYearRollbackTokenMissing;
+
+  /// No description provided for @fiscalYearRollbackConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Final confirmation'**
+  String get fiscalYearRollbackConfirmTitle;
+
+  /// No description provided for @fiscalYearRollbackConfirmWithBackupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A full business backup will be saved in the system first, then the current fiscal year and all its documents will be removed. Closing documents on the previous year (if any) will also be removed. This cannot be undone in the app.'**
+  String get fiscalYearRollbackConfirmWithBackupBody;
+
+  /// No description provided for @fiscalYearRollbackConfirmWithoutBackupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The current fiscal year and all its documents will be removed. Closing documents on the previous year (if any) will also be removed. This cannot be undone in the app.'**
+  String get fiscalYearRollbackConfirmWithoutBackupBody;
+
+  /// No description provided for @fiscalYearRollbackCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get fiscalYearRollbackCancel;
+
+  /// No description provided for @fiscalYearRollbackConfirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove current year'**
+  String get fiscalYearRollbackConfirmDelete;
+
+  /// No description provided for @fiscalYearRollbackPhaseBackupStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating full system backup…'**
+  String get fiscalYearRollbackPhaseBackupStarting;
+
+  /// No description provided for @fiscalYearRollbackBackupStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start backup.'**
+  String get fiscalYearRollbackBackupStartFailed;
+
+  /// No description provided for @fiscalYearRollbackBackupJobIdMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup job id was not returned by the server.'**
+  String get fiscalYearRollbackBackupJobIdMissing;
+
+  /// No description provided for @fiscalYearRollbackPhasePreviewRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing preview (new confirmation code)…'**
+  String get fiscalYearRollbackPhasePreviewRefresh;
+
+  /// No description provided for @fiscalYearRollbackAfterBackupBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'After the backup, fiscal rollback is no longer allowed. The business state may have changed. Review the preview and try again.'**
+  String get fiscalYearRollbackAfterBackupBlocked;
+
+  /// No description provided for @fiscalYearRollbackTokenAfterBackupMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No confirmation code after backup. Tap “Refresh preview”.'**
+  String get fiscalYearRollbackTokenAfterBackupMissing;
+
+  /// No description provided for @fiscalYearRollbackTokenMissingGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation code is not available.'**
+  String get fiscalYearRollbackTokenMissingGeneric;
+
+  /// No description provided for @fiscalYearRollbackPhaseDeleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing current fiscal year…'**
+  String get fiscalYearRollbackPhaseDeleting;
+
+  /// No description provided for @fiscalYearRollbackSuccessFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed successfully'**
+  String get fiscalYearRollbackSuccessFallback;
+
+  /// No description provided for @fiscalYearRollbackWarningCard.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes all documents in the current fiscal year and makes the previous year current.'**
+  String get fiscalYearRollbackWarningCard;
+
+  /// No description provided for @fiscalYearRollbackCurrentYearLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current year (will be removed)'**
+  String get fiscalYearRollbackCurrentYearLabel;
+
+  /// No description provided for @fiscalYearRollbackYearIdSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'ID {id}'**
+  String fiscalYearRollbackYearIdSuffix(String id);
+
+  /// No description provided for @fiscalYearRollbackNextCurrentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Will become current'**
+  String get fiscalYearRollbackNextCurrentLabel;
+
+  /// No description provided for @fiscalYearRollbackDocCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents in current year: {count}'**
+  String fiscalYearRollbackDocCountLabel(String count);
+
+  /// No description provided for @fiscalYearRollbackClosingDocsToDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing documents on the previous year to be removed: {count}'**
+  String fiscalYearRollbackClosingDocsToDelete(String count);
+
+  /// No description provided for @fiscalYearRollbackBackupCheckboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a full backup before removing the year'**
+  String get fiscalYearRollbackBackupCheckboxTitle;
+
+  /// No description provided for @fiscalYearRollbackBackupCheckboxSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Same system backup (.hbx) as in settings, for restore if needed.'**
+  String get fiscalYearRollbackBackupCheckboxSubtitle;
+
+  /// No description provided for @fiscalYearRollbackOpenBackupPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open backup page'**
+  String get fiscalYearRollbackOpenBackupPage;
+
+  /// No description provided for @fiscalYearRollbackExecuteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove current fiscal year'**
+  String get fiscalYearRollbackExecuteButton;
+
+  /// No description provided for @fiscalYearRollbackBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This action is not allowed right now — reasons:'**
+  String get fiscalYearRollbackBlockedTitle;
+
+  /// No description provided for @fiscalYearRollbackBlockedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After fixing the items below, tap “Refresh preview”.'**
+  String get fiscalYearRollbackBlockedHint;
+
+  /// No description provided for @fiscalYearRollbackRefreshPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh preview'**
+  String get fiscalYearRollbackRefreshPreview;
+
+  /// No description provided for @fiscalYearRollbackBackupProgressPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup: {detail}'**
+  String fiscalYearRollbackBackupProgressPrefix(String detail);
+
+  /// No description provided for @fiscalYearRollbackPreviewFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal rollback preview failed.'**
+  String get fiscalYearRollbackPreviewFailed;
+
+  /// No description provided for @fiscalYearRollbackNetworkUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the server. Check your connection and sign-in.'**
+  String get fiscalYearRollbackNetworkUnreachable;
+
+  /// No description provided for @fiscalYearRollbackExecuteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal rollback failed.'**
+  String get fiscalYearRollbackExecuteFailed;
+
+  /// No description provided for @fiscalYearRollbackExecuteFailedSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'The operation failed. If it keeps happening, contact support.'**
+  String get fiscalYearRollbackExecuteFailedSupport;
+
+  /// No description provided for @backupJobWaitTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup did not finish within the wait time. Check status under Settings → Backup.'**
+  String get backupJobWaitTimeout;
+
+  /// No description provided for @backupJobStorageLimitFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup could not be saved due to storage limits. Activate a plan or free space.'**
+  String get backupJobStorageLimitFallback;
+
+  /// No description provided for @settingsSideCurrenciesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary currencies'**
+  String get settingsSideCurrenciesTitle;
+
+  /// No description provided for @settingsSideCurrenciesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add and remove currencies available for this business'**
+  String get settingsSideCurrenciesSubtitle;
+
+  /// No description provided for @settingsInvoiceFxPolicyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice FX revaluation policy'**
+  String get settingsInvoiceFxPolicyTitle;
+
+  /// No description provided for @settingsInvoiceFxPolicySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference time for the rate and behavior when no rate exists (base vs. foreign currency)'**
+  String get settingsInvoiceFxPolicySubtitle;
+
+  /// No description provided for @fxRevaluationSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice revaluation (policy)'**
+  String get fxRevaluationSettingsTitle;
+
+  /// No description provided for @fxRevaluationSettingsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'These options define the reference time for the revaluation rate (against the base currency) for invoices in foreign currency, and what happens if no rate exists.'**
+  String get fxRevaluationSettingsIntro;
+
+  /// No description provided for @fxRevaluationAsOfSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference time for the rate (as_of)'**
+  String get fxRevaluationAsOfSourceLabel;
+
+  /// No description provided for @fxRevaluationAsOfSourceDocumentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date (time from the option below)'**
+  String get fxRevaluationAsOfSourceDocumentDate;
+
+  /// No description provided for @fxRevaluationAsOfSourceRegisteredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'When the document is registered in the system'**
+  String get fxRevaluationAsOfSourceRegisteredAt;
+
+  /// No description provided for @fxRevaluationDateEffectiveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective time on that day (UTC)'**
+  String get fxRevaluationDateEffectiveLabel;
+
+  /// No description provided for @fxRevaluationTimeStartOfDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Start of day 00:00'**
+  String get fxRevaluationTimeStartOfDay;
+
+  /// No description provided for @fxRevaluationTimeNoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Midday 12:00'**
+  String get fxRevaluationTimeNoon;
+
+  /// No description provided for @fxRevaluationTimeEndOfDay.
+  ///
+  /// In en, this message translates to:
+  /// **'End of day 23:59:59 (multiple rates per day)'**
+  String get fxRevaluationTimeEndOfDay;
+
+  /// No description provided for @fxRevaluationWhenNoRateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'If no revaluation rate exists for the reference time'**
+  String get fxRevaluationWhenNoRateLabel;
+
+  /// No description provided for @fxRevaluationWhenNoRateBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block saving the invoice'**
+  String get fxRevaluationWhenNoRateBlock;
+
+  /// No description provided for @fxRevaluationWhenNoRateAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow saving without a rate (incomplete FX on the document)'**
+  String get fxRevaluationWhenNoRateAllow;
+
+  /// No description provided for @fxRevaluationSettingsFooterNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Users without “Currency revaluation” permission cannot pick a specific rate row; the system uses the latest effective rate up to the reference time.'**
+  String get fxRevaluationSettingsFooterNote;
+
+  /// No description provided for @fxRevaluationSettingsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load: {error}'**
+  String fxRevaluationSettingsLoadError(String error);
+
+  /// No description provided for @fxRevaluationSettingsSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save: {error}'**
+  String fxRevaluationSettingsSaveError(String error);
+
+  /// No description provided for @invoiceFxRateFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Revaluation rate (optional)'**
+  String get invoiceFxRateFieldLabel;
+
+  /// No description provided for @invoiceFxRateAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic (business policy settings)'**
+  String get invoiceFxRateAuto;
+
+  /// No description provided for @invoiceFxRateHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'For non-base currency; “Automatic” uses the latest valid rate up to the document reference time.'**
+  String get invoiceFxRateHelper;
+
+  /// No description provided for @invoiceFxRateStoredOnDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate stored on this document'**
+  String get invoiceFxRateStoredOnDocument;
+
+  /// No description provided for @invoiceFxRateRow.
+  ///
+  /// In en, this message translates to:
+  /// **'{rate} — {effective}{idPart}'**
+  String invoiceFxRateRow(String rate, String effective, String idPart);
 }
 
 class _AppLocalizationsDelegate

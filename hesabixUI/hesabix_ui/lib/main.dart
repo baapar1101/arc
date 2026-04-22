@@ -47,6 +47,7 @@ import 'pages/business/bank_accounts_page.dart';
 import 'pages/business/wallet_page.dart';
 import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
+import 'pages/admin/currencies_admin_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/admin/document_monetization_page.dart';
@@ -60,6 +61,7 @@ import 'pages/business/edit_invoice_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/business_currencies_settings_page.dart';
+import 'pages/business/fx_revaluation_settings_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/kardex_page.dart';
 import 'pages/business/debtors_report_page.dart';
@@ -158,6 +160,7 @@ import 'widgets/url_tracker.dart';
 import 'utils/route_prefetcher.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/year_end_closing_page.dart';
+import 'pages/business/currency_revaluation_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
@@ -166,6 +169,7 @@ import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/business_ftp_backup_settings_page.dart';
 import 'pages/business/backup/restore_page.dart';
 import 'pages/profile/delete_business_page.dart';
+import 'pages/business/fiscal_year_rollback_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
 import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
@@ -1061,6 +1065,20 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'currencies',
+                  name: 'system_settings_currencies',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const CurrenciesAdminPage();
+                  },
+                ),
+                GoRoute(
                   path: 'wallet-payouts',
                   name: 'system_settings_wallet_payouts',
                   builder: (context, state) {
@@ -1546,6 +1564,20 @@ class _MyAppState extends State<MyApp> {
                   child: YearEndClosingPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/currency-revaluation',
+              name: 'business_currency_revaluation',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CurrencyRevaluationPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2629,6 +2661,20 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/settings/fiscal-year-rollback',
+              name: 'business_settings_fiscal_year_rollback',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final isOwner = _authStore!.currentBusiness?.id == businessId &&
+                    _authStore!.currentBusiness?.isOwner == true;
+                final canRollback = isOwner || _authStore!.hasBusinessPermission('fiscal_years', 'rollback');
+                if (!canRollback) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                return NoTransitionPage(child: FiscalYearRollbackPage(businessId: businessId));
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/settings/business',
               name: 'business_settings_business',
               pageBuilder: (context, state) {
@@ -2655,6 +2701,24 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: BusinessCurrenciesSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/fx-revaluation',
+              name: 'business_settings_fx_revaluation',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'business')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: FxRevaluationSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
                 );
               },
             ),

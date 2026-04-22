@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class BusinessPrintSettingsPage extends StatefulWidget {
   final int businessId;
@@ -164,6 +165,7 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.printSettings),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),

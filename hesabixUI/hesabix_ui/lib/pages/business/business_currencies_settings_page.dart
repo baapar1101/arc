@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import 'dart:ui' as ui;
 
 class BusinessCurrenciesSettingsPage extends StatefulWidget {
@@ -239,14 +240,20 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('مدیریت ارزهای جانبی')),
+        appBar: AppBar(
+          title: Text(t.settingsSideCurrenciesTitle),
+          leading: businessSubpageBackLeading(context, widget.businessId),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('مدیریت ارزهای جانبی')),
+        appBar: AppBar(
+          title: Text(t.settingsSideCurrenciesTitle),
+          leading: businessSubpageBackLeading(context, widget.businessId),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -265,7 +272,8 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مدیریت ارزهای جانبی'),
+        title: Text(t.settingsSideCurrenciesTitle),
+        leading: businessSubpageBackLeading(context, widget.businessId),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

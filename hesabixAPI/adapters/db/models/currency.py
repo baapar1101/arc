@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import String, Integer, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, ForeignKey, UniqueConstraint, Boolean, SmallInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -20,6 +20,20 @@ class Currency(Base):
 	title: Mapped[str] = mapped_column(String(100), nullable=False)
 	symbol: Mapped[str] = mapped_column(String(16), nullable=False)
 	code: Mapped[str] = mapped_column(String(16), nullable=False)  # نام کوتاه
+	decimal_places: Mapped[int] = mapped_column(
+		SmallInteger,
+		nullable=False,
+		default=2,
+		server_default="2",
+		comment="تعداد اعشار مبلغ (۰=بدون اعشار، ۲=دو رقم اعشار)",
+	)
+	round_monetary_amounts: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=True,
+		server_default="1",
+		comment="گرد کردن مبالغ در محاسبات به decimal_places",
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

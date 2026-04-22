@@ -648,3 +648,128 @@ msgstr "Insufficient loyalty points at save time."
 
 msgid "LOYALTY_DISCOUNT_TOO_HIGH"
 msgstr "Loyalty discount exceeds the invoice net amount."
+
+# Fiscal year rollback
+msgid "ROLLBACK_TOKEN_EMPTY"
+msgstr "Confirmation token is empty. Use Run from the preview page or refresh the preview."
+
+msgid "ROLLBACK_TOKEN_MALFORMED"
+msgstr "Confirmation token is incomplete or invalid. Close this page, sign in again, and take a new preview."
+
+msgid "ROLLBACK_TOKEN_BAD_SIGNATURE"
+msgstr "Confirmation token signature is invalid. Server settings may have changed; take a new preview."
+
+msgid "ROLLBACK_TOKEN_WRONG_BUSINESS"
+msgstr "This confirmation token is not for the current business. Use the same business where you opened the preview."
+
+msgid "ROLLBACK_TOKEN_WRONG_USER"
+msgstr "This confirmation token belongs to another user or your session changed. Sign in again and refresh the preview."
+
+msgid "ROLLBACK_TOKEN_INVALID_EXP"
+msgstr "Confirmation token is invalid. Take a new preview."
+
+msgid "ROLLBACK_TOKEN_EXPIRED"
+msgstr "The confirmation period ({minutes} minutes) has expired. Take a new preview to continue."
+
+msgid "ROLLBACK_TOKEN_PARSE_FAILED"
+msgstr "Could not read the confirmation token. Take a new preview and run immediately."
+
+msgid "ROLLBACK_NOT_ENOUGH_FISCAL_YEARS"
+msgstr "At least two fiscal years are required to remove the current year and go back. If you only have one year, this action is not available."
+
+msgid "NO_CURRENT_FISCAL_YEAR"
+msgstr "No fiscal year is marked as current. Fix fiscal years in settings or contact support."
+
+msgid "FISCAL_YEAR_MISMATCH"
+msgstr "The fiscal year does not belong to this business. Check access or business id."
+
+msgid "FISCAL_YEAR_NOT_IN_LIST"
+msgstr "Current fiscal year is missing from this business list; data may be inconsistent. Contact support."
+
+msgid "ROLLBACK_NO_PREVIOUS_YEAR"
+msgstr "No older fiscal year was found to roll back to. An older year than the current one must exist."
+
+msgid "ROLLBACK_SOURCE_DOCUMENT_MONETIZATION"
+msgstr "document services charge (system)"
+
+msgid "ROLLBACK_SOURCE_STORAGE_INVOICE"
+msgstr "storage invoice (system)"
+
+msgid "ROLLBACK_REASON_SYSTEM_DOC"
+msgstr "This document is a system-internal record ({label}). Removing it may break wallet or billing consistency."
+
+msgid "ROLLBACK_REASON_TAX_WORKSPACE"
+msgstr "This document is in the tax workspace; fiscal rollback is blocked until it is cleared from the workspace."
+
+msgid "ROLLBACK_REASON_LOCKED"
+msgstr "Document is locked; remove the lock or void it through the proper workflow."
+
+msgid "ROLLBACK_REASON_WALLET_PROTECTED_FALLBACK"
+msgstr "This document has protected system wallet transactions; removing the fiscal year is not allowed to preserve financial integrity."
+
+msgid "ROLLBACK_REASON_CHECK_LINES"
+msgstr "This document has lines linked to checks; fix check status first."
+
+msgid "ROLLBACK_REASON_AI_INVOICE"
+msgstr "This document is linked to AI billing; contact support before rolling back the fiscal year."
+
+msgid "ROLLBACK_PLUGIN_PURCHASE_BLOCK"
+msgstr "A successful add-on purchase from the wallet exists in this fiscal year. Removing the current year may break reports or licenses; contact support."
+
+msgid "ROLLBACK_BLOCK_DOC_LINE"
+msgstr "Document {code} (type: {doc_type}) — {reason}"
+
+msgid "ROLLBACK_BLOCK_PREV_YEAR_LINE"
+msgstr "Previous year — {kind} document ({code}) — {reason}"
+
+msgid "ROLLBACK_DOC_KIND_YEAR_END_CLOSING"
+msgstr "year-end closing"
+
+msgid "ROLLBACK_DOC_KIND_PERSON_BALANCE"
+msgstr "person balance"
+
+msgid "ROLLBACK_WAREHOUSE_PURGE_FAILED"
+msgstr "Could not delete warehouse documents for this fiscal year. Check database connection or locks. Details: {detail}"
+
+msgid "ROLLBACK_REPAIR_PURGE_FAILED"
+msgstr "Could not delete repair-shop orders for this fiscal year. Fix linked documents first. Details: {detail}"
+
+msgid "ROLLBACK_DELETE_RECEIPT_PAYMENT_FAILED"
+msgstr "Receipt/payment document \"{code}\" could not be deleted. Contact support."
+
+msgid "ROLLBACK_DELETE_EXPENSE_INCOME_FAILED"
+msgstr "Expense/income document \"{code}\" could not be deleted. Check database constraints."
+
+msgid "ROLLBACK_DOCUMENTS_REMAINING"
+msgstr "After deletion attempts, {count} document(s) still remain in this fiscal year. An unsupported document type may exist; contact support with the fiscal year id."
+
+msgid "ROLLBACK_BLOCKED"
+msgstr "The current fiscal year cannot be removed due to safety or system dependencies. Resolve the items shown in the preview block list, then refresh the preview."
+
+msgid "ROLLBACK_STALE_TOKEN"
+msgstr "The current or previous fiscal year changed between preview and confirm. Take a fresh preview and run immediately."
+
+msgid "ROLLBACK_FAILED"
+msgstr "Fiscal rollback did not complete; no changes were saved. Check network, server load, or database errors and try again. Details: {detail}"
+
+msgid "ROLLBACK_SUCCESS_MESSAGE"
+msgstr "Current fiscal year was removed; the previous year is now current. You can register or edit documents in that year subject to its rules."
+
+msgid "ROLLBACK_ACTIVITY_LOG"
+msgstr "Removed fiscal year {removed} and set current to {current}"
+
+msgid "ROLLBACK_PREVIEW_FAILED"
+msgstr "Fiscal rollback preview failed. Check connectivity and try again. ({error})"
+
+msgid "ROLLBACK_EXECUTE_FAILED"
+msgstr "Fiscal rollback failed unexpectedly. If it persists, contact support. ({error})"
+
+# FX revaluation (invoices & currency rates)
+msgid "FX_RATE_MISMATCH"
+msgstr "The selected rate does not match the document currency"
+
+msgid "FX_RATE_INVALID"
+msgstr "The selected rate is effective after the document revaluation reference time"
+
+msgid "FX_REVALUATION_ERROR"
+msgstr "Error calculating foreign exchange revaluation"

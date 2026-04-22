@@ -11,6 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/tax_settings_model.dart';
 import '../../services/tax_settings_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 
 class TaxSettingsPage extends StatefulWidget {
@@ -318,6 +319,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(t.taxIntegrationTitle),
+          leading: businessSubpageBackLeading(context, widget.businessId),
           backgroundColor: cs.surface,
           foregroundColor: cs.onSurface,
           bottom: TabBar(

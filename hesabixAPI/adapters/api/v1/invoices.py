@@ -62,6 +62,27 @@ from sqlalchemy import func
 logger = logging.getLogger(__name__)
 
 
+def _user_can_select_fx_rate_for_business(
+    db: Session,
+    ctx: AuthContext,
+    business_id: int,
+) -> bool:
+    """انتخاب دستی نرخ تسعیر فقط با مجوز مشاهدهٔ تاریخچه نرخ (currency_revaluation.view)."""
+    if ctx.is_superadmin():
+        return True
+    if ctx.is_business_owner(business_id):
+        return True
+    from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+
+    repo = BusinessPermissionRepository(db)
+    perm_obj = repo.get_by_user_and_business(ctx.get_user_id(), business_id)
+    if not perm_obj or not perm_obj.business_permissions:
+        return False
+    perms = ctx._normalize_permissions_value(perm_obj.business_permissions) or {}
+    sec = perms.get("currency_revaluation") or {}
+    return bool(sec.get("view") or sec.get("read"))
+
+
 def _format_line_custom_attributes_for_pdf(extra_info: Any) -> Optional[str]:
     if not isinstance(extra_info, dict):
         return None
@@ -114,11 +135,13 @@ def create_invoice_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("invoices", "add")),
 ) -> Dict[str, Any]:
+    can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
     result = create_invoice(
         db=db,
         business_id=business_id,
         user_id=ctx.get_user_id(),
         data=payload,
+        user_can_select_fx_rate=can_pick,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 
@@ -395,11 +418,13 @@ def update_invoice_endpoint(
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
     try:
+        can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         result = update_invoice(
             db=db,
             document_id=invoice_id,
             user_id=ctx.get_user_id(),
             data=payload,
+            user_can_select_fx_rate=can_pick,
         )
     except IntegrityError as e:
         db.rollback()

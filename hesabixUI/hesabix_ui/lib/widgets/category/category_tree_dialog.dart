@@ -91,96 +91,68 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   bool get _canEdit => widget.authStore.hasBusinessPermission('categories', 'edit');
   bool get _canDelete => widget.authStore.hasBusinessPermission('categories', 'delete');
 
-  double get _indentStep => ResponsiveHelper.isMobile(context) ? 16.0 : 24.0;
+  double get _indentStep => ResponsiveHelper.isMobile(context) ? 12.0 : 24.0;
+
+  /// حداقل فاصلهٔ افقی لیست درخت روی موبایل (بدون مارجین اضافه)
+  double _treeListHorizontalInset(BuildContext context) {
+    return ResponsiveHelper.isMobile(context) ? 6.0 : ResponsiveHelper.getPadding(context);
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
-    final padding = ResponsiveHelper.getPadding(context);
+    final modePad = _treeListHorizontalInset(context);
 
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_selectedCategoryForProducts == null) _buildModeSelector(context, t, padding),
+        if (_selectedCategoryForProducts == null) _buildModeSelector(context, t, modePad),
         Expanded(child: _buildBody(t)),
       ],
     );
 
     if (isMobile) {
+      final size = MediaQuery.sizeOf(context);
       return Dialog(
         insetPadding: EdgeInsets.zero,
         backgroundColor: theme.colorScheme.surface,
-        clipBehavior: Clip.antiAlias,
-        child: Scaffold(
-          backgroundColor: theme.colorScheme.surface,
-          appBar: AppBar(
-            centerTitle: false,
-            titleSpacing: 8,
-            title: Text(
-              t.categoriesDialogTitle,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            actions: [
-              if (_canAdd)
-                IconButton.filledTonal(
-                  icon: const Icon(Icons.add_rounded),
-                  tooltip: t.addCategory,
-                  onPressed: () => _showEditDialog(isRoot: true),
-                ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded),
-                tooltip: t.categoryTreeActionsMenuTooltip,
-                onSelected: (value) {
-                  switch (value) {
-                    case 'expand':
-                      _expandAll();
-                      break;
-                    case 'collapse':
-                      _collapseAll();
-                      break;
-                    case 'add':
-                      if (_canAdd) _showEditDialog(isRoot: true);
-                      break;
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: 'expand',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.unfold_more_rounded),
-                      title: Text(t.expandAllCategories),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'collapse',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.unfold_less_rounded),
-                      title: Text(t.collapseAllCategories),
-                    ),
-                  ),
-                  if (_canAdd)
-                    PopupMenuItem(
-                      value: 'add',
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.add_rounded),
-                        title: Text(t.addCategory),
-                      ),
-                    ),
-                ],
+        clipBehavior: Clip.hardEdge,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        child: SizedBox(
+          width: size.width,
+          height: size.height,
+          child: Scaffold(
+            backgroundColor: theme.colorScheme.surface,
+            appBar: AppBar(
+              centerTitle: false,
+              titleSpacing: 0,
+              toolbarHeight: kToolbarHeight,
+              title: Text(
+                t.categoriesDialogTitle,
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
-            ],
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              actions: [
+                if (_canAdd)
+                  IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 22),
+                    tooltip: t.addCategory,
+                    onPressed: () => _showEditDialog(isRoot: true),
+                  ),
+              ],
+            ),
+            body: body,
           ),
-          body: body,
         ),
       );
     }
@@ -249,13 +221,16 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   }
 
   Widget _buildModeSelector(BuildContext context, AppLocalizations t, double horizontalPadding) {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 8),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, isMobile ? 8 : 12, horizontalPadding, isMobile ? 6 : 8),
       child: SegmentedButton<int>(
         showSelectedIcon: false,
         style: ButtonStyle(
-          visualDensity: VisualDensity.comfortable,
-          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+          visualDensity: isMobile ? VisualDensity.compact : VisualDensity.comfortable,
+          padding: WidgetStateProperty.all(
+            EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 8 : 12),
+          ),
         ),
         segments: <ButtonSegment<int>>[
           ButtonSegment<int>(
@@ -306,10 +281,127 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       child: ListView(
         padding: EdgeInsets.symmetric(
           vertical: 8,
-          horizontal: ResponsiveHelper.getPadding(context),
+          horizontal: _treeListHorizontalInset(context),
         ),
         physics: const AlwaysScrollableScrollPhysics(),
         children: _buildTreeNodes(_tree, t, 0),
+      ),
+    );
+  }
+
+  bool get _useMobileCategoryRowMenu => ResponsiveHelper.isMobile(context);
+
+  /// منوی فشرده کنار هر دسته (فقط موبایل)؛ دسکتاپ همچنان شیت عملیات را دارد.
+  Widget? _buildMobileCategoryRowMenu(AppLocalizations t, Map<String, dynamic> item) {
+    if (!_useMobileCategoryRowMenu) return null;
+    final id = item['id'] as int?;
+    if (id == null) return null;
+    final label = (item['label'] ?? item['title'] ?? item['name'] ?? '').toString();
+    final description = item['description'] as String?;
+    final sortOrder = (item['sort_order'] as num?)?.toInt();
+    final currentParentId = (item['parent_id'] as num?)?.toInt();
+
+    if (!(_showProducts || _canAdd || _canEdit || _canDelete)) return null;
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: t.categoryTreeMoreActionsTooltip,
+        padding: EdgeInsets.zero,
+        menuPadding: const EdgeInsets.symmetric(vertical: 4),
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        icon: Icon(
+          Icons.more_vert_rounded,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        onSelected: (value) {
+          switch (value) {
+            case 'products':
+              _loadCategoryProducts(id);
+              break;
+            case 'add':
+              _showEditDialog(parentId: id);
+              break;
+            case 'edit':
+              _showEditDialog(
+                categoryId: id,
+                initialLabel: label,
+                initialDescription: description,
+                initialSortOrder: sortOrder,
+                initialParentId: currentParentId,
+              );
+              break;
+            case 'delete':
+              _confirmDelete(id);
+              break;
+          }
+        },
+        itemBuilder: (ctx) {
+          final theme = Theme.of(ctx);
+          return <PopupMenuEntry<String>>[
+            if (_showProducts)
+              PopupMenuItem(
+                value: 'products',
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(t.categoryTreeShowProductsInCategory, style: theme.textTheme.bodyMedium)),
+                  ],
+                ),
+              ),
+            if (_canAdd)
+              PopupMenuItem(
+                value: 'add',
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_circle_outline_rounded, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(t.addChildCategory, style: theme.textTheme.bodyMedium)),
+                  ],
+                ),
+              ),
+            if (_canEdit)
+              PopupMenuItem(
+                value: 'edit',
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_outlined, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(t.renameCategory, style: theme.textTheme.bodyMedium)),
+                  ],
+                ),
+              ),
+            if (_canDelete)
+              PopupMenuItem(
+                value: 'delete',
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline_rounded, size: 20, color: theme.colorScheme.error),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        t.deleteCategory,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ];
+        },
       ),
     );
   }
@@ -326,12 +418,14 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       final isExpanded = id != null && _expandedNodes.contains(id);
       final hasChildren = children.isNotEmpty;
 
+      final mobileMenu = _buildMobileCategoryRowMenu(t, item);
       widgets.add(
         _CategoryTreeNodeWidget(
           label: label,
           description: description,
           level: level,
           indentStep: _indentStep,
+          compactHorizontal: _useMobileCategoryRowMenu,
           isExpanded: isExpanded,
           hasChildren: hasChildren,
           showProductsMode: _showProducts,
@@ -362,11 +456,12 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                   _expandedNodes.add(id!);
                 }
               });
-            } else if (_canAdd || _canEdit || _canDelete) {
+            } else if (!_useMobileCategoryRowMenu && (_canAdd || _canEdit || _canDelete)) {
               _openNodeActionsSheet(t, item);
             }
           },
           onMorePressed: () => _openNodeActionsSheet(t, item),
+          mobileTrailingMenu: mobileMenu,
           t: t,
         ),
       );
@@ -705,9 +800,9 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                     )
                   : ListView.builder(
                       padding: EdgeInsets.fromLTRB(
-                        ResponsiveHelper.getPadding(context),
+                        _treeListHorizontalInset(context),
                         12,
-                        ResponsiveHelper.getPadding(context),
+                        _treeListHorizontalInset(context),
                         24,
                       ),
                       itemCount: _categoryProducts.length,
@@ -1193,6 +1288,8 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
   final String? description;
   final int level;
   final double indentStep;
+  /// حالت موبایل: مارجین افقی کمتر برای ردیف
+  final bool compactHorizontal;
   final bool isExpanded;
   final bool hasChildren;
   final bool showProductsMode;
@@ -1202,6 +1299,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
   final VoidCallback? onToggleExpand;
   final VoidCallback onPrimaryContentTap;
   final VoidCallback onMorePressed;
+  final Widget? mobileTrailingMenu;
   final AppLocalizations t;
 
   const _CategoryTreeNodeWidget({
@@ -1209,6 +1307,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
     this.description,
     required this.level,
     required this.indentStep,
+    this.compactHorizontal = false,
     required this.isExpanded,
     required this.hasChildren,
     required this.showProductsMode,
@@ -1218,6 +1317,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
     this.onToggleExpand,
     required this.onPrimaryContentTap,
     required this.onMorePressed,
+    this.mobileTrailingMenu,
     required this.t,
   });
 
@@ -1226,15 +1326,18 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
     final theme = Theme.of(context);
     final indent = level * indentStep;
     final lineColor = theme.colorScheme.outline.withValues(alpha: 0.28);
-    final showMore = canAdd || canEdit || canDelete || showProductsMode;
+    final showDesktopMore = mobileTrailingMenu == null && (canAdd || canEdit || canDelete || showProductsMode);
+    final edgeInset = compactHorizontal ? 2.0 : 4.0;
+    final indentGap = compactHorizontal ? 4.0 : 8.0;
+    final chevronSize = compactHorizontal ? 32.0 : 36.0;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: EdgeInsets.only(bottom: compactHorizontal ? 3 : 4),
       child: Stack(
         children: [
           if (level > 0)
             Positioned(
-              right: indent - indentStep * 0.5,
+              right: indent - indentStep * 0.45,
               top: 0,
               bottom: 0,
               child: Container(
@@ -1244,82 +1347,96 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
             ),
           Material(
             color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(compactHorizontal ? 10 : 12),
             clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onPrimaryContentTap,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: indent + 8,
-                  left: 4,
-                  top: 6,
-                  bottom: 6,
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      child: hasChildren
-                          ? IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                              iconSize: 22,
-                              onPressed: onToggleExpand,
-                              icon: AnimatedRotation(
-                                turns: isExpanded ? 0.25 : 0,
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeOutCubic,
-                                child: Icon(
-                                  Icons.chevron_left_rounded,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            )
-                          : const SizedBox(width: 8),
-                    ),
-                    Icon(
-                      hasChildren ? Icons.folder_rounded : Icons.category_rounded,
-                      size: 22,
-                      color: hasChildren ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            label,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: hasChildren ? FontWeight.w600 : FontWeight.w500,
-                            ),
-                          ),
-                          if (description != null && description!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                description!,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: indent + indentGap,
+                left: edgeInset,
+                top: compactHorizontal ? 4 : 6,
+                bottom: compactHorizontal ? 4 : 6,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: chevronSize,
+                    child: hasChildren
+                        ? IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints.tight(Size(chevronSize, chevronSize)),
+                            iconSize: compactHorizontal ? 20 : 22,
+                            onPressed: onToggleExpand,
+                            icon: AnimatedRotation(
+                              turns: isExpanded ? 0.25 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(
+                                Icons.chevron_left_rounded,
+                                color: theme.colorScheme.primary,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    if (showMore)
-                      IconButton(
-                        icon: const Icon(Icons.more_vert_rounded),
-                        tooltip: t.categoryTreeMoreActionsTooltip,
-                        onPressed: onMorePressed,
-                        style: IconButton.styleFrom(
-                          foregroundColor: theme.colorScheme.onSurfaceVariant,
+                          )
+                        : SizedBox(width: compactHorizontal ? 4 : 8),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: onPrimaryContentTap,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: compactHorizontal ? 2 : 4, horizontal: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              hasChildren ? Icons.folder_rounded : Icons.category_rounded,
+                              size: compactHorizontal ? 20 : 22,
+                              color: hasChildren ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            SizedBox(width: compactHorizontal ? 6 : 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: (compactHorizontal ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)?.copyWith(
+                                      fontWeight: hasChildren ? FontWeight.w600 : FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (description != null && description!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        description!,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontSize: compactHorizontal ? 12 : null,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                  if (mobileTrailingMenu != null)
+                    mobileTrailingMenu!
+                  else if (showDesktopMore)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert_rounded),
+                      tooltip: t.categoryTreeMoreActionsTooltip,
+                      onPressed: onMorePressed,
+                      style: IconButton.styleFrom(
+                        foregroundColor: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

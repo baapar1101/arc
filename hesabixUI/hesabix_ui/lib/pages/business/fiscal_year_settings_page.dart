@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
@@ -295,6 +296,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('ویرایش سال مالی جاری'),
+          leading: businessSubpageBackLeading(context, widget.businessId),
           backgroundColor: cs.surface,
           foregroundColor: cs.onSurface,
         ),
@@ -305,6 +307,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('ویرایش سال مالی جاری'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),

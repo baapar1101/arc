@@ -3,6 +3,7 @@ import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class CreditSettingsPage extends StatefulWidget {
   final int businessId;
@@ -98,6 +99,7 @@ class _CreditSettingsPageState extends State<CreditSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.creditSettingsTitle),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),

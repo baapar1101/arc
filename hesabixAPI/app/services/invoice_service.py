@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import re
@@ -2197,6 +2197,7 @@ def create_invoice(
     business_id: int,
     user_id: int,
     data: Dict[str, Any],
+    user_can_select_fx_rate: bool = False,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد فاکتور ===")
 
@@ -2331,7 +2332,7 @@ def create_invoice(
     if invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN, INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN} and not person_id:
         raise ApiError("PERSON_REQUIRED", "person_id is required for this invoice type", http_status=400)
 
-    # Compute totals from lines if not provided
+    # جمع‌ها: تخفیف کلی (در صورت وجود) سپس totals از extra_info یا خطوط
     raw_extra = data.get("extra_info")
     header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
     dd_top = data.get("due_date")
@@ -2343,10 +2344,29 @@ def create_invoice(
             header_extra["due_date"] = _parse_iso_date(ds).isoformat()
         except Exception:
             pass
+    data["extra_info"] = header_extra
+    try:
+        from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
+
+        apply_global_discount_to_invoice_payload(
+            db, business_id, invoice_type, lines_input, data
+        )
+    except ApiError:
+        raise
+    except Exception:
+        logger.exception("invoice_global_discount_failed")
+        raise ApiError(
+            "GLOBAL_DISCOUNT_ERROR",
+            "خطا در محاسبه تخفیف کلی فاکتور",
+            http_status=400,
+        )
+    header_extra = dict(data.get("extra_info") or {})
     totals = (header_extra.get("totals") or {}) if isinstance(header_extra, dict) else {}
     totals_missing = not all(k in totals for k in ("gross", "discount", "tax", "net"))
     if totals_missing:
         totals = _extract_totals_from_lines(lines_input)
+    header_extra["totals"] = totals
+    data["extra_info"] = header_extra
 
     try:
         from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
@@ -2536,6 +2556,28 @@ def create_invoice(
         "tax": float(Decimal(str(totals["tax"]))),
         "net": float(Decimal(str(totals["net"]))),
     }
+
+    from app.services.invoice_fx_revaluation import apply_fx_revaluation_to_invoice_extra
+
+    business_for_fx = db.get(Business, business_id)
+    if business_for_fx is not None:
+        try:
+            new_extra_info = apply_fx_revaluation_to_invoice_extra(
+                db,
+                business_for_fx,
+                document_currency_id=int(currency_id),
+                document_date=document_date,
+                extra_info=new_extra_info,
+                data=data,
+                user_can_select_fx_rate=user_can_select_fx_rate,
+                registered_at_utc=datetime.now(timezone.utc),
+            )
+        except ApiError:
+            raise
+        except Exception:
+            logger.exception("invoice_fx_revaluation apply failed (create)")
+            raise ApiError("FX_REVALUATION_ERROR", "خطا در محاسبه تسعیر ارز", http_status=400)
+        new_extra_info = _normalize_document_extra_info_for_storage(new_extra_info) or new_extra_info
 
     # Create document با کنترل رقابت در شماره‌گذاری
     from app.services.document_numbering_service import generate_document_code
@@ -3378,6 +3420,7 @@ def update_invoice(
     document_id: int,
     user_id: int,
     data: Dict[str, Any],
+    user_can_select_fx_rate: bool = False,
 ) -> Dict[str, Any]:
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
@@ -3537,6 +3580,22 @@ def update_invoice(
         ln["extra_info"] = info
     # انتخاب انبار در مرحله فاکتور الزامی نیست
 
+    try:
+        from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
+
+        apply_global_discount_to_invoice_payload(
+            db, int(document.business_id), inv_type, lines_input, data
+        )
+    except ApiError:
+        raise
+    except Exception:
+        logger.exception("invoice_global_discount_failed_update")
+        raise ApiError(
+            "GLOBAL_DISCOUNT_ERROR",
+            "خطا در محاسبه تخفیف کلی فاکتور",
+            http_status=400,
+        )
+
     header_for_costing = data if data else {"extra_info": document.extra_info}
     post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)
 
@@ -3599,6 +3658,11 @@ def update_invoice(
         except ApiError:
             raise
         ex_merge = dict(document.extra_info or {})
+        if isinstance(header_extra, dict):
+            if header_extra.get("global_discount"):
+                ex_merge["global_discount"] = header_extra["global_discount"]
+            else:
+                ex_merge.pop("global_discount", None)
         ex_merge["totals"] = totals
         if "customer_club" in header_extra:
             ex_merge["customer_club"] = header_extra["customer_club"]
@@ -4265,6 +4329,29 @@ def update_invoice(
                 exc_info=True,
             )
 
+    from app.services.invoice_fx_revaluation import apply_fx_revaluation_to_invoice_extra
+
+    biz_fx = db.get(Business, int(document.business_id))
+    if biz_fx is not None:
+        try:
+            ex_fx = apply_fx_revaluation_to_invoice_extra(
+                db,
+                biz_fx,
+                document_currency_id=int(document.currency_id),
+                document_date=document.document_date,
+                extra_info=dict(document.extra_info or {}),
+                data=data,
+                user_can_select_fx_rate=user_can_select_fx_rate,
+                registered_at_utc=datetime.now(timezone.utc),
+            )
+        except ApiError:
+            raise
+        except Exception:
+            logger.exception("invoice_fx_revaluation apply failed (update)")
+            raise ApiError("FX_REVALUATION_ERROR", "خطا در محاسبه تسعیر ارز", http_status=400)
+        document.extra_info = _normalize_document_extra_info_for_storage(ex_fx) or ex_fx
+        flag_modified(document, "extra_info")
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -4298,7 +4385,7 @@ def update_invoice(
     return result
 
 
-def delete_invoice(db: Session, document_id: int) -> bool:
+def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> bool:
     """
     حذف یک فاکتور
     
@@ -4560,11 +4647,20 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         db.delete(document)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")
         
-        # commit همه تغییرات به صورت اتمیک
-        try:
-            db.commit()
-            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: ===== Successfully committed all deletions =====")
-            
+        # commit یا flush (برای حذف گروهی / برگشت سال مالی بدون commit میانی)
+        if commit:
+            try:
+                db.commit()
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: ===== Successfully committed all deletions =====")
+            except Exception as commit_ex:
+                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Error committing transaction: {commit_ex}", exc_info=True)
+                db.rollback()
+                raise ApiError("DELETE_FAILED", f"Failed to commit invoice deletion: {str(commit_ex)}", http_status=500)
+        else:
+            db.flush()
+            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: flushed (no commit)")
+
+        if commit:
             # Invalidate cache بعد از حذف موفق فاکتور
             invalidate_invoices_cache(
                 business_id=business_id,
@@ -4573,7 +4669,7 @@ def delete_invoice(db: Session, document_id: int) -> bool:
                 document_type=document_type,
                 project_id=project_id
             )
-            
+
             # همچنین اسناد عمومی را هم invalidate کن
             from app.services.document_service import invalidate_documents_cache
             invalidate_documents_cache(
@@ -4582,7 +4678,7 @@ def delete_invoice(db: Session, document_id: int) -> bool:
                 document_id=document_id,
                 document_type=document_type
             )
-            
+
             # اگر expense/income باشد
             if document_type in ['expense', 'income']:
                 from app.services.expense_income_service import invalidate_expense_income_cache
@@ -4591,12 +4687,7 @@ def delete_invoice(db: Session, document_id: int) -> bool:
                     fiscal_year_id=fiscal_year_id,
                     document_id=document_id
                 )
-            
-        except Exception as commit_ex:
-            logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Error committing transaction: {commit_ex}", exc_info=True)
-            db.rollback()
-            raise ApiError("DELETE_FAILED", f"Failed to commit invoice deletion: {str(commit_ex)}", http_status=500)
-        
+
         return True
     except ApiError as api_err:
         # ApiError code و message در detail ذخیره می‌شوند

@@ -48,6 +48,7 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.currencies import router as admin_currencies_router
 from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
 from adapters.api.v1.admin.system_services import router as admin_system_services_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
@@ -67,6 +68,7 @@ from adapters.api.v1.expense_income import router as expense_income_router
 from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.opening_balance import router as opening_balance_router
+from adapters.api.v1.business_currency_rates import router as business_currency_rates_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.zohal import router as zohal_router
@@ -1021,6 +1023,7 @@ def create_app() -> FastAPI:
     application.include_router(activity_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
     application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_currency_rates_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(zohal_router, prefix=settings.api_v1_prefix)
@@ -1084,6 +1087,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_currencies_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_monitoring_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_services_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)

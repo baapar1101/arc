@@ -17,6 +17,7 @@ from app.core.responses import ApiError
 from app.services.customer_club_service import (
 	_basis_net_and_total_from_document,
 	_person_is_customer,
+	rfm_normalized_from_snapshot,
 )
 from app.services.invoice_service import INVOICE_SALES, INVOICE_SALES_RETURN
 
@@ -316,6 +317,9 @@ def get_rfm_summary(db: Session, business_id: int) -> Dict[str, Any]:
 	segments = [{"label": str(lab or ""), "count": int(cnt)} for lab, cnt in segments_rows]
 	segments.sort(key=lambda x: (-x["count"], x["label"]))
 
+	integration_mode = (
+		getattr(settings, "loyalty_rfm_integration_mode", None) or "decoupled" if settings else "decoupled"
+	)
 	return {
 		"total_persons": int(total),
 		"computed_at": subq.isoformat() if subq else None,
@@ -327,6 +331,7 @@ def get_rfm_summary(db: Session, business_id: int) -> Dict[str, Any]:
 		"segments": segments,
 		"rfm_enabled": bool(getattr(settings, "rfm_analytics_enabled", False)) if settings else False,
 		"clv_enabled": bool(getattr(settings, "clv_analytics_enabled", False)) if settings else False,
+		"loyalty_rfm_integration_mode": integration_mode,
 	}
 
 
@@ -395,6 +400,7 @@ def list_rfm_persons(
 	items: List[Dict[str, Any]] = []
 	for snap, person in rows:
 		pid = int(snap.person_id)
+		rfm_n = rfm_normalized_from_snapshot(snap)
 		items.append(
 			{
 				"person_id": pid,
@@ -410,6 +416,7 @@ def list_rfm_persons(
 				"rfm_cell": snap.rfm_cell,
 				"segment_label": snap.segment_label,
 				"composite_score": float(snap.composite_score) if snap.composite_score is not None else None,
+				"rfm_normalized_score": float(rfm_n) if rfm_n is not None else None,
 				"clv_estimate": float(snap.clv_estimate) if snap.clv_estimate is not None else None,
 				"loyalty_balance_points": balances.get(pid),
 				"computed_at": snap.computed_at.isoformat() if snap.computed_at else None,
@@ -417,3 +424,36 @@ def list_rfm_persons(
 		)
 
 	return items, int(total)
+
+
+def list_rfm_person_ids(
+	db: Session,
+	business_id: int,
+	*,
+	segment_label: Optional[str] = None,
+	search: Optional[str] = None,
+	limit: int = 5000,
+) -> Dict[str, Any]:
+	limit = min(max(1, int(limit)), 10000)
+	q = db.query(CustomerClubRfmSnapshot.person_id).filter(CustomerClubRfmSnapshot.business_id == business_id)
+	if segment_label and segment_label.strip():
+		q = q.filter(CustomerClubRfmSnapshot.segment_label == segment_label.strip())
+	if search and search.strip():
+		term = f"%{search.strip()}%"
+		q = q.join(Person, Person.id == CustomerClubRfmSnapshot.person_id).filter(
+			or_(
+				Person.alias_name.ilike(term),
+				Person.company_name.ilike(term),
+				cast(Person.code, String).ilike(term),
+			)
+		)
+	q = q.distinct()
+	total = q.count()
+	rows = q.order_by(CustomerClubRfmSnapshot.person_id.asc()).limit(limit).all()
+	ids = [int(r[0]) for r in rows]
+	return {
+		"person_ids": ids,
+		"total": int(total),
+		"limit": limit,
+		"truncated": int(total) > len(ids),
+	}

@@ -322,14 +322,17 @@ class DocumentRepository:
 
         return self.to_dict_with_lines(document)
 
-    def delete_document(self, document_id: int) -> bool:
+    def delete_document(self, document_id: int, *, commit: bool = True) -> bool:
         """حذف سند"""
         document = self.get_document(document_id)
         if not document:
             return False
 
         self.db.delete(document)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         return True
 
     @staticmethod

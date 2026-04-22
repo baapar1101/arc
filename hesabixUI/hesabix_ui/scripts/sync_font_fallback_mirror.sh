@@ -36,6 +36,11 @@ SRC_ARABIC="$APP_DIR/assets/fonts/nanosansarabic.woff2"
 DEST_ARABIC="$TARGET_ROOT/fonts/gstatic/s/notosansarabic/v28/nwpxtLGrOAZMl5nJ_wfgRg3DrWFZWsnVBJ_sS6tlqHHFlhQ5l3sQWIHPqzCfyGyvvnCBFQLaig.woff2"
 mirror_file "$SRC_ARABIC" "$DEST_ARABIC" "Noto Sans Arabic"
 
+# Noto Sans Armenian — همان مسیر gstatic که موتور وب درخواست می‌کند (باندل در assets؛ بیلد آفلاین)
+SRC_ARMENIAN="$APP_DIR/assets/fonts/notosansarmenian.woff2"
+DEST_ARMENIAN="$TARGET_ROOT/fonts/gstatic/s/notosansarmenian/v43/ZgN0jOZKPa7CHqq0h37c7ReDUubm2SEdFXp7ig73qtTY5idb74R9UdM3y2nZLorxb60nYy6zF3Eg.woff2"
+mirror_file "$SRC_ARMENIAN" "$DEST_ARMENIAN" "Noto Sans Armenian"
+
 # Noto Color Emoji — همان نام‌های sliceای که موتور با fontFallbackBaseUrl درخواست می‌کند
 # منبع ترجیحی: assets/fonts/notocoloremoji.woff2 (همان محتوا به هر مسیر gstatic کپی می‌شود)
 PATHS_FILE="$SCRIPT_DIR/web_gstatic_fallback_font_paths.txt"

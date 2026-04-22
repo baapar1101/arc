@@ -379,6 +379,14 @@ class BusinessResponse {
   final bool allowNegativeInventoryForUnique;
   /// حواله انتقال همیشه کنترل کسری کامل
   final bool warehouseTransferRequirePositiveStock;
+  /// مبنای درصد تخفیف کلی فاکتور (کد API)
+  final String invoiceGlobalDiscountPercentBasis;
+  /// اثر تخفیف کلی بر مالیات (کد API)
+  final String invoiceGlobalDiscountTaxMode;
+  final double? invoiceGlobalDiscountMaxPercent;
+  final double? invoiceGlobalDiscountMaxAmount;
+  /// سیاست تسعیر فاکتور (as_of_source، document_date_effective، when_no_rate)
+  final Map<String, dynamic>? fxRevaluationPolicy;
   final Map<String, dynamic>? defaultCurrency;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -426,6 +434,11 @@ class BusinessResponse {
     this.allowNegativeInventoryForBulk = false,
     this.allowNegativeInventoryForUnique = false,
     this.warehouseTransferRequirePositiveStock = true,
+    this.invoiceGlobalDiscountPercentBasis = 'subtotal_after_line_discount',
+    this.invoiceGlobalDiscountTaxMode = 'recalculate_tax_proportional',
+    this.invoiceGlobalDiscountMaxPercent,
+    this.invoiceGlobalDiscountMaxAmount,
+    this.fxRevaluationPolicy,
     this.defaultCurrency,
     required this.createdAt,
     required this.updatedAt,
@@ -487,6 +500,18 @@ class BusinessResponse {
       allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
       warehouseTransferRequirePositiveStock:
           (json['warehouse_transfer_require_positive_stock'] as bool?) ?? true,
+      invoiceGlobalDiscountPercentBasis:
+          (json['invoice_global_discount_percent_basis'] as String?) ??
+              'subtotal_after_line_discount',
+      invoiceGlobalDiscountTaxMode: (json['invoice_global_discount_tax_mode'] as String?) ??
+          'recalculate_tax_proportional',
+      invoiceGlobalDiscountMaxPercent:
+          (json['invoice_global_discount_max_percent'] as num?)?.toDouble(),
+      invoiceGlobalDiscountMaxAmount:
+          (json['invoice_global_discount_max_amount'] as num?)?.toDouble(),
+      fxRevaluationPolicy: json['fx_revaluation_policy'] != null
+          ? Map<String, dynamic>.from(json['fx_revaluation_policy'] as Map)
+          : null,
       defaultCurrency: json['default_currency'] != null ? Map<String, dynamic>.from(json['default_currency'] as Map) : null,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 
 /// صفحه مدیریت قالب‌های نوتیفیکیشن کسب‌وکار
@@ -80,6 +81,7 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('قالب‌های نوتیفیکیشن'),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           // فیلتر کانال
           PopupMenuButton<String>(

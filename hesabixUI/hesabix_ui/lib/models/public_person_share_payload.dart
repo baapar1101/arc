@@ -140,6 +140,7 @@ class PublicLedgerItem {
   final String? description;
   final double? debit;
   final double? credit;
+  final String? currencyCode;
 
   const PublicLedgerItem({
     required this.lineId,
@@ -151,6 +152,7 @@ class PublicLedgerItem {
     required this.description,
     required this.debit,
     required this.credit,
+    required this.currencyCode,
   });
 
   factory PublicLedgerItem.fromJson(Map<String, dynamic> json) {
@@ -164,6 +166,7 @@ class PublicLedgerItem {
       description: json['description']?.toString(),
       debit: _toDouble(json['debit']),
       credit: _toDouble(json['credit']),
+      currencyCode: json['currency_code']?.toString(),
     );
   }
 
