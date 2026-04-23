@@ -82,7 +82,7 @@ class HesabixDateUtils {
     if (displayString == null || displayString.isEmpty) return null;
     
     try {
-      if (isJalali) {
+        if (isJalali) {
         // Parse format: YYYY/MM/DD
         final parts = displayString.split('/');
         if (parts.length == 3) {
@@ -90,7 +90,12 @@ class HesabixDateUtils {
           final month = int.parse(parts[1]);
           final day = int.parse(parts[2]);
           final jalali = Jalali(year, month, day);
-          return jalali.toDateTime();
+          final dt = jalali.toDateTime();
+          final l = dt.toLocal();
+          if (l.year < 1800 || l.year > 2200) {
+            return null;
+          }
+          return dt;
         }
       } else {
         // Parse format: YYYY/MM/DD
@@ -120,6 +125,34 @@ class HesabixDateUtils {
       // Return null if parsing fails
     }
     return null;
+  }
+
+  /// نرمال‌سازی به «فقط روز» در زمان محلی (بدون ساعت) برای مقایسه و بازه.
+  static DateTime toDateOnlyLocal(DateTime d) {
+    final l = d.toLocal();
+    return DateTime(l.year, l.month, l.day);
+  }
+
+  /// آیا [date] (فقط روز) بین [firstDate] و [lastDate] (شامل) است؟
+  static bool isDateOnlyInRange(
+    DateTime date,
+    DateTime? firstDate,
+    DateTime? lastDate,
+  ) {
+    final d = toDateOnlyLocal(date);
+    if (firstDate != null) {
+      final f = toDateOnlyLocal(firstDate);
+      if (d.isBefore(f)) {
+        return false;
+      }
+    }
+    if (lastDate != null) {
+      final l = toDateOnlyLocal(lastDate);
+      if (d.isAfter(l)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Get Jalali month name

@@ -168,6 +168,35 @@ class EnglishDigitsFormatter extends TextInputFormatter {
   }
 }
 
+String _stripTrailingZerosAndDot(String s) {
+  if (!s.contains('.')) return s;
+  var out = s;
+  while (out.endsWith('0')) {
+    out = out.substring(0, out.length - 1);
+  }
+  if (out.endsWith('.')) {
+    out = out.substring(0, out.length - 1);
+  }
+  return out;
+}
+
+/// نمایش نرخ تسعیر و اعداد مشابه: جداکننده هزارگان و حذف صفرهای انتهایی اعشار.
+String formatFxRateForDisplay(dynamic value) {
+  if (value == null) return '—';
+  final raw = value.toString().trim();
+  if (raw.isEmpty || raw == '—') return '—';
+
+  var canonical = toEnglishDigits(raw.replaceAll(RegExp(r'[\s,]'), ''));
+  if (canonical.isEmpty) return '—';
+
+  final n = num.tryParse(canonical);
+  if (n == null) return raw;
+
+  var s = n.toDouble().toStringAsFixed(12);
+  s = _stripTrailingZerosAndDot(s);
+  return _addThousandsSeparator(s);
+}
+
 /// فرمت کردن عدد برای نمایش در فیلد ورودی با جداکننده هزارگان
 String formatNumberForInput(num? value, {int? decimalPlaces}) {
   if (value == null) return '';

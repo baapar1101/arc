@@ -42,6 +42,9 @@ import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_print_options_bottom_sheet.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
+import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
+import 'package:share_plus/share_plus.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
   if (v == null) return null;
@@ -106,7 +109,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   String? _invoicePrintPaperSize;
   String _invoicePrintOrientation = 'landscape';
   bool _invoicePrintShowStamp = true;
+  bool _invoicePrintShowShareQr = false;
+  /// اگر در تنظیمات چاپ کسب‌وکار برای این نوع سند فعال باشد، سوییچ QR در چاپ نمایش داده می‌شود
+  bool _businessPrintAllowsShareQr = false;
   int? _invoicePrintTemplateId;
+  Map<String, dynamic>? _invoicePublicShareLink;
+  bool _loadingInvoiceShareLink = false;
+  bool _revokingInvoiceShareLink = false;
+  /// مقدار `hours` برای ایجاد لینک: 168، 336، 720 یا null = پیش‌فرض سرور
+  int? _invoiceShareExpiryChoiceHours = 168;
+  final TextEditingController _invoiceShareMaxViewsController = TextEditingController();
   
   // تراکنش‌های پرداخت
   final _receiptPaymentService = ReceiptPaymentService(ApiClient());
@@ -339,7 +351,105 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (ss is bool) {
         setState(() => _invoicePrintShowStamp = ss);
       }
+      final sqr = target['show_share_qr'];
+      if (sqr is bool) {
+        setState(() {
+          _businessPrintAllowsShareQr = sqr;
+          _invoicePrintShowShareQr = sqr;
+        });
+      } else {
+        setState(() {
+          _businessPrintAllowsShareQr = false;
+          _invoicePrintShowShareQr = false;
+        });
+      }
     } catch (_) {}
+  }
+
+  Future<void> _loadInvoiceShareLinkInfo(DocumentModel doc) async {
+    if (!doc.documentType.startsWith('invoice')) return;
+    setState(() => _loadingInvoiceShareLink = true);
+    try {
+      final link = await _invoiceService.getInvoiceShareLink(
+        businessId: doc.businessId,
+        invoiceId: doc.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _invoicePublicShareLink = link;
+        _loadingInvoiceShareLink = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingInvoiceShareLink = false);
+      }
+    }
+  }
+
+  Future<void> _copyInvoicePublicLink() async {
+    final u = _invoicePublicShareLink?['short_url']?.toString();
+    if (u == null || u.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: u));
+    if (!mounted) return;
+    SnackBarHelper.showSuccess(context, message: 'لینک کپی شد');
+  }
+
+  Future<void> _createOrRefreshInvoicePublicLink() async {
+    final d = _document;
+    if (d == null) return;
+    try {
+      int? maxV;
+      final mv = _invoiceShareMaxViewsController.text.trim();
+      if (mv.isNotEmpty) {
+        maxV = int.tryParse(mv.replaceAll(',', ''));
+      }
+      final created = await _invoiceService.createInvoiceShareLink(
+        businessId: d.businessId,
+        invoiceId: d.id,
+        expiresInHours: _invoiceShareExpiryChoiceHours,
+        maxViewCount: maxV,
+      );
+      if (!mounted) return;
+      setState(() => _invoicePublicShareLink = created);
+      SnackBarHelper.showSuccess(context, message: 'لینک نمایش عمومی فاکتور ایجاد شد');
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در ایجاد لینک: $e');
+      }
+    }
+  }
+
+  Future<void> _revokeInvoicePublicShareLink() async {
+    final d = _document;
+    if (d == null) return;
+    setState(() => _revokingInvoiceShareLink = true);
+    try {
+      await _invoiceService.revokeInvoiceShareLink(
+        businessId: d.businessId,
+        invoiceId: d.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _invoicePublicShareLink = null;
+        _revokingInvoiceShareLink = false;
+      });
+      SnackBarHelper.showSuccess(context, message: 'لینک لغو شد');
+      await _loadInvoiceShareLinkInfo(d);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _revokingInvoiceShareLink = false);
+        SnackBarHelper.showError(context, message: 'خطا در لغو لینک: $e');
+      }
+    }
+  }
+
+  Future<void> _copyAndShareInvoicePublicLink() async {
+    final u = _invoicePublicShareLink?['short_url']?.toString();
+    if (u == null || u.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: u));
+    await Share.share(u);
+    if (!mounted) return;
+    SnackBarHelper.showSuccess(context, message: 'لینک کپی و آمادهٔ اشتراک‌گذاری است');
   }
 
   Future<void> _onInvoicePrintPdfTapped() async {
@@ -351,6 +461,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       initialPaperSize: _invoicePrintPaperSize,
       initialOrientation: _invoicePrintOrientation,
       initialShowStamp: _invoicePrintShowStamp,
+      allowShareQrOption: _businessPrintAllowsShareQr,
+      initialShowShareQr: _invoicePrintShowShareQr,
       initialTemplateId: _invoicePrintTemplateId,
     );
     if (result == null || !mounted) return;
@@ -358,6 +470,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       _invoicePrintPaperSize = result.paperSize;
       _invoicePrintOrientation = result.orientation;
       _invoicePrintShowStamp = result.showStamp;
+      _invoicePrintShowShareQr = result.showShareQr;
       _invoicePrintTemplateId = result.templateId;
     });
     await _generatePdf(invoicePrint: result);
@@ -392,6 +505,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           query['orientation'] = p.orientation;
         }
         query['show_stamp'] = p.showStamp ? 'true' : 'false';
+        query['show_share_qr'] = p.showShareQr ? 'true' : 'false';
         if (p.templateId != null) {
           query['template_id'] = p.templateId;
         }
@@ -484,7 +598,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _installmentPlanError = null;
           }
         });
-        final tabCount = isInvoice ? (hasInstallmentPlan ? 6 : 5) : 3;
+        final tabCount = isInvoice ? (hasInstallmentPlan ? 7 : 6) : 3;
         if (_tabController.length != tabCount) {
           _tabController.dispose();
           _tabController = TabController(length: tabCount, vsync: this);
@@ -498,6 +612,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         if (doc.documentType.startsWith('invoice')) {
           await _loadInvoiceTemplates(doc.businessId);
           await _loadInvoicePrintStampDefault(doc);
+          await _loadInvoiceShareLinkInfo(doc);
         }
       } catch (_) {
         // خطای بارگذاری قالب‌ها نباید نمایش سند را متوقف کند
@@ -632,6 +747,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   @override
   void dispose() {
     _tabController.dispose();
+    _invoiceShareMaxViewsController.dispose();
     super.dispose();
   }
 
@@ -676,15 +792,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               controller: _tabController,
                               children: _document != null && _document!.documentType.startsWith('invoice')
                                   ? [
-                                      _buildInfoTab(theme),
+                                      _buildInfoTab(context, theme),
                                       _buildProductsTab(theme),
                                       _buildAccountsTab(theme),
                                       _buildTransactionsTab(theme),
                                       if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
+                                      _buildInvoiceShareTab(theme),
                                       _buildAttachmentsTab(theme),
                                     ]
                                   : [
-                                      _buildInfoTab(theme),
+                                      _buildInfoTab(context, theme),
                                       _buildAccountsTab(theme),
                                       _buildAttachmentsTab(theme),
                                     ],
@@ -728,6 +845,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           icon: Icons.calendar_view_month,
           label: t.documentDetailsInstallmentsTab,
         ),
+      if (_document != null && _document!.documentType.startsWith('invoice'))
+        _detailTab(compact: compact, icon: Icons.share, label: 'اشتراک‌گذاری'),
       _detailTab(compact: compact, icon: Icons.attach_file, label: 'فایل‌ها'),
     ];
     return TabBar(
@@ -893,8 +1012,241 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
+  Widget _invoiceShareStatChip(ThemeData theme, String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            value,
+            style: theme.textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceShareTab(ThemeData theme) {
+    final canEditInvoices = ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false;
+    final isJalali = widget.calendarController.isJalali;
+    if (_loadingInvoiceShareLink) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final link = _invoicePublicShareLink;
+    final active = link != null && link['is_active'] == true;
+    final url = link?['short_url']?.toString();
+    final status = link?['status']?.toString() ?? '—';
+    final fmt = NumberFormat('#,##0', 'fa_IR');
+    final viewCount = fmt.format((link?['view_count'] as num?)?.toInt() ?? 0);
+
+    String expiryText = '—';
+    final expRaw = link?['expires_at']?.toString();
+    if (expRaw != null && expRaw.isNotEmpty) {
+      try {
+        final dt = DateTime.tryParse(expRaw);
+        if (dt != null) {
+          expiryText = HesabixDateUtils.formatDateTime(dt, isJalali);
+        }
+      } catch (_) {
+        expiryText = expRaw;
+      }
+    } else {
+      expiryText = 'بدون محدودیت';
+    }
+
+    String lastViewText = '—';
+    final lv = link?['last_view_at']?.toString();
+    if (lv != null && lv.isNotEmpty) {
+      try {
+        final dt = DateTime.tryParse(lv);
+        if (dt != null) {
+          lastViewText = HesabixDateUtils.formatDateTime(dt, isJalali);
+        }
+      } catch (_) {
+        lastViewText = lv;
+      }
+    }
+
+    Color statusColor;
+    switch (status) {
+      case 'فعال':
+        statusColor = Colors.green[700] ?? theme.colorScheme.primary;
+        break;
+      case 'منقضی':
+        statusColor = theme.colorScheme.error;
+        break;
+      default:
+        statusColor = theme.colorScheme.secondary;
+    }
+
+    final expiryOptions = <Map<String, dynamic>>[
+      {'label': '۷ روز', 'value': 168},
+      {'label': '۱۴ روز', 'value': 336},
+      {'label': '۳۰ روز', 'value': 720},
+      {'label': 'پیش‌فرض سامانه', 'value': null},
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (link != null && active && url != null && url.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('لینک فعال', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            url,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'کپی',
+                          onPressed: _copyInvoicePublicLink,
+                          icon: const Icon(Icons.copy),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _invoiceShareStatChip(theme, 'وضعیت', status, statusColor),
+                        _invoiceShareStatChip(theme, 'انقضا', expiryText, theme.colorScheme.onSurface),
+                        _invoiceShareStatChip(theme, 'بازدید', viewCount, theme.colorScheme.primary),
+                        _invoiceShareStatChip(theme, 'آخرین بازدید', lastViewText, theme.colorScheme.onSurface),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _copyAndShareInvoicePublicLink,
+                          icon: const Icon(Icons.share),
+                          label: const Text('کپی و اشتراک'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: canEditInvoices && !_revokingInvoiceShareLink ? _revokeInvoicePublicShareLink : null,
+                          icon: _revokingInvoiceShareLink
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.link_off),
+                          label: Text(_revokingInvoiceShareLink ? 'در حال لغو…' : 'لغو لینک'),
+                        ),
+                        TextButton.icon(
+                          onPressed: _loadingInvoiceShareLink ? null : () => _document != null ? _loadInvoiceShareLinkInfo(_document!) : null,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('بروزرسانی وضعیت'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else if (link != null && !active) ...[
+            Card(
+              color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'لینک قبلی منقضی یا غیرفعال است. می‌توانید لینک جدید بسازید.',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ایجاد لینک جدید', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    'با این لینک، بدون ورود به حساب، نسخهٔ ثبت‌شدهٔ این فاکتور قابل مشاهده است. در صورت وجود لینک فعال، ابتدا لغو و لینک تازه ایجاد می‌شود.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int?>(
+                    value: _invoiceShareExpiryChoiceHours,
+                    decoration: const InputDecoration(
+                      labelText: 'مدت اعتبار',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: expiryOptions
+                        .map(
+                          (e) => DropdownMenuItem<int?>(
+                            value: e['value'] as int?,
+                            child: Text(e['label'] as String),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: canEditInvoices
+                        ? (v) => setState(() => _invoiceShareExpiryChoiceHours = v)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _invoiceShareMaxViewsController,
+                    decoration: const InputDecoration(
+                      labelText: 'حداکثر بازدید (اختیاری)',
+                      hintText: 'خالی = نامحدود',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    enabled: canEditInvoices,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: canEditInvoices ? _createOrRefreshInvoicePublicLink : null,
+                    icon: const Icon(Icons.add_link),
+                    label: Text(link == null ? 'ایجاد لینک' : 'ایجاد لینک جدید'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'آدرس کوتاه مشابه کارت حساب اشخاص است: دامنهٔ شما /i/کد — پس از باز کردن، به صفحهٔ عمومی فاکتور هدایت می‌شوید.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// ساخت تب اطلاعات
-  Widget _buildInfoTab(ThemeData theme) {
+  Widget _buildInfoTab(BuildContext context, ThemeData theme) {
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -917,6 +1269,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
     final isInvoice = document.documentType.startsWith('invoice');
     final totals = document.extraInfo?['totals'] as Map<String, dynamic>?;
+    final t = AppLocalizations.of(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -950,72 +1303,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             const SizedBox(height: 24),
             _buildCounterpartyInfoCard(theme, document),
           ],
-          if (_relatedWhDocs.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _buildSectionHeader('حواله‌های مرتبط'),
-            Card(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _relatedWhDocs.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final it = _relatedWhDocs[index] as Map<String, dynamic>;
-                  return ListTile(
-                    dense: true,
-                    title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
-                    subtitle: Text(_formatRelatedWarehouseDocumentDate(it['document_date'])),
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => WarehouseDocumentDetailsDialog(
-                          businessId: document.businessId,
-                          documentId: it['id'] as int,
-                        ),
-                      ).then((_) => _loadDocument());
-                    },
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (it['status'] == 'draft')
-                          IconButton(
-                            icon: const Icon(Icons.publish),
-                            onPressed: () async {
-                              try {
-                                await _warehouseService.postDoc(
-                                  businessId: document.businessId,
-                                  docId: it['id'],
-                                );
-                                if (!context.mounted) return;
-                                SnackBarHelper.show(context, message: 'حواله پست شد');
-                                _loadDocument();
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                SnackBarHelper.show(context, message: 'خطا در پست حواله: $e');
-                              }
-                            },
-                            tooltip: 'پست',
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.visibility),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => WarehouseDocumentDetailsDialog(
-                                businessId: document.businessId,
-                                documentId: it['id'] as int,
-                              ),
-                            ).then((_) => _loadDocument());
-                          },
-                          tooltip: 'جزئیات',
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+          if (_relatedWhDocs.isNotEmpty) ..._buildRelatedWarehouseDocumentsSection(context, theme, t, document),
         ],
       ),
     );
@@ -1032,6 +1320,242 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     } catch (_) {
       return s;
     }
+  }
+
+  /// ترتیب نمایش گروه‌ها در لیست حواله‌های مرتبط (ورود، خروج، …).
+  int _warehouseDocTypeSortOrder(String? type) {
+    if (type == null || type.isEmpty) return 100;
+    const order = ['receipt', 'issue', 'transfer', 'adjustment', 'production_in', 'production_out'];
+    final i = order.indexOf(type);
+    return i >= 0 ? i : 99;
+  }
+
+  String _warehouseDocTypeLabel(String? type, AppLocalizations t) {
+    switch (type) {
+      case 'receipt':
+        return t.docTypeReceipt;
+      case 'issue':
+        return t.docTypeIssue;
+      case 'transfer':
+        return t.docTypeTransfer;
+      case 'adjustment':
+        return t.docTypeAdjustment;
+      case 'production_in':
+        return t.docTypeProductionIn;
+      case 'production_out':
+        return t.docTypeProductionOut;
+      default:
+        return type?.isNotEmpty == true ? type! : '-';
+    }
+  }
+
+  String _warehouseDocStatusLabel(String? status, AppLocalizations t) {
+    switch (status) {
+      case 'draft':
+        return t.statusDraft;
+      case 'posted':
+        return t.statusPosted;
+      case 'cancelled':
+        return t.statusCancelled;
+      default:
+        return status?.isNotEmpty == true ? status! : '-';
+    }
+  }
+
+  Color _warehouseDocStatusColor(String? status) {
+    switch (status) {
+      case 'draft':
+        return Colors.orange;
+      case 'posted':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _warehouseDocTypeIcon(String? type) {
+    switch (type) {
+      case 'receipt':
+        return Icons.move_to_inbox;
+      case 'issue':
+        return Icons.outbox;
+      case 'transfer':
+        return Icons.swap_horiz;
+      case 'adjustment':
+        return Icons.tune;
+      case 'production_in':
+      case 'production_out':
+        return Icons.precision_manufacturing_outlined;
+      default:
+        return Icons.inventory_2_outlined;
+    }
+  }
+
+  void _openRelatedWarehouseDocument(BuildContext context, DocumentModel document, int docId) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => WarehouseDocumentDetailsDialog(
+        businessId: document.businessId,
+        documentId: docId,
+      ),
+    ).then((_) => _loadDocument());
+  }
+
+  List<Widget> _buildRelatedWarehouseDocumentsSection(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations t,
+    DocumentModel document,
+  ) {
+    final sorted = List<Map<String, dynamic>>.from(
+      _relatedWhDocs.map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+    sorted.sort((a, b) {
+      final ta = a['doc_type'] as String?;
+      final tb = b['doc_type'] as String?;
+      final c = _warehouseDocTypeSortOrder(ta).compareTo(_warehouseDocTypeSortOrder(tb));
+      if (c != 0) return c;
+      final da = a['document_date']?.toString() ?? '';
+      final db = b['document_date']?.toString() ?? '';
+      return da.compareTo(db);
+    });
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final it in sorted) {
+      final key = (it['doc_type'] as String?) ?? '';
+      groups.putIfAbsent(key, () => []).add(it);
+    }
+    final keys = groups.keys.toList()
+      ..sort((a, b) => _warehouseDocTypeSortOrder(a.isEmpty ? null : a).compareTo(_warehouseDocTypeSortOrder(b.isEmpty ? null : b)));
+
+    final children = <Widget>[];
+    for (var gi = 0; gi < keys.length; gi++) {
+      final key = keys[gi];
+      final items = groups[key]!;
+      final typeForLabel = key.isEmpty ? null : key;
+      if (gi > 0) {
+        children.add(Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.5)));
+      }
+      children.add(
+        Material(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(_warehouseDocTypeIcon(typeForLabel), size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _warehouseDocTypeLabel(typeForLabel, t),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${items.length}',
+                  style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < items.length; i++) {
+        if (i > 0) {
+          children.add(const Divider(height: 1));
+        }
+        final it = items[i];
+        final status = it['status'] as String?;
+        final statusLabel = _warehouseDocStatusLabel(status, t);
+        final statusColor = _warehouseDocStatusColor(status);
+        final code = it['code']?.toString() ?? '-';
+        final docId = it['id'] as int;
+        children.add(
+          InkWell(
+            onTap: () => _openRelatedWarehouseDocument(context, document, docId),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(code, style: theme.textTheme.titleSmall),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${t.warehouseDocumentDate}: ${_formatRelatedWarehouseDocumentDate(it['document_date'])}',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 8, end: 4),
+                    child: Chip(
+                      label: Text(
+                        statusLabel,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      padding: EdgeInsets.zero,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Color.alphaBlend(statusColor.withValues(alpha: 0.14), theme.colorScheme.surface),
+                      side: BorderSide(color: statusColor.withValues(alpha: 0.35)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  if (status == 'draft')
+                    IconButton(
+                      icon: const Icon(Icons.publish),
+                      onPressed: () async {
+                        try {
+                          await _warehouseService.postDoc(
+                            businessId: document.businessId,
+                            docId: it['id'],
+                          );
+                          if (!context.mounted) return;
+                          SnackBarHelper.show(context, message: t.warehouseDocumentPostSuccess);
+                          _loadDocument();
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          SnackBarHelper.show(context, message: t.warehouseDocumentPostFailed(e.toString()));
+                        }
+                      },
+                      tooltip: t.postWarehouseDocument,
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.visibility),
+                    onPressed: () => _openRelatedWarehouseDocument(context, document, docId),
+                    tooltip: t.viewWarehouseDocument,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return [
+      const SizedBox(height: 24),
+      _buildSectionHeader(t.relatedWarehouseDocuments),
+      Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
+    ];
   }
 
   Widget _buildSectionHeader(String title) {
@@ -4009,8 +4533,10 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
         }
       }
     } else {
-      // برای تراکنش جدید، پیش‌فرض person
-      _selectedTransactionMethod = 'person';
+      _selectedTransactionMethod = TransactionType.bank.value;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applySavedDefaultPaymentMethod();
+      });
       final seq = widget.initialInstallmentSeq;
       final alloc = widget.initialInstallmentAllocationAmount;
       if (seq != null && alloc != null && alloc > 0) {
@@ -4022,6 +4548,16 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
         _descriptionController.text = presetDesc.trim();
       }
     }
+  }
+
+  Future<void> _applySavedDefaultPaymentMethod() async {
+    if (widget.existingDocument != null || !mounted) return;
+    final resolved = await InvoiceTransactionPreferences.resolveInitialTransactionType(
+      widget.document.businessId,
+      InvoiceTransactionPreferences.receiptPaymentDialogTypes,
+    );
+    if (widget.existingDocument != null || !mounted) return;
+    setState(() => _selectedTransactionMethod = resolved.value);
   }
 
   @override
@@ -4195,7 +4731,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       
                       // روش پرداخت
                       DropdownButtonFormField<String>(
-                        value: _selectedTransactionMethod,
+                        key: ValueKey(_selectedTransactionMethod),
+                        initialValue: _selectedTransactionMethod,
                         decoration: const InputDecoration(
                           labelText: 'روش پرداخت *',
                           border: OutlineInputBorder(),
@@ -4648,7 +5185,15 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       };
 
       await widget.onSave(data);
-      
+
+      final methodType =
+          TransactionType.fromValue(_selectedTransactionMethod ?? '') ??
+              TransactionType.bank;
+      await InvoiceTransactionPreferences.setLastUsedTransactionType(
+        widget.document.businessId,
+        methodType,
+      );
+
       if (mounted) {
         Navigator.pop(context);
       }

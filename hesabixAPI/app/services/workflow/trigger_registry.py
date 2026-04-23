@@ -68,12 +68,18 @@ class TriggerRegistry:
             DocumentCreatedTrigger,
             InvoiceCreatedTrigger,
             ReceiptPaymentCreatedTrigger,
+            ReceiptPaymentUpdatedTrigger,
             CheckDueDateTrigger,
             InventoryLowTrigger,
             PersonCreatedTrigger,
             ScheduledTrigger,
             WebhookTrigger,
         )
+        from app.services.workflow.triggers.document_triggers import (
+            DocumentUpdatedTrigger,
+            InvoiceUpdatedTrigger,
+        )
+        from app.services.workflow.triggers.person_triggers import PersonUpdatedTrigger
         from app.services.workflow.triggers.crm_triggers import (
             LeadCreatedTrigger,
             LeadStageChangedTrigger,
@@ -88,12 +94,17 @@ class TriggerRegistry:
         
         # Document triggers
         self.register("document.created", DocumentCreatedTrigger())
+        self.register("document.updated", DocumentUpdatedTrigger())
         self.register("invoice.created", InvoiceCreatedTrigger())
         self.register("invoice.sales.created", InvoiceCreatedTrigger())
         self.register("invoice.purchase.created", InvoiceCreatedTrigger())
+        self.register("invoice.updated", InvoiceUpdatedTrigger())
+        self.register("invoice.sales.updated", InvoiceUpdatedTrigger())
+        self.register("invoice.purchase.updated", InvoiceUpdatedTrigger())
         
         # Financial triggers
         self.register("receipt_payment.created", ReceiptPaymentCreatedTrigger())
+        self.register("receipt_payment.updated", ReceiptPaymentUpdatedTrigger())
         self.register("check.due_date", CheckDueDateTrigger())
         
         # Inventory triggers
@@ -101,6 +112,7 @@ class TriggerRegistry:
         
         # Person triggers
         self.register("person.created", PersonCreatedTrigger())
+        self.register("person.updated", PersonUpdatedTrigger())
         
         # Scheduled triggers
         self.register("scheduled", ScheduledTrigger())

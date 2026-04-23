@@ -62,6 +62,19 @@ class ProductRepository(BaseRepository[Product]):
                         stmt = stmt.where(Product.name == value)
                     continue
 
+                if field == "item_type" and operator == "=" and value is not None:
+                    # مقدار رشته‌ای enum (مثلاً product / service)
+                    try:
+                        from adapters.db.models.product import ProductItemType
+                        iv = str(value).strip().lower()
+                        if iv in (ProductItemType.PRODUCT.value, "product"):
+                            stmt = stmt.where(Product.item_type == ProductItemType.PRODUCT)
+                        elif iv in (ProductItemType.SERVICE.value, "service"):
+                            stmt = stmt.where(Product.item_type == ProductItemType.SERVICE)
+                    except Exception:
+                        pass
+                    continue
+
                 # Category ID filter (supports "in" operator for multi-select)
                 if field == "category_id":
                     if operator == "in" and isinstance(value, (list, tuple)):

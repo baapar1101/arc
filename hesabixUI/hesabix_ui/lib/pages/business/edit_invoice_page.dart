@@ -32,6 +32,7 @@ import '../../services/currency_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
+import '../../widgets/invoice/keep_alive_tab_child.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -152,23 +153,68 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   Map<String, dynamic>? get _installmentPlanForEditor =>
       _documentHadInstallmentPlanAtLoad ? _initialInstallmentPlanCopy : null;
 
+  int _installmentsSlotIndex() => 2 + (_shouldShowTransactionsTab ? 1 : 0);
+
+  int _mapTabIndexAfterInstallmentsToggle({
+    required int oldIndex,
+    required int oldLength,
+    required int newLength,
+    required bool addedInstallments,
+    required int installmentsSlot,
+  }) {
+    if (oldLength == newLength) {
+      return oldIndex.clamp(0, newLength - 1);
+    }
+    if (addedInstallments && newLength == oldLength + 1) {
+      if (oldIndex >= installmentsSlot) return oldIndex + 1;
+      return oldIndex;
+    }
+    if (!addedInstallments && oldLength == newLength + 1) {
+      if (oldIndex > installmentsSlot) return oldIndex - 1;
+      return oldIndex;
+    }
+    return oldIndex.clamp(0, newLength - 1);
+  }
+
   void _syncTabControllerLength() {
     final newTabCount = _getTabCount();
-    if (newTabCount != _tabController.length) {
-      _tabController.dispose();
-      _tabController = TabController(length: newTabCount, vsync: this);
-    }
+    if (newTabCount == _tabController.length) return;
+    final prevIdx = _tabController.index;
+    _tabController.dispose();
+    _tabController = TabController(
+      length: newTabCount,
+      vsync: this,
+      initialIndex: prevIdx.clamp(0, newTabCount - 1),
+    );
   }
 
   void _onUseInstallmentsChanged(bool value) {
+    final oldIdx = _tabController.index;
+    final oldLen = _tabController.length;
+    final slot = _installmentsSlotIndex();
     setState(() {
       _useInstallments = value;
-      _syncTabControllerLength();
+      final newLen = _getTabCount();
+      if (newLen != oldLen) {
+        final newIdx = _mapTabIndexAfterInstallmentsToggle(
+          oldIndex: oldIdx,
+          oldLength: oldLen,
+          newLength: newLen,
+          addedInstallments: value,
+          installmentsSlot: slot,
+        );
+        _tabController.dispose();
+        _tabController = TabController(
+          length: newLen,
+          vsync: this,
+          initialIndex: newIdx.clamp(0, newLen - 1),
+        );
+      }
     });
     if (value) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final instIdx = 2 + (_shouldShowTransactionsTab ? 1 : 0);
+        final instIdx = _installmentsSlotIndex();
         if (instIdx >= 0 && instIdx < _tabController.length) {
           _tabController.animateTo(instIdx);
         }
@@ -425,8 +471,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       // به‌روزرسانی TabController بر اساس تعداد تب‌ها
       final newTabCount = _getTabCount();
       if (newTabCount != _tabController.length) {
+        final prevIdx = _tabController.index;
         _tabController.dispose();
-        _tabController = TabController(length: newTabCount, vsync: this);
+        _tabController = TabController(
+          length: newTabCount,
+          vsync: this,
+          initialIndex: prevIdx.clamp(0, newTabCount - 1),
+        );
       }
 
       await _reloadFxRates();
@@ -735,13 +786,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     _buildProductsTab(),
                     if (_shouldShowTransactionsTab) _buildTransactionsTab(),
                     if (_shouldShowInstallmentsTab)
-                      InvoiceInstallmentsEditor(
-                        key: _installmentsEditorKey,
-                        businessId: widget.businessId,
-                        calendarController: widget.calendarController,
-                        sumTotal: _sumTotal,
-                        invoiceDate: _invoiceDate,
-                        initialInstallmentPlan: _installmentPlanForEditor,
+                      KeepAliveTabChild(
+                        child: InvoiceInstallmentsEditor(
+                          key: _installmentsEditorKey,
+                          businessId: widget.businessId,
+                          calendarController: widget.calendarController,
+                          sumTotal: _sumTotal,
+                          invoiceDate: _invoiceDate,
+                          initialInstallmentPlan: _installmentPlanForEditor,
+                        ),
                       ),
                     _buildSettingsTab(),
                   ],

@@ -58,6 +58,9 @@ dependencies:
   fl_chart: ^1.1.1
   web: ^1.1.1
   qr_flutter: ^4.1.0
+  printing: ^5.14.2
+  pdf: ^3.11.3
+  barcode: ^2.2.9
   flutter_sound: ^9.2.13
   permission_handler: ^11.3.1
 
@@ -119,6 +122,9 @@ flutter:
           weight: 900
   assets:
     - assets/images/
+    - assets/fonts/Vazirmatn-Regular.ttf
+    - assets/fonts/YekanBakhFaNum-Regular.ttf
+    - assets/fonts/YekanBakhFaNum-Bold.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

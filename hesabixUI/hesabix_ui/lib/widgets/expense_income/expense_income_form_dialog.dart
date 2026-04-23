@@ -120,6 +120,105 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
     super.dispose();
   }
 
+  static const double _balanceEpsilon = 1e-6;
+
+  double _sumItems() =>
+      _itemLines.fold<double>(0, (p, e) => p + e.amount);
+
+  double _sumCounterparties() => _counterpartyLines.fold<double>(
+        0,
+        (p, e) => p + e.amount,
+      );
+
+  /// تعدیل آخرین ردیف طرف‌حساب تا جمع آن برابر جمع «حساب‌ها» (اقلام) شود.
+  void _onBalanceFavoringItemsColumn() {
+    if (_counterpartyLines.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق حساب‌ها، حداقل یک ردیف طرف‌حساب لازم است',
+      );
+      return;
+    }
+    final sumI = _sumItems();
+    final sumC = _sumCounterparties();
+    final add = sumI - sumC;
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _counterpartyLines.length - 1;
+    final newAmt = _counterpartyLines[last].amount + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر طرف‌حساب پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _counterpartyLines[last] =
+          _counterpartyLines[last].copyWith(amount: newAmt);
+    });
+  }
+
+  /// تعدیل آخرین ردیف قلم حساب تا جمع اقلام برابر جمع طرف‌حساب‌ها شود.
+  void _onBalanceFavoringCounterpartiesColumn() {
+    if (_itemLines.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق طرف‌حساب‌ها، حداقل یک ردیف حساب (قلم) لازم است',
+      );
+      return;
+    }
+    final sumI = _sumItems();
+    final sumC = _sumCounterparties();
+    final add = sumC - sumI;
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _itemLines.length - 1;
+    final newAmt = _itemLines[last].amount + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر اقلام پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _itemLines[last] = _itemLines[last].copyWith(amount: newAmt);
+    });
+  }
+
+  Widget _buildBalanceActionButtons() {
+    final diff = _sumItems() - _sumCounterparties();
+    if (diff.abs() < _balanceEpsilon) return const SizedBox.shrink();
+    if (_itemLines.isEmpty || _counterpartyLines.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final sumI = _sumItems();
+    final sumC = _sumCounterparties();
+    final addToCp = sumI - sumC;
+    final lastC = _counterpartyLines.length - 1;
+    final canMatchItems =
+        _counterpartyLines[lastC].amount + addToCp >= -_balanceEpsilon;
+    final addToItem = sumC - sumI;
+    final lastI = _itemLines.length - 1;
+    final canMatchCp = _itemLines[lastI].amount + addToItem >= -_balanceEpsilon;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: canMatchItems ? _onBalanceFavoringItemsColumn : null,
+          icon: const Icon(Icons.receipt_long, size: 18),
+          label: const Text('مطابق حساب‌ها'),
+        ),
+        OutlinedButton.icon(
+          onPressed: canMatchCp ? _onBalanceFavoringCounterpartiesColumn : null,
+          icon: const Icon(Icons.payments, size: 18),
+          label: const Text('مطابق طرف‌حساب‌ها'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveHelper.isMobile(context);
@@ -265,6 +364,13 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
                           _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
                           _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
                         ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _buildBalanceActionButtons(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -430,16 +536,27 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
               Padding(
                 padding: EdgeInsets.fromLTRB(padding, padding / 2, padding, padding),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _TotalChip(label: 'حساب‌ها', value: sumItems),
-                          _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
-                          _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _TotalChip(label: 'حساب‌ها', value: sumItems),
+                              _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
+                              _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: _buildBalanceActionButtons(),
+                          ),
                         ],
                       ),
                     ),

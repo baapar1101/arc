@@ -17,6 +17,9 @@ class WorkflowToolbarWidget extends StatelessWidget {
   final ValueChanged<WorkflowAutoLayoutType>? onLayoutTypeChanged;
   final VoidCallback? onSaveAsTemplate;
   final VoidCallback? onLoadTemplate;
+  final VoidCallback? onTestRun;
+  final bool testRunEnabled;
+  final bool testRunBusy;
 
   const WorkflowToolbarWidget({
     super.key,
@@ -30,6 +33,9 @@ class WorkflowToolbarWidget extends StatelessWidget {
     this.layoutType = WorkflowAutoLayoutType.hierarchical,
     this.onSaveAsTemplate,
     this.onLoadTemplate,
+    this.onTestRun,
+    this.testRunEnabled = true,
+    this.testRunBusy = false,
   });
 
   static void _showValidationErrors(BuildContext context, WorkflowEditorState state) {
@@ -411,6 +417,25 @@ class WorkflowToolbarWidget extends StatelessWidget {
             onPressed: state.canRedo ? onRedo : null,
           ),
         ),
+        if (onTestRun != null) ...[
+          const VerticalDivider(),
+          Tooltip(
+            message: t.workflowTestRun,
+            child: IconButton(
+              icon: testRunBusy
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.play_circle_outline),
+              onPressed: (!testRunEnabled || testRunBusy) ? null : onTestRun,
+            ),
+          ),
+        ],
         if (isDesktop) const Spacer() else const SizedBox(width: 24),
         Text(
           t.workflowToolbarNodes,

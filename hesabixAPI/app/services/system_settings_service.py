@@ -375,6 +375,48 @@ def resolve_public_app_base_url_for_public_links(db: Session) -> str:
 	return env_base
 
 
+def _normalize_http_origin_for_share_path(base: str) -> str:
+	"""حذف پسوندهای /public و /p و /i از انتهای پایه تا بتوان {origin}/p/... و {origin}/i/... ساخت."""
+	if not base:
+		return ""
+	s = base.strip().rstrip("/")
+	changed = True
+	while changed:
+		changed = False
+		low = s.lower()
+		for suffix in ("/public", "/p", "/i"):
+			if low.endswith(suffix):
+				s = s[: -len(suffix)].rstrip("/")
+				low = s.lower()
+				changed = True
+				break
+	return s
+
+
+def resolve_share_url_http_origin(
+	db: Optional[Session] = None,
+	request_base_url: Optional[str] = None,
+) -> str:
+	"""
+	پایهٔ دامنهٔ مطلق برای لینک کوتاه /p/ و /i/:
+	1) مقدار DB + env از طریق resolve_public_app_base_url_for_public_links
+	2) متغیر env قدیمی share_link_public_base_url
+	3) host درخواست (فقط اگر ۱ و ۲ خالی باشد)
+	"""
+	if db is not None:
+		b = (resolve_public_app_base_url_for_public_links(db) or "").strip()
+		b = _normalize_http_origin_for_share_path(b)
+		if b:
+			return b
+	b = (get_settings().share_link_public_base_url or "").strip()
+	b = _normalize_http_origin_for_share_path(b)
+	if b:
+		return b
+	if request_base_url:
+		return _normalize_http_origin_for_share_path(request_base_url)
+	return ""
+
+
 def get_default_document_policies(db: Session) -> List[Dict[str, Any]]:
 	"""
 	خواندن سیاست‌های پیش‌فرض درآمدزایی اسناد برای کسب‌وکارهای جدید

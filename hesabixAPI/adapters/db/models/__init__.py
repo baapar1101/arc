@@ -15,6 +15,7 @@ from .business_permission import BusinessPermission  # noqa: F401
 from .person import Person, PersonBankAccount  # noqa: F401
 from .person_group import PersonGroup  # noqa: F401
 from .person_share_link import PersonShareLink  # noqa: F401
+from .document_share_link import DocumentShareLink  # noqa: F401
 # Business user models removed - using business_permissions instead
 
 # Import support models

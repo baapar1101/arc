@@ -66,10 +66,28 @@ class WorkflowService {
     required int businessId,
     required int workflowId,
     Map<String, dynamic>? triggerData,
+    bool asyncExecution = false,
+    /// اجرای آزمایشی: بدون ارسال/ثبت واقعی (تست امن)
+    bool dryRun = false,
   }) async {
     final res = await _apiClient.post<Map<String, dynamic>>(
       '/businesses/$businessId/workflows/$workflowId/execute',
-      data: triggerData ?? const <String, dynamic>{},
+      data: <String, dynamic>{
+        'async_execution': asyncExecution,
+        'dry_run': dryRun,
+        'trigger_data': triggerData ?? const <String, dynamic>{},
+      },
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> getWorkflowExecution({
+    required int businessId,
+    required int workflowId,
+    required int executionId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/executions/$executionId',
     );
     return _asMap(res.data?['data']);
   }
@@ -106,9 +124,13 @@ class WorkflowService {
     required int businessId,
     required int workflowId,
     required int executionId,
+    int? afterLogId,
   }) async {
     final res = await _apiClient.get<Map<String, dynamic>>(
       '/businesses/$businessId/workflows/$workflowId/executions/$executionId/logs',
+      query: {
+        if (afterLogId != null) 'after_log_id': afterLogId,
+      },
     );
     final data = res.data?['data'];
     final logs = (data as List?)

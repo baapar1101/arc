@@ -13,6 +13,9 @@ import '../../services/category_service.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/bulk_default_warehouse_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
+import '../../widgets/product/product_unique_instances_tab.dart';
+import '../../widgets/product/product_label_print_dialog.dart';
+import '../../models/warehouse_model.dart';
 import '../../widgets/attached_files/attached_files_widget.dart';
 import '../../services/business_storage_service.dart';
 import '../../core/api_client.dart';
@@ -146,6 +149,100 @@ class _ProductsPageState extends State<ProductsPage> {
     return '$formatted%';
   }
   
+  String _instanceStatusFa(String? s) {
+    switch (s) {
+      case 'available':
+        return 'موجود';
+      case 'sold':
+        return 'فروخته‌شده';
+      case 'warranty':
+        return 'گارانتی';
+      case 'defective':
+        return 'معیوب';
+      default:
+        return s ?? '-';
+    }
+  }
+
+  Future<void> _bulkPrintUniqueProductLabels() async {
+    if (!widget.authStore.hasBusinessPermission('inventory', 'read')) {
+      SnackBarHelper.showError(context, message: 'برای چاپ برچسب واحدهای یونیک، دسترسی مشاهده انبار لازم است.');
+      return;
+    }
+    final t = AppLocalizations.of(context);
+    try {
+      final state = _tableKey.currentState as dynamic;
+      final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+      if (items.isEmpty) {
+        SnackBarHelper.showError(context, message: t.noRowsSelectedError);
+        return;
+      }
+      final uniqueRows = <Map<String, dynamic>>[];
+      for (final row in items) {
+        if (row is Map<String, dynamic> && row['inventory_mode']?.toString() == 'unique') {
+          uniqueRows.add(row);
+        }
+      }
+      if (uniqueRows.isEmpty) {
+        SnackBarHelper.showError(context, message: 'در انتخاب شما کالای یونیکی وجود ندارد.');
+        return;
+      }
+      if (!mounted) return;
+      final ws = WarehouseService();
+      final whList = await ws.listWarehouses(businessId: widget.businessId);
+      final whMap = <int, String>{
+        for (final Warehouse w in whList)
+          if (w.id != null) w.id!: w.name,
+      };
+      final labels = <ProductLabelPrintItem>[];
+      for (final row in uniqueRows) {
+        final rawId = row['id'];
+        final productId = rawId is int
+            ? rawId
+            : (rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''));
+        if (productId == null) continue;
+        final name = row['name']?.toString() ?? '';
+        final code = row['code']?.toString() ?? '';
+        final res = await ws.searchProductInstances(
+          businessId: widget.businessId,
+          productId: productId,
+          allStatuses: true,
+        );
+        final instList = res['items'] as List<dynamic>? ?? const [];
+        for (final e in instList) {
+          final m = Map<String, dynamic>.from(e as Map);
+          final widRaw = m['warehouse_id'];
+          final wId = widRaw is int ? widRaw : int.tryParse(widRaw?.toString() ?? '');
+          final wLine = wId != null ? 'انبار: ${whMap[wId] ?? '#$wId'}' : 'انبار: -';
+          final serial = m['serial_number']?.toString() ?? '';
+          final bcRaw = m['barcode']?.toString();
+          labels.add(
+            ProductLabelPrintItem(
+              productName: name,
+              productCode: code,
+              serialNumber: serial,
+              instanceBarcode: (bcRaw != null && bcRaw.isNotEmpty) ? bcRaw : null,
+              warehouseLabel: wLine,
+              status: _instanceStatusFa(m['status']?.toString()),
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      if (labels.isEmpty) {
+        SnackBarHelper.showError(
+          context,
+          message: 'برای کالاهای یونیک انتخاب‌شده، واحدی ثبت نشده است.',
+        );
+        return;
+      }
+      await ProductLabelPrintDialog.show(context, items: labels);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: '${t.error}: $e');
+    }
+  }
+
   String _resolveDateField(Map<String, dynamic> product, String key) {
     final formattedKey = '${key}_formatted';
     final rawKey = '${key}_raw';
@@ -719,7 +816,15 @@ class _ProductsPageState extends State<ProductsPage> {
             final serviceType = _stringValue(product['item_type']);
             final barcode = _stringValue(product['barcode']);
             final productId = product['id'];
-            
+            final parsedProductId = productId is int
+                ? productId
+                : (productId is num ? productId.toInt() : int.tryParse(productId?.toString() ?? ''));
+            final isUniqueProduct = product['inventory_mode']?.toString() == 'unique';
+            final showInstancesTab = isUniqueProduct &&
+                widget.authStore.hasBusinessPermission('inventory', 'read') &&
+                parsedProductId != null;
+            final dialogTabCount = showInstancesTab ? 4 : 3;
+
             Widget buildDocumentsTab() {
               final canUpload = widget.authStore.canWriteSection('products');
               if (productId == null) {
@@ -790,7 +895,7 @@ class _ProductsPageState extends State<ProductsPage> {
               insetPadding: ResponsiveHelper.getDialogPadding(dialogContext),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: DefaultTabController(
-                length: 3,
+                length: dialogTabCount,
                 child: ConstrainedBox(
                   constraints: ResponsiveHelper.getDialogConstraints(dialogContext),
                   child: Column(
@@ -818,6 +923,11 @@ class _ProductsPageState extends State<ProductsPage> {
                                   icon: const Icon(Icons.info_outline),
                                   text: t.productGeneralInfo,
                                 ),
+                                if (showInstancesTab)
+                                  const Tab(
+                                    icon: Icon(Icons.qr_code_2_outlined),
+                                    text: 'سریال و بارکد',
+                                  ),
                                 Tab(
                                   icon: const Icon(Icons.warehouse_outlined),
                                   text: t.productStock,
@@ -847,6 +957,12 @@ class _ProductsPageState extends State<ProductsPage> {
                               barcode: barcode,
                               t: t,
                             ),
+                            if (showInstancesTab)
+                              ProductUniqueInstancesTab(
+                                businessId: widget.businessId,
+                                productId: parsedProductId,
+                                product: product,
+                              ),
                             _buildProductStockTab(
                               dialogContext: dialogContext,
                               productId: productId,
@@ -1463,6 +1579,14 @@ class _ProductsPageState extends State<ProductsPage> {
                     }
                   },
                   icon: const Icon(Icons.delete_sweep_outlined),
+                ),
+              ),
+            if (widget.authStore.hasBusinessPermission('inventory', 'read'))
+              Tooltip(
+                message: 'چاپ برچسب کالاهای یونیک انتخاب‌شده',
+                child: IconButton(
+                  onPressed: _bulkPrintUniqueProductLabels,
+                  icon: const Icon(Icons.qr_code_2_outlined),
                 ),
               ),
             if (widget.authStore.hasBusinessPermission('products', 'edit'))

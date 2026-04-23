@@ -8,6 +8,7 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import '../../utils/snackbar_helper.dart';
@@ -521,24 +522,35 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     return formatter.format(numeric);
   }
 
+  DateTime? _parseRowDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) {
+      if (value.isEmpty) return null;
+      final head = value.length >= 10 ? value.substring(0, 10) : value;
+      final fromApi = HesabixDateUtils.parseFromAPI(head);
+      if (fromApi != null) return fromApi;
+      return DateTime.tryParse(value);
+    }
+    if (value is Map) {
+      final raw = value['date_only'] ?? value['formatted'] ?? value['date_time'];
+      if (raw == null) return null;
+      return _parseRowDate(raw);
+    }
+    return null;
+  }
+
   String _formatDateValue(Map<String, dynamic> row, String key) {
     final dynamic value = row[key];
     if (value == null) return '-';
+    final dt = _parseRowDate(value);
+    if (dt != null) {
+      return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+    }
     if (value is String) {
       return value.isEmpty ? '-' : value;
     }
-    if (value is Map<String, dynamic>) {
-      final dateOnly = value['date_only'] ?? value['formatted'] ?? value['date_time'];
-      if (dateOnly == null) {
-        return '-';
-      }
-      return dateOnly.toString();
-    }
-    if (value is DateTime) {
-      final formatter = DateFormat('yyyy/MM/dd', Localizations.localeOf(context).toLanguageTag());
-      return formatter.format(value);
-    }
-    return value.toString();
+    return '-';
   }
 
   Widget _buildPagination(AppLocalizations t, {bool compact = false}) {

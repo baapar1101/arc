@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Request, Body, HTTPException, Query
+from fastapi import APIRouter, Depends, Request, Body, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, or_, func, cast, Text, case, text
 
@@ -33,6 +33,44 @@ from adapters.api.v1.schemas import QueryInfo
 
 router = APIRouter(tags=["workflows"])
 _logger = logging.getLogger(__name__)
+
+
+def _workflow_background_run(
+    execution_id: int,
+    workflow_id: int,
+    business_id: int,
+    user_id: Optional[int],
+    trigger_data: Dict[str, Any],
+) -> None:
+    """اجرای workflow در پس‌زمینه پس از پاسخ HTTP (برای نمایش زنده در کلاینت)."""
+    from adapters.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        workflow = db.get(Workflow, workflow_id)
+        execution = db.get(WorkflowExecution, execution_id)
+        if not workflow or not execution:
+            _logger.error("workflow background: workflow or execution missing")
+            return
+        if execution.workflow_id != workflow_id:
+            _logger.error("workflow background: execution workflow mismatch")
+            return
+        if workflow.business_id != business_id:
+            _logger.error("workflow background: business mismatch")
+            return
+        if execution.status != WorkflowExecutionStatus.PENDING:
+            _logger.warning(
+                "workflow background: execution %s status is %s, skip",
+                execution_id,
+                execution.status,
+            )
+            return
+        engine = WorkflowEngine(db, business_id, user_id)
+        engine.run_pending_execution(workflow, execution, trigger_data)
+    except Exception as e:
+        _logger.error("workflow background run failed: %s", e, exc_info=True)
+    finally:
+        db.close()
 
 
 def _webhook_trigger_timeout_seconds(workflow: Workflow) -> float:
@@ -410,13 +448,14 @@ async def delete_workflow(
 @router.post(
     "/businesses/{business_id}/workflows/{workflow_id}/execute",
     summary="اجرای workflow",
-    description="اجرای دستی یک workflow",
+    description="اجرای دستی. بدنه می‌تواند `dry_run: true` باشد (آزمایشی، بدون ارسال/ثبت واقعی).",
 )
 @require_business_access("business_id")
 async def execute_workflow(
     request: Request,
     business_id: int,
     workflow_id: int,
+    background_tasks: BackgroundTasks,
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
@@ -429,12 +468,33 @@ async def execute_workflow(
     if workflow.status != WorkflowStatus.ACTIVE:
         raise ApiError("WORKFLOW_NOT_ACTIVE", "Workflow فعال نیست")
     
-    trigger_data = body.get("trigger_data", {})
-    
-    # اجرای workflow
+    raw_trigger = body.get("trigger_data")
+    trigger_data: Dict[str, Any] = raw_trigger if isinstance(raw_trigger, dict) else {}
+    async_execution = bool(body.get("async_execution", False))
+    dry_run = bool(body.get("dry_run", False))
+    if dry_run:
+        from app.services.workflow.dry_run import DRY_RUN_TRIGGER_KEY
+
+        if isinstance(trigger_data, dict):
+            trigger_data = {**trigger_data, DRY_RUN_TRIGGER_KEY: True}
+        else:
+            trigger_data = {DRY_RUN_TRIGGER_KEY: True}
+
     engine = WorkflowEngine(db, business_id, ctx.get_user_id())
-    execution = engine.execute_workflow(workflow, trigger_data)
-    
+
+    if async_execution:
+        execution = engine.create_pending_execution(workflow, trigger_data)
+        background_tasks.add_task(
+            _workflow_background_run,
+            execution.id,
+            workflow_id,
+            business_id,
+            ctx.get_user_id(),
+            trigger_data,
+        )
+    else:
+        execution = engine.execute_workflow(workflow, trigger_data)
+
     return success_response(
         data=format_datetime_fields(execution.__dict__, request),
         request=request,
@@ -490,6 +550,35 @@ async def list_workflow_executions(
 
 
 @router.get(
+    "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}",
+    summary="جزئیات یک اجرای workflow",
+    description="دریافت وضعیت یک اجرا (برای polling هنگام اجرای ناهمزمان)",
+)
+@require_business_access("business_id")
+async def get_workflow_execution(
+    request: Request,
+    business_id: int,
+    workflow_id: int,
+    execution_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow or workflow.business_id != business_id:
+        raise ApiError("WORKFLOW_NOT_FOUND", "Workflow یافت نشد")
+
+    execution = db.get(WorkflowExecution, execution_id)
+    if not execution or execution.workflow_id != workflow_id:
+        raise ApiError("EXECUTION_NOT_FOUND", "اجرای workflow یافت نشد")
+
+    return success_response(
+        data=format_datetime_fields(execution.__dict__, request),
+        request=request,
+        message="WORKFLOW_EXECUTION_RETRIEVED",
+    )
+
+
+@router.get(
     "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}/logs",
     summary="لاگ‌های اجرای workflow",
     description="دریافت لاگ‌های یک اجرای workflow",
@@ -500,6 +589,11 @@ async def get_workflow_execution_logs(
     business_id: int,
     workflow_id: int,
     execution_id: int,
+    after_log_id: Optional[int] = Query(
+        None,
+        ge=0,
+        description="فقط لاگ‌های با id بزرگ‌تر از این مقدار (polling افزایشی؛ ۰ یعنی از ابدا)",
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
@@ -513,7 +607,9 @@ async def get_workflow_execution_logs(
         raise ApiError("EXECUTION_NOT_FOUND", "اجرای workflow یافت نشد")
     
     stmt = select(WorkflowLog).where(WorkflowLog.execution_id == execution_id)
-    stmt = stmt.order_by(WorkflowLog.timestamp.asc())
+    if after_log_id is not None and after_log_id > 0:
+        stmt = stmt.where(WorkflowLog.id > after_log_id)
+    stmt = stmt.order_by(WorkflowLog.id.asc())
     
     logs = list(db.execute(stmt).scalars().all())
     
@@ -890,7 +986,10 @@ async def get_actions_metadata(
 ):
     """دریافت metadata actionها با پشتیبانی از ترجمه"""
     from app.services.workflow.i18n import translate_metadata
-    
+    from app.services.workflow.i18n.hesabix_data_actions_i18n import get_workflow_action_keys
+
+    _wf_data_action_keys = get_workflow_action_keys()
+
     action_registry = ActionRegistry()
     all_actions = action_registry.get_all_metadata()
     
@@ -913,7 +1012,9 @@ async def get_actions_metadata(
             translation_context = "send_telegram"
         elif "email" in action_key:
             translation_context = "send_email"
-        
+        elif action_key in _wf_data_action_keys:
+            translation_context = action_key
+
         # ترجمه metadata
         if translation_context:
             translated = translate_metadata(action, lang, translation_context)
@@ -946,28 +1047,23 @@ async def get_workflow_translations(
         SEND_TELEGRAM_TRANSLATIONS,
         SEND_EMAIL_TRANSLATIONS,
         OTHER_ACTIONS_TRANSLATIONS,
-        RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
-        DOCUMENT_CREATED_TRANSLATIONS,
         BUSINESS_BACKUP_TRANSLATIONS,
-        SCHEDULED_TRIGGER_TRANSLATIONS,
     )
-    
-    # ترکیب تمام ترجمه‌ها
-    all_translations = {}
-    
-    # ترجمه‌های مشترک
+    from app.services.workflow.i18n.hesabix_data_actions_i18n import WORKFLOW_ACTION_TRANSLATIONS
+    from app.services.workflow.i18n.workflow_translations import TRIGGER_TRANSLATIONS_BY_KEY
+
+    all_translations: dict = {}
     all_translations.update(COMMON_TRANSLATIONS.get(lang, {}))
-    
-    # ترجمه‌های اکشن‌ها
     all_translations["create_invoice"] = CREATE_INVOICE_TRANSLATIONS.get(lang, {})
     all_translations["send_telegram"] = SEND_TELEGRAM_TRANSLATIONS.get(lang, {})
     all_translations["send_email"] = SEND_EMAIL_TRANSLATIONS.get(lang, {})
     all_translations["others"] = OTHER_ACTIONS_TRANSLATIONS.get(lang, {})
-    # ترجمه تریگرها (کلید = همان trigger_type برای UI)
-    all_translations["receipt_payment.created"] = RECEIPT_PAYMENT_CREATED_TRANSLATIONS.get(lang, {})
-    all_translations["document.created"] = DOCUMENT_CREATED_TRANSLATIONS.get(lang, {})
-    all_translations["scheduled"] = SCHEDULED_TRIGGER_TRANSLATIONS.get(lang, {})
     all_translations["business_backup"] = BUSINESS_BACKUP_TRANSLATIONS.get(lang, {})
+
+    for _tk, _bundle in TRIGGER_TRANSLATIONS_BY_KEY.items():
+        all_translations[_tk] = _bundle.get(lang, {})
+    for _ak, _abundle in WORKFLOW_ACTION_TRANSLATIONS.items():
+        all_translations[_ak] = _abundle.get(lang, {})
     
     return success_response(
         data={

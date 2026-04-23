@@ -54,6 +54,98 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
     super.dispose();
   }
 
+  static const double _balanceEpsilon = 1e-6;
+
+  double _sumItems() => _items.fold<double>(0, (p, e) => p + e.amount);
+
+  double _sumTx() =>
+      _transactions.fold<double>(0, (p, e) => p + e.amount.toDouble());
+
+  void _onBalanceFavoringItemsColumn() {
+    if (_transactions.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق اقلام، حداقل یک ردیف طرف‌حساب لازم است',
+      );
+      return;
+    }
+    final add = _sumItems() - _sumTx();
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _transactions.length - 1;
+    final newAmt = _transactions[last].amount.toDouble() + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر طرف‌حساب پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _transactions[last] =
+          _transactions[last].copyWith(amount: newAmt);
+    });
+  }
+
+  void _onBalanceFavoringCounterpartiesColumn() {
+    if (_items.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق طرف‌حساب، حداقل یک ردیف اقلام لازم است',
+      );
+      return;
+    }
+    final add = _sumTx() - _sumItems();
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _items.length - 1;
+    final newAmt = _items[last].amount + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر اقلام پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _items[last] = _items[last].copyWith(amount: newAmt);
+    });
+  }
+
+  Widget _buildBalanceActionButtons() {
+    final sumItems = _sumItems();
+    final sumTx = _sumTx();
+    if ((sumItems - sumTx).abs() < _balanceEpsilon) {
+      return const SizedBox.shrink();
+    }
+    if (_items.isEmpty || _transactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final addToTx = sumItems - sumTx;
+    final lastT = _transactions.length - 1;
+    final canMatchItems = _transactions[lastT].amount.toDouble() + addToTx >=
+        -_balanceEpsilon;
+    final addToItem = sumTx - sumItems;
+    final lastI = _items.length - 1;
+    final canMatchTx =
+        _items[lastI].amount + addToItem >= -_balanceEpsilon;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: canMatchItems ? _onBalanceFavoringItemsColumn : null,
+          icon: const Icon(Icons.receipt_long, size: 18),
+          label: const Text('مطابق اقلام'),
+        ),
+        OutlinedButton.icon(
+          onPressed: canMatchTx ? _onBalanceFavoringCounterpartiesColumn : null,
+          icon: const Icon(Icons.payments, size: 18),
+          label: const Text('مطابق طرف‌حساب'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sumItems = _items.fold<double>(0, (p, e) => p + e.amount);
@@ -127,13 +219,28 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: Wrap(spacing: 16, runSpacing: 8, children: [
-                        _chip('جمع اقلام', sumItems),
-                        _chip('جمع طرف‌حساب', sumTx),
-                        _chip('اختلاف', diff, isError: diff != 0),
-                      ]),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            children: [
+                              _chip('جمع اقلام', sumItems),
+                              _chip('جمع طرف‌حساب', sumTx),
+                              _chip('اختلاف', diff, isError: diff != 0),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: _buildBalanceActionButtons(),
+                          ),
+                        ],
+                      ),
                     ),
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('انصراف')),
                     const SizedBox(width: 8),

@@ -226,6 +226,35 @@ class WarehouseService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  /// جستجوی کالاهای یونیک (instance). بدون [allStatuses] و بدون [status]، فقط وضعیت available برمی‌گردد.
+  Future<Map<String, dynamic>> searchProductInstances({
+    required int businessId,
+    int? productId,
+    int? warehouseId,
+    String? status,
+    bool allStatuses = false,
+    String? serialNumber,
+    String? barcode,
+    String? searchTerm,
+  }) async {
+    final body = <String, dynamic>{};
+    if (productId != null) body['product_id'] = productId;
+    if (warehouseId != null) body['warehouse_id'] = warehouseId;
+    if (allStatuses) body['all_statuses'] = true;
+    if (status != null && status.isNotEmpty) body['status'] = status;
+    if (serialNumber != null && serialNumber.isNotEmpty) {
+      body['serial_number'] = serialNumber;
+    }
+    if (barcode != null && barcode.isNotEmpty) body['barcode'] = barcode;
+    if (searchTerm != null && searchTerm.isNotEmpty) body['search'] = searchTerm;
+
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/product-instances/business/$businessId/search',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   Future<Map<String, dynamic>> convertProductToUnique({
     required int businessId,
     required int productId,

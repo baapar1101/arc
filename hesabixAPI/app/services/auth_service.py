@@ -361,16 +361,41 @@ def change_password(*, db: Session, user_id: int, current_password: str, new_pas
 		logger.warning(f"Failed to log password change activity: {e}")
 
 
-def send_password_reset_notification(*, db: Session, user_id: int, token: str) -> None:
+def send_password_reset_notification(
+	*,
+	db: Session,
+	user_id: int,
+	token: str,
+	reset_link: str | None = None,
+) -> None:
 	"""ارسال اعلان‌های پیکربندی‌شده (مثلاً ایمیل/پیامک) برای رویداد auth.password_reset."""
 	import logging
 	logger = logging.getLogger(__name__)
 	try:
 		from app.services.notification_service import NotificationService
 		svc = NotificationService(db)
-		svc.send(user_id=user_id, event_key="auth.password_reset", context={"token": token})
+		ctx: dict = {"token": token, "reset_link": (reset_link or "")}
+		svc.send(user_id=user_id, event_key="auth.password_reset", context=ctx)
 	except Exception as e:
 		logger.error("password_reset_notification_failed user_id=%s: %s", user_id, e, exc_info=True)
+
+
+def build_password_reset_web_url(*, request, token: str) -> str | None:
+	"""
+	لینک وب برای باز کردن صفحه ورود + دیالوگ تغییر رمز.
+	الویت: app_public_url → header Origin. اگر نبود None (کلاینت لینک می‌سازد).
+	"""
+	from urllib.parse import quote
+
+	settings = get_settings()
+	base = (getattr(settings, "app_public_url", "") or "").strip().rstrip("/")
+	if not base:
+		origin = (request.headers.get("origin") or "").strip()
+		if origin.startswith("http://") or origin.startswith("https://"):
+			base = origin.rstrip("/")
+	if not base:
+		return None
+	return f"{base}/login?reset_token={quote(token, safe='')}"
 
 
 def validate_new_password_policy(new_password: str) -> None:

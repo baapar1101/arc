@@ -321,6 +321,16 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
             });
           },
         ),
+        SwitchListTile(
+          title: const Text('QR نمایش آنلاین / اعتبارسنجی'),
+          subtitle: const Text('امکان درج QR در فاکتور چاپی برای مشاهدهٔ آنلاین (در صدور/چاپ موردی قابل خاموش)'),
+          value: cfg.showShareQr,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showShareQr: v));
+            });
+          },
+        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _footerController,
@@ -341,6 +351,7 @@ class _PrintConfig {
   final bool showStamp;
   final bool showPayments;
   final bool showInstallmentPlan;
+  final bool showShareQr;
   final String? footerNote;
 
   const _PrintConfig({
@@ -348,6 +359,7 @@ class _PrintConfig {
     required this.showStamp,
     required this.showPayments,
     required this.showInstallmentPlan,
+    required this.showShareQr,
     required this.footerNote,
   });
 
@@ -357,6 +369,7 @@ class _PrintConfig {
       showStamp: true,
       showPayments: true,
       showInstallmentPlan: true,
+      showShareQr: false,
       footerNote: null,
     );
   }
@@ -379,6 +392,7 @@ class _PrintConfig {
       showStamp: _b('show_stamp', true),
       showPayments: _b('show_payments', true),
       showInstallmentPlan: _b('show_installment_plan', true),
+      showShareQr: _b('show_share_qr', false),
       footerNote: (json['footer_note'] as String?)?.trim().isEmpty == true
           ? null
           : json['footer_note'] as String?,
@@ -391,6 +405,7 @@ class _PrintConfig {
       'show_stamp': showStamp,
       'show_payments': showPayments,
       'show_installment_plan': showInstallmentPlan,
+      'show_share_qr': showShareQr,
       'footer_note': footerNote,
     };
   }
@@ -400,6 +415,7 @@ class _PrintConfig {
     bool? showStamp,
     bool? showPayments,
     bool? showInstallmentPlan,
+    bool? showShareQr,
     String? footerNote,
   }) {
     return _PrintConfig(
@@ -407,6 +423,7 @@ class _PrintConfig {
       showStamp: showStamp ?? this.showStamp,
       showPayments: showPayments ?? this.showPayments,
       showInstallmentPlan: showInstallmentPlan ?? this.showInstallmentPlan,
+      showShareQr: showShareQr ?? this.showShareQr,
       footerNote: footerNote ?? this.footerNote,
     );
   }

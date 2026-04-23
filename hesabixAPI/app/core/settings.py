@@ -43,6 +43,10 @@ class Settings(BaseSettings):
 	# Used as default region when parsing phone numbers without a country code
 	default_phone_region: str = "IR"
 
+	# لینک‌های وب (مثلاً ساخت /login?reset_token=... برای ادمین و قالب اعلان)
+	# اگر خالی باشد، در endpoint بازنشانی از header Origin (درخواست مرورگر) استفاده می‌شود
+	app_public_url: str = ""
+
 	# CORS
 	# نکته: وقتی allow_credentials=True است، نمی‌توان از "*" استفاده کرد
 	# باید دامنه‌های خاص را مشخص کنید

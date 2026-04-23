@@ -11,6 +11,13 @@ class WorkflowConnectionPainter extends CustomPainter {
   final bool isConnecting;
   final Offset? connectingFrom;
   final Offset? connectingTo;
+  /// یال فعال در اجرای زنده (از آخرین نود تکمیل‌شده به نود در حال اجرا)
+  final String? liveEdgeSourceNodeId;
+  final String? liveEdgeTargetNodeId;
+  /// یال‌های روی مسیر `executed_nodes` در تاریخچه
+  final Set<String> historyHighlightedConnectionIds;
+  /// ۰…۱ برای ضخامت/شفافیت پالس روی یال زنده (اختیاری)
+  final double? liveEdgePulseT;
 
   WorkflowConnectionPainter({
     required this.connections,
@@ -19,6 +26,10 @@ class WorkflowConnectionPainter extends CustomPainter {
     this.isConnecting = false,
     this.connectingFrom,
     this.connectingTo,
+    this.liveEdgeSourceNodeId,
+    this.liveEdgeTargetNodeId,
+    this.liveEdgePulseT,
+    this.historyHighlightedConnectionIds = const {},
   });
 
   @override
@@ -31,6 +42,11 @@ class WorkflowConnectionPainter extends CustomPainter {
     final selectedPaint = Paint()
       ..color = Colors.blue.shade700
       ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+
+    final historyPathPaint = Paint()
+      ..color = const Color(0xFFF9A825)
+      ..strokeWidth = 3.4
       ..style = PaintingStyle.stroke;
 
     // رسم خطوط اتصال موجود
@@ -47,8 +63,32 @@ class WorkflowConnectionPainter extends CustomPainter {
       final sourcePoint = _getConnectionPoint(sourceNodePos, sourceSide);
       final targetPoint = _getConnectionPoint(targetNodePos, targetSide);
 
+      final isLiveEdge = liveEdgeSourceNodeId != null &&
+          liveEdgeTargetNodeId != null &&
+          connection.sourceNodeId == liveEdgeSourceNodeId &&
+          connection.targetNodeId == liveEdgeTargetNodeId;
+      final isHistoryEdge = historyHighlightedConnectionIds.contains(connection.id);
       final isSelected = connection.id == selectedConnectionId;
-      final paint = isSelected ? selectedPaint : defaultPaint;
+
+      final Paint paint;
+      if (isLiveEdge) {
+        final pulse = liveEdgePulseT;
+        final wave = pulse != null
+            ? (0.5 + 0.5 * math.sin(pulse * math.pi * 2))
+            : 1.0;
+        final strokeW = 3.6 + 1.9 * wave;
+        final alpha = 0.72 + 0.28 * wave;
+        paint = Paint()
+          ..color = const Color(0xFF00897B).withValues(alpha: alpha)
+          ..strokeWidth = strokeW
+          ..style = PaintingStyle.stroke;
+      } else if (isHistoryEdge) {
+        paint = historyPathPaint;
+      } else if (isSelected) {
+        paint = selectedPaint;
+      } else {
+        paint = defaultPaint;
+      }
 
       _drawConnection(canvas, sourcePoint, targetPoint, paint);
     }
@@ -203,7 +243,11 @@ class WorkflowConnectionPainter extends CustomPainter {
         oldDelegate.selectedConnectionId != selectedConnectionId ||
         oldDelegate.isConnecting != isConnecting ||
         oldDelegate.connectingFrom != connectingFrom ||
-        oldDelegate.connectingTo != connectingTo;
+        oldDelegate.connectingTo != connectingTo ||
+        oldDelegate.liveEdgeSourceNodeId != liveEdgeSourceNodeId ||
+        oldDelegate.liveEdgeTargetNodeId != liveEdgeTargetNodeId ||
+        oldDelegate.liveEdgePulseT != liveEdgePulseT ||
+        oldDelegate.historyHighlightedConnectionIds != historyHighlightedConnectionIds;
   }
 }
 

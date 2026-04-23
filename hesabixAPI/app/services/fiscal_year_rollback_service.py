@@ -625,6 +625,10 @@ def _delete_documents_for_fiscal_year(
             logger.warning("rollback_unknown_document_type", extra={"type": dtype, "id": d.id})
             _hard_delete_document(db, d.id)
 
+    # Session با autoflush=False است؛ _hard_delete_document فقط db.delete می‌زند و flush نمی‌کند.
+    # بدون flush، پرس و جوی count آخر روی دیتابیس رکوردهای «در انتظار حذف» را هنوز می‌بیند.
+    db.flush()
+
     remaining = (
         db.query(Document)
         .filter(
@@ -634,6 +638,27 @@ def _delete_documents_for_fiscal_year(
         .count()
     )
     if remaining:
+        # برای تشخیص نوع(های) باقی‌مانده در لاگ/پشتیبانی
+        rem_docs = (
+            db.query(Document)
+            .filter(
+                Document.business_id == int(business_id),
+                Document.fiscal_year_id == int(fiscal_year_id),
+            )
+            .limit(30)
+            .all()
+        )
+        rem_samples = [
+            {"id": d.id, "code": d.code, "document_type": d.document_type} for d in rem_docs
+        ]
+        logger.error(
+            "rollback_documents_still_remaining",
+            extra={
+                "business_id": business_id,
+                "fiscal_year_id": fiscal_year_id,
+                "sample": rem_samples,
+            },
+        )
         raise ApiError(
             "ROLLBACK_DOCUMENTS_REMAINING",
             _tr(

@@ -119,6 +119,37 @@
     .invoice-layout .header-meta-right {
       flex: 0 0 auto;
       font-size: 11px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ترتیب DOM: QR سپس متن — در RTL ردیف عادی، در LTR معکوس تا کد/تاریخ همیشه چپِ QR باشد */
+    html[dir="ltr"] .invoice-layout .header-meta-right {
+      flex-direction: row-reverse;
+    }
+
+    .invoice-layout .header-meta-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      text-align: right;
+    }
+
+    html[dir="ltr"] .invoice-layout .header-meta-lines {
+      text-align: left;
+    }
+
+    .invoice-layout .header-qr {
+      flex: 0 0 auto;
+    }
+
+    .invoice-layout .header-qr img {
+      display: block;
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
     }
 
     .invoice-layout .header .title {
@@ -277,13 +308,20 @@
             {% endif %}
           </div>
           <div class="header-meta-right">
-            <div>
-              {{ 'کد فاکتور' if is_fa else 'Invoice code' }}:
-              {{ invoice.code or '-' }}
-            </div>
-            <div>
-              {{ 'تاریخ فاکتور' if is_fa else 'Invoice date' }}:
-              {{ invoice.issue_date or '-' }}
+            {% if show_invoice_verify_qr and invoice_verify_qr_data_uri %}
+              <div class="header-qr">
+                <img src="{{ invoice_verify_qr_data_uri }}" alt="" />
+              </div>
+            {% endif %}
+            <div class="header-meta-lines">
+              <div>
+                {{ 'کد فاکتور' if is_fa else 'Invoice code' }}:
+                {{ invoice.code or '-' }}
+              </div>
+              <div>
+                {{ 'تاریخ فاکتور' if is_fa else 'Invoice date' }}:
+                {{ invoice.issue_date or '-' }}
+              </div>
             </div>
           </div>
         </div>

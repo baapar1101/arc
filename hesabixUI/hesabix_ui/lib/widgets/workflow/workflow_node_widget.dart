@@ -18,11 +18,13 @@ class WorkflowNodeWidget extends StatelessWidget {
   final bool highlightConnectionPoints; // برای highlight کردن connection points قابل اتصال
   final ValueChanged<Offset>? onDeltaChanged; // برای ارسال موقعیت global در canvas coordinates
   final List<String>? validationErrors; // خطاهای اعتبارسنجی
+  final WorkflowNodeRunPhase runPhase;
 
   const WorkflowNodeWidget({
     super.key,
     required this.node,
     this.isSelected = false,
+    this.runPhase = WorkflowNodeRunPhase.idle,
     this.onTap,
     this.onPositionChanged,
     this.onStartConnection,
@@ -62,12 +64,38 @@ class WorkflowNodeWidget extends StatelessWidget {
         color: colorForClosure,
       );
       
-      // ایجاد border color
+      // ایجاد border color (اجرای زنده اولویت بعد از خطای اعتبارسنجی)
       final hasErrors = validationErrors != null && validationErrors!.isNotEmpty;
-      final borderColor = hasErrors 
-          ? Colors.red 
-          : (isSelectedForClosure ? themeForClosure.colorScheme.primary : colorForClosure);
-      final borderWidth = (isSelectedForClosure || hasErrors) ? 3.0 : 2.0;
+      final Color borderColor;
+      final double borderWidth;
+      if (hasErrors) {
+        borderColor = Colors.red;
+        borderWidth = (isSelectedForClosure || hasErrors) ? 3.0 : 2.0;
+      } else {
+        switch (runPhase) {
+          case WorkflowNodeRunPhase.running:
+            borderColor = themeForClosure.colorScheme.primary;
+            borderWidth = 3.5;
+            break;
+          case WorkflowNodeRunPhase.success:
+            borderColor = Colors.green.shade700;
+            borderWidth = 3.0;
+            break;
+          case WorkflowNodeRunPhase.error:
+            borderColor = Colors.red.shade800;
+            borderWidth = 3.0;
+            break;
+          case WorkflowNodeRunPhase.historyReplay:
+            borderColor = Colors.amber.shade800;
+            borderWidth = 3.0;
+            break;
+          case WorkflowNodeRunPhase.idle:
+            borderColor =
+                isSelectedForClosure ? themeForClosure.colorScheme.primary : colorForClosure;
+            borderWidth = (isSelectedForClosure || hasErrors) ? 3.0 : 2.0;
+            break;
+        }
+      }
       
       // ایجاد surface color
       final surfaceColor = themeForClosure.colorScheme.surface;
@@ -91,6 +119,8 @@ class WorkflowNodeWidget extends StatelessWidget {
         headerBackgroundColor: headerBackgroundColor,
         iconData: iconData,
         textStyle: textStyle,
+        hasErrors: hasErrors,
+        runPhase: runPhase,
       );
       
       return Positioned(
@@ -177,6 +207,8 @@ class WorkflowNodeWidget extends StatelessWidget {
     required Color headerBackgroundColor,
     required IconData iconData,
     required TextStyle? textStyle,
+    required bool hasErrors,
+    required WorkflowNodeRunPhase runPhase,
   }) {
     try {
       // ایجاد لیست connection points
@@ -360,6 +392,50 @@ class WorkflowNodeWidget extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        );
+      }
+
+      if (!hasErrors && runPhase == WorkflowNodeRunPhase.running) {
+        children.add(
+          Positioned(
+            top: 6,
+            right: 6,
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+        );
+      }
+      if (!hasErrors && runPhase == WorkflowNodeRunPhase.success) {
+        children.add(
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+          ),
+        );
+      }
+      if (!hasErrors && runPhase == WorkflowNodeRunPhase.error) {
+        children.add(
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Icon(Icons.cancel, color: Colors.red.shade800, size: 20),
+          ),
+        );
+      }
+      if (!hasErrors && runPhase == WorkflowNodeRunPhase.historyReplay) {
+        children.add(
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Icon(Icons.history, color: Colors.amber.shade900, size: 20),
           ),
         );
       }

@@ -34,7 +34,6 @@ def search_product_instances(
     
     product_id = payload.get("product_id")
     warehouse_id = payload.get("warehouse_id")
-    status = payload.get("status", "available")
     serial_number = payload.get("serial_number")
     barcode = payload.get("barcode")
     search_term = payload.get("search")
@@ -49,8 +48,16 @@ def search_product_instances(
     if warehouse_id:
         query = query.filter(ProductInstance.warehouse_id == warehouse_id)
     
-    if status:
-        query = query.filter(ProductInstance.status == status)
+    # وضعیت: اگر کلید status ارسال نشود، پیش‌فرض فقط available (سازگاری با کلاینتهای قدیمی).
+    # اگر status صریحاً null یا رشته خالی باشد، یا all_statuses=true، فیلتر وضعیت اعمال نمی‌شود.
+    if payload.get("all_statuses") is True:
+        pass
+    elif "status" in payload:
+        status = payload.get("status")
+        if status:
+            query = query.filter(ProductInstance.status == status)
+    else:
+        query = query.filter(ProductInstance.status == "available")
     
     if serial_number:
         query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_number}%"))

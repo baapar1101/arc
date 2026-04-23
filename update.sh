@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
-# pip: Runflare mirror via pip config --user (mirror-pypi.runflare.com) before backend pip install.
+# pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install.
 # Flutter: Runflare pub/storage (mirror-flutter.runflare.com + mirror-gcs.runflare.com) tried first when env unset.
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
@@ -46,14 +46,14 @@ PROFILE
   fi
 }
 
-configure_pip_runflare_mirror() {
+configure_pip_hesabix_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
-  python3 -m pip config --user set global.index "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.index-url "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.trusted-host "mirror-pypi.runflare.com" 2>/dev/null || true
-  log_info "pip user config: Runflare PyPI (mirror-pypi.runflare.com/simple)"
+  python3 -m pip config --user set global.index "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.trusted-host "p.mirror.hesabix.ir" 2>/dev/null || true
+  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple)"
 }
 
 if [[ $EUID -ne 0 ]]; then
@@ -111,7 +111,7 @@ log_ok "Source updated."
 
 # --- 2. Backend: pip, migrations, restart services ---
 log_info "Step 2: Backend – install deps, migrations, restart services..."
-configure_pip_runflare_mirror
+configure_pip_hesabix_mirror
 api_dir="${APP_ROOT}/app/hesabixAPI"
 if [[ ! -d "${api_dir}/.venv" ]]; then
   log_err "Backend venv not found. Run full deploy first."
@@ -120,6 +120,8 @@ fi
 cd "${api_dir}"
 # shellcheck disable=SC1091
 source .venv/bin/activate
+export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
+export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
 pip install --upgrade pip setuptools wheel -q
 pip install -e . -q
 # Ensure alembic_version.version_num is VARCHAR(255) for long revision IDs (fixes StringDataRightTruncation)
@@ -142,6 +144,7 @@ if ! alembic upgrade head; then
 fi
 log_ok "Migrations done."
 chown -R www-data:www-data "${api_dir}"
+systemctl daemon-reload
 systemctl restart hesabix-api hesabix-rq-worker hesabix-notification-moderation
 sleep 3
 for svc in hesabix-api; do

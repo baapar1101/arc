@@ -27,6 +27,31 @@ class AppConfig {
 
     return 'http://localhost:8000';
   }
+
+  static const String _envAppPublicUrl = String.fromEnvironment(
+    'APP_PUBLIC_URL',
+    defaultValue: '',
+  );
+
+  /// آدرس پایهٔ وب‌اپ (بدون /login) — برای ساخت لینک بازیابی وقتی API لینک ندهد
+  static String get appPublicBaseUrl {
+    final v = _envAppPublicUrl.trim();
+    if (v.isNotEmpty) {
+      return v.replaceAll(RegExp(r'/+$'), '');
+    }
+    if (kIsWeb) {
+      return Uri.base.origin;
+    }
+    return apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+  }
+
+  /// لینک کامل: باز کردن /login?reset_token=... (هم‌راستا با بک‌اند)
+  static String? buildPasswordResetUrl(String token) {
+    if (token.isEmpty) return null;
+    final b = appPublicBaseUrl;
+    if (b.isEmpty) return null;
+    return '$b/login?reset_token=${Uri.encodeComponent(token)}';
+  }
 }
 
 

@@ -35,14 +35,16 @@ IFS=$'\n\t'
 #
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
+# - Nginx: بعد از SSL، برای عوض کردن فقط دامنه‌ها از scripts/update_nginx_domains.sh استفاده کنید؛
+#   این اسکریپت listen 443 و مسیرهای /p/ و /i/ را با گواهی Let's Encrypt (یا SSL_LETSENCRYPT_LIVE در .deploy_env) می‌سازد.
+#   نوشتن دستی hesabix-api فقط با HTTP باعث می‌شود https به سرور پیش‌فرض 443 (مثلاً pgAdmin) بخورد.
 # - Resume from failure: if a step fails, re-run the script to continue from that step
 #   (completed steps are skipped using .deploy_state)
 # - Saved inputs: last entered domain, branch, pgAdmin4 options, etc. are stored in .deploy_saved_vars
 #   and used as defaults on next run (override by env vars or leave blank to be prompted again).
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
-# - If PyPI is blocked: set PIP_INDEX_URL (e.g. https://pypi.tuna.tsinghua.edu.cn/simple);
-#   script also auto-detects mirrors (Runflare first, then Tsinghua, Aliyun, Tencent). Optional: PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
-# - pip: Runflare mirror via `pip config --user` (mirror-pypi.runflare.com) — see configure_pip_runflare_mirror.
+# - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (see configure_pip_hesabix_mirror, set_pip_mirror_env).
+#   If PIP_INDEX_URL is set in the environment before deploy, that value is used instead (advanced override).
 # - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected (Runflare اول). shell.hesabix.ir فقط برای tarball SDK است، نه آینهٔ pub.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
@@ -1145,6 +1147,7 @@ setup_db() {
       sudo chown postgres:postgres "${pg_conf_dest}" && \
       sudo chmod 644 "${pg_conf_dest}" && \
       log_success "PostgreSQL optimization config applied. Restarting PostgreSQL..." && \
+      systemctl daemon-reload 2>/dev/null || true && \
       systemctl restart "${pg_service:-postgresql}" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
   fi
 }
@@ -1160,27 +1163,19 @@ deploy_backend() {
   
   cd "${api_dir}"
 
-  configure_pip_runflare_mirror
+  configure_pip_hesabix_mirror
   set_pip_mirror_env
-  # Python venv + install (retry with next mirror if one fails)
+  # Python venv + install
   if [[ ! -d ".venv" ]]; then
     python3 -m venv .venv
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
-  local pip_ok=0
-  while IFS= read -r pip_url; do
-    set_pip_mirror_for_url "$pip_url"
-    log_info "Trying PyPI: ${PIP_INDEX_URL}"
-    if pip install --upgrade pip setuptools wheel && pip install -e .; then
-      pip_ok=1
-      log_success "Backend dependencies installed from ${PIP_INDEX_URL}"
-      break
-    fi
-    log_warning "PyPI mirror failed: ${PIP_INDEX_URL}; trying next..."
-  done < <(get_pip_mirrors_list)
-  if [[ $pip_ok -eq 0 ]]; then
-    log_error "Failed to install backend dependencies from any PyPI mirror. Set PIP_INDEX_URL to a working mirror if needed."
+  log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
+  if pip install --upgrade pip setuptools wheel && pip install -e .; then
+    log_success "Backend dependencies installed from ${PIP_INDEX_URL}"
+  else
+    log_error "Failed to install backend dependencies from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
     exit 1
   fi
 
@@ -1421,32 +1416,19 @@ UNIT
   fi
 }
 
-# pip آینه Runflare (ایران) — همان دستوراتی که کاربر برای pip سراسری می‌خواهد
-configure_pip_runflare_mirror() {
+# میرور داخلی PyPI (pip) — فقط Hesabix
+HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
+HESABIX_PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
+
+# pip config سراسری کاربر — همان آدرس برای نصب‌های بعدی
+configure_pip_hesabix_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
-  python3 -m pip config --user set global.index "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.index-url "https://mirror-pypi.runflare.com/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.trusted-host "mirror-pypi.runflare.com" 2>/dev/null || true
-  log_info "pip user config: Runflare PyPI (mirror-pypi.runflare.com/simple)"
-}
-
-# List of PyPI mirrors to try in order (url only; PIP_TRUSTED_HOST is set for non-pypi.org).
-# Used for retry-on-failure: if one mirror fails, we try the next.
-get_pip_mirrors_list() {
-  local list=()
-  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
-    list+=("${PIP_INDEX_URL}")
-  fi
-  list+=(
-    "https://mirror-pypi.runflare.com/simple"
-    "https://pypi.org/simple"
-    "https://pypi.tuna.tsinghua.edu.cn/simple"
-    "https://mirrors.aliyun.com/pypi/simple/"
-    "https://mirrors.cloud.tencent.com/pypi/simple"
-  )
-  printf '%s\n' "${list[@]}"
+  python3 -m pip config --user set global.index "${HESABIX_PIP_INDEX_URL}" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "${HESABIX_PIP_INDEX_URL}" 2>/dev/null || true
+  python3 -m pip config --user set global.trusted-host "${HESABIX_PIP_TRUSTED_HOST}" 2>/dev/null || true
+  log_info "pip user config: Hesabix PyPI (${HESABIX_PIP_INDEX_URL})"
 }
 
 # Set PIP_INDEX_URL and PIP_TRUSTED_HOST for a given mirror URL. Call before pip install.
@@ -1462,44 +1444,21 @@ set_pip_mirror_for_url() {
   fi
 }
 
-# Set PyPI index (mirror) so pip works when pypi.org is blocked. Export PIP_INDEX_URL, PIP_EXTRA_INDEX_URL, PIP_TRUSTED_HOST.
-# Call before any "pip install" (backend and pgAdmin4). For retry-on-failure use get_pip_mirrors_list + set_pip_mirror_for_url in a loop.
+# میرور پیش‌فرض: Hesabix. اگر PIP_INDEX_URL از قبل در محیط باشد، همان (override) استفاده می‌شود.
+# قبل از هر pip install (بک‌اند و pgAdmin4) صدا بزنید.
 set_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
-    log_info "Using custom PyPI index: PIP_INDEX_URL=$PIP_INDEX_URL"
+    log_info "Using PyPI index from environment: PIP_INDEX_URL=$PIP_INDEX_URL"
     export PIP_INDEX_URL
-    [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && export PIP_EXTRA_INDEX_URL
-    [[ -n "${PIP_TRUSTED_HOST:-}" ]] && export PIP_TRUSTED_HOST
+    if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
+      export PIP_TRUSTED_HOST
+    else
+      set_pip_mirror_for_url "${PIP_INDEX_URL}"
+    fi
     return 0
   fi
-  log_info "Detecting PyPI mirror (for pip packages)..."
-  local index_url=""
-  if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://mirror-pypi.runflare.com/simple" 2>/dev/null | grep -q '^[23]'; then
-    index_url="https://mirror-pypi.runflare.com/simple"
-  fi
-  if [[ -z "${index_url}" ]] && curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "https://pypi.org/simple/" 2>/dev/null | grep -q '^[23]'; then
-    index_url="https://pypi.org/simple"
-  fi
-  if [[ -z "${index_url}" ]]; then
-    local mirrors=(
-      "https://mirror-pypi.runflare.com/simple"
-      "https://pypi.tuna.tsinghua.edu.cn/simple"
-      "https://mirrors.aliyun.com/pypi/simple/"
-      "https://mirrors.cloud.tencent.com/pypi/simple"
-    )
-    for url in "${mirrors[@]}"; do
-      if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "${url}" 2>/dev/null | grep -q '^[23]'; then
-        index_url="$url"
-        break
-      fi
-    done
-  fi
-  if [[ -n "${index_url}" ]]; then
-    set_pip_mirror_for_url "${index_url}"
-    log_success "Using PyPI mirror: ${index_url}"
-    return 0
-  fi
-  log_warning "No reachable PyPI mirror; pip will use default (may fail if pypi.org is blocked). Set PIP_INDEX_URL to a mirror if needed."
+  set_pip_mirror_for_url "${HESABIX_PIP_INDEX_URL}"
+  log_info "Using Hesabix PyPI mirror: ${PIP_INDEX_URL}"
   return 0
 }
 
@@ -1927,10 +1886,30 @@ server {
     proxy_send_timeout 30;
   }
 
+  # لینک اشتراک فاکتور/سند: /i/{code} → بک‌اند (ریدایرکت ۳۰۷ به /public/invoice-link/ در Flutter)
+  location /i/ {
+    proxy_pass http://127.0.0.1:8000/i/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # وقتی API و UI روی یک دامنه هستند: مسیرهای /public/ را از روت UI سرو کن (SPA)
+  # fallback با named location تا /index.html به location / { return 404; } نخورد
   location /public/ {
     root /var/www/${UI_DOMAIN};
-    try_files \$uri \$uri/ /index.html;
+    try_files \$uri \$uri/ @hesabix_public_spa;
+  }
+  location @hesabix_public_spa {
+    root /var/www/${UI_DOMAIN};
+    rewrite ^ /index.html break;
   }
 
   location / {
@@ -2034,6 +2013,21 @@ server {
   # لینک اشتراک عمومی: /p/{code} → بک‌اند (ریدایرکت ۳۰۷)
   location /p/ {
     proxy_pass http://127.0.0.1:8000/p/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+  # لینک اشتراک فاکتور: /i/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  location /i/ {
+    proxy_pass http://127.0.0.1:8000/i/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
@@ -2239,7 +2233,7 @@ install_pgadmin4() {
     return 0
   fi
   
-  configure_pip_runflare_mirror
+  configure_pip_hesabix_mirror
   set_pip_mirror_env
   export DEBIAN_FRONTEND=noninteractive
   apt-get install -y -qq python3-venv python3-pip libpq-dev >/dev/null 2>&1
@@ -2248,19 +2242,11 @@ install_pgadmin4() {
   if [[ ! -d "${pgadmin_venv}" ]]; then
     echo "Creating Python venv for pgAdmin4..."
     python3 -m venv "${pgadmin_venv}"
-    local pgadmin_pip_ok=0
-    while IFS= read -r pip_url; do
-      set_pip_mirror_for_url "$pip_url"
-      log_info "Trying PyPI for pgAdmin4: ${PIP_INDEX_URL}"
-      if "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
-        pgadmin_pip_ok=1
-        log_success "pgAdmin4 installed from ${PIP_INDEX_URL}"
-        break
-      fi
-      log_warning "PyPI mirror failed for pgAdmin4: ${PIP_INDEX_URL}; trying next..."
-    done < <(get_pip_mirrors_list)
-    if [[ $pgadmin_pip_ok -eq 0 ]]; then
-      log_error "Failed to install pgAdmin4 from any PyPI mirror. Set PIP_INDEX_URL to a working mirror if needed."
+    log_info "Installing pgAdmin4 from PyPI: ${PIP_INDEX_URL}"
+    if "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+      log_success "pgAdmin4 installed from ${PIP_INDEX_URL}"
+    else
+      log_error "Failed to install pgAdmin4 from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
       return 1
     fi
   fi

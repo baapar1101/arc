@@ -685,7 +685,21 @@ def update_manual_document(
         )
         
         # دریافت جزئیات کامل سند
-        return repo.get_document_details(updated_document.id)
+        details = repo.get_document_details(updated_document.id)
+
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_document_updated
+
+            trigger_document_updated(
+                db=db,
+                business_id=int(document.business_id),
+                document_id=int(updated_document.id),
+                document_type="manual",
+            )
+        except Exception as wfe:
+            logger.warning("document.updated workflow trigger failed: %s", wfe, exc_info=True)
+
+        return details
         
     except ApiError:
         raise

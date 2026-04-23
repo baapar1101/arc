@@ -257,9 +257,14 @@ class HttpRequestAction(ActionHandler):
         node_results: Dict[str, Any]
     ) -> Dict[str, Any]:
         import httpx
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
         from app.services.workflow.utils.circuit_breaker import get_circuit_breaker, CircuitBreakerOpenError
+
+        sk = dry_run_skip(context, "درخواست HTTP")
+        if sk is not None:
+            return sk
         
         # حل کردن مقادیر
         url = str(WorkflowEngine._resolve_value_static(config.get("url"), context, node_results))

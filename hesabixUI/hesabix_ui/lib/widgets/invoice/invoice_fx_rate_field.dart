@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 String invoiceFxFormatRowLabel(AppLocalizations t, Map<String, dynamic> e) {
-  final rate = e['rate']?.toString() ?? '—';
+  final rawRate = e['rate'];
+  final rate = rawRate == null ? '—' : formatFxRateForDisplay(rawRate);
   var eff = e['effective_at']?.toString() ?? '';
   if (eff.isEmpty) {
     eff = '—';

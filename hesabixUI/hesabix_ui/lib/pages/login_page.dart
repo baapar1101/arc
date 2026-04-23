@@ -72,6 +72,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _loadingForgot = false;
   Timer? _forgotCaptchaTimer;
 
+  /// دیپ‌لینک: /login?reset_token=...
+  bool _resetDeepLinkScheduled = false;
+
   // OTP Login
   final _otpLoginKey = GlobalKey<FormState>();
   final _otpLoginIdentifierCtrl = TextEditingController();
@@ -169,6 +172,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _refreshCaptcha('otpLogin');
     // ذخیره کد معرف از URL (اگر وجود داشت)
     unawaited(ReferralStore.captureFromCurrentUrl());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_resetDeepLinkScheduled) return;
+    String? t;
+    try {
+      t = GoRouterState.of(context).uri.queryParameters['reset_token'] ??
+          GoRouterState.of(context).uri.queryParameters['token'];
+    } catch (_) {
+      t = null;
+    }
+    if (t == null || t.isEmpty) return;
+    _resetDeepLinkScheduled = true;
+    final tok = t;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_showResetPasswordDialog(context, tok));
+    });
   }
 
   String _extractErrorMessage(Object e, AppLocalizations t) {

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # به‌روزرسانی فقط دامنه‌های Nginx (بدون دست زدن به دیتابیس یا سرویس‌های دیگر)
 # اجرا: sudo bash scripts/update_nginx_domains.sh
-# دامنه‌ها از .deploy_env خوانده می‌شوند
+# دامنه‌ها از .deploy_env خوانده می‌شوند.
+# TLS: اگر برای API_DOMAIN پوشه‌ی /etc/letsencrypt/live/<domain> نبود، گواهی با SAN همان دامنه جستجو می‌شود.
+#     اختیاری: SSL_LETSENCRYPT_LIVE=/etc/letsencrypt/live/arc.example.com در .deploy_env (باید SAN شامل API_DOMAIN باشد).
 
 set -euo pipefail
 
@@ -26,7 +28,79 @@ if [[ -z "${API_DOMAIN:-}" ]] || [[ -z "${UI_DOMAIN:-}" ]]; then
   exit 1
 fi
 
+# مسیر live گواهی Let's Encrypt برای یک دامنه (SAN یا همان نام پوشه).
+# اختیاری در .deploy_env: SSL_LETSENCRYPT_LIVE=/etc/letsencrypt/live/arc.example.com
+pick_letsencrypt_live_for_domain() {
+  local dom="$1"
+  [[ -z "${dom}" ]] && return 1
+  if [[ -n "${SSL_LETSENCRYPT_LIVE:-}" ]] && [[ -f "${SSL_LETSENCRYPT_LIVE}/fullchain.pem" ]]; then
+    if openssl x509 -in "${SSL_LETSENCRYPT_LIVE}/fullchain.pem" -noout -text 2>/dev/null | grep -q "DNS:${dom}"; then
+      echo "${SSL_LETSENCRYPT_LIVE}"
+      return 0
+    fi
+  fi
+  if [[ -f "/etc/letsencrypt/live/${dom}/fullchain.pem" ]]; then
+    echo "/etc/letsencrypt/live/${dom}"
+    return 0
+  fi
+  local d
+  for d in /etc/letsencrypt/live/*; do
+    [[ -f "${d}/fullchain.pem" ]] || continue
+    if openssl x509 -in "${d}/fullchain.pem" -noout -text 2>/dev/null | grep -q "DNS:${dom}"; then
+      echo "${d}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+nginx_ssl_block_for_live_dir() {
+  local live="$1"
+  [[ -z "${live}" ]] || [[ ! -f "${live}/fullchain.pem" ]] && return 0
+  echo "  listen 443 ssl;"
+  echo "  ssl_certificate ${live}/fullchain.pem;"
+  echo "  ssl_certificate_key ${live}/privkey.pem;"
+  if [[ -f /etc/letsencrypt/options-ssl-nginx.conf ]]; then
+    echo "  include /etc/letsencrypt/options-ssl-nginx.conf;"
+  fi
+  if [[ -f /etc/letsencrypt/ssl-dhparams.pem ]]; then
+    echo "  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;"
+  fi
+}
+
+API_LETSENCRYPT_LIVE=""
+if API_LETSENCRYPT_LIVE=$(pick_letsencrypt_live_for_domain "${API_DOMAIN}"); then
+  :
+else
+  API_LETSENCRYPT_LIVE=""
+fi
+UI_LETSENCRYPT_LIVE=""
+if UI_LETSENCRYPT_LIVE=$(pick_letsencrypt_live_for_domain "${UI_DOMAIN}"); then
+  :
+else
+  UI_LETSENCRYPT_LIVE=""
+fi
+
+API_SSL_BLOCK=""
+if [[ -n "${API_LETSENCRYPT_LIVE}" ]]; then
+  API_SSL_BLOCK=$(nginx_ssl_block_for_live_dir "${API_LETSENCRYPT_LIVE}")
+fi
+UI_SSL_BLOCK=""
+if [[ -n "${UI_LETSENCRYPT_LIVE}" ]]; then
+  UI_SSL_BLOCK=$(nginx_ssl_block_for_live_dir "${UI_LETSENCRYPT_LIVE}")
+fi
+
 echo ">> به‌روزرسانی Nginx با API_DOMAIN=${API_DOMAIN} و UI_DOMAIN=${UI_DOMAIN}"
+if [[ -n "${API_SSL_BLOCK}" ]]; then
+  echo ">> TLS API: ${API_LETSENCRYPT_LIVE}"
+else
+  echo ">> هشدار: گواهی Let's Encrypt برای ${API_DOMAIN} پیدا نشد؛ فقط listen 80 برای API. در صورت نیاز SSL_LETSENCRYPT_LIVE را در .deploy_env بگذارید."
+fi
+if [[ -n "${UI_SSL_BLOCK}" ]]; then
+  echo ">> TLS UI: ${UI_LETSENCRYPT_LIVE}"
+else
+  echo ">> هشدار: گواهی برای ${UI_DOMAIN} پیدا نشد؛ فقط listen 80 برای UI."
+fi
 
 # همان کانفیگ deploy.sh
 if [[ -d /etc/nginx/conf.d ]]; then
@@ -39,6 +113,7 @@ cat > /etc/nginx/sites-available/hesabix-api.conf <<NGINX
 # Backend API
 server {
   listen 80;
+${API_SSL_BLOCK}
   server_name ${API_DOMAIN};
 
   add_header X-Frame-Options "DENY" always;
@@ -72,10 +147,29 @@ server {
     proxy_send_timeout 30;
   }
 
+  # Public invoice share link: /i/{code} → backend (307 → Flutter /public/invoice-link/...)
+  location /i/ {
+    proxy_pass http://127.0.0.1:8000/i/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # وقتی API و UI روی یک دامنه هستند: مسیرهای /public/ را از روت UI سرو کن (SPA)
   location /public/ {
     root /var/www/${UI_DOMAIN};
-    try_files \$uri \$uri/ /index.html;
+    try_files \$uri \$uri/ @hesabix_public_spa;
+  }
+  location @hesabix_public_spa {
+    root /var/www/${UI_DOMAIN};
+    rewrite ^ /index.html break;
   }
 
   location / {
@@ -136,6 +230,7 @@ cat > /etc/nginx/sites-available/hesabix-ui.conf <<NGINX
 # Frontend (Flutter Web)
 server {
   listen 80;
+${UI_SSL_BLOCK}
   server_name ${UI_DOMAIN};
 
   root /var/www/${UI_DOMAIN};
@@ -149,6 +244,21 @@ server {
   # Public share link redirect: /p/{code} → backend (307 to /public/person-link/{code})
   location /p/ {
     proxy_pass http://127.0.0.1:8000/p/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+  # Public invoice share: /i/{code} → backend (307 to /public/invoice-link/{code})
+  location /i/ {
+    proxy_pass http://127.0.0.1:8000/i/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;

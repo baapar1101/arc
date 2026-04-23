@@ -118,6 +118,7 @@ def apply_recognized_profit_to_invoice_lines(
         biz.invoice_profit_overhead_type or "none",
         overhead_pct if getattr(biz, "invoice_profit_overhead_percent", None) else None,
         biz.invoice_profit_calculation_type or "gross",
+        fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
     line_profits: List[Dict[str, Any]] = profit_data.get("line_profits") or []
@@ -184,6 +185,7 @@ def sync_ledger_profit_from_analytical_for_document(
         biz.invoice_profit_overhead_type or "none",
         overhead_pct if getattr(biz, "invoice_profit_overhead_percent", None) else None,
         biz.invoice_profit_calculation_type or "gross",
+        fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
     line_profits: List[Dict[str, Any]] = profit_data.get("line_profits") or []

@@ -88,7 +88,8 @@ def recalculate_invoice_profits_job(
                         business.invoice_profit_include_overhead or False,
                         business.invoice_profit_overhead_type or "none",
                         Decimal(str(business.invoice_profit_overhead_percent or 0)) if business.invoice_profit_overhead_percent else None,
-                        business.invoice_profit_calculation_type or "gross"
+                        business.invoice_profit_calculation_type or "gross",
+                        fifo_shortage_mode=getattr(business, "invoice_profit_fifo_shortage_mode", None),
                     )
                     
                     # بررسی اینکه آیا سود محاسبه شده است

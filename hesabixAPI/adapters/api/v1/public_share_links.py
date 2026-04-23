@@ -10,10 +10,37 @@ from app.services.person_share_link_service import (
     get_public_invoice_details,
     resolve_public_payload_by_code,
 )
+from app.services.document_share_link_service import (
+    resolve_public_payload_by_code as resolve_invoice_document_share_by_code,
+)
 from app.services.system_settings_service import get_share_link_settings
 
 
 router = APIRouter(tags=["public-share-links"])
+
+
+def _strip_trailing_public_segment(url: str) -> str:
+	"""حذف پسوند /public از پایهٔ URL تا مسیر نهایی دوبل نشود (/public/public/...)."""
+	u = (url or "").strip().rstrip("/")
+	if u.lower().endswith("/public"):
+		u = u[: -len("/public")].rstrip("/")
+	return u
+
+
+def _flutter_public_page_url(request: Request, settings_public_app: str, env_public_app: str, subpath: str) -> str:
+	"""
+	URL کامل صفحهٔ عمومی Flutter (مثلاً /public/invoice-link/{code}).
+
+	اولویت با همان scheme+host درخواست است تا لینک کوتاه روی hsxn به arc نپرد
+	(مگر اینکه واقعاً فقط روی دامنهٔ دیگری UI سرو شود — آن زمان باید nginx همان دامنه /public را داشته باشد
+	یا لینک کوتاه روی دامنهٔ UI صادر شود).
+	"""
+	same_origin = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+	configured = _strip_trailing_public_segment(settings_public_app)
+	env_base = _strip_trailing_public_segment(env_public_app)
+	base = same_origin or configured or env_base
+	base = base.rstrip("/")
+	return f"{base}/public/{subpath.lstrip('/')}"
 
 
 @router.get(
@@ -67,14 +94,44 @@ async def redirect_public_person_link(
 	db: Session = Depends(get_db),
 ):
 	settings = get_share_link_settings(db)
-	configured_base = (settings.get("public_app_url") or "").strip()
-	default_base = (get_settings().share_link_public_app_url or "").strip()
-	if default_base.lower().endswith("/public"):
-		default_base = default_base[:-len("/public")].rstrip("/")
-	# اگر در تنظیمات base مشخص نشده، از همان دامنهٔ درخواست استفاده کن (مثلاً hsxn.hesabix.ir)
-	same_origin_base = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
-	base_url = configured_base or same_origin_base or default_base
-	target_base = (base_url.rstrip("/") or "/public") + "/public"
-	target_url = f"{target_base}/person-link/{code}"
+	configured = (settings.get("public_app_url") or "").strip()
+	env_app = (get_settings().share_link_public_app_url or "").strip()
+	target_url = _flutter_public_page_url(request, configured, env_app, f"person-link/{code}")
+	return RedirectResponse(url=target_url, status_code=307)
+
+
+@router.get(
+	"/api/v1/public/invoice-links/{code}",
+	summary="نمایش عمومی فاکتور از طریق کد لینک (بدون احراز هویت)",
+)
+async def get_public_invoice_document_link(
+	code: str,
+	request: Request,
+	db: Session = Depends(get_db),
+):
+	try:
+		payload = resolve_invoice_document_share_by_code(db, code)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+	return success_response(
+		data=payload,
+		request=request,
+		message="اطلاعات فاکتور دریافت شد",
+	)
+
+
+@router.get(
+	"/i/{code}",
+	summary="انتقال به صفحهٔ عمومی فاکتور در Flutter",
+)
+async def redirect_public_invoice_link(
+	code: str,
+	request: Request,
+	db: Session = Depends(get_db),
+):
+	settings = get_share_link_settings(db)
+	configured = (settings.get("public_app_url") or "").strip()
+	env_app = (get_settings().share_link_public_app_url or "").strip()
+	target_url = _flutter_public_page_url(request, configured, env_app, f"invoice-link/{code}")
 	return RedirectResponse(url=target_url, status_code=307)
 

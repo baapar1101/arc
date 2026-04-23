@@ -367,6 +367,8 @@ class BusinessResponse {
   final String? invoiceProfitCalculationType;
   /// زمان شناسایی بهای تمام‌شده قطعی در دفتر (با ISO API هم‌نام)
   final String? invoiceProfitLedgerRecognitionBasis;
+  /// کسری لایه در مبنای سود FIFO/LIFO: perpetual_mixed | average_purchase_on_shortage
+  final String invoiceProfitFifoShortageMode;
   final bool invoiceSyncUpdateSalesPriceEnabled;
   final bool invoiceSyncUpdatePurchasePriceEnabled;
   final String? invoiceSyncSalesPriceBasis;
@@ -426,6 +428,7 @@ class BusinessResponse {
     this.invoiceProfitOverheadPercent,
     this.invoiceProfitCalculationType,
     this.invoiceProfitLedgerRecognitionBasis,
+    this.invoiceProfitFifoShortageMode = 'perpetual_mixed',
     this.invoiceSyncUpdateSalesPriceEnabled = false,
     this.invoiceSyncUpdatePurchasePriceEnabled = false,
     this.invoiceSyncSalesPriceBasis,
@@ -487,6 +490,8 @@ class BusinessResponse {
       invoiceProfitLedgerRecognitionBasis:
           (json['invoice_profit_ledger_recognition_basis'] as String?) ??
               'warehouse_document_posting',
+      invoiceProfitFifoShortageMode:
+          (json['invoice_profit_fifo_shortage_mode'] as String?) ?? 'perpetual_mixed',
       invoiceSyncUpdateSalesPriceEnabled:
           (json['invoice_sync_update_sales_price_enabled'] as bool?) ?? false,
       invoiceSyncUpdatePurchasePriceEnabled:

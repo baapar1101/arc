@@ -1,7 +1,7 @@
 """
 Schema models برای فاکتورها (Invoices)
 """
-from typing import Optional, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from decimal import Decimal
@@ -200,4 +200,23 @@ class InvoiceUpdateRequest(BaseModel):
     status: Optional[Literal["draft", "confirmed", "paid", "cancelled"]] = None
     project_id: Optional[int] = Field(None, description="شناسه پروژه", gt=0)
 
+
+class InvoiceShareLinkCreateRequest(BaseModel):
+    """ایجاد/تمدید لینک مشاهده عمومی فاکتور"""
+    expires_in_hours: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=720,
+        description="مدت اعتبار (ساعت). خالی: پیش‌فرض سامانه",
+    )
+    max_view_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=1000,
+        description="حداکثر بازدید؛ خالی = نامحدود",
+    )
+    replace_existing: bool = Field(
+        default=True,
+        description="در صورت وجود لینک فعال، ابتدا لغو و لینک جدید",
+    )
 

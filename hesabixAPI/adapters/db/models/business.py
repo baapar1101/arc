@@ -62,11 +62,27 @@ class Business(Base):
     
     # تنظیمات محاسبه سود فاکتور
     invoice_profit_calculation_method: Mapped[str | None] = mapped_column(String(20), nullable=True, default="automatic", server_default="automatic", comment="روش محاسبه سود فاکتور: automatic, manual, disabled")
-    invoice_profit_calculation_basis: Mapped[str | None] = mapped_column(String(30), nullable=True, default="purchase_price", server_default="purchase_price", comment="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, standard_cost, actual_cost")
+    invoice_profit_calculation_basis: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+        default="purchase_price",
+        server_default="purchase_price",
+        comment="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, moving_weighted_average, standard_cost, actual_cost",
+    )
     invoice_profit_include_overhead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
     invoice_profit_overhead_type: Mapped[str | None] = mapped_column(String(30), nullable=True, default="none", server_default="none", comment="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
     invoice_profit_overhead_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, default=0, server_default="0", comment="درصد هزینه‌های سربار (در صورت انتخاب custom_percent)")
     invoice_profit_calculation_type: Mapped[str | None] = mapped_column(String(20), nullable=True, default="gross", server_default="gross", comment="نوع محاسبه سود: gross, net, both")
+    invoice_profit_fifo_shortage_mode: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="perpetual_mixed",
+        server_default="perpetual_mixed",
+        comment=(
+            "سیاست بهای کسری در مبنای FIFO/LIFO: perpetual_mixed (لایه+آخرین قیمت) | "
+            "average_purchase_on_shortage (میانگین خرید برای بخش بدون لایه)"
+        ),
+    )
     # شناسایی سود/بهای تمام‌شده قطعی (دفتر) در برابر محاسبه تحلیلی
     invoice_profit_ledger_recognition_basis: Mapped[str] = mapped_column(
         String(40),

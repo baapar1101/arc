@@ -12,15 +12,19 @@ import '../../utils/snackbar_helper.dart';
 class WorkflowExecutionHistoryPanel extends StatefulWidget {
   final int businessId;
   final int workflowId;
-  final List<WorkflowNodeModel>? nodes; // برای highlight کردن نودهای اجرا شده
-  final Function(String nodeId)? onNodeHighlight;
+  final List<WorkflowNodeModel>? nodes;
+  /// ترتیب `executed_nodes` از بک‌اند؛ هایلیت یکجای نودها و یال‌های مسیر
+  final void Function(List<String> executedNodeIds)? onExecutedNodesHighlight;
+  /// پاک کردن هایلیت نود/یال روی بوم بدون بستن کشو
+  final VoidCallback? onClearCanvasHighlight;
 
   const WorkflowExecutionHistoryPanel({
     super.key,
     required this.businessId,
     required this.workflowId,
     this.nodes,
-    this.onNodeHighlight,
+    this.onExecutedNodesHighlight,
+    this.onClearCanvasHighlight,
   });
 
   @override
@@ -87,15 +91,12 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     final executionId = execution['id'] as int?;
     if (executionId != null) {
       _loadLogs(executionId);
-      
-      // Highlight کردن نودهای اجرا شده
+
       final executionData = execution['execution_data'] as Map<String, dynamic>?;
       final executedNodes = executionData?['executed_nodes'] as List<dynamic>?;
-      if (executedNodes != null && widget.onNodeHighlight != null) {
-        for (final nodeId in executedNodes) {
-          widget.onNodeHighlight?.call(nodeId.toString());
-        }
-      }
+      widget.onExecutedNodesHighlight?.call(
+        executedNodes?.map((e) => e.toString()).toList() ?? const [],
+      );
     }
   }
 
@@ -127,12 +128,18 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                 Icon(Icons.history, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'تاریخچه اجرا',
+                  AppLocalizations.of(context).workflowExecutionHistory,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Spacer(),
+                if (widget.onClearCanvasHighlight != null)
+                  IconButton(
+                    icon: const Icon(Icons.layers_clear_outlined),
+                    onPressed: widget.onClearCanvasHighlight,
+                    tooltip: AppLocalizations.of(context).workflowHistoryClearCanvasHighlight,
+                  ),
                 IconButton(
                   icon: const Icon(Icons.analytics_outlined),
                   onPressed: () {

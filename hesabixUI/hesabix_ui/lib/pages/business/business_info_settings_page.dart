@@ -58,6 +58,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   String? _invoiceProfitCalculationType;
   bool _recalculatingProfits = false;
   String? _invoiceProfitLedgerRecognitionBasis;
+  /// perpetual_mixed | average_purchase_on_shortage
+  String _invoiceProfitFifoShortageMode = 'perpetual_mixed';
   bool _backfillingProfitLedger = false;
 
   // همگام‌سازی قیمت پایه کالا از فاکتور قطعی (ارز کالا = ارز پیش‌فرض کسب‌وکار)
@@ -151,6 +153,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceProfitCalculationType = resp.invoiceProfitCalculationType ?? 'gross';
       _invoiceProfitLedgerRecognitionBasis =
           resp.invoiceProfitLedgerRecognitionBasis ?? 'warehouse_document_posting';
+      _invoiceProfitFifoShortageMode = resp.invoiceProfitFifoShortageMode;
       _invoiceSyncUpdateSalesPriceEnabled = resp.invoiceSyncUpdateSalesPriceEnabled;
       _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
@@ -289,6 +292,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if (_invoiceProfitLedgerRecognitionBasis != null &&
         _invoiceProfitLedgerRecognitionBasis != origLedgerBasis) {
       payload['invoice_profit_ledger_recognition_basis'] = _invoiceProfitLedgerRecognitionBasis;
+    }
+    if (_invoiceProfitFifoShortageMode != orig.invoiceProfitFifoShortageMode) {
+      payload['invoice_profit_fifo_shortage_mode'] = _invoiceProfitFifoShortageMode;
     }
     if (_invoiceSyncUpdateSalesPriceEnabled != orig.invoiceSyncUpdateSalesPriceEnabled) {
       payload['invoice_sync_update_sales_price_enabled'] = _invoiceSyncUpdateSalesPriceEnabled;
@@ -1071,7 +1077,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   ),
                   DropdownMenuItem(
                     value: 'weighted_average',
-                    child: Text('میانگین وزنی'),
+                    child: Text('میانگین وزنی خریدها (تا تاریخ سند)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'moving_weighted_average',
+                    child: Text('میانگین موزون متحرک (WMA دائمی)'),
                   ),
                   DropdownMenuItem(
                     value: 'standard_cost',
@@ -1084,6 +1094,36 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   });
                 },
               ),
+              if (_invoiceProfitCalculationBasis == 'fifo' ||
+                  _invoiceProfitCalculationBasis == 'lifo' ||
+                  _invoiceProfitCalculationBasis == 'moving_weighted_average') ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _invoiceProfitFifoShortageMode,
+                  decoration: const InputDecoration(
+                    labelText: 'سیاست کسری (FIFO / LIFO / WMA)',
+                    helperText:
+                        'در کمبود موجودی: آخرین بهای موزون / لایه، یا میانگین خرید تا تاریخ سند',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'perpetual_mixed',
+                      child: Text('لایه‌ها + آخرین قیمت لایه (پیش‌فرض قبلی)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'average_purchase_on_shortage',
+                      child: Text('میانگین خرید برای بخش بدون لایه'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _invoiceProfitFifoShortageMode = value;
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               // نوع محاسبه سود
               DropdownButtonFormField<String>(

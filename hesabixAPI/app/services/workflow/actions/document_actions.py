@@ -48,10 +48,15 @@ class CreateDocumentAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any]
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.document_service import create_manual_document
         from app.services.fiscal_year_service import get_current_fiscal_year
         from datetime import datetime
+
+        sk = dry_run_skip(context, "ایجاد سند")
+        if sk is not None:
+            return sk
         
         db = context.get("db")
         if not db:
@@ -447,12 +452,17 @@ class CreateInvoiceAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any]
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.invoice_service import create_invoice
         from datetime import datetime, date
         import logging
         
         logger = logging.getLogger(__name__)
+
+        sk = dry_run_skip(context, "ایجاد فاکتور")
+        if sk is not None:
+            return sk
         
         db = context.get("db")
         if not db:
@@ -654,9 +664,14 @@ class UpdateInventoryAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any]
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.warehouse_service import create_manual_warehouse_document, post_warehouse_document
         from datetime import datetime
+
+        sk = dry_run_skip(context, "به‌روزرسانی موجودی")
+        if sk is not None:
+            return sk
         
         db = context.get("db")
         if not db:

@@ -1251,28 +1251,7 @@ def get_receipt_payment(db: Session, document_id: int) -> Optional[Dict[str, Any
         return None
     
     result = document_to_dict(db, document)
-    
-    # فراخوانی workflow triggers
-    try:
-        from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_created
-        # محاسبه مجموع مبلغ
-        total_amount = sum(
-            float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
-            for line in result.get("lines", [])
-        )
-        is_receipt = document.document_type == DOCUMENT_TYPE_RECEIPT
-        trigger_receipt_payment_created(
-            db=db,
-            business_id=document.business_id,
-            receipt_payment_id=document.id,
-            type="receipt" if is_receipt else "payment",
-            amount=total_amount,
-            user_id=document.created_by_user_id
-        )
-    except Exception as e:
-        # عدم موفقیت در trigger نباید مانع بازگشت سند شود
-        logger.warning(f"Failed to trigger workflows for receipt/payment {document.id}: {e}")
-    
+
     return result
 
 
@@ -2328,16 +2307,16 @@ def update_receipt_payment(
         document_type=document_type
     )
     
-    # فراخوانی workflow triggers
+    # فراخوانی workflow triggers (ویرایش، نه ایجاد)
     try:
-        from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_created
+        from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_updated
         # محاسبه مجموع مبلغ
         total_amount = sum(
             float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
             for line in result.get("lines", [])
         )
         is_receipt = document.document_type == DOCUMENT_TYPE_RECEIPT
-        trigger_receipt_payment_created(
+        trigger_receipt_payment_updated(
             db=db,
             business_id=document.business_id,
             receipt_payment_id=document.id,

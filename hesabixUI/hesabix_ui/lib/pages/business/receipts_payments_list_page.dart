@@ -1430,6 +1430,139 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
     super.dispose();
   }
 
+  static const double _balanceEpsilon = 1e-6;
+
+  double _sumPersons() =>
+      _personLines.fold<double>(0, (p, e) => p + e.amount);
+
+  double _sumCenters() => _centerTransactions.fold<double>(
+        0,
+        (p, e) => p + e.amount.toDouble(),
+      );
+
+  /// اختلافی که باید صفر شود (همان [diff] در فوتر).
+  double _diffAmount() {
+    final sumP = _sumPersons();
+    final sumC = _sumCenters();
+    return (_isReceipt ? sumC - sumP : sumP - sumC);
+  }
+
+  double _allocSumForPersonLine(_PersonLine line) {
+    if (line.installmentAllocations == null ||
+        line.installmentAllocations!.isEmpty) {
+      return 0.0;
+    }
+    return line.installmentAllocations!.values.fold<double>(
+      0,
+      (p, e) => p + (e > 0 ? e : 0),
+    );
+  }
+
+  /// آخرین ردیفی که با افزودن [delta] به مبلغش، مبلغ ≥ ۰ (و در اقساط ≥ جمع تخصیص) می‌ماند.
+  int? _personLineIndexForBalanceDelta(double delta) {
+    for (int i = _personLines.length - 1; i >= 0; i--) {
+      final line = _personLines[i];
+      final newAmount = line.amount + delta;
+      if (line.installmentsEnabled == true) {
+        final asum = _allocSumForPersonLine(line);
+        if (newAmount + _balanceEpsilon >= asum) return i;
+      } else {
+        if (newAmount + _balanceEpsilon >= 0) return i;
+      }
+    }
+    return null;
+  }
+
+  void _onBalanceToMatchPeople() {
+    if (_centerTransactions.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق اشخاص، حداقل یک ردیف حساب لازم است',
+      );
+      return;
+    }
+    final sumP = _sumPersons();
+    final sumC = _sumCenters();
+    final addToLastCenter = sumP - sumC;
+    if (addToLastCenter.abs() < _balanceEpsilon) return;
+    final last = _centerTransactions.length - 1;
+    final newAmt = _centerTransactions[last].amount.toDouble() + addToLastCenter;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر حساب پس از تعدیل منفی می‌شود. اختلاف را در چند ردیف تقسیم کنید.',
+      );
+      return;
+    }
+    setState(() {
+      _centerTransactions[last] =
+          _centerTransactions[last].copyWith(amount: newAmt);
+    });
+  }
+
+  void _onBalanceToMatchAccounts() {
+    if (_personLines.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق حساب‌ها، حداقل یک ردیف شخص لازم است',
+      );
+      return;
+    }
+    final sumP = _sumPersons();
+    final sumC = _sumCenters();
+    final addToPerson = sumC - sumP;
+    if (addToPerson.abs() < _balanceEpsilon) return;
+    final idx = _personLineIndexForBalanceDelta(addToPerson);
+    if (idx == null) {
+      SnackBarHelper.showError(
+        context,
+        message:
+            'هیچ ردیف اشخاصی قابل تعدیل خودکار نیست (مثلاً مبناهای اقساط اجازه کاهش نمی‌دهد).',
+      );
+      return;
+    }
+    setState(() {
+      final line = _personLines[idx];
+      _personLines[idx] = line.copyWith(amount: line.amount + addToPerson);
+    });
+  }
+
+  /// دکمه‌های تسویه اختلاف وقتی هر دو طرف ردیف دارند و اختلاف ≠ ۰ است.
+  Widget _buildBalanceActionButtons() {
+    final d = _diffAmount();
+    if (d.abs() < _balanceEpsilon) return const SizedBox.shrink();
+    if (_personLines.isEmpty || _centerTransactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final sumP = _sumPersons();
+    final sumC = _sumCenters();
+    final addToLastCenter = sumP - sumC;
+    final last = _centerTransactions.length - 1;
+    final canMatchPeople = _centerTransactions[last].amount.toDouble() +
+            addToLastCenter >=
+        -_balanceEpsilon;
+    final addToPerson = sumC - sumP;
+    final canMatchAccounts = addToPerson.abs() >= _balanceEpsilon &&
+        _personLineIndexForBalanceDelta(addToPerson) != null;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: canMatchPeople ? _onBalanceToMatchPeople : null,
+          icon: const Icon(Icons.people, size: 18),
+          label: const Text('مطابق اشخاص'),
+        ),
+        OutlinedButton.icon(
+          onPressed: canMatchAccounts ? _onBalanceToMatchAccounts : null,
+          icon: const Icon(Icons.account_balance, size: 18),
+          label: const Text('مطابق حساب‌ها'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveHelper.isMobile(context);
@@ -1590,6 +1723,13 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                           _TotalChip(label: t.accounts, value: sumCenters),
                           _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
                         ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _buildBalanceActionButtons(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -1765,16 +1905,31 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
               Padding(
                 padding: EdgeInsets.fromLTRB(padding, padding / 2, padding, padding),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _TotalChip(label: t.people, value: sumPersons),
-                          _TotalChip(label: t.accounts, value: sumCenters),
-                          _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _TotalChip(label: t.people, value: sumPersons),
+                              _TotalChip(label: t.accounts, value: sumCenters),
+                              _TotalChip(
+                                label: 'اختلاف',
+                                value: diff,
+                                isError: diff != 0,
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: _buildBalanceActionButtons(),
+                          ),
                         ],
                       ),
                     ),

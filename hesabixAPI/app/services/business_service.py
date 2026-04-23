@@ -1055,6 +1055,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_stamp": bool(getattr(row, "show_stamp", True)),
             "show_payments": bool(getattr(row, "show_payments", True)),
             "show_installment_plan": bool(getattr(row, "show_installment_plan", True)),
+            "show_share_qr": bool(getattr(row, "show_share_qr", False)),
             "footer_note": getattr(row, "footer_note", None),
         }
 
@@ -1064,6 +1065,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_stamp": True,
         "show_payments": True,
         "show_installment_plan": True,
+        "show_share_qr": False,
         "footer_note": None,
     }
     per_type: Dict[str, Any] = {}
@@ -1141,6 +1143,7 @@ def update_business_print_settings(
             "show_installment_plan",
             True,
         )
+        default_row.show_share_qr = _get_bool(default_data, "show_share_qr", False)
         default_row.footer_note = (
             (default_data.get("footer_note") or None)
             if isinstance(default_data.get("footer_note"), str)
@@ -1186,6 +1189,7 @@ def update_business_print_settings(
             "show_installment_plan",
             True,
         )
+        row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
         row.footer_note = (
             (cfg.get("footer_note") or None)
             if isinstance(cfg.get("footer_note"), str)
@@ -1351,6 +1355,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_profit_calculation_type": getattr(business, "invoice_profit_calculation_type", None),
         "invoice_profit_ledger_recognition_basis": getattr(
             business, "invoice_profit_ledger_recognition_basis", None
+        ),
+        "invoice_profit_fifo_shortage_mode": str(
+            getattr(business, "invoice_profit_fifo_shortage_mode", None) or "perpetual_mixed",
         ),
         "invoice_sync_update_sales_price_enabled": bool(getattr(business, "invoice_sync_update_sales_price_enabled", False)),
         "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),

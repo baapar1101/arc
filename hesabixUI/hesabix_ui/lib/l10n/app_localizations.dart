@@ -11945,6 +11945,24 @@ abstract class AppLocalizations {
   /// **'Warehouse Documents'**
   String get warehouseDocuments;
 
+  /// No description provided for @relatedWarehouseDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Related warehouse documents'**
+  String get relatedWarehouseDocuments;
+
+  /// No description provided for @warehouseDocumentPostSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse document posted.'**
+  String get warehouseDocumentPostSuccess;
+
+  /// No description provided for @warehouseDocumentPostFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not post warehouse document: {error}'**
+  String warehouseDocumentPostFailed(String error);
+
   /// No description provided for @warehouseDocument.
   ///
   /// In en, this message translates to:
@@ -12569,11 +12587,29 @@ abstract class AppLocalizations {
   /// **'Run now'**
   String get workflowRunNow;
 
+  /// No description provided for @workflowTestRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Test run (live status)'**
+  String get workflowTestRun;
+
+  /// No description provided for @workflowFixValidationBeforeTestRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix validation errors on the canvas before running a test.'**
+  String get workflowFixValidationBeforeTestRun;
+
   /// No description provided for @workflowExecutionHistory.
   ///
   /// In en, this message translates to:
   /// **'Execution history'**
   String get workflowExecutionHistory;
+
+  /// No description provided for @workflowHistoryClearCanvasHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear highlight on canvas'**
+  String get workflowHistoryClearCanvasHighlight;
 
   /// No description provided for @workflowEdit.
   ///
@@ -15208,6 +15244,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only won deals; writes an info log entry'**
   String get workflowTemplateCrmDealWonLogDesc;
+
+  /// No description provided for @workflowTemplateReceiptUpdatedNotifyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify on receipt/payment edit'**
+  String get workflowTemplateReceiptUpdatedNotifyName;
+
+  /// No description provided for @workflowTemplateReceiptUpdatedNotifyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After a receipt or payment is edited, an in-app notification is created'**
+  String get workflowTemplateReceiptUpdatedNotifyDesc;
+
+  /// No description provided for @workflowTemplateInvoiceAmountBranchName.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales invoice: high vs low amount'**
+  String get workflowTemplateInvoiceAmountBranchName;
+
+  /// No description provided for @workflowTemplateInvoiceAmountBranchDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'If amount is at least 10M, high-priority in-app notice; otherwise only a log (simple If example)'**
+  String get workflowTemplateInvoiceAmountBranchDesc;
+
+  /// No description provided for @workflowTestRunCompletedDry.
+  ///
+  /// In en, this message translates to:
+  /// **'Dry run succeeded (no real sends or writes).'**
+  String get workflowTestRunCompletedDry;
 
   /// No description provided for @settingsCategoriesCount.
   ///
@@ -18046,6 +18112,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select Date'**
   String get datePickerSelectDate;
+
+  /// No description provided for @dateInputInvalidFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid date in YYYY/MM/DD format'**
+  String get dateInputInvalidFormat;
+
+  /// No description provided for @dateInputOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Date is outside the allowed range'**
+  String get dateInputOutOfRange;
+
+  /// No description provided for @dateInputOpenCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Open calendar'**
+  String get dateInputOpenCalendar;
 
   /// No description provided for @timePickerSelectTime.
   ///

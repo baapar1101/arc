@@ -27,7 +27,7 @@ class WorkflowCanvas extends StatefulWidget {
   State<WorkflowCanvas> createState() => _WorkflowCanvasState();
 }
 
-class _WorkflowCanvasState extends State<WorkflowCanvas> {
+class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProviderStateMixin {
   late TransformationController _transformationController;
   Offset? _lastPanPosition;
   Offset? _connectingToPosition;
@@ -35,22 +35,49 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   final GlobalKey _interactiveViewerKey = GlobalKey();
   String? _draggingNodeId; // ID نودی که در حال drag است
   bool _isDragStarted = false; // آیا drag شروع شده است
+  AnimationController? _liveEdgePulseController;
 
   @override
   void initState() {
     super.initState();
     _transformationController = TransformationController();
     widget.state.addListener(_onStateChanged);
+    _syncLiveEdgePulse();
   }
 
   @override
   void dispose() {
     widget.state.removeListener(_onStateChanged);
+    _liveEdgePulseController?.removeListener(_pulseTick);
+    _liveEdgePulseController?.dispose();
     _transformationController.dispose();
     super.dispose();
   }
 
+  void _pulseTick() {
+    if (mounted) setState(() {});
+  }
+
+  void _syncLiveEdgePulse() {
+    final need = widget.state.liveActiveEdgeSourceNodeId != null &&
+        widget.state.liveActiveEdgeTargetNodeId != null;
+
+    if (need && _liveEdgePulseController == null) {
+      _liveEdgePulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 780),
+      )
+        ..repeat(reverse: true)
+        ..addListener(_pulseTick);
+    } else if (!need && _liveEdgePulseController != null) {
+      _liveEdgePulseController!.removeListener(_pulseTick);
+      _liveEdgePulseController!.dispose();
+      _liveEdgePulseController = null;
+    }
+  }
+
   void _onStateChanged() {
+    _syncLiveEdgePulse();
     setState(() {});
   }
 
@@ -247,6 +274,10 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                     isConnecting: widget.state.isConnecting,
                     connectingFrom: connectingFrom,
                     connectingTo: connectingTo,
+                    liveEdgeSourceNodeId: widget.state.liveActiveEdgeSourceNodeId,
+                    liveEdgeTargetNodeId: widget.state.liveActiveEdgeTargetNodeId,
+                    liveEdgePulseT: _liveEdgePulseController?.value,
+                    historyHighlightedConnectionIds: widget.state.historyPathConnectionIds,
                   ),
                   size: Size.infinite,
                 ),
@@ -289,6 +320,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                     key: ValueKey(node.id),
                     node: nodeToDisplay,
                     isSelected: isSelected,
+                    runPhase: widget.state.nodeRunPhase(node.id),
                     zoomLevel: widget.state.zoomLevel > 0 ? widget.state.zoomLevel : 1.0,
                     highlightConnectionPoints: widget.state.isConnecting && canConnect,
                     validationErrors: validationErrors.isNotEmpty ? validationErrors : null,

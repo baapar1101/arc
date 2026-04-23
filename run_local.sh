@@ -11,6 +11,10 @@ if [ ! -d .venv ]; then
 fi
 
 source .venv/bin/activate
+
+export PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
+export PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
+
 python -m pip install --upgrade pip
 
 # Install with development dependencies for running tests

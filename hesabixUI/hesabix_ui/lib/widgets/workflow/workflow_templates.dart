@@ -20,6 +20,8 @@ class WorkflowTemplates {
       case 'person_welcome': return t.workflowTemplatePersonWelcomeName;
       case 'crm_new_lead_notify': return t.workflowTemplateCrmNewLeadNotifyName;
       case 'crm_deal_won_log': return t.workflowTemplateCrmDealWonLogName;
+      case 'receipt_payment_updated_notify': return t.workflowTemplateReceiptUpdatedNotifyName;
+      case 'invoice_amount_branch': return t.workflowTemplateInvoiceAmountBranchName;
       default: return t.workflowTemplateDefault;
     }
   }
@@ -32,6 +34,8 @@ class WorkflowTemplates {
       case 'person_welcome': return t.workflowTemplatePersonWelcomeDesc;
       case 'crm_new_lead_notify': return t.workflowTemplateCrmNewLeadNotifyDesc;
       case 'crm_deal_won_log': return t.workflowTemplateCrmDealWonLogDesc;
+      case 'receipt_payment_updated_notify': return t.workflowTemplateReceiptUpdatedNotifyDesc;
+      case 'invoice_amount_branch': return t.workflowTemplateInvoiceAmountBranchDesc;
       default: return '';
     }
   }
@@ -45,6 +49,10 @@ class WorkflowTemplates {
       case 'crm_new_lead_notify':
       case 'crm_deal_won_log':
         return t.workflowCategoryCrm;
+      case 'receipt_payment_updated_notify':
+        return t.workflowCategoryFinancial;
+      case 'invoice_amount_branch':
+        return t.workflowCategoryInvoice;
       default: return t.workflowTemplateDefault;
     }
   }
@@ -313,6 +321,117 @@ class WorkflowTemplates {
           ],
         },
       ),
+      WorkflowTemplate(
+        id: 'receipt_payment_updated_notify',
+        name: nameFn('receipt_payment_updated_notify'),
+        description: descFn('receipt_payment_updated_notify'),
+        triggerType: 'receipt_payment.updated',
+        category: categoryFn('receipt_payment_updated_notify'),
+        icon: Icons.edit_note,
+        workflowData: {
+          'nodes': [
+            {
+              'id': 'trigger_1',
+              'type': 'trigger',
+              'label': 'ویرایش دریافت/پرداخت',
+              'key': 'receipt_payment.updated',
+              'position': {'x': 100, 'y': 100},
+              'config': {
+                'trigger_type': 'receipt_payment.updated',
+                'enabled': true,
+              },
+            },
+            {
+              'id': 'action_1',
+              'type': 'action',
+              'label': 'اعلان ویرایش',
+              'key': 'create_notification',
+              'position': {'x': 100, 'y': 280},
+              'config': {
+                'action_type': 'create_notification',
+                'event_key': 'receipt_payment.updated',
+                'title': 'ویرایش دریافت/پرداخت',
+                'message': r'سند ویرایش شد. مبلغ: $trigger_1.amount',
+                'channels': ['inapp'],
+                'priority': 'normal',
+              },
+            },
+          ],
+          'connections': [
+            {'source': 'trigger_1', 'target': 'action_1'},
+          ],
+        },
+      ),
+      WorkflowTemplate(
+        id: 'invoice_amount_branch',
+        name: nameFn('invoice_amount_branch'),
+        description: descFn('invoice_amount_branch'),
+        triggerType: 'invoice.sales.created',
+        category: categoryFn('invoice_amount_branch'),
+        icon: Icons.account_tree,
+        workflowData: {
+          'nodes': [
+            {
+              'id': 'trigger_1',
+              'type': 'trigger',
+              'label': 'فاکتور فروش جدید',
+              'key': 'invoice.sales.created',
+              'position': {'x': 100, 'y': 60},
+              'config': {
+                'trigger_type': 'invoice.sales.created',
+                'enabled': true,
+                'status_filter': ['confirmed'],
+              },
+            },
+            {
+              'id': 'cond_1',
+              'type': 'condition',
+              'key': 'condition.if',
+              'label': r'مبلغ ≥ ۱۰ میلیون تومان؟',
+              'position': {'x': 100, 'y': 200},
+              'config': {
+                'condition_type': 'simple',
+                'left_value': r'$trigger_1.total_amount',
+                'operator': '>=',
+                'right_value': 10000000,
+              },
+            },
+            {
+              'id': 'action_high',
+              'type': 'action',
+              'label': 'اعلان مبلغ بالا',
+              'key': 'create_notification',
+              'position': {'x': 320, 'y': 360},
+              'config': {
+                'action_type': 'create_notification',
+                'event_key': 'invoice.high_amount',
+                'title': 'فاکتور پرمبلغ',
+                'message': r'فاکتور فروش با مبلغ $trigger_1.total_amount ثبت شد.',
+                'channels': ['inapp'],
+                'priority': 'high',
+              },
+            },
+            {
+              'id': 'action_low',
+              'type': 'action',
+              'label': 'ثبت لاگ',
+              'key': 'log',
+              'position': {'x': 80, 'y': 360},
+              'config': {
+                'action_type': 'log',
+                'level': 'info',
+                'message': r'فاکتور عادی: $trigger_1.invoice_number',
+                'include_context': false,
+              },
+            },
+          ],
+          'connections': [
+            {'source': 'trigger_1', 'target': 'cond_1'},
+            {'source': 'cond_1', 'target': 'action_high', 'sourceHandle': 'true'},
+            {'source': 'cond_1', 'target': 'action_low', 'sourceHandle': 'false'},
+          ],
+        },
+      ),
     ];
   }
 
@@ -323,6 +442,8 @@ class WorkflowTemplates {
     'person_welcome': 'خوش‌آمدگویی شخص جدید',
     'crm_new_lead_notify': 'اعلان سرنخ جدید',
     'crm_deal_won_log': 'ثبت لاگ بستن معامله موفق',
+    'receipt_payment_updated_notify': 'اعلان ویرایش دریافت/پرداخت',
+    'invoice_amount_branch': 'فاکتور فروش: شاخه مبلغ',
   };
   static const Map<String, String> _fallbackDescs = {
     'invoice_sales_notification': 'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود',
@@ -331,6 +452,8 @@ class WorkflowTemplates {
     'person_welcome': 'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود',
     'crm_new_lead_notify': 'با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود',
     'crm_deal_won_log': 'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود',
+    'receipt_payment_updated_notify': 'بعد از ویرایش دریافت/پرداخت اعلان درون‌برنامه',
+    'invoice_amount_branch': 'با شرط ساده: مبلغ بالا یا پایین',
   };
   static const Map<String, String> _fallbackCategories = {
     'invoice_sales_notification': 'فاکتور',
@@ -339,6 +462,8 @@ class WorkflowTemplates {
     'person_welcome': 'اشخاص',
     'crm_new_lead_notify': 'CRM',
     'crm_deal_won_log': 'CRM',
+    'receipt_payment_updated_notify': 'مالی',
+    'invoice_amount_branch': 'فاکتور',
   };
 
   /// دریافت لیست templateهای موجود (fallback - ترجیحاً getLocalizedTemplates استفاده شود)

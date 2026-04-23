@@ -2501,6 +2501,16 @@
   "policyTypePerDocument": "Per Document",
   "policyTypeHybrid": "Hybrid",
   "warehouseDocuments": "Warehouse Documents",
+  "relatedWarehouseDocuments": "Related warehouse documents",
+  "warehouseDocumentPostSuccess": "Warehouse document posted.",
+  "warehouseDocumentPostFailed": "Could not post warehouse document: {error}",
+  "@warehouseDocumentPostFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "warehouseDocument": "Warehouse Document",
   "warehouseDocumentCode": "Document Code",
   "warehouseDocumentType": "Document Type",
@@ -2518,7 +2528,6 @@
   "docTypeProductionOut": "Production Out",
   "statusDraft": "Draft",
   "statusPosted": "Posted",
-  "statusCancelled": "Cancelled",
   "createWarehouseDocument": "Create Manual Document",
   "postWarehouseDocument": "Post Document",
   "cancelWarehouseDocument": "Cancel Document",
@@ -2616,7 +2625,10 @@
   "workflowCreate": "Create Workflow",
   "workflowRefresh": "Refresh",
   "workflowRunNow": "Run now",
+  "workflowTestRun": "Test run (live status)",
+  "workflowFixValidationBeforeTestRun": "Fix validation errors on the canvas before running a test.",
   "workflowExecutionHistory": "Execution history",
+  "workflowHistoryClearCanvasHighlight": "Clear highlight on canvas",
   "workflowEdit": "Edit",
   "workflowLastUpdate": "Last update",
   "workflowAvailableTriggers": "Available triggers",
@@ -3085,6 +3097,11 @@
   "workflowTemplateCrmNewLeadNotifyDesc": "When a lead is created, an in-app notification is recorded",
   "workflowTemplateCrmDealWonLogName": "Log won deal closure",
   "workflowTemplateCrmDealWonLogDesc": "Only won deals; writes an info log entry",
+  "workflowTemplateReceiptUpdatedNotifyName": "Notify on receipt/payment edit",
+  "workflowTemplateReceiptUpdatedNotifyDesc": "After a receipt or payment is edited, an in-app notification is created",
+  "workflowTemplateInvoiceAmountBranchName": "Sales invoice: high vs low amount",
+  "workflowTemplateInvoiceAmountBranchDesc": "If amount is at least 10M, high-priority in-app notice; otherwise only a log (simple If example)",
+  "workflowTestRunCompletedDry": "Dry run succeeded (no real sends or writes).",
   "settingsCategoriesCount": "Categories",
   "settingsCount": "Settings",
   "expandAllCategories": "Expand All",
@@ -3667,6 +3684,9 @@
   "apiKeyEditTitle": "Edit API Key",
   "apiKeyWithoutName": "Unnamed",
   "datePickerSelectDate": "Select Date",
+  "dateInputInvalidFormat": "Enter a valid date in YYYY/MM/DD format",
+  "dateInputOutOfRange": "Date is outside the allowed range",
+  "dateInputOpenCalendar": "Open calendar",
   "timePickerSelectTime": "Select Time",
   "dateTimeLabel": "Date and Time",
   "dateLabel": "Date",

@@ -114,6 +114,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   bool _printAfterSave = false;
   String? _selectedPaperSize;
   bool _showStampOnPrint = true;
+  /// فقط اگر در تنظیمات چاپ کسب‌وکار برای این نوع سند فعال باشد
+  bool _businessPrintAllowsShareQr = false;
+  bool _showShareQrOnPrint = false;
   String? _selectedPrintTemplate;
   String? _selectedPaperOrientation = 'landscape';
   bool _sendToTaxFolder = false;
@@ -372,6 +375,22 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         _showStampOnPrint = showStamp;
       });
     }
+    final sqr = target['show_share_qr'];
+    if (sqr is bool) {
+      setState(() {
+        _businessPrintAllowsShareQr = sqr;
+        if (!_hasUserCustomizedSettings) {
+          _showShareQrOnPrint = sqr;
+        }
+      });
+    } else {
+      setState(() {
+        _businessPrintAllowsShareQr = false;
+        if (!_hasUserCustomizedSettings) {
+          _showShareQrOnPrint = false;
+        }
+      });
+    }
     _loadLocalSettingsForCurrentType();
   }
 
@@ -413,6 +432,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         final showStamp = _parseBool(data['show_stamp']);
         if (showStamp != null) {
           _showStampOnPrint = showStamp;
+        }
+        final showSq = _parseBool(data['show_share_qr']);
+        if (showSq != null) {
+          _showShareQrOnPrint = showSq;
         }
         final sendTax = _parseBool(data['send_to_tax_folder']);
         if (sendTax != null) {
@@ -474,6 +497,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'print_template': _selectedPrintTemplate,
       'orientation': _selectedPaperOrientation,
       'show_stamp': _showStampOnPrint,
+      'show_share_qr': _showShareQrOnPrint,
       'send_to_tax_folder': _sendToTaxFolder,
       'invoice_warehouse_release_mode': _invoiceWarehouseReleaseMode,
       'document_warehouse_id': _documentWarehouseId,
@@ -1254,17 +1278,65 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
 
-  // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
+  /// تب تراکنش‌ها همان منطق [ _shouldShowTransactionsTab ] ولی برای آرگومان [type].
+  bool _transactionsTabVisibleForType(InvoiceType? type) {
+    if (_isDraft) return false;
+    if (type == InvoiceType.waste ||
+        type == InvoiceType.directConsumption ||
+        type == InvoiceType.production) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _installmentsTabVisibleForType(InvoiceType? type) {
+    return _useInstallments &&
+        (type == InvoiceType.sales || type == InvoiceType.salesReturn);
+  }
+
+  /// اندیس تب اقساط (قبل از تب تنظیمات) در صورت نمایش؛ وگرنه null.
+  int? _installmentsTabIndexForType(InvoiceType? type) {
+    if (!_installmentsTabVisibleForType(type)) return null;
+    return _getTabCountForType(type) - 2;
+  }
+
+  // محاسبه تعداد تب‌ها بر اساس نوع فاکتور (هم‌تراز با ترتیب TabBar / TabBarView)
   int _getTabCountForType(InvoiceType? type) {
-    if (type == InvoiceType.waste || 
-        type == InvoiceType.directConsumption || 
+    if (type == InvoiceType.waste ||
+        type == InvoiceType.directConsumption ||
         type == InvoiceType.production) {
       return 3; // اطلاعات فاکتور، کالاها و خدمات، تنظیمات
     }
-    // اگر فروش اقساطی فعال باشد، تب اقساط اضافه می‌شود
-    final base = 4;
-    final addInstallmentsTab = (_useInstallments && (type == InvoiceType.sales || type == InvoiceType.salesReturn));
-    return base + (addInstallmentsTab ? 1 : 0);
+    var n = 3; // اطلاعات، کالاها، تنظیمات
+    if (_transactionsTabVisibleForType(type)) n += 1; // تراکنش‌ها بین کالاها و اقساط/تنظیمات
+    if (_installmentsTabVisibleForType(type)) n += 1; // اقساط قبل از تنظیمات
+    return n;
+  }
+
+  /// نگاشت اندیس تب هنگام افزودن/حذف تب اقساط در ایندکس [installmentsSlot].
+  int _mapTabIndexAfterInstallmentsToggle({
+    required int oldIndex,
+    required int oldLength,
+    required int newLength,
+    required bool addedInstallments,
+    required int installmentsSlot,
+  }) {
+    if (oldLength == newLength) {
+      return oldIndex.clamp(0, newLength - 1);
+    }
+    if (addedInstallments && newLength == oldLength + 1) {
+      if (oldIndex >= installmentsSlot) return oldIndex + 1;
+      return oldIndex;
+    }
+    if (!addedInstallments && oldLength == newLength + 1) {
+      if (oldIndex > installmentsSlot) return oldIndex - 1;
+      return oldIndex;
+    }
+    return oldIndex.clamp(0, newLength - 1);
+  }
+
+  int _installmentsSlotForType(InvoiceType? type) {
+    return 2 + (_transactionsTabVisibleForType(type) ? 1 : 0);
   }
 
 
@@ -1441,7 +1513,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onDraftChanged: (isDraft) {
                             setState(() {
                               _isDraft = isDraft;
-                              // اگر پیش‌فاکتور فعال شد، اقساط را غیرفعال کن
                               if (isDraft && _useInstallments) {
                                 _useInstallments = false;
                                 _hasUserCustomizedSettings = true;
@@ -1450,13 +1521,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 _interestRate = null;
                                 _firstInstallmentDueDate = null;
                                 _installmentRows = [];
-                                // همگام‌سازی TabController
-                                final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                                if (newTabCount != _tabController.length) {
-                                  _tabController.dispose();
-                                  _tabController = TabController(length: newTabCount, vsync: this);
-                                  _attachTabListener();
-                                }
+                              }
+                              final newTabCount = _getTabCountForType(_selectedInvoiceType);
+                              final prevIdx = _tabController.index;
+                              if (newTabCount != _tabController.length) {
+                                _tabController.dispose();
+                                _tabController = TabController(
+                                  length: newTabCount,
+                                  vsync: this,
+                                  initialIndex: prevIdx.clamp(0, newTabCount - 1),
+                                );
+                                _attachTabListener();
                               }
                             });
                             _saveLocalSettings();
@@ -1745,7 +1820,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onDraftChanged: (isDraft) {
                                   setState(() {
                                     _isDraft = isDraft;
-                                    // اگر پیش‌فاکتور فعال شد، اقساط را غیرفعال کن
                                     if (isDraft && _useInstallments) {
                                       _useInstallments = false;
                                       _numInstallments = null;
@@ -1753,13 +1827,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _interestRate = null;
                                       _firstInstallmentDueDate = null;
                                       _installmentRows = [];
-                                      // همگام‌سازی TabController
-                                      final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                                      if (newTabCount != _tabController.length) {
-                                        _tabController.dispose();
-                                        _tabController = TabController(length: newTabCount, vsync: this);
-                                        _attachTabListener();
-                                      }
+                                    }
+                                    final newTabCount = _getTabCountForType(_selectedInvoiceType);
+                                    final prevIdx = _tabController.index;
+                                    if (newTabCount != _tabController.length) {
+                                      _tabController.dispose();
+                                      _tabController = TabController(
+                                        length: newTabCount,
+                                        vsync: this,
+                                        initialIndex: prevIdx.clamp(0, newTabCount - 1),
+                                      );
+                                      _attachTabListener();
                                     }
                                   });
                                 },
@@ -2222,6 +2300,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         query['template_id'] = templateId;
       }
       query['show_stamp'] = _showStampOnPrint ? 'true' : 'false';
+      if (_businessPrintAllowsShareQr) {
+        query['show_share_qr'] = _showShareQrOnPrint ? 'true' : 'false';
+      }
 
       final bytes = await service.downloadInvoicePdf(
         businessId: widget.businessId,
@@ -2726,9 +2807,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       
       // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
       final newTabCount = _getTabCountForType(newType);
+      final prevTabIndex = _tabController.index;
       if (newTabCount != _tabController.length) {
         _tabController.dispose();
-        _tabController = TabController(length: newTabCount, vsync: this);
+        _tabController = TabController(
+          length: newTabCount,
+          vsync: this,
+          initialIndex: prevTabIndex.clamp(0, newTabCount - 1),
+        );
         _attachTabListener();
       }
     });
@@ -2991,29 +3077,42 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           value: _useInstallments,
                           // غیرفعال در حالت پیش‌فاکتور (onChanged: null باعث غیرفعال شدن می‌شود)
                           onChanged: _isDraft ? null : (value) {
+                            final oldLen = _tabController.length;
+                            final oldIdx = _tabController.index;
+                            final slot = _installmentsSlotForType(_selectedInvoiceType);
                             setState(() {
                               _useInstallments = value;
                               _firstInstallmentDueDate ??= _invoiceDate ?? DateTime.now();
                               _hasUserCustomizedSettings = true;
-                              // همگام‌سازی TabController با تعداد تب‌ها پس از تغییر وضعیت اقساط
                               final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                              if (newTabCount != _tabController.length) {
+                              if (newTabCount != oldLen) {
+                                final newIdx = _mapTabIndexAfterInstallmentsToggle(
+                                  oldIndex: oldIdx,
+                                  oldLength: oldLen,
+                                  newLength: newTabCount,
+                                  addedInstallments: value,
+                                  installmentsSlot: slot,
+                                );
                                 _tabController.dispose();
-                                _tabController = TabController(length: newTabCount, vsync: this);
+                                _tabController = TabController(
+                                  length: newTabCount,
+                                  vsync: this,
+                                  initialIndex: newIdx.clamp(0, newTabCount - 1),
+                                );
                                 _attachTabListener();
                               }
                               if (value == true) {
-                                // در صورت فعال‌سازی فروش اقساطی، پلن‌ها را تازه‌سازی کن
                                 _loadInstallmentPlans();
-                                // انتقال خودکار به تب اقساط (در صورت وجود)
-                                if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn) {
-                                  try {
-                                    // تب اقساط همیشه قبل از تب تنظیمات قرار می‌گیرد
-                                    final installmentsTabIndex = _tabController.length - 2;
-                                    if (installmentsTabIndex >= 0 && installmentsTabIndex < _tabController.length) {
-                                      _tabController.index = installmentsTabIndex;
+                                final installmentsTabIndex =
+                                    _installmentsTabIndexForType(_selectedInvoiceType);
+                                if (installmentsTabIndex != null) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (!mounted) return;
+                                    if (installmentsTabIndex >= 0 &&
+                                        installmentsTabIndex < _tabController.length) {
+                                      _tabController.animateTo(installmentsTabIndex);
                                     }
-                                  } catch (_) {}
+                                  });
                                 }
                               }
                             });
@@ -3231,6 +3330,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             _saveLocalSettings();
                           },
                         ),
+                        if (_businessPrintAllowsShareQr) ...[
+                          const SizedBox(height: 4),
+                          SwitchListTile(
+                            title: const Text('QR نمایش آنلاین / اعتبارسنجی'),
+                            subtitle: const Text('درج کد QR بالای فاکتور چاپی برای مشاهدهٔ نسخهٔ آنلاین'),
+                            value: _showShareQrOnPrint,
+                            onChanged: (value) {
+                              setState(() {
+                                _showShareQrOnPrint = value;
+                                _hasUserCustomizedSettings = true;
+                              });
+                              _saveLocalSettings();
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         
                         // انتخاب قالب چاپ

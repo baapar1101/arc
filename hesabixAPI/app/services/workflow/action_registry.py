@@ -92,6 +92,26 @@ class ActionRegistry:
             CrmLinkDealDocumentAction,
         )
         from app.services.workflow.actions.backup_action import BusinessBackupAction
+        from app.services.workflow.actions.hesabix_query_actions import (
+            QueryPersonsAction,
+            QueryPersonAction,
+            QueryProductsAction,
+            QueryProductAction,
+            QueryDocumentsAction,
+            QueryDocumentAction,
+            QueryInvoicesAction,
+            QueryReceiptsPaymentsAction,
+            QueryWarehouseDocumentsAction,
+        )
+        from app.services.workflow.actions.flow_control_actions import (
+            WaitAction,
+            CodeExpressionAction,
+            SubWorkflowAction,
+        )
+        from app.services.workflow.actions.merge_split_actions import (
+            MergeDataAction,
+            SplitInBatchesAction,
+        )
         
         # Communication actions
         self.register("send_email", SendEmailAction())
@@ -124,4 +144,22 @@ class ActionRegistry:
 
         # AI Agent
         self.register("ai_agent", AIAgentAction())
+
+        # Hesabix data / query
+        self.register("query_persons", QueryPersonsAction())
+        self.register("query_person", QueryPersonAction())
+        self.register("query_products", QueryProductsAction())
+        self.register("query_product", QueryProductAction())
+        self.register("query_documents", QueryDocumentsAction())
+        self.register("query_document", QueryDocumentAction())
+        self.register("query_invoices", QueryInvoicesAction())
+        self.register("query_receipts_payments", QueryReceiptsPaymentsAction())
+        self.register("query_warehouse_documents", QueryWarehouseDocumentsAction())
+
+        # Flow control
+        self.register("wait", WaitAction())
+        self.register("code_expression", CodeExpressionAction())
+        self.register("sub_workflow", SubWorkflowAction())
+        self.register("merge_data", MergeDataAction())
+        self.register("split_in_batches", SplitInBatchesAction())
 

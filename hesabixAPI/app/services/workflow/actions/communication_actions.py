@@ -113,8 +113,13 @@ class SendEmailAction(ActionHandler):
     ) -> Dict[str, Any]:
         from adapters.db.session import get_db_session
         from app.services.email_service import EmailService
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
-        
+
+        sk = dry_run_skip(context, "ارسال ایمیل")
+        if sk is not None:
+            return sk
+
         # حل کردن مقادیر
         to_email = WorkflowEngine._resolve_value_static(config.get("to"), context, node_results)
         cc = config.get("cc", [])
@@ -265,7 +270,12 @@ class SendTelegramAction(ActionHandler):
         from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
         from adapters.db.models.user import User
         from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
-        
+        from app.services.workflow.dry_run import dry_run_skip
+
+        sk = dry_run_skip(context, "ارسال تلگرام")
+        if sk is not None:
+            return sk
+
         db = context.get("db")
         if not db:
             db = get_db_session().__enter__()
@@ -482,6 +492,11 @@ class SendBaleAction(ActionHandler):
         from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
         from adapters.db.models.user import User
         from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+        from app.services.workflow.dry_run import dry_run_skip
+
+        sk = dry_run_skip(context, "ارسال بله")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         if not db:
@@ -759,6 +774,11 @@ class CreateNotificationAction(ActionHandler):
     ) -> Dict[str, Any]:
         from adapters.db.session import get_db_session
         from app.services.notification_service import NotificationService
+        from app.services.workflow.dry_run import dry_run_skip
+
+        sk = dry_run_skip(context, "اعلان (نوتیفیکیشن)")
+        if sk is not None:
+            return sk
         
         db = context.get("db")
         if not db:

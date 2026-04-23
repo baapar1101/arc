@@ -151,6 +151,7 @@ ALLOWED_INVOICE_PROFIT_BASIS = {
     "fifo",
     "lifo",
     "weighted_average",
+    "moving_weighted_average",
     "standard_cost",
     "actual_cost",
 }
@@ -167,6 +168,8 @@ def _normalize_invoice_profit_method(value: Optional[str]) -> str:
 
 def _normalize_invoice_profit_basis(value: Optional[str]) -> str:
     basis = str(value or "purchase_price").strip().lower()
+    if basis in ("wma", "moving_wavg", "mwa"):
+        basis = "moving_weighted_average"
     if basis not in ALLOWED_INVOICE_PROFIT_BASIS:
         return "purchase_price"
     return basis
@@ -184,6 +187,23 @@ def _normalize_invoice_profit_overhead_type(value: Optional[str]) -> str:
     if overhead_type not in ALLOWED_INVOICE_PROFIT_OVERHEAD_TYPES:
         return "none"
     return overhead_type
+
+
+ALLOWED_INVOICE_PROFIT_FIFO_SHORTAGE_MODES = frozenset({"perpetual_mixed", "average_purchase_on_shortage"})
+
+
+def _normalize_invoice_profit_fifo_shortage_mode(value: Optional[str]) -> str:
+    """
+    سیاست هزینه‌گذاری وقتی لایه‌های FIFO/LIFO به اندازه خروج کفایت نکند.
+    - perpetual_mixed: همان رفتار قبلی (باقی‌مانده با آخرین قیمت لایه؛ بدون لایه → صفر)
+    - average_purchase_on_shortage: مقدار بدون لایه با میانگین خرید تا تاریخ سند
+    """
+    s = str(value or "perpetual_mixed").strip().lower()
+    if s in ("avg", "average", "avg_shortage"):
+        s = "average_purchase_on_shortage"
+    if s not in ALLOWED_INVOICE_PROFIT_FIFO_SHORTAGE_MODES:
+        return "perpetual_mixed"
+    return s
 
 
 def _distinct_product_ids_for_invoice(db: Session, document_id: int) -> List[int]:
@@ -272,6 +292,8 @@ def _unit_cost_at_target_outbound_line(
     invoice_item_line_id: int,
     *,
     reverse: bool,
+    fifo_shortage_mode: str = "perpetual_mixed",
+    average_unit_for_shortage: Optional[Decimal] = None,
 ) -> Optional[Decimal]:
     """
     بهای تمام‌شده میانگین واحد برای «همان» ردیف خروج، بلافاصله قبل از اعمال آن خروج (FIFO/LIFO دائمی).
@@ -295,17 +317,33 @@ def _unit_cost_at_target_outbound_line(
     if target_mv is None or target_mv.get("movement") != "out":
         return None
 
-    return _consume_cost_layers_for_quantity(_copy_cost_layers(layers), qty)
+    return _consume_cost_layers_for_quantity(
+        _copy_cost_layers(layers),
+        qty,
+        fifo_shortage_mode=fifo_shortage_mode,
+        average_unit_for_shortage=average_unit_for_shortage,
+    )
 
 
-def _consume_cost_layers_for_quantity(layers: deque, quantity: Decimal) -> Decimal:
+def _consume_cost_layers_for_quantity(
+    layers: deque,
+    quantity: Decimal,
+    *,
+    fifo_shortage_mode: str = "perpetual_mixed",
+    average_unit_for_shortage: Optional[Decimal] = None,
+) -> Decimal:
     """
     مصرف تعداد موردنیاز از لایه‌ها و بازگرداندن هزینه هر واحد.
-    در کمبود لایه، با آخرین هزینه مصرف‌شده fallback می‌کند.
+    در کمبود لایه: perpetual_mixed با آخرین هزینه لایه؛ اگر لایه‌ای نبود صفر.
+    average_purchase_on_shortage: باقی‌مانده با average_unit_for_shortage (یا صفر اگر None).
     """
     qty = Decimal(str(quantity or 0))
     if qty <= 0:
         return Decimal(0)
+
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    use_avg = sm == "average_purchase_on_shortage" and average_unit_for_shortage is not None
+    av = Decimal(str(average_unit_for_shortage or 0)) if use_avg else None
 
     remain = qty
     total_cost = Decimal(0)
@@ -328,10 +366,159 @@ def _consume_cost_layers_for_quantity(layers: deque, quantity: Decimal) -> Decim
         if top["qty"] <= 0:
             layers.popleft()
 
-    if remain > 0 and used_any:
-        total_cost += remain * last_cost
+    if remain > 0:
+        if use_avg and av is not None:
+            total_cost += remain * av
+        elif used_any:
+            total_cost += remain * last_cost
 
     return total_cost / qty if qty > 0 else Decimal(0)
+
+
+def _wma_resolve_wac_zero_stock(
+    last_wac: Optional[Decimal],
+    *,
+    use_avg_shortage: bool,
+    average_unit_for_shortage: Optional[Decimal],
+) -> Decimal:
+    if use_avg_shortage and average_unit_for_shortage is not None:
+        return Decimal(str(average_unit_for_shortage))
+    if last_wac is not None:
+        return Decimal(str(last_wac))
+    return Decimal(0)
+
+
+def _wma_apply_movement_to_running_state(
+    state: Tuple[Decimal, Decimal, Optional[Decimal]],
+    mv: Dict[str, Any],
+    *,
+    fifo_shortage_mode: str,
+    average_unit_for_shortage: Optional[Decimal],
+) -> Tuple[Decimal, Decimal, Optional[Decimal]]:
+    """به‌روزرسانی موجودی دائمی میانگین موزون (مقدار، ارزش، آخرین WAC اعمال‌شده)."""
+    q, v, last_wac = state
+    qty = Decimal(str(mv.get("quantity") or 0))
+    if qty <= 0:
+        return (q, v, last_wac)
+
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    use_avg = sm == "average_purchase_on_shortage" and average_unit_for_shortage is not None
+
+    if mv.get("movement") == "in":
+        unit_cost = Decimal(str(mv.get("cost_price") or 0))
+        new_q = q + qty
+        new_v = v + qty * unit_cost
+        new_last = (new_v / new_q) if new_q > 0 else last_wac
+        return (new_q, new_v, new_last)
+
+    if mv.get("movement") == "out":
+        if q > 0:
+            wac = v / q
+        else:
+            wac = _wma_resolve_wac_zero_stock(
+                last_wac,
+                use_avg_shortage=use_avg,
+                average_unit_for_shortage=average_unit_for_shortage,
+            )
+        cogs = qty * wac
+        return (q - qty, v - cogs, wac)
+
+    return (q, v, last_wac)
+
+
+def _wma_total_cost_for_quantity_from_state(
+    q: Decimal,
+    v: Decimal,
+    last_wac: Optional[Decimal],
+    sell_qty: Decimal,
+    *,
+    fifo_shortage_mode: str,
+    average_unit_for_shortage: Optional[Decimal],
+) -> Decimal:
+    """هزینه کل برای یک خروج به میزان sell_qty بلافاصله قبل از اعمال آن خروج."""
+    sell_qty = Decimal(str(sell_qty or 0))
+    if sell_qty <= 0:
+        return Decimal(0)
+
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    use_avg = sm == "average_purchase_on_shortage" and average_unit_for_shortage is not None
+
+    if q >= sell_qty:
+        if q > 0:
+            wac = v / q
+        else:
+            wac = _wma_resolve_wac_zero_stock(
+                last_wac,
+                use_avg_shortage=use_avg,
+                average_unit_for_shortage=average_unit_for_shortage,
+            )
+        return sell_qty * wac
+
+    total = Decimal(0)
+    if q > 0:
+        wac = v / q
+        total += q * wac
+        short = sell_qty - q
+        if short > 0:
+            if use_avg and average_unit_for_shortage is not None:
+                total += short * Decimal(str(average_unit_for_shortage))
+            else:
+                total += short * wac
+        return total
+
+    wac = _wma_resolve_wac_zero_stock(
+        last_wac,
+        use_avg_shortage=use_avg,
+        average_unit_for_shortage=average_unit_for_shortage,
+    )
+    return sell_qty * wac
+
+
+def _unit_wma_cost_at_target_outbound_line(
+    movements: List[Dict[str, Any]],
+    quantity: Decimal,
+    document_id: int,
+    invoice_item_line_id: int,
+    *,
+    fifo_shortage_mode: str = "perpetual_mixed",
+    average_unit_for_shortage: Optional[Decimal] = None,
+) -> Optional[Decimal]:
+    """
+    بهای تمام‌شده هر واحد برای همان ردیف خروج با میانگین موزون متحرک دائمی،
+    بلافاصله قبل از اعمال آن خروج.
+    """
+    qty = Decimal(str(quantity or 0))
+    if qty <= 0:
+        return Decimal(0)
+
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    sorted_movements = sorted(movements, key=_movement_sort_key)
+    state: Tuple[Decimal, Decimal, Optional[Decimal]] = (Decimal(0), Decimal(0), None)
+
+    for mv in sorted_movements:
+        if int(mv["document_id"]) == int(document_id) and int(mv.get("invoice_item_line_id") or 0) == int(
+            invoice_item_line_id
+        ):
+            if mv.get("movement") != "out":
+                return None
+            q, v, last_wac = state
+            total = _wma_total_cost_for_quantity_from_state(
+                q,
+                v,
+                last_wac,
+                qty,
+                fifo_shortage_mode=sm,
+                average_unit_for_shortage=average_unit_for_shortage,
+            )
+            return total / qty if qty > 0 else Decimal(0)
+
+        state = _wma_apply_movement_to_running_state(
+            state,
+            mv,
+            fifo_shortage_mode=sm,
+            average_unit_for_shortage=average_unit_for_shortage,
+        )
+    return None
 
 
 # --- Inventory & Costing helpers ---
@@ -1730,12 +1917,14 @@ def _calculate_fifo_cost(
     *,
     document_id: Optional[int] = None,
     invoice_item_line_id: Optional[int] = None,
+    fifo_shortage_mode: str = "perpetual_mixed",
 ) -> Decimal:
     """
     بهای تمام‌شده میانگین واحد با FIFO دائمی برای همان ردیف فاکتور (بلافاصله پیش از خروج این ردیف).
     ترتیب حرکات: تاریخ سند، سپس registered_at، سپس شناسه سند، سپس خط فاکتور.
     بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
     """
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     movements = _iter_profit_movements_from_invoice_lines(
         db=db,
         business_id=business_id,
@@ -1745,12 +1934,17 @@ def _calculate_fifo_cost(
     )
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
+        avg_for_short: Optional[Decimal] = None
+        if sm == "average_purchase_on_shortage":
+            avg_for_short = _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
         unit = _unit_cost_at_target_outbound_line(
             movements,
             qty,
             int(document_id),
             int(invoice_item_line_id),
             reverse=False,
+            fifo_shortage_mode=sm,
+            average_unit_for_shortage=avg_for_short,
         )
         if unit is not None:
             return unit
@@ -1768,11 +1962,13 @@ def _calculate_lifo_cost(
     *,
     document_id: Optional[int] = None,
     invoice_item_line_id: Optional[int] = None,
+    fifo_shortage_mode: str = "perpetual_mixed",
 ) -> Decimal:
     """
     بهای تمام‌شده میانگین واحد با LIFO دائمی برای همان ردیف فاکتور.
     بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
     """
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     movements = _iter_profit_movements_from_invoice_lines(
         db=db,
         business_id=business_id,
@@ -1782,12 +1978,59 @@ def _calculate_lifo_cost(
     )
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
+        avg_for_short: Optional[Decimal] = None
+        if sm == "average_purchase_on_shortage":
+            avg_for_short = _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
         unit = _unit_cost_at_target_outbound_line(
             movements,
             qty,
             int(document_id),
             int(invoice_item_line_id),
             reverse=True,
+            fifo_shortage_mode=sm,
+            average_unit_for_shortage=avg_for_short,
+        )
+        if unit is not None:
+            return unit
+    return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
+
+
+def _calculate_moving_weighted_average_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    quantity: Decimal,
+    as_of_date: date,
+    warehouse_id: Optional[int] = None,
+    *,
+    document_id: Optional[int] = None,
+    invoice_item_line_id: Optional[int] = None,
+    fifo_shortage_mode: str = "perpetual_mixed",
+) -> Decimal:
+    """
+    بهای تمام‌شده میانگین موزون متحرک (دائمی) برای همان ردیف فاکتور، بلافاصله پیش از آن خروج.
+    بدون شناسه ردیف، از میانگین خریدهای تاریخی تا تاریخ سند استفاده می‌شود.
+    """
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    movements = _iter_profit_movements_from_invoice_lines(
+        db=db,
+        business_id=business_id,
+        product_id=product_id,
+        as_of_date=as_of_date,
+        warehouse_id=warehouse_id,
+    )
+    qty = Decimal(str(quantity or 0))
+    if document_id is not None and invoice_item_line_id is not None:
+        avg_for_short: Optional[Decimal] = None
+        if sm == "average_purchase_on_shortage":
+            avg_for_short = _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
+        unit = _unit_wma_cost_at_target_outbound_line(
+            movements,
+            qty,
+            int(document_id),
+            int(invoice_item_line_id),
+            fifo_shortage_mode=sm,
+            average_unit_for_shortage=avg_for_short,
         )
         if unit is not None:
             return unit
@@ -1814,13 +2057,16 @@ def _get_cost_per_unit_by_basis(
     line: Any,
     calculation_basis: str,
     document_date: date,
-    warehouse_id: Optional[int] = None
+    warehouse_id: Optional[int] = None,
+    *,
+    fifo_shortage_mode: str = "perpetual_mixed",
 ) -> Decimal:
     """
     محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
     """
     extra_info = line.extra_info or {}
     normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     
     if normalized_basis == "purchase_price":
         return Decimal(str(product.base_purchase_price or 0))
@@ -1852,6 +2098,7 @@ def _get_cost_per_unit_by_basis(
             warehouse_id,
             document_id=int(_doc_id) if _doc_id is not None else None,
             invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+            fifo_shortage_mode=sm,
         )
 
     elif normalized_basis == "lifo":
@@ -1866,6 +2113,22 @@ def _get_cost_per_unit_by_basis(
             warehouse_id,
             document_id=int(_doc_id) if _doc_id is not None else None,
             invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+            fifo_shortage_mode=sm,
+        )
+
+    elif normalized_basis == "moving_weighted_average":
+        _doc_id = getattr(line, "document_id", None)
+        _line_id = getattr(line, "id", None)
+        return _calculate_moving_weighted_average_cost(
+            db,
+            business_id,
+            product.id,
+            Decimal(str(line.quantity)),
+            document_date,
+            warehouse_id,
+            document_id=int(_doc_id) if _doc_id is not None else None,
+            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+            fifo_shortage_mode=sm,
         )
     
     elif normalized_basis == "weighted_average":
@@ -1923,7 +2186,9 @@ def _calculate_invoice_profit(
     include_overhead: bool = False,
     overhead_type: str = "none",
     overhead_percent: Optional[Decimal] = None,
-    calculation_type: str = "gross"
+    calculation_type: str = "gross",
+    *,
+    fifo_shortage_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     محاسبه سود فاکتور با پشتیبانی از روش‌های مختلف و هزینه‌های سربار
@@ -1932,6 +2197,7 @@ def _calculate_invoice_profit(
     normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
     normalized_type = _normalize_invoice_profit_type(calculation_type)
     normalized_overhead_type = _normalize_invoice_profit_overhead_type(overhead_type)
+    fifo_sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     # اگر محاسبه سود غیرفعال است
     if normalized_method == "disabled":
         return _empty_profit_response()
@@ -1973,7 +2239,8 @@ def _calculate_invoice_profit(
             line_warehouse_id = line_extra.get("warehouse_id")
             cost_per_unit = _get_cost_per_unit_by_basis(
                 db, business_id, product, line, normalized_basis,
-                document.document_date, line_warehouse_id
+                document.document_date, line_warehouse_id,
+                fifo_shortage_mode=fifo_sm,
             )
             total_materials_cost += qty * cost_per_unit
         
@@ -2092,6 +2359,7 @@ def _calculate_invoice_profit(
                     warehouse_id,
                     document_id=int(document.id),
                     invoice_item_line_id=int(item_line.id),
+                    fifo_shortage_mode=fifo_sm,
                 )
             elif normalized_basis == "lifo":
                 cost_per_unit = _calculate_lifo_cost(
@@ -2103,6 +2371,19 @@ def _calculate_invoice_profit(
                     warehouse_id,
                     document_id=int(document.id),
                     invoice_item_line_id=int(item_line.id),
+                    fifo_shortage_mode=fifo_sm,
+                )
+            elif normalized_basis == "moving_weighted_average":
+                cost_per_unit = _calculate_moving_weighted_average_cost(
+                    db,
+                    business_id,
+                    product.id,
+                    qty,
+                    document.document_date,
+                    warehouse_id,
+                    document_id=int(document.id),
+                    invoice_item_line_id=int(item_line.id),
+                    fifo_shortage_mode=fifo_sm,
                 )
             elif normalized_basis == "weighted_average":
                 cost_per_unit = _calculate_weighted_average_cost(db, business_id, product.id, document.document_date)
@@ -4381,6 +4662,18 @@ def update_invoice(
             fiscal_year_id=document.fiscal_year_id,
             document_id=document.id
         )
+
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_invoice_updated
+
+        trigger_invoice_updated(
+            db=db,
+            business_id=int(document.business_id),
+            document=document,
+            user_id=user_id,
+        )
+    except Exception as wfe:
+        logger.warning("invoice.updated workflow trigger failed: %s", wfe, exc_info=True)
     
     return result
 
@@ -4891,7 +5184,8 @@ def invoice_document_to_dict(
                 business.invoice_profit_include_overhead or False,
                 business.invoice_profit_overhead_type or "none",
                 Decimal(str(business.invoice_profit_overhead_percent or 0)) if business.invoice_profit_overhead_percent else None,
-                business.invoice_profit_calculation_type or "gross"
+                business.invoice_profit_calculation_type or "gross",
+                fifo_shortage_mode=getattr(business, "invoice_profit_fifo_shortage_mode", None),
             )
         except Exception as e:
             logger.warning(f"Error calculating invoice profit for document {document.id}: {e}")

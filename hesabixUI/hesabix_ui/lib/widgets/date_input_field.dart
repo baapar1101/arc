@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../core/date_utils.dart';
 import '../core/calendar_controller.dart';
 import 'jalali_date_picker.dart';
 
-/// Custom TextField for date input that handles both Gregorian and Jalali calendars
+/// فیلد تاریخ با ویرایش مستقیم متن و دکمهٔ باز کردن تقویم.
+/// پشتیبانی شمسی/میلادی طبق [CalendarController]؛ قالب `YYYY/MM/DD`.
 class DateInputField extends StatefulWidget {
   final DateTime? value;
   final ValueChanged<DateTime?>? onChanged;
@@ -38,8 +41,10 @@ class DateInputField extends StatefulWidget {
 }
 
 class _DateInputFieldState extends State<DateInputField> {
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  final GlobalKey<FormFieldState<String>> _formFieldKey =
+      GlobalKey<FormFieldState<String>>();
 
   @override
   void initState() {
@@ -47,9 +52,25 @@ class _DateInputFieldState extends State<DateInputField> {
     _controller = TextEditingController();
     _focusNode = FocusNode();
     _updateDisplayValue();
-    
-    // Listen to calendar controller changes
     widget.calendarController.addListener(_onCalendarChanged);
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  /// اجرای validator برای نمایش خطا (blur/Enter) و هماهنگی با [FormState.validate] هنگام ارسال.
+  void _requestFieldValidation() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _formFieldKey.currentState?.validate();
+    });
+  }
+
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus) {
+      _commitTextToParent();
+      _requestFieldValidation();
+    }
   }
 
   void _onCalendarChanged() {
@@ -61,37 +82,139 @@ class _DateInputFieldState extends State<DateInputField> {
   @override
   void didUpdateWidget(DateInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value || 
-        (oldWidget.calendarController.isJalali == true) != (widget.calendarController.isJalali == true)) {
+    final calChanged = (oldWidget.calendarController.isJalali == true) !=
+        (widget.calendarController.isJalali == true);
+    if (!_sameDateOnly(oldWidget.value, widget.value) || calChanged) {
       _updateDisplayValue();
     }
   }
 
-
   @override
   void dispose() {
-    // Remove listener
     widget.calendarController.removeListener(_onCalendarChanged);
+    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  DateTime _effectiveFirst() {
+    final now = DateTime.now();
+    return widget.firstDate ?? DateTime(now.year - 2);
+  }
+
+  DateTime _effectiveLast() {
+    final now = DateTime.now();
+    return widget.lastDate ?? DateTime(now.year + 2);
+  }
+
   void _updateDisplayValue() {
     final displayValue = HesabixDateUtils.formatForDisplay(
-      widget.value, 
-      widget.calendarController.isJalali == true
+      widget.value,
+      widget.calendarController.isJalali == true,
     );
-    _controller.text = displayValue;
+    if (_controller.text == displayValue) {
+      return;
+    }
+    _controller.value = TextEditingValue(
+      text: displayValue,
+      selection: TextSelection.collapsed(offset: displayValue.length),
+    );
+  }
+
+  static bool _sameDateOnly(DateTime? a, DateTime? b) {
+    if (a == null && b == null) {
+      return true;
+    }
+    if (a == null || b == null) {
+      return false;
+    }
+    final al = a.toLocal();
+    final bl = b.toLocal();
+    return al.year == bl.year && al.month == bl.month && al.day == bl.day;
+  }
+
+  /// پس از ویرایش: اعمال مقدار معتبر به parent (خالی = null).
+  void _commitTextToParent() {
+    if (!widget.enabled) {
+      return;
+    }
+    final text = _controller.text.trim();
+    final isJalali = widget.calendarController.isJalali == true;
+    if (text.isEmpty) {
+      if (widget.value != null) {
+        widget.onChanged?.call(null);
+      }
+      return;
+    }
+    final parsed = HesabixDateUtils.parseFromDisplay(text, isJalali);
+    if (parsed == null) {
+      return;
+    }
+    if (!HesabixDateUtils.isDateOnlyInRange(
+      parsed,
+      _effectiveFirst(),
+      _effectiveLast(),
+    )) {
+      return;
+    }
+    final n = HesabixDateUtils.toDateOnlyLocal(parsed);
+    if (!_sameDateOnly(widget.value, n)) {
+      widget.onChanged?.call(n);
+    }
+  }
+
+  String? _validateDateText(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    final t = AppLocalizations.of(context);
+    final isJalali = widget.calendarController.isJalali == true;
+    final parsed = HesabixDateUtils.parseFromDisplay(text, isJalali);
+    if (parsed == null) {
+      return t.dateInputInvalidFormat;
+    }
+    if (!HesabixDateUtils.isDateOnlyInRange(
+      parsed,
+      _effectiveFirst(),
+      _effectiveLast(),
+    )) {
+      return t.dateInputOutOfRange;
+    }
+    return null;
+  }
+
+  String? _combinedValidator(String? v) {
+    final e = _validateDateText(v);
+    if (e != null) {
+      return e;
+    }
+    return widget.validator?.call(v);
   }
 
   Future<void> _selectDate() async {
-    if (!widget.enabled) return;
+    if (!widget.enabled) {
+      return;
+    }
+    _commitTextToParent();
+    if (!context.mounted) {
+      return;
+    }
 
     final now = DateTime.now();
     final firstDate = widget.firstDate ?? DateTime(now.year - 2);
     final lastDate = widget.lastDate ?? DateTime(now.year + 2);
-    final initialDate = widget.value ?? now;
+    final isJalali = widget.calendarController.isJalali == true;
+    var initialDate = widget.value ?? now;
+    final fieldText = _controller.text.trim();
+    if (fieldText.isNotEmpty) {
+      final fromField = HesabixDateUtils.parseFromDisplay(fieldText, isJalali);
+      if (fromField != null &&
+          HesabixDateUtils.isDateOnlyInRange(fromField, firstDate, lastDate)) {
+        initialDate = fromField;
+      }
+    }
 
     final selectedDate = await showAdaptiveDatePicker(
       context: context,
@@ -102,24 +225,41 @@ class _DateInputFieldState extends State<DateInputField> {
       helpText: widget.helpText,
     );
 
-    if (selectedDate != null) {
+    if (selectedDate != null && context.mounted) {
       widget.onChanged?.call(selectedDate);
+      _requestFieldValidation();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+
     return TextFormField(
+      key: _formFieldKey,
       controller: _controller,
       focusNode: _focusNode,
-      readOnly: true,
       enabled: widget.enabled,
+      keyboardType: TextInputType.datetime,
+      textInputAction: TextInputAction.done,
+      autovalidateMode: AutovalidateMode.disabled,
+      onEditingComplete: () {
+        _commitTextToParent();
+        _requestFieldValidation();
+      },
+      onChanged: (_) {
+        final st = _formFieldKey.currentState;
+        if (st != null && st.hasError) {
+          st.validate();
+        }
+      },
       decoration: InputDecoration(
         labelText: widget.labelText,
         hintText: widget.hintText,
         suffixIcon: IconButton(
           icon: const Icon(Icons.calendar_today),
-          onPressed: _selectDate,
+          tooltip: t.dateInputOpenCalendar,
+          onPressed: widget.enabled ? _selectDate : null,
         ),
         border: const OutlineInputBorder(),
         isDense: widget.isDense,
@@ -127,12 +267,11 @@ class _DateInputFieldState extends State<DateInputField> {
             ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
             : null,
       ),
-      onTap: _selectDate,
-      validator: widget.validator,
       inputFormatters: [
-        // Prevent manual input
-        FilteringTextInputFormatter.deny(RegExp(r'.')),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+        LengthLimitingTextInputFormatter(10),
       ],
+      validator: _combinedValidator,
     );
   }
 }

@@ -36,9 +36,14 @@ class CreateLeadAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import Lead
         from app.services.document_numbering_service import generate_document_code
+
+        sk = dry_run_skip(context, "ایجاد سرنخ")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")
@@ -127,9 +132,14 @@ class CreateDealAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import Deal
         from app.services.document_numbering_service import generate_document_code
+
+        sk = dry_run_skip(context, "ایجاد فرصت فروش")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")
@@ -222,9 +232,14 @@ class CreateCrmActivityAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import CrmActivity
         from app.services.document_numbering_service import generate_document_code
+
+        sk = dry_run_skip(context, "ثبت فعالیت CRM")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")
@@ -322,8 +337,13 @@ class UpdateLeadAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import Lead, CrmProcessStage
+
+        sk = dry_run_skip(context, "به‌روزرسانی سرنخ")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")
@@ -393,8 +413,13 @@ class UpdateDealAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import Deal, CrmProcessStage
+
+        sk = dry_run_skip(context, "به‌روزرسانی فرصت فروش")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")
@@ -459,8 +484,13 @@ class CrmLinkDealDocumentAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from adapters.db.models.crm import Deal
+
+        sk = dry_run_skip(context, "لینک سند به فرصت")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")

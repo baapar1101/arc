@@ -2,8 +2,20 @@
 سیستم ترجمه برای نودهای ورک‌فلو
 این ماژول رشته‌های قابل ترجمه برای metadata نودها را مدیریت می‌کند
 """
+import copy
 from typing import Dict, Any
 from enum import Enum
+
+from .hesabix_data_actions_i18n import (
+    WORKFLOW_ACTION_TRANSLATIONS,
+    get_workflow_action_keys,
+)
+from .lifecycle_triggers_i18n import (
+    INVOICE_WORKFLOW_TRIGGER_TRANSLATIONS,
+    INVOICE_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
+    PERSON_WORKFLOW_TRIGGER_TRANSLATIONS,
+    PERSON_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
+)
 
 
 class SupportedLanguage(str, Enum):
@@ -714,6 +726,12 @@ RECEIPT_PAYMENT_CREATED_TRANSLATIONS = {
     },
 }
 
+RECEIPT_PAYMENT_UPDATED_TRANSLATIONS = copy.deepcopy(RECEIPT_PAYMENT_CREATED_TRANSLATIONS)
+RECEIPT_PAYMENT_UPDATED_TRANSLATIONS["fa"]["trigger_name"] = "ویرایش دریافت/پرداخت"
+RECEIPT_PAYMENT_UPDATED_TRANSLATIONS["fa"]["trigger_description"] = "زمانی که سند دریافت یا پرداخت ویرایش می‌شود"
+RECEIPT_PAYMENT_UPDATED_TRANSLATIONS["en"]["trigger_name"] = "Receipt / payment updated"
+RECEIPT_PAYMENT_UPDATED_TRANSLATIONS["en"]["trigger_description"] = "When a receipt or payment document is updated"
+
 # ترجمه تریگر document.created
 DOCUMENT_CREATED_TRANSLATIONS = {
     "fa": {
@@ -884,6 +902,14 @@ SCHEDULED_TRIGGER_TRANSLATIONS = {
     },
 }
 
+# ترجمه تریگر document.updated (فیلدها همان document.created)
+DOCUMENT_UPDATED_TRANSLATIONS = copy.deepcopy(DOCUMENT_CREATED_TRANSLATIONS)
+DOCUMENT_UPDATED_TRANSLATIONS["fa"]["trigger_name"] = "ویرایش سند"
+DOCUMENT_UPDATED_TRANSLATIONS["fa"]["trigger_description"] = "هنگام ویرایش سند حسابداری (مثلاً سند دستی)"
+DOCUMENT_UPDATED_TRANSLATIONS["en"]["trigger_name"] = "Document updated"
+DOCUMENT_UPDATED_TRANSLATIONS["en"]["trigger_description"] = "When an accounting document is updated"
+
+
 # ترجمه اکشن business_backup
 BUSINESS_BACKUP_TRANSLATIONS = {
     "fa": {
@@ -900,10 +926,20 @@ BUSINESS_BACKUP_TRANSLATIONS = {
     },
 }
 
-TRIGGER_TRANSLATIONS_BY_KEY = {
+TRIGGER_TRANSLATIONS_BY_KEY: Dict[str, Any] = {
     "receipt_payment.created": RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
+    "receipt_payment.updated": RECEIPT_PAYMENT_UPDATED_TRANSLATIONS,
     "document.created": DOCUMENT_CREATED_TRANSLATIONS,
+    "document.updated": DOCUMENT_UPDATED_TRANSLATIONS,
     "scheduled": SCHEDULED_TRIGGER_TRANSLATIONS,
+    "person.created": PERSON_WORKFLOW_TRIGGER_TRANSLATIONS,
+    "person.updated": PERSON_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
+    "invoice.created": INVOICE_WORKFLOW_TRIGGER_TRANSLATIONS,
+    "invoice.sales.created": INVOICE_WORKFLOW_TRIGGER_TRANSLATIONS,
+    "invoice.purchase.created": INVOICE_WORKFLOW_TRIGGER_TRANSLATIONS,
+    "invoice.updated": INVOICE_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
+    "invoice.sales.updated": INVOICE_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
+    "invoice.purchase.updated": INVOICE_WORKFLOW_TRIGGER_UPDATED_TRANSLATIONS,
 }
 
 
@@ -925,6 +961,11 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
     
     # جستجو در ترجمه‌های خاص
     if context:
+        if context in WORKFLOW_ACTION_TRANSLATIONS:
+            wmap = WORKFLOW_ACTION_TRANSLATIONS[context]
+            if lang in wmap and key in wmap[lang]:
+                return wmap[lang][key]
+
         if context in TRIGGER_TRANSLATIONS_BY_KEY:
             trans = TRIGGER_TRANSLATIONS_BY_KEY[context]
             if lang in trans and key in trans[lang]:

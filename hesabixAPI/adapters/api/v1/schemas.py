@@ -660,7 +660,13 @@ class BusinessUpdateRequest(BaseModel):
 	check_credit_enabled_by_default: Optional[bool] = Field(default=None, description="بررسی اعتبار مشتریان به صورت پیشفرض")
 	# تنظیمات محاسبه سود فاکتور
 	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور: automatic, manual, disabled")
-	invoice_profit_calculation_basis: Optional[str] = Field(default=None, description="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, standard_cost, actual_cost")
+	invoice_profit_calculation_basis: Optional[str] = Field(
+		default=None,
+		description=(
+			"مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, "
+			"weighted_average, moving_weighted_average (WMA دائمی), standard_cost, actual_cost"
+		),
+	)
 	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد هزینه‌های سربار (0-100) - فقط برای custom_percent")
@@ -668,6 +674,10 @@ class BusinessUpdateRequest(BaseModel):
 	invoice_profit_ledger_recognition_basis: Optional[str] = Field(
 		default=None,
 		description="زمان شناسایی بهای تمام‌شده قطعی در دفتر: warehouse_document_posting | sales_invoice_document",
+	)
+	invoice_profit_fifo_shortage_mode: Optional[str] = Field(
+		default=None,
+		description="سیاست کسری در مبنای سود FIFO/LIFO/moving_weighted_average: perpetual_mixed | average_purchase_on_shortage",
 	)
 	# به‌روزرسانی قیمت پایه کالا از فاکتور قطعی
 	invoice_sync_update_sales_price_enabled: Optional[bool] = Field(
@@ -805,10 +815,13 @@ class BusinessUpdateRequest(BaseModel):
 			"fifo",
 			"lifo",
 			"weighted_average",
+			"moving_weighted_average",
 			"standard_cost",
 			"actual_cost",
 		}
 		value = str(v).strip().lower()
+		if value in ("wma", "moving_wavg", "mwa"):
+			value = "moving_weighted_average"
 		if value not in allowed:
 			raise ValueError("مبنای محاسبه سود نامعتبر است")
 		return value
@@ -846,6 +859,20 @@ class BusinessUpdateRequest(BaseModel):
 			)
 		return value
 
+	@validator("invoice_profit_fifo_shortage_mode")
+	def _validate_invoice_profit_fifo_shortage_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s in ("avg", "average", "avg_shortage"):
+			s = "average_purchase_on_shortage"
+		allowed = {"perpetual_mixed", "average_purchase_on_shortage"}
+		if s not in allowed:
+			raise ValueError(
+				"invoice_profit_fifo_shortage_mode نامعتبر است (perpetual_mixed یا average_purchase_on_shortage)"
+			)
+		return s
+
 
 class BusinessResponse(BaseModel):
 	id: int = Field(..., description="شناسه کسب و کار")
@@ -878,6 +905,10 @@ class BusinessResponse(BaseModel):
 	invoice_profit_ledger_recognition_basis: Optional[str] = Field(
 		default=None,
 		description="شناسایی بهای تمام‌شده قطعی دفتر: با حواله یا با فاکتور",
+	)
+	invoice_profit_fifo_shortage_mode: str = Field(
+		default="perpetual_mixed",
+		description="سیاست کسری در محاسبه سود بر مبنای FIFO/LIFO/moving_weighted_average",
 	)
 	invoice_sync_update_sales_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت فروش از فاکتور")
 	invoice_sync_update_purchase_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت خرید از فاکتور")

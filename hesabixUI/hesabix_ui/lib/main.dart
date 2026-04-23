@@ -171,6 +171,7 @@ import 'pages/business/backup/restore_page.dart';
 import 'pages/profile/delete_business_page.dart';
 import 'pages/business/fiscal_year_rollback_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
+import 'pages/public/public_invoice_share_link_page.dart';
 import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
@@ -786,6 +787,8 @@ class _MyAppState extends State<MyApp> {
       redirect: (context, state) async {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
+        final isShortPublicSharePath =
+            currentPath.startsWith('/i/') || currentPath.startsWith('/p/');
         
         // اگر authStore هنوز load نشده، منتظر بمان
         if (_authStore == null) {
@@ -796,7 +799,7 @@ class _MyAppState extends State<MyApp> {
         
         // اگر API key ندارد
         if (!hasKey) {
-          if (isPublicRoute) {
+          if (isPublicRoute || isShortPublicSharePath) {
             return null;
           }
           if (currentPath != '/login') {
@@ -851,6 +854,24 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) => PublicPersonShareLinkPage(
             code: state.pathParameters['code'] ?? '',
           ),
+        ),
+        GoRoute(
+          path: '/public/invoice-link/:code',
+          name: 'public_invoice_share_link',
+          builder: (context, state) => PublicInvoiceShareLinkPage(
+            code: state.pathParameters['code'] ?? '',
+          ),
+        ),
+        GoRoute(
+          path: '/i/:code',
+          name: 'short_invoice_link_redirect',
+          redirect: (context, state) {
+            final c = state.pathParameters['code'] ?? '';
+            if (c.isEmpty) {
+              return '/';
+            }
+            return '/public/invoice-link/${Uri.encodeComponent(c)}';
+          },
         ),
         GoRoute(
           path: '/public/storage-file/:token',

@@ -6322,6 +6322,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warehouseDocuments => 'حواله‌های انبار';
 
   @override
+  String get relatedWarehouseDocuments => 'حواله‌های مرتبط';
+
+  @override
+  String get warehouseDocumentPostSuccess => 'حواله با موفقیت پست شد.';
+
+  @override
+  String warehouseDocumentPostFailed(String error) {
+    return 'خطا در پست حواله: $error';
+  }
+
+  @override
   String get warehouseDocument => 'حواله انبار';
 
   @override
@@ -6640,7 +6651,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowRunNow => 'اجرای فوری';
 
   @override
+  String get workflowTestRun => 'اجرای آزمایشی (وضعیت زنده)';
+
+  @override
+  String get workflowFixValidationBeforeTestRun =>
+      'قبل از اجرای آزمایشی، خطاهای اعتبارسنجی روی بوم را برطرف کنید.';
+
+  @override
   String get workflowExecutionHistory => 'تاریخچه اجرا';
+
+  @override
+  String get workflowHistoryClearCanvasHighlight => 'پاک کردن هایلایت روی بوم';
 
   @override
   String get workflowEdit => 'ویرایش';
@@ -8009,6 +8030,26 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get workflowTemplateCrmDealWonLogDesc =>
       'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود';
+
+  @override
+  String get workflowTemplateReceiptUpdatedNotifyName =>
+      'اعلان ویرایش دریافت/پرداخت';
+
+  @override
+  String get workflowTemplateReceiptUpdatedNotifyDesc =>
+      'بعد از ویرایش سند دریافت یا پرداخت، یک اعلان درون‌برنامه ثبت می‌شود';
+
+  @override
+  String get workflowTemplateInvoiceAmountBranchName =>
+      'فاکتور فروش: مبلغ بالا یا پایین';
+
+  @override
+  String get workflowTemplateInvoiceAmountBranchDesc =>
+      'اگر مبلغ فاکتور از ۱۰ میلیون تومان بیشتر باشد اعلان با اولویت بالا؛ وگرنه فقط ثبت لاگ (مثال شرط ساده)';
+
+  @override
+  String get workflowTestRunCompletedDry =>
+      'اجرای آزمایشی موفق بود (بدون ارسال/ثبت واقعی).';
 
   @override
   String get settingsCategoriesCount => 'دسته‌بندی';
@@ -9554,6 +9595,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get datePickerSelectDate => 'انتخاب تاریخ';
+
+  @override
+  String get dateInputInvalidFormat =>
+      'تاریخ معتبر به صورت YYYY/MM/DD وارد کنید';
+
+  @override
+  String get dateInputOutOfRange => 'تاریخ در بازه مجاز نیست';
+
+  @override
+  String get dateInputOpenCalendar => 'باز کردن تقویم';
 
   @override
   String get timePickerSelectTime => 'انتخاب زمان';

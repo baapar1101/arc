@@ -14,6 +14,25 @@ enum ConnectionPointType {
   output,
 }
 
+/// فاز نمایش اجرای زنده روی نود (مشابه n8n)
+enum WorkflowNodeRunPhase {
+  idle,
+  running,
+  success,
+  error,
+  /// نودهایی که در تاریخچهٔ یک اجرای انتخاب‌شده در مسیر بوده‌اند
+  historyReplay,
+}
+
+/// مقادیر status اجرای workflow در API (هم‌نام با enum بک‌اند، فارسی)
+abstract final class WorkflowExecutionStatusValue {
+  static const completed = 'تکمیل شده';
+  static const failed = 'ناموفق';
+  static const cancelled = 'لغو شده';
+  static const running = 'در حال اجرا';
+  static const pending = 'در انتظار';
+}
+
 /// مدل یک node در workflow
 class WorkflowNodeModel {
   final String id;

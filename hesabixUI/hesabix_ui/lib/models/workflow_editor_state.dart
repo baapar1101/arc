@@ -37,6 +37,14 @@ class WorkflowEditorState extends ChangeNotifier {
   final List<WorkflowNodeModel> _clipboard = [];
   final List<WorkflowConnectionModel> _clipboardConnections = [];
 
+  /// هایلایت زنده هنگام اجرای آزمایشی
+  final Map<String, WorkflowNodeRunPhase> _nodeRunPhases = {};
+  bool _isLiveRunActive = false;
+  String? _liveRunLastCompletedNodeId;
+  String? _liveEdgeFromNodeId;
+  String? _liveEdgeToNodeId;
+  final Set<String> _historyPathConnectionIds = {};
+
   // Getters
   List<WorkflowNodeModel> get nodes => List.unmodifiable(_nodes);
   List<WorkflowConnectionModel> get connections => List.unmodifiable(_connections);
@@ -60,12 +68,126 @@ class WorkflowEditorState extends ChangeNotifier {
   bool get canUndo => _history.canUndo();
   bool get canRedo => _history.canRedo();
 
+  bool get isLiveRunActive => _isLiveRunActive;
+
+  String? get liveActiveEdgeSourceNodeId => _liveEdgeFromNodeId;
+  String? get liveActiveEdgeTargetNodeId => _liveEdgeToNodeId;
+
+  Set<String> get historyPathConnectionIds =>
+      Set<String>.unmodifiable(_historyPathConnectionIds);
+
+  WorkflowNodeRunPhase nodeRunPhase(String nodeId) =>
+      _nodeRunPhases[nodeId] ?? WorkflowNodeRunPhase.idle;
+
+  Set<String> _connectionIdsAlongPath(List<String> order) {
+    final out = <String>{};
+    for (var i = 0; i < order.length - 1; i++) {
+      final a = order[i].toString();
+      final b = order[i + 1].toString();
+      for (final c in _connections) {
+        if (c.sourceNodeId == a && c.targetNodeId == b) {
+          out.add(c.id);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  void beginLiveRun() {
+    _nodeRunPhases.clear();
+    _historyPathConnectionIds.clear();
+    _liveRunLastCompletedNodeId = null;
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    _isLiveRunActive = true;
+    notifyListeners();
+  }
+
+  void finishLiveRun() {
+    _isLiveRunActive = false;
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    notifyListeners();
+  }
+
+  void clearLiveRunOverlay() {
+    _nodeRunPhases.clear();
+    _historyPathConnectionIds.clear();
+    _liveRunLastCompletedNodeId = null;
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    _isLiveRunActive = false;
+    notifyListeners();
+  }
+
+  void onLiveRunLogNodeStarted(String nodeId) {
+    if (_liveRunLastCompletedNodeId != null) {
+      _liveEdgeFromNodeId = _liveRunLastCompletedNodeId;
+      _liveEdgeToNodeId = nodeId;
+    } else {
+      _liveEdgeFromNodeId = null;
+      _liveEdgeToNodeId = null;
+    }
+    _nodeRunPhases[nodeId] = WorkflowNodeRunPhase.running;
+    notifyListeners();
+  }
+
+  void onLiveRunLogNodeSuccess(String nodeId) {
+    _liveRunLastCompletedNodeId = nodeId;
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    _nodeRunPhases[nodeId] = WorkflowNodeRunPhase.success;
+    notifyListeners();
+  }
+
+  void onLiveRunLogNodeError(String nodeId) {
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    _nodeRunPhases[nodeId] = WorkflowNodeRunPhase.error;
+    notifyListeners();
+  }
+
+  void setHistoryExecutionHighlight(List<String> executedOrder) {
+    _nodeRunPhases.removeWhere((_, v) => v == WorkflowNodeRunPhase.historyReplay);
+    _historyPathConnectionIds
+      ..clear()
+      ..addAll(_connectionIdsAlongPath(executedOrder));
+    for (final id in executedOrder) {
+      final s = id.toString();
+      if (s.isNotEmpty) {
+        _nodeRunPhases[s] = WorkflowNodeRunPhase.historyReplay;
+      }
+    }
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
+    _liveRunLastCompletedNodeId = null;
+    notifyListeners();
+  }
+
+  void clearHistoryExecutionHighlight() {
+    _historyPathConnectionIds.clear();
+    _nodeRunPhases.removeWhere((_, v) => v == WorkflowNodeRunPhase.historyReplay);
+    notifyListeners();
+  }
+
+  void setNodeRunPhase(String nodeId, WorkflowNodeRunPhase phase) {
+    _nodeRunPhases[nodeId] = phase;
+    notifyListeners();
+  }
+
   /// بارگذاری workflow از backend format
   void loadWorkflow(Map<String, dynamic> workflowData) {
     try {
       _nodes.clear();
       _connections.clear();
       _nodesMap.clear();
+      _nodeRunPhases.clear();
+      _isLiveRunActive = false;
+      _historyPathConnectionIds.clear();
+      _liveRunLastCompletedNodeId = null;
+      _liveEdgeFromNodeId = null;
+      _liveEdgeToNodeId = null;
 
       final nodesRaw = workflowData['nodes'];
       final connectionsRaw = workflowData['connections'];
@@ -939,6 +1061,12 @@ class WorkflowEditorState extends ChangeNotifier {
     _history.clear();
     _clipboard.clear();
     _clipboardConnections.clear();
+    _nodeRunPhases.clear();
+    _isLiveRunActive = false;
+    _historyPathConnectionIds.clear();
+    _liveRunLastCompletedNodeId = null;
+    _liveEdgeFromNodeId = null;
+    _liveEdgeToNodeId = null;
     notifyListeners();
   }
 

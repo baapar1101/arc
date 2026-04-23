@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 
 /// دیالوگ سه‌حالته: توکن بازیابی، رمز انتخابی مدیر، رمز تصادفی.
@@ -19,6 +20,16 @@ int? _parseUserId(Map<String, dynamic> u) {
   if (v is int) return v;
   if (v is num) return v.toInt();
   return null;
+}
+
+/// الویت: `reset_link` از بک‌اند → ساخت از `token` (یا در نهایت نمایش توکن خام)
+String? _resolvePasswordResetDisplayUrl(Map<String, dynamic>? data) {
+  if (data == null) return null;
+  final link = data['reset_link'] as String?;
+  if (link != null && link.isNotEmpty) return link;
+  final token = data['token'] as String?;
+  if (token == null || token.isEmpty) return null;
+  return AppConfig.buildPasswordResetUrl(token) ?? token;
 }
 
 class _AdminUserPasswordDialog extends StatefulWidget {
@@ -91,21 +102,23 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
       );
       if (res.statusCode == 200) {
         final data = res.data?['data'] as Map<String, dynamic>?;
-        final token = data?['token'] as String?;
         if (!mounted) return;
-        if (token != null && token.isNotEmpty) {
+        final displayUrl = _resolvePasswordResetDisplayUrl(data);
+        if (displayUrl != null && displayUrl.isNotEmpty) {
           if (!context.mounted) return;
           await _showResultDialog(
             context,
-            title: 'توکن بازنشانی (فقط محیط توسعه)',
-            body: token,
+            title: 'لینک بازیابی کلمه عبور',
+            body: displayUrl,
+            hint:
+                'این لینک را کپی و برای کاربر ارسال کنید. با باز کردن آن، صفحه ورود و تعیین رمز جدید نمایش داده می‌شود.',
           );
         } else {
           if (!mounted) return;
           _msg(
             _sendNotification
-                ? 'توکن ایجاد شد. در صورت فعال بودن کانال‌ها، اعلان برای کاربر ارسال می‌شود.'
-                : 'توکن بازیابی ایجاد شد.',
+                ? 'توکن در سرور ثبت شد. اگر اعلان فعال است برای کاربر ارسال می‌شود (در این پاسخ لینک قابل ساختن نبود — APP_PUBLIC_URL یا Origin).'
+                : 'توکن بازیابی در سرور ثبت شد. برای نمایش لینک، آدرس پایهٔ برنامه (APP_PUBLIC_URL) را پیکربندی کنید.',
           );
         }
         if (!mounted) return;
@@ -277,7 +290,7 @@ class _TokenTab extends StatelessWidget {
     return ListView(
       children: [
         const Text(
-          'توکن بازنشانی در پایگاه داده ثبت می‌شود. با فعال بودن اعلان، مثل فراموشی رمز، پیام ارسال می‌گردد.',
+          'توکن در سرور ثبت می‌شود. لینک کامل (برای کپی) در پاسخ نمایش داده می‌شود؛ در صورت فعال بودن اعلان، مثل فراموشی رمز، پیام نیز ارسال می‌گردد.',
           style: TextStyle(fontSize: 12),
         ),
         SwitchListTile(
@@ -400,14 +413,31 @@ Future<void> _showResultDialog(
   BuildContext context, {
   required String title,
   required String body,
+  String? hint,
 }) async {
   await showDialog<void>(
     context: context,
     builder: (c) => AlertDialog(
       title: Text(title),
-      content: SelectableText(
-        body,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (hint != null) ...[
+              Text(hint, style: Theme.of(c).textTheme.bodySmall),
+              const SizedBox(height: 12),
+            ],
+            SelectableText(
+              body,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -416,10 +446,10 @@ Future<void> _showResultDialog(
             Clipboard.setData(ClipboardData(text: body));
             Navigator.pop(c);
             messenger?.showSnackBar(
-              const SnackBar(content: Text('در حافظه کپی شد')),
+              const SnackBar(content: Text('لینک در حافظه کپی شد')),
             );
           },
-          child: const Text('کپی و بستن'),
+          child: const Text('کپی لینک'),
         ),
         TextButton(onPressed: () => Navigator.pop(c), child: const Text('بستن')),
       ],

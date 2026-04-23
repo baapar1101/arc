@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -58,6 +59,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   final FocusNode _focusNode = FocusNode();
   final _uuid = const Uuid();
   WorkflowAutoLayoutType _layoutType = WorkflowAutoLayoutType.hierarchical;
+  bool _testRunBusy = false;
 
   @override
   void initState() {
@@ -198,6 +200,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         _goBackToWorkflowsList();
       },
       child: Scaffold(
+        onEndDrawerChanged: (isOpened) {
+          if (!isOpened) {
+            _editorState.clearHistoryExecutionHighlight();
+          }
+        },
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(
@@ -260,6 +267,26 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
           ),
         ),
       ),
+      endDrawer: _workflow != null && _workflow!['id'] != null
+          ? Drawer(
+              width: math.min(400, MediaQuery.sizeOf(context).width * 0.92),
+              child: WorkflowExecutionHistoryPanel(
+                businessId: widget.businessId,
+                workflowId: _workflow!['id'] as int,
+                nodes: _editorState.nodes,
+                onExecutedNodesHighlight: (ids) {
+                  if (ids.isEmpty) {
+                    _editorState.clearHistoryExecutionHighlight();
+                  } else {
+                    _editorState.setHistoryExecutionHighlight(ids);
+                  }
+                },
+                onClearCanvasHighlight: () {
+                  _editorState.clearHistoryExecutionHighlight();
+                },
+              ),
+            )
+          : null,
       body: _loading
           ? const Center(child: LoadingIndicator())
           : KeyboardListener(
@@ -297,6 +324,9 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                         onLoadTemplate: () {
                           _loadTemplate();
                         },
+                        onTestRun: _canLiveTestRun ? _runLiveTestWorkflow : null,
+                        testRunEnabled: _canLiveTestRun,
+                        testRunBusy: _testRunBusy,
                       ),
                       Expanded(
                         child: WorkflowCanvas(
@@ -367,6 +397,149 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             ),
       ),
     );
+  }
+
+  bool _executionWasDryRun(Map<String, dynamic>? ex) {
+    if (ex == null) return false;
+    final ed = ex['execution_data'];
+    if (ed is! Map) return false;
+    return Map<String, dynamic>.from(
+      ed.map((k, v) => MapEntry(k.toString(), v)),
+    )['dry_run'] == true;
+  }
+
+  bool get _canLiveTestRun {
+    if (_workflow == null || _workflow!['id'] == null) return false;
+    final s = _workflow!['status']?.toString();
+    return s == 'فعال';
+  }
+
+  void _applyLiveRunLogEntry(Map<String, dynamic> log) {
+    final level = log['level']?.toString().toLowerCase();
+    final dataRaw = log['data'];
+    if (dataRaw is! Map) return;
+    final data = Map<String, dynamic>.from(
+      dataRaw.map((k, v) => MapEntry(k.toString(), v)),
+    );
+    final nodeId = data['node_id']?.toString();
+    if (nodeId == null || nodeId.isEmpty) return;
+
+    final event = data['event']?.toString();
+    if (event == 'node_started') {
+      _editorState.onLiveRunLogNodeStarted(nodeId);
+      return;
+    }
+    if (level == 'error' && data['success'] == false) {
+      _editorState.onLiveRunLogNodeError(nodeId);
+      return;
+    }
+    if (data['success'] == true) {
+      _editorState.onLiveRunLogNodeSuccess(nodeId);
+    }
+  }
+
+  Future<void> _runLiveTestWorkflow() async {
+    if (_testRunBusy || !_canLiveTestRun) return;
+    final t = AppLocalizations.of(context);
+    final wid = _workflow!['id'] as int;
+
+    final errors = WorkflowValidator.validateWorkflow(
+      nodes: _editorState.nodes,
+      connections: _editorState.connections,
+      context: context,
+    );
+    if (errors.isNotEmpty) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.workflowValidationError),
+          content: Text(t.workflowFixValidationBeforeTestRun),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text(t.workflowClose)),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() => _testRunBusy = true);
+    _editorState.beginLiveRun();
+
+    try {
+      final exec = await _workflowService.executeWorkflow(
+        businessId: widget.businessId,
+        workflowId: wid,
+        triggerData: const <String, dynamic>{},
+        asyncExecution: true,
+        dryRun: true,
+      );
+      final executionId = exec['id'];
+      if (executionId is! int) {
+        throw StateError('execution id missing');
+      }
+
+      var lastLogId = 0;
+      Map<String, dynamic>? lastExecution;
+
+      while (mounted) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+
+        final logs = await _workflowService.getExecutionLogs(
+          businessId: widget.businessId,
+          workflowId: wid,
+          executionId: executionId,
+          afterLogId: lastLogId,
+        );
+        for (final log in logs) {
+          final id = log['id'];
+          if (id is int && id > lastLogId) {
+            lastLogId = id;
+          }
+          _applyLiveRunLogEntry(Map<String, dynamic>.from(log.map((k, v) => MapEntry(k.toString(), v))));
+        }
+
+        lastExecution = await _workflowService.getWorkflowExecution(
+          businessId: widget.businessId,
+          workflowId: wid,
+          executionId: executionId,
+        );
+        final st = lastExecution['status']?.toString() ?? '';
+        if (st == WorkflowExecutionStatusValue.completed ||
+            st == WorkflowExecutionStatusValue.failed ||
+            st == WorkflowExecutionStatusValue.cancelled) {
+          break;
+        }
+      }
+
+      if (!mounted) return;
+
+      final st = lastExecution?['status']?.toString() ?? '';
+      if (st == WorkflowExecutionStatusValue.completed) {
+        final dry = _executionWasDryRun(lastExecution);
+        SnackBarHelper.show(
+          context,
+          message: dry ? t.workflowTestRunCompletedDry : t.workflowExecuted,
+        );
+      } else if (st == WorkflowExecutionStatusValue.failed) {
+        final err = lastExecution?['error_message']?.toString();
+        SnackBarHelper.showError(
+          context,
+          message: err != null && err.isNotEmpty ? err : t.workflowErrorExecuting,
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('خطا در اجرای آزمایشی workflow: $e');
+      debugPrint('StackTrace: $stackTrace');
+      if (mounted) {
+        SnackBarHelper.showError(context, message: t.workflowErrorExecuting);
+      }
+    } finally {
+      _editorState.finishLiveRun();
+      if (mounted) {
+        setState(() => _testRunBusy = false);
+      }
+    }
   }
 
   void _applyAutoLayout({WorkflowAutoLayoutType? type}) {

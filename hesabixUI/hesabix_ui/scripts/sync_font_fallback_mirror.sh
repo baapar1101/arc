@@ -55,16 +55,25 @@ download_gstatic_slice_if_missing() {
   fi
   mkdir -p "$(dirname "$dest")"
   if ! command -v curl >/dev/null 2>&1; then
-    echo "[warn] sync_font_fallback_mirror: curl یافت نشد؛ نمی‌توان Noto Color Emoji را گرفت: $rel" >&2
+    echo "[warn] sync_font_fallback_mirror: curl یافت نشد؛ نمی‌توان از gstatic گرفت: $rel" >&2
     return 0
   fi
   if curl -fsSL --retry 2 --connect-timeout 20 "${GSTATIC_BASE}/${rel}" -o "$dest.tmp" && mv -f "$dest.tmp" "$dest"; then
-    echo "[info] آینهٔ fallback موتور (Noto Color Emoji، دانلود): $dest"
+    echo "[info] آینهٔ fallback موتور (دانلود gstatic): $dest"
   else
     rm -f "$dest.tmp" "$dest"
     echo "[warn] sync_font_fallback_mirror: دانلود ناموفق (اینترنت/فایروال؟): $rel" >&2
   fi
 }
+
+# Noto Sans SC (چینی ساده) — مثل Armenian: اگر assets/fonts/notosanssc.woff2 هست کپی؛ وگرنه دانلود از gstatic
+REL_NOTO_SANS_SC="notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FrY9HbczS.woff2"
+SRC_NOTO_SANS_SC="$APP_DIR/assets/fonts/notosanssc.woff2"
+if [ -f "$SRC_NOTO_SANS_SC" ]; then
+  mirror_file "$SRC_NOTO_SANS_SC" "$TARGET_ROOT/fonts/gstatic/s/$REL_NOTO_SANS_SC" "Noto Sans SC"
+else
+  download_gstatic_slice_if_missing "$REL_NOTO_SANS_SC"
+fi
 
 if [ -f "$PATHS_FILE" ]; then
   if [ -f "$SRC_NOTO_COLOR_EMOJI" ]; then

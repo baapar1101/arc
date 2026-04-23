@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, cast, Integer
@@ -52,6 +52,15 @@ from adapters.db.models.person import Person
 from app.services.receipt_payment_service import get_receipt_payment
 from app.services.file_storage_service import FileStorageService
 from app.services.person_service import calculate_person_balance
+from app.services.document_share_link_service import (
+    create_share_link as create_document_share_link,
+    get_active_share_link_for_document,
+    get_or_create_link_for_print,
+    revoke_share_link as revoke_document_share_link,
+    serialize_document_share_link,
+    build_invoice_share_i_url,
+)
+from adapters.api.v1.schema_models.invoice import InvoiceShareLinkCreateRequest
 from app.services.document_list_sort import apply_invoice_search_ordering, apply_invoice_search_ordering_from_body
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
@@ -97,6 +106,31 @@ def _format_line_custom_attributes_for_pdf(extra_info: Any) -> Optional[str]:
     if not parts:
         return None
     return "؛ ".join(parts)
+
+
+def _invoice_verify_qr_data_uri(verify_url: str) -> Optional[str]:
+    """تصویر PNG به‌صورت data URI برای درج در PDF."""
+    try:
+        import io
+        import qrcode
+        from qrcode.constants import ERROR_CORRECT_M
+
+        buf = io.BytesIO()
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=ERROR_CORRECT_M,
+            box_size=3,
+            border=2,
+        )
+        qr.add_data(verify_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        logger.exception("Failed to build invoice verify QR")
+        return None
 
 
 def _invoice_line_unit_display_for_pdf(pl: Dict[str, Any]) -> str:
@@ -158,6 +192,76 @@ def get_invoice_installments_endpoint(
 ):
     data = get_invoice_installment_plan(db=db, business_id=business_id, invoice_id=invoice_id)
     return success_response(data=data, request=request, message="INSTALLMENT_PLAN_FETCHED")
+
+
+@router.get("/business/{business_id}/{invoice_id}/share-link")
+@require_business_access("business_id")
+def get_invoice_share_link_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "view", Document, "invoice_id")),
+):
+    link = get_active_share_link_for_document(db, business_id, invoice_id)
+    return success_response(
+        data={"link": serialize_document_share_link(
+            link, str(request.base_url), db=db
+        )},
+        request=request,
+        message="INVOICE_SHARE_LINK_STATUS",
+    )
+
+
+@router.post("/business/{business_id}/{invoice_id}/share-link")
+@require_business_access("business_id")
+def create_invoice_share_link_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    payload: InvoiceShareLinkCreateRequest = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "edit", Document, "invoice_id")),
+):
+    link = create_document_share_link(
+        db,
+        business_id=business_id,
+        document_id=invoice_id,
+        user_id=ctx.get_user_id(),
+        expires_in_hours=payload.expires_in_hours,
+        max_view_count=payload.max_view_count,
+        replace_existing=payload.replace_existing,
+    )
+    return success_response(
+        data=serialize_document_share_link(
+            link, str(request.base_url), db=db
+        ),
+        request=request,
+        message="INVOICE_SHARE_LINK_CREATED",
+    )
+
+
+@router.delete("/business/{business_id}/{invoice_id}/share-link")
+@require_business_access("business_id")
+def delete_invoice_share_link_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "edit", Document, "invoice_id")),
+):
+    ok = revoke_document_share_link(
+        db,
+        business_id=business_id,
+        document_id=invoice_id,
+        user_id=ctx.get_user_id(),
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="لینک فعالی برای لغو وجود ندارد")
+    return success_response(data=None, request=request, message="INVOICE_SHARE_LINK_REVOKED")
 
 
 @router.post("/business/{business_id}/installments/search")
@@ -908,7 +1012,8 @@ def recalculate_invoice_profits_endpoint(
                 business.invoice_profit_include_overhead or False,
                 business.invoice_profit_overhead_type or "none",
                 Decimal(str(business.invoice_profit_overhead_percent or 0)) if business.invoice_profit_overhead_percent else None,
-                business.invoice_profit_calculation_type or "gross"
+                business.invoice_profit_calculation_type or "gross",
+                fifo_shortage_mode=getattr(business, "invoice_profit_fifo_shortage_mode", None),
             )
             
             # بررسی اینکه آیا سود محاسبه شده است
@@ -1023,6 +1128,7 @@ async def export_single_invoice_pdf(
         "show_stamp": True,
         "show_payments": True,
         "show_installment_plan": True,
+        "show_share_qr": False,
         "footer_note": None,
     }
     invoice_footer_note: Optional[str] = None
@@ -1070,6 +1176,7 @@ async def export_single_invoice_pdf(
                             "show_installment_plan": bool(
                                 getattr(r, "show_installment_plan", True)
                             ),
+                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
                             "footer_note": getattr(r, "footer_note", None),
                         }
                     elif r.document_type == doc.document_type:
@@ -1080,6 +1187,7 @@ async def export_single_invoice_pdf(
                             "show_installment_plan": bool(
                                 getattr(r, "show_installment_plan", True)
                             ),
+                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
                             "footer_note": getattr(r, "footer_note", None),
                         }
                 if per_type_cfg is None:
@@ -1106,9 +1214,17 @@ async def export_single_invoice_pdf(
                         return False
                 return None
 
-            override_value = _normalize_bool(show_stamp_override)
-            if override_value is not None:
-                print_settings["show_stamp"] = override_value
+            # پارامترهای query: مهر و QR
+            try:
+                _qp_print = request.query_params
+                _st_q = _normalize_bool(_qp_print.get("show_stamp"))
+                if _st_q is not None:
+                    print_settings["show_stamp"] = _st_q
+                _shq = _normalize_bool(_qp_print.get("show_share_qr"))
+                if _shq is not None:
+                    print_settings["show_share_qr"] = _shq
+            except Exception:
+                pass
 
             # لوگو و مهر کسب‌وکار بر اساس تنظیمات چاپ
             if print_settings.get("show_logo", True):
@@ -1143,6 +1259,34 @@ async def export_single_invoice_pdf(
         business_stamp_data_uri = None
         owner_signature_data_uri = None
         invoice_footer_note = None
+
+    # اگر بلوک بالا خطا خورد، باز هم پارامترهای query چاپ را روی print_settings اعمال کن
+    try:
+        _qp_fb = request.query_params
+
+        def _norm_bool_pdf(v):
+            if isinstance(v, bool):
+                return v
+            if v is None:
+                return None
+            if isinstance(v, (int, float)):
+                return bool(v)
+            if isinstance(v, str):
+                s = v.strip().lower()
+                if s in {"1", "true", "yes", "on"}:
+                    return True
+                if s in {"0", "false", "no", "off"}:
+                    return False
+            return None
+
+        _sf = _norm_bool_pdf(_qp_fb.get("show_stamp"))
+        if _sf is not None:
+            print_settings["show_stamp"] = _sf
+        _qf = _norm_bool_pdf(_qp_fb.get("show_share_qr"))
+        if _qf is not None:
+            print_settings["show_share_qr"] = _qf
+    except Exception:
+        pass
 
     # Locale و نوع تقویم
     locale = negotiate_locale(request.headers.get("Accept-Language"))
@@ -1696,6 +1840,31 @@ async def export_single_invoice_pdf(
         fa_font_url_regular = None
         fa_font_url_bold = None
 
+    invoice_verify_qr_data_uri: Optional[str] = None
+    show_invoice_verify_qr = bool(print_settings.get("show_share_qr", False))
+    if show_invoice_verify_qr:
+        try:
+            _link = get_or_create_link_for_print(
+                db,
+                business_id=business_id,
+                document_id=invoice_id,
+                user_id=ctx.get_user_id(),
+            )
+            _verify_url = build_invoice_share_i_url(
+                _link.code,
+                str(request.base_url),
+                db=db,
+            )
+            _qr_uri = _invoice_verify_qr_data_uri(_verify_url)
+            if _qr_uri:
+                invoice_verify_qr_data_uri = _qr_uri
+            else:
+                show_invoice_verify_qr = False
+        except Exception:
+            logger.exception("Invoice PDF: verify QR failed")
+            show_invoice_verify_qr = False
+            invoice_verify_qr_data_uri = None
+
     # کانتکست قالب
     template_context = {
         "business_id": business_id,
@@ -1721,6 +1890,8 @@ async def export_single_invoice_pdf(
         "fa_font_url_bold": fa_font_url_bold,
         "invoice_footer_note": invoice_footer_note,
         "customer_balance_info": customer_balance_info,
+        "show_invoice_verify_qr": show_invoice_verify_qr,
+        "invoice_verify_qr_data_uri": invoice_verify_qr_data_uri,
     }
 
     # تلاش برای رندر با قالب سفارشی

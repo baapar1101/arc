@@ -36,6 +36,7 @@ Requires-Dist: simpleeval>=0.9.14
 Requires-Dist: croniter>=2.0.0
 Requires-Dist: pytz>=2024.1
 Requires-Dist: paramiko>=3.4.0
+Requires-Dist: qrcode>=7.4.2
 Provides-Extra: dev
 Requires-Dist: pytest>=8.2.0; extra == "dev"
 Requires-Dist: httpx>=0.27.0; extra == "dev"

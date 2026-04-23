@@ -1,4 +1,6 @@
 from typing import List, Optional, Dict, Any
+from decimal import Decimal
+from datetime import datetime, time, timezone
 import json
 from sqlalchemy.exc import IntegrityError
 from app.core.responses import ApiError
@@ -646,6 +648,28 @@ def update_person(
     
     # Invalidate کش لیست اشخاص
     invalidate_persons_cache(business_id, fiscal_year_id=None)
+
+    # فراخوانی workflow
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_person_updated
+
+        types_list: list = []
+        if person.person_types:
+            try:
+                tmp = json.loads(person.person_types)
+                if isinstance(tmp, list):
+                    types_list = [str(x) for x in tmp]
+            except Exception:
+                pass
+        trigger_person_updated(
+            db=db,
+            business_id=business_id,
+            person_id=int(person.id),
+            person_types=types_list,
+            user_id=None,
+        )
+    except Exception as e:
+        logger.warning("person.updated workflow trigger failed: %s", e, exc_info=True)
     
     return success_response(
         message="شخص با موفقیت ویرایش شد",
@@ -890,13 +914,136 @@ def count_persons(db: Session, business_id: int, search_query: Optional[str] = N
     return query.count()
 
 
+def _person_balance_status_from_totals(
+    total_credit: Decimal, total_debit: Decimal, balance: Decimal
+) -> str:
+    if total_credit == 0 and total_debit == 0:
+        return "بدون تراکنش"
+    if balance > 0:
+        return "بستانکار"
+    if balance < 0:
+        return "بدهکار"
+    return "بالانس"
+
+
+def _document_to_base_currency_rate(
+    db: Session,
+    business_id: int,
+    base_currency_id: int,
+    document: Document,
+    *,
+    rate_cache: Dict[int, Decimal],
+) -> Decimal:
+    """
+    نرخ تبدیل ۱ واحد ارز سند به ارز پایه (هم‌معنا با resolve_rate_to_base).
+    اولویت: extra_info.fx.rate ثبت‌شده روی سند، وگرنه نرخ تاریخ سند.
+    """
+    doc_id = int(document.id)
+    if doc_id in rate_cache:
+        return rate_cache[doc_id]
+    dc = int(document.currency_id or 0)
+    if dc == int(base_currency_id):
+        rate_cache[doc_id] = Decimal(1)
+        return Decimal(1)
+
+    extra = document.extra_info or {}
+    fx = extra.get("fx") if isinstance(extra, dict) else None
+    if isinstance(fx, dict) and not fx.get("skipped") and fx.get("rate") is not None:
+        try:
+            rate = Decimal(str(fx["rate"]))
+            if rate > 0:
+                rate_cache[doc_id] = rate
+                return rate
+        except Exception:
+            pass
+
+    from app.services.business_currency_rate_service import resolve_rate_to_base, _to_utc_aware
+    from app.services.invoice_fx_revaluation import compute_fx_as_of_utc, get_fx_revaluation_policy
+
+    b = db.get(Business, int(business_id))
+    if not b:
+        logger.warning(
+            "person balance: business %s not found, using rate=1 for document %s",
+            business_id,
+            doc_id,
+        )
+        rate_cache[doc_id] = Decimal(1)
+        return Decimal(1)
+
+    policy = get_fx_revaluation_policy(b)
+    reg = document.registered_at or datetime.now(timezone.utc)
+    if reg.tzinfo is None:
+        reg = reg.replace(tzinfo=timezone.utc)
+    reg = _to_utc_aware(reg)
+    as_of = compute_fx_as_of_utc(document.document_date, reg, policy)
+    try:
+        res = resolve_rate_to_base(db, int(business_id), dc, as_of)
+        rate = res["rate"] if isinstance(res["rate"], Decimal) else Decimal(str(res["rate"]))
+        if rate <= 0:
+            rate = Decimal(1)
+        rate_cache[doc_id] = rate
+        return rate
+    except ApiError:
+        pass
+    try:
+        fallback_as_of = datetime.combine(
+            document.document_date, time(23, 59, 59, 999999), tzinfo=timezone.utc
+        )
+        res = resolve_rate_to_base(db, int(business_id), dc, fallback_as_of)
+        rate = res["rate"] if isinstance(res["rate"], Decimal) else Decimal(str(res["rate"]))
+        if rate <= 0:
+            rate = Decimal(1)
+        rate_cache[doc_id] = rate
+        return rate
+    except ApiError as e:
+        logger.warning(
+            "person balance: no FX rate business=%s document=%s currency=%s: %s",
+            business_id,
+            doc_id,
+            dc,
+            e,
+        )
+        rate_cache[doc_id] = Decimal(1)
+        return Decimal(1)
+
+
+def _person_line_amount_to_base(
+    db: Session,
+    document: Document,
+    amount: Any,
+    *,
+    rate_cache: Dict[int, Decimal],
+    base_currency_by_business: Dict[int, Optional[int]],
+) -> Decimal:
+    try:
+        amt = Decimal(str(amount or 0))
+    except Exception:
+        return Decimal(0)
+    if amt == 0:
+        return Decimal(0)
+    bid = int(document.business_id)
+    if bid not in base_currency_by_business:
+        bz = db.get(Business, bid)
+        base_currency_by_business[bid] = (
+            int(bz.default_currency_id) if bz and bz.default_currency_id else None
+        )
+    base_id = base_currency_by_business[bid]
+    if base_id is None:
+        return amt
+    rate = _document_to_base_currency_rate(db, bid, int(base_id), document, rate_cache=rate_cache)
+    return amt * rate
+
+
 def calculate_person_balance(
     db: Session, 
     person_id: int, 
     fiscal_year_id: Optional[int] = None
 ) -> tuple[float, str]:
     """
-    محاسبه تراز و وضعیت مالی یک شخص
+    محاسبه تراز و وضعیت مالی یک شخص (به ارز پایهٔ کسب‌وکار).
+
+    مبالغ خطوط سند که به ارز غیر پایه هستند با نرخ ذخیره‌شده در extra_info.fx
+    (در صورت وجود) یا نرخ تاریخ همان سند به ارز پایه تبدیل می‌شوند.
     
     Args:
         db: نشست پایگاه داده
@@ -905,46 +1052,43 @@ def calculate_person_balance(
     
     Returns:
         tuple: (تراز, وضعیت)
-        - تراز: credit - debit
+        - تراز: بستانکار - بدهکار به ارز پایه
         - وضعیت: "بستانکار" | "بدهکار" | "بالانس" | "بدون تراکنش"
     """
-    # Query برای محاسبه مجموع بستانکار و بدهکار
-    query = db.query(
-        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        DocumentLine.person_id == person_id,
-        Document.is_proforma == False  # فقط اسناد قطعی
-    )
-    
-    # اعمال فیلتر سال مالی
-    if fiscal_year_id:
-        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-    
-    result = query.first()
-    
-    if result is None:
+    pers = db.query(Person).filter(Person.id == person_id).first()
+    if not pers:
         return 0.0, "بدون تراکنش"
-    
-    total_credit = float(result.total_credit or 0)
-    total_debit = float(result.total_debit or 0)
-    
-    # محاسبه تراز: بستانکار - بدهکار
-    balance = total_credit - total_debit
-    
-    # تعیین وضعیت
-    if total_credit == 0 and total_debit == 0:
-        status = "بدون تراکنش"
-    elif balance > 0:
-        status = "بستانکار"
-    elif balance < 0:
-        status = "بدهکار"
-    else:  # balance == 0
-        status = "بالانس"
-    
-    return balance, status
+
+    line_query = (
+        db.query(DocumentLine, Document)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id == person_id,
+            Document.is_proforma == False,
+        )
+    )
+    if fiscal_year_id:
+        line_query = line_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    rows = line_query.all()
+
+    if not rows:
+        return 0.0, "بدون تراکنش"
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    total_credit_base = Decimal(0)
+    total_debit_base = Decimal(0)
+    for line, doc in rows:
+        total_debit_base += _person_line_amount_to_base(
+            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+        total_credit_base += _person_line_amount_to_base(
+            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+
+    balance = total_credit_base - total_debit_base
+    status = _person_balance_status_from_totals(total_credit_base, total_debit_base, balance)
+    return float(balance), status
 
 
 def calculate_persons_balances_bulk(
@@ -953,7 +1097,9 @@ def calculate_persons_balances_bulk(
     fiscal_year_id: Optional[int] = None
 ) -> Dict[int, tuple[float, str]]:
     """
-    محاسبه تراز و وضعیت چندین شخص به صورت دسته‌جمعی
+    محاسبه تراز و وضعیت چندین شخص به صورت دسته‌جمعی (به ارز پایهٔ هر کسب‌وکار).
+
+    فرض: person_ids معمولاً همگی متعلق به یک business_id هستند (مثل لیست اشخاص یک کسب‌وکار).
     
     Args:
         db: نشست پایگاه داده
@@ -965,54 +1111,50 @@ def calculate_persons_balances_bulk(
     """
     if not person_ids:
         return {}
-    
-    # Query برای محاسبه مجموع بستانکار و بدهکار برای هر شخص
-    query = db.query(
-        DocumentLine.person_id,
-        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        DocumentLine.person_id.in_(person_ids),
-        Document.is_proforma == False  # فقط اسناد قطعی
+
+    balances: Dict[int, tuple[float, str]] = {
+        int(pid): (0.0, "بدون تراکنش") for pid in person_ids
+    }
+
+    q = (
+        db.query(DocumentLine, Document)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id.in_(person_ids),
+            Document.is_proforma == False,
+        )
     )
-    
-    # اعمال فیلتر سال مالی
     if fiscal_year_id:
-        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-    
-    # Group by person_id
-    query = query.group_by(DocumentLine.person_id)
-    
-    results = query.all()
-    
-    # ساخت دیکشنری نتایج
-    balances: Dict[int, tuple[float, str]] = {}
-    
-    # ابتدا همه را به "بدون تراکنش" تنظیم می‌کنیم
-    for person_id in person_ids:
-        balances[person_id] = (0.0, "بدون تراکنش")
-    
-    # سپس نتایج واقعی را اعمال می‌کنیم
-    for result in results:
-        person_id = result.person_id
-        total_credit = float(result.total_credit or 0)
-        total_debit = float(result.total_debit or 0)
-        
-        # محاسبه تراز
-        balance = total_credit - total_debit
-        
-        # تعیین وضعیت
-        if balance > 0:
-            status = "بستانکار"
-        elif balance < 0:
-            status = "بدهکار"
-        else:  # balance == 0
-            status = "بالانس"
-        
-        balances[person_id] = (balance, status)
-    
+        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
+
+    rows = q.all()
+    if not rows:
+        return balances
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    credit_by_person: Dict[int, Decimal] = {int(pid): Decimal(0) for pid in person_ids}
+    debit_by_person: Dict[int, Decimal] = {int(pid): Decimal(0) for pid in person_ids}
+
+    for line, doc in rows:
+        pid = int(line.person_id)
+        if pid not in debit_by_person:
+            continue
+        debit_by_person[pid] += _person_line_amount_to_base(
+            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+        credit_by_person[pid] += _person_line_amount_to_base(
+            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+
+    for pid in person_ids:
+        pid = int(pid)
+        tc = credit_by_person[pid]
+        td = debit_by_person[pid]
+        bal = tc - td
+        status = _person_balance_status_from_totals(tc, td, bal)
+        balances[pid] = (float(bal), status)
+
     return balances
 
 

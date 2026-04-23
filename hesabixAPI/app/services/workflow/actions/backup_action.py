@@ -33,7 +33,12 @@ class BusinessBackupAction(ActionHandler):
         config: Dict[str, Any],
         node_results: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
+
+        sk = dry_run_skip(context, "پشتیبان کسب‌وکار")
+        if sk is not None:
+            return sk
 
         db = context.get("db")
         business_id = context.get("business_id")

@@ -280,6 +280,39 @@ def trigger_receipt_payment_created(
     return trigger_workflows(db, business_id, "receipt_payment.created", trigger_data, user_id)
 
 
+def trigger_receipt_payment_updated(
+    db: Session,
+    business_id: int,
+    receipt_payment_id: int,
+    type: str,  # receipt or payment
+    amount: float,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها بعد از ویرایش دریافت/پرداخت"""
+    trigger_data = {
+        "receipt_payment_id": receipt_payment_id,
+        "type": type,
+    }
+    try:
+        from app.services.workflow.workflow_trigger_enrichment import (
+            build_receipt_payment_trigger_enrichment,
+        )
+
+        enrichment = build_receipt_payment_trigger_enrichment(db, business_id, receipt_payment_id)
+        trigger_data.update(enrichment)
+    except Exception as e:
+        logger.warning(
+            "build_receipt_payment_trigger_enrichment failed document_id=%s: %s",
+            receipt_payment_id,
+            e,
+            exc_info=True,
+        )
+    if trigger_data.get("amount") is None:
+        trigger_data["amount"] = float(amount)
+
+    return trigger_workflows(db, business_id, "receipt_payment.updated", trigger_data, user_id)
+
+
 def trigger_person_created(
     db: Session,
     business_id: int,
@@ -779,4 +812,89 @@ def trigger_distribution_visit_completed(
     except Exception as e:
         logger.warning("trigger_distribution_visit_completed failed: %s", e, exc_info=True)
         return 0
+
+
+def trigger_person_updated(
+    db: Session,
+    business_id: int,
+    person_id: int,
+    person_types: list,
+    user_id: Optional[int] = None,
+):
+    """فراخوانی workflowها پس از ویرایش شخص"""
+    trigger_data: Dict[str, Any] = {
+        "person_id": person_id,
+        "person_types": person_types,
+        "event": "updated",
+    }
+    return trigger_workflows(db, business_id, "person.updated", trigger_data, user_id)
+
+
+def trigger_document_updated(
+    db: Session,
+    business_id: int,
+    document_id: int,
+    document_type: str,
+    user_id: Optional[int] = None,
+    extra_fields: Optional[Dict[str, Any]] = None,
+):
+    """فراخوانی workflowها پس از ویرایش سند (غیرفاکتور / دستی)"""
+    trigger_data: Dict[str, Any] = {
+        "document_id": document_id,
+        "document_type": document_type,
+        "event": "updated",
+    }
+    if extra_fields:
+        trigger_data.update(extra_fields)
+    try:
+        from app.services.workflow.workflow_trigger_enrichment import build_document_trigger_enrichment
+
+        enrichment = build_document_trigger_enrichment(db, business_id, document_id)
+        trigger_data.update(enrichment)
+    except Exception as e:
+        logger.warning(
+            "build_document_trigger_enrichment failed (updated) document_id=%s: %s",
+            document_id,
+            e,
+            exc_info=True,
+        )
+    return trigger_workflows(db, business_id, "document.updated", trigger_data, user_id)
+
+
+def trigger_invoice_updated(
+    db: Session,
+    business_id: int,
+    document: Any,
+    user_id: Optional[int] = None,
+    extra_fields: Optional[Dict[str, Any]] = None,
+):
+    """فراخوانی workflowها پس از ویرایش فاکتور (انواع پشتیبانی‌شده)"""
+    from app.services.invoice_service import INVOICE_PURCHASE, INVOICE_SALES
+
+    ex = build_invoice_trigger_enrichment(db, document)
+    inv_type = getattr(document, "document_type", None) or ""
+    totals = (getattr(document, "extra_info", None) or {}).get("totals") or {}
+    try:
+        total_amount = float(totals.get("net", 0) or 0)
+    except (TypeError, ValueError):
+        total_amount = 0.0
+
+    trigger_data: Dict[str, Any] = {
+        "invoice_id": int(document.id),
+        "document_id": int(document.id),
+        "invoice_type": inv_type,
+        "total_amount": total_amount,
+        "event": "updated",
+    }
+    trigger_data.update(ex)
+    if extra_fields:
+        trigger_data.update(extra_fields)
+
+    n1 = trigger_workflows(db, business_id, "invoice.updated", trigger_data, user_id)
+    n2 = 0
+    if inv_type == INVOICE_SALES:
+        n2 = trigger_workflows(db, business_id, "invoice.sales.updated", trigger_data, user_id)
+    elif inv_type == INVOICE_PURCHASE:
+        n2 = trigger_workflows(db, business_id, "invoice.purchase.updated", trigger_data, user_id)
+    return n1 + n2
 

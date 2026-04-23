@@ -6,12 +6,14 @@ class InvoicePrintOptionsResult {
   final String? paperSize;
   final String orientation;
   final bool showStamp;
+  final bool showShareQr;
   final int? templateId;
 
   const InvoicePrintOptionsResult({
     this.paperSize,
     required this.orientation,
     required this.showStamp,
+    this.showShareQr = false,
     this.templateId,
   });
 }
@@ -24,6 +26,8 @@ Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
   String? initialPaperSize,
   String initialOrientation = 'landscape',
   bool initialShowStamp = true,
+  bool allowShareQrOption = true,
+  bool initialShowShareQr = false,
   int? initialTemplateId,
 }) {
   return showModalBottomSheet<InvoicePrintOptionsResult>(
@@ -38,6 +42,8 @@ Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
         initialPaperSize: initialPaperSize,
         initialOrientation: initialOrientation,
         initialShowStamp: initialShowStamp,
+        allowShareQrOption: allowShareQrOption,
+        initialShowShareQr: initialShowShareQr,
         initialTemplateId: initialTemplateId,
       );
     },
@@ -50,6 +56,8 @@ class _InvoicePrintOptionsSheet extends StatefulWidget {
   final String? initialPaperSize;
   final String initialOrientation;
   final bool initialShowStamp;
+  final bool allowShareQrOption;
+  final bool initialShowShareQr;
   final int? initialTemplateId;
 
   const _InvoicePrintOptionsSheet({
@@ -58,6 +66,8 @@ class _InvoicePrintOptionsSheet extends StatefulWidget {
     required this.initialPaperSize,
     required this.initialOrientation,
     required this.initialShowStamp,
+    required this.allowShareQrOption,
+    required this.initialShowShareQr,
     required this.initialTemplateId,
   });
 
@@ -69,6 +79,7 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
   late String? _paperSize;
   late String _orientation;
   late bool _showStamp;
+  late bool _showShareQr;
   late int? _templateId;
 
   @override
@@ -77,6 +88,7 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
     _paperSize = widget.initialPaperSize;
     _orientation = widget.initialOrientation;
     _showStamp = widget.initialShowStamp;
+    _showShareQr = widget.initialShowShareQr;
     _templateId = widget.initialTemplateId;
   }
 
@@ -149,6 +161,16 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
                 value: _showStamp,
                 onChanged: (v) => setState(() => _showStamp = v),
               ),
+              if (widget.allowShareQrOption) ...[
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('QR نمایش آنلاین / اعتبارسنجی'),
+                  subtitle: const Text('در صورت فعال بودن، کد QR بالای فاکتور درج می‌شود'),
+                  value: _showShareQr,
+                  onChanged: (v) => setState(() => _showShareQr = v),
+                ),
+              ],
               const SizedBox(height: 8),
               if (widget.loadingTemplates)
                 const Padding(
@@ -206,6 +228,7 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
                             paperSize: _paperSize,
                             orientation: _orientation,
                             showStamp: _showStamp,
+                            showShareQr: widget.allowShareQrOption ? _showShareQr : false,
                             templateId: _templateId,
                           ),
                         );

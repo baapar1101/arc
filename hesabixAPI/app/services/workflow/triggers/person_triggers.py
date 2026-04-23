@@ -43,3 +43,29 @@ class PersonCreatedTrigger(BaseTrigger):
         
         return data
 
+
+class PersonUpdatedTrigger(PersonCreatedTrigger):
+    """به‌روزرسانی اطلاعات شخص"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "ویرایش شخص",
+            "description": "زمانی که اطلاعات یک شخص ویرایش می‌شود",
+            "config_schema": {
+                "person_type": {
+                    "type": "string",
+                    "description": "نوع شخص",
+                    "enum": ["customer", "supplier", "employee", "other"],
+                    "ui_config": {
+                        "labels": {
+                            "customer": "مشتری",
+                            "supplier": "تامین‌کننده",
+                            "employee": "کارمند",
+                            "other": "سایر"
+                        }
+                    },
+                    "required": False
+                }
+            }
+        }
+

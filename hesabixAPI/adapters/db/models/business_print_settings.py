@@ -51,6 +51,8 @@ class BusinessPrintSettings(Base):
     show_stamp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_payments: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_installment_plan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    # QR لینک مشاهده آنلاین/اعتبارسنجی فاکتور در خروجی چاپ
+    show_share_qr: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
 
     # متن ثابت انتهای فاکتور (پاورقی قابل تنظیم برای این نوع سند)
     footer_note: Mapped[str | None] = mapped_column(Text, nullable=True)

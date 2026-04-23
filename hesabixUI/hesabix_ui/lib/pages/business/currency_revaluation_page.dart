@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -10,6 +9,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_currency_rate_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 
@@ -127,7 +127,9 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     }
     var effective = _parseEffective(row ?? {}) ?? DateTime.now();
     final rateCtrl = TextEditingController(
-      text: row != null && row['rate'] != null ? '${row['rate']}' : '',
+      text: row != null && row['rate'] != null
+          ? formatFxRateForDisplay(row['rate'])
+          : '',
     );
     final noteCtrl = TextEditingController(
       text: row != null && row['note'] != null ? '${row['note']}' : '',
@@ -229,12 +231,12 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
                       controller: rateCtrl,
                       decoration: const InputDecoration(
                         labelText: 'نرخ',
-                        hintText: 'مثال: 58500.25',
+                        hintText: 'مثال: 58,500.25',
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      inputFormatters: const [
+                        NumberInputFormatter(allowDecimal: true),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -279,10 +281,15 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
       SnackBarHelper.showError(context, message: 'نرخ را وارد کنید');
       return;
     }
+    final rateNum = parseFormattedNumber(rateStr);
+    if (rateNum == null) {
+      SnackBarHelper.showError(context, message: 'نرخ معتبر نیست');
+      return;
+    }
     final body = <String, dynamic>{
       'currency_id': curId,
       'effective_at': effective.toUtc().toIso8601String(),
-      'rate': rateStr,
+      'rate': rateNum.toString(),
       if (noteCtrl.text.trim().isNotEmpty) 'note': noteCtrl.text.trim(),
     };
     try {
@@ -451,7 +458,8 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
                     sortable: false,
                     searchable: false,
                     width: ColumnWidth.medium,
-                    formatter: (r) => r['rate']?.toString() ?? '—',
+                    formatter: (r) =>
+                        r['rate'] == null ? '—' : formatFxRateForDisplay(r['rate']),
                   ),
                   TextColumn(
                     'note',

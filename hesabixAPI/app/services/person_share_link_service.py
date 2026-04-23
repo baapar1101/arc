@@ -20,6 +20,7 @@ from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.services.invoice_service import SUPPORTED_INVOICE_TYPES, invoice_document_to_dict
 from app.services.person_service import calculate_person_balance
+from app.services.system_settings_service import resolve_share_url_http_origin
 
 
 logger = logging.getLogger(__name__)
@@ -193,33 +194,27 @@ def get_active_share_link_for_person(
     )
 
 
-def _default_short_link_base() -> str:
-    base = (get_settings().share_link_public_base_url or "").strip()
-    base = base.rstrip("/")
-    lower = base.lower()
-    if lower.endswith("/public"):
-        base = base[:-len("/public")].rstrip("/")
-        lower = base.lower()
-    if lower.endswith("/p"):
-        base = base[:-len("/p")].rstrip("/")
-    return base
+def build_person_share_p_url(
+    code: str,
+    request_base_url: Optional[str] = None,
+    db: Optional[Session] = None,
+) -> str:
+    base = resolve_share_url_http_origin(db, request_base_url)
+    if base:
+        return f"{base}/p/{code}"
+    return f"/p/{code}"
 
 
 def serialize_share_link(
     link: Optional[PersonShareLink],
     request_base_url: Optional[str] = None,
+    db: Optional[Session] = None,
 ) -> Optional[Dict[str, Any]]:
     if not link:
         return None
-    short_base = (request_base_url or "").strip()
-    if short_base:
-        short_base = short_base.rstrip("/")
-    else:
-        short_base = _default_short_link_base()
-    if short_base:
-        public_url = f"{short_base}/p/{link.code}"
-    else:
-        public_url = f"/p/{link.code}"
+    public_url = build_person_share_p_url(
+        link.code, request_base_url=request_base_url, db=db
+    )
     options = _normalize_options(link.options or {})
     now = datetime.utcnow()
     expires_in = None
@@ -534,7 +529,7 @@ def build_public_payload(
     )
 
     return {
-        "share_link": serialize_share_link(link),
+        "share_link": serialize_share_link(link, db=db),
         "person": {
             "id": person.id,
             "code": person.code,

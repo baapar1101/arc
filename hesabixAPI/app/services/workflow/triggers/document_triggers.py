@@ -404,3 +404,23 @@ class InvoiceCreatedTrigger(BaseTrigger):
         
         return data
 
+
+class DocumentUpdatedTrigger(DocumentCreatedTrigger):
+    """ویرایش سند (همان فیلترهای «ایجاد سند»)"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        meta = super().get_metadata()
+        meta["name"] = "ویرایش سند"
+        meta["description"] = "زمانی که یک سند حسابداری (غیرفاکتور) ویرایش می‌شود"
+        return meta
+
+
+class InvoiceUpdatedTrigger(InvoiceCreatedTrigger):
+    """ویرایش فاکتور"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        meta = super().get_metadata()
+        meta["name"] = "ویرایش فاکتور"
+        meta["description"] = "زمانی که فاکتور ویرایش / به‌روز می‌شود"
+        return meta
+

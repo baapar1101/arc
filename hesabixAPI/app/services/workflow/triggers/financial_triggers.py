@@ -253,6 +253,16 @@ class ReceiptPaymentCreatedTrigger(BaseTrigger):
         return data
 
 
+class ReceiptPaymentUpdatedTrigger(ReceiptPaymentCreatedTrigger):
+    """همان فیلترهای «ایجاد» برای رویداد ویرایش دریافت/پرداخت"""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        meta = super().get_metadata()
+        meta["name"] = "ویرایش دریافت/پرداخت"
+        meta["description"] = "زمانی که سند دریافت یا پرداخت ویرایش می‌شود"
+        return meta
+
+
 class CheckDueDateTrigger(BaseTrigger):
     """Trigger برای سررسید چک"""
     

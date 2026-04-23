@@ -264,6 +264,53 @@ class InvoiceService {
     );
   }
 
+  Future<Map<String, dynamic>?> getInvoiceShareLink({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/$invoiceId/share-link',
+    );
+    final data = res.data?['data'];
+    if (data is Map<String, dynamic>) {
+      final link = data['link'];
+      if (link is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(link);
+      }
+      if (link == null) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> createInvoiceShareLink({
+    required int businessId,
+    required int invoiceId,
+    int? expiresInHours,
+    int? maxViewCount,
+    bool replaceExisting = true,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/$invoiceId/share-link',
+      data: {
+        if (expiresInHours != null) 'expires_in_hours': expiresInHours,
+        if (maxViewCount != null) 'max_view_count': maxViewCount,
+        'replace_existing': replaceExisting,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<void> revokeInvoiceShareLink({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    await _api.delete(
+      '/api/v1/invoices/business/$businessId/$invoiceId/share-link',
+    );
+  }
+
   num _extractInvoiceAmount(Map<String, dynamic> payload) {
     final extraInfo = payload['extra_info'];
     if (extraInfo is Map<String, dynamic>) {

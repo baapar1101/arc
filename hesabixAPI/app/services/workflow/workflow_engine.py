@@ -25,6 +25,7 @@ from adapters.db.models.workflow import (
 )
 from app.services.workflow.trigger_registry import TriggerRegistry
 from app.services.workflow.action_registry import ActionRegistry
+from app.services.workflow.dry_run import DRY_RUN_TRIGGER_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +47,12 @@ class WorkflowEngine:
         self.cache_enabled = True
         self.cache_ttl = 300  # 5 minutes default
     
-    def execute_workflow(
+    def create_pending_execution(
         self,
         workflow: Workflow,
-        trigger_data: Optional[Dict[str, Any]] = None
+        trigger_data: Optional[Dict[str, Any]] = None,
     ) -> WorkflowExecution:
-        """
-        اجرای یک workflow
-        
-        Args:
-            workflow: workflow برای اجرا
-            trigger_data: داده‌های trigger که workflow را فعال کرده
-        
-        Returns:
-            WorkflowExecution: نتیجه اجرا
-        """
-        # ایجاد execution record
+        """فقط رکورد اجرا را می‌سازد (PENDING) — برای اجرای ناهمزمان."""
         execution = WorkflowExecution(
             workflow_id=workflow.id,
             status=WorkflowExecutionStatus.PENDING,
@@ -71,39 +62,76 @@ class WorkflowEngine:
         self.db.add(execution)
         self.db.commit()
         self.db.refresh(execution)
-        
-        workflow_start_time = time.time()  # شروع زمان‌سنجی کلی
-        
+        return execution
+
+    def execute_workflow(
+        self,
+        workflow: Workflow,
+        trigger_data: Optional[Dict[str, Any]] = None,
+    ) -> WorkflowExecution:
+        """
+        اجرای یک workflow.
+        اگر trigger_data حاوی کلید __workflow_dry_run__ برای اجرای آزمایشی باشد، اثرات جانبی نادیده گرفته می‌شود.
+        """
+        td: Dict[str, Any] = dict(trigger_data or {})
+        execution = self.create_pending_execution(workflow, td)
+        self._run_execution(workflow, execution, td)
+        return execution
+
+    def run_pending_execution(
+        self,
+        workflow: Workflow,
+        execution: WorkflowExecution,
+        trigger_data: Optional[Dict[str, Any]] = None,
+    ) -> WorkflowExecution:
+        """
+        اجرای کامل برای رکورد اجرایی از قبل ایجادشده (مثلاً BackgroundTasks).
+        انتظار: execution.status == PENDING
+        """
+        if trigger_data is not None:
+            trigger_payload: Dict[str, Any] = trigger_data
+        else:
+            trigger_payload = execution.trigger_data or {}
+        self._run_execution(workflow, execution, trigger_payload)
+        return execution
+
+    def _run_execution(
+        self,
+        workflow: Workflow,
+        execution: WorkflowExecution,
+        trigger_data: Dict[str, Any],
+    ) -> None:
+        workflow_start_time = time.time()
         try:
             execution.status = WorkflowExecutionStatus.RUNNING
             execution.started_at = datetime.utcnow()
             self.db.commit()
-            
+
+            dry_preview = bool((trigger_data or {}).get(DRY_RUN_TRIGGER_KEY))
             self._log(
                 execution,
                 WorkflowLogLevel.INFO,
-                f"Workflow '{workflow.name}' started",
+                f"Workflow '{workflow.name}' started" + (" (آزمایشی / بدون اثر جانبی)" if dry_preview else ""),
                 {
                     "workflow_id": workflow.id,
                     "workflow_name": workflow.name,
                     "correlation_id": self.correlation_id,
                     "business_id": self.business_id,
                     "user_id": self.user_id,
-                    "trigger_data_preview": str(trigger_data)[:200] if trigger_data else None
+                    "trigger_data_preview": str(trigger_data)[:200] if trigger_data else None,
+                    "dry_run": dry_preview,
                 }
             )
-            
-            # اجرای workflow
-            result = self._execute_workflow_internal(workflow, execution, trigger_data or {})
-            
+
+            result = self._execute_workflow_internal(workflow, execution, trigger_data)
+
             execution.status = WorkflowExecutionStatus.COMPLETED
             execution.completed_at = datetime.utcnow()
             execution.execution_data = result
             self.db.commit()
-            
-            # محاسبه مدت زمان کلی
+
             total_duration_ms = (time.time() - workflow_start_time) * 1000
-            
+
             self._log(
                 execution,
                 WorkflowLogLevel.INFO,
@@ -114,11 +142,11 @@ class WorkflowEngine:
                     "correlation_id": self.correlation_id,
                     "total_duration_ms": round(total_duration_ms, 2),
                     "total_nodes_executed": len(result.get("executed_nodes", [])),
-                    "success": True
+                    "success": True,
+                    "event": "workflow_completed",
                 }
             )
-            
-            # لاگ‌گیری اجرای موفق workflow در activity log
+
             try:
                 from app.services.activity_log_service import log_activity
                 log_activity(
@@ -141,19 +169,17 @@ class WorkflowEngine:
                 self.db.commit()
             except Exception as e:
                 logger.warning(f"Failed to log workflow execution activity: {e}")
-            
+
         except Exception as e:
             total_duration_ms = (time.time() - workflow_start_time) * 1000
-            
+
             logger.error(f"Workflow execution failed: {e}", exc_info=True)
-            
-            # Rollback transaction در صورت خطا
+
             try:
                 self.db.rollback()
             except Exception as rollback_error:
                 logger.error(f"Error during rollback: {rollback_error}", exc_info=True)
-            
-            # ایجاد execution record جدید برای خطا
+
             try:
                 execution.status = WorkflowExecutionStatus.FAILED
                 execution.completed_at = datetime.utcnow()
@@ -165,7 +191,7 @@ class WorkflowEngine:
                     self.db.rollback()
                 except Exception:
                     pass
-            
+
             self._log(
                 execution,
                 WorkflowLogLevel.ERROR,
@@ -178,11 +204,11 @@ class WorkflowEngine:
                     "error_type": type(e).__name__,
                     "error_message": str(e),
                     "stack_trace": traceback.format_exc(),
-                    "success": False
+                    "success": False,
+                    "event": "workflow_failed",
                 }
             )
-            
-            # لاگ‌گیری اجرای ناموفق workflow در activity log
+
             try:
                 from app.services.activity_log_service import log_activity
                 log_activity(
@@ -206,9 +232,13 @@ class WorkflowEngine:
                 self.db.commit()
             except Exception as log_error:
                 logger.warning(f"Failed to log workflow execution failure activity: {log_error}")
-        
-        return execution
     
+    @staticmethod
+    def _format_node_user_error(node: Dict[str, Any], node_id: str, exc: Exception) -> str:
+        label = (node.get("label") or node_id or "?").strip()
+        body = (str(exc).strip() or type(exc).__name__)
+        return f"نود «{label}» اجرا نشد: {body}"
+
     def _execute_workflow_internal(
         self,
         workflow: Workflow,
@@ -233,16 +263,19 @@ class WorkflowEngine:
             raise ValueError("No trigger node found in workflow")
         
         # اجرای trigger و دریافت داده‌های اولیه
+        td: Dict[str, Any] = dict(trigger_data or {})
+        dry_flag = bool(td.pop(DRY_RUN_TRIGGER_KEY, False))
         context = {
             "business_id": self.business_id,
             "user_id": self.user_id,
-            "trigger_data": trigger_data,
+            "trigger_data": td,
             "execution_id": execution.id,
             "workflow_id": workflow.id,
             "correlation_id": self.correlation_id,  # اضافه کردن correlation_id
             "db": self.db,  # اضافه کردن db برای استفاده در actions
             "_workflow": workflow,
             "_execution": execution,
+            "dry_run": dry_flag,
         }
         
         # اجرای nodeها به ترتیب
@@ -264,6 +297,18 @@ class WorkflowEngine:
                 continue
             
             # اجرای node
+            self._log(
+                execution,
+                WorkflowLogLevel.INFO,
+                f"Node '{node.get('label', node_id)}' starting",
+                {
+                    "event": "node_started",
+                    "node_id": node_id,
+                    "node_type": node.get("type"),
+                    "node_label": node.get("label"),
+                    "correlation_id": self.correlation_id,
+                }
+            )
             node_start_time = time.time()  # شروع زمان‌سنجی
             try:
                 result = self._execute_node(node, context, node_results)
@@ -327,8 +372,10 @@ class WorkflowEngine:
                 strategy = error_handling.get("strategy", "fail_fast")
                 
                 if strategy == "fail_fast":
-                    # متوقف کردن workflow
-                    raise
+                    # متوقف کردن workflow — پیام قابل فهم برای کاربر نهایی
+                    raise RuntimeError(
+                        self._format_node_user_error(node, str(node_id), e)
+                    ) from e
                 elif strategy == "continue":
                     # ادامه دادن workflow
                     node_results[node_id] = {"success": False, "error": str(e)}
@@ -375,6 +422,19 @@ class WorkflowEngine:
                             logger.info(f"Retrying node '{node.get('label', node_id)}' (attempt {attempt}/{max_attempts}) after {delay}s...")
                             time.sleep(delay)
                         
+                        self._log(
+                            execution,
+                            WorkflowLogLevel.INFO,
+                            f"Node '{node.get('label', node_id)}' starting (attempt {attempt}/{max_attempts})",
+                            {
+                                "event": "node_started",
+                                "node_id": node_id,
+                                "node_type": node.get("type"),
+                                "node_label": node.get("label"),
+                                "correlation_id": self.correlation_id,
+                                "attempt": attempt,
+                            }
+                        )
                         try:
                             result = self._execute_node(node, context, node_results)
                             node_results[node_id] = result
@@ -385,7 +445,14 @@ class WorkflowEngine:
                                 execution,
                                 WorkflowLogLevel.INFO,
                                 f"Node '{node.get('label', node_id)}' executed successfully after {attempt} attempt(s)",
-                                {"node_id": node_id, "result": result, "attempt": attempt}
+                                {
+                                    "node_id": node_id,
+                                    "node_type": node.get("type"),
+                                    "node_label": node.get("label"),
+                                    "result": result,
+                                    "attempt": attempt,
+                                    "success": True,
+                                }
                             )
                             break
                         except Exception as retry_error:
@@ -404,7 +471,9 @@ class WorkflowEngine:
                                     next_nodes = list(extra_follow)
                             queue.extend(next_nodes)
                         else:
-                            raise last_exception
+                            raise RuntimeError(
+                                self._format_node_user_error(node, str(node_id), last_exception)
+                            ) from last_exception
                     else:
                         # پیدا کردن nodeهای بعدی
                         condition_result = result if node.get("type") == "condition" else None
@@ -418,6 +487,7 @@ class WorkflowEngine:
                         queue.extend(next_nodes)
         
         # حذف db و ارجاعات داخلی از context قبل از ذخیره‌سازی
+        dry_done = bool(context.get("dry_run"))
         context.pop("_workflow", None)
         context.pop("_execution", None)
         context_for_storage = {k: v for k, v in context.items() if k != "db"}
@@ -425,7 +495,8 @@ class WorkflowEngine:
         return {
             "node_results": node_results,
             "executed_nodes": list(executed_nodes),
-            "context": context_for_storage
+            "context": context_for_storage,
+            "dry_run": dry_done,
         }
     
     def _execute_node(
@@ -1378,8 +1449,13 @@ class WorkflowEngine:
         """
         ثبت لاگ با قابلیت هشدار خودکار
         """
+        node_id_val = None
+        if data and data.get("node_id") is not None:
+            node_id_val = str(data.get("node_id"))[:100]
+
         log = WorkflowLog(
             execution_id=execution.id,
+            node_id=node_id_val,
             level=level,
             message=message,
             data=data

@@ -2543,6 +2543,16 @@
   "policyTypePerDocument": "تک سند",
   "policyTypeHybrid": "ترکیبی",
   "warehouseDocuments": "حواله‌های انبار",
+  "relatedWarehouseDocuments": "حواله‌های مرتبط",
+  "warehouseDocumentPostSuccess": "حواله با موفقیت پست شد.",
+  "warehouseDocumentPostFailed": "خطا در پست حواله: {error}",
+  "@warehouseDocumentPostFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "warehouseDocument": "حواله انبار",
   "warehouseDocumentCode": "کد حواله",
   "warehouseDocumentType": "نوع حواله",
@@ -2560,7 +2570,6 @@
   "docTypeProductionOut": "خروج تولید",
   "statusDraft": "پیش‌نویس",
   "statusPosted": "پست شده",
-  "statusCancelled": "لغو شده",
   "createWarehouseDocument": "ایجاد حواله دستی",
   "postWarehouseDocument": "پست حواله",
   "cancelWarehouseDocument": "لغو حواله",
@@ -2658,7 +2667,10 @@
   "workflowCreate": "افزودن Workflow",
   "workflowRefresh": "بازخوانی",
   "workflowRunNow": "اجرای فوری",
+  "workflowTestRun": "اجرای آزمایشی (وضعیت زنده)",
+  "workflowFixValidationBeforeTestRun": "قبل از اجرای آزمایشی، خطاهای اعتبارسنجی روی بوم را برطرف کنید.",
   "workflowExecutionHistory": "تاریخچه اجرا",
+  "workflowHistoryClearCanvasHighlight": "پاک کردن هایلایت روی بوم",
   "workflowEdit": "ویرایش",
   "workflowLastUpdate": "آخرین بروزرسانی",
   "workflowAvailableTriggers": "Trigger های در دسترس",
@@ -3127,6 +3139,11 @@
   "workflowTemplateCrmNewLeadNotifyDesc": "با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود",
   "workflowTemplateCrmDealWonLogName": "ثبت لاگ بستن معامله موفق",
   "workflowTemplateCrmDealWonLogDesc": "فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود",
+  "workflowTemplateReceiptUpdatedNotifyName": "اعلان ویرایش دریافت/پرداخت",
+  "workflowTemplateReceiptUpdatedNotifyDesc": "بعد از ویرایش سند دریافت یا پرداخت، یک اعلان درون‌برنامه ثبت می‌شود",
+  "workflowTemplateInvoiceAmountBranchName": "فاکتور فروش: مبلغ بالا یا پایین",
+  "workflowTemplateInvoiceAmountBranchDesc": "اگر مبلغ فاکتور از ۱۰ میلیون تومان بیشتر باشد اعلان با اولویت بالا؛ وگرنه فقط ثبت لاگ (مثال شرط ساده)",
+  "workflowTestRunCompletedDry": "اجرای آزمایشی موفق بود (بدون ارسال/ثبت واقعی).",
   "settingsCategoriesCount": "دسته‌بندی",
   "settingsCount": "تنظیمات",
   "expandAllCategories": "باز کردن همه",
@@ -3709,6 +3726,9 @@
   "apiKeyEditTitle": "ویرایش کلید API",
   "apiKeyWithoutName": "بدون نام",
   "datePickerSelectDate": "انتخاب تاریخ",
+  "dateInputInvalidFormat": "تاریخ معتبر به صورت YYYY/MM/DD وارد کنید",
+  "dateInputOutOfRange": "تاریخ در بازه مجاز نیست",
+  "dateInputOpenCalendar": "باز کردن تقویم",
   "timePickerSelectTime": "انتخاب زمان",
   "dateTimeLabel": "تاریخ و زمان",
   "dateLabel": "تاریخ",

@@ -6352,6 +6352,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get warehouseDocuments => 'Warehouse Documents';
 
   @override
+  String get relatedWarehouseDocuments => 'Related warehouse documents';
+
+  @override
+  String get warehouseDocumentPostSuccess => 'Warehouse document posted.';
+
+  @override
+  String warehouseDocumentPostFailed(String error) {
+    return 'Could not post warehouse document: $error';
+  }
+
+  @override
   String get warehouseDocument => 'Warehouse Document';
 
   @override
@@ -6670,7 +6681,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowRunNow => 'Run now';
 
   @override
+  String get workflowTestRun => 'Test run (live status)';
+
+  @override
+  String get workflowFixValidationBeforeTestRun =>
+      'Fix validation errors on the canvas before running a test.';
+
+  @override
   String get workflowExecutionHistory => 'Execution history';
+
+  @override
+  String get workflowHistoryClearCanvasHighlight => 'Clear highlight on canvas';
 
   @override
   String get workflowEdit => 'Edit';
@@ -8048,6 +8069,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workflowTemplateCrmDealWonLogDesc =>
       'Only won deals; writes an info log entry';
+
+  @override
+  String get workflowTemplateReceiptUpdatedNotifyName =>
+      'Notify on receipt/payment edit';
+
+  @override
+  String get workflowTemplateReceiptUpdatedNotifyDesc =>
+      'After a receipt or payment is edited, an in-app notification is created';
+
+  @override
+  String get workflowTemplateInvoiceAmountBranchName =>
+      'Sales invoice: high vs low amount';
+
+  @override
+  String get workflowTemplateInvoiceAmountBranchDesc =>
+      'If amount is at least 10M, high-priority in-app notice; otherwise only a log (simple If example)';
+
+  @override
+  String get workflowTestRunCompletedDry =>
+      'Dry run succeeded (no real sends or writes).';
 
   @override
   String get settingsCategoriesCount => 'Categories';
@@ -9598,6 +9639,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get datePickerSelectDate => 'Select Date';
+
+  @override
+  String get dateInputInvalidFormat =>
+      'Enter a valid date in YYYY/MM/DD format';
+
+  @override
+  String get dateInputOutOfRange => 'Date is outside the allowed range';
+
+  @override
+  String get dateInputOpenCalendar => 'Open calendar';
 
   @override
   String get timePickerSelectTime => 'Select Time';

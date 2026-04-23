@@ -25,6 +25,7 @@ import '../../utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../widgets/date_input_field.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/invoice_transaction_preferences.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -1082,7 +1083,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedType = widget.transaction?.type ?? TransactionType.person;
+    if (widget.transaction != null) {
+      _selectedType = widget.transaction!.type;
+    } else {
+      _selectedType = TransactionType.bank;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applySavedDefaultTransactionType();
+      });
+    }
     _transactionDate = widget.transaction?.transactionDate ?? DateTime.now();
     if (widget.transaction != null) {
       _amountController.text =
@@ -1113,6 +1121,17 @@ class _TransactionDialogState extends State<TransactionDialog> {
     
     // لود کردن داده‌ها از دیتابیس
     _loadData();
+  }
+
+  Future<void> _applySavedDefaultTransactionType() async {
+    if (!mounted || widget.transaction != null) return;
+    final allowed = _availableTransactionTypes();
+    final resolved = await InvoiceTransactionPreferences.resolveInitialTransactionType(
+      widget.businessId,
+      allowed,
+    );
+    if (!mounted || widget.transaction != null) return;
+    setState(() => _selectedType = resolved);
   }
   
   Future<void> _loadSelectedAccount() async {
@@ -1254,6 +1273,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                     children: [
                       // انتخاب نوع تراکنش
                       DropdownButtonFormField<TransactionType>(
+                        key: ValueKey(_selectedType),
                         initialValue: _selectedType,
                         decoration: const InputDecoration(
                           labelText: 'نوع تراکنش *',
@@ -1569,7 +1589,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
 
-  void _saveTransaction() {
+  Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate()) return;
     
     // اعتبارسنجی انتخاب فیلدهای خاص هر نوع تراکنش
@@ -1686,7 +1706,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
     );
     
     widget.onSave(transaction);
-    Navigator.pop(context);
+    await InvoiceTransactionPreferences.setLastUsedTransactionType(
+      widget.businessId,
+      _selectedType,
+    );
+    if (mounted) Navigator.pop(context);
   }
 
   String? _getBankName(String? id) {

@@ -46,7 +46,7 @@ if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>/dev
   exit 0
 fi
 
-log "import app.main failed; attempting pip install -e . from mirrors (deploy.sh order)..."
+log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
 
 set_pip_env_for_url() {
   local index_url="$1"
@@ -60,18 +60,13 @@ set_pip_env_for_url() {
   fi
 }
 
-# get_pip_mirrors_list در deploy.sh
+# فقط میرور Hesabix (مطابق deploy.sh). اگر PIP_INDEX_URL در محیط سرویس تنظیم شده، همان استفاده می‌شود.
 MIRRORS=()
 if [[ -n "${PIP_INDEX_URL:-}" ]]; then
   MIRRORS+=("${PIP_INDEX_URL}")
+else
+  MIRRORS+=("https://p.mirror.hesabix.ir/simple")
 fi
-MIRRORS+=(
-  "https://mirror-pypi.runflare.com/simple"
-  "https://pypi.org/simple"
-  "https://pypi.tuna.tsinghua.edu.cn/simple"
-  "https://mirrors.aliyun.com/pypi/simple/"
-  "https://mirrors.cloud.tencent.com/pypi/simple"
-)
 
 for url in "${MIRRORS[@]}"; do
   [[ -z "$url" ]] && continue

@@ -433,6 +433,8 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
         return 'بعد از ایجاد سند حسابداری فعال می‌شود';
       case 'receipt_payment.created':
         return 'بعد از ثبت دریافت/پرداخت فعال می‌شود';
+      case 'receipt_payment.updated':
+        return 'بعد از ویرایش سند دریافت/پرداخت فعال می‌شود';
       case 'person.created':
         return 'بعد از ایجاد شخص جدید فعال می‌شود';
       case 'inventory.low':

@@ -101,6 +101,7 @@ run_hesabix_services() {
       echo "Stopped Hesabix services."
       ;;
     restart)
+      systemctl daemon-reload
       for u in "${core[@]}"; do
         systemctl restart "${u}.service"
       done

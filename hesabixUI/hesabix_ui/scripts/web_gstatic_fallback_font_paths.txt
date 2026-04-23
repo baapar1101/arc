@@ -1,5 +1,6 @@
 # فهرست مسیرهای نسبی فونت‌های fallback موتور Flutter وب (fonts.gstatic.com/s/)
 # بدون زیرمجموعهٔ CJK (JP/KR/SC/TC/HK) برای حجم معقول — با Flutter 3.41 استخراج شده.
+# Noto Sans SC: notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FrY9HbczS.woff2 در sync_font_fallback_mirror.sh آینه می‌شود.
 # برای بازتولید: grep ... font_fallback_data.dart | ...
 #
 notocoloremoji/v32/Yq6P-KqIXTD0t4D9z1ESnKM3-HpFabsE4tq3luCC7p-aXxcn.0.woff2

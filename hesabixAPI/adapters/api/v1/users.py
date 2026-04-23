@@ -22,6 +22,7 @@ from app.services.auth_service import (
 	_hash_reset_token,
 	send_password_reset_notification,
 	admin_set_user_password,
+	build_password_reset_web_url,
 )
 from app.core.settings import get_settings
 from secrets import token_urlsafe
@@ -1399,7 +1400,10 @@ def bulk_reset_password(
 					pr_repo.create(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
 					tokens_created += 1
 					if payload.send_notification:
-						send_password_reset_notification(db=db, user_id=user.id, token=token)
+						rlink = build_password_reset_web_url(request=request, token=token)
+						send_password_reset_notification(
+							db=db, user_id=user.id, token=token, reset_link=rlink
+						)
 				except Exception:
 					pass  # در صورت خطا ادامه می‌دهیم
 	
@@ -1729,11 +1733,15 @@ def reset_user_password(
 	token_hash = _hash_reset_token(token)
 	expires_at = datetime.utcnow() + timedelta(seconds=settings.reset_password_ttl_seconds)
 	pr_repo.create(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
+	reset_link = build_password_reset_web_url(request=request, token=token)
 	if send_notification:
-		send_password_reset_notification(db=db, user_id=user.id, token=token)
+		send_password_reset_notification(
+			db=db, user_id=user.id, token=token, reset_link=reset_link
+		)
 	data: dict = {
 		"message": "توکن بازنشانی رمز عبور ایجاد شد",
 		"send_notification": send_notification,
+		"reset_link": reset_link,
 	}
 	if settings.debug:
 		data["token"] = token

@@ -1007,7 +1007,9 @@ async def get_person_share_link_endpoint(
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     link = get_active_share_link_for_person(db, person.business_id, person.id)
     return success_response(
-        data={"link": serialize_share_link(link, request_base_url=str(request.base_url))},
+        data={"link": serialize_share_link(
+            link, request_base_url=str(request.base_url), db=db
+        )},
         request=request,
         message="وضعیت لینک اشتراک",
     )
@@ -1041,7 +1043,9 @@ async def create_person_share_link_endpoint(
         replace_existing=payload.replace_existing,
     )
     return success_response(
-        data=serialize_share_link(link, request_base_url=str(request.base_url)),
+        data=serialize_share_link(
+            link, request_base_url=str(request.base_url), db=db
+        ),
         request=request,
         message="لینک اشتراک ایجاد شد",
     )

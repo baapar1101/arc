@@ -238,16 +238,27 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Wrap(
-                      spacing: 16,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _chip('جمع اقلام', _sumItems()),
-                        _chip('جمع طرف‌حساب', _sumTxs()),
-                        _chip('اختلاف', (_docType == 'income' ? _sumTxs() - _sumItems() : _sumItems() - _sumTxs()), isError: _sumItems() != _sumTxs()),
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _chip('جمع اقلام', _sumItems()),
+                            _chip('جمع طرف‌حساب', _sumTxs()),
+                            _chip('اختلاف', (_docType == 'income' ? _sumTxs() - _sumItems() : _sumItems() - _sumTxs()), isError: _sumItems() != _sumTxs()),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: _buildBalanceActionButtons(),
+                        ),
                       ],
                     ),
                   ),
@@ -263,9 +274,91 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
     );
   }
 
+  static const double _balanceEpsilon = 1e-6;
+
   double _sumItems() => _itemLines.fold<double>(0, (p, e) => p + e.amount);
   double _sumTxs() => _txLines.fold<double>(0, (p, e) => p + e.amount);
   bool get _canSave => _currencyId != null && _itemLines.isNotEmpty && _txLines.isNotEmpty && _sumItems() == _sumTxs();
+
+  void _onBalanceFavoringItemsColumn() {
+    if (_txLines.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق اقلام، حداقل یک ردیف طرف‌حساب لازم است',
+      );
+      return;
+    }
+    final add = _sumItems() - _sumTxs();
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _txLines.length - 1;
+    final newAmt = _txLines[last].amount + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر طرف‌حساب پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _txLines[last] = _txLines[last].copyWith(amount: newAmt);
+    });
+  }
+
+  void _onBalanceFavoringCounterpartiesColumn() {
+    if (_itemLines.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای تعدیل مطابق طرف‌حساب، حداقل یک ردیف اقلام لازم است',
+      );
+      return;
+    }
+    final add = _sumTxs() - _sumItems();
+    if (add.abs() < _balanceEpsilon) return;
+    final last = _itemLines.length - 1;
+    final newAmt = _itemLines[last].amount + add;
+    if (newAmt < -_balanceEpsilon) {
+      SnackBarHelper.showError(
+        context,
+        message: 'مبلغ ردیف آخر اقلام پس از تعدیل منفی می‌شود.',
+      );
+      return;
+    }
+    setState(() {
+      _itemLines[last] = _itemLines[last].copyWith(amount: newAmt);
+    });
+  }
+
+  Widget _buildBalanceActionButtons() {
+    if ((_sumItems() - _sumTxs()).abs() < _balanceEpsilon) {
+      return const SizedBox.shrink();
+    }
+    if (_itemLines.isEmpty || _txLines.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final addToTx = _sumItems() - _sumTxs();
+    final lastT = _txLines.length - 1;
+    final canMatchItems = _txLines[lastT].amount + addToTx >= -_balanceEpsilon;
+    final addToItem = _sumTxs() - _sumItems();
+    final lastI = _itemLines.length - 1;
+    final canMatchTx = _itemLines[lastI].amount + addToItem >= -_balanceEpsilon;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: canMatchItems ? _onBalanceFavoringItemsColumn : null,
+          icon: const Icon(Icons.receipt_long, size: 18),
+          label: const Text('مطابق اقلام'),
+        ),
+        OutlinedButton.icon(
+          onPressed: canMatchTx ? _onBalanceFavoringCounterpartiesColumn : null,
+          icon: const Icon(Icons.payments, size: 18),
+          label: const Text('مطابق طرف‌حساب'),
+        ),
+      ],
+    );
+  }
 
   Future<void> _save() async {
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
@@ -541,6 +634,48 @@ class _TxLine {
         accountId: tx.accountId,
         accountName: tx.accountName,
       );
+
+  _TxLine copyWith({
+    String? id,
+    DateTime? date,
+    String? type,
+    double? amount,
+    double? commission,
+    String? description,
+    String? bankId,
+    String? bankName,
+    String? cashRegisterId,
+    String? cashRegisterName,
+    String? pettyCashId,
+    String? pettyCashName,
+    String? checkId,
+    String? checkNumber,
+    String? personId,
+    String? personName,
+    String? accountId,
+    String? accountName,
+  }) {
+    return _TxLine(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
+      commission: commission ?? this.commission,
+      description: description ?? this.description,
+      bankId: bankId ?? this.bankId,
+      bankName: bankName ?? this.bankName,
+      cashRegisterId: cashRegisterId ?? this.cashRegisterId,
+      cashRegisterName: cashRegisterName ?? this.cashRegisterName,
+      pettyCashId: pettyCashId ?? this.pettyCashId,
+      pettyCashName: pettyCashName ?? this.pettyCashName,
+      checkId: checkId ?? this.checkId,
+      checkNumber: checkNumber ?? this.checkNumber,
+      personId: personId ?? this.personId,
+      personName: personName ?? this.personName,
+      accountId: accountId ?? this.accountId,
+      accountName: accountName ?? this.accountName,
+    );
+  }
 }
 
 Widget _chip(String label, double value, {bool isError = false}) {
