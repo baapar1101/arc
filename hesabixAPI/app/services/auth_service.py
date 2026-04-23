@@ -57,7 +57,7 @@ def _generate_referral_code(db: Session) -> str:
 	return token_urlsafe(12).replace('-', '').replace('_', '')[:12]
 
 
-def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None, base_url: str | None = None) -> int:
+def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None, base_url: str | None = None, client_ip: str | None = None) -> int:
 	from app.core.responses import ApiError
 	from app.services.system_settings_service import is_registration_enabled, get_max_users
 	
@@ -73,7 +73,7 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 		if current_user_count >= max_users:
 			raise ApiError("MAX_USERS_REACHED", f"حداکثر تعداد کاربران ({max_users}) رسیده است", http_status=403)
 	
-	if not validate_captcha(db, captcha_id, captcha_code):
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=client_ip):
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 
 	email_n = _normalize_email(email)
@@ -130,7 +130,20 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 
 
 def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, captcha_code: str, device_id: str | None, user_agent: str | None, ip: str | None) -> tuple[str, datetime | None, dict]:
-	if not validate_captcha(db, captcha_id, captcha_code):
+	from app.services.system_settings_service import get_captcha_auth_security_effective
+	from app.services.auth_security_event_service import check_login_backoff, record_login_password_failed
+
+	_cfg = get_captcha_auth_security_effective(db)
+	if int(_cfg.get("login_backoff_max_fails") or 0) > 0:
+		check_login_backoff(
+			db,
+			client_ip=ip,
+			identifier=identifier,
+			max_fails=int(_cfg["login_backoff_max_fails"]),
+			window_minutes=int(_cfg["login_backoff_window_minutes"]),
+			backoff_seconds=int(_cfg["login_backoff_seconds"]),
+		)
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=ip):
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 
@@ -164,7 +177,10 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 			import logging
 			logger = logging.getLogger(__name__)
 			logger.warning(f"Failed to log failed login activity: {e}")
-		
+		try:
+			record_login_password_failed(client_ip=ip, identifier=identifier)
+		except Exception:
+			pass
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CREDENTIALS", "Invalid credentials")
 	if not user.is_active:
@@ -235,8 +251,8 @@ def _hash_reset_token(token: str) -> str:
 	return hashlib.sha256(f"{settings.captcha_secret}:{token}".encode("utf-8")).hexdigest()
 
 
-def create_password_reset(*, db: Session, identifier: str, captcha_id: str, captcha_code: str) -> str:
-	if not validate_captcha(db, captcha_id, captcha_code):
+def create_password_reset(*, db: Session, identifier: str, captcha_id: str, captcha_code: str, client_ip: str | None = None) -> str:
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=client_ip):
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 
@@ -272,8 +288,8 @@ def create_password_reset(*, db: Session, identifier: str, captcha_id: str, capt
 	return token
 
 
-def reset_password(*, db: Session, token: str, new_password: str, captcha_id: str, captcha_code: str) -> None:
-	if not validate_captcha(db, captcha_id, captcha_code):
+def reset_password(*, db: Session, token: str, new_password: str, captcha_id: str, captcha_code: str, client_ip: str | None = None) -> None:
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=client_ip):
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 
@@ -621,6 +637,7 @@ def update_user_mobile(
 	captcha_code: str,
 	force_unverified: bool = False,
 	send_verification_sms: bool = False,
+	client_ip: str | None = None,
 ) -> dict:
 	"""
 	تغییر شماره موبایل کاربر
@@ -644,7 +661,7 @@ def update_user_mobile(
 	from adapters.db.models.user import User
 	
 	# 1. تایید کپچا
-	if not validate_captcha(db, captcha_id, captcha_code):
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=client_ip):
 		raise ApiError("INVALID_CAPTCHA", "کد کپچا نامعتبر است", http_status=400)
 	
 	# 2. بررسی Rate Limiting (حداکثر 3 بار در 24 ساعت)
@@ -735,7 +752,8 @@ def update_user_email(
 	email: str,
 	captcha_id: str,
 	captcha_code: str,
-	force_unverified: bool = False
+	force_unverified: bool = False,
+	client_ip: str | None = None,
 ) -> dict:
 	"""
 	تغییر ایمیل کاربر
@@ -759,7 +777,7 @@ def update_user_email(
 	from adapters.db.models.user import User
 	
 	# 1. تایید کپچا
-	if not validate_captcha(db, captcha_id, captcha_code):
+	if not validate_captcha(db, captcha_id, captcha_code, client_ip=client_ip):
 		raise ApiError("INVALID_CAPTCHA", "کد کپچا نامعتبر است", http_status=400)
 	
 	# 2. بررسی Rate Limiting (حداکثر 3 بار در 24 ساعت)

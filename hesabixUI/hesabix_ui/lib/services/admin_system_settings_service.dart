@@ -33,6 +33,15 @@ class AdminSystemSettingsService {
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 
+  /// گزارش رویدادهای امنیت احراز هویت / کپچا (بازه زمانی اخیر).
+  Future<Map<String, dynamic>> getAuthSecurityReport({int hours = 24, int limit = 80}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/auth-security-report',
+      query: {'hours': hours.toString(), 'limit': limit.toString()},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
   Future<Map<String, dynamic>> updateSystemConfiguration(Map<String, dynamic> data) async {
     final res = await _api.put<Map<String, dynamic>>('/api/v1/admin/system-settings/configuration', data: data);
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});

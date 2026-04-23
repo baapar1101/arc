@@ -279,9 +279,8 @@ echo "Build path: $BUILD_DIR"
 
 cd "$APP_DIR"
 
-# Configure mirror to resolve pub.dev access issues
-export PUB_HOSTED_URL="https://pub.flutter-io.cn"
-export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 
 # Configure C++ compiler flags to resolve deprecated warnings
 export CXXFLAGS="-Wno-deprecated-literal-operator"

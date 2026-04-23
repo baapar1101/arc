@@ -46,6 +46,16 @@ class SettingsCategorizationService {
             categoryId: 'core_configuration',
             order: 3,
           ),
+          SettingsItem(
+            id: 'firewall',
+            title: 'settingsFirewall',
+            description: 'settingsFirewallDescription',
+            icon: Icons.security_outlined,
+            color: const Color(0xFF455A64),
+            route: '/user/profile/system-settings/firewall',
+            categoryId: 'core_configuration',
+            order: 4,
+          ),
         ],
       ),
 

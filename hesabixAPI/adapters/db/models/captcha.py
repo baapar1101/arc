@@ -16,5 +16,6 @@ class Captcha(Base):
 	expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 	attempts: Mapped[int] = mapped_column(default=0, nullable=False)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	client_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
 
 

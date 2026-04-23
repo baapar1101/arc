@@ -8,7 +8,7 @@ import '../../core/api_client.dart';
 import '../../services/verification_service.dart';
 import '../../widgets/auth/otp_input_dialog.dart';
 import '../../utils/snackbar_helper.dart';
-import '../../utils/number_normalizer.dart' show toEnglishDigits;
+import '../../utils/number_normalizer.dart' show toEnglishDigits, EnglishDigitsFormatter;
 import '../../services/errors/api_error.dart';
 import 'package:dio/dio.dart';
 
@@ -43,6 +43,19 @@ class _VerificationPageState extends State<VerificationPage> {
   Uint8List? _emailCaptchaImage;
   Timer? _emailCaptchaTimer;
   final _emailCaptchaCtrl = TextEditingController();
+  String _captchaMode = 'numeric';
+
+  List<TextInputFormatter> get _captchaInputFormatters => _captchaMode == 'alphanumeric'
+      ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))]
+      : <TextInputFormatter>[const EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly];
+
+  String _normalizeCaptchaCode(String raw) {
+    final s = raw.trim();
+    if (_captchaMode == 'alphanumeric') {
+      return s.toUpperCase();
+    }
+    return toEnglishDigits(s);
+  }
 
   @override
   void initState() {
@@ -115,6 +128,7 @@ class _VerificationPageState extends State<VerificationPage> {
       final String? id = captchaData['captcha_id']?.toString();
       final String? imgB64 = captchaData['image_base64']?.toString();
       final int? ttl = (captchaData['ttl_seconds'] as num?)?.toInt();
+      final m = captchaData['captcha_mode']?.toString();
       
       if (id == null || imgB64 == null) return;
       
@@ -127,6 +141,9 @@ class _VerificationPageState extends State<VerificationPage> {
       
       if (!mounted) return;
       setState(() {
+        if (m == 'alphanumeric' || m == 'numeric') {
+          _captchaMode = m!;
+        }
         if (type == 'mobile') {
           _mobileCaptchaId = id;
           _mobileCaptchaImage = bytes;
@@ -191,7 +208,7 @@ class _VerificationPageState extends State<VerificationPage> {
       await _service.updateMobile(
         mobile: iranianMobile,
         captchaId: _mobileCaptchaId!,
-        captchaCode: _mobileCaptchaCtrl.text.trim(),
+        captchaCode: _normalizeCaptchaCode(_mobileCaptchaCtrl.text),
         forceUnverified: false,
       );
       
@@ -250,7 +267,7 @@ class _VerificationPageState extends State<VerificationPage> {
             await _service.updateMobile(
               mobile: iranianMobile,
               captchaId: _mobileCaptchaId!,
-              captchaCode: _mobileCaptchaCtrl.text.trim(),
+              captchaCode: _normalizeCaptchaCode(_mobileCaptchaCtrl.text),
               forceUnverified: true,
             );
             
@@ -351,7 +368,7 @@ class _VerificationPageState extends State<VerificationPage> {
       await _service.updateEmail(
         email: _emailCtrl.text.trim(),
         captchaId: _emailCaptchaId!,
-        captchaCode: _emailCaptchaCtrl.text.trim(),
+        captchaCode: _normalizeCaptchaCode(_emailCaptchaCtrl.text),
         forceUnverified: false,
       );
       
@@ -416,7 +433,7 @@ class _VerificationPageState extends State<VerificationPage> {
             await _service.updateEmail(
               email: _emailCtrl.text.trim(),
               captchaId: _emailCaptchaId!,
-              captchaCode: _emailCaptchaCtrl.text.trim(),
+              captchaCode: _normalizeCaptchaCode(_emailCaptchaCtrl.text),
               forceUnverified: true,
             );
             
@@ -494,6 +511,8 @@ class _VerificationPageState extends State<VerificationPage> {
           children: [
             // بخش شماره موبایل
             _VerificationSection(
+              captchaKeyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+              captchaInputFormatters: _captchaInputFormatters,
               title: 'شماره موبایل',
               icon: Icons.phone_android,
               value: mobile,
@@ -552,6 +571,8 @@ class _VerificationPageState extends State<VerificationPage> {
             const SizedBox(height: 24),
             // بخش ایمیل
             _VerificationSection(
+              captchaKeyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+              captchaInputFormatters: _captchaInputFormatters,
               title: 'ایمیل',
               icon: Icons.email,
               value: email,
@@ -593,6 +614,8 @@ class _VerificationPageState extends State<VerificationPage> {
 }
 
 class _VerificationSection extends StatefulWidget {
+  final TextInputType captchaKeyboardType;
+  final List<TextInputFormatter> captchaInputFormatters;
   final String title;
   final IconData icon;
   final String? value;
@@ -611,6 +634,8 @@ class _VerificationSection extends StatefulWidget {
   final String? Function(String?)? validator;
 
   const _VerificationSection({
+    required this.captchaKeyboardType,
+    required this.captchaInputFormatters,
     required this.title,
     required this.icon,
     required this.value,
@@ -750,10 +775,8 @@ class _VerificationSectionState extends State<_VerificationSection> {
                             labelText: 'کد کپچا',
                             border: OutlineInputBorder(),
                           ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
+                          keyboardType: widget.captchaKeyboardType,
+                          inputFormatters: widget.captchaInputFormatters,
                         ),
                       ),
                       const SizedBox(width: 8),

@@ -15827,6 +15827,204 @@ abstract class AppLocalizations {
   /// **'Configure Redis cache for improved performance'**
   String get settingsRedisCacheDescription;
 
+  /// No description provided for @settingsFirewall.
+  ///
+  /// In en, this message translates to:
+  /// **'Application firewall'**
+  String get settingsFirewall;
+
+  /// No description provided for @settingsFirewallDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'IP allow/deny rules, temporary bans, logs and reports'**
+  String get settingsFirewallDescription;
+
+  /// No description provided for @firewallTabRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get firewallTabRules;
+
+  /// No description provided for @firewallTabBlockLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked requests'**
+  String get firewallTabBlockLogs;
+
+  /// No description provided for @firewallTabAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit log'**
+  String get firewallTabAudit;
+
+  /// No description provided for @firewallTabReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get firewallTabReports;
+
+  /// No description provided for @firewallAddRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get firewallAddRule;
+
+  /// No description provided for @firewallEditRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit rule'**
+  String get firewallEditRule;
+
+  /// No description provided for @firewallActionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get firewallActionLabel;
+
+  /// No description provided for @firewallActionAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get firewallActionAllow;
+
+  /// No description provided for @firewallActionDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get firewallActionDeny;
+
+  /// No description provided for @firewallIpCidr.
+  ///
+  /// In en, this message translates to:
+  /// **'IP or CIDR'**
+  String get firewallIpCidr;
+
+  /// No description provided for @firewallPathPrefixOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Path prefix (optional)'**
+  String get firewallPathPrefixOptional;
+
+  /// No description provided for @firewallHttpMethodsOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP methods e.g. GET,POST (optional)'**
+  String get firewallHttpMethodsOptional;
+
+  /// No description provided for @firewallPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority (lower = evaluated first)'**
+  String get firewallPriority;
+
+  /// No description provided for @firewallNoteOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get firewallNoteOptional;
+
+  /// No description provided for @firewallSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get firewallSaved;
+
+  /// No description provided for @firewallBanIp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ban IP'**
+  String get firewallBanIp;
+
+  /// No description provided for @firewallDurationMinutesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration in minutes (empty = permanent until removed)'**
+  String get firewallDurationMinutesHint;
+
+  /// No description provided for @firewallBanDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Ban applied'**
+  String get firewallBanDone;
+
+  /// No description provided for @firewallActiveOnlyFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Active rules only'**
+  String get firewallActiveOnlyFilter;
+
+  /// No description provided for @firewallRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get firewallRefresh;
+
+  /// No description provided for @firewallNoRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No rules'**
+  String get firewallNoRules;
+
+  /// No description provided for @firewallDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete rule?'**
+  String get firewallDeleteConfirmTitle;
+
+  /// No description provided for @firewallDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get firewallDeleteConfirmBody;
+
+  /// No description provided for @firewallNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get firewallNoExpiry;
+
+  /// No description provided for @firewallFilterByIp.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by IP'**
+  String get firewallFilterByIp;
+
+  /// No description provided for @firewallReportsPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get firewallReportsPeriod;
+
+  /// No description provided for @firewallReportsDays.
+  ///
+  /// In en, this message translates to:
+  /// **'days'**
+  String get firewallReportsDays;
+
+  /// No description provided for @firewallReportsTotalBlocks.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked requests (period)'**
+  String get firewallReportsTotalBlocks;
+
+  /// No description provided for @firewallReportsActiveDenyRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Active deny rules'**
+  String get firewallReportsActiveDenyRules;
+
+  /// No description provided for @firewallReportsTopIps.
+  ///
+  /// In en, this message translates to:
+  /// **'Top blocked IPs'**
+  String get firewallReportsTopIps;
+
+  /// No description provided for @firewallReportsByDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocks by day'**
+  String get firewallReportsByDay;
+
   /// No description provided for @settingsStoragePlans.
   ///
   /// In en, this message translates to:

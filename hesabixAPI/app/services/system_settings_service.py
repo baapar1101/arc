@@ -61,6 +61,31 @@ SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
 SYSTEM_CONFIG_BUSINESS_CREATION_VERIFICATION_REQUIREMENT = "system_config_business_creation_verification_requirement"
 
+# کپچا و محدودیت نرخ احراز هویت (قابل تنظیم توسط مدیر)
+SYSTEM_CONFIG_CAPTCHA_MAX_ATTEMPTS = "system_config_captcha_max_attempts"
+SYSTEM_CONFIG_CAPTCHA_LENGTH = "system_config_captcha_length"
+SYSTEM_CONFIG_CAPTCHA_TTL_SECONDS = "system_config_captcha_ttl_seconds"
+SYSTEM_CONFIG_CAPTCHA_MODE = "system_config_captcha_mode"
+SYSTEM_CONFIG_CAPTCHA_BIND_IP = "system_config_captcha_bind_ip"
+SYSTEM_CONFIG_CAPTCHA_STRONG_IMAGE = "system_config_captcha_strong_image"
+SYSTEM_CONFIG_CAPTCHA_RATE_MAX = "system_config_captcha_rate_max"
+SYSTEM_CONFIG_CAPTCHA_RATE_WINDOW_SEC = "system_config_captcha_rate_window_sec"
+SYSTEM_CONFIG_LOGIN_RATE_MAX_SHORT = "system_config_login_rate_max_short"
+SYSTEM_CONFIG_LOGIN_RATE_WINDOW_SHORT_SEC = "system_config_login_rate_window_short_sec"
+SYSTEM_CONFIG_LOGIN_RATE_MAX_LONG = "system_config_login_rate_max_long"
+SYSTEM_CONFIG_LOGIN_RATE_WINDOW_LONG_SEC = "system_config_login_rate_window_long_sec"
+SYSTEM_CONFIG_REGISTER_RATE_MAX = "system_config_register_rate_max"
+SYSTEM_CONFIG_REGISTER_RATE_WINDOW_SEC = "system_config_register_rate_window_sec"
+SYSTEM_CONFIG_FORGOT_RATE_MAX = "system_config_forgot_password_rate_max"
+SYSTEM_CONFIG_FORGOT_RATE_WINDOW_SEC = "system_config_forgot_password_rate_window_sec"
+SYSTEM_CONFIG_RESET_RATE_MAX = "system_config_reset_password_rate_max"
+SYSTEM_CONFIG_RESET_RATE_WINDOW_SEC = "system_config_reset_password_rate_window_sec"
+SYSTEM_CONFIG_PR_OTP_RATE_MAX = "system_config_password_reset_otp_rate_max"
+SYSTEM_CONFIG_PR_OTP_RATE_WINDOW_SEC = "system_config_password_reset_otp_rate_window_sec"
+SYSTEM_CONFIG_LOGIN_BACKOFF_MAX_FAILS = "system_config_login_backoff_max_fails"
+SYSTEM_CONFIG_LOGIN_BACKOFF_WINDOW_MINUTES = "system_config_login_backoff_window_minutes"
+SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS = "system_config_login_backoff_seconds"
+
 # Redis Cache Configuration Keys
 REDIS_CONFIG_ENABLED = "redis_config_enabled"
 REDIS_CONFIG_HOST = "redis_config_host"
@@ -625,6 +650,58 @@ def get_default_theme(db: Session) -> str:
 	return (default_theme.value_string if default_theme and default_theme.value_string else "system")
 
 
+def get_captcha_auth_security_effective(db: Session) -> Dict[str, Any]:
+	"""
+	مقادیر مؤثر امنیت کپچا و محدودیت نرخ (DB + env).
+	برای استفاده در سرویس کپچا و rate limiter.
+	"""
+	env = get_settings()
+
+	def _ii(key: str, default: int) -> int:
+		v = _get_setting_int(db, key)
+		return int(v) if v is not None else default
+
+	def _bb(key: str, default: bool) -> bool:
+		b = _get_setting_bool(db, key)
+		return b if b is not None else default
+
+	def _ss(key: str, default: str) -> str:
+		o = _get_setting(db, key)
+		if o and o.value_string:
+			return o.value_string.strip()
+		return default
+
+	mode = _ss(SYSTEM_CONFIG_CAPTCHA_MODE, "numeric")
+	if mode not in ("numeric", "alphanumeric"):
+		mode = "numeric"
+
+	return {
+		"captcha_max_attempts": max(1, min(30, _ii(SYSTEM_CONFIG_CAPTCHA_MAX_ATTEMPTS, 5))),
+		"captcha_length": max(4, min(8, _ii(SYSTEM_CONFIG_CAPTCHA_LENGTH, int(env.captcha_length)))),
+		"captcha_ttl_seconds": max(60, min(600, _ii(SYSTEM_CONFIG_CAPTCHA_TTL_SECONDS, int(env.captcha_ttl_seconds)))),
+		"captcha_mode": mode,
+		"captcha_bind_ip": _bb(SYSTEM_CONFIG_CAPTCHA_BIND_IP, True),
+		"captcha_strong_image": _bb(SYSTEM_CONFIG_CAPTCHA_STRONG_IMAGE, True),
+		"captcha_rate_max": max(1, min(200, _ii(SYSTEM_CONFIG_CAPTCHA_RATE_MAX, 20))),
+		"captcha_rate_window_sec": max(10, min(3600, _ii(SYSTEM_CONFIG_CAPTCHA_RATE_WINDOW_SEC, 60))),
+		"login_rate_max_short": max(1, min(100, _ii(SYSTEM_CONFIG_LOGIN_RATE_MAX_SHORT, 10))),
+		"login_rate_window_short_sec": max(10, min(3600, _ii(SYSTEM_CONFIG_LOGIN_RATE_WINDOW_SHORT_SEC, 60))),
+		"login_rate_max_long": max(1, min(500, _ii(SYSTEM_CONFIG_LOGIN_RATE_MAX_LONG, 10))),
+		"login_rate_window_long_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_LOGIN_RATE_WINDOW_LONG_SEC, 300))),
+		"register_rate_max": max(1, min(100, _ii(SYSTEM_CONFIG_REGISTER_RATE_MAX, 5))),
+		"register_rate_window_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_REGISTER_RATE_WINDOW_SEC, 3600))),
+		"forgot_rate_max": max(1, min(100, _ii(SYSTEM_CONFIG_FORGOT_RATE_MAX, 5))),
+		"forgot_rate_window_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_FORGOT_RATE_WINDOW_SEC, 3600))),
+		"reset_rate_max": max(1, min(200, _ii(SYSTEM_CONFIG_RESET_RATE_MAX, 10))),
+		"reset_rate_window_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_RESET_RATE_WINDOW_SEC, 3600))),
+		"pr_otp_rate_max": max(1, min(100, _ii(SYSTEM_CONFIG_PR_OTP_RATE_MAX, 5))),
+		"pr_otp_rate_window_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_PR_OTP_RATE_WINDOW_SEC, 300))),
+		"login_backoff_max_fails": max(0, min(50, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_MAX_FAILS, 5))),
+		"login_backoff_window_minutes": max(1, min(1440, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_WINDOW_MINUTES, 15))),
+		"login_backoff_seconds": max(0, min(3600, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS, 90))),
+	}
+
+
 def get_system_configuration(db: Session) -> Dict[str, Any]:
 	"""
 	خواندن تنظیمات پیکربندی سیستم
@@ -642,7 +719,9 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 	max_file_size = _get_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE)
 	max_users = _get_setting_int(db, SYSTEM_CONFIG_MAX_USERS)
 	business_creation_requirement = get_business_creation_verification_requirement(db)
-	
+	sms_r = get_sms_destination_rate_effective(db)
+	sec = get_captcha_auth_security_effective(db)
+
 	return {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
 		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
@@ -655,6 +734,32 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"max_file_size": (max_file_size if max_file_size is not None else 10),
 		"max_users": (max_users if max_users is not None else 0),
 		"business_creation_verification_requirement": business_creation_requirement,
+		"sms_destination_rate_enabled": sms_r[0],
+		"sms_destination_rate_max_sends": sms_r[1],
+		"sms_destination_rate_window_minutes": sms_r[2],
+		"captcha_max_attempts": sec["captcha_max_attempts"],
+		"captcha_length": sec["captcha_length"],
+		"captcha_ttl_seconds": sec["captcha_ttl_seconds"],
+		"captcha_mode": sec["captcha_mode"],
+		"captcha_bind_ip": sec["captcha_bind_ip"],
+		"captcha_strong_image": sec["captcha_strong_image"],
+		"captcha_rate_max": sec["captcha_rate_max"],
+		"captcha_rate_window_sec": sec["captcha_rate_window_sec"],
+		"login_rate_max_short": sec["login_rate_max_short"],
+		"login_rate_window_short_sec": sec["login_rate_window_short_sec"],
+		"login_rate_max_long": sec["login_rate_max_long"],
+		"login_rate_window_long_sec": sec["login_rate_window_long_sec"],
+		"register_rate_max": sec["register_rate_max"],
+		"register_rate_window_sec": sec["register_rate_window_sec"],
+		"forgot_password_rate_max": sec["forgot_rate_max"],
+		"forgot_password_rate_window_sec": sec["forgot_rate_window_sec"],
+		"reset_password_rate_max": sec["reset_rate_max"],
+		"reset_password_rate_window_sec": sec["reset_rate_window_sec"],
+		"password_reset_otp_rate_max": sec["pr_otp_rate_max"],
+		"password_reset_otp_rate_window_sec": sec["pr_otp_rate_window_sec"],
+		"login_backoff_max_fails": sec["login_backoff_max_fails"],
+		"login_backoff_window_minutes": sec["login_backoff_window_minutes"],
+		"login_backoff_seconds": sec["login_backoff_seconds"],
 	}
 
 
@@ -672,6 +777,32 @@ def set_system_configuration(
 	max_file_size: int | None = None,
 	max_users: int | None = None,
 	business_creation_verification_requirement: str | None = None,
+	sms_destination_rate_enabled: bool | None = None,
+	sms_destination_rate_max_sends: int | None = None,
+	sms_destination_rate_window_minutes: int | None = None,
+	captcha_max_attempts: int | None = None,
+	captcha_length: int | None = None,
+	captcha_ttl_seconds: int | None = None,
+	captcha_mode: str | None = None,
+	captcha_bind_ip: bool | None = None,
+	captcha_strong_image: bool | None = None,
+	captcha_rate_max: int | None = None,
+	captcha_rate_window_sec: int | None = None,
+	login_rate_max_short: int | None = None,
+	login_rate_window_short_sec: int | None = None,
+	login_rate_max_long: int | None = None,
+	login_rate_window_long_sec: int | None = None,
+	register_rate_max: int | None = None,
+	register_rate_window_sec: int | None = None,
+	forgot_password_rate_max: int | None = None,
+	forgot_password_rate_window_sec: int | None = None,
+	reset_password_rate_max: int | None = None,
+	reset_password_rate_window_sec: int | None = None,
+	password_reset_otp_rate_max: int | None = None,
+	password_reset_otp_rate_window_sec: int | None = None,
+	login_backoff_max_fails: int | None = None,
+	login_backoff_window_minutes: int | None = None,
+	login_backoff_seconds: int | None = None,
 ) -> Dict[str, Any]:
 	"""
 	تنظیم پیکربندی سیستم با اعتبارسنجی
@@ -737,6 +868,107 @@ def set_system_configuration(
 		if not req_value:
 			req_value = "none"
 		set_business_creation_verification_requirement(db, req_value)
+
+	if sms_destination_rate_enabled is not None:
+		_upsert_setting_bool(db, SMS_DESTINATION_RATE_ENABLED_KEY, sms_destination_rate_enabled)
+	if sms_destination_rate_max_sends is not None:
+		if sms_destination_rate_max_sends < 0 or sms_destination_rate_max_sends > 1_000_000:
+			raise ApiError("INVALID_SMS_DEST_RATE", "سقف ارسال به مقصد باید بین 0 تا 1000000 باشد", http_status=400)
+		_upsert_setting_int(db, SMS_DESTINATION_RATE_MAX_SENDS_KEY, sms_destination_rate_max_sends)
+	if sms_destination_rate_window_minutes is not None:
+		if sms_destination_rate_window_minutes < 1 or sms_destination_rate_window_minutes > 10080:
+			raise ApiError("INVALID_SMS_DEST_WINDOW", "پنجره زمانی باید بین 1 تا 10080 دقیقه باشد", http_status=400)
+		_upsert_setting_int(db, SMS_DESTINATION_RATE_WINDOW_MINUTES_KEY, sms_destination_rate_window_minutes)
+
+	if captcha_max_attempts is not None:
+		if captcha_max_attempts < 1 or captcha_max_attempts > 30:
+			raise ApiError("INVALID_CAPTCHA_MAX_ATTEMPTS", "حداکثر تلاش کپچا باید بین 1 تا 30 باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_CAPTCHA_MAX_ATTEMPTS, captcha_max_attempts)
+	if captcha_length is not None:
+		if captcha_length < 4 or captcha_length > 8:
+			raise ApiError("INVALID_CAPTCHA_LENGTH", "طول کپچا باید بین 4 تا 8 باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_CAPTCHA_LENGTH, captcha_length)
+	if captcha_ttl_seconds is not None:
+		if captcha_ttl_seconds < 60 or captcha_ttl_seconds > 600:
+			raise ApiError("INVALID_CAPTCHA_TTL", "زمان انقضای کپچا باید بین 60 تا 600 ثانیه باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_CAPTCHA_TTL_SECONDS, captcha_ttl_seconds)
+	if captcha_mode is not None:
+		cm = str(captcha_mode).strip().lower()
+		if cm not in ("numeric", "alphanumeric"):
+			raise ApiError("INVALID_CAPTCHA_MODE", "حالت کپچا باید numeric یا alphanumeric باشد", http_status=400)
+		_upsert_setting_string(db, SYSTEM_CONFIG_CAPTCHA_MODE, cm)
+	if captcha_bind_ip is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_CAPTCHA_BIND_IP, captcha_bind_ip)
+	if captcha_strong_image is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_CAPTCHA_STRONG_IMAGE, captcha_strong_image)
+	if captcha_rate_max is not None:
+		if captcha_rate_max < 1 or captcha_rate_max > 200:
+			raise ApiError("INVALID_CAPTCHA_RATE", "سقف درخواست کپچا باید بین 1 تا 200 باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_CAPTCHA_RATE_MAX, captcha_rate_max)
+	if captcha_rate_window_sec is not None:
+		if captcha_rate_window_sec < 10 or captcha_rate_window_sec > 3600:
+			raise ApiError("INVALID_CAPTCHA_RATE_WINDOW", "پنجره نرخ کپچا باید بین 10 تا 3600 ثانیه باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_CAPTCHA_RATE_WINDOW_SEC, captcha_rate_window_sec)
+	if login_rate_max_short is not None:
+		if login_rate_max_short < 1 or login_rate_max_short > 100:
+			raise ApiError("INVALID_LOGIN_RATE", "محدودیت کوتاه ورود نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_RATE_MAX_SHORT, login_rate_max_short)
+	if login_rate_window_short_sec is not None:
+		if login_rate_window_short_sec < 10 or login_rate_window_short_sec > 3600:
+			raise ApiError("INVALID_LOGIN_RATE_WINDOW", "پنجره کوتاه ورود نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_RATE_WINDOW_SHORT_SEC, login_rate_window_short_sec)
+	if login_rate_max_long is not None:
+		if login_rate_max_long < 1 or login_rate_max_long > 500:
+			raise ApiError("INVALID_LOGIN_RATE_LONG", "محدودیت بلند ورود نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_RATE_MAX_LONG, login_rate_max_long)
+	if login_rate_window_long_sec is not None:
+		if login_rate_window_long_sec < 60 or login_rate_window_long_sec > 86400:
+			raise ApiError("INVALID_LOGIN_RATE_WINDOW_LONG", "پنجره بلند ورود نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_RATE_WINDOW_LONG_SEC, login_rate_window_long_sec)
+	if register_rate_max is not None:
+		if register_rate_max < 1 or register_rate_max > 100:
+			raise ApiError("INVALID_REGISTER_RATE", "محدودیت ثبت‌نام نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_REGISTER_RATE_MAX, register_rate_max)
+	if register_rate_window_sec is not None:
+		if register_rate_window_sec < 60 or register_rate_window_sec > 86400:
+			raise ApiError("INVALID_REGISTER_WINDOW", "پنجره ثبت‌نام نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_REGISTER_RATE_WINDOW_SEC, register_rate_window_sec)
+	if forgot_password_rate_max is not None:
+		if forgot_password_rate_max < 1 or forgot_password_rate_max > 100:
+			raise ApiError("INVALID_FORGOT_RATE", "محدودیت فراموشی رمز نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_FORGOT_RATE_MAX, forgot_password_rate_max)
+	if forgot_password_rate_window_sec is not None:
+		if forgot_password_rate_window_sec < 60 or forgot_password_rate_window_sec > 86400:
+			raise ApiError("INVALID_FORGOT_WINDOW", "پنجره فراموشی رمز نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_FORGOT_RATE_WINDOW_SEC, forgot_password_rate_window_sec)
+	if reset_password_rate_max is not None:
+		if reset_password_rate_max < 1 or reset_password_rate_max > 200:
+			raise ApiError("INVALID_RESET_RATE", "محدودیت بازنشانی رمز نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_RESET_RATE_MAX, reset_password_rate_max)
+	if reset_password_rate_window_sec is not None:
+		if reset_password_rate_window_sec < 60 or reset_password_rate_window_sec > 86400:
+			raise ApiError("INVALID_RESET_WINDOW", "پنجره بازنشانی رمز نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_RESET_RATE_WINDOW_SEC, reset_password_rate_window_sec)
+	if password_reset_otp_rate_max is not None:
+		if password_reset_otp_rate_max < 1 or password_reset_otp_rate_max > 100:
+			raise ApiError("INVALID_PR_OTP_RATE", "محدودیت OTP بازیابی نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_PR_OTP_RATE_MAX, password_reset_otp_rate_max)
+	if password_reset_otp_rate_window_sec is not None:
+		if password_reset_otp_rate_window_sec < 60 or password_reset_otp_rate_window_sec > 86400:
+			raise ApiError("INVALID_PR_OTP_WINDOW", "پنجره OTP بازیابی نامعتبر است", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_PR_OTP_RATE_WINDOW_SEC, password_reset_otp_rate_window_sec)
+	if login_backoff_max_fails is not None:
+		if login_backoff_max_fails < 0 or login_backoff_max_fails > 50:
+			raise ApiError("INVALID_LOGIN_BACKOFF_FAILS", "تعداد تلاش برای backoff باید بین 0 تا 50 باشد (0=غیرفعال)", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_BACKOFF_MAX_FAILS, login_backoff_max_fails)
+	if login_backoff_window_minutes is not None:
+		if login_backoff_window_minutes < 1 or login_backoff_window_minutes > 1440:
+			raise ApiError("INVALID_LOGIN_BACKOFF_WINDOW", "پنجره backoff باید بین 1 تا 1440 دقیقه باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_BACKOFF_WINDOW_MINUTES, login_backoff_window_minutes)
+	if login_backoff_seconds is not None:
+		if login_backoff_seconds < 0 or login_backoff_seconds > 3600:
+			raise ApiError("INVALID_LOGIN_BACKOFF_SEC", "مدت انتظار backoff باید بین 0 تا 3600 ثانیه باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS, login_backoff_seconds)
 	
 	db.commit()
 	return get_system_configuration(db)

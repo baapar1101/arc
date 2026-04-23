@@ -239,8 +239,8 @@ BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
 [ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
 [ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
 
-export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.flutter-io.cn}"
-export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.flutter-io.cn}"
+export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 export DART_COMPILE_JS_WORKERS="$BUILD_WORKERS"
 [ "$MODE" = "debug" ] && export DART_VM_OPTIONS="--enable-asserts"
 

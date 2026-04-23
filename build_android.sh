@@ -177,61 +177,8 @@ echo "Split APK: $BUILD_SPLIT_APK"
 
 cd "$APP_DIR"
 
-# Function to check accessibility of a URL
-check_url_accessibility() {
-  local url="$1"
-  local timeout="${2:-5}"
-  if curl -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
-    return 0
-  fi
-  if curl -k -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-# Function to find best available mirror
-find_available_mirror() {
-  local mirrors=(
-    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
-    "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
-    "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-    "https://pub.dev|https://storage.googleapis.com"
-    "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
-  )
-  
-  echo "Checking ${#mirrors[@]} different mirrors..." >&2
-  
-  for mirror_pair in "${mirrors[@]}"; do
-    IFS='|' read -r pub_url storage_url <<< "$mirror_pair"
-    echo "  Checking: $pub_url" >&2
-    if check_url_accessibility "$pub_url" 5; then
-      echo "  ✓ Available!" >&2
-      echo "$pub_url|$storage_url"
-      return 0
-    else
-      echo "  ✗ Not available" >&2
-    fi
-  done
-  
-  return 1
-}
-
-# Configure Flutter mirror
-if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
-  echo "Checking Flutter mirror accessibility..."
-  
-  if available_mirror=$(find_available_mirror); then
-    IFS='|' read -r pub_url storage_url <<< "$available_mirror"
-    export PUB_HOSTED_URL="$pub_url"
-    export FLUTTER_STORAGE_BASE_URL="$storage_url"
-    echo "✓ Available mirror found: $PUB_HOSTED_URL"
-  else
-    export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
-    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
-    warn "No accessible mirror found. Using default: $PUB_HOSTED_URL"
-  fi
-fi
+export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 
 echo "Using Pub Hosted URL: $PUB_HOSTED_URL"
 echo "Using Flutter Storage URL: $FLUTTER_STORAGE_BASE_URL"

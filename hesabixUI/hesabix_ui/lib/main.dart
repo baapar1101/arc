@@ -30,6 +30,7 @@ import 'pages/admin/user_management_page.dart';
 import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
 import 'pages/admin/redis_settings_page.dart';
+import 'pages/admin/firewall_admin_page.dart';
 import 'pages/admin/system_monitoring_page.dart';
 import 'pages/admin/service_logs_page.dart';
 import 'pages/admin/database_backup_page.dart';
@@ -1465,6 +1466,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const RedisSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'firewall',
+                  name: 'system_settings_firewall',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const FirewallAdminPage();
                   },
                 ),
                 GoRoute(

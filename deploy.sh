@@ -45,7 +45,7 @@ IFS=$'\n\t'
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
 # - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (see configure_pip_hesabix_mirror, set_pip_mirror_env).
 #   If PIP_INDEX_URL is set in the environment before deploy, that value is used instead (advanced override).
-# - Flutter/Dart: PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL override mirrors; otherwise auto-detected (Runflare اول). shell.hesabix.ir فقط برای tarball SDK است، نه آینهٔ pub.
+# - Flutter/Dart: همیشه آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs). shell.hesabix.ir فقط برای tarball SDK است.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 # - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
@@ -61,7 +61,7 @@ IFS=$'\n\t'
 
 REPO_URL="https://source.hesabix.ir/hesabix/arc.git"
 APP_ROOT="/opt/hesabix"
-# مخزن داخلی Flutter (ایران) — همیشه اول از این آدرس امتحان می‌شود؛ فقط SDK، کتابخانه‌های pub از PUB_HOSTED_URL
+# مخزن داخلی tarball SDK (ایران)؛ کتابخانه‌های pub فقط از f.mirror.hesabix.ir
 FLUTTER_SDK_TARBALL_URL_INTERNAL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
 STATE_FILE="${APP_ROOT}/.deploy_state"
 LOG_FILE="${APP_ROOT}/deploy.log"
@@ -1462,48 +1462,11 @@ set_pip_mirror_env() {
   return 0
 }
 
-# List of Flutter/Dart mirror pairs (pub_url|storage_url), one per line. Used for retry-on-failure.
-# If PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL are set, that pair is tried first.
-get_flutter_mirrors_list() {
-  if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
-    echo "${PUB_HOSTED_URL}|${FLUTTER_STORAGE_BASE_URL}"
-  fi
-  echo "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-  echo "https://pub.dev|https://storage.googleapis.com"
-  echo "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
-  echo "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
-  echo "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-  echo "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
-}
-
-# Detect and export Flutter/Dart mirror so SDK and package downloads work when Google is blocked.
-# Call this before any "flutter" command (including first run that downloads Dart SDK).
+# یک آینهٔ ثابت (کش Nginx → Runflare) برای pub و engine artifacts
 set_flutter_mirror_env() {
-  if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
-    log_info "Using existing Flutter mirror: PUB_HOSTED_URL=$PUB_HOSTED_URL"
-    return 0
-  fi
-  log_info "Detecting Flutter/Dart mirror (for SDK and pub packages)..."
-  local mirrors=(
-    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-    "https://pub.dev|https://storage.googleapis.com"
-    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
-    "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
-    "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-    "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
-  )
-  for pair in "${mirrors[@]}"; do
-    IFS='|' read -r pub_url storage_url <<< "$pair"
-    if curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" "$pub_url" 2>/dev/null | grep -q '^[23]'; then
-      export PUB_HOSTED_URL="$pub_url"
-      export FLUTTER_STORAGE_BASE_URL="$storage_url"
-      log_success "Using Flutter mirror: $pub_url"
-      return 0
-    fi
-  done
-  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
-  export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
-  log_warning "No reachable Flutter mirror; using default (may fail if Google is blocked)."
+  export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+  export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
+  log_info "Flutter pub/storage: PUB_HOSTED_URL=$PUB_HOSTED_URL"
 }
 
 # نصب PATH دائمی برای شِل‌های جدید (ورود به سیستم / bash --login). فایل POSIX-sh برای /etc/profile.d.
@@ -1685,7 +1648,7 @@ ensure_flutter_sdk() {
   fi
   log_info "Running flutter doctor (first run may download Dart SDK from mirror)..."
   if ! flutter doctor -v 2>&1; then
-    log_warning "flutter doctor had issues; continuing. If build fails, set PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL to a working mirror."
+    log_warning "flutter doctor had issues; continuing. If build fails, check f.mirror.hesabix.ir and hesabixAPI/f.mirror.hesabix.ir.conf."
   fi
   log_success "Flutter SDK ready at /opt/flutter."
 }
@@ -1758,33 +1721,21 @@ install_flutter_and_build_frontend() {
   echo "  API URL: ${api_url}"
   echo "  Output: /var/www/${UI_DOMAIN}"
   echo
-  echo "$CHECK_MARK Flutter build will try mirrors in order; if one fails, the next is used."
+  echo "$CHECK_MARK Flutter build uses Hesabix mirror: f.mirror.hesabix.ir"
 
-  # Build using build_web.sh; retry with next mirror if one fails
   cd "${app_dir}"
-  local flutter_build_ok=0
-  while IFS='|' read -r pub_url storage_url; do
-    [[ -z "$pub_url" ]] && continue
-    export PUB_HOSTED_URL="$pub_url"
-    export FLUTTER_STORAGE_BASE_URL="$storage_url"
-    log_info "Building Flutter web with mirror: ${pub_url}"
-    if env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
-        PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
-        bash build_web.sh \
-      --mode release \
-      --api-base-url "${api_url}" \
-      --clean \
-      --install-deps; then
-      flutter_build_ok=1
-      log_success "Flutter build succeeded with mirror: ${pub_url}"
-      break
-    fi
-    log_warning "Flutter build failed with mirror ${pub_url}; trying next mirror..."
-  done < <(get_flutter_mirrors_list)
-  if [[ $flutter_build_ok -eq 0 ]]; then
-    log_error "Flutter build failed with all mirrors. Check network or set PUB_HOSTED_URL and FLUTTER_STORAGE_BASE_URL to a working mirror."
+  log_info "Building Flutter web (pub/storage via ${PUB_HOSTED_URL})"
+  if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
+      PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
+      bash build_web.sh \
+    --mode release \
+    --api-base-url "${api_url}" \
+    --clean \
+    --install-deps; then
+    log_error "Flutter build failed. Check network, DNS, and f.mirror.hesabix.ir (see hesabixAPI/f.mirror.hesabix.ir.conf)."
     exit 1
   fi
+  log_success "Flutter web build succeeded"
   
   # Find the build output directory
   local ui_project_dir="${app_dir}/hesabixUI/hesabix_ui"

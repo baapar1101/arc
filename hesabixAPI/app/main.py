@@ -48,6 +48,7 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.firewall import router as admin_firewall_router
 from adapters.api.v1.admin.currencies import router as admin_currencies_router
 from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
 from adapters.api.v1.admin.system_services import router as admin_system_services_router
@@ -1087,6 +1088,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_firewall_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_currencies_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_monitoring_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_services_router, prefix=settings.api_v1_prefix)
@@ -1238,6 +1240,10 @@ def create_app() -> FastAPI:
             response.headers["X-RateLimit-Reset"] = str(int(time.time()) + reset_after)
         
         return response
+
+    from app.core.firewall_middleware import internal_firewall_middleware
+
+    application.middleware("http")(internal_firewall_middleware)
 
     @application.middleware("http")
     async def track_request_context(request: Request, call_next):

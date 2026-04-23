@@ -36,6 +36,31 @@ def generate_otp() -> str:
 	return str(random.randint(100000, 999999))
 
 
+def _resolve_identifier_for_otp(identifier: str):
+	"""
+	نرمال‌سازی شناسه ورود OTP (ایمیل یا موبایل) — همان منطق get_available_channels بدون دسترسی به DB.
+	برمی‌گرداند: (kind, email, mobile) که kind یکی از email|mobile|invalid است.
+	"""
+	from app.services.auth_service import _detect_identifier
+	import structlog
+	logger = structlog.get_logger()
+	kind, email, mobile = _detect_identifier(identifier)
+	logger.info(f"resolve_otp_identifier - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+	if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
+		identifier_clean = identifier.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+		if len(identifier_clean) >= 10 and any(c.isdigit() for c in identifier_clean):
+			try:
+				normalized_fallback = normalize_phone_number(identifier)
+				mobile = normalized_fallback
+				kind = "mobile"
+				logger.info(f"resolve_otp_identifier - fallback normalize_phone_number: {normalized_fallback}")
+			except ValueError as e:
+				logger.debug(f"resolve_otp_identifier - normalize_phone_number failed: {e}")
+		else:
+			logger.debug("resolve_otp_identifier - short or non-phone, skipping phone fallback")
+	return kind, email, mobile
+
+
 class OtpLoginService:
 	"""
 	Service برای مدیریت ورود با OTP از طریق SMS، Email یا Telegram
@@ -65,9 +90,24 @@ class OtpLoginService:
 		)
 		self.bale_provider = BaleProvider(bot_token=notify_cfg.get("bale_bot_token"))
 	
+	def get_public_otp_channel_options(self, identifier: str) -> dict:
+		"""
+		فهرست کانال برای UI قبل از ورود — فقط بر اساس فرمت شناسه و پیکربندی سرویس‌ها.
+		هیچ جستجوی کاربر در DB انجام نمی‌شود (جلوگیری از user enumeration).
+		"""
+		kind, email, mobile = _resolve_identifier_for_otp(identifier)
+		if kind == "invalid" or (kind == "mobile" and mobile is None):
+			return {"available_channels": []}
+		channels: list[str] = []
+		if email and kind == "email" and self.email_provider.is_configured():
+			channels.append("email")
+		if mobile and self.sms_provider.is_configured():
+			channels.append("sms")
+		return {"available_channels": channels}
+	
 	def get_available_channels(self, identifier: str) -> dict:
 		"""
-		دریافت کانال‌های در دسترس برای یک identifier
+		دریافت کانال‌های در دسترس برای یک identifier (با جستجوی کاربر — فقط برای منطق داخلی ارسال OTP).
 		
 		Args:
 			identifier: ایمیل یا شماره موبایل
@@ -75,32 +115,11 @@ class OtpLoginService:
 		Returns:
 			dict با کلیدهای available_channels و user_info
 		"""
-		from app.services.auth_service import _detect_identifier
 		import structlog
 		logger = structlog.get_logger()
 		
-		kind, email, mobile = _detect_identifier(identifier)
+		kind, email, mobile = _resolve_identifier_for_otp(identifier)
 		logger.info(f"get_available_channels - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
-		
-		# اگر _detect_identifier شماره را تشخیص نداد یا mobile None است، سعی می‌کنیم با normalize_phone_number
-		# این برای مواردی است که phonenumbers کتابخانه مشکل دارد یا تنظیمات درست نیست
-		# اما فقط اگر identifier به نظر می‌رسد شماره تلفن باشد (حداقل 10 کاراکتر و شامل اعداد)
-		if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
-			# بررسی اولیه: اگر identifier خیلی کوتاه است یا فقط اعداد نیست، skip کن
-			identifier_clean = identifier.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-			if len(identifier_clean) >= 10 and any(c.isdigit() for c in identifier_clean):
-				try:
-					normalized_fallback = normalize_phone_number(identifier)
-					mobile = normalized_fallback
-					kind = "mobile"
-					logger.info(f"get_available_channels - fallback to normalize_phone_number: {normalized_fallback}")
-				except ValueError as e:
-					# فقط در سطح debug لاگ کن، نه warning - چون این یک fallback است
-					logger.debug(f"get_available_channels - normalize_phone_number failed (expected for invalid input): {e}")
-					# return نکن، بگذار به بررسی بعدی برود
-			else:
-				# identifier خیلی کوتاه است یا فرمت نامعتبر - skip fallback
-				logger.debug(f"get_available_channels - identifier too short or invalid format, skipping normalize_phone_number fallback")
 		
 		if kind == "invalid" or (kind == "mobile" and mobile is None):
 			logger.warning(f"get_available_channels - invalid identifier: {identifier}")

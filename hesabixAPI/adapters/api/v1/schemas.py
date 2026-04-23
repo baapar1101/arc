@@ -277,6 +277,10 @@ class SendLoginOtpRequest(CaptchaSolve):
 	session_id: Optional[str] = Field(default=None, description="شناسه session موجود (برای تغییر کانال)")
 
 
+class AvailableChannelsRequest(CaptchaSolve):
+	identifier: str = Field(..., min_length=3, max_length=255, description="ایمیل یا شماره موبایل")
+
+
 class ResetPasswordRequest(CaptchaSolve):
 	token: str = Field(..., min_length=16)
 	new_password: str = Field(..., min_length=8, max_length=128)

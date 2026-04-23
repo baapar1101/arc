@@ -8394,6 +8394,108 @@ class AppLocalizationsEn extends AppLocalizations {
       'Configure Redis cache for improved performance';
 
   @override
+  String get settingsFirewall => 'Application firewall';
+
+  @override
+  String get settingsFirewallDescription =>
+      'IP allow/deny rules, temporary bans, logs and reports';
+
+  @override
+  String get firewallTabRules => 'Rules';
+
+  @override
+  String get firewallTabBlockLogs => 'Blocked requests';
+
+  @override
+  String get firewallTabAudit => 'Audit log';
+
+  @override
+  String get firewallTabReports => 'Reports';
+
+  @override
+  String get firewallAddRule => 'Add rule';
+
+  @override
+  String get firewallEditRule => 'Edit rule';
+
+  @override
+  String get firewallActionLabel => 'Action';
+
+  @override
+  String get firewallActionAllow => 'Allow';
+
+  @override
+  String get firewallActionDeny => 'Deny';
+
+  @override
+  String get firewallIpCidr => 'IP or CIDR';
+
+  @override
+  String get firewallPathPrefixOptional => 'Path prefix (optional)';
+
+  @override
+  String get firewallHttpMethodsOptional =>
+      'HTTP methods e.g. GET,POST (optional)';
+
+  @override
+  String get firewallPriority => 'Priority (lower = evaluated first)';
+
+  @override
+  String get firewallNoteOptional => 'Note (optional)';
+
+  @override
+  String get firewallSaved => 'Saved';
+
+  @override
+  String get firewallBanIp => 'Ban IP';
+
+  @override
+  String get firewallDurationMinutesHint =>
+      'Duration in minutes (empty = permanent until removed)';
+
+  @override
+  String get firewallBanDone => 'Ban applied';
+
+  @override
+  String get firewallActiveOnlyFilter => 'Active rules only';
+
+  @override
+  String get firewallRefresh => 'Refresh';
+
+  @override
+  String get firewallNoRules => 'No rules';
+
+  @override
+  String get firewallDeleteConfirmTitle => 'Delete rule?';
+
+  @override
+  String get firewallDeleteConfirmBody => 'This cannot be undone.';
+
+  @override
+  String get firewallNoExpiry => 'No expiry';
+
+  @override
+  String get firewallFilterByIp => 'Filter by IP';
+
+  @override
+  String get firewallReportsPeriod => 'Period';
+
+  @override
+  String get firewallReportsDays => 'days';
+
+  @override
+  String get firewallReportsTotalBlocks => 'Blocked requests (period)';
+
+  @override
+  String get firewallReportsActiveDenyRules => 'Active deny rules';
+
+  @override
+  String get firewallReportsTopIps => 'Top blocked IPs';
+
+  @override
+  String get firewallReportsByDay => 'Blocks by day';
+
+  @override
   String get settingsStoragePlans => 'Storage Plans';
 
   @override

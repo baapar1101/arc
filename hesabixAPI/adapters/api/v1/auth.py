@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.services.captcha_service import create_captcha
+from app.services.captcha_service import create_captcha, validate_captcha
 from app.services.auth_service import register_user, login_user, create_password_reset, reset_password, change_password, referral_stats
 from app.services.email_verification_service import verify_email_token, resend_verification_email
 from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
-	SendLoginOtpRequest, ChangePasswordRequest, UpdateMobileRequest, UpdateEmailRequest,
+	SendLoginOtpRequest, AvailableChannelsRequest, ChangePasswordRequest, UpdateMobileRequest, UpdateEmailRequest,
 	SendMobileVerificationRequest,
 	CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
 	SuccessResponse, CaptchaResponse, LoginResponse, ApiKeyResponse, 
@@ -23,7 +23,8 @@ from app.core.settings import get_settings
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.api_key_service import list_personal_keys, create_personal_key, revoke_key
 from app.services.session_service import list_user_sessions, revoke_session, revoke_other_sessions
-from app.core.rate_limiter import rate_limit, get_client_ip
+from app.core.rate_limiter import get_client_ip, rate_limit
+from app.services.auth_dynamic_rate_limit import enforce_auth_rate_limit
 
 
 router = APIRouter(prefix="/auth", tags=["احراز هویت"])
@@ -59,13 +60,22 @@ def _otp_in_response(otp_code: str | None) -> dict:
 		}
 	}
 )
-@rate_limit(max_requests=20, window_seconds=60, error_message="تعداد درخواست‌های کپچا بیش از حد مجاز است. لطفاً کمی صبر کنید.")
 async def generate_captcha(request: Request, db: Session = Depends(get_db)) -> dict:
-	captcha_id, image_base64, ttl = create_captcha(db)
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="captcha",
+		error_message="تعداد درخواست‌های کپچا بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+	)
+	captcha_id, image_base64, ttl = create_captcha(db, get_client_ip(request))
+	from app.services.system_settings_service import get_captcha_auth_security_effective
+	_csec = get_captcha_auth_security_effective(db)
 	return success_response({
 		"captcha_id": captcha_id,
 		"image_base64": image_base64,
 		"ttl_seconds": ttl,
+		"captcha_mode": _csec["captcha_mode"],
+		"captcha_length": _csec["captcha_length"],
 	})
 
 
@@ -175,13 +185,13 @@ def get_current_user_info(
 		}
 	}
 )
-@rate_limit(
-	max_requests=5, 
-	window_seconds=3600,  # 1 ساعت
-	key_func=lambda req: f"register:{get_client_ip(req)}",
-	error_message="تعداد درخواست‌های ثبت‌نام بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
-)
 async def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="register",
+		error_message="تعداد درخواست‌های ثبت‌نام بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
+	)
 	import logging
 	logger = logging.getLogger(__name__)
 	# ساخت base_url از request برای verification email
@@ -204,6 +214,7 @@ async def register(request: Request, payload: RegisterRequest, db: Session = Dep
 			captcha_code=payload.captcha_code,
 			referrer_code=payload.referrer_code,
 			base_url=base_url,
+			client_ip=get_client_ip(request),
 		)
 		# Create a session api key similar to login
 		user_agent = request.headers.get("User-Agent")
@@ -297,21 +308,21 @@ async def register(request: Request, payload: RegisterRequest, db: Session = Dep
 		}
 	}
 )
-@rate_limit(
-	max_requests=10, 
-	window_seconds=300,  # 5 دقیقه
-	key_func=lambda req: f"login:{get_client_ip(req)}",
-	error_message="تعداد درخواست‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید."
-)
-@rate_limit(
-    max_requests=10,
-    window_seconds=60,
-    key_func=lambda req: f"login:{get_client_ip(req)}",
-    error_message="تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید."
-)
 async def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="login_short",
+		error_message="تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+	)
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="login_long",
+		error_message="تعداد درخواست‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+	)
 	user_agent = request.headers.get("User-Agent")
-	ip = request.client.host if request.client else None
+	ip = get_client_ip(request)
 	api_key, expires_at, user = login_user(
 		db=db,
 		identifier=payload.identifier,
@@ -382,15 +393,21 @@ async def login(request: Request, payload: LoginRequest, db: Session = Depends(g
 		}
 	}
 )
-@rate_limit(
-	max_requests=5, 
-	window_seconds=3600,  # 1 ساعت
-	key_func=lambda req: f"forgot_password:{get_client_ip(req)}",
-	error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
-)
 async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="forgot",
+		error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
+	)
 	# ایجاد token برای reset password
-	token = create_password_reset(db=db, identifier=payload.identifier, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
+	token = create_password_reset(
+		db=db,
+		identifier=payload.identifier,
+		captcha_id=payload.captcha_id,
+		captcha_code=payload.captcha_code,
+		client_ip=get_client_ip(request),
+	)
 	# Send notification via preferred channels
 	if token:
 		from adapters.db.repositories.user_repo import UserRepository
@@ -461,14 +478,21 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
 		}
 	}
 )
-@rate_limit(
-	max_requests=10, 
-	window_seconds=3600,  # 1 ساعت
-	key_func=lambda req: f"reset_password:{get_client_ip(req)}",
-	error_message="تعداد درخواست‌های بازنشانی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
-)
 async def reset_password_endpoint(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
-	reset_password(db=db, token=payload.token, new_password=payload.new_password, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="reset",
+		error_message="تعداد درخواست‌های بازنشانی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
+	)
+	reset_password(
+		db=db,
+		token=payload.token,
+		new_password=payload.new_password,
+		captcha_id=payload.captcha_id,
+		captcha_code=payload.captcha_code,
+		client_ip=get_client_ip(request),
+	)
 	return success_response({"ok": True})
 
 
@@ -500,24 +524,24 @@ async def reset_password_endpoint(request: Request, payload: ResetPasswordReques
 		}
 	}
 )
-@rate_limit(
-	max_requests=5,
-	window_seconds=300,
-	key_func=lambda req: f"password_reset_send_otp:{get_client_ip(req)}",
-	error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.",
-)
 def send_password_reset_otp(
 	request: Request,
 	payload: ForgotPasswordRequest,
 	db: Session = Depends(get_db)
 ) -> dict:
 	"""ارسال OTP برای بازیابی رمز عبور"""
+	enforce_auth_rate_limit(
+		request,
+		db,
+		kind="pr_otp",
+		error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.",
+	)
 	from app.services.password_reset_otp_service import PasswordResetOtpService
 	from app.services.captcha_service import validate_captcha
 	from app.core.responses import ApiError
 	
 	# تایید کپچا
-	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code, client_ip=get_client_ip(request)):
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 	
 	service = PasswordResetOtpService(db)
@@ -1587,7 +1611,7 @@ def send_mobile_verification(
 	from app.services.auth_service import _normalize_mobile
 	from app.core.responses import ApiError
 	
-	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code, client_ip=get_client_ip(request)):
 		raise ApiError("INVALID_CAPTCHA", "کد کپچا نامعتبر است", http_status=400)
 	
 	# نرمال‌سازی شماره موبایل (همان مسیری که در ثبت‌نام است)
@@ -1770,6 +1794,7 @@ def update_mobile(
 			captcha_code=payload.captcha_code,
 			force_unverified=payload.force_unverified,
 			send_verification_sms=payload.send_verification_sms,
+			client_ip=get_client_ip(request),
 		)
 		
 		return success_response(
@@ -1838,7 +1863,8 @@ def update_email(
 			email=payload.email,
 			captcha_id=payload.captcha_id,
 			captcha_code=payload.captcha_code,
-			force_unverified=payload.force_unverified
+			force_unverified=payload.force_unverified,
+			client_ip=get_client_ip(request),
 		)
 		
 		return success_response(
@@ -1851,23 +1877,34 @@ def update_email(
 		raise
 
 
-@router.get(
+@router.post(
 	"/login/available-channels",
 	summary="دریافت کانال‌های در دسترس برای ورود با OTP",
-	description="دریافت لیست کانال‌های در دسترس (SMS, Email, Telegram) برای یک identifier",
+	description=(
+		"دریافت فهرست کانال‌های اولیه (فقط SMS یا ایمیل) بر اساس فرمت شناسه، "
+		"بدون افشای وجود کاربر. نیاز به کپتچای معتبر دارد."
+	),
 	response_model=SuccessResponse,
 )
-def get_available_channels(
+@rate_limit(
+	max_requests=12,
+	window_seconds=300,
+	key_func=lambda req: f"login_otp_channels:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های دریافت کانال ورود بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.",
+)
+def post_login_available_channels(
 	request: Request,
-	identifier: str = Query(..., description="ایمیل یا شماره موبایل"),
+	payload: AvailableChannelsRequest,
 	db: Session = Depends(get_db)
 ) -> dict:
-	"""دریافت کانال‌های در دسترس"""
+	"""کانال‌های قابل انتخاب قبل از ارسال OTP (ضد user enumeration)."""
 	from app.services.otp_login_service import OtpLoginService
 	
-	service = OtpLoginService(db)
-	channels_info = service.get_available_channels(identifier)
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code, client_ip=get_client_ip(request)):
+		raise ApiError("INVALID_CAPTCHA", "کد کپتچا نامعتبر است", http_status=400)
 	
+	service = OtpLoginService(db)
+	channels_info = service.get_public_otp_channel_options(payload.identifier)
 	return success_response(channels_info, request)
 
 
@@ -1920,13 +1957,13 @@ def send_login_otp(
 	from app.core.responses import ApiError
 	
 	# تایید کپتچا
-	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code, client_ip=get_client_ip(request)):
 		raise ApiError("INVALID_CAPTCHA", "کد کپتچا نامعتبر است", http_status=400)
 	
 	service = OtpLoginService(db)
 	
 	# دریافت IP و User Agent
-	ip_address = request.client.host if request.client else None
+	ip_address = get_client_ip(request)
 	user_agent = request.headers.get("User-Agent")
 	
 	try:

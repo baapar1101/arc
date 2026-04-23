@@ -36,6 +36,34 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _smsDestinationRateMaxSends = 40;
   int _smsDestinationRateWindowMinutes = 60;
 
+  // امنیت کپچا و نرخ احراز هویت
+  int _captchaMaxAttempts = 5;
+  int _captchaLength = 5;
+  int _captchaTtlSeconds = 180;
+  String _captchaMode = 'numeric';
+  bool _captchaBindIp = true;
+  bool _captchaStrongImage = true;
+  int _captchaRateMax = 20;
+  int _captchaRateWindowSec = 60;
+  int _loginRateMaxShort = 10;
+  int _loginRateWindowShortSec = 60;
+  int _loginRateMaxLong = 10;
+  int _loginRateWindowLongSec = 300;
+  int _registerRateMax = 5;
+  int _registerRateWindowSec = 3600;
+  int _forgotPasswordRateMax = 5;
+  int _forgotPasswordRateWindowSec = 3600;
+  int _resetPasswordRateMax = 10;
+  int _resetPasswordRateWindowSec = 3600;
+  int _passwordResetOtpRateMax = 5;
+  int _passwordResetOtpRateWindowSec = 300;
+  int _loginBackoffMaxFails = 5;
+  int _loginBackoffWindowMinutes = 15;
+  int _loginBackoffSeconds = 90;
+
+  bool _authReportLoading = false;
+  Map<String, dynamic>? _authReport;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +81,42 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
       return v.round();
     }
     return int.tryParse(v.toString()) ?? defaultValue;
+  }
+
+  static bool _asConfigBool(Object? v, bool defaultValue) {
+    if (v == null) {
+      return defaultValue;
+    }
+    if (v is bool) {
+      return v;
+    }
+    final s = v.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1') {
+      return true;
+    }
+    if (s == 'false' || s == '0') {
+      return false;
+    }
+    return defaultValue;
+  }
+
+  Future<void> _loadAuthReport() async {
+    if (!mounted) return;
+    setState(() => _authReportLoading = true);
+    try {
+      final r = await _service.getAuthSecurityReport(hours: 24, limit: 80);
+      if (mounted) {
+        setState(() => _authReport = r);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _authReport = null);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _authReportLoading = false);
+      }
+    }
   }
 
   Future<void> _loadConfiguration() async {
@@ -96,7 +160,32 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           if (_smsDestinationRateWindowMinutes < 1) {
             _smsDestinationRateWindowMinutes = 1;
           }
+          _captchaMaxAttempts = _asConfigInt(data['captcha_max_attempts'], 5);
+          _captchaLength = _asConfigInt(data['captcha_length'], 5);
+          _captchaTtlSeconds = _asConfigInt(data['captcha_ttl_seconds'], 180);
+          final cm = data['captcha_mode']?.toString().trim() ?? 'numeric';
+          _captchaMode = (cm == 'alphanumeric' || cm == 'numeric') ? cm : 'numeric';
+          _captchaBindIp = _asConfigBool(data['captcha_bind_ip'], true);
+          _captchaStrongImage = _asConfigBool(data['captcha_strong_image'], true);
+          _captchaRateMax = _asConfigInt(data['captcha_rate_max'], 20);
+          _captchaRateWindowSec = _asConfigInt(data['captcha_rate_window_sec'], 60);
+          _loginRateMaxShort = _asConfigInt(data['login_rate_max_short'], 10);
+          _loginRateWindowShortSec = _asConfigInt(data['login_rate_window_short_sec'], 60);
+          _loginRateMaxLong = _asConfigInt(data['login_rate_max_long'], 10);
+          _loginRateWindowLongSec = _asConfigInt(data['login_rate_window_long_sec'], 300);
+          _registerRateMax = _asConfigInt(data['register_rate_max'], 5);
+          _registerRateWindowSec = _asConfigInt(data['register_rate_window_sec'], 3600);
+          _forgotPasswordRateMax = _asConfigInt(data['forgot_password_rate_max'], 5);
+          _forgotPasswordRateWindowSec = _asConfigInt(data['forgot_password_rate_window_sec'], 3600);
+          _resetPasswordRateMax = _asConfigInt(data['reset_password_rate_max'], 10);
+          _resetPasswordRateWindowSec = _asConfigInt(data['reset_password_rate_window_sec'], 3600);
+          _passwordResetOtpRateMax = _asConfigInt(data['password_reset_otp_rate_max'], 5);
+          _passwordResetOtpRateWindowSec = _asConfigInt(data['password_reset_otp_rate_window_sec'], 300);
+          _loginBackoffMaxFails = _asConfigInt(data['login_backoff_max_fails'], 5);
+          _loginBackoffWindowMinutes = _asConfigInt(data['login_backoff_window_minutes'], 15);
+          _loginBackoffSeconds = _asConfigInt(data['login_backoff_seconds'], 90);
         });
+        await _loadAuthReport();
       }
     } catch (e) {
       if (mounted) {
@@ -410,6 +499,268 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
+                  'امنیت کپچا و محدودیت نرخ احراز هویت',
+                  Icons.shield_outlined,
+                  [
+                    _buildNumberField(
+                      label: 'حداکثر تلاش اشتباه برای هر کپچا',
+                      value: _captchaMaxAttempts,
+                      onChanged: (v) => setState(() => _captchaMaxAttempts = v),
+                      min: 1,
+                      max: 30,
+                    ),
+                    _buildNumberField(
+                      label: 'طول کد کپچا (۴ تا ۸)',
+                      value: _captchaLength,
+                      onChanged: (v) => setState(() => _captchaLength = v),
+                      min: 4,
+                      max: 8,
+                    ),
+                    _buildNumberField(
+                      label: 'زمان انقضای کپچا (ثانیه، ۶۰–۶۰۰)',
+                      value: _captchaTtlSeconds,
+                      onChanged: (v) => setState(() => _captchaTtlSeconds = v),
+                      min: 60,
+                      max: 600,
+                    ),
+                    _buildDropdownField(
+                      label: 'نوع کاراکتر کپچا',
+                      value: _captchaMode,
+                      items: const [
+                        DropdownMenuItem(value: 'numeric', child: Text('فقط عدد')),
+                        DropdownMenuItem(value: 'alphanumeric', child: Text('حروف انگلیسی + عدد')),
+                      ],
+                      onChanged: (v) => setState(() => _captchaMode = v ?? 'numeric'),
+                    ),
+                    _buildSwitchField(
+                      label: 'اتصال کپچا به IP مشتری',
+                      value: _captchaBindIp,
+                      onChanged: (v) => setState(() => _captchaBindIp = v),
+                    ),
+                    _buildSwitchField(
+                      label: 'تصویر کپچای قوی‌تر (نویز بیشتر)',
+                      value: _captchaStrongImage,
+                      onChanged: (v) => setState(() => _captchaStrongImage = v),
+                    ),
+                    _buildNumberField(
+                      label: 'سقف درخواست تولید کپچا به‌ازای هر IP (در پنجره)',
+                      value: _captchaRateMax,
+                      onChanged: (v) => setState(() => _captchaRateMax = v),
+                      min: 1,
+                      max: 200,
+                    ),
+                    _buildNumberField(
+                      label: 'پنجره نرخ تولید کپچا (ثانیه)',
+                      value: _captchaRateWindowSec,
+                      onChanged: (v) => setState(() => _captchaRateWindowSec = v),
+                      min: 10,
+                      max: 3600,
+                    ),
+                    const Divider(height: 32),
+                    Text(
+                      'محدودیت درخواست ورود (رمز عبور) به‌ازای هر IP',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildNumberField(
+                      label: 'کوتاه‌مدت: حداکثر درخواست',
+                      value: _loginRateMaxShort,
+                      onChanged: (v) => setState(() => _loginRateMaxShort = v),
+                      min: 1,
+                      max: 100,
+                    ),
+                    _buildNumberField(
+                      label: 'کوتاه‌مدت: پنجره (ثانیه)',
+                      value: _loginRateWindowShortSec,
+                      onChanged: (v) => setState(() => _loginRateWindowShortSec = v),
+                      min: 10,
+                      max: 3600,
+                    ),
+                    _buildNumberField(
+                      label: 'بلندمدت: حداکثر درخواست',
+                      value: _loginRateMaxLong,
+                      onChanged: (v) => setState(() => _loginRateMaxLong = v),
+                      min: 1,
+                      max: 500,
+                    ),
+                    _buildNumberField(
+                      label: 'بلندمدت: پنجره (ثانیه)',
+                      value: _loginRateWindowLongSec,
+                      onChanged: (v) => setState(() => _loginRateWindowLongSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
+                    const Divider(height: 32),
+                    Text(
+                      'Backoff پس از ورود ناموفق (بر اساس IP + شناسه)',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'با ۰ در «حداکثر خطا» این قابلیت غیرفعال می‌شود.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildNumberField(
+                      label: 'حداکثر خطای رمز در پنجره (۰ = غیرفعال)',
+                      value: _loginBackoffMaxFails,
+                      onChanged: (v) => setState(() => _loginBackoffMaxFails = v),
+                      min: 0,
+                      max: 50,
+                      allowUnlimited: false,
+                    ),
+                    _buildNumberField(
+                      label: 'پنجره شمارش خطا (دقیقه)',
+                      value: _loginBackoffWindowMinutes,
+                      onChanged: (v) => setState(() => _loginBackoffWindowMinutes = v),
+                      min: 1,
+                      max: 1440,
+                    ),
+                    _buildNumberField(
+                      label: 'مدت مسدودسازی پس از رسیدن به سقف (ثانیه)',
+                      value: _loginBackoffSeconds,
+                      onChanged: (v) => setState(() => _loginBackoffSeconds = v),
+                      min: 0,
+                      max: 3600,
+                      allowUnlimited: true,
+                      unlimitedLabel: 'بدون انتظار اجباری',
+                    ),
+                    const Divider(height: 32),
+                    Text(
+                      'سایر محدودیت‌ها (به‌ازای هر IP)',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildNumberField(
+                      label: 'ثبت‌نام: حداکثر درخواست / پنجره (ثانیه در فیلد بعد)',
+                      value: _registerRateMax,
+                      onChanged: (v) => setState(() => _registerRateMax = v),
+                      min: 1,
+                      max: 100,
+                    ),
+                    _buildNumberField(
+                      label: 'ثبت‌نام: پنجره (ثانیه)',
+                      value: _registerRateWindowSec,
+                      onChanged: (v) => setState(() => _registerRateWindowSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
+                    _buildNumberField(
+                      label: 'فراموشی رمز: حداکثر درخواست',
+                      value: _forgotPasswordRateMax,
+                      onChanged: (v) => setState(() => _forgotPasswordRateMax = v),
+                      min: 1,
+                      max: 100,
+                    ),
+                    _buildNumberField(
+                      label: 'فراموشی رمز: پنجره (ثانیه)',
+                      value: _forgotPasswordRateWindowSec,
+                      onChanged: (v) => setState(() => _forgotPasswordRateWindowSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
+                    _buildNumberField(
+                      label: 'بازنشانی رمز با توکن: حداکثر درخواست',
+                      value: _resetPasswordRateMax,
+                      onChanged: (v) => setState(() => _resetPasswordRateMax = v),
+                      min: 1,
+                      max: 200,
+                    ),
+                    _buildNumberField(
+                      label: 'بازنشانی رمز با توکن: پنجره (ثانیه)',
+                      value: _resetPasswordRateWindowSec,
+                      onChanged: (v) => setState(() => _resetPasswordRateWindowSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
+                    _buildNumberField(
+                      label: 'ارسال OTP بازیابی رمز: حداکثر درخواست',
+                      value: _passwordResetOtpRateMax,
+                      onChanged: (v) => setState(() => _passwordResetOtpRateMax = v),
+                      min: 1,
+                      max: 100,
+                    ),
+                    _buildNumberField(
+                      label: 'ارسال OTP بازیابی رمز: پنجره (ثانیه)',
+                      value: _passwordResetOtpRateWindowSec,
+                      onChanged: (v) => setState(() => _passwordResetOtpRateWindowSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
+                  'گزارش امنیت احراز هویت (۲۴ ساعت اخیر)',
+                  Icons.analytics_outlined,
+                  [
+                    Row(
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: _authReportLoading ? null : _loadAuthReport,
+                          icon: _authReportLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.refresh, size: 20),
+                          label: const Text('بروزرسانی گزارش'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (_authReport == null && !_authReportLoading)
+                      Text(
+                        'داده‌ای برای نمایش نیست.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    else if (_authReport != null) ...[
+                      Text('مجموع رویدادها: ${_authReport!['total'] ?? 0}'),
+                      const SizedBox(height: 8),
+                      if ((_authReport!['by_type'] as Map?)?.isNotEmpty ?? false) ...[
+                        Text('به تفکیک نوع', style: theme.textTheme.labelLarge),
+                        const SizedBox(height: 4),
+                        ...((_authReport!['by_type'] as Map).entries.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text('${e.key}: ${e.value}'),
+                          ),
+                        )),
+                        const SizedBox(height: 12),
+                      ],
+                      Text('آخرین رویدادها', style: theme.textTheme.labelLarge),
+                      const SizedBox(height: 4),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 240),
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            for (final item in (_authReport!['recent'] as List? ?? const []))
+                              ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  '${item['event_type'] ?? ''}  ${item['client_ip'] != null ? '— ${item['client_ip']}' : ''}',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                subtitle: Text(
+                                  item['created_at']?.toString() ?? '',
+                                  style: theme.textTheme.labelSmall,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 32),
                 // دکمه ذخیره بزرگ و واضح در پایین صفحه
                 SizedBox(
@@ -630,6 +981,29 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'sms_destination_rate_enabled': _smsDestinationRateEnabled,
         'sms_destination_rate_max_sends': _smsDestinationRateMaxSends,
         'sms_destination_rate_window_minutes': _smsDestinationRateWindowMinutes,
+        'captcha_max_attempts': _captchaMaxAttempts,
+        'captcha_length': _captchaLength,
+        'captcha_ttl_seconds': _captchaTtlSeconds,
+        'captcha_mode': _captchaMode,
+        'captcha_bind_ip': _captchaBindIp,
+        'captcha_strong_image': _captchaStrongImage,
+        'captcha_rate_max': _captchaRateMax,
+        'captcha_rate_window_sec': _captchaRateWindowSec,
+        'login_rate_max_short': _loginRateMaxShort,
+        'login_rate_window_short_sec': _loginRateWindowShortSec,
+        'login_rate_max_long': _loginRateMaxLong,
+        'login_rate_window_long_sec': _loginRateWindowLongSec,
+        'register_rate_max': _registerRateMax,
+        'register_rate_window_sec': _registerRateWindowSec,
+        'forgot_password_rate_max': _forgotPasswordRateMax,
+        'forgot_password_rate_window_sec': _forgotPasswordRateWindowSec,
+        'reset_password_rate_max': _resetPasswordRateMax,
+        'reset_password_rate_window_sec': _resetPasswordRateWindowSec,
+        'password_reset_otp_rate_max': _passwordResetOtpRateMax,
+        'password_reset_otp_rate_window_sec': _passwordResetOtpRateWindowSec,
+        'login_backoff_max_fails': _loginBackoffMaxFails,
+        'login_backoff_window_minutes': _loginBackoffWindowMinutes,
+        'login_backoff_seconds': _loginBackoffSeconds,
       });
 
       if (mounted) {

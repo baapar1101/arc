@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
 # pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install.
-# Flutter: Runflare pub/storage (mirror-flutter.runflare.com + mirror-gcs.runflare.com) tried first when env unset.
+# Flutter: فقط f.mirror.hesabix.ir (pub + gcs) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 set -euo pipefail
@@ -166,22 +166,8 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 persist_flutter_path_in_profile_d
-# Mirror detection (minimal)
-if [[ -z "${PUB_HOSTED_URL:-}" ]] || [[ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
-  for pair in \
-    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com" \
-    "https://pub.flutter-io.cn|https://storage.flutter-io.cn" \
-    "https://pub.dev|https://storage.googleapis.com"; do
-    IFS='|' read -r pub_url storage_url <<< "$pair"
-    if curl -s --connect-timeout 3 -o /dev/null -w "%{http_code}" "$pub_url" 2>/dev/null | grep -q '^[23]'; then
-      export PUB_HOSTED_URL="$pub_url"
-      export FLUTTER_STORAGE_BASE_URL="$storage_url"
-      break
-    fi
-  done
-  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.dev}"
-  export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.googleapis.com}"
-fi
+export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 app_dir="${APP_ROOT}/app"
 build_script="${app_dir}/build_web.sh"
 if [[ ! -f "${build_script}" ]]; then

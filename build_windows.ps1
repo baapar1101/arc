@@ -111,10 +111,10 @@ if ($PubHostedUrl) { $env:PUB_HOSTED_URL = $PubHostedUrl }
 if ($FlutterStorageBaseUrl) { $env:FLUTTER_STORAGE_BASE_URL = $FlutterStorageBaseUrl }
 
 if (-not $env:PUB_HOSTED_URL) {
-    $env:PUB_HOSTED_URL = "https://mirrors.tuna.tsinghua.edu.cn/dart-pub"
+    $env:PUB_HOSTED_URL = "https://f.mirror.hesabix.ir/pub"
 }
 if (-not $env:FLUTTER_STORAGE_BASE_URL) {
-    $env:FLUTTER_STORAGE_BASE_URL = "https://mirrors.tuna.tsinghua.edu.cn/flutter"
+    $env:FLUTTER_STORAGE_BASE_URL = "https://f.mirror.hesabix.ir/gcs"
 }
 
 Write-Host "PUB_HOSTED_URL: $($env:PUB_HOSTED_URL)"

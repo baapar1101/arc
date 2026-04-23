@@ -87,6 +87,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   List<String> _availableChannels = [];
   bool _loadingOtpLogin = false;
   bool _loadingChannels = false;
+  Timer? _otpChannelDebounce;
+  /// از پاسخ `/auth/captcha` — همه کپچاهای صفحه از یک تنظیم سرور تبعیت می‌کنند.
+  String _captchaMode = 'numeric';
+
+  List<TextInputFormatter> get _captchaInputFormatters => _captchaMode == 'alphanumeric'
+      ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))]
+      : <TextInputFormatter>[const EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly];
+
+  String _normalizeCaptchaCode(String raw) {
+    final s = raw.trim();
+    if (_captchaMode == 'alphanumeric') {
+      return s.toUpperCase();
+    }
+    return toEnglishDigits(s);
+  }
 
   @override
   void dispose() {
@@ -107,12 +122,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginIdentifierCtrl.dispose();
     _otpLoginCaptchaCtrl.dispose();
     _otpLoginCaptchaTimer?.cancel();
+    _otpChannelDebounce?.cancel();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
     super.dispose();
   }
 
-  Future<void> _refreshCaptcha(String scope) async {
+  Future<void> _refreshCaptcha(String scope, {bool clearOtpChannels = true}) async {
     try {
       final api = ApiClient();
       final res = await api.post<Map<String, dynamic>>('/api/v1/auth/captcha');
@@ -131,11 +147,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
       if (!mounted) return;
+      final m = data['captcha_mode']?.toString();
       setState(() {
+        if (m == 'alphanumeric' || m == 'numeric') {
+          _captchaMode = m!;
+        }
         if (scope == 'login') _loginCaptchaId = id;
         if (scope == 'register') _registerCaptchaId = id;
         if (scope == 'forgot') _forgotCaptchaId = id;
-        if (scope == 'otpLogin') _otpLoginCaptchaId = id;
+        if (scope == 'otpLogin') {
+          _otpLoginCaptchaId = id;
+          _otpLoginCaptchaCtrl.clear();
+          if (clearOtpChannels) {
+            _availableChannels = [];
+            _selectedChannel = null;
+          }
+        }
         if (scope == 'login') _loginCaptchaImage = bytes;
         if (scope == 'register') _registerCaptchaImage = bytes;
         if (scope == 'forgot') _forgotCaptchaImage = bytes;
@@ -154,7 +181,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _forgotCaptchaTimer = Timer(delay, () => _refreshCaptcha('forgot'));
         } else if (scope == 'otpLogin') {
           _otpLoginCaptchaTimer?.cancel();
-          _otpLoginCaptchaTimer = Timer(delay, () => _refreshCaptcha('otpLogin'));
+          _otpLoginCaptchaTimer = Timer(delay, () => _refreshCaptcha('otpLogin', clearOtpChannels: true));
         }
       }
     } catch (_) {
@@ -262,9 +289,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     SnackBarHelper.show(context, message: message);
   }
 
+  void _scheduleLoadOtpChannels() {
+    _otpChannelDebounce?.cancel();
+    _otpChannelDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      unawaited(_loadAvailableChannels());
+    });
+  }
+
   Future<void> _loadAvailableChannels() async {
     final identifier = toEnglishDigits(_otpLoginIdentifierCtrl.text.trim());
     if (identifier.isEmpty) {
+      setState(() {
+        _availableChannels = [];
+        _selectedChannel = null;
+      });
+      return;
+    }
+
+    final captchaRaw = _otpLoginCaptchaCtrl.text.trim();
+    if (captchaRaw.isEmpty || _otpLoginCaptchaId == null) {
       setState(() {
         _availableChannels = [];
         _selectedChannel = null;
@@ -278,23 +322,35 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     try {
       final service = OtpLoginService(ApiClient());
-      final result = await service.getAvailableChannels(identifier);
-      
+      final result = await service.getAvailableChannels(
+        identifier: identifier,
+        captchaId: _otpLoginCaptchaId!,
+        captchaCode: _normalizeCaptchaCode(_otpLoginCaptchaCtrl.text),
+      );
+
       if (!mounted) return;
-      
+
       final channels = (result['available_channels'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ?? [];
-      
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+
       setState(() {
         _availableChannels = channels;
         if (channels.isNotEmpty && !channels.contains(_selectedChannel)) {
           _selectedChannel = channels.first;
         }
       });
+      // کپتچا پس از اعتبارسنجی در سرور مصرف می‌شود؛ تصویر جدید برای مرحلهٔ ارسال کد
+      await _refreshCaptcha('otpLogin', clearOtpChannels: false);
     } catch (e) {
       if (!mounted) return;
-      // خطا را نادیده می‌گیریم - کاربر می‌تواند ادامه دهد
+      final t = AppLocalizations.of(context);
+      final msg = _extractErrorMessage(e, t);
+      if (msg.isNotEmpty) {
+        SnackBarHelper.showError(context, message: msg);
+      }
+      await _refreshCaptcha('otpLogin', clearOtpChannels: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -329,7 +385,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         identifier: identifier,
         channel: _selectedChannel!,
         captchaId: _otpLoginCaptchaId!,
-        captchaCode: toEnglishDigits(_otpLoginCaptchaCtrl.text.trim()),
+        captchaCode: _normalizeCaptchaCode(_otpLoginCaptchaCtrl.text),
         sessionId: changeChannel ? _otpLoginSessionId : null,
       );
       
@@ -450,7 +506,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   identifier: identifier,
                   channel: _selectedChannel!,
                   captchaId: _otpLoginCaptchaId!,
-                  captchaCode: toEnglishDigits(captchaCode),
+                  captchaCode: _normalizeCaptchaCode(captchaCode),
                   sessionId: sessionId,
                 );
                 final newSessionId = resendResult['session_id']?.toString();
@@ -538,7 +594,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'identifier': _identifierCtrl.text.trim(),
           'password': _passwordCtrl.text,
           'captcha_id': _loginCaptchaId,
-          'captcha_code': _loginCaptchaCtrl.text.trim(),
+          'captcha_code': _normalizeCaptchaCode(_loginCaptchaCtrl.text),
           'device_id': widget.authStore.deviceId,
           'referrer_code': await ReferralStore.getReferrerCode(),
         },
@@ -673,7 +729,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'mobile': _mobileCtrl.text.trim().isEmpty ? null : _mobileCtrl.text.trim(),
           'password': _registerPasswordCtrl.text,
           'captcha_id': _registerCaptchaId,
-          'captcha_code': _registerCaptchaCtrl.text.trim(),
+          'captcha_code': _normalizeCaptchaCode(_registerCaptchaCtrl.text),
           'device_id': widget.authStore.deviceId,
           'referrer_code': await ReferralStore.getReferrerCode(),
         },
@@ -807,7 +863,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         final result = await otpService.sendPasswordResetOtp(
           identifier: identifier,
           captchaId: _forgotCaptchaId!,
-          captchaCode: toEnglishDigits(_forgotCaptchaCtrl.text.trim()),
+          captchaCode: _normalizeCaptchaCode(_forgotCaptchaCtrl.text),
         );
         
         if (!mounted) return;
@@ -849,7 +905,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           data: {
             'identifier': identifier,
             'captcha_id': _forgotCaptchaId,
-            'captcha_code': toEnglishDigits(_forgotCaptchaCtrl.text.trim()),
+            'captcha_code': _normalizeCaptchaCode(_forgotCaptchaCtrl.text),
             'referrer_code': await ReferralStore.getReferrerCode(),
           },
         );
@@ -892,6 +948,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     String? captchaId;
     Uint8List? captchaImage;
     Timer? captchaTimer;
+    var dialogCaptchaMode = _captchaMode;
 
     // تابع برای دریافت کپچا
     Future<void> loadCaptcha() async {
@@ -902,6 +959,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         final String? id = captchaData?['captcha_id']?.toString();
         final String? imgB64 = captchaData?['image_base64']?.toString();
         final int? ttl = (captchaData?['ttl_seconds'] as num?)?.toInt();
+        final m = captchaData?['captcha_mode']?.toString();
+        if (m == 'alphanumeric' || m == 'numeric') {
+          dialogCaptchaMode = m!;
+        }
         
         if (id != null && imgB64 != null) {
           try {
@@ -986,11 +1047,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             labelText: 'کد کپچا',
                             prefixIcon: Icon(Icons.security),
                           ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            const EnglishDigitsFormatter(),
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
+                          keyboardType: dialogCaptchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+                          inputFormatters: dialogCaptchaMode == 'alphanumeric'
+                              ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))]
+                              : <TextInputFormatter>[const EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
                               return 'کد کپچا الزامی است';
@@ -1054,7 +1114,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       'token': resetToken,
                       'new_password': newPasswordCtrl.text,
                       'captcha_id': captchaId!,
-                      'captcha_code': toEnglishDigits(captchaCtrl.text.trim()),
+                      'captcha_code': dialogCaptchaMode == 'alphanumeric'
+                          ? captchaCtrl.text.trim().toUpperCase()
+                          : toEnglishDigits(captchaCtrl.text.trim()),
                     },
                   );
                   
@@ -1198,11 +1260,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         controller: _loginCaptchaCtrl,
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: TextInputType.number,
-                                                        inputFormatters: [
-                                                          const EnglishDigitsFormatter(),
-                                                          FilteringTextInputFormatter.digitsOnly,
-                                                        ],
+                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+                                                        inputFormatters: _captchaInputFormatters,
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1313,11 +1372,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         controller: _registerCaptchaCtrl,
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: TextInputType.number,
-                                                        inputFormatters: [
-                                                          const EnglishDigitsFormatter(),
-                                                          FilteringTextInputFormatter.digitsOnly,
-                                                        ],
+                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+                                                        inputFormatters: _captchaInputFormatters,
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1420,11 +1476,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         controller: _forgotCaptchaCtrl,
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: TextInputType.number,
-                                                        inputFormatters: [
-                                                          const EnglishDigitsFormatter(),
-                                                          FilteringTextInputFormatter.digitsOnly,
-                                                        ],
+                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+                                                        inputFormatters: _captchaInputFormatters,
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1521,7 +1574,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   textInputAction: TextInputAction.next,
                                                   onChanged: (_) {
                                                     if (_otpLoginSessionId == null) {
-                                                      _loadAvailableChannels();
+                                                      _scheduleLoadOtpChannels();
                                                     }
                                                   },
                                                   validator: (v) {
@@ -1531,6 +1584,57 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     return null;
                                                   },
                                                 ),
+                                                if (_otpLoginSessionId == null) ...[
+                                                  const SizedBox(height: 16),
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: TextFormField(
+                                                          controller: _otpLoginCaptchaCtrl,
+                                                          enabled: !_loadingOtpLogin && !_loadingChannels,
+                                                          decoration: InputDecoration(
+                                                            labelText: AppLocalizations.of(context).captcha,
+                                                            prefixIcon: const Icon(Icons.security),
+                                                          ),
+                                                          keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
+                                                          textInputAction: TextInputAction.next,
+                                                          inputFormatters: _captchaInputFormatters,
+                                                          onChanged: (_) {
+                                                            _scheduleLoadOtpChannels();
+                                                          },
+                                                          validator: (v) {
+                                                            if (v == null || v.trim().isEmpty) {
+                                                              return AppLocalizations.of(context).captchaRequired;
+                                                            }
+                                                            return null;
+                                                          },
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      if (_otpLoginCaptchaImage != null)
+                                                        ClipRRect(
+                                                          borderRadius: BorderRadius.circular(4),
+                                                          child: Image.memory(
+                                                            _otpLoginCaptchaImage!,
+                                                            height: 40,
+                                                            width: 120,
+                                                            fit: BoxFit.contain,
+                                                          ),
+                                                        )
+                                                      else
+                                                        const SizedBox(height: 40, width: 120),
+                                                      const SizedBox(width: 8),
+                                                      IconButton(
+                                                        onPressed: (_loadingOtpLogin || _loadingChannels)
+                                                            ? null
+                                                            : () => _refreshCaptcha('otpLogin'),
+                                                        icon: const Icon(Icons.refresh),
+                                                        tooltip: AppLocalizations.of(context).refresh,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                                 if (_otpLoginSessionId == null && _availableChannels.isNotEmpty) ...[
                                                   const SizedBox(height: 16),
                                                   Text(
@@ -1562,52 +1666,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                       secondary: Icon(channelIcons[channel] ?? Icons.send),
                                                       dense: true,
                                                     );
-                                                  }                                                  ),
+                                                  }),
                                                 ],
                                                 if (_otpLoginSessionId == null) ...[
-                                                  const SizedBox(height: 16),
-                                                  Row(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Expanded(
-                                                        child: TextFormField(
-                                                          controller: _otpLoginCaptchaCtrl,
-                                                          enabled: !_loadingOtpLogin,
-                                                          decoration: InputDecoration(
-                                                            labelText: AppLocalizations.of(context).captcha,
-                                                            prefixIcon: const Icon(Icons.security),
-                                                          ),
-                                                          keyboardType: TextInputType.text,
-                                                          textInputAction: TextInputAction.done,
-                                                          validator: (v) {
-                                                            if (v == null || v.trim().isEmpty) {
-                                                              return AppLocalizations.of(context).captchaRequired;
-                                                            }
-                                                            return null;
-                                                          },
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      if (_otpLoginCaptchaImage != null)
-                                                        ClipRRect(
-                                                          borderRadius: BorderRadius.circular(4),
-                                                          child: Image.memory(
-                                                            _otpLoginCaptchaImage!,
-                                                            height: 40,
-                                                            width: 120,
-                                                            fit: BoxFit.contain,
-                                                          ),
-                                                        )
-                                                      else
-                                                        const SizedBox(height: 40, width: 120),
-                                                      const SizedBox(width: 8),
-                                                      IconButton(
-                                                        onPressed: _loadingOtpLogin ? null : () => _refreshCaptcha('otpLogin'),
-                                                        icon: const Icon(Icons.refresh),
-                                                        tooltip: AppLocalizations.of(context).refresh,
-                                                      ),
-                                                    ],
-                                                  ),
                                                   const SizedBox(height: 16),
                                                   FilledButton.icon(
                                                     onPressed: (_loadingOtpLogin || _selectedChannel == null) ? null : _sendOtpLogin,

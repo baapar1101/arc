@@ -4,7 +4,9 @@ from adapters.db.session import Base  # re-export Base for Alembic
 from .user import User  # noqa: F401
 from .api_key import ApiKey  # noqa: F401
 from .captcha import Captcha  # noqa: F401
+from .auth_security_event import AuthSecurityEvent  # noqa: F401
 from .sms_destination_send_log import SmsDestinationSendLog  # noqa: F401
+from .firewall_rule import FirewallRule, FirewallRequestLog, FirewallAuditLog  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .email_verification import EmailVerificationToken  # noqa: F401
 from .mobile_verification import MobileVerificationToken  # noqa: F401

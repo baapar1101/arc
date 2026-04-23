@@ -20,6 +20,7 @@ from app.services.database_restore_service import (
 )
 from app.services.job_manager import JobManager
 from pydantic import BaseModel, Field
+from app.services.auth_security_event_service import get_auth_security_report
 from app.services.system_settings_service import (
 	get_wallet_settings,
 	set_wallet_base_currency_code,
@@ -337,6 +338,32 @@ class SystemConfigurationPayload(BaseModel):
 		default=None,
 		description="کنترل دسترسی ایجاد کسب و کار: none, email_only, mobile_only, both, either"
 	)
+	sms_destination_rate_enabled: bool | None = None
+	sms_destination_rate_max_sends: int | None = None
+	sms_destination_rate_window_minutes: int | None = None
+	captcha_max_attempts: int | None = None
+	captcha_length: int | None = None
+	captcha_ttl_seconds: int | None = None
+	captcha_mode: str | None = None
+	captcha_bind_ip: bool | None = None
+	captcha_strong_image: bool | None = None
+	captcha_rate_max: int | None = None
+	captcha_rate_window_sec: int | None = None
+	login_rate_max_short: int | None = None
+	login_rate_window_short_sec: int | None = None
+	login_rate_max_long: int | None = None
+	login_rate_window_long_sec: int | None = None
+	register_rate_max: int | None = None
+	register_rate_window_sec: int | None = None
+	forgot_password_rate_max: int | None = None
+	forgot_password_rate_window_sec: int | None = None
+	reset_password_rate_max: int | None = None
+	reset_password_rate_window_sec: int | None = None
+	password_reset_otp_rate_max: int | None = None
+	password_reset_otp_rate_window_sec: int | None = None
+	login_backoff_max_fails: int | None = None
+	login_backoff_window_minutes: int | None = None
+	login_backoff_seconds: int | None = None
 
 
 @router.get(
@@ -381,8 +408,52 @@ def set_system_configuration_endpoint(
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,
 		business_creation_verification_requirement=payload.business_creation_verification_requirement,
+		sms_destination_rate_enabled=payload.sms_destination_rate_enabled,
+		sms_destination_rate_max_sends=payload.sms_destination_rate_max_sends,
+		sms_destination_rate_window_minutes=payload.sms_destination_rate_window_minutes,
+		captcha_max_attempts=payload.captcha_max_attempts,
+		captcha_length=payload.captcha_length,
+		captcha_ttl_seconds=payload.captcha_ttl_seconds,
+		captcha_mode=payload.captcha_mode,
+		captcha_bind_ip=payload.captcha_bind_ip,
+		captcha_strong_image=payload.captcha_strong_image,
+		captcha_rate_max=payload.captcha_rate_max,
+		captcha_rate_window_sec=payload.captcha_rate_window_sec,
+		login_rate_max_short=payload.login_rate_max_short,
+		login_rate_window_short_sec=payload.login_rate_window_short_sec,
+		login_rate_max_long=payload.login_rate_max_long,
+		login_rate_window_long_sec=payload.login_rate_window_long_sec,
+		register_rate_max=payload.register_rate_max,
+		register_rate_window_sec=payload.register_rate_window_sec,
+		forgot_password_rate_max=payload.forgot_password_rate_max,
+		forgot_password_rate_window_sec=payload.forgot_password_rate_window_sec,
+		reset_password_rate_max=payload.reset_password_rate_max,
+		reset_password_rate_window_sec=payload.reset_password_rate_window_sec,
+		password_reset_otp_rate_max=payload.password_reset_otp_rate_max,
+		password_reset_otp_rate_window_sec=payload.password_reset_otp_rate_window_sec,
+		login_backoff_max_fails=payload.login_backoff_max_fails,
+		login_backoff_window_minutes=payload.login_backoff_window_minutes,
+		login_backoff_seconds=payload.login_backoff_seconds,
 	)
 	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")
+
+
+@router.get(
+	"/auth-security-report",
+	summary="گزارش رویدادهای امنیت احراز هویت و کپچا",
+	description="آمار و آخرین رویدادها (محدود به مدیر سیستم).",
+)
+def get_auth_security_report_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	hours: int = Query(24, ge=1, le=2160),
+	limit: int = Query(80, ge=1, le=500),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_auth_security_report(db, hours=hours, limit=limit)
+	return success_response(data, request)
 
 
 class RedisConfigurationPayload(BaseModel):

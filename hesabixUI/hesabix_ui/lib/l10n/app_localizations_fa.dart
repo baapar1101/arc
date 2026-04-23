@@ -8354,6 +8354,108 @@ class AppLocalizationsFa extends AppLocalizations {
       'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس';
 
   @override
+  String get settingsFirewall => 'فایروال نرم‌افزار';
+
+  @override
+  String get settingsFirewallDescription =>
+      'قوانین اجازه/رد IP، بن موقت، لاگ و گزارش';
+
+  @override
+  String get firewallTabRules => 'قوانین';
+
+  @override
+  String get firewallTabBlockLogs => 'درخواست‌های مسدود';
+
+  @override
+  String get firewallTabAudit => 'ممیزی';
+
+  @override
+  String get firewallTabReports => 'گزارش';
+
+  @override
+  String get firewallAddRule => 'قانون جدید';
+
+  @override
+  String get firewallEditRule => 'ویرایش قانون';
+
+  @override
+  String get firewallActionLabel => 'نوع';
+
+  @override
+  String get firewallActionAllow => 'اجازه';
+
+  @override
+  String get firewallActionDeny => 'رد';
+
+  @override
+  String get firewallIpCidr => 'IP یا CIDR';
+
+  @override
+  String get firewallPathPrefixOptional => 'پیشوند مسیر (اختیاری)';
+
+  @override
+  String get firewallHttpMethodsOptional =>
+      'متدهای HTTP مثل GET,POST (اختیاری)';
+
+  @override
+  String get firewallPriority => 'اولویت (کمتر = زودتر ارزیابی)';
+
+  @override
+  String get firewallNoteOptional => 'یادداشت (اختیاری)';
+
+  @override
+  String get firewallSaved => 'ذخیره شد';
+
+  @override
+  String get firewallBanIp => 'مسدودسازی IP';
+
+  @override
+  String get firewallDurationMinutesHint =>
+      'مدت به دقیقه (خالی = دائم تا حذف دستی)';
+
+  @override
+  String get firewallBanDone => 'مسدودسازی اعمال شد';
+
+  @override
+  String get firewallActiveOnlyFilter => 'فقط قوانین فعال';
+
+  @override
+  String get firewallRefresh => 'بروزرسانی';
+
+  @override
+  String get firewallNoRules => 'قانونی ثبت نشده';
+
+  @override
+  String get firewallDeleteConfirmTitle => 'حذف قانون؟';
+
+  @override
+  String get firewallDeleteConfirmBody => 'این عمل برگشت‌پذیر نیست.';
+
+  @override
+  String get firewallNoExpiry => 'بدون انقضا';
+
+  @override
+  String get firewallFilterByIp => 'فیلتر IP';
+
+  @override
+  String get firewallReportsPeriod => 'بازه';
+
+  @override
+  String get firewallReportsDays => 'روز';
+
+  @override
+  String get firewallReportsTotalBlocks => 'تعداد درخواست مسدود (بازه)';
+
+  @override
+  String get firewallReportsActiveDenyRules => 'قوانین رد فعال';
+
+  @override
+  String get firewallReportsTopIps => 'بیشترین IP مسدود شده';
+
+  @override
+  String get firewallReportsByDay => 'مسدودها به تفکیک روز';
+
+  @override
   String get settingsStoragePlans => 'پلن‌های ذخیره‌سازی';
 
   @override

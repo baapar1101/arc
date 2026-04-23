@@ -167,95 +167,15 @@ echo "API URL: $API_BASE_URL"
 
 cd "$APP_DIR"
 
-# Function to check accessibility of a URL (with SSL issues support)
-check_url_accessibility() {
-  local url="$1"
-  local timeout="${2:-5}"
-  # Try with SSL verification
-  if curl -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
-    return 0
-  fi
-  # If SSL fails, try without verification (for internal mirrors only)
-  if curl -k -s --connect-timeout "$timeout" --max-time "$timeout" -I "$url" >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-# Function to find best available mirror
-# Same order as deploy.sh: Runflare (Iran) → official → Chinese / others (shell.hesabix.ir فقط tarball SDK در deploy، نه pub mirror)
-find_available_mirror() {
-  local mirrors=(
-    # Runflare mirror (Iran) — aligned with deploy.sh get_flutter_mirrors_list / set_flutter_mirror_env
-    "https://mirror-flutter.runflare.com|https://mirror-gcs.runflare.com"
-    # Official (if DNS works)
-    "https://pub.dev|https://storage.googleapis.com"
-    # Chinese mirrors (for servers inside China or restricted networks)
-    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub|https://mirrors.tuna.tsinghua.edu.cn/flutter"
-    "https://mirror.sjtu.edu.cn/dart-pub|https://mirror.sjtu.edu.cn"
-    "https://pub.flutter-io.cn|https://storage.flutter-io.cn"
-    # Other alternative mirrors
-    "https://mirrors.cloud.tencent.com/dart-pub|https://mirrors.cloud.tencent.com/flutter"
-  )
-  
-  echo "Checking ${#mirrors[@]} different mirrors..." >&2
-  
-  for mirror_pair in "${mirrors[@]}"; do
-    IFS='|' read -r pub_url storage_url <<< "$mirror_pair"
-    echo "  Checking: $pub_url" >&2
-    if check_url_accessibility "$pub_url" 5; then
-      echo "  ✓ Available!" >&2
-      echo "$pub_url|$storage_url"
-      return 0
-    else
-      echo "  ✗ Not available" >&2
-    fi
-  done
-  
-  return 1
-}
-
-# Configure Flutter mirror
-# Priority: environment variables → find available mirror → default
-if [ -z "${PUB_HOSTED_URL:-}" ] || [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
-  echo "Checking Flutter mirror accessibility..."
-  
-  if available_mirror=$(find_available_mirror); then
-    IFS='|' read -r pub_url storage_url <<< "$available_mirror"
-    export PUB_HOSTED_URL="$pub_url"
-    export FLUTTER_STORAGE_BASE_URL="$storage_url"
-    echo "✓ Available mirror found: $PUB_HOSTED_URL"
-  else
-    # If no mirror is reachable, continue with offline cache mode.
-    # Do NOT stop build here; later dependency step will run `flutter pub get --offline`.
+# آینهٔ pub/storage: فقط Hesabix (مثل deploy.sh / hesabixAPI/f.mirror.hesabix.ir.conf)
+export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
+# اگر --offline داده نشده و f.mirror در دسترس نبود، مثل حالت آفلاین رفتار کن
+if [ "$USE_OFFLINE_CACHE" != true ]; then
+  if ! curl -fsS --connect-timeout 4 --max-time 8 "https://f.mirror.hesabix.ir/pub" >/dev/null 2>&1 && \
+     ! curl -kfsS --connect-timeout 4 --max-time 8 "https://f.mirror.hesabix.ir/pub" >/dev/null 2>&1; then
     USE_OFFLINE_CACHE=true
-    warn ""
-    warn "=========================================="
-    warn "⚠ Warning: No accessible mirror found!"
-    warn "=========================================="
-    warn ""
-    warn "All mirrors checked and not available:"
-    warn "  - mirror-flutter.runflare.com / mirror-gcs.runflare.com (Runflare)"
-    warn "  - pub.dev / storage.googleapis.com"
-    warn "  - mirrors.tuna.tsinghua.edu.cn"
-    warn "  - mirror.sjtu.edu.cn"
-    warn "  - pub.flutter-io.cn"
-    warn "  - mirrors.cloud.tencent.com"
-    warn ""
-    warn "No mirror selected. Will try offline cache mode for pub dependencies."
-    warn ""
-    warn "Suggested solutions:"
-    warn "  1. Check internet connection: ping 8.8.8.8"
-    warn "  2. Check DNS: nslookup pub.dev"
-    warn "  3. Configure DNS: cd /var/www/ark && ./fix_dns.sh"
-    warn "  4. Manually use mirror (e.g. Runflare, same as deploy.sh):"
-    warn "     export PUB_HOSTED_URL='https://mirror-flutter.runflare.com'"
-    warn "     export FLUTTER_STORAGE_BASE_URL='https://mirror-gcs.runflare.com'"
-    warn "     # or: mirrors.tuna.tsinghua.edu.cn/dart-pub + .../flutter"
-    warn "  5. Check firewall or proxy"
-    warn ""
-    warn "For complete guide, refer to TROUBLESHOOTING_DNS.md file."
-    warn ""
+    warn "f.mirror.hesabix.ir در دسترس نیست — اگر cache محلی ندارید، pub get ممکن است شکست بخورد. بررسی DNS/فایروال/Nginx میرور."
   fi
 fi
 

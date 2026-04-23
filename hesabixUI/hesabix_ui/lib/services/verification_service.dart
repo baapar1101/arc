@@ -29,6 +29,8 @@ class VerificationService {
         'captcha_id': data['captcha_id']?.toString(),
         'image_base64': data['image_base64']?.toString(),
         'ttl_seconds': (data['ttl_seconds'] as num?)?.toInt(),
+        'captcha_mode': data['captcha_mode']?.toString(),
+        'captcha_length': (data['captcha_length'] as num?)?.toInt(),
       };
     }
     return {};

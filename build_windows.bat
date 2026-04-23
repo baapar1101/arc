@@ -9,8 +9,8 @@ set REPO_ROOT=%SCRIPT_DIR%
 
 set DEFAULT_MODE=release
 set DEFAULT_API_BASE_URL=https://hsxn.hesabix.ir
-set DEFAULT_PUB_HOSTED_URL=https://mirrors.tuna.tsinghua.edu.cn/dart-pub
-set DEFAULT_FLUTTER_STORAGE_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn/flutter
+set DEFAULT_PUB_HOSTED_URL=https://f.mirror.hesabix.ir/pub
+set DEFAULT_FLUTTER_STORAGE_BASE_URL=https://f.mirror.hesabix.ir/gcs
 
 set USER_PROJECT=
 set MODE=%DEFAULT_MODE%
