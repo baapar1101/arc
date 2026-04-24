@@ -33,6 +33,8 @@ class AIConfig(Base):
     # تنظیمات Model
     max_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=4000)
     temperature: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0.7)
+    # اگر False باشد، tools به provider ارسال نمی‌شود (برای vLLM بدون --enable-auto-tool-choice)
+    function_calling_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     
     # وضعیت
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

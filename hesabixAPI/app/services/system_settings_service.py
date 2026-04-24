@@ -85,6 +85,8 @@ SYSTEM_CONFIG_PR_OTP_RATE_WINDOW_SEC = "system_config_password_reset_otp_rate_wi
 SYSTEM_CONFIG_LOGIN_BACKOFF_MAX_FAILS = "system_config_login_backoff_max_fails"
 SYSTEM_CONFIG_LOGIN_BACKOFF_WINDOW_MINUTES = "system_config_login_backoff_window_minutes"
 SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS = "system_config_login_backoff_seconds"
+SYSTEM_CONFIG_FIREWALL_AUTO_BAN_ON_LOGIN_FAIL = "system_config_firewall_auto_ban_on_login_fail"
+SYSTEM_CONFIG_FIREWALL_AUTO_BAN_DURATION_SEC = "system_config_firewall_auto_ban_duration_sec"
 
 # Redis Cache Configuration Keys
 REDIS_CONFIG_ENABLED = "redis_config_enabled"
@@ -699,6 +701,8 @@ def get_captcha_auth_security_effective(db: Session) -> Dict[str, Any]:
 		"login_backoff_max_fails": max(0, min(50, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_MAX_FAILS, 5))),
 		"login_backoff_window_minutes": max(1, min(1440, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_WINDOW_MINUTES, 15))),
 		"login_backoff_seconds": max(0, min(3600, _ii(SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS, 90))),
+		"firewall_auto_ban_on_login_fail": _bb(SYSTEM_CONFIG_FIREWALL_AUTO_BAN_ON_LOGIN_FAIL, False),
+		"firewall_auto_ban_duration_sec": max(60, min(86400, _ii(SYSTEM_CONFIG_FIREWALL_AUTO_BAN_DURATION_SEC, 3600))),
 	}
 
 
@@ -760,6 +764,8 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"login_backoff_max_fails": sec["login_backoff_max_fails"],
 		"login_backoff_window_minutes": sec["login_backoff_window_minutes"],
 		"login_backoff_seconds": sec["login_backoff_seconds"],
+		"firewall_auto_ban_on_login_fail": sec["firewall_auto_ban_on_login_fail"],
+		"firewall_auto_ban_duration_sec": sec["firewall_auto_ban_duration_sec"],
 	}
 
 
@@ -803,6 +809,8 @@ def set_system_configuration(
 	login_backoff_max_fails: int | None = None,
 	login_backoff_window_minutes: int | None = None,
 	login_backoff_seconds: int | None = None,
+	firewall_auto_ban_on_login_fail: bool | None = None,
+	firewall_auto_ban_duration_sec: int | None = None,
 ) -> Dict[str, Any]:
 	"""
 	تنظیم پیکربندی سیستم با اعتبارسنجی
@@ -969,6 +977,16 @@ def set_system_configuration(
 		if login_backoff_seconds < 0 or login_backoff_seconds > 3600:
 			raise ApiError("INVALID_LOGIN_BACKOFF_SEC", "مدت انتظار backoff باید بین 0 تا 3600 ثانیه باشد", http_status=400)
 		_upsert_setting_int(db, SYSTEM_CONFIG_LOGIN_BACKOFF_SECONDS, login_backoff_seconds)
+	if firewall_auto_ban_on_login_fail is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_FIREWALL_AUTO_BAN_ON_LOGIN_FAIL, firewall_auto_ban_on_login_fail)
+	if firewall_auto_ban_duration_sec is not None:
+		if firewall_auto_ban_duration_sec < 60 or firewall_auto_ban_duration_sec > 86400:
+			raise ApiError(
+				"INVALID_FIREWALL_AUTO_BAN_DURATION",
+				"مدت بن خودکار پس از ورود ناموفق باید بین 60 تا 86400 ثانیه باشد",
+				http_status=400,
+			)
+		_upsert_setting_int(db, SYSTEM_CONFIG_FIREWALL_AUTO_BAN_DURATION_SEC, firewall_auto_ban_duration_sec)
 	
 	db.commit()
 	return get_system_configuration(db)

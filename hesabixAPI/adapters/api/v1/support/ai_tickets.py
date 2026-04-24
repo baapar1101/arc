@@ -100,7 +100,9 @@ async def suggest_ai_reply(
         {"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
     ]
     
-    response = await ai_service.chat_completion(ai_messages, use_function_calling=True)
+    # بدون tools: بسیاری از gatewayهای OpenAI-compatible (مثلاً vLLM) بدون
+    # --enable-auto-tool-choice خطا می‌دهند؛ پیشنهاد پاسخ تیکت فقط متن است.
+    response = await ai_service.chat_completion(ai_messages, use_function_calling=False)
     
     # بررسی سهمیه و شارژ
     usage = response.get("usage", {})

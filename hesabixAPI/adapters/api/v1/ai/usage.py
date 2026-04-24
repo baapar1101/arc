@@ -9,6 +9,7 @@ from app.core.responses import success_response, ApiError
 from adapters.db.repositories.ai_usage_log_repository import AIUsageLogRepository
 from adapters.db.repositories.ai_invoice_repository import AIInvoiceRepository
 from adapters.api.v1.schemas import QueryInfo, FilterItem
+from app.services.ai.ai_invoice_service import pay_ai_invoice_from_wallet
 
 router = APIRouter(prefix="/ai/usage", tags=["ai-usage"])
 
@@ -520,4 +521,30 @@ async def get_ai_invoice_details(
         "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
         "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None
     }, request)
+
+
+@router.post(
+    "/invoices/{invoice_id}/pay",
+    summary="پرداخت صورتحساب AI از کیف پول",
+    description="برای فاکتورهای در وضعیت issued (مثلاً قبل از اصلاح خودکار subscribe)",
+)
+async def post_pay_ai_invoice(
+    request: Request,
+    invoice_id: int = Path(...),
+    business_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    business_id = business_id or ctx.business_id
+    if not business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.is_business_owner(business_id) and not ctx.is_superadmin():
+        raise ApiError("FORBIDDEN", "دسترسی به این عملیات ندارید", http_status=403)
+    data = pay_ai_invoice_from_wallet(
+        db=db,
+        business_id=int(business_id),
+        invoice_id=invoice_id,
+        user_id=ctx.get_user_id(),
+    )
+    return success_response(data, request, "صورتحساب با موفقیت پرداخت شد")
 

@@ -86,8 +86,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   String? _selectedChannel;
   List<String> _availableChannels = [];
   bool _loadingOtpLogin = false;
-  bool _loadingChannels = false;
-  Timer? _otpChannelDebounce;
+  static const List<String> _otpAllChannels = ['sms', 'email', 'telegram', 'bale'];
+  /// پیکربندی کانال روی سرور (true = سرویس فعال است)
+  final Map<String, bool> _otpChannelOnServer = {};
+  bool _loadingOtpChannelStatus = true;
   /// از پاسخ `/auth/captcha` — همه کپچاهای صفحه از یک تنظیم سرور تبعیت می‌کنند.
   String _captchaMode = 'numeric';
 
@@ -122,7 +124,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginIdentifierCtrl.dispose();
     _otpLoginCaptchaCtrl.dispose();
     _otpLoginCaptchaTimer?.cancel();
-    _otpChannelDebounce?.cancel();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
     super.dispose();
@@ -197,8 +198,51 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _refreshCaptcha('register');
     _refreshCaptcha('forgot');
     _refreshCaptcha('otpLogin');
+    unawaited(_loadOtpChannelStatus());
     // ذخیره کد معرف از URL (اگر وجود داشت)
     unawaited(ReferralStore.captureFromCurrentUrl());
+  }
+
+  Future<void> _loadOtpChannelStatus() async {
+    setState(() {
+      _loadingOtpChannelStatus = true;
+    });
+    try {
+      final data = await OtpLoginService(ApiClient()).getOtpChannelStatus();
+      if (!mounted) return;
+      setState(() {
+        for (final c in _otpAllChannels) {
+          _otpChannelOnServer[c] = data[c] == true;
+        }
+        _ensureOtpChannelSelection();
+        _loadingOtpChannelStatus = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        for (final c in _otpAllChannels) {
+          _otpChannelOnServer[c] = true;
+        }
+        _ensureOtpChannelSelection();
+        _loadingOtpChannelStatus = false;
+      });
+    }
+  }
+
+  void _ensureOtpChannelSelection() {
+    String? firstOk;
+    for (final c in _otpAllChannels) {
+      if (_otpChannelOnServer[c] == true) {
+        firstOk = c;
+        break;
+      }
+    }
+    if (firstOk != null &&
+        (_selectedChannel == null || _otpChannelOnServer[_selectedChannel!] != true)) {
+      _selectedChannel = firstOk;
+    } else if (_selectedChannel == null) {
+      _selectedChannel = _otpAllChannels.first;
+    }
   }
 
   @override
@@ -289,77 +333,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     SnackBarHelper.show(context, message: message);
   }
 
-  void _scheduleLoadOtpChannels() {
-    _otpChannelDebounce?.cancel();
-    _otpChannelDebounce = Timer(const Duration(milliseconds: 450), () {
-      if (!mounted) return;
-      unawaited(_loadAvailableChannels());
-    });
-  }
-
-  Future<void> _loadAvailableChannels() async {
-    final identifier = toEnglishDigits(_otpLoginIdentifierCtrl.text.trim());
-    if (identifier.isEmpty) {
-      setState(() {
-        _availableChannels = [];
-        _selectedChannel = null;
-      });
-      return;
-    }
-
-    final captchaRaw = _otpLoginCaptchaCtrl.text.trim();
-    if (captchaRaw.isEmpty || _otpLoginCaptchaId == null) {
-      setState(() {
-        _availableChannels = [];
-        _selectedChannel = null;
-      });
-      return;
-    }
-
-    setState(() {
-      _loadingChannels = true;
-    });
-
-    try {
-      final service = OtpLoginService(ApiClient());
-      final result = await service.getAvailableChannels(
-        identifier: identifier,
-        captchaId: _otpLoginCaptchaId!,
-        captchaCode: _normalizeCaptchaCode(_otpLoginCaptchaCtrl.text),
-      );
-
-      if (!mounted) return;
-
-      final channels = (result['available_channels'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [];
-
-      setState(() {
-        _availableChannels = channels;
-        if (channels.isNotEmpty && !channels.contains(_selectedChannel)) {
-          _selectedChannel = channels.first;
-        }
-      });
-      // کپتچا پس از اعتبارسنجی در سرور مصرف می‌شود؛ تصویر جدید برای مرحلهٔ ارسال کد
-      await _refreshCaptcha('otpLogin', clearOtpChannels: false);
-    } catch (e) {
-      if (!mounted) return;
-      final t = AppLocalizations.of(context);
-      final msg = _extractErrorMessage(e, t);
-      if (msg.isNotEmpty) {
-        SnackBarHelper.showError(context, message: msg);
-      }
-      await _refreshCaptcha('otpLogin', clearOtpChannels: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingChannels = false;
-        });
-      }
-    }
-  }
-
   Future<void> _sendOtpLogin({bool changeChannel = false}) async {
     final form = _otpLoginKey.currentState;
     if (form == null || !form.validate()) return;
@@ -368,7 +341,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       SnackBarHelper.showError(context, message: AppLocalizations.of(context).otpSelectChannelError);
       return;
     }
-    
+
+    if (_otpChannelOnServer[_selectedChannel!] != true) {
+      SnackBarHelper.showError(
+        context,
+        message: 'این روش دریافت کد روی سرور فعال نیست؛ روش دیگری را انتخاب کنید.',
+      );
+      return;
+    }
+
     if ((_otpLoginCaptchaCtrl.text.trim().isEmpty) || (_otpLoginCaptchaId == null)) {
       SnackBarHelper.showError(context, message: AppLocalizations.of(context).captchaRequired);
       return;
@@ -407,6 +388,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'sms': t.otpChannelSms,
           'email': t.otpChannelEmail,
           'telegram': t.otpChannelTelegram,
+          'bale': 'بله',
         };
         final channelName = channelNames[_selectedChannel] ?? _selectedChannel ?? '';
         SnackBarHelper.show(context, message: t.otpCodeSentMessage(channelName));
@@ -1530,7 +1512,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     child: Stack(
                                       children: [
                                         AbsorbPointer(
-                                          absorbing: _loadingOtpLogin,
+                                          absorbing: _loadingOtpLogin || _loadingOtpChannelStatus,
                                           child: Form(
                                             key: _otpLoginKey,
                                             child: Column(
@@ -1549,6 +1531,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                   ),
                                                 ),
+                                                if (_loadingOtpChannelStatus) ...[
+                                                  const SizedBox(height: 12),
+                                                  const LinearProgressIndicator(),
+                                                ],
                                                 const SizedBox(height: 16),
                                                 TextFormField(
                                                   controller: _otpLoginIdentifierCtrl,
@@ -1559,24 +1545,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     helperText: _otpLoginSessionId != null
                                                         ? AppLocalizations.of(context).otpCodeSent
                                                         : AppLocalizations.of(context).otpLoginIdentifierHint,
-                                                    suffixIcon: _loadingChannels
-                                                        ? const SizedBox(
-                                                            width: 20,
-                                                            height: 20,
-                                                            child: Padding(
-                                                              padding: EdgeInsets.all(12.0),
-                                                              child: CircularProgressIndicator(strokeWidth: 2),
-                                                            ),
-                                                          )
-                                                        : null,
                                                   ),
                                                   keyboardType: TextInputType.emailAddress,
                                                   textInputAction: TextInputAction.next,
-                                                  onChanged: (_) {
-                                                    if (_otpLoginSessionId == null) {
-                                                      _scheduleLoadOtpChannels();
-                                                    }
-                                                  },
                                                   validator: (v) {
                                                     if (v == null || v.trim().isEmpty) {
                                                       return AppLocalizations.of(context).otpLoginIdentifierRequired;
@@ -1586,23 +1557,69 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 ),
                                                 if (_otpLoginSessionId == null) ...[
                                                   const SizedBox(height: 16),
+                                                  Text(
+                                                    AppLocalizations.of(context).otpChannelSelectionTitle,
+                                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'روش‌های غیرفعال روی سرور قابل انتخاب نیستند.',
+                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  ..._otpAllChannels.map((channel) {
+                                                    final t = AppLocalizations.of(context);
+                                                    final channelNames = {
+                                                      'sms': t.otpChannelSms,
+                                                      'email': t.otpChannelEmail,
+                                                      'telegram': t.otpChannelTelegram,
+                                                      'bale': 'بله',
+                                                    };
+                                                    final channelIcons = {
+                                                      'sms': Icons.sms,
+                                                      'email': Icons.email,
+                                                      'telegram': Icons.telegram,
+                                                      'bale': Icons.chat,
+                                                    };
+                                                    final configured = _otpChannelOnServer[channel] == true;
+                                                    final subStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                        );
+                                                    return RadioListTile<String>(
+                                                      title: Text(channelNames[channel] ?? channel),
+                                                      subtitle: configured
+                                                          ? null
+                                                          : Text('روی این سرور پیکربندی نشده است', style: subStyle),
+                                                      value: channel,
+                                                      groupValue: _selectedChannel,
+                                                      onChanged: (!configured || _loadingOtpChannelStatus)
+                                                          ? null
+                                                          : (value) {
+                                                              setState(() {
+                                                                _selectedChannel = value;
+                                                              });
+                                                            },
+                                                      secondary: Icon(channelIcons[channel] ?? Icons.send),
+                                                      dense: true,
+                                                    );
+                                                  }),
+                                                  const SizedBox(height: 16),
                                                   Row(
                                                     crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
                                                       Expanded(
                                                         child: TextFormField(
                                                           controller: _otpLoginCaptchaCtrl,
-                                                          enabled: !_loadingOtpLogin && !_loadingChannels,
+                                                          enabled: !_loadingOtpLogin,
                                                           decoration: InputDecoration(
                                                             labelText: AppLocalizations.of(context).captcha,
                                                             prefixIcon: const Icon(Icons.security),
                                                           ),
                                                           keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
-                                                          textInputAction: TextInputAction.next,
+                                                          textInputAction: TextInputAction.done,
                                                           inputFormatters: _captchaInputFormatters,
-                                                          onChanged: (_) {
-                                                            _scheduleLoadOtpChannels();
-                                                          },
                                                           validator: (v) {
                                                             if (v == null || v.trim().isEmpty) {
                                                               return AppLocalizations.of(context).captchaRequired;
@@ -1626,52 +1643,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         const SizedBox(height: 40, width: 120),
                                                       const SizedBox(width: 8),
                                                       IconButton(
-                                                        onPressed: (_loadingOtpLogin || _loadingChannels)
-                                                            ? null
-                                                            : () => _refreshCaptcha('otpLogin'),
+                                                        onPressed: _loadingOtpLogin ? null : () => _refreshCaptcha('otpLogin'),
                                                         icon: const Icon(Icons.refresh),
                                                         tooltip: AppLocalizations.of(context).refresh,
                                                       ),
                                                     ],
                                                   ),
-                                                ],
-                                                if (_otpLoginSessionId == null && _availableChannels.isNotEmpty) ...[
-                                                  const SizedBox(height: 16),
-                                                  Text(
-                                                    AppLocalizations.of(context).otpChannelSelectionTitle,
-                                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  ..._availableChannels.map((channel) {
-                                                    final t = AppLocalizations.of(context);
-                                                    final channelNames = {
-                                                      'sms': t.otpChannelSms,
-                                                      'email': t.otpChannelEmail,
-                                                      'telegram': t.otpChannelTelegram,
-                                                    };
-                                                    final channelIcons = {
-                                                      'sms': Icons.sms,
-                                                      'email': Icons.email,
-                                                      'telegram': Icons.telegram,
-                                                    };
-                                                    return RadioListTile<String>(
-                                                      title: Text(channelNames[channel] ?? channel),
-                                                      value: channel,
-                                                      groupValue: _selectedChannel,
-                                                      onChanged: (value) {
-                                                        setState(() {
-                                                          _selectedChannel = value;
-                                                        });
-                                                      },
-                                                      secondary: Icon(channelIcons[channel] ?? Icons.send),
-                                                      dense: true,
-                                                    );
-                                                  }),
-                                                ],
-                                                if (_otpLoginSessionId == null) ...[
                                                   const SizedBox(height: 16),
                                                   FilledButton.icon(
-                                                    onPressed: (_loadingOtpLogin || _selectedChannel == null) ? null : _sendOtpLogin,
+                                                    onPressed: (_loadingOtpLogin ||
+                                                            _selectedChannel == null ||
+                                                            _otpChannelOnServer[_selectedChannel!] != true)
+                                                        ? null
+                                                        : _sendOtpLogin,
                                                     icon: _loadingOtpLogin
                                                         ? const SizedBox(
                                                             width: 20,
@@ -1698,6 +1682,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                           'sms': t.otpChannelSms,
                                                           'email': t.otpChannelEmail,
                                                           'telegram': t.otpChannelTelegram,
+                                                          'bale': 'بله',
                                                         };
                                                         return OutlinedButton(
                                                           onPressed: _loadingOtpLogin ? null : () async {
@@ -1717,8 +1702,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                       setState(() {
                                                         _otpLoginSessionId = null;
                                                         _otpLoginIdentifierCtrl.clear();
-                                                        _selectedChannel = null;
                                                         _availableChannels = [];
+                                                        _ensureOtpChannelSelection();
                                                       });
                                                     },
                                                     icon: const Icon(Icons.edit),

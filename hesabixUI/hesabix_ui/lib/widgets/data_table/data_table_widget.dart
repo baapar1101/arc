@@ -319,7 +319,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     try {
       final tableId = widget.config.effectiveTableId;
-      final savedSettings = await ColumnSettingsService.getColumnSettings(tableId);
+      final savedSettings = await ColumnSettingsService.getColumnSettings(
+        tableId,
+        businessId: widget.config.businessId,
+      );
       
       ColumnSettings effectiveSettings;
       if (savedSettings != null) {
@@ -752,6 +755,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         await ColumnSettingsService.saveColumnSettings(
           widget.config.effectiveTableId,
           updated,
+          businessId: widget.config.businessId,
         );
         if (mounted) {
           setState(() {
@@ -1059,7 +1063,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final validatedSettings = _validateColumnSettings(settings);
       
       final tableId = widget.config.effectiveTableId;
-      await ColumnSettingsService.saveColumnSettings(tableId, validatedSettings);
+      await ColumnSettingsService.saveColumnSettings(
+        tableId,
+        validatedSettings,
+        businessId: widget.config.businessId,
+      );
       
       setState(() {
         _columnSettings = validatedSettings;
@@ -2596,7 +2604,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           } : null,
           onResizeDragEnd: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, _columnSettings!);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                _columnSettings!,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onAutoFit: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
@@ -2612,7 +2626,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             setState(() {
               _columnSettings = updated;
             });
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                updated,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onPinLeft: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
@@ -2627,7 +2647,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _columnSettings = updated;
               _visibleColumns = _getVisibleColumnsFromSettings(updated);
             });
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                updated,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onPinRight: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
@@ -2642,7 +2668,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _columnSettings = updated;
               _visibleColumns = _getVisibleColumnsFromSettings(updated);
             });
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                updated,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onUnpin: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
@@ -2654,7 +2686,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _columnSettings = updated;
               _visibleColumns = _getVisibleColumnsFromSettings(updated);
             });
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                updated,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onHide: widget.config.enableColumnSettings ? () {
             if (_columnSettings == null) return;
@@ -2665,7 +2703,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _columnSettings = updated;
               _visibleColumns = _getVisibleColumnsFromSettings(updated);
             });
-            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+            unawaited(
+              ColumnSettingsService.saveColumnSettings(
+                widget.config.effectiveTableId,
+                updated,
+                businessId: widget.config.businessId,
+              ),
+            );
           } : null,
           onResetColumns: widget.config.enableColumnSettings ? () async {
             final defaults = ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
@@ -2673,7 +2717,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _columnSettings = defaults;
               _visibleColumns = _getVisibleColumnsFromSettings(defaults);
             });
-            await ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, defaults);
+            await ColumnSettingsService.saveColumnSettings(
+              widget.config.effectiveTableId,
+              defaults,
+              businessId: widget.config.businessId,
+            );
           } : null,
         ),
         size: DataTableUtils.getColumnSize(column.width),

@@ -354,6 +354,30 @@ def unban_ip(
 	return count
 
 
+def has_active_login_fail_auto_ban(db: Session, client_ip: str) -> bool:
+	"""اگر برای این IP قبلاً قانون رد فعال با منبع ورود ناموفق ثبت شده باشد."""
+	raw = (client_ip or "").strip().split("%")[0].strip()
+	if not raw or raw == "unknown":
+		return False
+	try:
+		ip_norm = validate_ip_or_cidr(raw)
+	except ValueError:
+		ip_norm = raw
+	now = datetime.utcnow()
+	row = (
+		db.query(FirewallRule)
+		.filter(
+			FirewallRule.enabled.is_(True),
+			FirewallRule.action == "deny",
+			FirewallRule.ip_cidr == ip_norm,
+			FirewallRule.source == "login_fail_auto",
+			or_(FirewallRule.expires_at.is_(None), FirewallRule.expires_at > now),
+		)
+		.first()
+	)
+	return row is not None
+
+
 def list_request_logs(
 	db: Session,
 	*,

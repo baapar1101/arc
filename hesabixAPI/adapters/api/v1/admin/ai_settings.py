@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,8 @@ class AIConfigRequest(BaseModel):
     max_tokens: int = 4000
     temperature: float = 0.7
     is_active: bool = True
+    # اگر null باشد (کلاینت قدیمی) هنگام به‌روز رکورد موجود، مقدار DB عوض نمی‌شود
+    function_calling_enabled: Optional[bool] = None
 
 
 @router.get("/config", summary="دریافت تنظیمات AI")
@@ -48,7 +50,8 @@ async def get_ai_config(
             "api_key": None,
             "max_tokens": 4000,
             "temperature": 0.7,
-            "is_active": False
+            "is_active": False,
+            "function_calling_enabled": True,
         }, request)
     
     return success_response({
@@ -59,7 +62,8 @@ async def get_ai_config(
         "api_key": "***" if config.api_key else None,  # مخفی کردن API key
         "max_tokens": config.max_tokens,
         "temperature": float(config.temperature),
-        "is_active": config.is_active
+        "is_active": config.is_active,
+        "function_calling_enabled": bool(getattr(config, "function_calling_enabled", True)),
     }, request)
 
 
@@ -89,6 +93,8 @@ async def update_ai_config(
         config.max_tokens = config_data.max_tokens
         config.temperature = config_data.temperature
         config.is_active = config_data.is_active
+        if config_data.function_calling_enabled is not None:
+            config.function_calling_enabled = config_data.function_calling_enabled
     else:
         from app.services.ai.encryption import encrypt_api_key
         encrypted_key = encrypt_api_key(config_data.api_key) if config_data.api_key else None
@@ -99,7 +105,10 @@ async def update_ai_config(
             api_key=encrypted_key,
             max_tokens=config_data.max_tokens,
             temperature=config_data.temperature,
-            is_active=config_data.is_active
+            is_active=config_data.is_active,
+            function_calling_enabled=config_data.function_calling_enabled
+            if config_data.function_calling_enabled is not None
+            else True,
         )
         db.add(config)
     
@@ -114,7 +123,8 @@ async def update_ai_config(
         "api_key": "***" if config.api_key else None,
         "max_tokens": config.max_tokens,
         "temperature": float(config.temperature),
-        "is_active": config.is_active
+        "is_active": config.is_active,
+        "function_calling_enabled": bool(getattr(config, "function_calling_enabled", True)),
     }, request)
 
 

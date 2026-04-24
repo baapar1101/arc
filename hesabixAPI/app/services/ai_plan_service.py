@@ -12,7 +12,7 @@ from adapters.db.models.ai_plan import AIPlan, AIPlanType
 from adapters.db.models.ai_subscription import UserAISubscription, SubscriptionType
 from adapters.db.repositories.ai_plan_repository import AIPlanRepository
 from adapters.db.repositories.ai_subscription_repository import AISubscriptionRepository
-from app.services.ai.ai_invoice_service import create_subscription_invoice
+from app.services.ai.ai_invoice_service import create_subscription_invoice, pay_ai_invoice_from_wallet
 from app.services.system_settings_service import get_wallet_settings
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def subscribe_to_plan(
 ) -> Dict[str, Any]:
     """
     اشتراک به پلن
-    - اگر subscription: ایجاد invoice و پرداخت
+    - اگر subscription / hybrid و مبلد دوره > 0: ایجاد فاکتور و پرداخت فوری از کیف پول (سند + تراکنش)؛ ناکافی = خطا
     - اگر free: فعال‌سازی مستقیم
     - اگر pay_as_go: فقط ثبت subscription
     """
@@ -222,6 +222,7 @@ def subscribe_to_plan(
     db.flush()
 
     invoice = None
+    payment_info: Optional[Dict[str, Any]] = None
     if plan.plan_type in [AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value]:
         pricing_config = json.loads(plan.pricing_config or "{}")
         subscription_config = pricing_config.get("subscription", {})
@@ -232,6 +233,12 @@ def subscribe_to_plan(
             amount = Decimal(str(subscription_config.get("yearly_price", 0)))
 
         if amount > 0:
+            if not business_id:
+                raise ApiError(
+                    "BUSINESS_ID_REQUIRED",
+                    "برای پلن اشتراکی پولی، شناسه کسب‌وکار الزامی است",
+                    http_status=400,
+                )
             wallet_settings = get_wallet_settings(db)
             currency_id = wallet_settings.get("wallet_base_currency_id")
             if not currency_id:
@@ -240,15 +247,24 @@ def subscribe_to_plan(
             invoice = create_subscription_invoice(
                 db=db,
                 subscription_id=subscription.id,
-                business_id=business_id or 0,
+                business_id=int(business_id),
                 amount=amount,
                 period=period,
                 currency_id=currency_id,
             )
+            payment_info = pay_ai_invoice_from_wallet(
+                db=db,
+                business_id=int(business_id),
+                invoice_id=invoice.id,
+                user_id=int(user_id),
+            )
+            db.refresh(invoice)
+            db.refresh(subscription)
 
-    db.commit()
-
+    if not payment_info:
+        db.commit()
     return {
         "subscription": subscription,
         "invoice": invoice,
+        "payment": payment_info,
     }

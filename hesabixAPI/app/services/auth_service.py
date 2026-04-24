@@ -131,7 +131,11 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 
 def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, captcha_code: str, device_id: str | None, user_agent: str | None, ip: str | None) -> tuple[str, datetime | None, dict]:
 	from app.services.system_settings_service import get_captcha_auth_security_effective
-	from app.services.auth_security_event_service import check_login_backoff, record_login_password_failed
+	from app.services.auth_security_event_service import (
+		check_login_backoff,
+		maybe_firewall_ban_after_login_password_failed,
+		record_login_password_failed,
+	)
 
 	_cfg = get_captcha_auth_security_effective(db)
 	if int(_cfg.get("login_backoff_max_fails") or 0) > 0:
@@ -179,6 +183,10 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 			logger.warning(f"Failed to log failed login activity: {e}")
 		try:
 			record_login_password_failed(client_ip=ip, identifier=identifier)
+		except Exception:
+			pass
+		try:
+			maybe_firewall_ban_after_login_password_failed(client_ip=ip, identifier=identifier, cfg=_cfg)
 		except Exception:
 			pass
 		from app.core.responses import ApiError

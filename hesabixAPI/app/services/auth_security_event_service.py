@@ -93,6 +93,62 @@ def record_login_password_failed(
 	)
 
 
+def maybe_firewall_ban_after_login_password_failed(
+	*,
+	client_ip: str | None,
+	identifier: str,
+	cfg: dict,
+) -> None:
+	"""
+	در صورت فعال بودن در تنظیمات، پس از ثبت خطای رمز اگر تعداد خطا در پنجرهٔ backoff به سقف رسیده باشد، IP در فایروال موقتاً مسدود می‌شود.
+	از همان آستانه و پنجرهٔ «Backoff ورود ناموفق» استفاده می‌کند (login_backoff_*).
+	"""
+	if not cfg.get("firewall_auto_ban_on_login_fail"):
+		return
+	max_fails = int(cfg.get("login_backoff_max_fails") or 0)
+	window_minutes = int(cfg.get("login_backoff_window_minutes") or 0)
+	if max_fails <= 0 or window_minutes <= 0:
+		return
+	ip_raw = (client_ip or "").strip().split("%")[0].strip()
+	if not ip_raw or ip_raw == "unknown":
+		return
+	duration = int(cfg.get("firewall_auto_ban_duration_sec") or 3600)
+	ak = _account_key_for_login(ip=client_ip, identifier=identifier)
+	since = datetime.utcnow() - timedelta(minutes=window_minutes)
+	try:
+		from app.services.firewall_service import ban_ip, has_active_login_fail_auto_ban, invalidate_rules_cache
+
+		with get_db_session() as db:
+			q = (
+				select(func.count())
+				.select_from(AuthSecurityEvent)
+				.where(
+					AuthSecurityEvent.event_type == "login_password_failed",
+					AuthSecurityEvent.account_key == ak,
+					AuthSecurityEvent.created_at >= since,
+				)
+			)
+			n = int(db.execute(q).scalar() or 0)
+			if n < max_fails:
+				return
+			if has_active_login_fail_auto_ban(db, ip_raw):
+				return
+			ban_ip(
+				db,
+				ip_raw,
+				duration_seconds=duration,
+				note="مسدودسازی خودکار: رسیدن به سقف تلاش ناموفق ورود (تنظیمات backoff)",
+				path_prefix=None,
+				http_methods=None,
+				priority=5,
+				created_by_user_id=None,
+				source="login_fail_auto",
+			)
+		invalidate_rules_cache()
+	except Exception as e:
+		logger.warning("firewall auto-ban after login fail failed: %s", e)
+
+
 def get_auth_security_report(
 	db: Session,
 	*,

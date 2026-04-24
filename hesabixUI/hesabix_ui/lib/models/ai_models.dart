@@ -8,6 +8,8 @@ class AIConfig {
   final String modelName;
   final String? apiBaseUrl;
   final bool isActive;
+  /// اگر false: tools به provider نمی‌رود (gateway بدون tool calling)
+  final bool functionCallingEnabled;
   final int maxTokens;
   final double temperature;
   final DateTime? createdAt;
@@ -19,6 +21,7 @@ class AIConfig {
     required this.modelName,
     this.apiBaseUrl,
     this.isActive = false,
+    this.functionCallingEnabled = true,
     this.maxTokens = 2000,
     this.temperature = 0.7,
     this.createdAt,
@@ -32,6 +35,7 @@ class AIConfig {
       modelName: json['model_name'] as String,
       apiBaseUrl: json['api_base_url'] as String?,
       isActive: json['is_active'] as bool? ?? false,
+      functionCallingEnabled: json['function_calling_enabled'] as bool? ?? true,
       maxTokens: json['max_tokens'] as int? ?? 2000,
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
       createdAt: json['created_at'] != null
@@ -50,6 +54,7 @@ class AIConfig {
       'model_name': modelName,
       if (apiBaseUrl != null) 'api_base_url': apiBaseUrl,
       'is_active': isActive,
+      'function_calling_enabled': functionCallingEnabled,
       'max_tokens': maxTokens,
       'temperature': temperature,
     };
@@ -225,8 +230,12 @@ class UserAISubscription {
     );
   }
 
-  int get remainingTokens {
-    if (tokensLimit == null) return 0;
+  /// true وقتی سقف معین داریم (مثلاً اشتراک ماهانه با monthly_tokens).
+  bool get hasTokenCap => tokensLimit != null && tokensLimit! > 0;
+
+  /// null یعنی بدون سقف معین (مثلاً pay-as-go یا مقدار نامحدود).
+  int? get remainingTokens {
+    if (!hasTokenCap) return null;
     return (tokensLimit! - tokensUsed).clamp(0, tokensLimit!);
   }
 }

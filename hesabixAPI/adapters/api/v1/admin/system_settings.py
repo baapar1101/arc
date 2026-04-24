@@ -364,6 +364,8 @@ class SystemConfigurationPayload(BaseModel):
 	login_backoff_max_fails: int | None = None
 	login_backoff_window_minutes: int | None = None
 	login_backoff_seconds: int | None = None
+	firewall_auto_ban_on_login_fail: bool | None = None
+	firewall_auto_ban_duration_sec: int | None = Field(None, ge=60, le=86400)
 
 
 @router.get(
@@ -434,6 +436,8 @@ def set_system_configuration_endpoint(
 		login_backoff_max_fails=payload.login_backoff_max_fails,
 		login_backoff_window_minutes=payload.login_backoff_window_minutes,
 		login_backoff_seconds=payload.login_backoff_seconds,
+		firewall_auto_ban_on_login_fail=payload.firewall_auto_ban_on_login_fail,
+		firewall_auto_ban_duration_sec=payload.firewall_auto_ban_duration_sec,
 	)
 	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")
 

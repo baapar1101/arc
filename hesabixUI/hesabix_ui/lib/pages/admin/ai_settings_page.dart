@@ -26,6 +26,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
   final _maxTokensController = TextEditingController(text: '2000');
   final _temperatureController = TextEditingController(text: '0.7');
   bool _isActive = false;
+  bool _functionCallingEnabled = true;
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
         _maxTokensController.text = config.maxTokens.toString();
         _temperatureController.text = config.temperature.toString();
         _isActive = config.isActive;
+        _functionCallingEnabled = config.functionCallingEnabled;
         _loading = false;
       });
     } catch (e) {
@@ -75,6 +77,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
         'max_tokens': int.parse(_maxTokensController.text),
         'temperature': double.parse(_temperatureController.text),
         'is_active': _isActive,
+        'function_calling_enabled': _functionCallingEnabled,
       };
 
       await _aiService.updateAIConfig(data);
@@ -293,6 +296,16 @@ class _AISettingsPageState extends State<AISettingsPage> {
                         subtitle: const Text('AI در دسترس کاربران باشد'),
                         value: _isActive,
                         onChanged: (v) => setState(() => _isActive = v),
+                      ),
+                      SwitchListTile(
+                        title: const Text('فراخوانی توابع (ابزارها)'),
+                        subtitle: const Text(
+                          'برای OpenAI رسمی یا vLLM با tool parser بگذارید روشن. '
+                          'برای gatewayهایی مثل برخی deploymentهای Arvan که خطای tool choice می‌دهند، خاموش کنید.',
+                        ),
+                        value: _functionCallingEnabled,
+                        onChanged: (v) =>
+                            setState(() => _functionCallingEnabled = v),
                       ),
                     ],
                   ),
