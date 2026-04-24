@@ -82,6 +82,7 @@ adapters/api/v1/admin/currencies.py
 adapters/api/v1/admin/document_monetization.py
 adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
+adapters/api/v1/admin/firewall.py
 adapters/api/v1/admin/marketplace.py
 adapters/api/v1/admin/monitoring.py
 adapters/api/v1/admin/notification_moderation.py
@@ -157,6 +158,7 @@ adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
 adapters/db/models/announcement.py
 adapters/db/models/api_key.py
+adapters/db/models/auth_security_event.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
@@ -182,6 +184,7 @@ adapters/db/models/document_share_link.py
 adapters/db/models/email_config.py
 adapters/db/models/email_verification.py
 adapters/db/models/file_storage.py
+adapters/db/models/firewall_rule.py
 adapters/db/models/fiscal_year.py
 adapters/db/models/invoice_item_line.py
 adapters/db/models/marketplace.py
@@ -289,6 +292,7 @@ app/core/customer_club_plugin_dependency.py
 app/core/db_pool_monitor.py
 app/core/distribution_plugin_dependency.py
 app/core/error_handlers.py
+app/core/firewall_middleware.py
 app/core/i18n.py
 app/core/i18n_catalog.py
 app/core/logging.py
@@ -324,6 +328,8 @@ app/services/alert_service.py
 app/services/announcement_service.py
 app/services/api_key_service.py
 app/services/async_isolated.py
+app/services/auth_dynamic_rate_limit.py
+app/services/auth_security_event_service.py
 app/services/auth_service.py
 app/services/bank_account_service.py
 app/services/bom_service.py
@@ -367,6 +373,7 @@ app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
 app/services/file_storage_share_service.py
+app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
 app/services/general_ledger_service.py
 app/services/invoice_fx_revaluation.py
@@ -483,6 +490,7 @@ app/services/voice/tts.py
 app/services/voice/vad.py
 app/services/workflow/__init__.py
 app/services/workflow/action_registry.py
+app/services/workflow/dry_run.py
 app/services/workflow/logging_decorators.py
 app/services/workflow/schedule_cron_resolution.py
 app/services/workflow/trigger_registry.py
@@ -565,6 +573,8 @@ migrations/versions/20260428_000001_sms_destination_rate_limit_log.py
 migrations/versions/20260429_000001_business_print_settings_show_share_qr.py
 migrations/versions/20260429_000002_document_share_links.py
 migrations/versions/20260430_000001_business_invoice_profit_fifo_shortage_mode.py
+migrations/versions/20260501_000001_auth_security_events_captcha_ip.py
+migrations/versions/20260502_000001_internal_firewall.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

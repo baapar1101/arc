@@ -4,6 +4,7 @@
 # Flutter: فقط f.mirror.hesabix.ir (pub + gcs) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
+# آدرس API در بیلد وب: https اگر /etc/letsencrypt/live/<API_DOMAIN> وجود داشته باشد؛ وگرنه http مگر API_PUBLIC_SCHEME در محیط ست شود (TLS سفارشی).
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
@@ -175,7 +176,23 @@ if [[ ! -f "${build_script}" ]]; then
   exit 1
 fi
 chmod +x "${build_script}"
-api_url="https://${API_DOMAIN}"
+# shellcheck disable=SC1091
+if [[ -r "${app_dir}/scripts/api_public_scheme.sh" ]]; then
+  source "${app_dir}/scripts/api_public_scheme.sh"
+fi
+if ! declare -F hesabix_resolve_api_public_scheme >/dev/null 2>&1; then
+  hesabix_resolve_api_public_scheme() {
+    if [[ -n "${API_DOMAIN:-}" ]] && [[ -d "/etc/letsencrypt/live/${API_DOMAIN}" ]]; then
+      printf '%s' "https"; return 0
+    fi
+    local s="${API_PUBLIC_SCHEME:-}"
+    s="${s,,}"
+    case "$s" in http|https) printf '%s' "$s"; return 0 ;; esac
+    printf '%s' "http"
+  }
+fi
+api_scheme="$(hesabix_resolve_api_public_scheme)"
+api_url="${api_scheme}://${API_DOMAIN}"
 cd "${app_dir}"
 if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
     PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \

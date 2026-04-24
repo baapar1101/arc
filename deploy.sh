@@ -37,6 +37,8 @@ IFS=$'\n\t'
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Nginx: بعد از SSL، برای عوض کردن فقط دامنه‌ها از scripts/update_nginx_domains.sh استفاده کنید؛
 #   این اسکریپت listen 443 و مسیرهای /p/ و /i/ را با گواهی Let's Encrypt (یا SSL_LETSENCRYPT_LIVE در .deploy_env) می‌سازد.
+# - آدرس API در بیلد وب: به‌صورت خودکار http یا https از روی وجود گواهی در
+#   /etc/letsencrypt/live/<API_DOMAIN>؛ برای TLS بدون این مسیر، API_PUBLIC_SCHEME را در محیط export کنید.
 #   نوشتن دستی hesabix-api فقط با HTTP باعث می‌شود https به سرور پیش‌فرض 443 (مثلاً pgAdmin) بخورد.
 # - Resume from failure: if a step fails, re-run the script to continue from that step
 #   (completed steps are skipped using .deploy_state)
@@ -68,6 +70,24 @@ LOG_FILE="${APP_ROOT}/deploy.log"
 CHECK_MARK=$'\xE2\x9C\x94'
 CROSS_MARK=$'\xE2\x9D\x8C'
 WARNING_MARK=$'\xE2\x9A\xA0'
+
+DEPLOY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/api_public_scheme.sh
+if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/api_public_scheme.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${DEPLOY_SCRIPT_DIR}/scripts/api_public_scheme.sh"
+fi
+if ! declare -F hesabix_resolve_api_public_scheme >/dev/null 2>&1; then
+  hesabix_resolve_api_public_scheme() {
+    if [[ -n "${API_DOMAIN:-}" ]] && [[ -d "/etc/letsencrypt/live/${API_DOMAIN}" ]]; then
+      printf '%s' "https"; return 0
+    fi
+    local s="${API_PUBLIC_SCHEME:-}"
+    s="${s,,}"
+    case "$s" in http|https) printf '%s' "$s"; return 0 ;; esac
+    printf '%s' "http"
+  }
+fi
 
 # Initialize log file
 init_log_file() {
@@ -1713,12 +1733,13 @@ install_flutter_and_build_frontend() {
   # Make build script executable
   chmod +x "${build_script}"
 
-  # Build API URL (use HTTPS for API domain)
-  local api_url="https://${API_DOMAIN}"
+  local api_scheme
+  api_scheme="$(hesabix_resolve_api_public_scheme)"
+  local api_url="${api_scheme}://${API_DOMAIN}"
 
   echo "Building Flutter web with:"
   echo "  Mode: release"
-  echo "  API URL: ${api_url}"
+  echo "  API URL: ${api_url} (scheme from TLS detection or API_PUBLIC_SCHEME)"
   echo "  Output: /var/www/${UI_DOMAIN}"
   echo
   echo "$CHECK_MARK Flutter build uses Hesabix mirror: f.mirror.hesabix.ir"
@@ -2494,16 +2515,6 @@ main() {
   fi
   echo
   
-  # Build frontend (skip if already done; resume from here if previous run failed during frontend)
-  if ! check_step_completed "frontend"; then
-    install_flutter_and_build_frontend
-    mark_step_completed "frontend"
-  else
-    echo "$CHECK_MARK Frontend already built and deployed. Skipping..."
-    persist_flutter_path_in_profile_d
-  fi
-  echo
-  
   # Configure Nginx API (skip if already done)
   if ! check_step_completed "nginx_api"; then
     configure_nginx_api
@@ -2531,6 +2542,16 @@ main() {
     fi
   else
     echo "$CHECK_MARK SSL for API already configured. Skipping..."
+  fi
+  echo
+
+  # Build frontend after API TLS attempt so dart-define matches http vs https (see scripts/api_public_scheme.sh).
+  if ! check_step_completed "frontend"; then
+    install_flutter_and_build_frontend
+    mark_step_completed "frontend"
+  else
+    echo "$CHECK_MARK Frontend already built and deployed. Skipping..."
+    persist_flutter_path_in_profile_d
   fi
   echo
   
@@ -2587,10 +2608,17 @@ main() {
   echo "=========================================="
   echo
   log_info "Access URLs:"
-  echo "  API:  https://${API_DOMAIN}/api/v1/health"
-  echo "  UI:   https://${UI_DOMAIN}/"
+  local _api_s _ui_s
+  _api_s="$(hesabix_resolve_api_public_scheme)"
+  if [[ -d "/etc/letsencrypt/live/${UI_DOMAIN}" ]]; then _ui_s=https; else _ui_s=http; fi
+  echo "  API:  ${_api_s}://${API_DOMAIN}/api/v1/health"
+  echo "  UI:   ${_ui_s}://${UI_DOMAIN}/"
   if [[ "${INSTALL_PGADMIN4}" =~ ^[Yy]$ ]] && [[ -n "${PGADMIN4_DOMAIN}" ]]; then
-    echo "  pgAdmin4: https://${PGADMIN4_DOMAIN}/"
+    if [[ -d "/etc/letsencrypt/live/${PGADMIN4_DOMAIN}" ]]; then
+      echo "  pgAdmin4: https://${PGADMIN4_DOMAIN}/"
+    else
+      echo "  pgAdmin4: http://${PGADMIN4_DOMAIN}/"
+    fi
   fi
   echo
   log_info "Service management:"
