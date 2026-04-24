@@ -41,10 +41,19 @@ SRC_ARMENIAN="$APP_DIR/assets/fonts/notosansarmenian.woff2"
 DEST_ARMENIAN="$TARGET_ROOT/fonts/gstatic/s/notosansarmenian/v43/ZgN0jOZKPa7CHqq0h37c7ReDUubm2SEdFXp7ig73qtTY5idb74R9UdM3y2nZLorxb60nYy6zF3Eg.woff2"
 mirror_file "$SRC_ARMENIAN" "$DEST_ARMENIAN" "Noto Sans Armenian"
 
+# Noto Sans (slice لاتین موتور وب) — باید با خط «notosans/v37/...» در web_gstatic_fallback_font_paths.txt یکی باشد.
+# روی سرور بیلد اگر gstatic در دسترس نباشد، بدون این فایل ۴۰۴ می‌گیرید؛ بنابراین در repo باندل شده است.
+SRC_NOTO_SANS_ENGINE="$APP_DIR/assets/fonts/notosans_v37_engine_fallback.woff2"
+DEST_NOTO_SANS_ENGINE="$TARGET_ROOT/fonts/gstatic/s/notosans/v37/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99Y41P6zHtY.woff2"
+mirror_file "$SRC_NOTO_SANS_ENGINE" "$DEST_NOTO_SANS_ENGINE" "Noto Sans (engine fallback v37)"
+
 # Noto Color Emoji — همان نام‌های sliceای که موتور با fontFallbackBaseUrl درخواست می‌کند
 # منبع ترجیحی: assets/fonts/notocoloremoji.woff2 (همان محتوا به هر مسیر gstatic کپی می‌شود)
 PATHS_FILE="$SCRIPT_DIR/web_gstatic_fallback_font_paths.txt"
-GSTATIC_BASE="https://fonts.gstatic.com/s"
+# در شبکه‌هایی که fonts.gstatic.com فیلتر است، می‌توان آینه با همان ساختار مسیر gstatic ست کرد، مثلاً:
+#   export GSTATIC_BASE_URL='https://example.com/myfonts/s'
+GSTATIC_BASE="${GSTATIC_BASE_URL:-https://fonts.gstatic.com/s}"
+GSTATIC_BASE="${GSTATIC_BASE%/}"
 SRC_NOTO_COLOR_EMOJI="$APP_DIR/assets/fonts/notocoloremoji.woff2"
 
 download_gstatic_slice_if_missing() {

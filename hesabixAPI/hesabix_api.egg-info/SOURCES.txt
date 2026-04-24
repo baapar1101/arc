@@ -12,6 +12,7 @@ adapters/api/v1/boms.py
 adapters/api/v1/business_backups.py
 adapters/api/v1/business_currency_rates.py
 adapters/api/v1/business_dashboard.py
+adapters/api/v1/business_data_table_settings.py
 adapters/api/v1/business_ftp_backup.py
 adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
@@ -163,6 +164,7 @@ adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_currency_rate.py
+adapters/db/models/business_dashboard_layout.py
 adapters/db/models/business_ftp_backup_setting.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
@@ -175,6 +177,7 @@ adapters/db/models/credit.py
 adapters/db/models/crm.py
 adapters/db/models/currency.py
 adapters/db/models/customer_club.py
+adapters/db/models/data_table_user_column_settings.py
 adapters/db/models/distribution.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
@@ -356,6 +359,7 @@ app/services/currency_quant.py
 app/services/customer_club_analytics_service.py
 app/services/customer_club_service.py
 app/services/dashboard_widgets_service.py
+app/services/data_table_user_settings_service.py
 app/services/database_backup_service.py
 app/services/database_restore_service.py
 app/services/distribution_service.py
@@ -575,6 +579,9 @@ migrations/versions/20260429_000002_document_share_links.py
 migrations/versions/20260430_000001_business_invoice_profit_fifo_shortage_mode.py
 migrations/versions/20260501_000001_auth_security_events_captcha_ip.py
 migrations/versions/20260502_000001_internal_firewall.py
+migrations/versions/20260503_000001_ai_config_function_calling_enabled.py
+migrations/versions/20260504_000001_business_dashboard_layout_tables.py
+migrations/versions/20260504_000002_data_table_user_column_settings.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
