@@ -7,6 +7,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# خروجی بیشتر از این در بسیاری از gatewayها (vLLM و مشابه) رد می‌شود؛ حتی اگر
+# مدیر در دیتابیس مقدار بسیار بزرگ بگذارد.
+_MAX_SAFE_CHAT_OUTPUT_TOKENS = 32000
+
+
+def _is_openai_model_unavailable_error(error_message: str) -> bool:
+    """تشخیص «مدل ناموجود/غیرقابل استفاده» بدون false positive روی max_model_len و ..."""
+    s = error_message.lower()
+    if "model_not_found" in s or "model not found" in s:
+        return True
+    if "invalid model" in s or "model does not exist" in s or "does not exist" in s and "model" in s:
+        return True
+    if "unknown model" in s or "no such model" in s:
+        return True
+    return False
+
 
 class AIProviderBase(ABC):
     """کلاس پایه برای AI Providers"""
@@ -81,6 +97,8 @@ class OpenAIProvider(AIProviderBase):
     ) -> Dict[str, Any]:
         """ارسال درخواست به OpenAI"""
         try:
+            if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
+                max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
             response = self.client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -116,7 +134,21 @@ class OpenAIProvider(AIProviderBase):
             logger.error(f"OpenAI API error: {e}", exc_info=True)
             # تبدیل خطاهای OpenAI به ApiError
             error_message = str(e)
-            if "model_not_found" in error_message or "model" in error_message.lower():
+            el = error_message.lower()
+            if (
+                "max_model_len" in el
+                or "max_total_tokens" in el
+                or ("max_tokens" in el and ("cannot" in el or "greater than" in el or "exceed" in el or "invalid" in el))
+                or ("context length" in el and ("exceed" in el or "exceeds" in el))
+            ):
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "AI_INVALID_MAX_TOKENS",
+                    "مقدار «حداکثر توکن» در تنظیمات AI برای این سرویس بیش‌ازحد مجاز است. "
+                    f"لطفاً مقدار را به عددی معقول (مثلاً ۴۰۰۰ تا {_MAX_SAFE_CHAT_OUTPUT_TOKENS}) کاهش دهید و دوباره تلاش کنید.",
+                    http_status=400
+                )
+            if _is_openai_model_unavailable_error(error_message):
                 from app.core.responses import ApiError
                 raise ApiError(
                     "MODEL_NOT_AVAILABLE",
@@ -159,6 +191,8 @@ class OpenAIProvider(AIProviderBase):
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
+            if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
+                max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
             # استفاده از async client برای streaming
             stream = await self.async_client.chat.completions.create(
                 model=model,
@@ -267,7 +301,21 @@ class OpenAIProvider(AIProviderBase):
             logger.error(f"OpenAI streaming API error: {e}", exc_info=True)
             # تبدیل خطاهای OpenAI به ApiError
             error_message = str(e)
-            if "model_not_found" in error_message or "model" in error_message.lower():
+            el = error_message.lower()
+            if (
+                "max_model_len" in el
+                or "max_total_tokens" in el
+                or ("max_tokens" in el and ("cannot" in el or "greater than" in el or "exceed" in el or "invalid" in el))
+                or ("context length" in el and ("exceed" in el or "exceeds" in el))
+            ):
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "AI_INVALID_MAX_TOKENS",
+                    "مقدار «حداکثر توکن» در تنظیمات AI برای این سرویس بیش‌ازحد مجاز است. "
+                    f"لطفاً مقدار را به عددی معقول (مثلاً ۴۰۰۰ تا {_MAX_SAFE_CHAT_OUTPUT_TOKENS}) کاهش دهید و دوباره تلاش کنید.",
+                    http_status=400
+                )
+            if _is_openai_model_unavailable_error(error_message):
                 from app.core.responses import ApiError
                 raise ApiError(
                     "MODEL_NOT_AVAILABLE",

@@ -404,34 +404,16 @@ class NotificationService:
 				if reuse_outbox is not None:
 					sent = ok
 					break
-				# اما برای اعلان‌های پشتیبانی باید audience_filters را به درستی تنظیم کنیم
+				# اعلان In-App در UI فقط برای گیرندهٔ هدف؛ بدون این فیلتر، user_list همه را مجاز می‌داند
 				try:
-					# اگر event_key مربوط به پشتیبانی است، audience_filters را تنظیم می‌کنیم
-					audience_filters = None
+					audience_filters: Optional[Dict[str, Any]] = {"allowed_user_ids": [user_id]}
 					if event_key.startswith("support."):
-						if event_key == "support.operator_reply":
-							# برای پاسخ اپراتور: فقط کاربر صاحب تیکت می‌تواند ببیند
-							audience_filters = {
-								"allowed_user_ids": [user_id]
-							}
-						elif event_key == "support.ticket_assigned":
-							# برای تخصیص تیکت: فقط اپراتور تخصیص‌یافته می‌تواند ببیند
-							# (این اعلان به اپراتور ارسال می‌شود)
-							audience_filters = {
-								"allowed_user_ids": [user_id]  # user_id در اینجا همان operator_id است
-							}
-						elif event_key == "support.ticket_status_changed":
-							# برای تغییر وضعیت: فقط کاربر صاحب تیکت
-							# استخراج user_id از context اگر موجود باشد
+						if event_key == "support.ticket_status_changed":
 							ticket_user_id = context.get("user_id") or user_id
-							audience_filters = {
-								"allowed_user_ids": [ticket_user_id]
-							}
-						else:
-							# برای سایر اعلان‌های پشتیبانی (ticket_created, user_reply): فقط اپراتورها
-							audience_filters = {
-								"require_permissions": ["support_operator"]
-							}
+							audience_filters = {"allowed_user_ids": [ticket_user_id]}
+						elif event_key not in ("support.operator_reply", "support.ticket_assigned"):
+							# ticket_created، user_reply و ... فقط برای اپراتورهای پشتیبانی
+							audience_filters = {"require_permissions": ["support_operator"]}
 					
 					# محدود کردن محتوای حساس برای اعلان‌های پشتیبانی
 					announcement_body = body_inapp or ""

@@ -117,6 +117,7 @@ async def subscribe_to_plan_endpoint(
     
     subscription = result["subscription"]
     invoice = result.get("invoice")
+    payment = result.get("payment")
     
     response_data = {
         "subscription": {
@@ -140,10 +141,35 @@ async def subscribe_to_plan_endpoint(
             "id": invoice.id,
             "code": invoice.code,
             "total": float(invoice.total),
-            "status": invoice.status
+            "status": invoice.status,
+            "document_id": invoice.document_id,
+            "wallet_transaction_id": invoice.wallet_transaction_id,
         }
     
+    if payment:
+        response_data["payment"] = payment
+
     return success_response(response_data, request, "اشتراک با موفقیت ایجاد شد")
+
+
+@router.post("/upgrade", summary="ارتقا به پلن دیگر")
+async def upgrade_to_plan(
+    request: Request,
+    plan_id: int = Body(..., embed=True),
+    business_id: Optional[int] = Body(None, embed=True),
+    period: str = Body("monthly", embed=True),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """ارتقا به پلن دیگر؛ منطق با subscribe یکسان است (اشتراک فعال قبلی غیرفعال می‌شود)."""
+    return await subscribe_to_plan_endpoint(
+        request=request,
+        plan_id=plan_id,
+        business_id=business_id,
+        period=period,
+        db=db,
+        ctx=ctx,
+    )
 
 
 @router.get("/usage", summary="آمار استفاده")

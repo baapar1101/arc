@@ -290,7 +290,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
           _layout = updated;
         });
       } catch (_) {
-        // ignore save errors silently for now
+        if (!mounted) return;
+        SnackBarHelper.showError(
+          context,
+          message: 'ذخیره چیدمان داشبورد انجام نشد. اتصال را بررسی کنید یا دوباره تلاش کنید.',
+        );
       }
     });
   }

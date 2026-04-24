@@ -60,6 +60,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _loginBackoffMaxFails = 5;
   int _loginBackoffWindowMinutes = 15;
   int _loginBackoffSeconds = 90;
+  bool _firewallAutoBanOnLoginFail = false;
+  int _firewallAutoBanDurationSec = 3600;
 
   bool _authReportLoading = false;
   Map<String, dynamic>? _authReport;
@@ -184,6 +186,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _loginBackoffMaxFails = _asConfigInt(data['login_backoff_max_fails'], 5);
           _loginBackoffWindowMinutes = _asConfigInt(data['login_backoff_window_minutes'], 15);
           _loginBackoffSeconds = _asConfigInt(data['login_backoff_seconds'], 90);
+          _firewallAutoBanOnLoginFail = _asConfigBool(data['firewall_auto_ban_on_login_fail'], false);
+          _firewallAutoBanDurationSec = _asConfigInt(data['firewall_auto_ban_duration_sec'], 3600);
         });
         await _loadAuthReport();
       }
@@ -628,6 +632,24 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       allowUnlimited: true,
                       unlimitedLabel: 'بدون انتظار اجباری',
                     ),
+                    const SizedBox(height: 12),
+                    _buildSwitchField(
+                      label: 'فایروال: بن خودکار IP پس از رسیدن به همان سقف خطای بالا',
+                      value: _firewallAutoBanOnLoginFail,
+                      onChanged: (v) => setState(() => _firewallAutoBanOnLoginFail = v),
+                    ),
+                    Text(
+                      'نیازمند فعال بودن backoff (حداکثر خطا > 0). مدت بن جدا از انتظار backoff است.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildNumberField(
+                      label: 'مدت بن خودکار در فایروال (ثانیه، ۶۰ تا ۸۶۴۰۰)',
+                      value: _firewallAutoBanDurationSec,
+                      onChanged: (v) => setState(() => _firewallAutoBanDurationSec = v),
+                      min: 60,
+                      max: 86400,
+                    ),
                     const Divider(height: 32),
                     Text(
                       'سایر محدودیت‌ها (به‌ازای هر IP)',
@@ -1004,6 +1026,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'login_backoff_max_fails': _loginBackoffMaxFails,
         'login_backoff_window_minutes': _loginBackoffWindowMinutes,
         'login_backoff_seconds': _loginBackoffSeconds,
+        'firewall_auto_ban_on_login_fail': _firewallAutoBanOnLoginFail,
+        'firewall_auto_ban_duration_sec': _firewallAutoBanDurationSec,
       });
 
       if (mounted) {

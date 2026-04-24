@@ -1877,6 +1877,25 @@ def update_email(
 		raise
 
 
+@router.get(
+	"/login/otp-channel-status",
+	summary="وضعیت پیکربندی کانال‌های OTP ورود",
+	description="نمایش اینکه هر کانال (پیامک، ایمیل، تلگرام، بله) روی سرور پیکربندی شده یا نه — بدون اطلاع از کاربر.",
+	response_model=SuccessResponse,
+)
+@rate_limit(
+	max_requests=40,
+	window_seconds=60,
+	key_func=lambda req: f"login_otp_channel_status:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+)
+def get_otp_channel_status(request: Request, db: Session = Depends(get_db)) -> dict:
+	from app.services.otp_login_service import OtpLoginService
+	
+	service = OtpLoginService(db)
+	return success_response(service.get_otp_channel_status_flags(), request)
+
+
 @router.post(
 	"/login/available-channels",
 	summary="دریافت کانال‌های در دسترس برای ورود با OTP",
@@ -1967,6 +1986,8 @@ def send_login_otp(
 	user_agent = request.headers.get("User-Agent")
 	
 	try:
+		from app.services.otp_login_service import OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE
+		
 		success, new_session_id, channels_info = service.send_login_otp(
 			identifier=payload.identifier,
 			channel=payload.channel,
@@ -1976,9 +1997,7 @@ def send_login_otp(
 		)
 		
 		if not success:
-			channel_names = {"sms": "پیامک", "email": "ایمیل", "telegram": "تلگرام", "bale": "بله"}
-			channel_name = channel_names.get(payload.channel, payload.channel)
-			raise ApiError("SEND_FAILED", f"خطا در ارسال {channel_name}", http_status=500)
+			raise ApiError("SEND_FAILED", OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE, http_status=400)
 		
 		channel_messages = {
 			"sms": "کد ورود به شماره موبایل ارسال شد",

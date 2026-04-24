@@ -7,6 +7,9 @@ import '../models/ai_models.dart';
 // Enable debug prints
 bool get debugPrintEnabled => kDebugMode;
 
+/// مدل‌های کند (مثلاً روی gateway) ممکن است بیش از ۳۰s پاسخ دهند؛ ApiClient پیش‌فرض ۳۰s است.
+const Duration _kLongAiHttpTimeout = Duration(minutes: 5);
+
 class AIService {
   final ApiClient _api;
   AIService(this._api);
@@ -30,6 +33,10 @@ class AIService {
   Future<Map<String, dynamic>> testAIConnection() async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/admin/ai/config/test-connection',
+      options: Options(
+        receiveTimeout: _kLongAiHttpTimeout,
+        sendTimeout: const Duration(seconds: 60),
+      ),
     );
     return res.data as Map<String, dynamic>;
   }
@@ -189,6 +196,10 @@ class AIService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions/$sessionId/messages',
       data: {'content': content},
+      options: Options(
+        receiveTimeout: _kLongAiHttpTimeout,
+        sendTimeout: const Duration(seconds: 60),
+      ),
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
@@ -213,8 +224,9 @@ class AIService {
         data: {'content': content},
         responseType: ResponseType.stream,
         options: Options(
-          receiveTimeout: const Duration(seconds: 30), // timeout 30 ثانیه
-          sendTimeout: const Duration(seconds: 30),
+          // استریم ممکن است بین chunkها مکث طولانی داشته باشد (مدل سنگین)
+          receiveTimeout: const Duration(minutes: 10),
+          sendTimeout: const Duration(seconds: 60),
           headers: {
             'Accept': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -420,6 +432,34 @@ class AIService {
     await _api.post('/api/v1/ai/subscription/cancel', query: query);
   }
 
+  /// آمار استفاده (از لاگ). بدون from/to کل دوره را می‌دهد.
+  Future<Map<String, dynamic>> getSubscriptionUsageStats({
+    int? businessId,
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) {
+      query['business_id'] = businessId.toString();
+    }
+    if (fromDate != null) {
+      query['from_date'] = fromDate.toIso8601String();
+    }
+    if (toDate != null) {
+      query['to_date'] = toDate.toIso8601String();
+    }
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/subscription/usage',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return {};
+  }
+
   // ========== User: Personal Prompts ==========
   Future<List<AIPrompt>> getMyPrompts() async {
     final res = await _api.get<Map<String, dynamic>>('/api/v1/ai/prompts/my');
@@ -555,6 +595,10 @@ class AIService {
       data: {
         if (context != null) 'context': context,
       },
+      options: Options(
+        receiveTimeout: _kLongAiHttpTimeout,
+        sendTimeout: const Duration(seconds: 60),
+      ),
     );
     return res.data as Map<String, dynamic>;
   }
@@ -568,6 +612,10 @@ class AIService {
       data: {
         if (context != null) 'context': context,
       },
+      options: Options(
+        receiveTimeout: _kLongAiHttpTimeout,
+        sendTimeout: const Duration(seconds: 60),
+      ),
     );
     return res.data as Map<String, dynamic>;
   }

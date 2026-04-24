@@ -4,19 +4,10 @@ class OtpLoginService {
   final ApiClient _api;
   OtpLoginService(this._api);
 
-  /// دریافت کانال‌های اولیه (SMS/ایمیل) با کپتچا — بدون افشای وجود کاربر در سرور
-  Future<Map<String, dynamic>> getAvailableChannels({
-    required String identifier,
-    required String captchaId,
-    required String captchaCode,
-  }) async {
-    final res = await _api.post<Map<String, dynamic>>(
-      '/api/v1/auth/login/available-channels',
-      data: {
-        'identifier': identifier,
-        'captcha_id': captchaId,
-        'captcha_code': captchaCode,
-      },
+  /// وضعیت پیکربندی کانال‌ها روی سرور (بدون وابستگی به شناسهٔ کاربر)
+  Future<Map<String, dynamic>> getOtpChannelStatus() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/auth/login/otp-channel-status',
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
@@ -65,4 +56,3 @@ class OtpLoginService {
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 }
-

@@ -36,6 +36,17 @@ def generate_otp() -> str:
 	return str(random.randint(100000, 999999))
 
 
+# پیام یکسان برای خطاهای کانال / عدم امکان ارسال — بدون افشای وجود کاربر یا جزئیات داخلی
+OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE = (
+	"امکان ارسال کد ورود از این روش در حال حاضر وجود ندارد. "
+	"شناسه، روش دریافت کد و کد امنیتی را بررسی کنید؛ در صورت نیاز روش دیگری را انتخاب کنید."
+)
+
+
+def _otp_login_channel_not_supported_error() -> ApiError:
+	return ApiError("CHANNEL_NOT_SUPPORTED", OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE, http_status=400)
+
+
 def _resolve_identifier_for_otp(identifier: str):
 	"""
 	نرمال‌سازی شناسه ورود OTP (ایمیل یا موبایل) — همان منطق get_available_channels بدون دسترسی به DB.
@@ -89,6 +100,15 @@ class OtpLoginService:
 			proxy_config=notify_cfg.get("telegram_proxy"),
 		)
 		self.bale_provider = BaleProvider(bot_token=notify_cfg.get("bale_bot_token"))
+	
+	def get_otp_channel_status_flags(self) -> dict[str, bool]:
+		"""وضعیت پیکربندی کانال‌ها روی سرور (بدون وابستگی به کاربر)."""
+		return {
+			"sms": self.sms_provider.is_configured(),
+			"email": self.email_provider.is_configured(),
+			"telegram": self.telegram_provider.is_configured(),
+			"bale": self.bale_provider.is_configured(),
+		}
 	
 	def get_public_otp_channel_options(self, identifier: str) -> dict:
 		"""
@@ -306,32 +326,44 @@ class OtpLoginService:
 		# بررسی کانال انتخابی
 		available_channels_info = self.get_available_channels(identifier)
 		if channel not in available_channels_info["available_channels"]:
-			raise ApiError("CHANNEL_NOT_AVAILABLE", f"کانال {channel} برای این شناسه در دسترس نیست", http_status=400)
+			logger.info(
+				f"send_login_otp channel not in user-specific list channel={channel!r} "
+				f"available={available_channels_info.get('available_channels')!r}"
+			)
+			raise _otp_login_channel_not_supported_error()
 		
 		# بررسی پیکربندی کانال
 		if channel == "sms" and not self.sms_provider.is_configured():
-			raise ApiError("SMS_NOT_CONFIGURED", "سرویس پیامک پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
+			logger.warning("send_login_otp sms not configured")
+			raise _otp_login_channel_not_supported_error()
 		if channel == "email":
 			if not user:
-				# برای جلوگیری از user enumeration، همان خطای کانال را برمی‌گردانیم
-				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال ایمیل برای این شناسه در دسترس نیست", http_status=400)
+				logger.info("send_login_otp email channel rejected (no user row)")
+				raise _otp_login_channel_not_supported_error()
 			if not self.email_provider.is_configured():
-				raise ApiError("EMAIL_NOT_CONFIGURED", "سرویس ایمیل پیکربندی نشده است. لطفاً با مدیر سیستم تماس بگیرید", http_status=503)
+				logger.warning("send_login_otp email provider not configured")
+				raise _otp_login_channel_not_supported_error()
 		if channel == "telegram":
 			logger.info(f"send_login_otp - checking telegram channel - user: {user is not None}, user_id: {user.id if user else None}, telegram_chat_id: {user.telegram_chat_id if user else None}")
 			if not user:
-				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
+				logger.info("send_login_otp telegram rejected (no user)")
+				raise _otp_login_channel_not_supported_error()
 			if not user.telegram_chat_id:
-				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
+				logger.info(f"send_login_otp telegram rejected (no chat id) user_id={user.id}")
+				raise _otp_login_channel_not_supported_error()
 			if not self.telegram_provider.is_configured():
-				raise ApiError("TELEGRAM_NOT_CONFIGURED", "سرویس تلگرام پیکربندی نشده است", http_status=503)
+				logger.warning("send_login_otp telegram provider not configured")
+				raise _otp_login_channel_not_supported_error()
 		if channel == "bale":
 			if not user:
-				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال بله برای این شناسه در دسترس نیست", http_status=400)
+				logger.info("send_login_otp bale rejected (no user)")
+				raise _otp_login_channel_not_supported_error()
 			if not getattr(user, "bale_chat_id", None):
-				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال بله برای این شناسه در دسترس نیست", http_status=400)
+				logger.info(f"send_login_otp bale rejected (no chat id) user_id={user.id}")
+				raise _otp_login_channel_not_supported_error()
 			if not self.bale_provider.is_configured():
-				raise ApiError("BALE_NOT_CONFIGURED", "سرویس بله پیکربندی نشده است", http_status=503)
+				logger.warning("send_login_otp bale provider not configured")
+				raise _otp_login_channel_not_supported_error()
 		
 		# سهمیه + جلوگیری از race: قفل دیتابیسی، سپس شمارش و ثبت session در همان تراکنش
 		rate_key = f"login_otp:{(normalized_mobile or (email or ''))[:4000]}"
@@ -424,7 +456,8 @@ class OtpLoginService:
 			
 			elif channel == "telegram":
 				if not user or not user.telegram_chat_id:
-					raise ApiError("TELEGRAM_NOT_CONNECTED", "حساب تلگرام شما به سیستم متصل نشده است", http_status=400)
+					logger.warning(f"send_login_otp telegram fallback missing link user_id={getattr(user, 'id', None)}")
+					raise _otp_login_channel_not_supported_error()
 				success = self.telegram_provider.send_text(
 					chat_id=int(user.telegram_chat_id),
 					text=message
@@ -433,7 +466,8 @@ class OtpLoginService:
 					logger.error("telegram_login_otp_send_failed", user_id=user.id, chat_id=user.telegram_chat_id)
 			elif channel == "bale":
 				if not user or not getattr(user, "bale_chat_id", None):
-					raise ApiError("BALE_NOT_CONNECTED", "حساب بله شما به سیستم متصل نشده است", http_status=400)
+					logger.warning(f"send_login_otp bale fallback missing link user_id={getattr(user, 'id', None)}")
+					raise _otp_login_channel_not_supported_error()
 				success = self.bale_provider.send_text(
 					chat_id=int(user.bale_chat_id),
 					text=message

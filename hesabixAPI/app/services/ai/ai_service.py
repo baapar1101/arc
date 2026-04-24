@@ -63,6 +63,18 @@ class AIService:
         """دریافت تنظیمات AI"""
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
+
+    def _use_tools_for_request(self, use_function_calling: bool) -> bool:
+        """
+        اگر در تنظیمات سراسری function_calling_enabled=False باشد،
+        tools به provider ارسال نمی‌شود (مثال: vLLM بدون --enable-auto-tool-choice).
+        """
+        if not use_function_calling:
+            return False
+        cfg = self.config
+        if cfg is not None and getattr(cfg, "function_calling_enabled", True) is False:
+            return False
+        return True
     
     def check_availability(
         self,
@@ -85,6 +97,7 @@ class AIService:
         """
         # دسترسی‌های سیستمی (اپراتور/سوپرادمین) بدون نیاز به اشتراک
         if self.ctx.can_access_support_operator() or self.ctx.is_superadmin():
+            fce = bool(getattr(self.config, "function_calling_enabled", True)) if self.config else True
             return {
                 "can_use": True,
                 "reason": None,
@@ -94,6 +107,7 @@ class AIService:
                         "plan_type": "system",
                         "is_unlimited": True
                     },
+                    "function_calling_enabled": fce,
                     "suggestions": []
                 }
             }
@@ -179,6 +193,7 @@ class AIService:
         }
         
         suggestions = []
+        wallet_info = None  # فقط برای pay_as_go / hybrid مقداردهی می‌شود
         
         # بررسی بر اساس نوع پلن
         if plan.plan_type == "free":
@@ -297,12 +312,14 @@ class AIService:
                 }
         
         # همه چیز OK است
+        fce = bool(getattr(self.config, "function_calling_enabled", True)) if self.config else True
         return {
             "can_use": True,
             "reason": None,
             "details": {
                 "subscription": subscription_info,
                 "wallet": wallet_info if plan.plan_type in ["pay_as_go", "hybrid"] else None,
+                "function_calling_enabled": fce,
                 "suggestions": suggestions
             }
         }
@@ -659,8 +676,11 @@ class AIService:
         ]
         
         # دریافت function definitions
-        if use_function_calling and tools is None:
+        eff_tools = self._use_tools_for_request(use_function_calling)
+        if eff_tools and tools is None:
             tools = self.get_available_functions(session_business_id=session_business_id)
+        elif not eff_tools:
+            tools = None
         
         # ارسال به AI provider در thread pool برای جلوگیری از blocking
         try:
@@ -689,7 +709,7 @@ class AIService:
         
         # پردازش function calls در یک حلقه (multi-round agent)
         iteration = 0
-        while response["message"].get("function_calls") and iteration < max_iterations:
+        while eff_tools and response["message"].get("function_calls") and iteration < max_iterations:
             iteration += 1
             function_results = await self.handle_function_calls_async(
                 response["message"]["function_calls"],
@@ -846,8 +866,11 @@ class AIService:
         ]
         
         # دریافت function definitions
-        if use_function_calling and tools is None:
+        eff_tools = self._use_tools_for_request(use_function_calling)
+        if eff_tools and tools is None:
             tools = self.get_available_functions(session_business_id=session_business_id)
+        elif not eff_tools:
+            tools = None
         
         # ارسال به AI provider (streaming)
         try:
@@ -890,7 +913,7 @@ class AIService:
                 yield chunk
             
             # بررسی function calls (اگر وجود داشته باشد)
-            if function_calls and use_function_calling:
+            if function_calls and eff_tools:
                 # پردازش function calls به صورت async
                 function_results = await self.handle_function_calls_async(function_calls, session_business_id=session_business_id)
                 

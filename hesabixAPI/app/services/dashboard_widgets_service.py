@@ -6,6 +6,10 @@ from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
+from adapters.db.models.business_dashboard_layout import (
+    BusinessUserDashboardLayout,
+    BusinessDashboardDefaultLayout,
+)
 from adapters.db.models.document import Document
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.currency import Currency
@@ -330,18 +334,47 @@ def get_widget_definitions(
 
 
 # ----------------------------
-# Layout Storage (in-memory for now)
-# In production, persist in DB (e.g., dashboard_layouts table or settings)
+# Layout storage (DB): چند worker و رفرش مرورگر — منبع حقیقت پایگاه داده
 # ----------------------------
-_IN_MEMORY_LAYOUTS: Dict[str, Dict[str, Any]] = {}
-_IN_MEMORY_DEFAULTS: Dict[str, Dict[str, Any]] = {}
+
+def _normalize_layout_breakpoint(breakpoint: str) -> str:
+    bp = (breakpoint or "md").lower()
+    if bp not in COLUMNS_BY_BREAKPOINT:
+        return "md"
+    return bp
 
 
-def _layout_key(business_id: int, user_id: int, breakpoint: str) -> str:
-    return f"{business_id}:{user_id}:{breakpoint}"
+def _default_layout_items(breakpoint: str) -> List[Dict[str, Any]]:
+    columns = COLUMNS_BY_BREAKPOINT[breakpoint]
+    out: List[Dict[str, Any]] = []
+    order = 1
+    for d in DEFAULT_WIDGET_DEFINITIONS:
+        defaults = (d.get("defaults") or {}).get(breakpoint) or {}
+        out.append({
+            "key": d["key"],
+            "order": order,
+            "colSpan": int(defaults.get("colSpan", max(1, columns // 2))),
+            "rowSpan": int(defaults.get("rowSpan", 2)),
+            "hidden": False,
+        })
+        order += 1
+    return out
 
-def _default_key(business_id: int, breakpoint: str) -> str:
-    return f"{business_id}:DEFAULT:{breakpoint}"
+
+def _layout_profile_dict(
+    bp: str,
+    items: List[Dict[str, Any]],
+    updated_at: datetime,
+) -> Dict[str, Any]:
+    columns = COLUMNS_BY_BREAKPOINT[bp]
+    return {
+        "breakpoint": bp,
+        "columns": columns,
+        "items": items,
+        "version": 2,
+        "updated_at": updated_at.isoformat() + "Z",
+    }
+
 
 def get_dashboard_layout_profile(
     db: Session,
@@ -353,37 +386,26 @@ def get_dashboard_layout_profile(
     Returns a profile for the requested breakpoint:
     { breakpoint, columns, items: [{ key, order, colSpan, rowSpan, hidden }] }
     """
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
-    key = _layout_key(business_id, user_id, bp)
-    found = _IN_MEMORY_LAYOUTS.get(key)
-    if found:
-        return found
+    bp = _normalize_layout_breakpoint(breakpoint)
+    row = (
+        db.query(BusinessUserDashboardLayout)
+        .filter(
+            BusinessUserDashboardLayout.business_id == business_id,
+            BusinessUserDashboardLayout.user_id == user_id,
+            BusinessUserDashboardLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is not None and row.items is not None:
+        stored = list(row.items)  # type: ignore[arg-type]
+        return _layout_profile_dict(
+            bp,
+            sorted(stored, key=lambda x: int(x.get("order", 1))),
+            row.updated_at,
+        )
 
-    # Build default layout from definitions
-    columns = COLUMNS_BY_BREAKPOINT[bp]
-    items: List[Dict[str, Any]] = []
-    order = 1
-    for d in DEFAULT_WIDGET_DEFINITIONS:
-        defaults = (d.get("defaults") or {}).get(bp) or {}
-        items.append({
-            "key": d["key"],
-            "order": order,
-            "colSpan": int(defaults.get("colSpan", max(1, columns // 2))),
-            "rowSpan": int(defaults.get("rowSpan", 2)),
-            "hidden": False,
-        })
-        order += 1
-    profile = {
-        "breakpoint": bp,
-        "columns": columns,
-        "items": items,
-        "version": 2,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _IN_MEMORY_LAYOUTS[key] = profile
-    return profile
+    now = datetime.utcnow()
+    return _layout_profile_dict(bp, _default_layout_items(bp), now)
 
 
 def save_dashboard_layout_profile(
@@ -393,20 +415,18 @@ def save_dashboard_layout_profile(
     breakpoint: str,
     items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
+    bp = _normalize_layout_breakpoint(breakpoint)
     columns = COLUMNS_BY_BREAKPOINT[bp]
     sanitized: List[Dict[str, Any]] = []
     for it in (items or []):
         try:
-            key = str(it.get("key"))
+            wkey = str(it.get("key"))
             order = int(it.get("order", 1))
             col_span = max(1, min(columns, int(it.get("colSpan", 1))))
             row_span = int(it.get("rowSpan", 1))
             hidden = bool(it.get("hidden", False))
             sanitized.append({
-                "key": key,
+                "key": wkey,
                 "order": order,
                 "colSpan": col_span,
                 "rowSpan": row_span,
@@ -414,15 +434,30 @@ def save_dashboard_layout_profile(
             })
         except Exception:
             continue
-    profile = {
-        "breakpoint": bp,
-        "columns": columns,
-        "items": sorted(sanitized, key=lambda x: x.get("order", 1)),
-        "version": 2,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _IN_MEMORY_LAYOUTS[_layout_key(business_id, user_id, bp)] = profile
-    return profile
+    sanitized = sorted(sanitized, key=lambda x: x.get("order", 1))
+    now = datetime.utcnow()
+    row = (
+        db.query(BusinessUserDashboardLayout)
+        .filter(
+            BusinessUserDashboardLayout.business_id == business_id,
+            BusinessUserDashboardLayout.user_id == user_id,
+            BusinessUserDashboardLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is None:
+        row = BusinessUserDashboardLayout(
+            business_id=business_id,
+            user_id=user_id,
+            breakpoint=bp,
+            items=sanitized,
+        )
+        db.add(row)
+    else:
+        row.items = sanitized
+        row.updated_at = now
+    db.flush()
+    return _layout_profile_dict(bp, sanitized, row.updated_at)
 
 
 def get_business_default_layout(
@@ -430,11 +465,23 @@ def get_business_default_layout(
     business_id: int,
     breakpoint: str,
 ) -> Dict[str, Any] | None:
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
-    key = _default_key(business_id, bp)
-    return _IN_MEMORY_DEFAULTS.get(key)
+    bp = _normalize_layout_breakpoint(breakpoint)
+    row = (
+        db.query(BusinessDashboardDefaultLayout)
+        .filter(
+            BusinessDashboardDefaultLayout.business_id == business_id,
+            BusinessDashboardDefaultLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is None or row.items is None:
+        return None
+    stored = list(row.items)  # type: ignore[arg-type]
+    return _layout_profile_dict(
+        bp,
+        sorted(stored, key=lambda x: int(x.get("order", 1))),
+        row.updated_at,
+    )
 
 
 def save_business_default_layout(
@@ -443,20 +490,18 @@ def save_business_default_layout(
     breakpoint: str,
     items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
+    bp = _normalize_layout_breakpoint(breakpoint)
     columns = COLUMNS_BY_BREAKPOINT[bp]
     sanitized: List[Dict[str, Any]] = []
     for it in (items or []):
         try:
-            key = str(it.get("key"))
+            wkey = str(it.get("key"))
             order = int(it.get("order", 1))
             col_span = max(1, min(columns, int(it.get("colSpan", 1))))
             row_span = int(it.get("rowSpan", 1))
             hidden = bool(it.get("hidden", False))
             sanitized.append({
-                "key": key,
+                "key": wkey,
                 "order": order,
                 "colSpan": col_span,
                 "rowSpan": row_span,
@@ -464,15 +509,28 @@ def save_business_default_layout(
             })
         except Exception:
             continue
-    profile = {
-        "breakpoint": bp,
-        "columns": columns,
-        "items": sorted(sanitized, key=lambda x: x.get("order", 1)),
-        "version": 2,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _IN_MEMORY_DEFAULTS[_default_key(business_id, bp)] = profile
-    return profile
+    sanitized = sorted(sanitized, key=lambda x: x.get("order", 1))
+    now = datetime.utcnow()
+    row = (
+        db.query(BusinessDashboardDefaultLayout)
+        .filter(
+            BusinessDashboardDefaultLayout.business_id == business_id,
+            BusinessDashboardDefaultLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is None:
+        row = BusinessDashboardDefaultLayout(
+            business_id=business_id,
+            breakpoint=bp,
+            items=sanitized,
+        )
+        db.add(row)
+    else:
+        row.items = sanitized
+        row.updated_at = now
+    db.flush()
+    return _layout_profile_dict(bp, sanitized, row.updated_at)
 
 
 # ----------------------------

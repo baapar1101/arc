@@ -69,7 +69,8 @@ def create_subscription_invoice(
     )
     
     db.add(invoice)
-    db.commit()
+    # commit عمداً انجام نمی‌شود تا با پرداخت در همان تراکنش (subscribe_to_plan) اتمام یابد
+    db.flush()
     db.refresh(invoice)
     return invoice
 
@@ -96,7 +97,8 @@ def create_usage_invoice(
     )
     
     db.add(invoice)
-    db.commit()
+    # commit بر عهدهٔ فراخوان‌کننده (مثلاً pay_ai_invoice_from_wallet یا همان session)
+    db.flush()
     db.refresh(invoice)
     return invoice
 
