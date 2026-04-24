@@ -793,17 +793,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               children: _document != null && _document!.documentType.startsWith('invoice')
                                   ? [
                                       _buildInfoTab(context, theme),
-                                      _buildProductsTab(theme),
-                                      _buildAccountsTab(theme),
-                                      _buildTransactionsTab(theme),
+                                      _buildProductsTab(context, theme),
+                                      _buildAccountsTab(context, theme),
+                                      _buildTransactionsTab(context, theme),
                                       if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
-                                      _buildInvoiceShareTab(theme),
-                                      _buildAttachmentsTab(theme),
+                                      _buildInvoiceShareTab(context, theme),
+                                      _buildAttachmentsTab(context, theme),
                                     ]
                                   : [
                                       _buildInfoTab(context, theme),
-                                      _buildAccountsTab(theme),
-                                      _buildAttachmentsTab(theme),
+                                      _buildAccountsTab(context, theme),
+                                      _buildAttachmentsTab(context, theme),
                                     ],
                             ),
                 ),
@@ -819,7 +819,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Tab _detailTab({required bool compact, required IconData icon, required String label}) {
     if (compact) {
       return Tab(
-        height: 48,
+        height: 44,
         child: Tooltip(
           message: label,
           child: Icon(icon, size: 22),
@@ -853,9 +853,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       controller: _tabController,
       isScrollable: true,
       tabAlignment: TabAlignment.start,
-      labelPadding: compact ? const EdgeInsets.symmetric(horizontal: 10) : null,
+      labelPadding: compact ? const EdgeInsets.symmetric(horizontal: 6) : null,
       tabs: tabs,
     );
+  }
+
+  /// فاصلهٔ اطراف محتوای تب‌ها (در موبایل کم‌تر برای استفادهٔ بهتر از عرض/ارتفاع)
+  EdgeInsets _documentDetailsTabPadding(BuildContext context) {
+    return EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 8 : 20);
+  }
+
+  double _documentDetailsSectionGap(BuildContext context) {
+    return ResponsiveHelper.isMobile(context) ? 12 : 24;
+  }
+
+  double _documentDetailsCardInnerPadding(BuildContext context) {
+    return ResponsiveHelper.isMobile(context) ? 12 : 20;
   }
 
   /// ساخت هدر دیالوگ
@@ -870,7 +883,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             : theme.colorScheme.onSurfaceVariant;
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: dense ? 12 : 24, vertical: dense ? 10 : 16),
+      padding: EdgeInsets.symmetric(horizontal: dense ? 8 : 24, vertical: dense ? 8 : 16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         border: Border(
@@ -1034,8 +1047,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Widget _buildInvoiceShareTab(ThemeData theme) {
+  Widget _buildInvoiceShareTab(BuildContext context, ThemeData theme) {
     final canEditInvoices = ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false;
+    final cardPad = _documentDetailsCardInnerPadding(context);
     final isJalali = widget.calendarController.isJalali;
     if (_loadingInvoiceShareLink) {
       return const Center(child: CircularProgressIndicator());
@@ -1096,14 +1110,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     ];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: _documentDetailsTabPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (link != null && active && url != null && url.isNotEmpty) ...[
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(cardPad),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1172,7 +1186,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             Card(
               color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(cardPad),
                 child: Text(
                   'لینک قبلی منقضی یا غیرفعال است. می‌توانید لینک جدید بسازید.',
                   style: theme.textTheme.bodyMedium,
@@ -1183,7 +1197,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           ],
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(cardPad),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1272,20 +1286,20 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final t = AppLocalizations.of(context);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: _documentDetailsTabPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isInvoice && totals != null) ...[
             _buildFinancialSummaryCard(theme, totals),
-            const SizedBox(height: 24),
+            SizedBox(height: _documentDetailsSectionGap(context)),
           ],
           // نمایش سود (فقط برای فاکتورهای فروش و تولید)
           if (isInvoice && (document.documentType == 'invoice_sales' || 
               document.documentType == 'invoice_sales_return' || 
               document.documentType == 'invoice_production')) ...[
             _buildProfitSection(theme),
-            const SizedBox(height: 24),
+            SizedBox(height: _documentDetailsSectionGap(context)),
           ],
           _buildSectionHeader('مشخصات پایه'),
           _buildInfoGrid([
@@ -1300,7 +1314,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               _InfoRow('توضیحات', document.description!),
           ]),
           if (isInvoice) ...[
-            const SizedBox(height: 24),
+            SizedBox(height: _documentDetailsSectionGap(context)),
             _buildCounterpartyInfoCard(theme, document),
           ],
           if (_relatedWhDocs.isNotEmpty) ..._buildRelatedWarehouseDocumentsSection(context, theme, t, document),
@@ -2200,7 +2214,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت تب محصولات
-  Widget _buildProductsTab(ThemeData theme) {
+  Widget _buildProductsTab(BuildContext context, ThemeData theme) {
     if (_document == null || _rawDocumentData == null) {
       return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
     }
@@ -2225,17 +2239,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       );
     }
 
-    return _buildProductLinesTable(theme);
+    return _buildProductLinesTable(context, theme);
   }
 
   /// ساخت تب حساب‌ها
-  Widget _buildAccountsTab(ThemeData theme) {
+  Widget _buildAccountsTab(BuildContext context, ThemeData theme) {
     if (_document == null) {
       return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: _documentDetailsTabPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2248,7 +2262,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت تب تراکنش‌ها
-  Widget _buildTransactionsTab(ThemeData theme) {
+  Widget _buildTransactionsTab(BuildContext context, ThemeData theme) {
     if (_document == null) {
       return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
     }
@@ -2257,7 +2271,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final canAddTransaction = _canAddTransaction();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: _documentDetailsTabPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2981,13 +2995,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت تب فایل‌ها
-  Widget _buildAttachmentsTab(ThemeData theme) {
+  Widget _buildAttachmentsTab(BuildContext context, ThemeData theme) {
     if (_document == null) {
       return const Center(child: Text('برای الصاق فایل نیاز به شناسه معتبر سند است.'));
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: _documentDetailsTabPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3017,58 +3031,79 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   
 
 
+  DataColumn _productLineColumnLabel(String label) {
+    return DataColumn(
+      label: Center(
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
   /// ساخت جدول سطرهای محصول (فقط برای فاکتورها)
-  Widget _buildProductLinesTable(ThemeData theme) {
+  Widget _buildProductLinesTable(BuildContext context, ThemeData theme) {
     final productLines = _rawDocumentData?['product_lines'] as List<dynamic>?;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final outerPad = _documentDetailsTabPadding(context);
+    final titlePad = EdgeInsets.symmetric(
+      horizontal: isMobile ? 8 : 16,
+      vertical: isMobile ? 8 : 16,
+    );
+    final tableHMargin = isMobile ? 8.0 : 16.0;
+    final tableColSpacing = isMobile ? 12.0 : 24.0;
     
     if (productLines == null || productLines.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: outerPad,
       child: Card(
         elevation: 2,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: titlePad,
               child: Text(
                 'لیست کالاها',
+                textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
             const Divider(height: 1),
-            // اسکرول عمودی برای لیست طولانی کالاها
+            // اسکرول عمودی + افقی: متن کامل نام/توضیح بدون برش؛ در صورت عرض زیاد، اسکرول افقی
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
+              child: Scrollbar(
                 child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                      theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    ),
-                    columns: [
-                      const DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('نام کالا', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('فی', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
-                      const DataColumn(label: Text('قیمت', style: TextStyle(fontWeight: FontWeight.bold))),
-                      // ستون سود (فقط اگر line_profits موجود باشد)
-                      if (_rawDocumentData?['line_profits'] != null)
-                        const DataColumn(
-                          label: Text('سود', style: TextStyle(fontWeight: FontWeight.bold)),
-                          numeric: true,
-                        ),
-                      const DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      horizontalMargin: tableHMargin,
+                      columnSpacing: tableColSpacing,
+                      headingRowColor: WidgetStateProperty.all(
+                        theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      ),
+                      dataRowMinHeight: 48,
+                      dataRowMaxHeight: 200,
+                      columns: [
+                        _productLineColumnLabel('ردیف'),
+                        _productLineColumnLabel('نام کالا'),
+                        _productLineColumnLabel('تعداد'),
+                        _productLineColumnLabel('واحد'),
+                        _productLineColumnLabel('فی'),
+                        _productLineColumnLabel('تخفیف'),
+                        _productLineColumnLabel('مالیات'),
+                        _productLineColumnLabel('قیمت'),
+                        if (_rawDocumentData?['line_profits'] != null) _productLineColumnLabel('سود'),
+                        _productLineColumnLabel('توضیحات'),
+                      ],
                     rows: productLines.asMap().entries.map((entry) {
                       final index = entry.key;
                       final line = entry.value as Map<String, dynamic>;
@@ -3080,6 +3115,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
                       final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
                       final unit = extraInfo?['unit'] as String? ?? '-';
+                      final lineDesc = (line['description'] as String? ?? '-').trim();
+                      final descText = lineDesc.isEmpty ? '-' : lineDesc;
                       
                       // دریافت سود این ردیف از line_profits
                       Map<String, dynamic>? lineProfitData;
@@ -3102,117 +3139,152 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       return DataRow(
                         cells: [
                           DataCell(
-                            Text(
-                              '${index + 1}',
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle,
+                            Center(
+                              child: Text(
+                                '${index + 1}',
+                                textAlign: TextAlign.center,
+                                textDirection: ui.TextDirection.ltr,
+                                style: baseNumberStyle,
+                              ),
                             ),
                           ),
                           DataCell(
-                            Tooltip(
-                              message: productName,
-                              child: SizedBox(
-                                width: 200,
-                                child: Text(
-                                  productName,
-                                  overflow: TextOverflow.ellipsis,
+                            Center(
+                              child: Tooltip(
+                                message: productName,
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(minWidth: 100),
+                                  child: Text(
+                                    productName,
+                                    textAlign: TextAlign.center,
+                                    softWrap: true,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         DataCell(
-                          Text(
-                            formatWithThousands(quantity, decimalPlaces: quantity % 1 == 0 ? 0 : 2),
-                            textDirection: ui.TextDirection.ltr,
-                            style: baseNumberStyle,
-                          ),
-                        ),
-                        DataCell(Text(unit)),
-                        DataCell(
-                          Text(
-                            formatWithThousands(unitPrice, decimalPlaces: unitPrice % 1 == 0 ? 0 : 2),
-                            textDirection: ui.TextDirection.ltr,
-                            style: baseNumberStyle,
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            discount > 0 ? formatWithThousands(discount, decimalPlaces: discount % 1 == 0 ? 0 : 2) : '-',
-                            textDirection: ui.TextDirection.ltr,
-                            style: baseNumberStyle.copyWith(color: Colors.orange),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            tax > 0 ? formatWithThousands(tax, decimalPlaces: tax % 1 == 0 ? 0 : 2) : '-',
-                            textDirection: ui.TextDirection.ltr,
-                            style: baseNumberStyle.copyWith(color: Colors.blue),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            formatWithThousands(lineTotal, decimalPlaces: lineTotal % 1 == 0 ? 0 : 2),
-                            textDirection: ui.TextDirection.ltr,
-                            style: baseNumberStyle.copyWith(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
+                          Center(
+                            child: Text(
+                              formatWithThousands(quantity, decimalPlaces: quantity % 1 == 0 ? 0 : 2),
+                              textAlign: TextAlign.center,
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle,
                             ),
                           ),
                         ),
-                        // سلول سود (فقط اگر line_profits موجود باشد)
+                        DataCell(
+                          Center(
+                            child: Text(unit, textAlign: TextAlign.center),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              formatWithThousands(unitPrice, decimalPlaces: unitPrice % 1 == 0 ? 0 : 2),
+                              textAlign: TextAlign.center,
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              discount > 0 ? formatWithThousands(discount, decimalPlaces: discount % 1 == 0 ? 0 : 2) : '-',
+                              textAlign: TextAlign.center,
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle.copyWith(color: Colors.orange),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              tax > 0 ? formatWithThousands(tax, decimalPlaces: tax % 1 == 0 ? 0 : 2) : '-',
+                              textAlign: TextAlign.center,
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle.copyWith(color: Colors.blue),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              formatWithThousands(lineTotal, decimalPlaces: lineTotal % 1 == 0 ? 0 : 2),
+                              textAlign: TextAlign.center,
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle.copyWith(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                         if (_rawDocumentData?['line_profits'] != null)
                           DataCell(
-                            Builder(
-                              builder: (context) {
-                                if (lineProfitData == null) {
-                                  return const Text('-');
-                                }
-                                final profit = (lineProfitData['profit'] ?? lineProfitData['gross_profit']) as num?;
-                                final profitPercent = (lineProfitData['profit_percent'] ?? lineProfitData['gross_profit_percent']) as num?;
-                                if (profit == null) {
-                                  return const Text('-');
-                                }
-                                final profitValue = profit.toDouble();
-                                final profitPercentValue = profitPercent?.toDouble() ?? 0.0;
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      formatWithThousands(profitValue),
-                                      textDirection: ui.TextDirection.ltr,
-                                      style: baseNumberStyle.copyWith(
-                                        color: profitValue >= 0 ? Colors.green : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (profitPercentValue != 0)
+                            Center(
+                              child: Builder(
+                                builder: (context) {
+                                  if (lineProfitData == null) {
+                                    return const Text('-', textAlign: TextAlign.center);
+                                  }
+                                  final profit = (lineProfitData['profit'] ?? lineProfitData['gross_profit']) as num?;
+                                  final profitPercent = (lineProfitData['profit_percent'] ?? lineProfitData['gross_profit_percent']) as num?;
+                                  if (profit == null) {
+                                    return const Text('-', textAlign: TextAlign.center);
+                                  }
+                                  final profitValue = profit.toDouble();
+                                  final profitPercentValue = profitPercent?.toDouble() ?? 0.0;
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
                                       Text(
-                                        '${profitPercentValue.toStringAsFixed(1)}%',
+                                        formatWithThousands(profitValue),
+                                        textAlign: TextAlign.center,
                                         textDirection: ui.TextDirection.ltr,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                        style: baseNumberStyle.copyWith(
+                                          color: profitValue >= 0 ? Colors.green : Colors.red,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                  ],
-                                );
-                              },
+                                      if (profitPercentValue != 0)
+                                        Text(
+                                          '${profitPercentValue.toStringAsFixed(1)}%',
+                                          textAlign: TextAlign.center,
+                                          textDirection: ui.TextDirection.ltr,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
                             ),
                           ),
                           DataCell(
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                line['description'] as String? ?? '-',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
+                            Center(
+                              child: Tooltip(
+                                message: descText,
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(minWidth: 100),
+                                  child: Text(
+                                    descText,
+                                    textAlign: TextAlign.center,
+                                    softWrap: true,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ],
                       );
                     }).toList(),
+                    ),
                   ),
                 ),
               ),
@@ -4350,7 +4422,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     ];
 
     return Container(
-      padding: EdgeInsets.all(dense ? 10 : 16),
+      padding: EdgeInsets.all(dense ? 8 : 16),
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
