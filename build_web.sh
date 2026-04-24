@@ -298,7 +298,7 @@ echo ""
 SYNC_FONT_MIRROR="$APP_DIR/scripts/sync_font_fallback_mirror.sh"
 if [ -f "$SYNC_FONT_MIRROR" ]; then
   chmod +x "$SYNC_FONT_MIRROR" 2>/dev/null || true
-  echo "Syncing local font fallback mirror (Roboto, Arabic, Noto Color Emoji + gstatic slices from web_gstatic_fallback_font_paths.txt) into web/ ..."
+  echo "Syncing local font fallback mirror (bundled fonts + all gstatic paths in web_gstatic_fallback_font_paths.txt) into web/ ..."
   "$SYNC_FONT_MIRROR" "$APP_DIR/web" || warn "Font fallback mirror sync failed; engine may 404 on missing gstatic slices (check network)"
 else
   warn "sync_font_fallback_mirror.sh not found; skipping local gstatic font mirror for web engine"
@@ -323,7 +323,7 @@ fi
 # همان آینهٔ gstatic (Roboto + Arabic + فهرست fallback موتور) را روی خروجی نهایی هم بنویس —
 # مخصوصاً اگر build-dir سفارشی باشد یا فایل‌های دانلودی فقط در web/ مانده باشند.
 if [ -f "$SYNC_FONT_MIRROR" ]; then
-  echo "Ensuring local font fallback mirror (including Noto Color Emoji) in $BUILD_DIR ..."
+  echo "Ensuring local font fallback mirror (full engine fallback list) in $BUILD_DIR ..."
   "$SYNC_FONT_MIRROR" "$BUILD_DIR" || warn "Font fallback mirror sync to build output failed; check network for gstatic downloads"
 fi
 

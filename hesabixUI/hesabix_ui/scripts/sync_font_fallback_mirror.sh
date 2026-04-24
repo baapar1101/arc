@@ -75,23 +75,28 @@ else
   download_gstatic_slice_if_missing "$REL_NOTO_SANS_SC"
 fi
 
+# همهٔ مسیرهای نسبی در web_gstatic_fallback_font_paths.txt (غیر از کامنت) باید روی TARGET_ROOT
+# در fonts/gstatic/s/<rel> باشند؛ موتور وب با fontFallbackBaseUrl همین URLها را از همان دامنهٔ UI می‌زند.
+# خطوط notocoloremoji از assets/notocoloremoji.woff2 کپی می‌شوند (یک فایل برای همهٔ sliceها)؛ بقیه از gstatic
+# دانلود می‌شوند مگر از قبل با mirror_file بالاتر پر شده باشند.
 if [ -f "$PATHS_FILE" ]; then
-  if [ -f "$SRC_NOTO_COLOR_EMOJI" ]; then
-    while IFS= read -r line || [ -n "$line" ]; do
-      [[ "$line" =~ ^# ]] && continue
-      [[ -z "${line// }" ]] && continue
-      [[ "$line" == notocoloremoji/* ]] || continue
-      mirror_file "$SRC_NOTO_COLOR_EMOJI" "$TARGET_ROOT/fonts/gstatic/s/$line" "Noto Color Emoji → $line"
-    done < "$PATHS_FILE"
-  else
-    echo "[warn] sync_font_fallback_mirror: $SRC_NOTO_COLOR_EMOJI یافت نشد؛ تلاش دانلود از gstatic برای sliceها" >&2
-    while IFS= read -r line || [ -n "$line" ]; do
-      [[ "$line" =~ ^# ]] && continue
-      [[ -z "${line// }" ]] && continue
-      [[ "$line" == notocoloremoji/* ]] || continue
-      download_gstatic_slice_if_missing "$line"
-    done < "$PATHS_FILE"
+  if [ ! -f "$SRC_NOTO_COLOR_EMOJI" ]; then
+    echo "[warn] sync_font_fallback_mirror: $SRC_NOTO_COLOR_EMOJI یافت نشد؛ sliceهای notocoloremoji از gstatic گرفته می‌شوند" >&2
   fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    [[ "$line" =~ ^# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    if [[ "$line" == notocoloremoji/* ]]; then
+      if [ -f "$SRC_NOTO_COLOR_EMOJI" ]; then
+        mirror_file "$SRC_NOTO_COLOR_EMOJI" "$TARGET_ROOT/fonts/gstatic/s/$line" "Noto Color Emoji → $line"
+      else
+        download_gstatic_slice_if_missing "$line"
+      fi
+    else
+      download_gstatic_slice_if_missing "$line"
+    fi
+  done < "$PATHS_FILE"
 else
   echo "[warn] sync_font_fallback_mirror: فایل فهرست مسیرها یافت نشد: $PATHS_FILE" >&2
 fi
