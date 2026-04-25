@@ -1050,6 +1050,7 @@
   "errorRequestTimeout": "زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.",
   "errorExtractorSaveData": "خطا در ذخیره اطلاعات",
   "errorExtractorFileUpload": "خطا در آپلود فایل",
+  "errorInternetUnavailablePleaseRetry": "ارتباط با اینترنت برقرار نیست. لطفاً دوباره تلاش کنید.",
   "errorInvalidInput": "داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.",
   "errorBackupNotFound": "بکاپ مورد نظر یافت نشد.",
   "errorBusinessMismatch": "این بکاپ متعلق به کسب‌وکار دیگری است.",

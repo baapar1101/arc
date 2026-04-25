@@ -20,6 +20,7 @@ import 'column_settings_dialog.dart';
 import 'helpers/data_table_utils.dart';
 import 'helpers/column_settings_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 /// Main reusable data table widget
 class DataTableWidget<T> extends StatefulWidget {
@@ -657,7 +658,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.extractErrorMessage(
+            e,
+            AppLocalizations.of(context),
+          );
         });
       }
     } finally {

@@ -1,96 +1,68 @@
 #!/usr/bin/env bash
-# کپی فونت‌های باندل‌شده به مسیرهایی که موتور Flutter Web با fontFallbackBaseUrl
-# (جایگزین https://fonts.gstatic.com/s/...) انتظار دارد تا بدون CDN از همان سرور سرو شوند.
+# فونت‌های fallback موتور Flutter Web را در web/build کپی می‌کند تا از همان دامنهٔ UI سرو شوند
+# (fontFallbackBaseUrl در index.html). منبع: باندل ثابت در repo — بدون fonts.gstatic.com در زمان بیلد.
 #
-# مسیرهای نسبی باید با نسخهٔ Flutter هم‌خوان باشند؛ پس از ارتقای Flutter اگر خطای
-# «Failed to parse fallback font …» دیدید، مسیر را از این فایل در SDK بگیرید:
-#   engine/src/flutter/lib/web_ui/lib/src/engine/font_fallback_data.dart
-# (جستجو برای نام فونت، مثلاً «Noto Sans Arabic».)
+# به‌روز کردن فهرست مسیرها پس از ارتقای Flutter: web_gstatic_fallback_font_paths.txt و سپس:
+#   bash scripts/populate_gstatic_font_bundle.sh
+# (با اینترنت؛ فایل‌های جدید را commit کنید.)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TARGET_ROOT="${1:-$APP_DIR/web}"
+PATHS_FILE="$SCRIPT_DIR/web_gstatic_fallback_font_paths.txt"
+BUNDLE_S="$APP_DIR/assets/gstatic_font_bundle/s"
+SRC_NOTO_COLOR_EMOJI="$APP_DIR/assets/fonts/notocoloremoji.woff2"
+
+# فقط اگر باندل ناقص بود و SYNC_FONT_FETCH_NETWORK=1: دانلود موقت از gstatic (توسعه)
+: "${SYNC_FONT_FETCH_NETWORK:-0}"
 
 mirror_file() {
   local src="$1"
   local dest="$2"
-  local label="$3"
+  local label="${3:-}"
   if [ ! -f "$src" ]; then
-    echo "[warn] sync_font_fallback_mirror: منبع یافت نشد ($label): $src" >&2
-    return 0
+    echo "[warn] sync_font_fallback_mirror: منبع یافت نشد${label:+ ($label)}: $src" >&2
+    return 1
   fi
   mkdir -p "$(dirname "$dest")"
   cp -f "$src" "$dest"
-  echo "[info] آینهٔ fallback موتور ($label): $dest"
+  echo "[info] آینهٔ fallback موتور${label:+ ($label)}: $dest"
 }
 
-# Roboto — canvaskit/fonts.dart
-SRC_ROBOTO="$APP_DIR/assets/fonts/roboto.woff2"
-DEST_ROBOTO="$TARGET_ROOT/fonts/gstatic/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2"
-mirror_file "$SRC_ROBOTO" "$DEST_ROBOTO" "Roboto"
-
-# Noto Sans Arabic — وقتی گلیفی خارج از فونت‌های اصلی نیاز به fallback دارد (font_fallback_data.dart)
-SRC_ARABIC="$APP_DIR/assets/fonts/nanosansarabic.woff2"
-DEST_ARABIC="$TARGET_ROOT/fonts/gstatic/s/notosansarabic/v28/nwpxtLGrOAZMl5nJ_wfgRg3DrWFZWsnVBJ_sS6tlqHHFlhQ5l3sQWIHPqzCfyGyvvnCBFQLaig.woff2"
-mirror_file "$SRC_ARABIC" "$DEST_ARABIC" "Noto Sans Arabic"
-
-# Noto Sans Armenian — همان مسیر gstatic که موتور وب درخواست می‌کند (باندل در assets؛ بیلد آفلاین)
-SRC_ARMENIAN="$APP_DIR/assets/fonts/notosansarmenian.woff2"
-DEST_ARMENIAN="$TARGET_ROOT/fonts/gstatic/s/notosansarmenian/v43/ZgN0jOZKPa7CHqq0h37c7ReDUubm2SEdFXp7ig73qtTY5idb74R9UdM3y2nZLorxb60nYy6zF3Eg.woff2"
-mirror_file "$SRC_ARMENIAN" "$DEST_ARMENIAN" "Noto Sans Armenian"
-
-# Noto Sans (slice لاتین موتور وب) — باید با خط «notosans/v37/...» در web_gstatic_fallback_font_paths.txt یکی باشد.
-# روی سرور بیلد اگر gstatic در دسترس نباشد، بدون این فایل ۴۰۴ می‌گیرید؛ بنابراین در repo باندل شده است.
-SRC_NOTO_SANS_ENGINE="$APP_DIR/assets/fonts/notosans_v37_engine_fallback.woff2"
-DEST_NOTO_SANS_ENGINE="$TARGET_ROOT/fonts/gstatic/s/notosans/v37/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99Y41P6zHtY.woff2"
-mirror_file "$SRC_NOTO_SANS_ENGINE" "$DEST_NOTO_SANS_ENGINE" "Noto Sans (engine fallback v37)"
-
-# Noto Color Emoji — همان نام‌های sliceای که موتور با fontFallbackBaseUrl درخواست می‌کند
-# منبع ترجیحی: assets/fonts/notocoloremoji.woff2 (همان محتوا به هر مسیر gstatic کپی می‌شود)
-PATHS_FILE="$SCRIPT_DIR/web_gstatic_fallback_font_paths.txt"
-# در شبکه‌هایی که fonts.gstatic.com فیلتر است، می‌توان آینه با همان ساختار مسیر gstatic ست کرد، مثلاً:
-#   export GSTATIC_BASE_URL='https://example.com/myfonts/s'
-GSTATIC_BASE="${GSTATIC_BASE_URL:-https://fonts.gstatic.com/s}"
-GSTATIC_BASE="${GSTATIC_BASE%/}"
-SRC_NOTO_COLOR_EMOJI="$APP_DIR/assets/fonts/notocoloremoji.woff2"
-
-download_gstatic_slice_if_missing() {
+copy_from_bundle() {
   local rel="${1:?}"
+  local src="$BUNDLE_S/$rel"
   local dest="$TARGET_ROOT/fonts/gstatic/s/$rel"
-  if [ -f "$dest" ]; then
+  if [ -f "$src" ]; then
+    mkdir -p "$(dirname "$dest")"
+    cp -f "$src" "$dest"
+    echo "[info] باندل → $dest"
     return 0
   fi
-  mkdir -p "$(dirname "$dest")"
-  if ! command -v curl >/dev/null 2>&1; then
-    echo "[warn] sync_font_fallback_mirror: curl یافت نشد؛ نمی‌توان از gstatic گرفت: $rel" >&2
-    return 0
-  fi
-  if curl -fsSL --retry 2 --connect-timeout 20 "${GSTATIC_BASE}/${rel}" -o "$dest.tmp" && mv -f "$dest.tmp" "$dest"; then
-    echo "[info] آینهٔ fallback موتور (دانلود gstatic): $dest"
-  else
+  if [ "$SYNC_FONT_FETCH_NETWORK" = "1" ] && command -v curl >/dev/null 2>&1; then
+    local base="${GSTATIC_BASE_URL:-https://fonts.gstatic.com/s}"
+    base="${base%/}"
+    echo "[info] باندل نبود، دانلود موقت: $rel" >&2
+    mkdir -p "$(dirname "$dest")"
+    if curl -fsSL --retry 2 --connect-timeout 25 --max-time 120 "${base}/${rel}" -o "$dest.tmp" && mv -f "$dest.tmp" "$dest"; then
+      echo "[info] دانلود → $dest"
+      return 0
+    fi
     rm -f "$dest.tmp" "$dest"
-    echo "[warn] sync_font_fallback_mirror: دانلود ناموفق (اینترنت/فایروال؟): $rel" >&2
   fi
+  echo "[warn] فایل باندل نیست: $src — برای پر کردن: scripts/populate_gstatic_font_bundle.sh" >&2
+  return 1
 }
 
-# Noto Sans SC (چینی ساده) — مثل Armenian: اگر assets/fonts/notosanssc.woff2 هست کپی؛ وگرنه دانلود از gstatic
-REL_NOTO_SANS_SC="notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FrY9HbczS.woff2"
-SRC_NOTO_SANS_SC="$APP_DIR/assets/fonts/notosanssc.woff2"
-if [ -f "$SRC_NOTO_SANS_SC" ]; then
-  mirror_file "$SRC_NOTO_SANS_SC" "$TARGET_ROOT/fonts/gstatic/s/$REL_NOTO_SANS_SC" "Noto Sans SC"
-else
-  download_gstatic_slice_if_missing "$REL_NOTO_SANS_SC"
-fi
+# Roboto + Noto SC در فهرست paths نیستند؛ در باندل هستند
+copy_from_bundle "roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2" || true
+copy_from_bundle "notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FrY9HbczS.woff2" || true
 
-# همهٔ مسیرهای نسبی در web_gstatic_fallback_font_paths.txt (غیر از کامنت) باید روی TARGET_ROOT
-# در fonts/gstatic/s/<rel> باشند؛ موتور وب با fontFallbackBaseUrl همین URLها را از همان دامنهٔ UI می‌زند.
-# خطوط notocoloremoji از assets/notocoloremoji.woff2 کپی می‌شوند (یک فایل برای همهٔ sliceها)؛ بقیه از gstatic
-# دانلود می‌شوند مگر از قبل با mirror_file بالاتر پر شده باشند.
 if [ -f "$PATHS_FILE" ]; then
   if [ ! -f "$SRC_NOTO_COLOR_EMOJI" ]; then
-    echo "[warn] sync_font_fallback_mirror: $SRC_NOTO_COLOR_EMOJI یافت نشد؛ sliceهای notocoloremoji از gstatic گرفته می‌شوند" >&2
+    echo "[warn] notocoloremoji: $SRC_NOTO_COLOR_EMOJI یافت نشد" >&2
   fi
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%$'\r'}"
@@ -98,14 +70,16 @@ if [ -f "$PATHS_FILE" ]; then
     [[ -z "${line// }" ]] && continue
     if [[ "$line" == notocoloremoji/* ]]; then
       if [ -f "$SRC_NOTO_COLOR_EMOJI" ]; then
-        mirror_file "$SRC_NOTO_COLOR_EMOJI" "$TARGET_ROOT/fonts/gstatic/s/$line" "Noto Color Emoji → $line"
+        mirror_file "$SRC_NOTO_COLOR_EMOJI" "$TARGET_ROOT/fonts/gstatic/s/$line" "Noto Color Emoji → $line" || true
+      elif [ "$SYNC_FONT_FETCH_NETWORK" = "1" ]; then
+        copy_from_bundle "$line" || true
       else
-        download_gstatic_slice_if_missing "$line"
+        echo "[warn] نمی‌توان slice ایموجی را ساخت: $line" >&2
       fi
     else
-      download_gstatic_slice_if_missing "$line"
+      copy_from_bundle "$line" || true
     fi
   done < "$PATHS_FILE"
 else
-  echo "[warn] sync_font_fallback_mirror: فایل فهرست مسیرها یافت نشد: $PATHS_FILE" >&2
+  echo "[warn] فهرست مسیرها یافت نشد: $PATHS_FILE" >&2
 fi

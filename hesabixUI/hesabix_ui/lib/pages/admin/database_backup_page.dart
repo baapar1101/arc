@@ -139,9 +139,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در ارسال: ${e.toString()}',
+          message: ErrorExtractor.extractErrorMessage(e, t),
         );
       }
     } finally {
@@ -244,7 +245,11 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در شروع ریستور: ${e.toString()}');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.extractErrorMessage(e, t),
+        );
       }
     } finally {
       if (mounted) {
@@ -279,9 +284,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در آپلود FTP: ${e.toString()}',
+          message: ErrorExtractor.extractErrorMessage(e, t),
         );
       }
     } finally {

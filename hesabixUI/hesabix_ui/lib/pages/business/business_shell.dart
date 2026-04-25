@@ -32,6 +32,7 @@ import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../core/date_utils.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 import 'check_form_page.dart';
 import 'bank_accounts_page.dart';
 import 'persons_page.dart';
@@ -403,12 +404,14 @@ class _BusinessShellState extends State<BusinessShell> {
       await widget.authStore.setCurrentBusiness(businessData);
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
+        final msg = ErrorExtractor.extractErrorMessage(e, t);
         setState(() {
-          _businessLoadError = e.toString();
+          _businessLoadError = msg;
         });
         SnackBarHelper.showError(
           context,
-          message: 'خطا در بارگذاری اطلاعات کسب و کار: $e',
+          message: msg,
         );
       }
     } finally {

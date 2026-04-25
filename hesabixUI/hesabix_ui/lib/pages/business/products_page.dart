@@ -641,7 +641,13 @@ class _ProductsPageState extends State<ProductsPage> {
       await _handleProductFileUploadError(dialogContext, e);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(dialogContext, message: 'خطا در آپلود فایل: $e');
+      SnackBarHelper.showError(
+        dialogContext,
+        message: ErrorExtractor.extractErrorMessage(
+          e,
+          AppLocalizations.of(dialogContext),
+        ),
+      );
     } finally {
       onUploadingChanged(false);
     }
@@ -666,7 +672,10 @@ class _ProductsPageState extends State<ProductsPage> {
       return;
     }
     
-    SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: ${e.message}');
+    SnackBarHelper.showError(
+      context,
+      message: ErrorExtractor.extractErrorMessage(e, AppLocalizations.of(context)),
+    );
   }
   
   Future<void> _showStorageLimitDialog(BuildContext context, Map<String, dynamic> error) async {

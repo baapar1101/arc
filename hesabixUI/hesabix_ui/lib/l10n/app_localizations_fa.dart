@@ -2616,6 +2616,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errorExtractorFileUpload => 'خطا در آپلود فایل';
 
   @override
+  String get errorInternetUnavailablePleaseRetry =>
+      'ارتباط با اینترنت برقرار نیست. لطفاً دوباره تلاش کنید.';
+
+  @override
   String get errorInvalidInput =>
       'داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.';
 

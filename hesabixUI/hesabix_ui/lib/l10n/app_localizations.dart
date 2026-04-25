@@ -5123,6 +5123,12 @@ abstract class AppLocalizations {
   /// **'File upload error.'**
   String get errorExtractorFileUpload;
 
+  /// No description provided for @errorInternetUnavailablePleaseRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'No internet connection. Please try again.'**
+  String get errorInternetUnavailablePleaseRetry;
+
   /// No description provided for @errorInvalidInput.
   ///
   /// In en, this message translates to:

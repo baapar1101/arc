@@ -6,7 +6,9 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
-import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 class AISubscriptionPage extends StatefulWidget {
   final int? businessId;
@@ -73,10 +75,11 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       });
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context);
       setState(() {
         _loading = false;
         _isRefreshing = false;
-        _loadError = e.toString();
+        _loadError = ErrorExtractor.extractErrorMessage(e, t);
       });
     }
   }
@@ -93,7 +96,11 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.extractErrorMessage(e, t),
+        );
       }
     }
   }
@@ -110,7 +117,11 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.extractErrorMessage(e, t),
+        );
       }
     }
   }
@@ -142,7 +153,11 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.show(context, message: 'خطا: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(
+            context,
+            message: ErrorExtractor.extractErrorMessage(e, t),
+          );
         }
       }
     }

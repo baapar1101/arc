@@ -952,6 +952,7 @@
   "errorRequestTimeout": "Request timeout. Please try again.",
   "errorExtractorSaveData": "Could not save data.",
   "errorExtractorFileUpload": "File upload error.",
+  "errorInternetUnavailablePleaseRetry": "No internet connection. Please try again.",
   "errorInvalidInput": "Invalid input data. Please check the information.",
   "errorBackupNotFound": "Backup not found.",
   "errorBusinessMismatch": "This backup belongs to a different business.",

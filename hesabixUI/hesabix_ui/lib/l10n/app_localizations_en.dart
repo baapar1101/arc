@@ -2627,6 +2627,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorExtractorFileUpload => 'File upload error.';
 
   @override
+  String get errorInternetUnavailablePleaseRetry =>
+      'No internet connection. Please try again.';
+
+  @override
   String get errorInvalidInput =>
       'Invalid input data. Please check the information.';
 

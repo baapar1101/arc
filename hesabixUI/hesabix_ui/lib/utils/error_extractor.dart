@@ -47,18 +47,57 @@ class ErrorExtractor {
     return lookupAppLocalizations(const Locale('fa'));
   }
 
+  /// قطع/تایم‌اوت اتصال یا خطای سطح سوکت (بدون اتکا به صرفاً [DioException.message] که متن فنی انگلیسی است).
+  static bool _isNetworkConnectivityFailure(dio.DioException e) {
+    final type = e.type;
+    if (type == dio.DioExceptionType.connectionTimeout ||
+        type == dio.DioExceptionType.receiveTimeout ||
+        type == dio.DioExceptionType.sendTimeout ||
+        type == dio.DioExceptionType.connectionError ||
+        type == dio.DioExceptionType.badCertificate) {
+      return true;
+    }
+    if (type == dio.DioExceptionType.badResponse || type == dio.DioExceptionType.cancel) {
+      return false;
+    }
+    if (type == dio.DioExceptionType.unknown) {
+      final m = (e.message ?? '').toLowerCase();
+      final errStr = (e.error?.toString() ?? '').toLowerCase();
+      if (m.contains('dioexception') &&
+          (m.contains('connection timeout') ||
+              m.contains('connection error') ||
+              m.contains('receive timeout') ||
+              m.contains('send timeout') ||
+              m.contains('aborted') ||
+              m.contains('took longer') ||
+              m.contains('larger than') ||
+              m.contains('requestoptions'))) {
+        return true;
+      }
+      if (m.contains('socketexception') || errStr.contains('socketexception')) {
+        return true;
+      }
+      if (m.contains('failed host lookup') ||
+          m.contains('network is unreachable') ||
+          m.contains('errno = 7') ||
+          m.contains('errno = 101') ||
+          m.contains('no address associated with hostname')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static String _dioTypeMessage(dio.DioExceptionType type, AppLocalizations t) {
-    if (type == dio.DioExceptionType.connectionTimeout) {
-      return t.errorConnectionTimeout;
+    if (type == dio.DioExceptionType.connectionTimeout ||
+        type == dio.DioExceptionType.receiveTimeout ||
+        type == dio.DioExceptionType.sendTimeout ||
+        type == dio.DioExceptionType.connectionError ||
+        type == dio.DioExceptionType.badCertificate) {
+      return t.errorInternetUnavailablePleaseRetry;
     }
-    if (type == dio.DioExceptionType.receiveTimeout) {
-      return t.errorReceiveTimeout;
-    }
-    if (type == dio.DioExceptionType.sendTimeout) {
-      return t.errorSendTimeout;
-    }
-    if (type == dio.DioExceptionType.connectionError) {
-      return t.errorConnectionError;
+    if (type == dio.DioExceptionType.cancel) {
+      return t.errorUnknownServer;
     }
     return t.errorUnknownServer;
   }
@@ -81,7 +120,12 @@ class ErrorExtractor {
         if (msg != null) return msg;
       }
 
-      // پیام خطای دیو
+      // قبل از نمایش message خام Dio (متن فنی/انگلیسی) — خطای شبکه/اینترنت
+      if (_isNetworkConnectivityFailure(e)) {
+        return t.errorInternetUnavailablePleaseRetry;
+      }
+
+      // پیام خطای دیو (مثلاً بدنهٔ خطای آپلود)
       if (e.message != null && e.message!.isNotEmpty) {
         // حذف قسمت‌های تکنیکی از پیام خطا
         String message = e.message!;
