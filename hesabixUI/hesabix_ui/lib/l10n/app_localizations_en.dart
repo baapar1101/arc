@@ -2621,6 +2621,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorRequestTimeout => 'Request timeout. Please try again.';
 
   @override
+  String get errorExtractorSaveData => 'Could not save data.';
+
+  @override
+  String get errorExtractorFileUpload => 'File upload error.';
+
+  @override
   String get errorInvalidInput =>
       'Invalid input data. Please check the information.';
 

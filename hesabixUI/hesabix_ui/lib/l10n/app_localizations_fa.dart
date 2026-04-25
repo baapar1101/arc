@@ -2610,6 +2610,12 @@ class AppLocalizationsFa extends AppLocalizations {
       'زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.';
 
   @override
+  String get errorExtractorSaveData => 'خطا در ذخیره اطلاعات';
+
+  @override
+  String get errorExtractorFileUpload => 'خطا در آپلود فایل';
+
+  @override
   String get errorInvalidInput =>
       'داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.';
 

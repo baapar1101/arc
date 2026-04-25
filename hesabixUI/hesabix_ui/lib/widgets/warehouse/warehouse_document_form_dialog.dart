@@ -17,6 +17,7 @@ import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart';
 
@@ -1881,7 +1882,8 @@ class _WarehouseDocumentFormDialogState
       }
     } catch (e) {
       if (!mounted) return;
-      final extracted = ErrorExtractor.extractErrorMessage(e);
+      final t = AppLocalizations.of(context);
+      final extracted = ErrorExtractor.extractErrorMessage(e, t);
       final cc =
           _calendarController ??
           widget.calendarController ??

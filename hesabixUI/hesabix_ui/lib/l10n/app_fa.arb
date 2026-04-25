@@ -1048,6 +1048,8 @@
   "errorSendTimeout": "زمان ارسال درخواست به سرور به پایان رسید.",
   "errorUnknownServer": "خطای نامشخص در ارتباط با سرور",
   "errorRequestTimeout": "زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.",
+  "errorExtractorSaveData": "خطا در ذخیره اطلاعات",
+  "errorExtractorFileUpload": "خطا در آپلود فایل",
   "errorInvalidInput": "داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.",
   "errorBackupNotFound": "بکاپ مورد نظر یافت نشد.",
   "errorBusinessMismatch": "این بکاپ متعلق به کسب‌وکار دیگری است.",

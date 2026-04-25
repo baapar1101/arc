@@ -950,6 +950,8 @@
   "errorSendTimeout": "Send timeout.",
   "errorUnknownServer": "Unknown server error",
   "errorRequestTimeout": "Request timeout. Please try again.",
+  "errorExtractorSaveData": "Could not save data.",
+  "errorExtractorFileUpload": "File upload error.",
   "errorInvalidInput": "Invalid input data. Please check the information.",
   "errorBackupNotFound": "Backup not found.",
   "errorBusinessMismatch": "This backup belongs to a different business.",

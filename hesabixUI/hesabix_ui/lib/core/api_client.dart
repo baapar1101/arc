@@ -33,6 +33,9 @@ class ApiClient {
     _currentLocale = locale;
   }
 
+  /// همان localeای که روی MaterialApp تنظیم شده (برای متن خطا بدون BuildContext).
+  static Locale? get currentLocale => _currentLocale;
+
   static void bindAuthStore(AuthStore store) {
     _authStore = store;
   }

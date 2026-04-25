@@ -1512,7 +1512,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     if (!context.mounted) return;
                     SnackBarHelper.showError(
                       context,
-                      message: ErrorExtractor.extractErrorMessage(e),
+                      message: ErrorExtractor.extractErrorMessage(e, t),
                     );
                   }
                 },
@@ -1574,7 +1574,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       if (!context.mounted) return;
                       SnackBarHelper.showError(
                         context,
-                        message: ErrorExtractor.extractErrorMessage(e),
+                        message: ErrorExtractor.extractErrorMessage(e, t),
                       );
                     }
                   },
