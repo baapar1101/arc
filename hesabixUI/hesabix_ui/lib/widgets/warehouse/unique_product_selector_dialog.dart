@@ -4,6 +4,7 @@ import '../../services/product_service.dart';
 import '../../services/product_attribute_service.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -131,7 +132,7 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
           _loading = false;
         });
       }

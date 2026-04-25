@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/tax_product_code_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/number_normalizer.dart';
 
 class TaxCodeSearchSheet extends StatefulWidget {
@@ -210,7 +211,8 @@ class _TaxCodeSearchSheetState extends State<TaxCodeSearchSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'خطا در دریافت نتایج: $e';
+        _errorMessage =
+            'خطا در دریافت نتایج: ${ErrorExtractor.forContext(e, context)}';
       });
     } finally {
       if (mounted) {

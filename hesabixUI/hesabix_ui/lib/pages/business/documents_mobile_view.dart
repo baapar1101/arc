@@ -14,6 +14,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// نمای موبایل برای لیست اسناد (نمایش کارت‌ها + فیلتر BottomSheet + سرچ + Load more)
 class DocumentsMobileView extends StatefulWidget {
@@ -209,7 +210,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       if (!mounted) return;

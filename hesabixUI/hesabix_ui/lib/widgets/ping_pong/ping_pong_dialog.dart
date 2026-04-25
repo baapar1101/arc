@@ -3,6 +3,7 @@ import 'ping_pong_game.dart';
 import '../../services/ping_pong_service.dart';
 import '../../models/ping_pong_score_model.dart';
 import 'dart:async';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class PingPongDialog extends StatefulWidget {
@@ -57,7 +58,11 @@ class _PingPongDialogState extends State<PingPongDialog> {
         _isLoading = false;
       });
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری بهترین امتیاز: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            'خطا در بارگذاری بهترین امتیاز: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -110,7 +115,11 @@ class _PingPongDialogState extends State<PingPongDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره امتیاز: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در ذخیره امتیاز: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

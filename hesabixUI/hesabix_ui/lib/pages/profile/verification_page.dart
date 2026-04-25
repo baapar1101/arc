@@ -11,6 +11,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/number_normalizer.dart' show toEnglishDigits, EnglishDigitsFormatter;
 import '../../services/errors/api_error.dart';
 import 'package:dio/dio.dart';
+import '../../utils/error_extractor.dart';
 
 class VerificationPage extends StatefulWidget {
   const VerificationPage({super.key});
@@ -112,7 +113,10 @@ class _VerificationPageState extends State<VerificationPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در دریافت اطلاعات: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -277,7 +281,10 @@ class _VerificationPageState extends State<VerificationPage> {
             await _openMobileOtpDialog(iranianMobile);
           } catch (e2) {
             if (mounted) {
-              SnackBarHelper.showError(context, message: 'خطا: $e2');
+              SnackBarHelper.showError(
+                context,
+                message: 'خطا: ${ErrorExtractor.userMessage(e2)}',
+              );
             }
           }
         }
@@ -286,7 +293,11 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در به‌روزرسانی شماره موبایل: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در به‌روزرسانی شماره موبایل: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -315,7 +326,10 @@ class _VerificationPageState extends State<VerificationPage> {
               }
               return false;
             } catch (e) {
-              SnackBarHelper.showError(ctx, message: 'خطا در تایید: $e');
+              SnackBarHelper.showError(
+                ctx,
+                message: 'خطا در تایید: ${ErrorExtractor.forContext(e, ctx)}',
+              );
               return false;
             }
           },
@@ -326,7 +340,11 @@ class _VerificationPageState extends State<VerificationPage> {
                 SnackBarHelper.show(ctx, message: 'کد جدید ارسال شد');
               }
             } catch (e) {
-              SnackBarHelper.showError(ctx, message: 'خطا در ارسال مجدد: $e');
+              SnackBarHelper.showError(
+                ctx,
+                message:
+                    'خطا در ارسال مجدد: ${ErrorExtractor.forContext(e, ctx)}',
+              );
             }
           },
         ),
@@ -337,7 +355,7 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -446,7 +464,10 @@ class _VerificationPageState extends State<VerificationPage> {
             }
           } catch (e2) {
             if (mounted) {
-              SnackBarHelper.showError(context, message: 'خطا: $e2');
+              SnackBarHelper.showError(
+                context,
+                message: 'خطا: ${ErrorExtractor.userMessage(e2)}',
+              );
             }
           }
         }
@@ -455,7 +476,11 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در به‌روزرسانی ایمیل: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در به‌روزرسانی ایمیل: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/session_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class SessionsPage extends StatefulWidget {
@@ -34,7 +35,11 @@ class _SessionsPageState extends State<SessionsPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.showError(context, message: '${t.sessionsErrorLoading}: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            '${t.sessionsErrorLoading}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -89,7 +94,11 @@ class _SessionsPageState extends State<SessionsPage> {
       } catch (e) {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          SnackBarHelper.showError(context, message: '${t.sessionsErrorDeleting}: $e');
+          SnackBarHelper.showError(
+          context,
+          message:
+              '${t.sessionsErrorDeleting}: ${ErrorExtractor.forContext(e, context)}',
+        );
         }
       }
     }
@@ -147,7 +156,11 @@ class _SessionsPageState extends State<SessionsPage> {
       } catch (e) {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          SnackBarHelper.showError(context, message: '${t.sessionsErrorDeleting}: $e');
+          SnackBarHelper.showError(
+          context,
+          message:
+              '${t.sessionsErrorDeleting}: ${ErrorExtractor.forContext(e, context)}',
+        );
         }
       }
     }

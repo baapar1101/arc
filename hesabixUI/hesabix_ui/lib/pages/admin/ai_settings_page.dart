@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class AISettingsPage extends StatefulWidget {
@@ -56,7 +57,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     }
@@ -90,7 +91,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
         );
       }
     }
@@ -118,7 +119,9 @@ class _AISettingsPageState extends State<AISettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در تست اتصال: $e')),
+          SnackBar(
+            content: Text('خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}'),
+          ),
         );
       }
     } finally {

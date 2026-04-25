@@ -97,11 +97,33 @@ class CrmChatService {
   Future<Map<String, dynamic>> postAgentMessage({
     required int businessId,
     required int conversationId,
-    required String body,
+    String? body,
+    String? fileStorageId,
   }) async {
     final res = await _apiClient.post<dynamic>(
       '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId/messages',
-      data: {'body': body},
+      data: {
+        if (body != null && body.isNotEmpty) 'body': body,
+        if (fileStorageId != null && fileStorageId.isNotEmpty) 'file_storage_id': fileStorageId,
+      },
+    );
+    final d = _extractData(res.data);
+    return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> getCrmSettings({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/chat/crm-settings');
+    final d = _extractData(res.data);
+    return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> updateCrmSettings({
+    required int businessId,
+    required bool allowWebChatFileUpload,
+  }) async {
+    final res = await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/crm-settings',
+      data: {'allow_web_chat_file_upload': allowWebChatFileUpload},
     );
     final d = _extractData(res.data);
     return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};

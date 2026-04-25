@@ -92,7 +92,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       if (!mounted) return;
       setState(() {
         _priceLists = [];
-        _priceListsLoadError = ErrorExtractor.extractErrorMessage(e);
+        _priceListsLoadError = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -238,7 +238,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = ErrorExtractor.extractErrorMessage(e);
+        _loadError = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -334,7 +334,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      SnackBarHelper.showError(context, message: ErrorExtractor.extractErrorMessage(e));
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 

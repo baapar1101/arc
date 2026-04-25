@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_order_model.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/error_extractor.dart';
 
 /// صفحه لیست سفارشات تعمیر
 class RepairOrdersListPage extends StatefulWidget {
@@ -93,8 +94,10 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'خطا در بارگذاری سفارشات: $e';
+        _errorMessage =
+            'خطا در بارگذاری سفارشات: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
       });
     }

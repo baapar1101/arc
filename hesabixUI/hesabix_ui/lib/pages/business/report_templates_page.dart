@@ -11,6 +11,7 @@ import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/helpers/file_saver.dart';
@@ -262,7 +263,9 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         },
       );
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) {
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      }
     }
   }
 
@@ -316,7 +319,12 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       SnackBarHelper.show(context, message: t.reportTemplateImportDoneOpenHtml);
       await _createDialog();
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: t.reportTemplateInvalidJsonError('$e'));
+      if (mounted) {
+        SnackBarHelper.showError(
+        context,
+        message: t.reportTemplateInvalidJsonError(ErrorExtractor.forContext(e, context)),
+      );
+      }
     }
   }
 
@@ -361,7 +369,9 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: AppLocalizations.of(context).reportTemplatesLoadError('$e'),
+          message: AppLocalizations.of(context).reportTemplatesLoadError(
+            ErrorExtractor.forContext(e, context),
+          ),
         );
       }
     } finally {
@@ -747,7 +757,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               await _fetch();
             } catch (e) {
               if (!dctx.mounted) return;
-              SnackBarHelper.showError(dctx, message: t.createError(e.toString()));
+              SnackBarHelper.showError(
+              dctx,
+              message: t.createError(ErrorExtractor.forContext(e, dctx)),
+            );
             }
           },
           child: Text(t.create),
@@ -903,7 +916,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           Navigator.of(context).pop();
           loadingOpen = false;
         }
-        SnackBarHelper.showError(context, message: t.reportTemplatePreviewError('$e'));
+        SnackBarHelper.showError(
+          context,
+          message: t.reportTemplatePreviewError(ErrorExtractor.forContext(e, context)),
+        );
       }
     }
   }
@@ -952,7 +968,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       }
                     } catch (e) {
                       if (mounted) {
-                        SnackBarHelper.showError(context, message: '$e');
+                        SnackBarHelper.showError(
+                        context,
+                        message: ErrorExtractor.forContext(e, context),
+                      );
                       }
                     }
                   },
@@ -1103,7 +1122,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               await _fetch();
             } catch (e) {
               if (!dctx.mounted) return;
-              SnackBarHelper.showError(dctx, message: tEdit.reportTemplateEditSaveError('$e'));
+              SnackBarHelper.showError(
+              dctx,
+              message: tEdit.reportTemplateEditSaveError(ErrorExtractor.forContext(e, dctx)),
+            );
             }
           },
           child: Text(tEdit.save),
@@ -1324,7 +1346,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                     } catch (e) {
                       if (!ctx.mounted) return;
-                      SnackBarHelper.showError(ctx, message: t.reportTemplatesSchemaFetchError('$e'));
+                      SnackBarHelper.showError(
+                      ctx,
+                      message: t.reportTemplatesSchemaFetchError(ErrorExtractor.forContext(e, ctx)),
+                    );
                     }
                   },
                   icon: const Icon(Icons.help_outline),

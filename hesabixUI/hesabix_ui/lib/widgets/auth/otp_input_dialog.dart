@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import '../../utils/number_normalizer.dart';
 
@@ -63,7 +64,10 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در تایید: $e');
+      SnackBarHelper.showError(
+      context,
+      message: 'خطا در تایید: ${ErrorExtractor.forContext(e, context)}',
+    );
     } finally {
       if (mounted) {
         setState(() => _verifying = false);
@@ -82,7 +86,10 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
       _startResendCooldown();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در ارسال مجدد: $e');
+      SnackBarHelper.showError(
+      context,
+      message: 'خطا در ارسال مجدد: ${ErrorExtractor.forContext(e, context)}',
+    );
     } finally {
       if (mounted) {
         setState(() => _resending = false);

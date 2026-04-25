@@ -12,6 +12,7 @@ import 'package:hesabix_ui/widgets/document/document_line_editor.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// دیالوگ ایجاد یا ویرایش سند حسابداری دستی
 class DocumentFormDialog extends StatefulWidget {
@@ -145,7 +146,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _fiscalYearError = e.toString();
+        _fiscalYearError = ErrorExtractor.forContext(e, context);
         _loadingFiscalYear = false;
       });
     }
@@ -334,7 +335,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) {

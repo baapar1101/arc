@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/permission_guard.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
@@ -52,7 +53,7 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.showError(context, message: t.fxRevaluationSettingsLoadError('$e'));
+        SnackBarHelper.showError(context, message: t.fxRevaluationSettingsLoadError(ErrorExtractor.forContext(e, context)));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -80,7 +81,7 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.showError(context, message: t.fxRevaluationSettingsSaveError('$e'));
+        SnackBarHelper.showError(context, message: t.fxRevaluationSettingsSaveError(ErrorExtractor.forContext(e, context)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

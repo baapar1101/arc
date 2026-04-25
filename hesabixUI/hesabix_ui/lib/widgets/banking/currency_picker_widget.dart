@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
+import '../../utils/error_extractor.dart';
 
 class CurrencyPickerWidget extends StatefulWidget {
   final int? selectedCurrencyId;
@@ -73,8 +74,9 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _isLoading = false;
       });
     }

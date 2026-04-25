@@ -12,6 +12,7 @@ import '../../services/price_list_service.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/category/category_picker_field.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
@@ -119,7 +120,11 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       setState(() => _isLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.dataLoadingError}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${t.dataLoadingError}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -1128,7 +1133,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       return apiError?.message ?? t.operationFailed;
     }
 
-    return '${t.operationFailed}: ${apiError?.message ?? e.toString()}';
+    return '${t.operationFailed}: ${apiError?.message ?? ErrorExtractor.userMessage(e, t)}';
   }
 
   String? _extractFieldName(dynamic loc) {

@@ -11,6 +11,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -895,7 +896,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: '${t.installmentsFetchError}: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.installmentsFetchError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1301,7 +1306,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: '${t.installmentsExportError}: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.installmentsExportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1343,7 +1352,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: '${t.installmentsExportError}: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.installmentsExportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }

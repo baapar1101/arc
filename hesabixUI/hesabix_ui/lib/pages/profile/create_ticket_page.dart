@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 
 class CreateTicketPage extends StatefulWidget {
@@ -116,8 +117,9 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _isLoading = false;
       });
     }
@@ -160,8 +162,9 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         Navigator.pop(context, true);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _isSubmitting = false;
       });
     }

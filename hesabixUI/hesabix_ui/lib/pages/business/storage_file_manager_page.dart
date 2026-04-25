@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه فایل منیجر برای مدیریت فایل‌های کسب‌وکار
 class StorageFileManagerPage extends StatefulWidget {
@@ -240,7 +241,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -274,7 +275,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
+          SnackBarHelper.showError(
+            context,
+            message:
+                'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       } finally {
         if (mounted) {
@@ -283,7 +288,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
         setState(() => _uploading = false);
       }
     }
@@ -306,7 +311,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -324,7 +329,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
               .toList() ??
           <Map<String, dynamic>>[];
     } catch (e) {
-      usageError = '$e';
+      usageError = ErrorExtractor.userMessage(e);
     }
 
     if (!mounted) return false;
@@ -482,7 +487,10 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در تغییر نام: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در تغییر نام: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -550,7 +558,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در دانلود فایل: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -1103,7 +1115,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
                   if (context.mounted) Navigator.pop(context, data);
                 } catch (e) {
                   if (context.mounted) {
-                    SnackBarHelper.showError(context, message: 'خطا: $e');
+                    SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
                   }
                 }
               },
@@ -1263,7 +1275,7 @@ class _BusinessSharesSheetState extends State<_BusinessSharesSheet> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -1316,7 +1328,10 @@ class _BusinessSharesSheetState extends State<_BusinessSharesSheet> {
                   _load();
                 } catch (e) {
                   if (!context.mounted) return;
-                  SnackBarHelper.showError(context, message: '$e');
+                  SnackBarHelper.showError(
+                    context,
+                    message: ErrorExtractor.forContext(e, context),
+                  );
                 }
               },
               child: const Text('لغو همه دسترسی‌های اشتراکی'),
@@ -1358,7 +1373,14 @@ class _BusinessSharesSheetState extends State<_BusinessSharesSheet> {
                                             _load();
                                           } catch (e) {
                                             if (!context.mounted) return;
-                                            SnackBarHelper.showError(context, message: '$e');
+                                            SnackBarHelper.showError(
+                                              context,
+                                              message:
+                                                  ErrorExtractor.forContext(
+                                                e,
+                                                context,
+                                              ),
+                                            );
                                           }
                                         },
                                       )

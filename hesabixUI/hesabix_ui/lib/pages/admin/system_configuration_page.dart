@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
+import '../../utils/error_extractor.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
   const SystemConfigurationPage({super.key});
@@ -194,12 +195,13 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
+        final err = ErrorExtractor.forContext(e, context);
         setState(() {
-          _error = '${t.errorLoadingSettings}: $e';
+          _error = '${t.errorLoadingSettings}: $err';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${t.errorLoadingSettings}: $e'),
+            content: Text('${t.errorLoadingSettings}: $err'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1042,9 +1044,10 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
+        final err = ErrorExtractor.forContext(e, context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${t.errorSavingSettings}: $e'),
+            content: Text('${t.errorSavingSettings}: $err'),
             backgroundColor: Colors.red,
           ),
         );

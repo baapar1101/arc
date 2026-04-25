@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// گزارش خلاصهٔ ویزیت و مرجوعی (مرکز گزارشات).
@@ -43,7 +44,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
       );
       if (mounted) setState(() => _data = d);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

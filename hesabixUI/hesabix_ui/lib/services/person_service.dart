@@ -29,7 +29,15 @@ class PersonService {
         queryParams['search'] = search;
         // اگر search_fields مشخص نشده، فیلدهای پیش‌فرض را استفاده کن
         if (searchFields == null || searchFields.isEmpty) {
-          queryParams['search_fields'] = ['alias_name', 'first_name', 'last_name', 'company_name', 'mobile', 'email'];
+          queryParams['search_fields'] = [
+            'alias_name',
+            'first_name',
+            'last_name',
+            'company_name',
+            'mobile',
+            'email',
+            'social_value',
+          ];
         }
       }
 

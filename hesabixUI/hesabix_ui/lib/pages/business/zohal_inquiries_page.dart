@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../services/zohal_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/zohal/identity_inquiry_dialog.dart';
@@ -76,7 +77,7 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -166,7 +167,10 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
     } catch (e) {
       setState(() => _submitting = false);
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در اجرای استعلام: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در اجرای استعلام: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

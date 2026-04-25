@@ -9,6 +9,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
@@ -180,7 +181,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxOperationError(e.toString()));
+      SnackBarHelper.showError(context, message: t.taxOperationError(ErrorExtractor.forContext(e, context)));
     }
   }
 
@@ -733,7 +734,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       // استخراج invoice_id از item برای نمایش بهتر خطاها
       final invoiceId = item['id'] is int ? item['id'] as int : int.tryParse(item['id']?.toString() ?? '');
       if (!_handleTaxSendError(e, invoiceId: invoiceId)) {
-        SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(e.toString()));
+        SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(ErrorExtractor.forContext(e, context)));
       }
     }
   }
@@ -789,7 +790,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(ErrorExtractor.forContext(e, context)));
     }
   }
 
@@ -896,7 +897,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     } catch (e) {
       if (!mounted) return;
       if (!_handleTaxSendError(e)) {
-        SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(e.toString()));
+        SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(ErrorExtractor.forContext(e, context)));
       }
     }
   }
@@ -970,7 +971,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               if (context.mounted) {
                 Navigator.of(context).pop();
                 if (!mounted) return;
-                SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(e.toString()));
+                SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(ErrorExtractor.forContext(e, context)));
                 _refreshData();
               }
             }
@@ -1139,7 +1140,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxRemoveSelectedErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(context, message: t.taxRemoveSelectedErrorWithMessage(ErrorExtractor.forContext(e, context)));
     }
   }
 
@@ -1207,7 +1208,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxInquireSelectedErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(context, message: t.taxInquireSelectedErrorWithMessage(ErrorExtractor.forContext(e, context)));
     }
   }
 

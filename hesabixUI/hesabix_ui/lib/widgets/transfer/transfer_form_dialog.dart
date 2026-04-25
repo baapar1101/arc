@@ -10,6 +10,7 @@ import '../../core/api_client.dart';
 import '../../services/transfer_service.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class TransferFormDialog extends StatefulWidget {
@@ -190,7 +191,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ثبت انتقال: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در ثبت انتقال: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       setState(() {

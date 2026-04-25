@@ -43,6 +43,7 @@ import '../../services/invoice_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../services/credit_api_service.dart';
 import '../../models/credit_models.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
 
@@ -348,7 +349,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       _applyPrintSettingsForCurrentType();
     } catch (e) {
       if (mounted) {
-        _showError('خطا در دریافت تنظیمات چاپ: $e');
+        _showError(
+          'خطا در دریافت تنظیمات چاپ: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       // no-op
@@ -2271,7 +2274,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           );
         }
       } catch (e) {
-        _showError(t.saveInvoiceErrorWithMessage(e.toString()));
+        _showError(
+          t.saveInvoiceErrorWithMessage(ErrorExtractor.forContext(e, context)),
+        );
       }
     } finally {
       if (mounted) {
@@ -2315,7 +2320,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       SnackBarHelper.showSuccess(context, message: 'فایل PDF فاکتور دانلود شد');
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در چاپ فاکتور: $e');
+      _showError(
+        'خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

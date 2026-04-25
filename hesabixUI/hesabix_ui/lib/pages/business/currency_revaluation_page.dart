@@ -8,6 +8,7 @@ import 'package:hesabix_ui/core/permission_guard.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_currency_rate_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
@@ -65,7 +66,10 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'بارگذاری ارزها: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'بارگذاری ارزها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -304,7 +308,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
       }
       _bumpListVersion();
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -330,7 +334,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
       if (mounted) SnackBarHelper.show(context, message: 'حذف شد');
       _bumpListVersion();
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 

@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class ZohalServicesAdminPage extends StatefulWidget {
   const ZohalServicesAdminPage({super.key});
@@ -65,7 +66,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
       debugPrint('[ZohalServicesAdminPage] Error loading services: $e');
       debugPrint('[ZohalServicesAdminPage] StackTrace: $stackTrace');
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -80,7 +81,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -161,7 +162,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                     }
                   } catch (e) {
                     if (mounted) {
-                      SnackBarHelper.showError(context, message: 'خطا: $e');
+                      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
                     }
                   }
                 },

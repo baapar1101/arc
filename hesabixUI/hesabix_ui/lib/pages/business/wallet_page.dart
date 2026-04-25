@@ -15,6 +15,7 @@ import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../widgets/wallet/wallet_top_up_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class WalletPage extends StatefulWidget {
@@ -149,7 +150,8 @@ class _WalletPageState extends State<WalletPage> {
       
       if (!mounted) return;
       setState(() {
-        _error = 'خطا در بارگذاری اطلاعات: ${e.toString()}';
+        _error =
+            'خطا در بارگذاری اطلاعات: ${ErrorExtractor.forContext(e, context)}';
         _overview = null;
         _metrics = null;
       });
@@ -231,7 +233,10 @@ class _WalletPageState extends State<WalletPage> {
         await _load();
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: '${t.error}: $e');
+          SnackBarHelper.showError(
+            context,
+            message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       }
     }

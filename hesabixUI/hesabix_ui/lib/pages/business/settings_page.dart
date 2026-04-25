@@ -9,6 +9,7 @@ import '../../services/business_user_service.dart';
 import '../../services/marketplace_service.dart';
 import '../../models/business_user_model.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/calendar_switcher.dart';
 import '../../widgets/language_switcher.dart';
@@ -181,6 +182,12 @@ class _SettingsPageState extends State<SettingsPage> {
     return authStore.hasBusinessPermission('distribution', 'view');
   }
 
+  bool _canAccessCrmSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    return authStore.canReadSection('crm');
+  }
+
   bool _canAccessRepairShopSettings() {
     final authStore = _authStore;
     if (authStore == null) return false;
@@ -304,6 +311,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                   icon: Icons.credit_score_outlined,
                                   onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
                                 ),
+                                if (_canAccessCrmSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: 'تنظیمات CRM',
+                                    subtitle: 'چت وب و ارسال فایل توسط بازدیدکننده',
+                                    icon: Icons.support_agent,
+                                    onTap: () => context.push('/business/${widget.businessId}/settings/crm'),
+                                  ),
                                 _buildSettingItem(
                                   context,
                                   title: 'تنظیمات فروش سریع',
@@ -603,6 +618,14 @@ class _SettingsPageState extends State<SettingsPage> {
                             icon: Icons.credit_score_outlined,
                             onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
                           ),
+                          if (_canAccessCrmSettings())
+                            _buildSettingItem(
+                              context,
+                              title: 'تنظیمات CRM',
+                              subtitle: 'چت وب و ارسال فایل توسط بازدیدکننده',
+                              icon: Icons.support_agent,
+                              onTap: () => context.push('/business/${widget.businessId}/settings/crm'),
+                            ),
                           _buildSettingItem(
                             context,
                             title: 'تنظیمات فروش سریع',
@@ -1134,7 +1157,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در خروج از کسب و کار: $e',
+          message: 'خطا در خروج از کسب و کار: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {

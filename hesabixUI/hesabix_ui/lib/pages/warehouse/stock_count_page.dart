@@ -9,6 +9,7 @@ import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/data_table/data_table.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
 
@@ -148,7 +149,9 @@ class _StockCountPageState extends State<StockCountPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در بارگذاری: $e');
+      _showError(
+        'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -201,7 +204,9 @@ class _StockCountPageState extends State<StockCountPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در محاسبه تفاوت‌ها: $e');
+      _showError(
+        'خطا در محاسبه تفاوت‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() => _calculating = false);
@@ -272,7 +277,9 @@ class _StockCountPageState extends State<StockCountPage> {
       context.go('/business/${widget.businessId}/warehouse-docs');
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در ایجاد حواله تعدیل: $e');
+      _showError(
+        'خطا در ایجاد حواله تعدیل: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() => _loading = false);

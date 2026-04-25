@@ -12,6 +12,7 @@ import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/helpers/file_saver.dart';
@@ -166,7 +167,10 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       _pushHistory();
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری قالب: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در بارگذاری قالب: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -316,7 +320,10 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره‌سازی: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در ذخیره‌سازی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -398,7 +405,10 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     } catch (e) {
       if (mounted) {
         setState(() => _previewLoading = false);
-        SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در پیش‌نمایش: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -2236,7 +2246,11 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                     }
                   } catch (e) {
                     if (mounted) {
-                      SnackBarHelper.showError(context, message: 'خطا در دانلود: $e');
+                      SnackBarHelper.showError(
+                        context,
+                        message:
+                            'خطا در دانلود: ${ErrorExtractor.forContext(e, context)}',
+                      );
                     }
                   }
                 },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/admin_firewall_service.dart';
 
@@ -87,7 +88,7 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
       final raw = data['items'] as List<dynamic>? ?? [];
       _items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorExtractor.forContext(e, context);
     }
     setState(() => _loading = false);
   }
@@ -159,7 +160,9 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.error}: ${ErrorExtractor.forContext(e, context)}')),
+        );
       }
     }
   }
@@ -205,7 +208,9 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
       }
     }
   }
@@ -289,7 +294,11 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
                                     await _load();
                                   } catch (e) {
                                     if (context.mounted) {
-                                      messenger.showSnackBar(SnackBar(content: Text('$e')));
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(ErrorExtractor.forContext(e, context)),
+                                        ),
+                                      );
                                     }
                                   }
                                 }
@@ -352,7 +361,7 @@ class _FirewallBlockLogsTabState extends State<_FirewallBlockLogsTab> {
       _items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       _total = (data['total'] as num?)?.toInt() ?? 0;
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorExtractor.forContext(e, context);
     }
     setState(() => _loading = false);
   }
@@ -460,7 +469,7 @@ class _FirewallAuditTabState extends State<_FirewallAuditTab> {
       final raw = data['items'] as List<dynamic>? ?? [];
       _items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorExtractor.forContext(e, context);
     }
     setState(() => _loading = false);
   }
@@ -528,7 +537,7 @@ class _FirewallReportsTabState extends State<_FirewallReportsTab> {
     try {
       _data = await widget.service.reportsSummary(days: 7);
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorExtractor.forContext(e, context);
     }
     setState(() => _loading = false);
   }

@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 
@@ -145,7 +146,7 @@ class _WarehousePostalLabelPrintDialogState extends State<_WarehousePostalLabelP
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: '$e');
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) setState(() => _downloading = false);

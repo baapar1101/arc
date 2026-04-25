@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/notifications_service.dart';
 import '../../services/admin_system_settings_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class NotificationsSettingsPage extends StatefulWidget {
@@ -153,7 +154,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
         _adminLoading = false;
       });
@@ -176,7 +177,11 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.notificationsSaveError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsSaveError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -202,7 +207,11 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       SnackBarHelper.show(context, message: t.notificationsAdvancedSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.notificationsAdvancedSaveError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsAdvancedSaveError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (!mounted) return;
       setState(() => _adminSaving = false);
@@ -232,9 +241,13 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       if (!mounted) return;
       setState(() {
         _webhookLastOk = false;
-        _webhookLastMessage = '$e';
+        _webhookLastMessage = ErrorExtractor.userMessage(e);
       });
-      SnackBarHelper.showError(context, message: '${t.notificationsTelegramConnectionError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsTelegramConnectionError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (!mounted) return;
       setState(() => _webhookRegistering = false);
@@ -264,9 +277,13 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       if (!mounted) return;
       setState(() {
         _baleWebhookLastOk = false;
-        _baleWebhookLastMessage = '$e';
+        _baleWebhookLastMessage = ErrorExtractor.userMessage(e);
       });
-      SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsBaleConnectionError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (!mounted) return;
       setState(() => _baleWebhookRegistering = false);

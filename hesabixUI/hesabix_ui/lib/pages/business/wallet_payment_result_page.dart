@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../services/wallet_service.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 
 class WalletPaymentResultPage extends StatefulWidget {
   final AuthStore authStore;
@@ -94,7 +95,12 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
         setState(() => _error = 'تراکنش یافت نشد. ممکن است تراکنش در لیست اخیر نباشد.');
       }
     } catch (e) {
-      setState(() => _error = 'خطا در بررسی وضعیت: $e');
+      if (mounted) {
+        setState(
+          () => _error =
+              'خطا در بررسی وضعیت: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);

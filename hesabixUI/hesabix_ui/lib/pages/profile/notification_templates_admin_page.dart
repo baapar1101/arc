@@ -8,6 +8,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/data_table/helpers/data_table_utils.dart';
 import '../../models/notification_template_model.dart';
 import '../../models/event_key_info.dart';
+import '../../utils/error_extractor.dart';
 
 class NotificationTemplatesAdminPage extends StatefulWidget {
   const NotificationTemplatesAdminPage({super.key});
@@ -735,7 +736,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                       if (!context.mounted) return;
                                       SnackBarHelper.showError(
                                         context,
-                                        message: 'خطا در فرمت JSON: $e',
+                                        message:
+                                            'خطا در فرمت JSON: ${ErrorExtractor.forContext(e, context)}',
                                       );
                                       return;
                                     }
@@ -754,7 +756,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                     if (!context.mounted) return;
                                     SnackBarHelper.showError(
                                       context,
-                                      message: 'خطا در پیش‌نمایش: $e',
+                                      message:
+                                          'خطا در پیش‌نمایش: ${ErrorExtractor.forContext(e, context)}',
                                     );
                                   }
                                 },
@@ -823,7 +826,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                               }
                             } catch (e) {
                               if (!context.mounted) return;
-                              SnackBarHelper.showError(context, message: 'خطا: $e');
+                              SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
                             }
                           },
                           icon: const Icon(Icons.save, size: 18),
@@ -876,7 +879,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }

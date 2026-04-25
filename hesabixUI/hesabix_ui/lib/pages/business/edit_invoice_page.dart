@@ -25,6 +25,7 @@ import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
 import '../../services/business_api_service.dart';
@@ -489,7 +490,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     } catch (e) {
       if (mounted) {
         setState(() {
-          _loadError = e.toString();
+          _loadError = ErrorExtractor.forContext(e, context);
           _loading = false;
         });
       }
@@ -1326,7 +1327,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         }
       } catch (e) {
         if (!mounted) return;
-        SnackBarHelper.show(context, message: 'خطا در ذخیره تغییرات: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در ذخیره تغییرات: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

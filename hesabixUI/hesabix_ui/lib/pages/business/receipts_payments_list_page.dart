@@ -28,6 +28,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 // removed duplicate import
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../services/business_dashboard_service.dart';
@@ -1022,7 +1023,10 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری جزئیات: $e');
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری جزئیات: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -1057,7 +1061,10 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در آماده‌سازی ویرایش: $e');
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در آماده‌سازی ویرایش: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -1161,7 +1168,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           }
         }
       } else {
-        message = e.toString();
+        message = ErrorExtractor.forContext(e, context);
       }
 
       SnackBarHelper.showError(context, message: message);
@@ -1253,7 +1260,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       if (e is DioException) {
         message = e.message ?? message;
       } else {
-        message = e.toString();
+        message = ErrorExtractor.forContext(e, context);
       }
       SnackBarHelper.showError(context, message: message);
     } finally {
@@ -2109,7 +2116,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       Navigator.pop(context);
       
       // نمایش خطا
-      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -2249,7 +2259,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           }
         }
       } else {
-        message = e.toString();
+        message = ErrorExtractor.forContext(e, context);
       }
       SnackBarHelper.show(context, message: message);
     }
@@ -4300,7 +4310,10 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.showError(context, message: '${t.exportError}: $e');
+        SnackBarHelper.showError(
+        context,
+        message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

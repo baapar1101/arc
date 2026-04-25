@@ -11,6 +11,7 @@ import '../../services/errors/api_error.dart';
 import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
@@ -85,7 +86,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -115,7 +116,8 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
           isInsufficientFunds = true;
           errorMessage = 'موجودی کیف‌پول کافی نیست';
         } else {
-          errorMessage = errorStr.isNotEmpty && errorStr != 'Exception' ? errorStr : t.paymentError;
+          final friendly = ErrorExtractor.userMessage(e);
+          errorMessage = friendly.isNotEmpty && friendly != 'Exception' ? friendly : t.paymentError;
         }
       }
       

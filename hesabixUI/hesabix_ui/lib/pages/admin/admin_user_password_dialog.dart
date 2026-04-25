@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// دیالوگ سه‌حالته: توکن بازیابی، رمز انتخابی مدیر، رمز تصادفی.
 Future<void> showAdminUserPasswordDialog(
@@ -84,12 +85,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
     );
   }
 
-  String _err(dynamic e) {
-    if (e is Exception) {
-      return e.toString();
-    }
-    return e.toString();
-  }
+  String _err(Object e) => ErrorExtractor.userMessage(e);
 
   Future<void> _resetToken() async {
     final id = _parseUserId(widget.user);

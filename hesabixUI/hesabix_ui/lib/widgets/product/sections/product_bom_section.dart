@@ -3,6 +3,7 @@ import '../../../services/bom_service.dart';
 import '../../../models/bom_models.dart';
 import '../../product/bom_editor_dialog.dart';
 import '../production_settings_dialog.dart';
+import '../../../../utils/error_extractor.dart';
 import '../../../../utils/snackbar_helper.dart';
 
 class ProductBomSection extends StatefulWidget {
@@ -48,7 +49,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -520,7 +521,10 @@ class _ProductBomSectionState extends State<ProductBomSection> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در حذف فرمول: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در حذف فرمول: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 }
@@ -606,7 +610,8 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'خطا در ایجاد فرمول: $e';
+        _errorMessage =
+            'خطا در ایجاد فرمول: ${ErrorExtractor.forContext(e, context)}';
       });
     }
   }
@@ -969,7 +974,8 @@ class _EditBomDialogState extends State<_EditBomDialog> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'خطا در ذخیره تغییرات: $e';
+        _errorMessage =
+            'خطا در ذخیره تغییرات: ${ErrorExtractor.forContext(e, context)}';
       });
     }
   }

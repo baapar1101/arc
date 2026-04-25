@@ -5,6 +5,7 @@ import 'package:hesabix_ui/services/marketplace_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class MarketplacePluginsAdminPage extends StatefulWidget {
   const MarketplacePluginsAdminPage({super.key});
@@ -45,7 +46,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -269,7 +270,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
-                                  message: 'خطا: $e',
+                                  message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
                                   backgroundColor: Colors.red,
                                 );
                               }
@@ -470,7 +471,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
-                                  message: 'خطا: $e',
+                                  message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
                                   backgroundColor: Colors.red,
                                 );
                               }
@@ -516,7 +517,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       _load();
       SnackBarHelper.show(context, message: 'افزونه با موفقیت حذف شد', backgroundColor: Colors.green);
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: $e', backgroundColor: Colors.red);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: Colors.red);
     }
   }
 
@@ -546,7 +547,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       _load();
       SnackBarHelper.show(context, message: 'پلن با موفقیت حذف شد', backgroundColor: Colors.green);
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: $e', backgroundColor: Colors.red);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: Colors.red);
     }
   }
 

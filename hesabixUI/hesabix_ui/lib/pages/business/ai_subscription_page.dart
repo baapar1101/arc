@@ -7,6 +7,7 @@ import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class AISubscriptionPage extends StatefulWidget {
   final int? businessId;
@@ -76,7 +77,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       setState(() {
         _loading = false;
         _isRefreshing = false;
-        _loadError = e.toString();
+        _loadError = ErrorExtractor.userMessage(e);
       });
     }
   }
@@ -93,7 +94,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -110,7 +111,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -142,7 +143,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.show(context, message: 'خطا: $e');
+          SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
         }
       }
     }

@@ -24,6 +24,7 @@ import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/warehouse/warehouse_document_details_dialog.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/bank_account_combobox_widget.dart';
@@ -186,7 +187,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
+          SnackBarHelper.showError(
+            context,
+            message: 'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       } finally {
         if (mounted) {
@@ -195,7 +199,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
         setState(() => _uploadingFile = false);
       }
     }
@@ -414,7 +421,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       SnackBarHelper.showSuccess(context, message: 'لینک نمایش عمومی فاکتور ایجاد شد');
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ایجاد لینک: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در ایجاد لینک: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -438,7 +448,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     } catch (e) {
       if (mounted) {
         setState(() => _revokingInvoiceShareLink = false);
-        SnackBarHelper.showError(context, message: 'خطا در لغو لینک: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در لغو لینک: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -516,7 +529,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در تولید PDF: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در تولید PDF: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _isGeneratingPdf = false);
     }
@@ -642,7 +658,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorExtractor.forContext(e, context);
           _isLoading = false;
           _showInstallmentsTab = false;
           _loadingInstallmentPlan = false;
@@ -669,7 +685,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (!mounted) return;
       setState(() {
         _loadingInstallmentPlan = false;
-        _installmentPlanError = e.toString();
+        _installmentPlanError = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -1541,7 +1557,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           _loadDocument();
                         } catch (e) {
                           if (!context.mounted) return;
-                          SnackBarHelper.show(context, message: t.warehouseDocumentPostFailed(e.toString()));
+                          SnackBarHelper.show(
+                            context,
+                            message: t.warehouseDocumentPostFailed(ErrorExtractor.forContext(e, context)),
+                          );
                         }
                       },
                       tooltip: t.postWarehouseDocument,
@@ -4113,7 +4132,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             return await _createReceiptPaymentFromFormData(data, transactionType);
           } catch (e) {
             if (mounted) {
-              SnackBarHelper.showError(context, message: 'خطا در افزودن تراکنش: $e');
+              SnackBarHelper.showError(
+                context,
+                message: 'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
+              );
             }
             rethrow;
           }
@@ -4160,7 +4182,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             return await _createReceiptPaymentFromFormData(data, transactionType);
           } catch (e) {
             if (mounted) {
-              SnackBarHelper.showError(context, message: 'خطا در افزودن تراکنش: $e');
+              SnackBarHelper.showError(
+                context,
+                message: 'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
+              );
             }
             rethrow;
           }
@@ -4214,7 +4239,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             return updated;
           } catch (e) {
             if (mounted) {
-              SnackBarHelper.showError(context, message: 'خطا در به‌روزرسانی تراکنش: $e');
+              SnackBarHelper.showError(
+                context,
+                message: 'خطا در به‌روزرسانی تراکنش: ${ErrorExtractor.forContext(e, context)}',
+              );
             }
             rethrow;
           }
@@ -4267,7 +4295,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در حذف تراکنش: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در حذف تراکنش: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -4340,7 +4371,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           }
         } catch (e) {
           // اگر خطا رخ داد، خطا را throw کن
-          throw Exception('خطا در دریافت اطلاعات فاکتور: $e');
+          throw Exception(
+            'خطا در دریافت اطلاعات فاکتور: ${ErrorExtractor.userMessage(e)}',
+          );
         }
       }
       
@@ -4362,7 +4395,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در به‌روزرسانی لینک‌های فاکتور: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در به‌روزرسانی لینک‌های فاکتور: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
       rethrow;
     }
@@ -5271,7 +5307,10 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

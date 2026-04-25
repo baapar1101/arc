@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
@@ -110,10 +111,14 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 

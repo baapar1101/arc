@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart' as dio;
 import '../models/product_form_data.dart';
 import '../services/product_service.dart';
 import '../services/category_service.dart';
@@ -154,7 +153,7 @@ class ProductFormController extends ChangeNotifier {
       _clearError();
       notifyListeners();
     } catch (e) {
-      _setError(ErrorExtractor.extractErrorMessage(e));
+      _setError(ErrorExtractor.userMessage(e));
     } finally {
       _setLoading(false);
     }
@@ -327,7 +326,7 @@ class ProductFormController extends ChangeNotifier {
       _clearError();
       return true;
     } catch (e) {
-      _setError(ErrorExtractor.extractErrorMessage(e));
+      _setError(ErrorExtractor.userMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -413,7 +412,7 @@ class ProductFormController extends ChangeNotifier {
       _clearError();
       return true;
     } catch (e) {
-      _setError(ErrorExtractor.extractErrorMessage(e));
+      _setError(ErrorExtractor.userMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -446,7 +445,7 @@ class ProductFormController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(ErrorExtractor.extractErrorMessage(e));
+      _setError(ErrorExtractor.userMessage(e));
       return false;
     } finally {
       _setLoading(false);

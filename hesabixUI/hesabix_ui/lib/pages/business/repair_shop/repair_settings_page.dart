@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_settings_model.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 
@@ -69,8 +70,10 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'خطا در بارگذاری تنظیمات: $e';
+        _errorMessage =
+            'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
       });
     }
@@ -102,7 +105,11 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در ذخیره تنظیمات: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

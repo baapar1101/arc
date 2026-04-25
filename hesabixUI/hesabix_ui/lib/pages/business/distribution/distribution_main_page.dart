@@ -7,6 +7,7 @@ import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart' as Hd;
 import '../../../l10n/app_localizations.dart';
 import '../../../services/distribution_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/jalali_date_picker.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
@@ -116,7 +117,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final d = await _svc.getSummary(businessId: widget.businessId);
       if (mounted) setState(() => _summary = d);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingSummary = false);
     }
@@ -131,7 +132,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final d = await _svc.getDailyPlan(businessId: widget.businessId, planDate: iso);
       if (mounted) setState(() => _dailyPlan = d);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingPlan = false);
     }
@@ -151,7 +152,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         });
       }
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingRoutes = false);
     }
@@ -162,7 +163,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final s = await _svc.listRouteStops(businessId: widget.businessId, routeId: routeId);
       if (mounted) setState(() => _stopsByRoute[routeId] = s);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -173,7 +174,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final d = await _svc.listVisits(businessId: widget.businessId, limit: 80, skip: 0);
       if (mounted) setState(() => _visitListPayload = d);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingVisits = false);
     }
@@ -186,7 +187,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final r = await _svc.listReturnRequests(businessId: widget.businessId);
       if (mounted) setState(() => _returns = r);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingReturns = false);
     }
@@ -210,7 +211,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       );
       await _showCompleteVisitSheet(int.parse('${res['id']}'));
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -297,7 +298,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                           await _refreshVisits();
                         }
                       } catch (e) {
-                        if (mounted) SnackBarHelper.showError(context, message: '$e');
+                        if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                       }
                     },
                     child: Text(t.distributionCompleteVisit),
@@ -338,7 +339,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 if (ctx.mounted) Navigator.pop(ctx);
                 await _refreshRoutesMaster();
               } catch (e) {
-                if (mounted) SnackBarHelper.showError(context, message: '$e');
+                if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
               }
             },
             child: const Text('OK'),
@@ -399,7 +400,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                     if (ctx.mounted) Navigator.pop(ctx);
                     await _refreshRoutesMaster();
                   } catch (e) {
-                    if (mounted) SnackBarHelper.showError(context, message: '$e');
+                    if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                   }
                 },
                 child: const Text('OK'),
@@ -463,7 +464,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                     if (ctx.mounted) Navigator.pop(ctx);
                     await _loadStops(routeId);
                   } catch (e) {
-                    if (mounted) SnackBarHelper.showError(context, message: '$e');
+                    if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                   }
                 },
                 child: const Text('OK'),
@@ -539,7 +540,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) SnackBarHelper.showSuccess(context, message: 'OK');
                   } catch (e) {
-                    if (mounted) SnackBarHelper.showError(context, message: '$e');
+                    if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                   }
                 },
                 child: const Text('OK'),
@@ -592,7 +593,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 if (ctx.mounted) Navigator.pop(ctx);
                 await _refreshReturns();
               } catch (e) {
-                if (mounted) SnackBarHelper.showError(context, message: '$e');
+                if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
               }
             },
             child: Text(t.distributionReturnCreate),
@@ -623,7 +624,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 if (ctx.mounted) Navigator.pop(ctx);
                 await _refreshReturns();
               } catch (e) {
-                if (mounted) SnackBarHelper.showError(context, message: '$e');
+                if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
               }
             },
             child: const Text('Reject'),
@@ -639,7 +640,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 if (ctx.mounted) Navigator.pop(ctx);
                 await _refreshReturns();
               } catch (e) {
-                if (mounted) SnackBarHelper.showError(context, message: '$e');
+                if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
               }
             },
             child: const Text('Approve'),
@@ -757,7 +758,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                     SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
                     await _refreshSummary();
                   } catch (e) {
-                    if (mounted) SnackBarHelper.showError(context, message: '$e');
+                    if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                   }
                 }
                 return Column(

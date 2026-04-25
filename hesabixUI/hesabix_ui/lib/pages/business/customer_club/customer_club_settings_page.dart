@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../services/customer_club_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 
@@ -116,7 +117,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         _loyaltyRfmIntegrationMode = (data['loyalty_rfm_integration_mode'] ?? 'decoupled').toString();
       });
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingSettings = false);
     }
@@ -231,7 +232,7 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
       SnackBarHelper.showSuccess(context, message: t.customerClubSettingsSaved);
       await _loadSettings();
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 
 import 'admin_user_password_dialog.dart';
@@ -380,7 +381,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         final err = Theme.of(context).colorScheme.error;
         messenger.showSnackBar(
           SnackBar(
-            content: Text('خطا: $e'),
+            content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
             backgroundColor: err,
           ),
         );
@@ -429,7 +430,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       final err = Theme.of(context).colorScheme.error;
       messenger.showSnackBar(
         SnackBar(
-          content: Text('خطا: $e'),
+          content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
           backgroundColor: err,
         ),
       );
@@ -507,7 +508,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در تعلیق کاربر: $e'),
+            content: Text(
+              'خطا در تعلیق کاربر: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );

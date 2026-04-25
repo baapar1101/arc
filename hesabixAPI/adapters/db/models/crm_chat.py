@@ -85,6 +85,9 @@ class CrmChatMessage(Base):
 	sender_role: Mapped[str] = mapped_column(String(20), nullable=False)
 	body: Mapped[str] = mapped_column(Text, nullable=False)
 	user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+	file_storage_id: Mapped[str | None] = mapped_column(
+		String(36), ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True, index=True
+	)
 	created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False, index=True)
 
 	conversation = relationship("CrmChatConversation", back_populates="messages")

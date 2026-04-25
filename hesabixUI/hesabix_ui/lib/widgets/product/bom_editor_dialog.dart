@@ -7,6 +7,7 @@ import '../../services/product_service.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -2622,7 +2623,10 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       Navigator.of(context).pop<ProductBOM>(updated);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در ذخیره: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }

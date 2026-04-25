@@ -18,6 +18,7 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 
@@ -727,7 +728,10 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
       if (!mounted) return;
       
       // نمایش خطا
-      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {

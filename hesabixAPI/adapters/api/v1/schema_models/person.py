@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
 from datetime import datetime
 
@@ -56,6 +56,58 @@ class PersonBankAccountResponse(BaseModel):
     sheba_number: Optional[str] = Field(default=None, description="شماره شبا")
     created_at: str = Field(..., description="تاریخ ایجاد")
     updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
+
+    class Config:
+        from_attributes = True
+
+
+class PersonSocialContactInput(BaseModel):
+    """سطر ارتباط پیام‌رسان / شبکه اجتماعی (ورودی ایجاد/ویرایش)"""
+    model_config = ConfigDict(extra="ignore")
+
+    platform_key: str = Field(..., min_length=1, max_length=64, description="کلید پلتفرم (مثل telegram) یا other")
+    custom_label: Optional[str] = Field(default=None, max_length=128, description="نام نمایش برای سایر/سفارشی")
+    value: str = Field(..., min_length=1, max_length=2000, description="آیدی، لینک، شماره و …")
+
+    @field_validator("platform_key", mode="before")
+    @classmethod
+    def _norm_platform_key(cls, v) -> str:
+        if v is None:
+            return ""
+        s = str(v).strip().lower()
+        return s
+
+    @field_validator("custom_label", mode="before")
+    @classmethod
+    def _empty_custom_to_none(cls, v):
+        if v is None:
+            return None
+        t = str(v).strip()
+        return t if t else None
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _norm_value(cls, v) -> str:
+        s = ("" if v is None else str(v)).strip()
+        return s
+
+    @model_validator(mode="after")
+    def _other_needs_label(self):
+        if self.platform_key == "other" and not self.custom_label:
+            raise ValueError("برای پلتفرم «سایر» باید نام/برچسب وارد شود")
+        return self
+
+
+class PersonSocialContactResponse(BaseModel):
+    """پاسخ اطلاعات ارتباط پیام‌رسان"""
+    id: int = Field(..., description="شناسه رکورد")
+    person_id: int = Field(..., description="شناسه شخص")
+    platform_key: str = Field(..., description="کلید پلتفرم")
+    custom_label: Optional[str] = Field(default=None, description="برچسب سفارشی")
+    value: str = Field(..., description="مقدار")
+    sort_order: int = Field(..., description="ترتیب نمایش")
+    created_at: str = Field(..., description="تاریخ ایجاد")
+    updated_at: str = Field(..., description="تاریخ بروزرسانی")
 
     class Config:
         from_attributes = True
@@ -124,6 +176,8 @@ class PersonCreateRequest(BaseModel):
     
     # حساب‌های بانکی
     bank_accounts: Optional[List[PersonBankAccountCreateRequest]] = Field(default=[], description="حساب‌های بانکی")
+    # پیام‌رسان / شبکه‌های اجتماعی
+    social_contacts: Optional[List[PersonSocialContactInput]] = Field(default=[], description="راه‌های ارتباط (تلگرام، اینستاگرام و …)")
     # سهام
     share_count: Optional[int] = Field(default=None, ge=1, description="تعداد سهام (برای سهامدار، اجباری و حداقل 1)")
     # پورسانت (برای بازاریاب/فروشنده)
@@ -232,6 +286,8 @@ class PersonUpdateRequest(BaseModel):
     # اعتبار
     credit_limit: Optional[float] = Field(default=None, ge=0, description="سقف اعتبار شخص")
     credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (خالی یعنی تبعیت از تنظیمات کسب‌وکار)")
+    # پیام‌رسان / شبکه‌های اجتماعی (در صورت ارسال، کل لیست جایگزین قبلی می‌شود)
+    social_contacts: Optional[List[PersonSocialContactInput]] = Field(default=None, description="راه‌های ارتباط؛ اگر ارسال شود جایگزین کامل است")
 
     @classmethod
     def __get_validators__(cls):
@@ -298,6 +354,7 @@ class PersonResponse(BaseModel):
     
     # حساب‌های بانکی
     bank_accounts: List[PersonBankAccountResponse] = Field(default=[], description="حساب‌های بانکی")
+    social_contacts: List[PersonSocialContactResponse] = Field(default_factory=list, description="پیام‌رسان و شبکه‌های اجتماعی")
     # سهام
     share_count: Optional[int] = Field(default=None, description="تعداد سهام")
     # پورسانت

@@ -4,6 +4,7 @@ import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class TransferDetailsDialog extends StatefulWidget {
@@ -63,7 +64,10 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در تولید PDF: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در تولید PDF: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

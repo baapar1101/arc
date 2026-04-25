@@ -7,6 +7,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../core/auth_store.dart';
 import '../../services/product_attribute_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class ProductAttributeItem {
@@ -450,7 +451,11 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         SnackBarHelper.showError(context, message: errorMessage);
       } catch (e) {
         if (!mounted) return;
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره ویژگی: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در ذخیره ویژگی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
     
@@ -496,7 +501,11 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
               SnackBarHelper.showError(context, message: errorMessage);
             } catch (e) {
               if (!mounted) return;
-              SnackBarHelper.showError(context, message: 'خطا در حذف ویژگی: $e');
+              SnackBarHelper.showError(
+              context,
+              message:
+                  'خطا در حذف ویژگی: ${ErrorExtractor.forContext(e, context)}',
+            );
             }
           }, style: TextButton.styleFrom(foregroundColor: Colors.red), child: Text(t.delete)),
         ],

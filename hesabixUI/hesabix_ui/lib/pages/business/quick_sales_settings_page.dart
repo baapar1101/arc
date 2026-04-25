@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
 import '../../core/auth_store.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
@@ -93,7 +94,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       }
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       setState(() {
@@ -145,7 +146,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       SnackBarHelper.show(context, message: t.savedSuccessfully);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       setState(() {

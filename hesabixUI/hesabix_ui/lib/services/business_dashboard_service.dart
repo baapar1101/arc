@@ -3,6 +3,7 @@ import '../core/api_client.dart';
 // duplicate removed
 import '../core/fiscal_year_controller.dart';
 import '../models/business_dashboard_models.dart';
+import '../models/quick_link_tile_models.dart';
 
 class BusinessDashboardService {
   final ApiClient _apiClient;
@@ -423,7 +424,8 @@ class BusinessDashboardService {
                                  data.containsKey('checks_today') ||
                                  data.containsKey('top_selling_products') ||
                                  data.containsKey('debtors_summary') ||
-                                 data.containsKey('pnl_summary');
+                                 data.containsKey('pnl_summary') ||
+                                 data.containsKey('quick_links');
             final hasJobMetadata = data.containsKey('state') || data.containsKey('id');
             
             if (hasWidgetKeys && !hasJobMetadata) {
@@ -507,6 +509,42 @@ class BusinessDashboardService {
     );
     final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
     return DashboardLayoutProfile.fromJson(data);
+  }
+
+  // ----- دسترسی سریع -----
+  Future<List<QuickLinkPresetOption>> getQuickLinkPresets(int businessId) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/quick-links/presets',
+    );
+    if (res.data?['success'] != true) {
+      throw Exception(res.data?['message'] ?? 'presets error');
+    }
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    final list = (data['items'] as List?) ?? const [];
+    return list
+        .map((e) => QuickLinkPresetOption.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> getQuickLinksRaw(int businessId) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/quick-links',
+    );
+    if (res.data?['success'] != true) {
+      throw Exception(res.data?['message'] ?? 'quick links error');
+    }
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> putQuickLinks(int businessId, List<Map<String, dynamic>> items) async {
+    final res = await _apiClient.put<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/quick-links',
+      data: {'items': items},
+    );
+    if (res.data?['success'] != true) {
+      throw Exception(res.data?['message'] ?? 'save quick links error');
+    }
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> _api_client_postJson(String path, Map<String, dynamic> body) async {

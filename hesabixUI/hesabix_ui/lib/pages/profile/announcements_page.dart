@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/announcements_service.dart';
 import '../../utils/date_formatters.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class AnnouncementsPage extends StatefulWidget {
   const AnnouncementsPage({super.key});
@@ -82,7 +82,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -108,7 +108,9 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
       setState(() => _loadingMore = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری: $e')),
+          SnackBar(
+            content: Text('خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}'),
+          ),
         );
       }
     }
@@ -133,7 +135,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
         );
       }
     } finally {

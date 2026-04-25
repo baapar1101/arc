@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/petty_cash.dart';
 import '../../services/petty_cash_service.dart';
 import 'currency_picker_widget.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class PettyCashFormDialog extends StatefulWidget {
@@ -105,7 +106,10 @@ class _PettyCashFormDialogState extends State<PettyCashFormDialog> {
 		} catch (e) {
 			if (mounted) {
 				final t = AppLocalizations.of(context);
-    SnackBarHelper.showError(context, message: '${t.error}: $e');
+    SnackBarHelper.showError(
+		context,
+		message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+	);
 			}
 		} finally {
 			if (mounted) {

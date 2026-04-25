@@ -4,6 +4,7 @@ import '../../services/check_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../pages/business/check_form_page.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 enum CheckPickerMode { any, receipt, payment }
@@ -260,7 +261,11 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
         }
       });
       _setModalState?.call(() {});
-      SnackBarHelper.showError(context, message: 'خطا در دریافت لیست چک‌ها: $e');
+      SnackBarHelper.showError(
+      context,
+      message:
+          'خطا در دریافت لیست چک‌ها: ${ErrorExtractor.forContext(e, context)}',
+    );
     }
   }
 

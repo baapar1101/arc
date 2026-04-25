@@ -3,6 +3,7 @@ import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../services/marketplace_service.dart';
 import '../../services/wallet_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 
@@ -47,11 +48,14 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> {
         _error = null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'خطا در بارگذاری: $e';
+        _error = 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}';
       });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -68,15 +72,18 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> {
       _showSnack('دوره trial با موفقیت شروع شد');
       await _load();
     } catch (e) {
+      if (!mounted) return;
       String errorMessage = 'خطا در شروع trial';
-      if (e.toString().contains('TRIAL_ALREADY_USED')) {
+      final raw = e.toString();
+      if (raw.contains('TRIAL_ALREADY_USED')) {
         errorMessage = 'شما قبلاً از trial این افزونه استفاده کرده‌اید';
-      } else if (e.toString().contains('TRIAL_NOT_ALLOWED')) {
+      } else if (raw.contains('TRIAL_NOT_ALLOWED')) {
         errorMessage = 'این افزونه trial ندارد';
-      } else if (e.toString().contains('PLUGIN_ALREADY_ACTIVE')) {
+      } else if (raw.contains('PLUGIN_ALREADY_ACTIVE')) {
         errorMessage = 'این افزونه قبلاً برای شما فعال شده است';
       } else {
-        errorMessage = 'خطا در شروع trial: ${e.toString()}';
+        errorMessage =
+            'خطا در شروع trial: ${ErrorExtractor.forContext(e, context)}';
       }
       _showSnack(errorMessage);
     }
@@ -105,19 +112,22 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> {
         _showSnack('نتیجه خرید: ${res['status']}');
       }
     } catch (e) {
+      if (!mounted) return;
       String errorMessage = 'خطا در خرید افزونه';
-      if (e.toString().contains('PLUGIN_NOT_FOUND')) {
+      final raw = e.toString();
+      if (raw.contains('PLUGIN_NOT_FOUND')) {
         errorMessage = 'افزونه یافت نشد یا غیرفعال است';
-      } else if (e.toString().contains('PLAN_NOT_FOUND')) {
+      } else if (raw.contains('PLAN_NOT_FOUND')) {
         errorMessage = 'پلن افزونه یافت نشد یا غیرفعال است';
-      } else if (e.toString().contains('INVALID_QUANTITY')) {
+      } else if (raw.contains('INVALID_QUANTITY')) {
         errorMessage = 'تعداد نامعتبر است';
-      } else if (e.toString().contains('CURRENCY_NOT_FOUND')) {
+      } else if (raw.contains('CURRENCY_NOT_FOUND')) {
         errorMessage = 'ارز پلن نامعتبر است';
-      } else if (e.toString().contains('BUSINESS_NOT_FOUND')) {
+      } else if (raw.contains('BUSINESS_NOT_FOUND')) {
         errorMessage = 'کسب‌وکار یافت نشد';
       } else {
-        errorMessage = 'خطا در خرید: ${e.toString()}';
+        errorMessage =
+            'خطا در خرید: ${ErrorExtractor.forContext(e, context)}';
       }
       _showSnack(errorMessage);
     }

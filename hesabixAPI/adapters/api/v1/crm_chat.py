@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Path, Query, Request
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.crm_chat import (
+	BusinessCrmSettingsUpdate,
 	CrmChatWidgetCreate,
 	CrmChatWidgetUpdate,
 	CrmChatAgentMessageCreate,
@@ -24,6 +25,35 @@ router = APIRouter(tags=["CRM — چت وب"])
 
 def _fmt(request: Request, data: Any) -> Any:
 	return format_datetime_fields(data, request)
+
+
+@router.get("/businesses/{business_id}/chat/crm-settings")
+@require_business_access("business_id")
+async def get_crm_business_settings(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+	s = chat_svc.get_or_create_crm_settings(db, business_id)
+	return success_response(data=_fmt(request, chat_svc.business_crm_settings_to_dict(s)), request=request)
+
+
+@router.patch("/businesses/{business_id}/chat/crm-settings")
+@require_business_access("business_id")
+async def patch_crm_business_settings(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: BusinessCrmSettingsUpdate = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+	s = chat_svc.update_crm_business_settings(
+		db, business_id, allow_web_chat_file_upload=body.allow_web_chat_file_upload
+	)
+	return success_response(data=_fmt(request, chat_svc.business_crm_settings_to_dict(s)), request=request, message="تنظیمات ذخیره شد")
 
 
 @router.get("/businesses/{business_id}/chat/widgets")
@@ -131,6 +161,7 @@ async def post_chat_message_agent(
 		conversation_id=conversation_id,
 		body=body.body,
 		user_id=ctx.get_user_id(),
+		file_storage_id=body.file_storage_id,
 	)
 	return success_response(data=_fmt(request, msg), request=request, message="پیام ارسال شد")
 

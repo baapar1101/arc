@@ -23,6 +23,11 @@ from app.services.dashboard_widgets_service import (
     get_business_default_layout,
     save_business_default_layout,
 )
+from app.services.business_quick_links_service import (
+    get_quick_link_presets_catalog,
+    get_or_create_quick_links,
+    save_quick_links,
+)
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/business", tags=["business-dashboard"])
@@ -475,6 +480,65 @@ def put_dashboard_layout(
     return success_response(result, request)
 
 
+@router.get(
+    "/{business_id}/dashboard/quick-links/presets",
+    summary="کاتالوگ presetهای دسترسی سریع",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_quick_link_presets(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    if ctx.business_id != business_id:
+        ctx.business_id = business_id
+        ctx.business_permissions = ctx._get_business_permissions()
+    return success_response(get_quick_link_presets_catalog(ctx), request)
+
+
+@router.get(
+    "/{business_id}/dashboard/quick-links",
+    summary="ذخیره‌شده کاشی‌های دسترسی سریع کاربر برای این کسب‌وکار",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_quick_links_saved(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = get_or_create_quick_links(db, business_id, ctx.get_user_id())
+    db.commit()
+    return success_response(data, request)
+
+
+@router.put(
+    "/{business_id}/dashboard/quick-links",
+    summary="ذخیره کاشی‌های دسترسی سریع",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def put_quick_links_saved(
+    request: Request,
+    business_id: int,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    if ctx.business_id != business_id:
+        ctx.business_id = business_id
+        ctx.business_permissions = ctx._get_business_permissions()
+    items = payload.get("items") or []
+    data = save_quick_links(
+        db, business_id=business_id, user_id=ctx.get_user_id(), items_in=items, ctx=ctx
+    )
+    db.commit()
+    return success_response(data, request)
+
+
 @router.post("/{business_id}/dashboard/data",
     summary="دریافت داده‌ی ویجت‌ها (Batch)",
     description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند. برای query های طولانی از background job استفاده می‌کند.",
@@ -562,6 +626,7 @@ def post_dashboard_widgets_data(
         widget_keys=[str(k) for k in widget_keys],
         filters=filters,
         calendar_type=calendar_type,
+        auth_ctx=ctx,
     )
     formatted = format_datetime_fields(data, request)
 

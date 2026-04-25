@@ -11,6 +11,7 @@ import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -148,7 +149,9 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       });
     } catch (e) {
       if (mounted) {
-        _showError('خطا در بارگذاری اطلاعات چک: $e');
+        _showError(
+          'خطا در بارگذاری اطلاعات چک: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -242,7 +245,9 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       Navigator.of(context).pop(true);
       widget.onSuccess?.call();
     } catch (e) {
-      _showError('خطا در ذخیره: $e');
+      if (mounted) {
+        _showError('خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../config/app_config.dart';
 import '../../services/payment_gateway_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:uuid/uuid.dart';
 
@@ -62,7 +63,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       final res = await _service.listAdmin();
       setState(() => _items = res);
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() => _error = ErrorExtractor.forContext(e, context));
     } finally {
       setState(() => _loading = false);
     }
@@ -146,7 +147,10 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       print('❌ [CREATE] Error creating gateway: $e');
       if (!ctx.mounted) return;
       final t = AppLocalizations.of(ctx);
-      SnackBarHelper.showError(ctx, message: '${t.error}: $e');
+      SnackBarHelper.showError(
+        ctx,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, ctx)}',
+      );
     }
   }
 
@@ -185,7 +189,10 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       print('❌ [UPDATE] Error updating gateway: $e');
       if (!ctx.mounted) return;
       final t = AppLocalizations.of(ctx);
-      SnackBarHelper.showError(ctx, message: '${t.error}: $e');
+      SnackBarHelper.showError(
+        ctx,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, ctx)}',
+      );
     }
   }
 
@@ -640,7 +647,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
     } catch (e) {
       if (!ctx.mounted) return;
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          content: Text('${t.error}: ${ErrorExtractor.forContext(e, ctx)}'),
+        ),
+      );
     }
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api_client.dart';import '../../utils/snackbar_helper.dart';
+import '../../core/api_client.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 
 /// صفحه فرم ایجاد/ویرایش قالب نوتیفیکیشن
@@ -221,7 +223,11 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری قالب: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری قالب: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -283,7 +289,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) {
@@ -347,7 +353,11 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در پیش‌نمایش: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در پیش‌نمایش: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

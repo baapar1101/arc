@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api_client.dart';import '../../utils/snackbar_helper.dart';
+import '../../core/api_client.dart';
+import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../utils/error_extractor.dart';
 
 
 /// صفحه مدیریت قالب‌های نوتیفیکیشن کسب‌وکار
@@ -67,7 +69,8 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'خطا در بارگذاری قالب‌ها: $e';
+        _errorMessage =
+            'خطا در بارگذاری قالب‌ها: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
       });
     }
@@ -537,7 +540,7 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }

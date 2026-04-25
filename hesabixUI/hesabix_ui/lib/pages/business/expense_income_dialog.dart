@@ -12,6 +12,7 @@ import '../../models/expense_income_document.dart' as expense;
 import '../../services/expense_income_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class ExpenseIncomeDialog extends StatefulWidget {
   final int businessId;
@@ -294,7 +295,7 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 

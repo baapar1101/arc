@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
 class StorageFilesPage extends StatefulWidget {
@@ -175,7 +176,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -226,7 +227,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         _loadingMore = false;
       });
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری بیشتر: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در بارگذاری بیشتر: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -271,7 +276,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     } catch (e) {
       setState(() => _loadingPlans = false);
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دریافت پلن‌ها: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در دریافت پلن‌ها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -287,7 +296,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     } catch (e) {
       setState(() => _loadingInvoices = false);
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دریافت صورتحساب‌ها: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در دریافت صورتحساب‌ها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -333,7 +346,10 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در اشتراک: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در اشتراک: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -393,7 +409,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
+          SnackBarHelper.showError(
+            context,
+            message:
+                'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       } finally {
         if (mounted) {
@@ -402,7 +422,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
         setState(() => _uploading = false);
       }
     }
@@ -678,7 +698,10 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دانلود: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در دانلود: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -2415,7 +2438,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -2433,7 +2456,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
               .toList() ??
           <Map<String, dynamic>>[];
     } catch (e) {
-      usageError = '$e';
+      usageError = ErrorExtractor.userMessage(e);
     }
 
     if (!mounted) return false;
@@ -2543,7 +2566,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در دانلود فایل: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

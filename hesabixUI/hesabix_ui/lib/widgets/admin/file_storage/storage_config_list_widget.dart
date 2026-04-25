@@ -3,6 +3,7 @@ import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_card.dart';
 import '../../../core/api_client.dart';
 import '../../../l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
 class StorageConfigListWidget extends StatefulWidget {
@@ -48,8 +49,9 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         throw Exception(response.data?['message'] ?? 'خطا در دریافت تنظیمات ذخیره‌سازی');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _isLoading = false;
       });
     }
@@ -73,7 +75,10 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'اتصال ناموفق: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'اتصال ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -126,7 +131,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         } else if (e.toString().contains('FORBIDDEN')) {
           errorMessage = AppLocalizations.of(ctx).accessDenied;
         } else {
-          errorMessage = e.toString().replaceFirst('Exception: ', '');
+          errorMessage = ErrorExtractor.forContext(e, ctx);
         }
         
         SnackBarHelper.showError(ctx, message: errorMessage);
@@ -154,7 +159,11 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       if (!context.mounted) return;
       final ctx2 = context;
       final t2 = AppLocalizations.of(ctx2);
-      SnackBarHelper.showError(ctx2, message: '${t2.defaultSetFailed}: $e');
+      SnackBarHelper.showError(
+        ctx2,
+        message:
+            '${t2.defaultSetFailed}: ${ErrorExtractor.forContext(e, ctx2)}',
+      );
     }
   }
 

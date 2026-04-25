@@ -3,6 +3,7 @@ import '../../services/warehouse_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart';
@@ -52,7 +53,7 @@ class _StockReportPageState extends State<StockReportPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا: $e')),
+        SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
       );
     } finally {
       if (mounted) {

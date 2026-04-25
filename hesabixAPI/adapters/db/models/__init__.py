@@ -16,10 +16,11 @@ from .business_dashboard_layout import (  # noqa: F401
 	BusinessUserDashboardLayout,
 	BusinessDashboardDefaultLayout,
 )
+from .business_user_quick_links import BusinessUserQuickLink  # noqa: F401
 from .data_table_user_column_settings import DataTableUserColumnSettings  # noqa: F401
 from .business_print_settings import BusinessPrintSettings  # noqa: F401
 from .business_permission import BusinessPermission  # noqa: F401
-from .person import Person, PersonBankAccount  # noqa: F401
+from .person import Person, PersonBankAccount, PersonSocialContact  # noqa: F401
 from .person_group import PersonGroup  # noqa: F401
 from .person_share_link import PersonShareLink  # noqa: F401
 from .document_share_link import DocumentShareLink  # noqa: F401
@@ -123,6 +124,7 @@ from .project import Project  # noqa: F401
 # Bale messenger linking
 from .bale import BaleLinkToken  # noqa: F401
 from .business_ftp_backup_setting import BusinessFtpBackupSetting  # noqa: F401
+from .business_crm_settings import BusinessCrmSettings  # noqa: F401
 # CRM
 from .crm import (  # noqa: F401
     CrmProcessDefinition,

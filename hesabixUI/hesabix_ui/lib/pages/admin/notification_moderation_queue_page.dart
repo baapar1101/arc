@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه مدیریت صف بررسی قالب‌های نوتیفیکیشن
 class NotificationModerationQueuePage extends StatefulWidget {
@@ -89,7 +90,7 @@ class _NotificationModerationQueuePageState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا: $e';
+          _error = 'خطا: ${ErrorExtractor.userMessage(e)}';
           _cachedFilteredItems = [];
           _isLoading = false;
         });
@@ -173,7 +174,7 @@ class _NotificationModerationQueuePageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
         );
       }
     } finally {
@@ -205,7 +206,7 @@ class _NotificationModerationQueuePageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
         );
       }
     } finally {
@@ -236,7 +237,7 @@ class _NotificationModerationQueuePageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
         );
       }
     } finally {

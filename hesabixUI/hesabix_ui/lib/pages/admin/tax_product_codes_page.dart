@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../services/tax_product_code_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -69,7 +70,10 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
       _startJobPolling();
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ارسال فایل: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در ارسال فایل: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -114,7 +118,11 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
       _jobTimer?.cancel();
       _jobTimer = null;
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دریافت وضعیت کار: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دریافت وضعیت کار: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

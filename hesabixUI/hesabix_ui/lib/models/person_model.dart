@@ -83,6 +83,89 @@ class PersonBankAccount {
   }
 }
 
+class PersonSocialContact {
+  final int? id;
+  final int personId;
+  final String platformKey;
+  final String? customLabel;
+  final String value;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  PersonSocialContact({
+    this.id,
+    required this.personId,
+    required this.platformKey,
+    this.customLabel,
+    required this.value,
+    this.sortOrder = 0,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory PersonSocialContact.fromJson(Map<String, dynamic> json) {
+    return PersonSocialContact(
+      id: json['id'] as int?,
+      personId: (json['person_id'] as int?) ?? 0,
+      platformKey: (json['platform_key'] as String?)?.trim() ?? 'telegram',
+      customLabel: json['custom_label'] as String?,
+      value: (json['value'] as String?) ?? '',
+      sortOrder: (json['sort_order'] as int?) ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'person_id': personId,
+      'platform_key': platformKey,
+      'custom_label': customLabel,
+      'value': value,
+      'sort_order': sortOrder,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  /// بدنه API برای create/update
+  Map<String, dynamic> toApiWrite() {
+    return {
+      'platform_key': platformKey,
+      'custom_label': customLabel,
+      'value': value,
+    };
+  }
+
+  PersonSocialContact copyWith({
+    int? id,
+    int? personId,
+    String? platformKey,
+    String? customLabel,
+    String? value,
+    int? sortOrder,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return PersonSocialContact(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      platformKey: platformKey ?? this.platformKey,
+      customLabel: customLabel ?? this.customLabel,
+      value: value ?? this.value,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
 enum PersonType {
   customer('مشتری', 'Customer'),
   marketer('بازاریاب', 'Marketer'),
@@ -133,6 +216,7 @@ class Person {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<PersonBankAccount> bankAccounts;
+  final List<PersonSocialContact> socialContacts;
   final int? shareCount;
   // پورسانت
   final double? commissionSalePercent;
@@ -180,6 +264,7 @@ class Person {
     required this.createdAt,
     required this.updatedAt,
     this.bankAccounts = const [],
+    this.socialContacts = const [],
     this.shareCount,
     this.commissionSalePercent,
     this.commissionSalesReturnPercent,
@@ -232,6 +317,10 @@ class Person {
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
           ?.map((ba) => PersonBankAccount.fromJson(ba))
           .toList() ?? [],
+      socialContacts: (json['social_contacts'] as List<dynamic>?)
+          ?.map((e) => PersonSocialContact.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+          [],
       shareCount: json['share_count'],
       commissionSalePercent: (json['commission_sale_percent'] as num?)?.toDouble(),
       commissionSalesReturnPercent: (json['commission_sales_return_percent'] as num?)?.toDouble(),
@@ -277,6 +366,7 @@ class Person {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'bank_accounts': bankAccounts.map((ba) => ba.toJson()).toList(),
+      'social_contacts': socialContacts.map((s) => s.toJson()).toList(),
       'share_count': shareCount,
       'commission_sale_percent': commissionSalePercent,
       'commission_sales_return_percent': commissionSalesReturnPercent,
@@ -320,6 +410,7 @@ class Person {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<PersonBankAccount>? bankAccounts,
+    List<PersonSocialContact>? socialContacts,
     int? personGroupId,
     String? personGroupName,
   }) {
@@ -351,6 +442,7 @@ class Person {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       bankAccounts: bankAccounts ?? this.bankAccounts,
+      socialContacts: socialContacts ?? this.socialContacts,
       shareCount: shareCount,
       commissionSalePercent: commissionSalePercent,
       commissionSalesReturnPercent: commissionSalesReturnPercent,
@@ -406,6 +498,7 @@ class PersonCreateRequest {
   final String? email;
   final String? website;
   final List<PersonBankAccount> bankAccounts;
+  final List<PersonSocialContact> socialContacts;
   final int? shareCount;
   final double? commissionSalePercent;
   final double? commissionSalesReturnPercent;
@@ -440,6 +533,7 @@ class PersonCreateRequest {
     this.email,
     this.website,
     this.bankAccounts = const [],
+    this.socialContacts = const [],
     this.shareCount,
     this.commissionSalePercent,
     this.commissionSalesReturnPercent,
@@ -452,6 +546,21 @@ class PersonCreateRequest {
   });
 
   Map<String, dynamic> toJson() {
+    List<Map<String, dynamic>> validSocialRows() {
+      return socialContacts
+          .where((s) {
+            final v = s.value.trim();
+            if (v.isEmpty) return false;
+            if (s.platformKey == 'other' && (s.customLabel == null || s.customLabel!.trim().isEmpty)) {
+              return false;
+            }
+            return s.platformKey.isNotEmpty;
+          })
+          .map((s) => s.toApiWrite())
+          .toList();
+    }
+
+    final sc = validSocialRows();
     return {
       'alias_name': aliasName,
       if (code != null) 'code': code,
@@ -485,6 +594,7 @@ class PersonCreateRequest {
                 'sheba_number': ba.shebaNumber,
               })
           .toList(),
+      'social_contacts': sc,
       if (shareCount != null) 'share_count': shareCount,
       if (commissionSalePercent != null) 'commission_sale_percent': commissionSalePercent,
       if (commissionSalesReturnPercent != null) 'commission_sales_return_percent': commissionSalesReturnPercent,
@@ -531,6 +641,8 @@ class PersonUpdateRequest {
   final bool? commissionExcludeAdditionsDeductions;
   final bool? commissionPostInInvoiceDocument;
   final int? personGroupId;
+  /// اگر ارسال شود، لیست راه‌های ارتباطی به‌طور کامل جایگزین می‌شود.
+  final List<Map<String, dynamic>>? socialContacts;
 
   PersonUpdateRequest({
     this.code,
@@ -565,6 +677,7 @@ class PersonUpdateRequest {
     this.commissionExcludeAdditionsDeductions,
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
+    this.socialContacts,
   });
 
   Map<String, dynamic> toJson() {
@@ -610,6 +723,7 @@ class PersonUpdateRequest {
       if (commissionPostInInvoiceDocument != null)
         'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'person_group_id': personGroupId,
+      if (socialContacts != null) 'social_contacts': socialContacts,
     };
   }
 }

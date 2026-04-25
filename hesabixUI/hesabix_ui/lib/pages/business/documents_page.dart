@@ -13,6 +13,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';
 import 'package:hesabix_ui/pages/business/documents_mobile_view.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../services/business_dashboard_service.dart';
@@ -579,7 +580,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
       SnackBarHelper.show(context, message: message);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در حذف گروهی: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -886,7 +890,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری سند: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بارگذاری سند: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -929,7 +936,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در حذف سند: $e');
+          SnackBarHelper.showError(
+            context,
+            message: 'خطا در حذف سند: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       }
     }
@@ -989,7 +999,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
+          SnackBarHelper.showError(
+            context,
+            message: 'خطا در حذف گروهی: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       }
     }

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/system_settings_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class AIPlansAdminPage extends StatefulWidget {
   const AIPlansAdminPage({super.key});
@@ -78,7 +79,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -406,7 +407,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             } catch (e) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطا: $e')),
+                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
                               );
                             }
                           },
@@ -543,7 +544,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('خطا: $e')),
+                                      SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
                                     );
                                   }
                                 }

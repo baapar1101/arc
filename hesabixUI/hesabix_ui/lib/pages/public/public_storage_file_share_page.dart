@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/public_storage_file_share_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// نمایش عمومی فایل از طریق لینک اشتراک (بدون ورود به Hesabix).
@@ -52,25 +53,16 @@ class _PublicStorageFileSharePageState extends State<PublicStorageFileSharePage>
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = _messageFromDio(e);
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     }
-  }
-
-  String _messageFromDio(DioException e) {
-    final d = e.response?.data;
-    if (d is Map && d['error'] is Map) {
-      final m = (d['error'] as Map)['message'];
-      if (m is String && m.isNotEmpty) return m;
-    }
-    return e.message ?? 'خطا در ارتباط با سرور';
   }
 
   Future<void> _unlock() async {
@@ -85,11 +77,11 @@ class _PublicStorageFileSharePageState extends State<PublicStorageFileSharePage>
       });
     } on DioException catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: _messageFromDio(e));
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       if (mounted) setState(() => _unlocking = false);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: e.toString());
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       if (mounted) setState(() => _unlocking = false);
     }
   }

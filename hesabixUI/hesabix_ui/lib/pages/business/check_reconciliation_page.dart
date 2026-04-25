@@ -9,6 +9,7 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/date_input_field.dart';
 import '../../services/check_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class CheckReconciliationPage extends StatefulWidget {
@@ -832,8 +833,9 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       // نمایش دیالوگ نتایج
       _showReconciliationResultDialog(result);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _calculationError = e.toString();
+        _calculationError = ErrorExtractor.forContext(e, context);
         _calculating = false;
       });
     }
@@ -915,7 +917,10 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       return true;
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در ذخیره: $e');
+        SnackBarHelper.show(
+        context,
+        message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
       return false;
     }
@@ -1146,7 +1151,10 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در حذف: $e');
+        SnackBarHelper.show(
+        context,
+        message: 'خطا در حذف: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

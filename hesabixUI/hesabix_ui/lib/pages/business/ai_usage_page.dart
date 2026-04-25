@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class AIUsagePage extends StatefulWidget {
   final int? businessId;
@@ -79,7 +80,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       if (!mounted) return;
       
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     } finally {
@@ -338,7 +339,9 @@ class _AIUsagePageState extends State<AIUsagePage> {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('خطا در نمایش آمار: $e'),
+            Text(
+              'خطا در نمایش آمار: ${ErrorExtractor.forContext(e, context)}',
+            ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _load,

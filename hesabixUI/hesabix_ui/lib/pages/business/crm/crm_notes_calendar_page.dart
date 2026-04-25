@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_note_editor_dialog.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
@@ -210,7 +211,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -483,7 +484,11 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
           },
         );
       } catch (e) {
-        SnackBarHelper.show(context, message: '${t.crmNotesErrorLoading}: $e', isError: true);
+        SnackBarHelper.show(
+          context,
+          message: '${t.crmNotesErrorLoading}: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
       return;
     }

@@ -10,6 +10,7 @@ import '../../models/cash_register.dart';
 import '../../services/cash_register_service.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/cash_register_form_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
 
@@ -339,7 +340,10 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			}
 		} catch (e) {
 			if (mounted) {
-				SnackBarHelper.showError(context, message: '${t.error}: $e');
+				SnackBarHelper.showError(
+				context,
+				message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+			);
 			}
 		}
 	}
@@ -390,7 +394,10 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			}
 		} catch (e) {
 			if (mounted) {
-				SnackBarHelper.showError(context, message: '${t.error}: $e');
+				SnackBarHelper.showError(
+				context,
+				message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+			);
 			}
 		}
 	}

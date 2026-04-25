@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../person/file_picker_bridge.dart';
 import '../../services/invoice_service.dart';
 import '../data_table/helpers/file_saver.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -63,7 +64,11 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.pickFileError}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${t.pickFileError}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -83,7 +88,11 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.templateDownloadError}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${t.templateDownloadError}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -128,7 +137,10 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.importError}: $e');
+        SnackBarHelper.show(
+        context,
+        message: '${t.importError}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

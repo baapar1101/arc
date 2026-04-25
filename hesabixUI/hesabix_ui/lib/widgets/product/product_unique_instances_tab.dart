@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../models/warehouse_model.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'product_label_print_dialog.dart';
 
@@ -89,7 +90,7 @@ class _ProductUniqueInstancesTabState extends State<ProductUniqueInstancesTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }

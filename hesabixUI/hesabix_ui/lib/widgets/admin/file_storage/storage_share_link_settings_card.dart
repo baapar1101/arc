@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
 import '../../../services/system_settings_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
 /// همان کلید `share_link_public_app_url` در تنظیمات سیستم؛ برای لینک اشتراک فایل و کارت حساب.
@@ -44,7 +45,7 @@ class _StorageShareLinkSettingsCardState extends State<StorageShareLinkSettingsC
       final data = await _service.getShareLinkSettings();
       _urlController.text = (data['public_app_url'] ?? '').toString();
     } catch (e) {
-      _error = '$e';
+      _error = ErrorExtractor.userMessage(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -60,7 +61,7 @@ class _StorageShareLinkSettingsCardState extends State<StorageShareLinkSettingsC
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره: $e');
+        SnackBarHelper.showError(context, message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) setState(() => _saving = false);

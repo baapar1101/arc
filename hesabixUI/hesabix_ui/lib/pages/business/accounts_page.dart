@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
-import 'package:hesabix_ui/services/account_service.dart';import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/account_service.dart';
+import '../../utils/error_extractor.dart';
+import '../../utils/snackbar_helper.dart';
 
 
 class AccountNode {
@@ -97,7 +99,8 @@ class _AccountsPageState extends State<AccountsPage> {
 				.toList();
 			setState(() { _roots = parsed; });
 		} catch (e) {
-			setState(() { _error = e.toString(); });
+			if (!mounted) return;
+			setState(() { _error = ErrorExtractor.forContext(e, context); });
 		} finally {
 			setState(() { _loading = false; });
 		}
@@ -145,8 +148,9 @@ class _AccountsPageState extends State<AccountsPage> {
 				_searchLoading = false;
 			});
 		} catch (e) {
+			if (!mounted) return;
 			setState(() {
-				_error = e.toString();
+				_error = ErrorExtractor.forContext(e, context);
 				_searchLoading = false;
 			});
 		}
@@ -321,7 +325,10 @@ class _AccountsPageState extends State<AccountsPage> {
 									Navigator.of(ctx).pop(true);
 								} catch (e) {
 									if (!ctx.mounted) return;
-         SnackBarHelper.show(ctx, message: 'خطا در ایجاد حساب: $e');
+         SnackBarHelper.show(
+         ctx,
+         message: 'خطا در ایجاد حساب: ${ErrorExtractor.forContext(e, ctx)}',
+       );
 								}
 							},
 							child: Text(t.add),
@@ -433,7 +440,10 @@ class _AccountsPageState extends State<AccountsPage> {
 									Navigator.of(ctx).pop(true);
 								} catch (e) {
 									if (!ctx.mounted) return;
-         SnackBarHelper.show(ctx, message: 'خطا در ویرایش حساب: $e');
+         SnackBarHelper.show(
+         ctx,
+         message: 'خطا در ویرایش حساب: ${ErrorExtractor.forContext(e, ctx)}',
+       );
 								}
 							},
 							child: Text(t.save),
@@ -479,7 +489,10 @@ class _AccountsPageState extends State<AccountsPage> {
 				}
 			} catch (e) {
 				if (!ctx.mounted) return;
-    SnackBarHelper.show(ctx, message: 'خطا در حذف حساب: $e');
+    SnackBarHelper.show(
+    ctx,
+    message: 'خطا در حذف حساب: ${ErrorExtractor.forContext(e, ctx)}',
+  );
 			}
 		}
 	}

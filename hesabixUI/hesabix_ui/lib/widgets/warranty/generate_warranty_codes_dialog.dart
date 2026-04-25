@@ -4,6 +4,7 @@ import '../../services/warranty_service.dart';
 import '../../services/product_service.dart';
 import '../../models/product_model.dart';
 import '../../models/warranty_models.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class GenerateWarrantyCodesDialog extends StatefulWidget {
@@ -67,7 +68,11 @@ class _GenerateWarrantyCodesDialogState extends State<GenerateWarrantyCodesDialo
     } catch (e) {
       if (mounted) {
         setState(() => _loadingProducts = false);
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری کالاها: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در بارگذاری کالاها: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -98,7 +103,11 @@ class _GenerateWarrantyCodesDialogState extends State<GenerateWarrantyCodesDialo
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در تولید کدهای گارانتی: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در تولید کدهای گارانتی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

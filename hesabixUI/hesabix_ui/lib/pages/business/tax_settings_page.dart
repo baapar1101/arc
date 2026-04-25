@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/tax_settings_model.dart';
 import '../../services/tax_settings_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
@@ -75,7 +76,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       _certificateRequestController.text = data.certificateRequest ?? '';
       _sandboxMode = data.sandboxMode;
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorExtractor.forContext(e, context);
     } finally {
       if (mounted) {
         setState(() {
@@ -101,7 +102,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _dataQualityError = e.toString();
+        _dataQualityError = ErrorExtractor.forContext(e, context);
       });
     } finally {
       if (mounted) {
@@ -156,10 +157,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       SnackBarHelper.show(context, message: t.taxSettingsSaved);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) {
@@ -249,7 +250,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در تست اتصال: ${e.toString()}',
+          message: 'خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -291,7 +292,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       SnackBarHelper.show(context, message: t.taxKeysGenerated);
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) {
@@ -674,7 +675,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     }
   }

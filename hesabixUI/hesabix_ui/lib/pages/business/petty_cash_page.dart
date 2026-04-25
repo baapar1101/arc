@@ -10,6 +10,7 @@ import '../../models/petty_cash.dart';
 import '../../services/petty_cash_service.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/petty_cash_form_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
 
@@ -321,7 +322,10 @@ class _PettyCashPageState extends State<PettyCashPage> {
 			}
 		} catch (e) {
 			if (mounted) {
-				SnackBarHelper.showError(context, message: '${t.error}: $e');
+				SnackBarHelper.showError(
+				context,
+				message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+			);
 			}
 		}
 	}
@@ -372,7 +376,10 @@ class _PettyCashPageState extends State<PettyCashPage> {
 			}
 		} catch (e) {
 			if (mounted) {
-				SnackBarHelper.showError(context, message: '${t.error}: $e');
+				SnackBarHelper.showError(
+				context,
+				message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+			);
 			}
 		}
 	}

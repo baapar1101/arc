@@ -7,6 +7,7 @@ import '../../models/warehouse_model.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class WarehousesPage extends StatefulWidget {
@@ -174,11 +175,11 @@ class _WarehousesPageState extends State<WarehousesPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      var msg = e.toString();
+      var msg = ErrorExtractor.forContext(e, context);
       if (e is DioException) {
         final err = e.error;
-        if (err is ApiErrorDetails) {
-          msg = err.message ?? msg;
+        if (err is ApiErrorDetails && (err.message?.trim().isNotEmpty ?? false)) {
+          msg = err.message!;
         }
       }
       SnackBarHelper.showError(context, message: msg);

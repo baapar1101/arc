@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
@@ -45,7 +46,9 @@ class _CreditSettingsPageState extends State<CreditSettingsPage> {
       _autoBlockDaysController.text = s.autoBlockAfterDays?.toString() ?? '';
       _strategy = s.strategy;
     } catch (e) {
-      _error = e.toString();
+      if (mounted) {
+        _error = ErrorExtractor.forContext(e, context);
+      }
     } finally {
       setState(() {
         _loading = false;
@@ -82,7 +85,7 @@ class _CreditSettingsPageState extends State<CreditSettingsPage> {
       SnackBarHelper.show(context, message: t.savedSuccessfully);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       setState(() {

@@ -14,6 +14,7 @@ import '../../services/check_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'check_form_page.dart';
 import 'check_details_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class ChecksPage extends StatefulWidget {
@@ -428,7 +429,10 @@ class _ChecksPageState extends State<ChecksPage> {
                   } catch (e) {
                     if (!context.mounted) return;
                     Navigator.pop(ctx);
-                    SnackBarHelper.showError(context, message: 'خطا: $e');
+                    SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
                   }
                 },
                 child: const Text('ثبت'),
@@ -475,7 +479,10 @@ class _ChecksPageState extends State<ChecksPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                SnackBarHelper.showError(context, message: 'خطا: $e');
+                SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
               }
             },
             child: const Text('ثبت'),
@@ -520,7 +527,10 @@ class _ChecksPageState extends State<ChecksPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                SnackBarHelper.showError(context, message: 'خطا: $e');
+                SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
               }
             },
             child: const Text('ثبت'),
@@ -549,7 +559,10 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -572,7 +585,10 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -595,7 +611,10 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -643,7 +662,10 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در حذف چک: $e');
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در حذف چک: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

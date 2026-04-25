@@ -4,6 +4,7 @@ import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../services/system_settings_service.dart';
 import '../../services/currency_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class ZohalSettingsPage extends StatefulWidget {
@@ -71,7 +72,7 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
         _walletCurrencyTitle = (walletCurrency['title'] ?? 'تومان').toString();
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() => _error = ErrorExtractor.forContext(e, context));
     } finally {
       setState(() => _loading = false);
     }
@@ -94,7 +95,10 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره تنظیمات: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

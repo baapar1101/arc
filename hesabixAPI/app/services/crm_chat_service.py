@@ -9,13 +9,20 @@ import secrets
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from uuid import UUID
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from fastapi import HTTPException, UploadFile
+
+from adapters.db.models.business import Business
+from adapters.db.models.business_crm_settings import BusinessCrmSettings
 from adapters.db.models.crm_chat import CrmChatConversation, CrmChatMessage, CrmChatWidget
+from adapters.db.models.file_storage import FileStorage
 from app.core.responses import ApiError
 from app.services.crm_chat_realtime import crm_chat_realtime_manager
+from app.services.file_storage_service import FileStorageService
 from app.services.workflow.workflow_trigger_service import trigger_workflows
 
 logger = logging.getLogger(__name__)
@@ -110,8 +117,86 @@ def message_to_dict(m: CrmChatMessage) -> Dict[str, Any]:
 		"sender_role": m.sender_role,
 		"body": m.body,
 		"user_id": m.user_id,
+		"file_storage_id": m.file_storage_id,
 		"created_at": m.created_at,
 	}
+
+
+def _message_to_dict_enriched(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
+	d = message_to_dict(m)
+	if m.file_storage_id:
+		fs = db.get(FileStorage, m.file_storage_id)
+		if fs:
+			d["file"] = {
+				"id": str(fs.id),
+				"original_name": fs.original_name,
+				"file_size": fs.file_size,
+				"mime_type": fs.mime_type,
+			}
+		else:
+			d["file"] = None
+	else:
+		d["file"] = None
+	return d
+
+
+def get_or_create_crm_settings(db: Session, business_id: int) -> BusinessCrmSettings:
+	row = db.get(BusinessCrmSettings, business_id)
+	if not row:
+		row = BusinessCrmSettings(business_id=business_id, allow_web_chat_file_upload=False)
+		db.add(row)
+		db.commit()
+		db.refresh(row)
+	return row
+
+
+def business_crm_settings_to_dict(s: BusinessCrmSettings) -> Dict[str, Any]:
+	return {
+		"business_id": s.business_id,
+		"allow_web_chat_file_upload": bool(s.allow_web_chat_file_upload),
+		"updated_at": s.updated_at,
+	}
+
+
+def update_crm_business_settings(
+	db: Session, business_id: int, *, allow_web_chat_file_upload: bool
+) -> BusinessCrmSettings:
+	row = get_or_create_crm_settings(db, business_id)
+	row.allow_web_chat_file_upload = allow_web_chat_file_upload
+	row.updated_at = datetime.utcnow()
+	db.commit()
+	db.refresh(row)
+	return row
+
+
+def _notify_business_crm_storage(db: Session, business_id: int, *, title: str, message: str) -> None:
+	b = db.get(Business, business_id)
+	if not b or b.owner_id is None:
+		return
+	try:
+		from app.services.notification_service import NotificationService
+
+		NotificationService(db).send(
+			user_id=int(b.owner_id),
+			event_key="system.generic",
+			context={"subject": title, "message": message},
+			preferred_channels=["inapp", "email"],
+		)
+	except Exception:
+		logger.exception("notify business %s for crm file storage failed", business_id)
+
+
+def _assert_crm_file_for_conversation(
+	db: Session, *, business_id: int, conversation_id: int, file_id: str
+) -> FileStorage:
+	fs = db.get(FileStorage, file_id)
+	if not fs or fs.business_id != business_id:
+		raise ApiError("NOT_FOUND", "فایل یافت نشد", http_status=404)
+	if (fs.module_context or "") != "crm_web_chat":
+		raise ApiError("VALIDATION_ERROR", "این فایل برای چت استفاده نمی‌شود", http_status=422)
+	if str(fs.context_id or "") != str(conversation_id):
+		raise ApiError("VALIDATION_ERROR", "فایل متعلق به این مکالمه نیست", http_status=422)
+	return fs
 
 
 def get_widget_by_public_key(db: Session, public_key: str) -> CrmChatWidget:
@@ -290,14 +375,14 @@ async def post_visitor_message(
 	if not text or len(text) > _MAX_BODY:
 		raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
 
-	msg = CrmChatMessage(conversation_id=c.id, sender_role="visitor", body=text, user_id=None)
+	msg = CrmChatMessage(conversation_id=c.id, sender_role="visitor", body=text, user_id=None, file_storage_id=None)
 	db.add(msg)
 	c.last_message_at = datetime.utcnow()
 	c.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(msg)
 
-	payload = {"type": "crm_chat.event", "event": "message.created", "message": message_to_dict(msg)}
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
@@ -314,7 +399,128 @@ async def post_visitor_message(
 		},
 	)
 
-	return message_to_dict(msg)
+	return _message_to_dict_enriched(db, msg)
+
+
+async def post_visitor_file(
+	db: Session,
+	*,
+	visitor_token: str,
+	conversation_id: int,
+	caption: Optional[str],
+	upload: UploadFile,
+	origin_header: Optional[str],
+) -> Dict[str, Any]:
+	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	w = db.get(CrmChatWidget, c.widget_id)
+	if not w:
+		raise ApiError("NOT_FOUND", "ویجت یافت نشد", http_status=404)
+	if not origin_allowed(w, origin_header):
+		raise ApiError("FORBIDDEN", "مبدأ درخواست برای این ویجت مجاز نیست", http_status=403)
+
+	bsettings = get_or_create_crm_settings(db, c.business_id)
+	if not bsettings.allow_web_chat_file_upload:
+		raise ApiError(
+			"CRM_FILE_UPLOAD_DISABLED",
+			"فعلاً ارسال فایل در این چت توسط کسب‌وکار فعال نشده است.",
+			http_status=403,
+		)
+
+	biz = db.get(Business, c.business_id)
+	if not biz or biz.owner_id is None:
+		raise ApiError("NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+	owner_id = int(biz.owner_id)
+
+	storage = FileStorageService(db)
+	try:
+		saved = await storage.upload_file(
+			file=upload,
+			user_id=owner_id,
+			module_context="crm_web_chat",
+			context_id=str(c.id),
+			developer_data={
+				"business_id": c.business_id,
+				"conversation_id": c.id,
+				"widget_id": w.id,
+				"visitor": True,
+			},
+			is_temporary=False,
+			expires_in_days=3650,
+			business_id=c.business_id,
+			check_storage_limit=True,
+		)
+	except HTTPException as e:
+		detail = e.detail
+		err_code = detail.get("error") if isinstance(detail, dict) else None
+		if err_code in ("NO_ACTIVE_STORAGE_PLAN", "STORAGE_LIMIT_EXCEEDED"):
+			_notify_business_crm_storage(
+				db,
+				c.business_id,
+				title="چت وب CRM — محدودیت فضا",
+				message=(
+					"یک بازدیدکننده تلاش به ارسال فایل داشت اما پلن/فضای ذخیره‌سازی اجازه نداد. "
+					"لطفاً پکیج ذخیره‌سازی را بررسی یا ارتقا دهید."
+				),
+			)
+		# پاسخ قابل فهم به بازدیدکننده
+		if err_code == "NO_ACTIVE_STORAGE_PLAN":
+			raise ApiError(
+				"CRM_FILE_NOT_AVAILABLE",
+				"فعلاً ارسال فایل ممکن نیست. لطفاً بعداً دوباره تلاش کنید.",
+				http_status=400,
+				details={"storage_error": "no_plan"},
+			) from None
+		if err_code == "STORAGE_LIMIT_EXCEEDED":
+			raise ApiError(
+				"CRM_FILE_NOT_AVAILABLE",
+				"فضای ذخیره‌سازی کافی نیست؛ فعلاً ارسال فایل ممکن نیست.",
+				http_status=400,
+				details={"storage_error": "quota"},
+			) from None
+		if err_code == "FILE_SIZE_EXCEEDED":
+			msg_s = str(detail.get("message") if isinstance(detail, dict) else "حجم فایل مجاز نیست")
+			raise ApiError("CRM_FILE_TOO_LARGE", msg_s, http_status=400) from None
+		raise ApiError("CRM_FILE_UPLOAD_FAILED", "ارسال فایل انجام نشد.", http_status=400) from None
+
+	fid = str(saved.get("file_id", ""))
+	orig_name = saved.get("original_name") or "file"
+	cap = (caption or "").strip()
+	text = cap if cap else f"📎 {orig_name}"
+	if len(text) > _MAX_BODY:
+		raise ApiError("VALIDATION_ERROR", "شرح خیلی طولانی است", http_status=422)
+
+	msg = CrmChatMessage(
+		conversation_id=c.id,
+		sender_role="visitor",
+		body=text,
+		user_id=None,
+		file_storage_id=fid,
+	)
+	db.add(msg)
+	c.last_message_at = datetime.utcnow()
+	c.updated_at = datetime.utcnow()
+	db.commit()
+	db.refresh(msg)
+
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
+	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
+
+	_fire(
+		db,
+		c.business_id,
+		"crm.chat.message.received",
+		{
+			"conversation_id": c.id,
+			"widget_id": c.widget_id,
+			"message_id": msg.id,
+			"body": text,
+			"sender_role": "visitor",
+			"file_storage_id": fid,
+		},
+	)
+
+	return _message_to_dict_enriched(db, msg)
 
 
 async def post_agent_message(
@@ -322,22 +528,43 @@ async def post_agent_message(
 	*,
 	business_id: int,
 	conversation_id: int,
-	body: str,
+	body: Optional[str],
 	user_id: int,
+	file_storage_id: Optional[str] = None,
 ) -> Dict[str, Any]:
 	c = _get_conversation_business(db, business_id, conversation_id)
-	text = (body or "").strip()
-	if not text or len(text) > _MAX_BODY:
-		raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+	fid: Optional[str] = None
+	text_combined: str
+	if file_storage_id:
+		fs = _assert_crm_file_for_conversation(
+			db, business_id=business_id, conversation_id=conversation_id, file_id=str(file_storage_id).strip()
+		)
+		fid = str(fs.id)
+		cap = (body or "").strip()
+		bname = cap if cap else f"📎 {fs.original_name or 'فایل'}"
+		if len(bname) > _MAX_BODY:
+			raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+		text_combined = bname
+	else:
+		text = (body or "").strip()
+		if not text or len(text) > _MAX_BODY:
+			raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+		text_combined = text
 
-	msg = CrmChatMessage(conversation_id=c.id, sender_role="agent", body=text, user_id=user_id)
+	msg = CrmChatMessage(
+		conversation_id=c.id,
+		sender_role="agent",
+		body=text_combined,
+		user_id=user_id,
+		file_storage_id=fid,
+	)
 	db.add(msg)
 	c.last_message_at = datetime.utcnow()
 	c.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(msg)
 
-	payload = {"type": "crm_chat.event", "event": "message.created", "message": message_to_dict(msg)}
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
@@ -349,14 +576,36 @@ async def post_agent_message(
 			"conversation_id": c.id,
 			"widget_id": c.widget_id,
 			"message_id": msg.id,
-			"body": text,
+			"body": text_combined,
 			"sender_role": "agent",
 			"agent_user_id": user_id,
 		},
 		user_id,
 	)
 
-	return message_to_dict(msg)
+	return _message_to_dict_enriched(db, msg)
+
+
+async def download_visitor_crm_file(
+	db: Session,
+	*,
+	visitor_token: str,
+	conversation_id: int,
+	file_id: str,
+) -> Dict[str, Any]:
+	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	m = db.scalar(
+		select(CrmChatMessage)
+		.where(
+			CrmChatMessage.conversation_id == c.id,
+			CrmChatMessage.file_storage_id == file_id,
+		)
+		.limit(1)
+	)
+	if m is None:
+		raise ApiError("NOT_FOUND", "فایل در این مکالمه یافت نشد", http_status=404)
+	storage = FileStorageService(db)
+	return await storage.download_file(UUID(str(file_id)))
 
 
 def list_messages_public(db: Session, visitor_token: str, conversation_id: int, limit: int = 100) -> List[Dict[str, Any]]:
@@ -368,7 +617,7 @@ def list_messages_public(db: Session, visitor_token: str, conversation_id: int, 
 		.limit(min(max(limit, 1), 500))
 	)
 	rows = list(db.scalars(q).all())
-	return [message_to_dict(m) for m in rows]
+	return [_message_to_dict_enriched(db, m) for m in rows]
 
 
 def list_messages_agent(db: Session, business_id: int, conversation_id: int, limit: int = 500) -> List[Dict[str, Any]]:
@@ -380,7 +629,7 @@ def list_messages_agent(db: Session, business_id: int, conversation_id: int, lim
 		.limit(min(max(limit, 1), 1000))
 	)
 	rows = list(db.scalars(q).all())
-	return [message_to_dict(m) for m in rows]
+	return [_message_to_dict_enriched(db, m) for m in rows]
 
 
 def list_conversations_agent(

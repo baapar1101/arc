@@ -5,6 +5,7 @@ import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/api_key_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/jalali_date_picker.dart';
 
@@ -44,7 +45,11 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.showError(context, message: '${t.apiKeyErrorLoadingKeys}: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              '${t.apiKeyErrorLoadingKeys}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -79,7 +84,11 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
       } catch (e) {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          SnackBarHelper.showError(context, message: '${t.apiKeyErrorCreatingKey}: $e');
+          SnackBarHelper.showError(
+          context,
+          message:
+              '${t.apiKeyErrorCreatingKey}: ${ErrorExtractor.forContext(e, context)}',
+        );
         }
       }
     }
@@ -189,7 +198,11 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
       } catch (e) {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          SnackBarHelper.showError(context, message: '${t.apiKeyErrorUpdating}: $e');
+          SnackBarHelper.showError(
+          context,
+          message:
+              '${t.apiKeyErrorUpdating}: ${ErrorExtractor.forContext(e, context)}',
+        );
         }
       }
     }
@@ -235,7 +248,11 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
       } catch (e) {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          SnackBarHelper.showError(context, message: '${t.apiKeyErrorDeleting}: $e');
+          SnackBarHelper.showError(
+          context,
+          message:
+              '${t.apiKeyErrorDeleting}: ${ErrorExtractor.forContext(e, context)}',
+        );
         }
       }
     }

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../services/customer_club_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
 /// تب تحلیل RFM و CLV — طراحی کارتی با فیلتر سگمنت و جستجو.
@@ -74,7 +75,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
         await _loadPersons(reset: true);
       }
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingBoot = false);
     }
@@ -86,7 +87,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
       if (!mounted) return;
       setState(() => _summary = Map<String, dynamic>.from(data));
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -123,7 +124,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
         _skip = _rows.length;
       });
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingPersons = false);
     }
@@ -193,7 +194,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
         ),
       );
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _exportingCampaign = false);
     }
@@ -209,7 +210,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
       await _loadSummary();
       await _loadPersons(reset: true);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _recalculating = false);
     }

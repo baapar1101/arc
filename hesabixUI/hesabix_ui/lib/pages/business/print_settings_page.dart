@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
@@ -68,7 +69,8 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
       _selectedDocType = 'all';
       _syncFormWithConfig();
     } catch (e) {
-      _error = e.toString();
+      if (!mounted) return;
+      _error = ErrorExtractor.forContext(e, context);
     } finally {
       if (!mounted) return;
       setState(() {
@@ -147,7 +149,7 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       if (!mounted) return;

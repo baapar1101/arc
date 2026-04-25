@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/admin_currencies_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// مدیریت ارزهای سیستم: اعشار، گرد کردن، افزودن و حذف (با شرایط).
 class CurrenciesAdminPage extends StatefulWidget {
@@ -36,7 +37,7 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = '$e');
+        setState(() => _error = ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) {
@@ -146,7 +147,9 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
       }
     }
   }
@@ -209,7 +212,9 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
       }
     }
   }

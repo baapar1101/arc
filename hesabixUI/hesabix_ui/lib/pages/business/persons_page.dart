@@ -16,6 +16,7 @@ import '../../services/person_group_service.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/marketplace_service.dart';
 
@@ -633,7 +634,10 @@ class _PersonsPageState extends State<PersonsPage> {
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);
-                    SnackBarHelper.showError(context, message: '${t.error}: $e');
+                    SnackBarHelper.showError(
+                        context,
+                        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+                      );
                   }
                 }
               },
@@ -761,7 +765,7 @@ class _PersonsPageState extends State<PersonsPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در حذف شخص: $e',
+          message: 'خطا در حذف شخص: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     }

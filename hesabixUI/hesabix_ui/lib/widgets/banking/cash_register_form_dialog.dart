@@ -6,6 +6,7 @@ import '../../models/cash_register.dart';
 import '../../services/cash_register_service.dart';
 import '../../utils/number_normalizer.dart';
 import 'currency_picker_widget.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class CashRegisterFormDialog extends StatefulWidget {
@@ -120,7 +121,10 @@ class _CashRegisterFormDialogState extends State<CashRegisterFormDialog> {
 		} catch (e) {
 			if (mounted) {
 				final t = AppLocalizations.of(context);
-    SnackBarHelper.showError(context, message: '${t.error}: $e');
+    SnackBarHelper.showError(
+		context,
+		message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+	);
 			}
 		} finally {
 			if (mounted) {

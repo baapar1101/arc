@@ -4,6 +4,7 @@ import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 class UserSignaturePage extends StatefulWidget {
   const UserSignaturePage({super.key});
@@ -81,7 +82,10 @@ class _UserSignaturePageState extends State<UserSignaturePage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در آپلود امضا: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در آپلود امضا: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (!mounted) return;

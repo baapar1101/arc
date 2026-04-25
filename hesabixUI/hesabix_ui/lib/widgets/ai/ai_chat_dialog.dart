@@ -10,6 +10,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -276,7 +277,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _showSnackbar('بازخورد ثبت شد');
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در ثبت بازخورد: $e');
+      _showError(
+        'خطا در ثبت بازخورد: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       ctrl.dispose();
     }
@@ -302,7 +305,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
     } catch (e) {
       setState(() => _sessionsLoading = false);
-      _showError('خطا در بارگذاری گفت‌وگوها: $e');
+      _showError(
+        'خطا در بارگذاری گفت‌وگوها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -330,7 +335,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _checkAvailability();
     } catch (e) {
       setState(() => _messagesLoading = false);
-      _showError('خطا در دریافت پیام‌ها: $e');
+      _showError(
+        'خطا در دریافت پیام‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
   
@@ -366,7 +373,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _selectSession(newSession);
       _showSnackbar('گفت‌وگوی جدید ایجاد شد');
     } catch (e) {
-      _showError('خطا در آغاز گفت‌وگو: $e');
+      _showError(
+        'خطا در آغاز گفت‌وگو: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -399,7 +408,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         });
       }
     } catch (e) {
-      _showError('حذف گفت‌وگو با خطا مواجه شد: $e');
+      _showError(
+        'حذف گفت‌وگو با خطا مواجه شد: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -463,7 +474,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _streamingContent = null;
             _streamingTimestamp = null;
           });
-          _showError('ارسال پیام ناموفق بود: $error');
+          _showError(
+            'ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(error, context)}',
+          );
         },
         cancelToken: cancelToken,
       )) {
@@ -520,7 +533,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _streamingTimestamp = null;
       });
       _streamCancelToken = null;
-      _showError('ارسال پیام ناموفق بود: $e');
+      _showError(
+        'ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -542,7 +557,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         }
       } catch (e) {
         if (!mounted) return;
-        _showError('خطا در کنترل ضبط: $e');
+        _showError(
+          'خطا در کنترل ضبط: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
       return;
     }
@@ -705,7 +722,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _voiceStarting = false);
-      _showError('خطا در شروع مکالمه صوتی: $e');
+      _showError(
+        'خطا در شروع مکالمه صوتی: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

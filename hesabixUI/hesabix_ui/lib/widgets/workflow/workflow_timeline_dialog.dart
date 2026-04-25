@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -54,7 +55,11 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadTimeline}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${AppLocalizations.of(context).workflowErrorLoadTimeline}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

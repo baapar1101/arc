@@ -1,13 +1,37 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart' as dio;
+import 'package:flutter/widgets.dart' show BuildContext, Locale;
 
+import '../core/api_client.dart';
+import '../l10n/app_localizations.dart';
 import '../services/errors/api_error.dart';
 
-/// کلاس کمکی برای استخراج پیام خطا از exception
+/// استخراج پیام خطای قابل‌نمایش برای کاربر (زبان از [AppLocalizations] یا آخرین locale برنامه).
 class ErrorExtractor {
-  /// استخراج پیام خطا از response.data (پشتیبانی از Map و bytes)
-  static String? _extractFromResponseData(dynamic data) {
+  static AppLocalizations _resolve(AppLocalizations? t) {
+    if (t != null) return t;
+    final loc = ApiClient.currentLocale;
+    if (loc != null) {
+      return lookupAppLocalizations(loc);
+    }
+    return lookupAppLocalizations(const Locale('en'));
+  }
+
+  /// پیام خطا برای نمایش به کاربر؛ ترجیحاً [t] را از `AppLocalizations.of(context)` بدهید.
+  static String userMessage(Object e, [AppLocalizations? t]) {
+    return _userMessage(e, _resolve(t));
+  }
+
+  /// راحت‌تر وقتی [BuildContext] در دسترس است (زبان از همان context).
+  static String forContext(Object e, BuildContext context) {
+    return userMessage(e, AppLocalizations.of(context));
+  }
+
+  /// معادل [userMessage] بدون [AppLocalizations] صریح (زبان از [ApiClient.currentLocale]).
+  static String extractErrorMessage(Object e) => userMessage(e, null);
+
+  static String? _extractFromResponseData(dynamic data, AppLocalizations t) {
     Map<String, dynamic>? dataMap;
     if (data is Map) {
       dataMap = Map<String, dynamic>.from(data);
@@ -35,56 +59,88 @@ class ErrorExtractor {
     return null;
   }
 
-  /// استخراج پیام خطا از exception
-  static String extractErrorMessage(Object e) {
-    if (e is dio.DioException) {
-      // خطای ساختاریافتهٔ API (پس از interceptor در ApiClient)
-      final inner = e.error;
-      if (inner is ApiErrorDetails) {
-        final m = inner.message;
-        if (m != null && m.isNotEmpty) return m;
-      }
+  static bool _isLowLevelNetworkNoise(String s) {
+    final l = s.toLowerCase();
+    if (l.contains('failed to fetch')) return true;
+    if (l.contains('xmlhttprequest')) return true;
+    if (l.contains('socketexception')) return true;
+    if (l.contains('clientexception')) return true;
+    if (l.contains('connection errored') || l.contains('connection error')) {
+      return l.contains('dio') || l.contains('onerror') || l.contains('callback') || l.contains('network layer');
+    }
+    if (l.contains('err_internet_disconnected') || l.contains('err_network_changed')) return true;
+    return false;
+  }
 
-      final response = e.response;
-      if (response != null && response.data != null) {
-        final msg = _extractFromResponseData(response.data);
-        if (msg != null) return msg;
+  static String _dioExceptionMessage(dio.DioException e, AppLocalizations t) {
+    final inner = e.error;
+    if (inner is ApiErrorDetails) {
+      final m = inner.message;
+      if (m != null && m.isNotEmpty) return m;
+    }
+
+    final response = e.response;
+    if (response != null && response.data != null) {
+      final msg = _extractFromResponseData(response.data, t);
+      if (msg != null && msg.isNotEmpty) return msg;
+    }
+
+    switch (e.type) {
+      case dio.DioExceptionType.connectionTimeout:
+        return t.errorConnectionTimeout;
+      case dio.DioExceptionType.sendTimeout:
+        return t.errorSendTimeout;
+      case dio.DioExceptionType.receiveTimeout:
+        return t.errorReceiveTimeout;
+      case dio.DioExceptionType.connectionError:
+        return t.errorConnectionError;
+      case dio.DioExceptionType.badCertificate:
+        return t.errorConnectionError;
+      case dio.DioExceptionType.cancel:
+        return t.errorUnknown;
+      case dio.DioExceptionType.badResponse:
+      case dio.DioExceptionType.unknown:
+        break;
+    }
+
+    if (e.message != null && e.message!.isNotEmpty) {
+      if (_isLowLevelNetworkNoise(e.message!)) {
+        return t.errorConnectionError;
       }
-      
-      // پیام خطای دیو
-      if (e.message != null && e.message!.isNotEmpty) {
-        // حذف قسمت‌های تکنیکی از پیام خطا
-        String message = e.message!;
-        if (message.contains('400:')) {
-          message = message.split('400:').last.trim();
-          // حذف JSON object از پیام
-          if (message.startsWith('{')) {
-            message = 'خطا در آپلود فایل';
-          }
+      var message = e.message!;
+      if (message.contains('400:')) {
+        message = message.split('400:').last.trim();
+        if (message.startsWith('{')) {
+          return t.errorFileUploadFailed;
         }
         return message;
       }
-      
-      // نوع خطا
-      switch (e.type) {
-        case dio.DioExceptionType.connectionTimeout:
-          return 'خطا در اتصال به سرور. لطفاً دوباره تلاش کنید.';
-        case dio.DioExceptionType.receiveTimeout:
-          return 'زمان دریافت پاسخ از سرور به پایان رسید.';
-        case dio.DioExceptionType.connectionError:
-          return 'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
-        default:
-          return 'خطا در ارتباط با سرور';
+      if (_isLowLevelNetworkNoise(message) || (message.length > 200 && message.contains('DioException'))) {
+        return t.errorConnectionError;
       }
+      return message;
     }
-    
-    // پیام خطای عمومی
+
+    if (e.type == dio.DioExceptionType.connectionError) {
+      return t.errorConnectionError;
+    }
+    return t.errorUnknownServer;
+  }
+
+  static String _userMessage(Object e, AppLocalizations t) {
+    if (e is dio.DioException) {
+      return _dioExceptionMessage(e, t);
+    }
     final errorMessage = e.toString();
+    if (errorMessage == 'Exception') {
+      return t.errorDataSaveFailed;
+    }
+    if (_isLowLevelNetworkNoise(errorMessage)) {
+      return t.errorConnectionError;
+    }
     if (errorMessage.contains('خطا')) {
       return errorMessage;
     }
-    return 'خطا در ذخیره اطلاعات';
+    return t.errorDataSaveFailed;
   }
 }
-
-

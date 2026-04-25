@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../models/person_group_model.dart';
 import '../../models/person_model.dart';
+import '../../models/person_social_platforms.dart';
 import '../../services/person_group_service.dart';
 import '../../services/person_service.dart';
 import 'person_groups_manage_dialog.dart';
@@ -12,6 +13,7 @@ import '../../utils/number_normalizer.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -88,6 +90,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   // Bank accounts
   List<PersonBankAccount> _bankAccounts = [];
 
+  /// پیام‌رسان و شبکه‌های اجتماعی
+  List<PersonSocialContact> _socialContacts = [];
+
   // Credit override UI state
   final _creditLimitController = TextEditingController();
   String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
@@ -162,6 +167,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         ..addAll(person.personTypes);
       _isActive = person.isActive;
       _bankAccounts = List.from(person.bankAccounts);
+      _socialContacts = List<PersonSocialContact>.from(person.socialContacts);
       // مقدار اولیه سهام
       if (person.personTypes.contains(PersonType.shareholder) && person.shareCount != null) {
         _shareCountController.text = person.shareCount!.toString();
@@ -443,6 +449,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
           bankAccounts: _bankAccounts,
+          socialContacts: _socialContacts,
           shareCount: _selectedPersonTypes.contains(PersonType.shareholder)
               ? int.tryParse(_shareCountController.text.trim())
               : null,
@@ -540,6 +547,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               ? _commissionPostInInvoiceDocument
               : null,
           personGroupId: _selectedPersonGroupId,
+          socialContacts: _socialContactsForApi(),
         );
 
         final updated = await _personService.updatePerson(
@@ -574,7 +582,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -1824,7 +1835,215 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             hintText: t.personWebsite,
           ),
         ),
+        SizedBox(height: spacing * 1.5),
+        _buildSocialContactsSection(t, isMobile, spacing),
       ],
+    );
+  }
+
+  List<Map<String, dynamic>> _socialContactsForApi() {
+    return _socialContacts
+        .where((s) {
+          final v = s.value.trim();
+          if (v.isEmpty) return false;
+          if (s.platformKey == 'other' && (s.customLabel == null || s.customLabel!.trim().isEmpty)) {
+            return false;
+          }
+          return s.platformKey.isNotEmpty;
+        })
+        .map((s) => s.toApiWrite())
+        .toList();
+  }
+
+  void _addSocialRow() {
+    setState(() {
+      final now = DateTime.now();
+      _socialContacts.add(
+        PersonSocialContact(
+          id: null,
+          personId: 0,
+          platformKey: 'telegram',
+          customLabel: null,
+          value: '',
+          sortOrder: _socialContacts.length,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    });
+  }
+
+  void _removeSocialRow(int index) {
+    setState(() {
+      if (index >= 0 && index < _socialContacts.length) {
+        _socialContacts.removeAt(index);
+      }
+    });
+  }
+
+  void _updateSocialRow(int index, PersonSocialContact next) {
+    setState(() {
+      if (index >= 0 && index < _socialContacts.length) {
+        _socialContacts[index] = next;
+      }
+    });
+  }
+
+  List<String> _platformOptionsForRow(PersonSocialContact s) {
+    final o = <String>{...kPersonSocialPlatformKeys};
+    if (s.platformKey.isNotEmpty && !o.contains(s.platformKey)) {
+      o.add(s.platformKey);
+    }
+    // ترتیب پایدار: شناخته‌شده سپس نامشخص
+    final u = o.toList();
+    u.sort((a, b) {
+      final ia = kPersonSocialPlatformKeys.indexOf(a);
+      final ib = kPersonSocialPlatformKeys.indexOf(b);
+      if (ia < 0 && ib < 0) return a.compareTo(b);
+      if (ia < 0) return 1;
+      if (ib < 0) return -1;
+      return ia.compareTo(ib);
+    });
+    return u;
+  }
+
+  Widget _buildSocialContactsSection(AppLocalizations t, bool isMobile, double spacing) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                t.personSocialNetworks,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _addSocialRow,
+                icon: const Icon(Icons.add),
+                label: Text(t.addPersonSocialRow),
+              ),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                t.personSocialNetworks,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              ElevatedButton.icon(
+                onPressed: _addSocialRow,
+                icon: const Icon(Icons.add),
+                label: Text(t.addPersonSocialRow),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (_socialContacts.isEmpty)
+          Container(
+            padding: EdgeInsets.all(spacing),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                t.noPersonSocialRows,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _socialContacts.length,
+            itemBuilder: (context, index) {
+              return _buildSocialContactCard(t, index, isMobile, spacing);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSocialContactCard(AppLocalizations t, int index, bool isMobile, double spacing) {
+    final s = _socialContacts[index];
+    final options = _platformOptionsForRow(s);
+    return Card(
+      margin: EdgeInsets.only(bottom: spacing),
+      child: Padding(
+        padding: EdgeInsets.all(spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: options.contains(s.platformKey) ? s.platformKey : options.first,
+                    decoration: InputDecoration(
+                      labelText: t.personSocialPlatform,
+                    ),
+                    items: options
+                        .map(
+                          (k) => DropdownMenuItem(
+                            value: k,
+                            child: Text(
+                              kPersonSocialPlatformLabelsFa[k] ?? k,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      _updateSocialRow(
+                        index,
+                        s.copyWith(
+                          platformKey: v,
+                          customLabel: v == 'other' ? s.customLabel : null,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _removeSocialRow(index),
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                ),
+              ],
+            ),
+            if (s.platformKey == 'other') ...[
+              SizedBox(height: spacing),
+              TextFormField(
+                initialValue: s.customLabel ?? '',
+                decoration: InputDecoration(
+                  labelText: t.personSocialCustomName,
+                ),
+                onChanged: (v) {
+                  _updateSocialRow(index, s.copyWith(customLabel: v));
+                },
+              ),
+            ],
+            SizedBox(height: spacing),
+            TextFormField(
+              initialValue: s.value,
+              decoration: InputDecoration(
+                labelText: t.personSocialValue,
+                hintText: t.personSocialValue,
+              ),
+              onChanged: (v) {
+                _updateSocialRow(index, s.copyWith(value: v));
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

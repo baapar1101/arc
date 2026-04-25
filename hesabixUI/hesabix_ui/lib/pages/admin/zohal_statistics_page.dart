@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 
 class ZohalStatisticsPage extends StatefulWidget {
@@ -48,7 +49,7 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }

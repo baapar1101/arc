@@ -10,7 +10,9 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
-import 'package:hesabix_ui/widgets/reports/common_report_filters.dart';import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/reports/common_report_filters.dart';
+import '../../utils/error_extractor.dart';
+import '../../utils/snackbar_helper.dart';
 
 
 class PnlPeriodReportPage extends StatefulWidget {
@@ -133,7 +135,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
           _loading = false;
         });
       }
@@ -184,7 +186,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'Export error: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -224,7 +229,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'Export error: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }

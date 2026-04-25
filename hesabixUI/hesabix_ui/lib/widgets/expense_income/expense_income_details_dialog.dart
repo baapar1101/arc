@@ -8,6 +8,7 @@ import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// دیالوگ مشاهده جزئیات سند هزینه/درآمد
@@ -378,7 +379,10 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در تولید PDF: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در تولید PDF: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

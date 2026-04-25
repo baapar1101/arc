@@ -9,6 +9,7 @@ import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه لیست فرایندهای CRM (فانل سرنخ، pipeline فروش و ...)
 class CrmProcessDefinitionsPage extends StatefulWidget {
@@ -60,10 +61,14 @@ class _CrmProcessDefinitionsPageState extends State<CrmProcessDefinitionsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 
@@ -257,7 +262,7 @@ class _CrmProcessDefinitionsPageState extends State<CrmProcessDefinitionsPage> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 }
@@ -513,7 +518,7 @@ class _ProcessDefinitionFormDialogState extends State<_ProcessDefinitionFormDial
       SnackBarHelper.show(context, message: 'ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -624,7 +629,7 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
       _loadStages();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 
@@ -650,7 +655,7 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
       _loadStages();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 

@@ -7,6 +7,7 @@ import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart';
 import '../../../models/person_model.dart';
 import '../../../services/customer_club_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
 import 'customer_club_analytics_tab.dart';
@@ -158,7 +159,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
         _ledgerTotal = total is int ? total : int.tryParse('$total') ?? 0;
       });
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingLedger = false);
     }
@@ -248,7 +249,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
       await _loadAdjustBalancePreview();
       await _loadLedger(reset: true);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: '$e');
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 

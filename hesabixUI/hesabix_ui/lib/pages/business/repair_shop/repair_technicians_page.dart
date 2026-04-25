@@ -5,6 +5,7 @@ import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../utils/error_extractor.dart';
 
 
 /// صفحه مدیریت تعمیرکاران
@@ -53,7 +54,8 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'خطا در بارگذاری تعمیرکاران: $e';
+        _errorMessage =
+            'خطا در بارگذاری تعمیرکاران: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
       });
     }
@@ -127,7 +129,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -420,7 +422,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) {

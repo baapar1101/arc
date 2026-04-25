@@ -1,5 +1,6 @@
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:dio/dio.dart';
 
 class SupportService {
@@ -204,7 +205,10 @@ class SupportService {
           await deleteTicket(ticketId);
           results[ticketId] = {'success': true};
         } catch (e) {
-          results[ticketId] = {'success': false, 'error': e.toString()};
+          results[ticketId] = {
+            'success': false,
+            'error': ErrorExtractor.userMessage(e),
+          };
         }
       }
       

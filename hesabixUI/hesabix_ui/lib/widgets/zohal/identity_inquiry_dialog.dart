@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// دیالوگ مستقل و شخصی‌سازی شده برای استعلام اطلاعات هویتی
@@ -135,14 +136,15 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
+        final err = ErrorExtractor.forContext(e, context);
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = err;
           _isSubmitting = false;
         });
-        
+
         SnackBarHelper.showError(
           context,
-          message: '${t.inquiryErrorPrefix} ${e.toString()}',
+          message: '${t.inquiryErrorPrefix} $err',
         );
       }
     }

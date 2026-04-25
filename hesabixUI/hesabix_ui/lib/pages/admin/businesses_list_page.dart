@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/document_monetization_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class BusinessesListPage extends StatefulWidget {
@@ -437,9 +438,10 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
 
   Future<void> _handleRestore(BuildContext context) async {
     if (widget.business['id'] == null) return;
-    
+    final pageContext = context;
+
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('بازیابی کسب و کار'),
         content: Text(
@@ -468,24 +470,24 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
     try {
       await BusinessApiService.restoreBusiness(widget.business['id'] as int);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('کسب و کار با موفقیت بازیابی شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
+      if (!pageContext.mounted) return;
+      ScaffoldMessenger.of(pageContext).showSnackBar(
+        const SnackBar(
+          content: Text('کسب و کار با موفقیت بازیابی شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(pageContext).pop();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بازیابی کسب و کار: $e'),
-            backgroundColor: Colors.red,
+      if (!pageContext.mounted) return;
+      ScaffoldMessenger.of(pageContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            'خطا در بازیابی کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
           ),
-        );
-      }
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -713,7 +715,7 @@ class _WalletTabState extends State<_WalletTab> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorExtractor.forContext(e, context);
           _isLoadingWallet = false;
         });
       }
@@ -763,7 +765,7 @@ class _WalletTabState extends State<_WalletTab> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorExtractor.forContext(e, context);
         });
       }
     } finally {
@@ -1070,7 +1072,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -1089,7 +1091,10 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
       );
       _showSnack('پلن با موفقیت اعمال شد');
     } catch (e) {
-      _showSnack('خطا در اعمال پلن: $e');
+      if (!mounted) return;
+      _showSnack(
+        'خطا در اعمال پلن: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() => _assigningPlan = false);
@@ -1104,7 +1109,11 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
       await _loadData();
       _showSnack('سیاست حذف شد');
     } catch (e) {
-      _showSnack('خطا در حذف سیاست: $e');
+      if (mounted) {
+        _showSnack(
+          'خطا در حذف سیاست: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _deleting = false);
@@ -1114,6 +1123,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
 
   Future<void> _openPolicyDialog({Map<String, dynamic>? initial}) async {
     final formKey = GlobalKey<FormState>();
+    final pageContext = context;
     final titleCtrl = TextEditingController(text: initial?['title'] ?? '');
     final priorityCtrl = TextEditingController(text: initial?['priority']?.toString() ?? '120');
     final configCtrl = TextEditingController(
@@ -1218,7 +1228,11 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
                     Navigator.pop(ctx);
                     _loadData();
                   } catch (e) {
-                    _showSnack('خطا در ذخیره سیاست: $e');
+                    if (pageContext.mounted) {
+                      _showSnack(
+                        'خطا در ذخیره سیاست: ${ErrorExtractor.forContext(e, pageContext)}',
+                      );
+                    }
                   }
                 },
                 child: const Text('ذخیره'),

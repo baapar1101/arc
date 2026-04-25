@@ -4,6 +4,7 @@ import '../../services/announcements_service.dart';
 import '../../utils/date_formatters.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/jalali_date_picker.dart';
+import '../../utils/error_extractor.dart';
 
 class AnnouncementsAdminPage extends StatefulWidget {
   const AnnouncementsAdminPage({super.key});
@@ -54,7 +55,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }

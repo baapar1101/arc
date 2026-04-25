@@ -17,6 +17,7 @@ import '../../utils/number_normalizer.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -390,7 +391,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 }

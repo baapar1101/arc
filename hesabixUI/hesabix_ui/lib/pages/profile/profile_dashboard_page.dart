@@ -9,6 +9,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -162,7 +163,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -650,7 +651,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               SnackBarHelper.show(context, message: 'به‌عنوان خوانده‌شده علامت خورد');
                             } catch (e) {
                               if (!context.mounted) return;
-                              SnackBarHelper.showError(context, message: 'خطا: $e');
+                              SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }

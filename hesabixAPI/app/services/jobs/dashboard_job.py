@@ -41,6 +41,18 @@ def process_dashboard_widgets_job(
         filters = filters or {}
         
         with get_db_session() as db:
+            from adapters.db.models.user import User
+            from app.core.auth_dependency import AuthContext
+
+            user = db.get(User, int(user_id))
+            auth_ctx = None
+            if user is not None:
+                auth_ctx = AuthContext(
+                    user=user,
+                    api_key_id=0,
+                    business_id=business_id,
+                    db=db,
+                )
             data = get_widgets_batch_data(
                 db=db,
                 business_id=business_id,
@@ -48,6 +60,7 @@ def process_dashboard_widgets_job(
                 widget_keys=widget_keys,
                 filters=filters,
                 calendar_type=calendar_type,
+                auth_ctx=auth_ctx,
             )
             
             logger.info(f"Dashboard widgets processed successfully for business {business_id}")

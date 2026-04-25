@@ -15,6 +15,7 @@ import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 class YearEndClosingPage extends StatefulWidget {
@@ -139,11 +140,12 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در دریافت سال مالی جاری: $e';
+          _error =
+              'خطا در دریافت سال مالی جاری: ${ErrorExtractor.forContext(e, context)}';
         });
         SnackBarHelper.show(
           context,
-          message: 'خطا در دریافت اطلاعات: $e',
+          message: 'خطا در دریافت اطلاعات: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
           action: SnackBarAction(
             label: 'تلاش مجدد',
@@ -276,12 +278,14 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در دریافت پیش‌نمایش: $e';
+          _error =
+              'خطا در دریافت پیش‌نمایش: ${ErrorExtractor.forContext(e, context)}';
           _loading = false;
         });
         SnackBarHelper.show(
           context,
-          message: 'خطا در دریافت پیش‌نمایش: $e',
+          message:
+              'خطا در دریافت پیش‌نمایش: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
           action: SnackBarAction(
             label: 'تلاش مجدد',
@@ -585,7 +589,8 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در بستن سال مالی: $e';
+          _error =
+              'خطا در بستن سال مالی: ${ErrorExtractor.forContext(e, context)}';
           _closing = false;
         });
         
@@ -617,7 +622,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      e.toString(),
+                      ErrorExtractor.forContext(e, context),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onErrorContainer,
                         fontSize: 13,

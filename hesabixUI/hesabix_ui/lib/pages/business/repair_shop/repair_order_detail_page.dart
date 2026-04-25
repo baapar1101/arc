@@ -5,6 +5,7 @@ import '../../../models/repair_order_model.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../core/api_client.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../utils/error_extractor.dart';
 
 
 /// صفحه جزئیات و عملیات سفارش تعمیر
@@ -81,7 +82,8 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'خطا در بارگذاری سفارش: $e';
+        _errorMessage =
+            'خطا در بارگذاری سفارش: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
       });
     }
@@ -156,7 +158,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -201,7 +203,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -230,7 +232,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -260,7 +262,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -298,7 +300,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }

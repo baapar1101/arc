@@ -4,7 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/email_models.dart';
 import 'package:hesabix_ui/services/email_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class EmailSettingsPage extends StatefulWidget {
   const EmailSettingsPage({super.key});
@@ -70,9 +70,13 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
             : (_configs.isNotEmpty ? _configs.first : null);
       });
     } catch (e) {
-      _showErrorSnackBar(e.toString());
+      if (mounted) {
+        _showErrorSnackBar(ErrorExtractor.forContext(e, context));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -123,9 +127,13 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       _loadConfigs();
       _clearForm();
     } catch (e) {
-      _showErrorSnackBar(e.toString());
+      if (mounted) {
+        _showErrorSnackBar(ErrorExtractor.forContext(e, context));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -150,7 +158,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     } catch (e) {
       if (!mounted) return;
       // نمایش Dialog با جزئیات خطا
-      _showConnectionErrorDialog(e.toString());
+      _showConnectionErrorDialog(ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) {
         setState(() => _isTesting = false);
@@ -439,7 +447,9 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       );
       _showSuccessSnackBar(t.testEmailSentSuccessfully);
     } catch (e) {
-      _showErrorSnackBar(e.toString());
+      if (mounted) {
+        _showErrorSnackBar(ErrorExtractor.forContext(e, context));
+      }
     }
   }
 
@@ -883,7 +893,9 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       _showSuccessSnackBar(t.emailConfigDeletedSuccessfully);
       _loadConfigs();
       } catch (e) {
-        _showErrorSnackBar(e.toString());
+        if (mounted) {
+          _showErrorSnackBar(ErrorExtractor.forContext(e, context));
+        }
       }
     }
   }

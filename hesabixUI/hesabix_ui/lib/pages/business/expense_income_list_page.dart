@@ -14,6 +14,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/expense_income/expense_income_form_dialog.dart';
 import 'package:hesabix_ui/widgets/expense_income/expense_income_details_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/project/project_selector_widget.dart';
@@ -1427,7 +1428,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       );
     } catch (e) {
       if (!ctx.mounted) return;
-      SnackBarHelper.show(ctx, message: 'خطا در بارگذاری جزئیات: $e');
+      SnackBarHelper.show(
+        ctx,
+        message:
+            'خطا در بارگذاری جزئیات: ${ErrorExtractor.forContext(e, ctx)}',
+      );
     }
   }
 
@@ -1465,7 +1470,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       }
     } catch (e) {
       if (!ctx.mounted) return;
-      SnackBarHelper.show(ctx, message: 'خطا در آماده‌سازی ویرایش: $e');
+      SnackBarHelper.show(
+        ctx,
+        message:
+            'خطا در آماده‌سازی ویرایش: ${ErrorExtractor.forContext(e, ctx)}',
+      );
     }
   }
 
@@ -1558,7 +1567,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
             }
           }
         } else {
-          message = e.toString();
+          message = ErrorExtractor.forContext(e, context);
         }
 
         SnackBarHelper.showError(context, message: message);
@@ -1641,12 +1650,9 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // بستن لودینگ
-      String message = 'خطا در حذف اسناد';
-      if (e is DioException) {
-        message = e.message ?? message;
-      } else {
-        message = e.toString();
-      }
+      final message = e is DioException && (e.message?.trim().isNotEmpty ?? false)
+          ? e.message!
+          : ErrorExtractor.forContext(e, context);
       SnackBarHelper.showError(context, message: message);
     }
   }

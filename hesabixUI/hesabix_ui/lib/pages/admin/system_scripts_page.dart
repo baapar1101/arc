@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../services/admin_scripts_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class SystemScriptsPage extends StatefulWidget {
@@ -53,7 +54,11 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در بارگذاری اسکریپت‌ها: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در بارگذاری اسکریپت‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -84,7 +89,10 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
       await _refreshRuns();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در شروع اجرا: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در شروع اجرا: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -116,7 +124,11 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در دریافت جزئیات اجرا: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دریافت جزئیات اجرا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

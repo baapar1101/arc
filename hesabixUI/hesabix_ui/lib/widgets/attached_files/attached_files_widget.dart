@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// کلید برای دسترسی به state از خارج (برای refresh)
@@ -118,7 +119,8 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در بارگذاری فایل‌ها: $e';
+          _error =
+              'خطا در بارگذاری فایل‌ها: ${ErrorExtractor.forContext(e, context)}';
           _loading = false;
         });
       }
@@ -150,7 +152,11 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دانلود فایل: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -177,7 +183,10 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در حذف فایل: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در حذف فایل: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -195,7 +204,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
               .toList() ??
           <Map<String, dynamic>>[];
     } catch (e) {
-      usageError = '$e';
+      usageError = ErrorExtractor.forContext(e, context);
     }
 
     if (!mounted) return false;

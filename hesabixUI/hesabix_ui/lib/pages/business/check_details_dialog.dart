@@ -12,6 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class CheckDetailsDialog extends StatefulWidget {
   final int checkId;
@@ -80,7 +81,8 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در بارگذاری اطلاعات چک: $e';
+          _error =
+              'خطا در بارگذاری اطلاعات چک: ${ErrorExtractor.forContext(e, context)}';
           _loading = false;
         });
       }
@@ -105,7 +107,11 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
         setState(() {
           _loadingHistory = false;
         });
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری سوابق: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری سوابق: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -143,7 +149,11 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
+          SnackBarHelper.showError(
+            context,
+            message:
+                'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       } finally {
         if (mounted) {
@@ -152,7 +162,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
         setState(() => _uploadingFile = false);
       }
     }

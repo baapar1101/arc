@@ -711,7 +711,10 @@ class _WarehouseDocumentFormDialogState
       debugPrint('Error loading document for edit: $e');
       if (mounted) {
         setState(() => _loadingDocument = false);
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری حواله: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بارگذاری حواله: ${ErrorExtractor.forContext(e, context)}',
+        );
         Navigator.of(context).pop();
       }
     }
@@ -1881,7 +1884,7 @@ class _WarehouseDocumentFormDialogState
       }
     } catch (e) {
       if (!mounted) return;
-      final extracted = ErrorExtractor.extractErrorMessage(e);
+      final extracted = ErrorExtractor.forContext(e, context);
       final cc =
           _calendarController ??
           widget.calendarController ??

@@ -2600,6 +2600,14 @@ class AppLocalizationsFa extends AppLocalizations {
       'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
 
   @override
+  String get errorFileUploadFailed =>
+      'خطا در آپلود فایل. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get errorDataSaveFailed =>
+      'ذخیره اطلاعات انجام نشد. لطفاً دوباره تلاش کنید.';
+
+  @override
   String get errorSendTimeout => 'زمان ارسال درخواست به سرور به پایان رسید.';
 
   @override
@@ -2854,6 +2862,24 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get personWebsite => 'وب‌سایت';
+
+  @override
+  String get personSocialNetworks => 'پیام‌رسان و شبکه‌های اجتماعی';
+
+  @override
+  String get personSocialPlatform => 'پلتفرم';
+
+  @override
+  String get personSocialValue => 'آیدی، لینک یا شماره';
+
+  @override
+  String get personSocialCustomName => 'نام پلتفرم (برای «سایر»)';
+
+  @override
+  String get addPersonSocialRow => 'افزودن راه ارتباطی';
+
+  @override
+  String get noPersonSocialRows => 'راه ارتباطی ثبت نشده است.';
 
   @override
   String get personBankAccounts => 'حساب‌های بانکی';

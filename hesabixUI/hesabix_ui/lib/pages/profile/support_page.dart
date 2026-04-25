@@ -12,6 +12,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
 import '../../utils/date_formatters.dart';
+import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'create_ticket_page.dart';
 
@@ -114,7 +115,7 @@ class _SupportPageState extends State<SupportPage> {
       if (!mounted) return;
       setState(() {
         _metadataLoading = false;
-        _metadataError = e.toString();
+        _metadataError = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -334,7 +335,7 @@ class _SupportPageState extends State<SupportPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _ticketsError = e.toString();
+        _ticketsError = ErrorExtractor.forContext(e, context);
       });
     } finally {
       if (!mounted) return;
@@ -658,7 +659,11 @@ class _SupportPageState extends State<SupportPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطا در ذخیره فیلتر: ${e.toString()}')),
+            SnackBar(
+              content: Text(
+                'خطا در ذخیره فیلتر: ${ErrorExtractor.forContext(e, context)}',
+              ),
+            ),
           );
         }
       }

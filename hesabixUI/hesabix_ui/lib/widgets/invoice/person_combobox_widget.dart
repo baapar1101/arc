@@ -4,6 +4,7 @@ import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_financial_balance_banner.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class _PersonPickerState {
@@ -222,7 +223,9 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           isSearching: _isSearching,
           hasSearched: _hasSearched,
         );
-        _showErrorSnackBar('خطا در جست‌وجو: $e');
+        _showErrorSnackBar(
+          'خطا در جست‌وجو: ${ErrorExtractor.forContext(e, context)}',
+        );
       } else {
         print('[PersonCombobox] ERROR: Widget is not mounted when handling error!');
       }

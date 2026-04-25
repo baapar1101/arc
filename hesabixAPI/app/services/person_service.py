@@ -4,15 +4,18 @@ from datetime import datetime, time, timezone
 import json
 from sqlalchemy.exc import IntegrityError
 from app.core.responses import ApiError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, or_, func, String
-from adapters.db.models.person import Person, PersonBankAccount, PersonType
+from adapters.db.models.person import Person, PersonBankAccount, PersonSocialContact, PersonType
 from adapters.db.models.business import Business
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.api.v1.schema_models.person import (
-    PersonCreateRequest, PersonUpdateRequest, PersonBankAccountCreateRequest
+    PersonCreateRequest,
+    PersonUpdateRequest,
+    PersonBankAccountCreateRequest,
+    PersonSocialContactInput,
 )
 from app.core.responses import success_response
 from app.core.cache import get_cache
@@ -198,6 +201,18 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
                 sheba_number=bank_account_data.sheba_number,
             )
             db.add(bank_account)
+
+    _socials = getattr(person_data, "social_contacts", None) or []
+    for i, sc in enumerate(_socials):
+        db.add(
+            PersonSocialContact(
+                person_id=person.id,
+                platform_key=sc.platform_key,
+                custom_label=sc.custom_label,
+                value=sc.value,
+                sort_order=i,
+            )
+        )
     
     try:
         db.commit()
@@ -241,7 +256,11 @@ def get_person_by_id(
     """دریافت شخص بر اساس شناسه (همراه با تراز و وضعیت مالی در سال مالی انتخاب‌شده یا جاری)"""
     person = (
         db.query(Person)
-        .options(joinedload(Person.person_group))
+        .options(
+            joinedload(Person.person_group),
+            selectinload(Person.bank_accounts),
+            selectinload(Person.social_contacts),
+        )
         .filter(and_(Person.id == person_id, Person.business_id == business_id))
         .first()
     )
@@ -286,7 +305,11 @@ def get_persons_by_business(
     """دریافت لیست اشخاص با جستجو و فیلتر"""
     query = (
         db.query(Person)
-        .options(joinedload(Person.person_group))
+        .options(
+            joinedload(Person.person_group),
+            selectinload(Person.bank_accounts),
+            selectinload(Person.social_contacts),
+        )
         .filter(Person.business_id == business_id)
     )
     
@@ -333,6 +356,14 @@ def get_persons_by_business(
                 search_conditions.append(Person.email.ilike(search_term))
             elif field == 'national_id':
                 search_conditions.append(Person.national_id.ilike(search_term))
+            elif field == "social_value":
+                search_conditions.append(
+                    Person.id.in_(
+                        db.query(PersonSocialContact.person_id).filter(
+                            PersonSocialContact.value.ilike(search_term)
+                        )
+                    )
+                )
         
         if search_conditions:
             query = query.filter(or_(*search_conditions))
@@ -591,6 +622,10 @@ def update_person(
         else person_data.dict(exclude_unset=True)
     )
 
+    sync_social: Optional[List[Any]] = None
+    if "social_contacts" in update_data:
+        sync_social = update_data.pop("social_contacts")
+
     # مدیریت کد یکتا (شامل پاک کردن صریح با null)
     if 'code' in update_data:
         desired_code = update_data['code']
@@ -643,8 +678,30 @@ def update_person(
             continue
         setattr(person, field, update_data[field])
     
+    if sync_social is not None:
+        db.query(PersonSocialContact).filter(PersonSocialContact.person_id == person_id).delete(
+            synchronize_session=False
+        )
+        for i, sc in enumerate(sync_social):
+            p = sc if isinstance(sc, PersonSocialContactInput) else PersonSocialContactInput.model_validate(sc)
+            db.add(
+                PersonSocialContact(
+                    person_id=person_id,
+                    platform_key=p.platform_key,
+                    custom_label=p.custom_label,
+                    value=p.value,
+                    sort_order=i,
+                )
+            )
+
     db.commit()
     db.refresh(person)
+    person = (
+        db.query(Person)
+        .options(selectinload(Person.bank_accounts), selectinload(Person.social_contacts))
+        .filter(Person.id == person_id)
+        .first()
+    ) or person
     
     # Invalidate کش لیست اشخاص
     invalidate_persons_cache(business_id, fiscal_year_id=None)
@@ -862,7 +919,23 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
                 'updated_at': ba.updated_at.isoformat(),
             }
             for ba in person.bank_accounts
-        ]
+        ],
+        'social_contacts': [
+            {
+                'id': sc.id,
+                'person_id': sc.person_id,
+                'platform_key': sc.platform_key,
+                'custom_label': sc.custom_label,
+                'value': sc.value,
+                'sort_order': sc.sort_order,
+                'created_at': sc.created_at.isoformat(),
+                'updated_at': sc.updated_at.isoformat(),
+            }
+            for sc in sorted(
+                getattr(person, "social_contacts", []) or [],
+                key=lambda x: (x.sort_order, x.id),
+            )
+        ],
     }
 
 

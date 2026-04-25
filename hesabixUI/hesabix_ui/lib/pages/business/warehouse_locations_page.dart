@@ -7,6 +7,7 @@ import '../../models/warehouse_model.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_location_service.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/code_field_widget.dart';
 
@@ -94,7 +95,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       if (!mounted) return;
       setState(() {
         _loadingMeta = false;
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -126,7 +127,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       if (!mounted) return;
       setState(() {
         _loadingTree = false;
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -522,7 +523,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       await _reloadTree();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '$e');
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       nameCtrl.dispose();
       notesCtrl.dispose();
@@ -557,7 +558,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '$e');
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -713,7 +714,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
                       await _reloadPlacements();
                     } catch (e) {
                       if (ctx.mounted) {
-                        SnackBarHelper.showError(ctx, message: '$e');
+                        SnackBarHelper.showError(ctx, message: ErrorExtractor.forContext(e, ctx));
                       }
                     }
                   },
@@ -784,7 +785,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '$e');
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -812,7 +813,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
       await _reloadPlacements();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '$e');
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 

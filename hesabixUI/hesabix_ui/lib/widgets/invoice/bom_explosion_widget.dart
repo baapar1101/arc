@@ -4,6 +4,7 @@ import '../../models/invoice_line_item.dart';
 import '../../services/bom_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// ویجت انفجار فرمول تولید برای استفاده در فاکتور تولید
@@ -269,7 +270,11 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
         _selectedBom = null;
         _isLoadingBoms = false;
       });
-      SnackBarHelper.showError(context, message: 'خطا در بارگذاری فرمول‌ها: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در بارگذاری فرمول‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -316,7 +321,10 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
       setState(() {
         _isExploding = false;
       });
-      SnackBarHelper.showError(context, message: 'خطا در انفجار فرمول: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در انفجار فرمول: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

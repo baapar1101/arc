@@ -31,6 +31,7 @@ import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../core/date_utils.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 import 'bank_accounts_page.dart';
@@ -403,12 +404,13 @@ class _BusinessShellState extends State<BusinessShell> {
       await widget.authStore.setCurrentBusiness(businessData);
     } catch (e) {
       if (mounted) {
+        final msg = ErrorExtractor.forContext(e, context);
         setState(() {
-          _businessLoadError = e.toString();
+          _businessLoadError = msg;
         });
         SnackBarHelper.showError(
           context,
-          message: 'خطا در بارگذاری اطلاعات کسب و کار: $e',
+          message: msg,
         );
       }
     } finally {
@@ -2133,7 +2135,7 @@ class _BusinessShellState extends State<BusinessShell> {
       if (!mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'خطا در دریافت فاکتور: $e',
+        message: 'خطا در دریافت فاکتور: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       dismissLoader();

@@ -11,6 +11,7 @@ import 'package:hesabix_ui/services/bank_account_service.dart';
 import 'package:hesabix_ui/services/cash_register_service.dart';
 import 'package:hesabix_ui/services/petty_cash_service.dart';
 import 'package:hesabix_ui/services/check_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// ویجت دینامیک برای انتخاب تفضیل بر اساس نوع حساب
@@ -246,7 +247,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری اشخاص: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری اشخاص: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -289,7 +294,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری کالاها: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری کالاها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -335,7 +344,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری حساب‌های بانکی: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری حساب‌های بانکی: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -381,7 +394,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری صندوق‌ها: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری صندوق‌ها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -427,7 +444,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری تنخواه‌ها: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری تنخواه‌ها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -473,7 +494,11 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری چک‌ها: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری چک‌ها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

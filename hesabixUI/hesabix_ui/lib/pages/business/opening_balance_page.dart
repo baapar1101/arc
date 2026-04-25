@@ -21,6 +21,7 @@ import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/services/product_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class OpeningBalancePage extends StatefulWidget {
@@ -96,7 +97,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در دریافت تراز افتتاحیه: $e',
+          message:
+              'خطا در دریافت تراز افتتاحیه: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -1480,7 +1482,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'خطا در ذخیره: ${e.toString()}',
+          message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
           backgroundColor: Theme.of(context).colorScheme.error,
           isError: true,
         );
@@ -1525,7 +1527,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'خطا در نهایی‌سازی: ${e.toString()}',
+          message: 'خطا در نهایی‌سازی: ${ErrorExtractor.forContext(e, context)}',
           backgroundColor: Theme.of(context).colorScheme.error,
           isError: true,
         );

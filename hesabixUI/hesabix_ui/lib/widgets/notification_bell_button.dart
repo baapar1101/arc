@@ -8,6 +8,7 @@ import '../core/api_client.dart';
 import '../services/announcements_service.dart';
 import '../services/notifications_ws_client.dart';
 import '../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 String _localizedAnnouncementLevel(BuildContext context, String raw) {
   final t = AppLocalizations.of(context);
@@ -299,7 +300,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) {

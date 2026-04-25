@@ -10,6 +10,8 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/models/person_social_platforms.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:hesabix_ui/models/person_share_link.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
@@ -27,6 +29,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class PersonDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -204,7 +207,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _summaryError = e.toString();
+        _summaryError = ErrorExtractor.forContext(e, context);
         _loadingSummary = false;
       });
     }
@@ -419,13 +422,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       }
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
-      if (msg.contains('403') || msg.contains('FORBIDDEN')) {
+      final raw = e.toString();
+      if (raw.contains('403') || raw.contains('FORBIDDEN')) {
         SnackBarHelper.showError(context, message: 'دسترسی ارسال نوتیفیکیشن ندارید.');
-      } else if (msg.contains('قالب') || msg.contains('فعال')) {
+      } else if (raw.contains('قالب') || raw.contains('فعال')) {
         SnackBarHelper.showError(context, message: t.personShareNoTemplateHint);
       } else {
-        SnackBarHelper.showError(context, message: 'خطا در ارسال پیامک.');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در ارسال پیامک: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _sendingLinkSms = false);
@@ -517,7 +523,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _detailsError = 'خطا در بارگذاری اطلاعات شخص: $e';
+        _detailsError =
+            'خطا در بارگذاری اطلاعات شخص: ${ErrorExtractor.forContext(e, context)}';
         _loadingDetails = false;
       });
     }
@@ -711,6 +718,30 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             _InfoRow('کد پستی', person.postalCode),
             _InfoRow('آدرس', person.address),
           ]),
+          if (person.socialContacts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildSectionHeader(t.personSocialNetworks),
+            ...person.socialContacts.map(
+              (s) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 140,
+                      child: Text(
+                        personSocialPlatformLabelFa(s.platformKey, customLabel: s.customLabel),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: _personSocialValueWidget(context, s.value)),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           _buildSectionHeader('اطلاعات ثبتی'),
           _buildInfoGrid([
@@ -1400,7 +1431,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   SnackBarHelper.show(context, message: 'فعالیت ثبت شد');
                   onSaved();
                 } catch (e) {
-                  if (mounted) SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+                  if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
                 }
               },
               child: const Text('ذخیره'),
@@ -1477,7 +1508,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   SnackBarHelper.show(context, message: 'فعالیت ویرایش شد');
                   onSaved();
                 } catch (e) {
-                  if (mounted) SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+                  if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
                 }
               },
               child: const Text('ذخیره'),
@@ -1509,7 +1540,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       onSaved();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 
@@ -2008,6 +2039,45 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     }
   }
 
+  Uri? _socialValueToUri(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http://') ||
+        s.startsWith('https://') ||
+        s.startsWith('tel:') ||
+        s.startsWith('mailto:') ||
+        s.startsWith('tg:') ||
+        s.startsWith('intent:')) {
+      try {
+        return Uri.parse(s);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Widget _personSocialValueWidget(BuildContext context, String? raw) {
+    final t = (raw ?? '').trim();
+    if (t.isEmpty) {
+      return Text('—', style: Theme.of(context).textTheme.bodyMedium);
+    }
+    final uri = _socialValueToUri(t);
+    if (uri != null) {
+      return InkWell(
+        onTap: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        child: Text(
+          t,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                decoration: TextDecoration.underline,
+              ),
+        ),
+      );
+    }
+    return SelectableText(t, style: Theme.of(context).textTheme.bodyMedium);
+  }
+
   Widget _buildInfoGrid(List<_InfoRow> rows) {
     final visibleRows = rows.where((row) => row.value != null && row.value!.trim().isNotEmpty && row.value != '-').toList();
     if (visibleRows.isEmpty) {
@@ -2073,7 +2143,11 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         await _handleUploadError(e);
       } catch (e) {
         if (!mounted) return;
-        SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+        );
       } finally {
         if (mounted) {
           setState(() => _uploadingFile = false);
@@ -2082,7 +2156,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     } catch (e) {
       if (!mounted) return;
       setState(() => _uploadingFile = false);
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 

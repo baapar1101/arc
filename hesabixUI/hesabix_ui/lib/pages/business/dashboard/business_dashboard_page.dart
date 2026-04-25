@@ -17,8 +17,10 @@ import 'package:shamsi_date/shamsi_date.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/currency_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/document/document_details_dialog.dart';
+import 'quick_links_dashboard_widget.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -231,7 +233,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -831,6 +833,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return _topSuppliersWidget;
       case 'pnl_summary':
         return _pnlSummaryWidget;
+      case 'quick_links':
+        return _quickLinksWidget;
       default:
         return null;
     }
@@ -851,7 +855,27 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         'top_customers': _topCustomersWidget,
         'top_suppliers': _topSuppliersWidget,
         'pnl_summary': _pnlSummaryWidget,
+        'quick_links': _quickLinksWidget,
       };
+
+  Widget _quickLinksWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return QuickLinksDashboardBody(
+      businessId: widget.businessId,
+      data: data,
+      editMode: _editMode,
+      onRefresh: onRefresh ?? () {},
+      onOpenEditor: () async {
+        await showQuickLinksEditorDialog(
+          context: context,
+          businessId: widget.businessId,
+          service: _service,
+          onSaved: () {
+            _reloadDataOnly();
+          },
+        );
+      },
+    );
+  }
 
   Widget _buildChecksWidget(BuildContext context, dynamic data, String title, VoidCallback? onRefresh) {
     final theme = Theme.of(context);
@@ -2139,7 +2163,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       SnackBarHelper.show(context, message: 'چیدمان پیش‌فرض کسب‌وکار منتشر شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در انتشار: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در انتشار: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -2173,6 +2200,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'بهترین تأمین‌کنندگان';
       case 'pnl_summary':
         return 'خلاصه سود و زیان';
+      case 'quick_links':
+        return 'دسترسی سریع';
       default:
         return key;
     }

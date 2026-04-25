@@ -12,6 +12,7 @@ import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:dio/dio.dart';
 import '../../services/errors/api_error.dart';
@@ -169,7 +170,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         }
         SnackBarHelper.showError(context, message: errorMessage);
       } catch (e) {
-        SnackBarHelper.showError(context, message: 'خطا در ایمپورت: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در ایمپورت: ${ErrorExtractor.forContext(e, context)}',
+        );
       } finally {
         if (mounted) {
           setState(() {
@@ -179,7 +183,11 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در انتخاب فایل: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در انتخاب فایل: ${ErrorExtractor.forContext(e, context)}',
+        );
         setState(() {
           _isLoading = false;
         });
@@ -224,7 +232,11 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در بررسی وضعیت: $e');
+          SnackBarHelper.showError(
+            context,
+            message:
+                'خطا در بررسی وضعیت: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
         break;
       }
@@ -567,7 +579,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       // سایر خطاها
       ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage ?? '${t.businessCreationFailed}: $e'),
+          content: Text(
+            errorMessage ??
+                '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
@@ -578,7 +593,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       if (mounted) {
         ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
           SnackBar(
-            content: Text('${t.businessCreationFailed}: $e'),
+            content: Text(
+              '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(16),

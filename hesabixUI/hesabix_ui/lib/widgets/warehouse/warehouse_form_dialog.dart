@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../models/warehouse_model.dart';
 import '../../services/warehouse_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class WarehouseFormDialog extends StatefulWidget {
   final int businessId;
@@ -176,10 +177,10 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
           });
         } else {
           setState(() {
-            _errorMessage = 'خطا: $e';
+            _errorMessage = 'خطا: ${ErrorExtractor.userMessage(e)}';
           });
         }
-        SnackBarHelper.showError(context, message: 'خطا: $e');
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) {

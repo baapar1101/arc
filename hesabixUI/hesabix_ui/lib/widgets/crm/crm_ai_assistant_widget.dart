@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// ویجت دستیار AI برای خلاصه سرنخ یا فرصت فروش
 class CrmAIAssistantWidget extends StatefulWidget {
@@ -56,7 +57,7 @@ class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 

@@ -8,6 +8,7 @@ import '../../core/date_utils.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
+import '../../utils/error_extractor.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
   final String code;
@@ -83,16 +84,15 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
         _loading = false;
       });
     } on DioException catch (e) {
-      final message = _extractErrorMessage(e);
       if (!mounted) return;
       setState(() {
-        _error = message;
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     }
@@ -524,7 +524,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
     } on DioException catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // بستن loading dialog
-      final message = _extractErrorMessage(e);
+      final message = ErrorExtractor.forContext(e, context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('خطا در دریافت جزئیات: $message'),
@@ -536,33 +536,11 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
       Navigator.of(context).pop(); // بستن loading dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطا: ${e.toString()}'),
+          content: Text(ErrorExtractor.forContext(e, context)),
           backgroundColor: theme.colorScheme.error,
         ),
       );
     }
-  }
-
-  String _extractErrorMessage(DioException exception) {
-    final response = exception.response?.data;
-    if (response is Map<String, dynamic>) {
-      final error = response['error'];
-      if (error is Map<String, dynamic>) {
-        final message = error['message']?.toString();
-        if (message != null && message.isNotEmpty) {
-          return message;
-        }
-      }
-      final message = response['message']?.toString();
-      if (message != null && message.isNotEmpty) {
-        return message;
-      }
-    }
-    final fallback = exception.error?.toString();
-    if (fallback != null && fallback.isNotEmpty) {
-      return fallback;
-    }
-    return 'خطا در دریافت اطلاعات کارت حساب';
   }
 }
 

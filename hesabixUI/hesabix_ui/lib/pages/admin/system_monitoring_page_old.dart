@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/monitoring_service.dart';
 import '../../widgets/loading_indicator.dart';
+import '../../utils/error_extractor.dart';
 
 class SystemMonitoringPage extends StatefulWidget {
   const SystemMonitoringPage({super.key});
@@ -69,14 +70,15 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
       }
     } catch (e) {
       if (mounted) {
+        final err = ErrorExtractor.forContext(e, context);
         setState(() {
-          _error = e.toString();
+          _error = err;
           _isLoading = false;
         });
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('خطا در بارگذاری داده‌ها: $e'),
+              content: Text('خطا در بارگذاری داده‌ها: $err'),
               backgroundColor: Colors.red,
             ),
           );

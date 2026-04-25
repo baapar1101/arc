@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -641,7 +642,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       }
     } catch (e) {
       if (dialogContext.mounted) {
-        SnackBarHelper.show(dialogContext, message: 'خطا در جستجو: $e');
+        SnackBarHelper.show(
+        dialogContext,
+        message:
+            'خطا در جستجو: ${ErrorExtractor.forContext(e, dialogContext)}',
+      );
       }
     }
   }

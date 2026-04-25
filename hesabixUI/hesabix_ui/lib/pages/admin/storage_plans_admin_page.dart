@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/storage_plan_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class StoragePlansAdminPage extends StatefulWidget {
@@ -45,7 +46,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -497,7 +498,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('خطا: $e'),
+                      content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -558,7 +559,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا: $e'),
+            content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
             backgroundColor: Colors.red,
           ),
         );

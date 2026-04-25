@@ -5,6 +5,7 @@ import '../../core/calendar_controller.dart';
 import '../../services/warranty_service.dart';
 import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
@@ -79,7 +80,11 @@ class _WarrantySettingsPageState extends State<WarrantySettingsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری تنظیمات: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -112,7 +117,11 @@ class _WarrantySettingsPageState extends State<WarrantySettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره تنظیمات: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

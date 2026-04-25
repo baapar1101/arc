@@ -6,6 +6,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/api_client.dart';
 import '../../services/system_services_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
 
@@ -160,15 +161,16 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
       }
     } catch (e) {
       if (!mounted) return;
+      final err = ErrorExtractor.forContext(e, context);
       setState(() {
-        _error = e.toString();
+        _error = err;
         _isLoading = false;
       });
       if (!silent) {
         final loc = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: loc.serviceLogsFetchError(e.toString()),
+          message: loc.serviceLogsFetchError(err),
         );
       }
     }
@@ -277,7 +279,12 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
     } catch (e) {
       if (!mounted) return;
       final loc = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: loc.serviceLogsRestartError(e.toString()));
+      SnackBarHelper.showError(
+        context,
+        message: loc.serviceLogsRestartError(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
       setState(() => _isLoading = false);
     }
   }

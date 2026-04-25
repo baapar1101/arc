@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/document_numbering_models.dart';
 import 'package:hesabix_ui/services/document_numbering_api_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:shamsi_date/shamsi_date.dart';
@@ -58,7 +59,11 @@ class _DocumentNumberingSettingsPageState
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -190,9 +195,10 @@ class _DocumentNumberingSettingsPageState
     String documentType,
     DocumentNumberingSetting setting,
   ) async {
+    final pageContext = context;
     final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => _EditDocumentNumberingDialog(
+      context: pageContext,
+      builder: (dialogContext) => _EditDocumentNumberingDialog(
         documentType: documentType,
         documentTypeName: _documentTypeNames[documentType]!,
         setting: setting,
@@ -203,14 +209,19 @@ class _DocumentNumberingSettingsPageState
               updatedSetting,
             );
             await _load();
-            if (mounted) {
-              SnackBarHelper.show(context, message: 'تنظیمات با موفقیت ذخیره شد');
-            }
+            if (!pageContext.mounted) return true;
+            SnackBarHelper.show(
+              pageContext,
+              message: 'تنظیمات با موفقیت ذخیره شد',
+            );
             return true;
           } catch (e) {
-            if (mounted) {
-              SnackBarHelper.show(context, message: 'خطا در ذخیره: $e');
-            }
+            if (!pageContext.mounted) return false;
+            SnackBarHelper.show(
+              pageContext,
+              message:
+                  'خطا در ذخیره: ${ErrorExtractor.forContext(e, pageContext)}',
+            );
             return false;
           }
         },
@@ -221,14 +232,19 @@ class _DocumentNumberingSettingsPageState
               documentType,
             );
             await _load();
-            if (mounted) {
-              SnackBarHelper.show(context, message: 'تنظیمات حذف شد و به پیش‌فرض بازگشت');
-            }
+            if (!pageContext.mounted) return true;
+            SnackBarHelper.show(
+              pageContext,
+              message: 'تنظیمات حذف شد و به پیش‌فرض بازگشت',
+            );
             return true;
           } catch (e) {
-            if (mounted) {
-              SnackBarHelper.show(context, message: 'خطا در حذف: $e');
-            }
+            if (!pageContext.mounted) return false;
+            SnackBarHelper.show(
+              pageContext,
+              message:
+                  'خطا در حذف: ${ErrorExtractor.forContext(e, pageContext)}',
+            );
             return false;
           }
         },

@@ -19,6 +19,7 @@ import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
 import 'helpers/data_table_utils.dart';
 import 'helpers/column_settings_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// Main reusable data table widget
@@ -657,7 +658,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
         });
       }
     } finally {
@@ -1082,7 +1083,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       debugPrint('Error saving column settings: $e');
       if (mounted) {
         final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-        SnackBarHelper.showError(context, message: '${t.error}: $e');
+        SnackBarHelper.showError(
+          context,
+          message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -1282,7 +1286,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: '${t.exportError}: $e');
+        SnackBarHelper.showError(
+          context,
+          message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

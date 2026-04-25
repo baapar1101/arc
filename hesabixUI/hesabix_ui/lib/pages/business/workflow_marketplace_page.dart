@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_marketplace_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// مخزن ورک‌فلو: مرور و نصب
@@ -87,7 +88,11 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
       });
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${AppLocalizations.of(context).workflowMarketplaceError}: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${AppLocalizations.of(context).workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -201,7 +206,10 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.workflowMarketplaceError}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -238,7 +246,10 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.workflowMarketplaceError}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/warehouse_model.dart';
 import '../../services/bulk_default_warehouse_service.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class BulkDefaultWarehouseDialog extends StatefulWidget {
@@ -65,7 +66,10 @@ class _BulkDefaultWarehouseDialogState extends State<BulkDefaultWarehouseDialog>
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: '${t.error}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _loadingWarehouses = false);
     }
@@ -103,7 +107,10 @@ class _BulkDefaultWarehouseDialogState extends State<BulkDefaultWarehouseDialog>
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: t.previewError(e.toString()));
+      SnackBarHelper.showError(
+        context,
+        message: t.previewError(ErrorExtractor.forContext(e, context)),
+      );
     } finally {
       if (mounted) setState(() => _previewLoading = false);
     }
@@ -153,7 +160,10 @@ class _BulkDefaultWarehouseDialogState extends State<BulkDefaultWarehouseDialog>
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.error}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _applyLoading = false);
     }

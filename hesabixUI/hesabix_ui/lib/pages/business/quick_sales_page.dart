@@ -13,6 +13,7 @@ import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../utils/number_normalizer.dart' as number_utils;
@@ -310,7 +311,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       } catch (_) {}
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری تنظیمات: $e', isError: true);
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
     } finally {
       setState(() {
@@ -502,7 +508,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در جستجو: $e', isError: true);
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در جستجو: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
     }
   }
@@ -561,7 +571,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
           } catch (e) {
             SnackBarHelper.show(
               context,
-              message: 'کالا ثبت شد اما خطا در افزودن به سبد: $e',
+              message:
+                  'کالا ثبت شد اما خطا در افزودن به سبد: ${ErrorExtractor.forContext(e, context)}',
               isError: true,
             );
           }
@@ -585,7 +596,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'خطا در باز کردن دیالوگ افزودن کالا: $e',
+          message:
+              'خطا در باز کردن دیالوگ افزودن کالا: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
         );
       }
@@ -1220,7 +1232,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         } else if (e.toString().contains('CURRENCY')) {
           errorMessage = 'خطا در تنظیمات ارز';
         } else {
-          errorMessage = 'خطا در ثبت فاکتور: ${e.toString().replaceAll('Exception: ', '')}';
+          errorMessage =
+              'خطا در ثبت فاکتور: ${ErrorExtractor.forContext(e, context)}';
         }
         SnackBarHelper.show(context, message: errorMessage, isError: true);
       }
@@ -1272,7 +1285,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       if (mounted) {
         SnackBarHelper.show(
           context, 
-          message: 'خطا در چاپ فاکتور: ${e.toString().replaceAll('Exception: ', '')}',
+          message: 'خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
         );
       }
@@ -1699,7 +1712,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                       if (mounted) {
                                         SnackBarHelper.show(
                                           context,
-                                          message: 'خطا در افزودن محصول: $e',
+                                          message:
+                                              'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
                                           isError: true,
                                         );
                                       }

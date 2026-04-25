@@ -2612,6 +2612,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Connection error. Please check your internet connection.';
 
   @override
+  String get errorFileUploadFailed => 'File upload failed. Please try again.';
+
+  @override
+  String get errorDataSaveFailed =>
+      'Could not save the data. Please try again.';
+
+  @override
   String get errorSendTimeout => 'Send timeout.';
 
   @override
@@ -2865,6 +2872,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personWebsite => 'Website';
+
+  @override
+  String get personSocialNetworks => 'Messengers and social networks';
+
+  @override
+  String get personSocialPlatform => 'Platform';
+
+  @override
+  String get personSocialValue => 'Username, link or number';
+
+  @override
+  String get personSocialCustomName => 'Custom platform name (for Other)';
+
+  @override
+  String get addPersonSocialRow => 'Add contact';
+
+  @override
+  String get noPersonSocialRows => 'No messenger or social entry yet.';
 
   @override
   String get personBankAccounts => 'Bank Accounts';

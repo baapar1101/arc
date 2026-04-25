@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -183,7 +184,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       // بارگذاری پیش‌نمایش لوگو و مهر در صورت وجود
       await _loadBrandingImages(resp);
     } catch (e) {
-      _error = e.toString();
+      _error = mounted ? ErrorExtractor.forContext(e, context) : ErrorExtractor.userMessage(e);
     } finally {
       if (mounted) {
         setState(() {
@@ -222,7 +223,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         _loadingCurrencies = false;
       });
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری ارزها: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بارگذاری ارزها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -373,11 +377,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         throw Exception(resp.data['message'] ?? 'خطا در ذخیره تغییرات');
       }
     } catch (e) {
+      final msg = ErrorExtractor.forContext(e, context);
       setState(() {
-        _error = e.toString();
+        _error = msg;
       });
       if (mounted) {
-        SnackBarHelper.showError(context, message: _error!);
+        SnackBarHelper.showError(context, message: msg);
       }
     } finally {
       if (mounted) {
@@ -449,7 +454,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در آپلود لوگو: $e');
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) {
@@ -485,7 +490,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در آپلود مهر/امضا: $e');
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) {
@@ -544,7 +549,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       }
     }
 
-    var errorMessage = 'خطا در آپلود فایل';
+    var errorMessage = ErrorExtractor.forContext(e, context);
     final response = e.response;
     if (response?.data is Map) {
       final data = response!.data as Map<String, dynamic>;
@@ -1726,7 +1731,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       if (!mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'خطا در ثبت بهای قطعی: $e',
+        message: 'خطا در ثبت بهای قطعی: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       if (mounted) {
@@ -1776,7 +1781,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       if (!mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'خطا در به‌روزرسانی سود فاکتورها: $e',
+        message: 'خطا در به‌روزرسانی سود فاکتورها: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       if (mounted) {

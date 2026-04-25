@@ -7,6 +7,7 @@ import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../models/person_model.dart';
@@ -185,7 +186,10 @@ class _ProjectFormDialogState extends State<ProjectFormDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) {
         setState(() {

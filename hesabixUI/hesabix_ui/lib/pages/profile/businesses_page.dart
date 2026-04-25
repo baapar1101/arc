@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../models/business_user_model.dart';
 import '../../core/auth_store.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -115,11 +116,16 @@ class _BusinessesPageState extends State<BusinessesPage> {
       }
     } catch (e) {
       if (mounted) {
+        final err = ErrorExtractor.forContext(e, context);
         setState(() {
           _loading = false;
-          _error = e.toString();
+          _error = err;
         });
-        SnackBarHelper.showError(context, message: '${AppLocalizations.of(context).dataLoadingError}: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              '${AppLocalizations.of(context).dataLoadingError}: $err',
+        );
       }
     }
   }
@@ -163,7 +169,11 @@ class _BusinessesPageState extends State<BusinessesPage> {
         setState(() {
           _isLoadingMore = false;
         });
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری صفحات بعدی: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در بارگذاری صفحات بعدی: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -996,11 +1006,12 @@ class _BusinessCardState extends State<_BusinessCard> {
   }
 
   Future<void> _handleRestore(BuildContext context) async {
-    final t = AppLocalizations.of(context);
-    
+    final pageContext = context;
+    final t = AppLocalizations.of(pageContext);
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('بازیابی کسب و کار'),
         content: Text(
@@ -1032,22 +1043,21 @@ class _BusinessCardState extends State<_BusinessCard> {
     try {
       await BusinessApiService.restoreBusiness(widget.business.id);
 
-      if (mounted) {
-        SnackBarHelper.showSuccess(
-          context,
-          message: 'کسب و کار با موفقیت بازیابی شد',
-        );
-        
-        // Refresh businesses list
-        widget.onLeave?.call();
-      }
+      if (!pageContext.mounted) return;
+      SnackBarHelper.showSuccess(
+        pageContext,
+        message: 'کسب و کار با موفقیت بازیابی شد',
+      );
+
+      // Refresh businesses list
+      widget.onLeave?.call();
     } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: 'خطا در بازیابی کسب و کار: $e',
-        );
-      }
+      if (!pageContext.mounted) return;
+      SnackBarHelper.showError(
+        pageContext,
+        message:
+            'خطا در بازیابی کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -1058,11 +1068,12 @@ class _BusinessCardState extends State<_BusinessCard> {
   }
 
   Future<void> _handleLeave(BuildContext context) async {
-    final t = AppLocalizations.of(context);
-    
+    final pageContext = context;
+    final t = AppLocalizations.of(pageContext);
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('خروج از کسب و کار'),
         content: Text(
@@ -1095,35 +1106,35 @@ class _BusinessCardState extends State<_BusinessCard> {
       final request = LeaveBusinessRequest(businessId: widget.business.id);
       final response = await _userService.leaveBusiness(request);
 
-      if (response.success && mounted) {
+      if (response.success) {
+        if (!pageContext.mounted) return;
         SnackBarHelper.showSuccess(
-          context,
+          pageContext,
           message: response.message,
         );
-        
+
         // Clear current business if it's the one we're leaving
         if (widget.authStore.currentBusiness?.id == widget.business.id) {
           await widget.authStore.clearCurrentBusiness();
         }
-        
-        // Refresh businesses list immediately to remove the business from the list
-        if (mounted) {
-          // Trigger refresh in parent to reload the list
-          widget.onLeave?.call();
-        }
-      } else if (mounted) {
+
+        if (!pageContext.mounted) return;
+        // Trigger refresh in parent to reload the list
+        widget.onLeave?.call();
+      } else {
+        if (!pageContext.mounted) return;
         SnackBarHelper.showError(
-          context,
+          pageContext,
           message: response.message,
         );
       }
     } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: 'خطا در خروج از کسب و کار: $e',
-        );
-      }
+      if (!pageContext.mounted) return;
+      SnackBarHelper.showError(
+        pageContext,
+        message:
+            'خطا در خروج از کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
+      );
     } finally {
       if (mounted) {
         setState(() {

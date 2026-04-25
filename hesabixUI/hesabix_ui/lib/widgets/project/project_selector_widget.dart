@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
 
 /// ویجت انتخاب پروژه (کمبوباکس)
@@ -65,7 +66,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
           _loading = false;
         });
       }

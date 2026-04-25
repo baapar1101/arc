@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_extractor.dart';
 import 'package:flutter/services.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
@@ -452,7 +453,9 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('${AppLocalizations.of(context).workflowErrorDisplay}: ${e.toString()}'),
+            Text(
+              '${AppLocalizations.of(context).workflowErrorDisplay}: ${ErrorExtractor.forContext(e, context)}',
+            ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () {

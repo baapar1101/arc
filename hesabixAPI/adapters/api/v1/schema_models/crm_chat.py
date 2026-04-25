@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CrmChatWidgetCreate(BaseModel):
@@ -41,7 +41,20 @@ class CrmChatVisitorMessageCreate(BaseModel):
 
 
 class CrmChatAgentMessageCreate(BaseModel):
-	body: str = Field(..., min_length=1, max_length=8000)
+	body: Optional[str] = Field(None, max_length=8000)
+	file_storage_id: Optional[str] = Field(
+		None,
+		max_length=36,
+		description="پس از آپلود در فضای کسب‌وکار با module crm_web_chat",
+	)
+
+	@model_validator(mode="after")
+	def body_or_file(self) -> "CrmChatAgentMessageCreate":
+		b = (self.body or "").strip()
+		f = (self.file_storage_id or "").strip() or None
+		if not b and not f:
+			raise ValueError("متن پیام یا فایل (file_storage_id) الزامی است")
+		return self
 
 
 class CrmChatConversationPatch(BaseModel):
@@ -49,3 +62,7 @@ class CrmChatConversationPatch(BaseModel):
 	assigned_to_user_id: Optional[int] = Field(None, ge=1)
 	lead_id: Optional[int] = Field(None, ge=1)
 	person_id: Optional[int] = Field(None, ge=1)
+
+
+class BusinessCrmSettingsUpdate(BaseModel):
+	allow_web_chat_file_upload: bool = Field(..., description="ارسال فایل توسط بازدیدکننده در چت وب")

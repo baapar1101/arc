@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// Widget برای کمک AI در پاسخ به تیکت‌های پشتیبانی
@@ -65,11 +66,14 @@ class _AITicketAssistantState extends State<AITicketAssistant>
       // پیشنهاد تنها هنگام فشردن دکمهٔ «استفاده از این پاسخ» به فیلد منتقل می‌شود
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _suggesting = false;
       });
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در دریافت پیشنهاد: $e');
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در دریافت پیشنهاد: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -125,11 +129,14 @@ class _AITicketAssistantState extends State<AITicketAssistant>
         }
       } catch (e) {
         setState(() {
-          _error = '$e';
+          _error = ErrorExtractor.forContext(e, context);
           _autoReplying = false;
         });
         if (mounted) {
-          SnackBarHelper.show(context, message: 'خطا در ارسال پاسخ: $e');
+          SnackBarHelper.show(
+            context,
+            message: 'خطا در ارسال پاسخ: ${ErrorExtractor.forContext(e, context)}',
+          );
         }
       }
     }

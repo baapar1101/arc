@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/admin_wallet_payouts_service.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
@@ -155,7 +156,10 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '$e');
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
     }
   }
 
@@ -416,7 +420,10 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     if (ctx.mounted) Navigator.of(ctx).pop(true);
                                   } catch (e) {
                                     if (!mounted) return;
-                                    SnackBarHelper.showError(context, message: '$e');
+                                    SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
                                   }
                                 },
                                 icon: const Icon(Icons.check_circle_outline),

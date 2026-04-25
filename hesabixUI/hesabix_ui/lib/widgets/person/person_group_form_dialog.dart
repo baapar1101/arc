@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/person_group_model.dart';
 import '../../models/person_model.dart';
 import '../../services/person_group_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// ایجاد یا ویرایش گروه اشخاص + مقادیر پیش‌فرض (فقط فیلدهای غیرخالی ذخیره می‌شوند)
 class PersonGroupFormDialog extends StatefulWidget {
@@ -209,7 +210,11 @@ class _PersonGroupFormDialogState extends State<PersonGroupFormDialog> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

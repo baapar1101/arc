@@ -3,6 +3,7 @@ import '../../../services/repair_shop_service.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
 
@@ -93,7 +94,11 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در ثبت سفارش: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در ثبت سفارش: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {

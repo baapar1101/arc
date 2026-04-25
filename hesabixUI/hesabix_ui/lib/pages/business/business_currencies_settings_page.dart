@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'dart:ui' as ui;
@@ -72,11 +73,14 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری ارزها: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بارگذاری ارزها: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -96,7 +100,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     }
   }
@@ -166,7 +173,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     }
   }
@@ -221,7 +231,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: e.toString());
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     } finally {
       if (mounted) {

@@ -27,6 +27,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
 
@@ -260,7 +261,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 debugPrint('خطا در افزودن نود: $e');
                 debugPrint('StackTrace: $stackTrace');
                 if (mounted) {
-                  SnackBarHelper.showError(context, message: '${t.workflowErrorAddNode}: ${e.toString()}');
+                  SnackBarHelper.showError(
+                    context,
+                    message:
+                        '${t.workflowErrorAddNode}: ${ErrorExtractor.forContext(e, context)}',
+                  );
                 }
               }
             },
@@ -1160,7 +1165,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       debugPrint('خطا در ذخیره template: $e');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // بستن loading indicator
-        SnackBarHelper.showError(context, message: '${t.workflowErrorSaveTemplate}: ${e.toString()}');
+        SnackBarHelper.showError(
+          context,
+          message:
+              '${t.workflowErrorSaveTemplate}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -1230,7 +1239,11 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         if (loadingOpen) {
           rootNav.pop();
         }
-        SnackBarHelper.show(context, message: '${t.workflowErrorLoadTemplate}: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              '${t.workflowErrorLoadTemplate}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

@@ -195,6 +195,7 @@ import 'pages/business/crm/crm_activities_page.dart';
 import 'pages/business/crm/crm_reports_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
 import 'pages/business/crm/crm_web_chat_page.dart';
+import 'pages/business/crm/business_crm_settings_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -2059,6 +2060,7 @@ class _MyAppState extends State<MyApp> {
                   child: CrmWebChatPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                    apiClient: ApiClient(),
                   ),
                 );
               },
@@ -2824,6 +2826,25 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: CreditSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/crm',
+              name: 'business_settings_crm',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.canReadSection('crm')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: BusinessCrmSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
                 );
               },
             ),

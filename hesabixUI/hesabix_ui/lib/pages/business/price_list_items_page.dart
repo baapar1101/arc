@@ -6,6 +6,7 @@ import '../../core/auth_store.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/api_datetime_display.dart';
 
@@ -44,7 +45,10 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
       _items = await _svc.listItems(businessId: widget.businessId, priceListId: widget.priceListId);
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

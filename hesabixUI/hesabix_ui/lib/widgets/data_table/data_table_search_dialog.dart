@@ -8,6 +8,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/services/category_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// Dialog for column search
 class DataTableSearchDialog extends StatefulWidget {
@@ -827,7 +828,7 @@ class _CategoryTreeFilterWidgetState extends State<_CategoryTreeFilterWidget> {
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     }
   }

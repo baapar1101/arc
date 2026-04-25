@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class InstallmentPlansPage extends StatefulWidget {
   final int businessId;
@@ -40,7 +41,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
       setState(() {
@@ -411,7 +412,7 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
       SnackBarHelper.showSuccess(context, message: 'طرح اقساط با موفقیت ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -11,6 +11,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
@@ -256,7 +257,11 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
       if (mounted) SnackBarHelper.show(context, message: msg, isError: true);
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).crmNotesErrorSaving}: $e', isError: true);
+        SnackBarHelper.show(
+          context,
+          message: '${AppLocalizations.of(context).crmNotesErrorSaving}: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
     }
   }
@@ -323,7 +328,11 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
       widget.onSaved();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: '${t.crmNotesErrorSaving}: $e', isError: true);
+      SnackBarHelper.show(
+      context,
+      message: '${t.crmNotesErrorSaving}: ${ErrorExtractor.forContext(e, context)}',
+      isError: true,
+    );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -369,7 +378,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
       Navigator.pop(context);
       widget.onSaved();
     } catch (e) {
-      SnackBarHelper.show(context, message: '$e', isError: true);
+      SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
     }
   }
 
@@ -394,7 +403,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
         }
       });
     } catch (e) {
-      SnackBarHelper.show(context, message: '$e', isError: true);
+      SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
     }
   }
 

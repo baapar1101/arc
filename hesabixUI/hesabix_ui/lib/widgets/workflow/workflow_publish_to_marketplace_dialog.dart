@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_marketplace_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// دیالوگ انتشار ورک‌فلو در مخزن
@@ -72,7 +73,10 @@ class _WorkflowPublishToMarketplaceDialogState extends State<WorkflowPublishToMa
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.workflowMarketplaceError}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -15,6 +15,7 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/invoice_warehouse_bulk_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
@@ -1570,8 +1571,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     } catch (e) {
       if (!mounted) return;
       rootNavigator.pop();
-      final message = e is Exception ? e.toString() : 'خطا در حذف فاکتورها';
-      SnackBarHelper.showError(context, message: message);
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
     }
   }
 
@@ -1801,7 +1804,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     } catch (e) {
       if (!mounted) return;
       rootNav.pop();
-      SnackBarHelper.showError(context, message: 'خطا در عملیات انبار: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در عملیات انبار: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -1837,7 +1843,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در دریافت اطلاعات: ${ErrorExtractor.forContext(e, context)}',
+      );
       return;
     }
     
@@ -2051,7 +2060,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.deleteInvoiceErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(
+        context,
+        message: t.deleteInvoiceErrorWithMessage(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 
@@ -2117,7 +2131,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxAddToWorkspaceErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(
+        context,
+        message: t.taxAddToWorkspaceErrorWithMessage(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 
@@ -2176,7 +2195,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(e.toString()));
+      SnackBarHelper.showError(
+        context,
+        message: t.taxRemoveFromWorkspaceErrorWithMessage(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 }

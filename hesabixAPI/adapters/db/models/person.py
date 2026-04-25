@@ -93,6 +93,9 @@ class Person(Base):
     business: Mapped["Business"] = relationship("Business", back_populates="persons")
     person_group: Mapped["PersonGroup | None"] = relationship("PersonGroup", back_populates="persons")
     bank_accounts: Mapped[list["PersonBankAccount"]] = relationship("PersonBankAccount", back_populates="person", cascade="all, delete-orphan")
+    social_contacts: Mapped[list["PersonSocialContact"]] = relationship(
+        "PersonSocialContact", back_populates="person", cascade="all, delete-orphan"
+    )
     crm_deals: Mapped[list["Deal"]] = relationship("Deal", back_populates="person", foreign_keys="[Deal.person_id]")
     crm_activities: Mapped[list["CrmActivity"]] = relationship("CrmActivity", back_populates="person", cascade="all, delete-orphan")
 
@@ -115,3 +118,27 @@ class PersonBankAccount(Base):
     
     # Relationships
     person: Mapped["Person"] = relationship("Person", back_populates="bank_accounts")
+
+
+class PersonSocialContact(Base):
+    """راه ارتباطی شبکه اجتماعی / پیام‌رسان برای شخص (چندتایی)"""
+
+    __tablename__ = "person_social_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # کلید پلتفرم (مثل telegram, instagram) یا other
+    platform_key: Mapped[str] = mapped_column(String(64), nullable=False, comment="کلید پلتفرم")
+    # در صورت other یا برچسب سفارشی
+    custom_label: Mapped[str | None] = mapped_column(String(128), nullable=True, comment="برچسب سفارشی (مثلاً سایر)")
+    value: Mapped[str] = mapped_column(Text, nullable=False, comment="مقدار: آیدی، لینک، شماره و …")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    person: Mapped["Person"] = relationship("Person", back_populates="social_contacts")

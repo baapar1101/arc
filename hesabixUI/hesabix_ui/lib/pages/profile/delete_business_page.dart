@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/business_api_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class DeleteBusinessPage extends StatefulWidget {
@@ -46,7 +47,11 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دریافت اطلاعات: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -327,7 +332,11 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در حذف کسب و کار: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در حذف کسب و کار: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

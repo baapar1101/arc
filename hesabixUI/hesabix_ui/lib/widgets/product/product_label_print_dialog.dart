@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../data_table/helpers/file_saver.dart';
 import 'label_pdf_preview_embed.dart';
@@ -122,7 +123,9 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
             child: pw.Padding(
               padding: const pw.EdgeInsets.all(24),
               child: pw.Text(
-                shapePdfPersianText('خطا در ساخت فایل PDF.\n$e'),
+                shapePdfPersianText(
+                  'خطا در ساخت فایل PDF.\n${ErrorExtractor.forContext(e, context)}',
+                ),
                 textAlign: pw.TextAlign.center,
                 textDirection: pw.TextDirection.ltr,
               ),
@@ -340,7 +343,10 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
       SnackBarHelper.show(context, message: 'فایل PDF ذخیره شد');
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: 'ذخیره PDF ناموفق: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'ذخیره PDF ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -350,7 +356,10 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
       await Printing.sharePdf(bytes: bytes, filename: 'product-labels.pdf');
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: 'اشتراک‌گذاری ناموفق: $e');
+      SnackBarHelper.showError(
+        context,
+        message: 'اشتراک‌گذاری ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

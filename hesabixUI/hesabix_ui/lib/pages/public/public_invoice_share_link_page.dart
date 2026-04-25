@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -39,27 +40,16 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = _extractError(e);
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.userMessage(e);
         _loading = false;
       });
     }
-  }
-
-  String _extractError(DioException e) {
-    final d = e.response?.data;
-    if (d is Map) {
-      final err = d['error'];
-      if (err is Map) {
-        return (err['message'] ?? err['code'] ?? e.message)?.toString() ?? 'خطا';
-      }
-    }
-    return e.message ?? 'خطا در دریافت اطلاعات';
   }
 
   NumberFormat _num() => NumberFormat('#,##0', 'en_US');

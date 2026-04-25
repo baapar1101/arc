@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth_store.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../person/person_financial_balance_banner.dart';
 
@@ -83,7 +84,11 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
         setState(() {
           _isLoading = false;
         });
-        SnackBarHelper.showError(context, message: 'خطا در دریافت لیست فروشندگان: $e');
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در دریافت لیست فروشندگان: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -145,7 +150,10 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
           }
         });
         _setModalState?.call(() {});
-        SnackBarHelper.showError(context, message: 'خطا در جست‌وجو: $e');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در جست‌وجو: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

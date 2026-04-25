@@ -28,6 +28,7 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class KardexPage extends StatefulWidget {
@@ -236,8 +237,12 @@ class _KardexPageState extends State<KardexPage> {
       final t = AppLocalizations.of(context);
       SnackBarHelper.show(context, message: t.presetSaved);
     } catch (e) {
+      if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: t.presetSaveError('$e'));
+      SnackBarHelper.showError(
+        context,
+        message: t.presetSaveError(ErrorExtractor.forContext(e, context)),
+      );
     }
   }
 
@@ -255,8 +260,12 @@ class _KardexPageState extends State<KardexPage> {
         }
       });
     } catch (e) {
+      if (!mounted) return;
       final t = AppLocalizations.of(context);
-      SnackBarHelper.showError(context, message: t.presetDeleteError('$e'));
+      SnackBarHelper.showError(
+        context,
+        message: t.presetDeleteError(ErrorExtractor.forContext(e, context)),
+      );
     }
   }
 
@@ -309,7 +318,10 @@ class _KardexPageState extends State<KardexPage> {
       if (!context.mounted) return;
       final ctx = context;
       final t = AppLocalizations.of(ctx);
-      SnackBarHelper.showError(ctx, message: t.presetApplyError('$e'));
+      SnackBarHelper.showError(
+        ctx,
+        message: t.presetApplyError(ErrorExtractor.forContext(e, ctx)),
+      );
     }
   }
 

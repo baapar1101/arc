@@ -7,6 +7,7 @@ import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
@@ -410,7 +411,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات پروژه');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دریافت اطلاعات پروژه: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -461,7 +466,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات پروژه: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در دریافت اطلاعات پروژه: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -502,7 +511,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
       _refreshData();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا در حذف پروژه: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در حذف پروژه: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

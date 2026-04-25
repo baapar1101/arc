@@ -10,6 +10,7 @@ import '../../models/bank_account_model.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
 import '../../services/bank_account_service.dart';
 import '../../services/currency_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
 
@@ -346,7 +347,11 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);
-                    SnackBarHelper.showError(context, message: '${t.error}: $e');
+                    SnackBarHelper.showError(
+                    context,
+                    message:
+                        '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+                  );
                   }
                 }
               },
@@ -431,7 +436,11 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: '${t.error}: $e');
+        SnackBarHelper.showError(
+                    context,
+                    message:
+                        '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+                  );
       }
     }
   }

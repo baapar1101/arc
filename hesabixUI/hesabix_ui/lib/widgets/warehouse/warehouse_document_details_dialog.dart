@@ -12,6 +12,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import 'warehouse_postal_label_print_dialog.dart';
+import '../../utils/error_extractor.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -59,7 +60,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       // پیدا کردن حواله مرتبط
       await _loadRelatedDoc(doc);
     } catch (e) {
-      setState(() { _error = e.toString(); });
+      setState(() { _error = ErrorExtractor.forContext(e, context); });
     } finally {
       setState(() { _loading = false; });
     }
@@ -169,7 +170,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       _load();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e');
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -181,7 +182,10 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       _load();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در پست: $e');
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در پست: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -213,7 +217,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e');
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -247,7 +251,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       _load();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e');
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -290,7 +294,10 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در دانلود PDF: $e');
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در دانلود PDF: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 

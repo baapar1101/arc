@@ -10,6 +10,7 @@ from adapters.db.session import Base
 from app.core.settings import get_settings
 import adapters.db.models  # noqa: F401  # Import models to register metadata
 import adapters.db.models.crm_chat  # noqa: F401  # CRM embed chat tables
+import adapters.db.models.business_crm_settings  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/warranty_service.dart';
 import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class PublicWarrantyActivationPage extends StatefulWidget {
@@ -119,7 +120,11 @@ class _PublicWarrantyActivationPageState extends State<PublicWarrantyActivationP
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.showError(context, message: 'خطا در فعال‌سازی گارانتی: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در فعال‌سازی گارانتی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

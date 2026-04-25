@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../core/calendar_controller.dart';
@@ -140,7 +141,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
           _loading = false;
         });
       }
@@ -275,9 +276,14 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
         });
-        SnackBarHelper.show(context, message: 'خطا در به‌روزرسانی سال مالی جاری: $e', isError: true);
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در به‌روزرسانی سال مالی جاری: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
     } finally {
       if (mounted) {

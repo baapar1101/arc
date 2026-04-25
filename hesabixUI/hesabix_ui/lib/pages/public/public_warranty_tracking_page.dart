@@ -4,7 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/warranty_service.dart';
 import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 
@@ -81,7 +81,8 @@ class _PublicWarrantyTrackingPageState extends State<PublicWarrantyTrackingPage>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در رهگیری گارانتی: $e';
+          _error =
+              'خطا در رهگیری گارانتی: ${ErrorExtractor.forContext(e, context)}';
           _loading = false;
         });
       }
@@ -114,7 +115,8 @@ class _PublicWarrantyTrackingPageState extends State<PublicWarrantyTrackingPage>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در رهگیری گارانتی: $e';
+          _error =
+              'خطا در رهگیری گارانتی: ${ErrorExtractor.forContext(e, context)}';
           _loading = false;
         });
       }

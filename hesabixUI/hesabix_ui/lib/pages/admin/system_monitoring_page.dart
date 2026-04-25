@@ -9,6 +9,7 @@ import '../../widgets/loading_indicator.dart';
 import '../../widgets/monitoring/metric_line_chart.dart';
 import '../../widgets/monitoring/metric_gauge.dart';
 import '../../widgets/monitoring/area_chart_widget.dart';
+import '../../utils/error_extractor.dart';
 
 class SystemMonitoringPage extends StatefulWidget {
   const SystemMonitoringPage({super.key});
@@ -175,13 +176,15 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
           _isLoading = false;
         });
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('خطا در بارگذاری داده‌ها: $e'),
+              content: Text(
+                'خطا در بارگذاری داده‌ها: ${ErrorExtractor.forContext(e, context)}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -220,7 +223,9 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
         setState(() => _outboxLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در بارگذاری صف اعلان: $e'),
+            content: Text(
+              'خطا در بارگذاری صف اعلان: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -1048,7 +1053,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                 } catch (e) {
                   if (!context.mounted) return;
                   messenger.showSnackBar(
-                    SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'), backgroundColor: Colors.red),
                   );
                 }
               },
@@ -1170,7 +1175,9 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در restart: $e'),
+            content: Text(
+              'خطا در restart: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );

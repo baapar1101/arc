@@ -18,6 +18,7 @@ import '../../core/api_client.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../services/invoice_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -903,7 +904,10 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       Navigator.pop(context);
       
       // نمایش خطا
-      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/production_settings_service.dart';
+import '../../utils/error_extractor.dart';
 
 class ProductionSettingsDialog extends StatefulWidget {
   final int businessId;
@@ -65,7 +66,8 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _errorMessage = 'خطا در ذخیره تنظیمات: $e';
+        _errorMessage =
+            'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}';
       });
     }
   }

@@ -5093,6 +5093,18 @@ abstract class AppLocalizations {
   /// **'Connection error. Please check your internet connection.'**
   String get errorConnectionError;
 
+  /// No description provided for @errorFileUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'File upload failed. Please try again.'**
+  String get errorFileUploadFailed;
+
+  /// No description provided for @errorDataSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the data. Please try again.'**
+  String get errorDataSaveFailed;
+
   /// No description provided for @errorSendTimeout.
   ///
   /// In en, this message translates to:
@@ -5584,6 +5596,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Website'**
   String get personWebsite;
+
+  /// No description provided for @personSocialNetworks.
+  ///
+  /// In en, this message translates to:
+  /// **'Messengers and social networks'**
+  String get personSocialNetworks;
+
+  /// No description provided for @personSocialPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform'**
+  String get personSocialPlatform;
+
+  /// No description provided for @personSocialValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Username, link or number'**
+  String get personSocialValue;
+
+  /// No description provided for @personSocialCustomName.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom platform name (for Other)'**
+  String get personSocialCustomName;
+
+  /// No description provided for @addPersonSocialRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add contact'**
+  String get addPersonSocialRow;
+
+  /// No description provided for @noPersonSocialRows.
+  ///
+  /// In en, this message translates to:
+  /// **'No messenger or social entry yet.'**
+  String get noPersonSocialRows;
 
   /// No description provided for @personBankAccounts.
   ///

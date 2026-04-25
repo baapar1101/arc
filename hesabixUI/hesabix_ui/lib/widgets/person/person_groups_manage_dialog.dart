@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../models/person_group_model.dart';
 import '../../services/person_group_service.dart';
+import '../../utils/error_extractor.dart';
 import 'person_group_form_dialog.dart';
 
 /// لیست و مدیریت گروه‌های اشخاص
@@ -46,7 +47,7 @@ class _PersonGroupsManageDialogState extends State<PersonGroupsManageDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -82,7 +83,9 @@ class _PersonGroupsManageDialogState extends State<PersonGroupsManageDialog> {
       if (mounted) await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     }
   }

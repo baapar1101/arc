@@ -239,7 +239,10 @@ class _ProductsPageState extends State<ProductsPage> {
       await ProductLabelPrintDialog.show(context, items: labels);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.error}: $e');
+      SnackBarHelper.showError(
+        context,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -641,7 +644,10 @@ class _ProductsPageState extends State<ProductsPage> {
       await _handleProductFileUploadError(dialogContext, e);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(dialogContext, message: 'خطا در آپلود فایل: $e');
+      SnackBarHelper.showError(
+        dialogContext,
+        message: 'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, dialogContext)}',
+      );
     } finally {
       onUploadingChanged(false);
     }
@@ -1512,7 +1518,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     if (!context.mounted) return;
                     SnackBarHelper.showError(
                       context,
-                      message: ErrorExtractor.extractErrorMessage(e),
+                      message: ErrorExtractor.forContext(e, context),
                     );
                   }
                 },
@@ -1574,7 +1580,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       if (!context.mounted) return;
                       SnackBarHelper.showError(
                         context,
-                        message: ErrorExtractor.extractErrorMessage(e),
+                        message: ErrorExtractor.forContext(e, context),
                       );
                     }
                   },
@@ -1625,7 +1631,10 @@ class _ProductsPageState extends State<ProductsPage> {
                       );
                     } catch (e) {
                       if (!context.mounted) return;
-                      SnackBarHelper.showError(context, message: '${t.error}: $e');
+                      SnackBarHelper.showError(
+        context,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
                     }
                   },
                   icon: const Icon(Icons.warehouse_outlined),
@@ -1820,7 +1829,10 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
         setState(() {
           _stockLoading = false;
         });
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری موجودی: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در بارگذاری موجودی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

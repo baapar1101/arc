@@ -3,6 +3,7 @@ import '../../models/customer_model.dart';
 import '../../services/customer_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 
 class CustomerPickerWidget extends StatefulWidget {
   final Customer? selectedCustomer;
@@ -77,8 +78,9 @@ class _CustomerPickerWidgetState extends State<CustomerPickerWidget> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = ErrorExtractor.forContext(e, context);
         _customers.clear();
         _hasSearched = true;
         _isLoading = false;

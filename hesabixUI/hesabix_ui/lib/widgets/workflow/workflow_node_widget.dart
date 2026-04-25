@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/workflow_editor_models.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/workflow_constants.dart';
 
 /// Widget برای نمایش یک node در workflow
@@ -454,7 +455,7 @@ class WorkflowNodeWidget extends StatelessWidget {
         color: Colors.red.withOpacity(0.2),
         child: Center(
           child: Text(
-            'خطا: ${e.toString()}',
+            'خطا: ${ErrorExtractor.forContext(e, context)}',
             style: const TextStyle(color: Colors.red, fontSize: 10),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,

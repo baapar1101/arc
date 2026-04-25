@@ -7,6 +7,7 @@ import '../../core/calendar_controller.dart';
 import '../../services/warranty_service.dart';
 import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -558,7 +559,11 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در حذف کد گارانتی: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در حذف کد گارانتی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -676,7 +681,10 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در حذف گروهی: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

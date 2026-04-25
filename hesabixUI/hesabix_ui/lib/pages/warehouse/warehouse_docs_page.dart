@@ -13,6 +13,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../models/warehouse_document_model.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/error_extractor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -116,7 +117,9 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در بارگذاری حواله: $e'),
+            content: Text(
+              'خطا در بارگذاری حواله: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -177,7 +180,11 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       dismissLoader();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دریافت فاکتور: $e')),
+        SnackBar(
+          content: Text(
+            'خطا در دریافت فاکتور: ${ErrorExtractor.forContext(e, context)}',
+          ),
+        ),
       );
     } finally {
       dismissLoader();
@@ -275,7 +282,11 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دانلود PDF: $e')),
+        SnackBar(
+          content: Text(
+            'خطا در دانلود PDF: ${ErrorExtractor.forContext(e, context)}',
+          ),
+        ),
       );
     }
   }
@@ -314,7 +325,11 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.operationFailed}: $e')),
+        SnackBar(
+          content: Text(
+            '${t.operationFailed}: ${ErrorExtractor.forContext(e, context)}',
+          ),
+        ),
       );
     }
   }
@@ -364,7 +379,11 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       _refreshTable();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
+      SnackBarHelper.show(
+        context,
+        message:
+            '${t.operationFailed}: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -479,7 +498,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                     } catch (e) {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('خطا: $e')),
+                        SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
                       );
                     }
                   } else {

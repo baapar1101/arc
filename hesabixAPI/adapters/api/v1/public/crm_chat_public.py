@@ -2,9 +2,11 @@
 """API عمومی چت وب CRM (بدون ورود Hesabix؛ فقط با public_key ویجت و توکن بازدیدکننده)."""
 from __future__ import annotations
 
+import io
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.crm_chat import (
@@ -82,4 +84,51 @@ async def public_list_messages(
 	return success_response(
 		data={"items": [format_datetime_fields(x, request) for x in items]},
 		request=request,
+	)
+
+
+@router.post("/api/v1/public/crm-chat/messages/file")
+async def public_post_message_file(
+	request: Request,
+	visitor_token: str = Form(..., min_length=16),
+	conversation_id: int = Form(..., gt=0),
+	caption: str = Form(""),
+	file: UploadFile = File(...),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""ارسال فایل توسط بازدیدکننده (پس از فعال‌سازی در تنظیمات CRM کسب‌وکار)."""
+	try:
+		msg = await chat_svc.post_visitor_file(
+			db,
+			visitor_token=visitor_token,
+			conversation_id=conversation_id,
+			caption=(caption or "").strip() or None,
+			upload=file,
+			origin_header=_origin(request),
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(data=format_datetime_fields(msg, request), request=request, message="فایل ثبت شد")
+
+
+@router.get("/api/v1/public/crm-chat/conversations/{conversation_id}/files/{file_id}/download")
+async def public_download_crm_file(
+	request: Request,
+	conversation_id: int,
+	file_id: str,
+	visitor_token: str = Query(..., min_length=16),
+	db: Session = Depends(get_db),
+):
+	"""دانلود فایل ضمیمه برای بازدیدکننده (همان مکالمه)."""
+	try:
+		data = await chat_svc.download_visitor_crm_file(
+			db, visitor_token=visitor_token, conversation_id=conversation_id, file_id=file_id
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	filename = data.get("filename") or "file"
+	return StreamingResponse(
+		io.BytesIO(data["content"]),
+		media_type=data.get("mime_type") or "application/octet-stream",
+		headers={"Content-Disposition": f'attachment; filename="{filename}"'},
 	)

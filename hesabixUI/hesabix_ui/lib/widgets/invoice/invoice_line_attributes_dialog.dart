@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
 import '../date_input_field.dart';
 import '../../core/calendar_controller.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/product_attribute_service.dart';
 
@@ -290,7 +291,11 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
   } catch (e) {
     _invoiceLineAttrsDialogLog('search FAILED error=$e');
     if (context.mounted) {
-      SnackBarHelper.showError(context, message: 'خطا در بارگذاری ویژگی‌ها: $e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در بارگذاری ویژگی‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
     return null;
   }

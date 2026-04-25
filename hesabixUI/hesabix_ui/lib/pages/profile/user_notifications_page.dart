@@ -11,6 +11,7 @@ import '../../core/date_utils.dart';
 import '../../services/notifications_service.dart';
 import '../../services/telegram_integration_service.dart';
 import '../../services/bale_integration_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class UserNotificationsPage extends StatefulWidget {
@@ -118,7 +119,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -317,7 +318,12 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       if (!mounted) return;
       setState(() => _telegramConnecting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.notificationsTelegramConnectionError}\n$e')),
+        SnackBar(
+          content: Text(
+            '${t.notificationsTelegramConnectionError}\n'
+            '${ErrorExtractor.forContext(e, context)}',
+          ),
+        ),
       );
     }
   }
@@ -486,7 +492,12 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       if (!mounted) return;
       setState(() => _telegramLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.notificationsTelegramDisconnectError}\n$e')),
+        SnackBar(
+          content: Text(
+            '${t.notificationsTelegramDisconnectError}\n'
+            '${ErrorExtractor.forContext(e, context)}',
+          ),
+        ),
       );
     }
   }
@@ -505,7 +516,11 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.notificationsSaveError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsSaveError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -1280,7 +1295,11 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _baleConnecting = false);
-      SnackBarHelper.showError(context, message: '${t.notificationsBaleConnectionError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsBaleConnectionError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -1375,7 +1394,11 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       SnackBarHelper.show(context, message: t.notificationsBaleDisconnectSuccess);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: '${t.notificationsBaleDisconnectError}\n$e');
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.notificationsBaleDisconnectError}\n${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _baleLoading = false);
     }

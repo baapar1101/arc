@@ -4,6 +4,7 @@ import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/date_formatters.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class PriceListsPage extends StatefulWidget {
@@ -50,7 +51,11 @@ class _PriceListsPageState extends State<PriceListsPage> {
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در بارگذاری لیست‌ها: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            'خطا در بارگذاری لیست‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -278,7 +283,11 @@ class _PriceListsPageState extends State<PriceListsPage> {
                 SnackBarHelper.show(ctx, message: 'لیست قیمت با موفقیت ایجاد شد');
               } catch (e) {
                 if (!ctx.mounted) return;
-                SnackBarHelper.show(ctx, message: 'خطا در ایجاد لیست قیمت: $e');
+                SnackBarHelper.show(
+                ctx,
+                message:
+                    'خطا در ایجاد لیست قیمت: ${ErrorExtractor.forContext(e, ctx)}',
+              );
               }
             },
             child: const Text('ایجاد'),
@@ -348,7 +357,11 @@ class _PriceListsPageState extends State<PriceListsPage> {
                 SnackBarHelper.show(ctx, message: 'لیست قیمت با موفقیت بروزرسانی شد');
               } catch (e) {
                 if (!ctx.mounted) return;
-                SnackBarHelper.show(ctx, message: 'خطا در ویرایش لیست قیمت: $e');
+                SnackBarHelper.show(
+                ctx,
+                message:
+                    'خطا در ویرایش لیست قیمت: ${ErrorExtractor.forContext(e, ctx)}',
+              );
               }
             },
             child: const Text('ذخیره'),
@@ -433,7 +446,11 @@ class _PriceListsPageState extends State<PriceListsPage> {
         }
       } catch (e) {
         if (!ctx.mounted) return;
-        SnackBarHelper.show(ctx, message: 'خطا در حذف لیست قیمت: $e');
+        SnackBarHelper.show(
+        ctx,
+        message:
+            'خطا در حذف لیست قیمت: ${ErrorExtractor.forContext(e, ctx)}',
+      );
       }
     }
   }

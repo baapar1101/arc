@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -73,7 +74,11 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingPerformance = false);
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadAnalytics}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${AppLocalizations.of(context).workflowErrorLoadAnalytics}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -95,7 +100,11 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingErrors = false);
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadErrorStats}: $e');
+        SnackBarHelper.show(
+        context,
+        message:
+            '${AppLocalizations.of(context).workflowErrorLoadErrorStats}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }

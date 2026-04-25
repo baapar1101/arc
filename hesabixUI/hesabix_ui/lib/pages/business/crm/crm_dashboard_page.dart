@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -61,10 +62,14 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 

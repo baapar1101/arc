@@ -8,6 +8,7 @@ import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 
 class OperatorTicketsPage extends StatefulWidget {
@@ -181,7 +182,11 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطا در ذخیره فیلتر: ${e.toString()}')),
+            SnackBar(
+              content: Text(
+                'خطا در ذخیره فیلتر: ${ErrorExtractor.forContext(e, context)}',
+              ),
+            ),
           );
         }
       }
@@ -257,7 +262,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در تخصیص تیکت‌ها: ${e.toString()}'),
+            content: Text(
+              'خطا در تخصیص تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -306,7 +313,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در تغییر وضعیت تیکت‌ها: ${e.toString()}'),
+            content: Text(
+              'خطا در تغییر وضعیت تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -383,10 +392,12 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطا در حذف تیکت: ${e.toString()}'),
+          content: Text(
+            'خطا در حذف تیکت: ${ErrorExtractor.forContext(e, context)}',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -505,7 +516,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطا در حذف تیکت‌ها: ${e.toString()}'),
+          content: Text(
+            'خطا در حذف تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
+          ),
           backgroundColor: Colors.red,
         ),
       );

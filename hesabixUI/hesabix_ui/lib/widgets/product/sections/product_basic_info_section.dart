@@ -12,6 +12,7 @@ import '../../../controllers/product_form_controller.dart';
 import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
 import '../../../utils/image_cache.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
 
@@ -744,7 +745,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
     } catch (e) {
       // خطای عمومی
       if (context.mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در انتخاب فایل: ${e.toString()}');
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در انتخاب فایل: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }

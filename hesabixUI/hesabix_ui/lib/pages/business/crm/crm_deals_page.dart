@@ -22,6 +22,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه لیست فرصت‌های فروش CRM
 class CrmDealsPage extends StatefulWidget {
@@ -151,10 +152,14 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 
@@ -202,7 +207,11 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
       SnackBarHelper.show(context, message: 'فایل deals.csv ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا در صادرات: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در صادرات: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 
@@ -657,7 +666,7 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
       _load(resetPage: true);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 }
@@ -819,7 +828,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingProbability = false);
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 
@@ -1299,7 +1308,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
       SnackBarHelper.show(context, message: 'ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1331,7 +1340,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
       SnackBarHelper.show(context, message: 'معامله بسته شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

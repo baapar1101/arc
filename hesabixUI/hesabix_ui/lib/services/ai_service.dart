@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
+import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
 
 // Enable debug prints
@@ -335,7 +336,7 @@ class AIService {
     } catch (e, stack) {
       debugPrint('[AIService] Streaming error: $e');
       debugPrintStack(stackTrace: stack);
-      onError?.call(e.toString());
+      onError?.call(ErrorExtractor.userMessage(e));
       rethrow;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -40,7 +41,7 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -167,7 +168,7 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                             } catch (e) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطا: $e')),
+                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
                               );
                             }
                           },
@@ -332,7 +333,7 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                                           } catch (e) {
                                             if (mounted) {
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('خطا: $e')),
+                                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
                                               );
                                             }
                                           }

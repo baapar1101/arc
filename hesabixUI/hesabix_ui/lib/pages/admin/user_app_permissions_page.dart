@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class UserAppPermissionsPage extends StatefulWidget {
   final int userId;
@@ -66,7 +67,9 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
         final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${t.errorLoadingSettings}: $e'),
+            content: Text(
+              '${t.errorLoadingSettings}: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -95,7 +98,9 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
         final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${t.errorSavingSettings}: $e'),
+            content: Text(
+              '${t.errorSavingSettings}: ${ErrorExtractor.forContext(e, context)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );

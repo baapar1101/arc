@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Callable
+from typing import Any, Dict, List, Callable, Optional
 from datetime import datetime, date, timedelta
 
 from sqlalchemy.orm import Session
@@ -255,6 +255,21 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
             "xl": {"colSpan": 4, "rowSpan": 2},
         },
         "cache_ttl": 60,
+    },
+    {
+        "key": "quick_links",
+        "title": "دسترسی سریع",
+        "icon": "dashboard_customize",
+        "version": 1,
+        "permissions_required": [],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 6, "rowSpan": 2},
+            "md": {"colSpan": 4, "rowSpan": 2},
+            "lg": {"colSpan": 4, "rowSpan": 2},
+            "xl": {"colSpan": 4, "rowSpan": 2},
+        },
+        "cache_ttl": 10,
     },
 ]
 
@@ -1002,15 +1017,34 @@ def get_widgets_batch_data(
     widget_keys: List[str],
     filters: Dict[str, Any],
     calendar_type: str = "gregorian",
+    auth_ctx: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Returns a map: { widget_key: data or error } for requested widget_keys.
     calendar_type: "jalali" or "gregorian" - used for date calculations in check widgets
+    auth_ctx: برای ویجت‌هایی مثل quick_links که به مجوز نیاز دارند
     """
+    from adapters.db.models.user import User
+    from app.core.auth_dependency import AuthContext
+    from app.services.business_quick_links_service import build_quick_links_widget_data
+
     result: Dict[str, Any] = {}
     filters_with_calendar = dict(filters or {})
     filters_with_calendar["calendar_type"] = calendar_type
     for key in widget_keys:
+        if key == "quick_links":
+            ctx = auth_ctx
+            if ctx is None:
+                u = db.get(User, user_id)
+                if u is None:
+                    result[key] = {"error": "NO_USER"}
+                    continue
+                ctx = AuthContext(user=u, api_key_id=0, business_id=business_id, db=db)
+            try:
+                result[key] = build_quick_links_widget_data(db, business_id, user_id, ctx)
+            except Exception as ex:
+                result[key] = {"error": str(ex)}
+            continue
         resolver = WIDGET_RESOLVERS.get(key)
         if not resolver:
             result[key] = {"error": "UNKNOWN_WIDGET"}

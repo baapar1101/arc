@@ -33,6 +33,9 @@ class ApiClient {
     _currentLocale = locale;
   }
 
+  /// For user-facing error messages when [BuildContext] is unavailable.
+  static Locale? get currentLocale => _currentLocale;
+
   static void bindAuthStore(AuthStore store) {
     _authStore = store;
   }

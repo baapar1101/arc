@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 /// صفحه لیست فعالیت‌های CRM
 class CrmActivitiesPage extends StatefulWidget {
@@ -108,10 +109,14 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(context, message: 'خطا در بارگذاری: $e', isError: true);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
     }
   }
 
@@ -341,7 +346,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 }
@@ -673,7 +678,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingSuggest = false);
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     }
   }
 
@@ -718,7 +723,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
       SnackBarHelper.show(context, message: 'ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'خطا: $e', isError: true);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

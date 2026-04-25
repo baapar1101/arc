@@ -8,6 +8,7 @@ import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
@@ -68,9 +69,11 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = e.toString();
+          _error = ErrorExtractor.forContext(e, context);
         });
-        _showErrorSnackBar('${AppLocalizations.of(context).dataLoadingError}: $e');
+        _showErrorSnackBar(
+          '${AppLocalizations.of(context).dataLoadingError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -118,7 +121,9 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       }
     } catch (e) {
       if (!ctx.mounted) return;
-      _showErrorSnackBar('${AppLocalizations.of(ctx).userAddFailed}: $e');
+      _showErrorSnackBar(
+        '${AppLocalizations.of(ctx).userAddFailed}: ${ErrorExtractor.forContext(e, ctx)}',
+      );
     }
   }
 
@@ -174,7 +179,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         _showErrorSnackBar(response.message);
       }
     } catch (e) {
-      _showErrorSnackBar('${t.userRemoveFailed}: $e');
+      _showErrorSnackBar('${t.userRemoveFailed}: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -785,7 +790,9 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('خطا در بارگذاری دسترسی‌ها: $e');
+        _showErrorSnackBar(
+        'خطا در بارگذاری دسترسی‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     }
   }
@@ -890,7 +897,9 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('خطا در خروج از کسب و کار: $e');
+        _showErrorSnackBar(
+        'خطا در خروج از کسب و کار: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -1230,7 +1239,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('خطا در به‌روزرسانی دسترسی‌ها: $e');
+        _showErrorSnackBar(
+        'خطا در به‌روزرسانی دسترسی‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

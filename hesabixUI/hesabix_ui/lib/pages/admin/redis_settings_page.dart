@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 class RedisSettingsPage extends StatefulWidget {
@@ -71,9 +72,14 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
       if (mounted) {
         final t = AppLocalizations.of(context);
         setState(() {
-          _error = 'خطا در بارگذاری تنظیمات: $e';
+          _error =
+              'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}';
         });
-        SnackBarHelper.showError(context, message: '${t.errorLoadingSettings}: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            '${t.errorLoadingSettings}: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -140,9 +146,14 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در ذخیره تنظیمات: $e';
+          _error =
+              'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}';
         });
-        SnackBarHelper.showError(context, message: 'خطا در ذخیره تنظیمات: $e');
+        SnackBarHelper.showError(
+        context,
+        message:
+            'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {
@@ -185,9 +196,13 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا در تست اتصال: $e';
+          _error =
+              'خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}';
         });
-        SnackBarHelper.showError(context, message: 'خطا در تست اتصال: $e');
+        SnackBarHelper.showError(
+        context,
+        message: 'خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}',
+      );
       }
     } finally {
       if (mounted) {

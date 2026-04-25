@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// جستجو و انتخاب سرنخ (مشترک بین یادداشت CRM، فعالیت و …).
@@ -55,7 +56,7 @@ class _CrmLeadPickerDialogState extends State<_CrmLeadPickerDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        SnackBarHelper.show(context, message: '$e', isError: true);
+        SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
       }
     }
   }

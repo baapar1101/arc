@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 
 class ShareLinkSettingsPage extends StatefulWidget {
   const ShareLinkSettingsPage({super.key});
@@ -36,7 +36,9 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
       final data = await _service.getShareLinkSettings();
       _urlController.text = (data['public_app_url'] ?? '').toString();
     } catch (e) {
-      _error = '$e';
+      if (mounted) {
+        _error = ErrorExtractor.forContext(e, context);
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -57,7 +59,12 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در ذخیره: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

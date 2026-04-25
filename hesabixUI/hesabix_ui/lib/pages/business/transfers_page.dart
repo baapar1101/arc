@@ -20,6 +20,7 @@ import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/petty_cash_combobox_widget.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -985,7 +986,7 @@ class _TransfersPageState extends State<TransfersPage> {
         _refreshData();
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا: $e');
+          SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
         }
       }
     }

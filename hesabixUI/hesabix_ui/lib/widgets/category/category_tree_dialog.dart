@@ -4,6 +4,7 @@ import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/responsive_helper.dart';
 import 'category_picker_field.dart';
@@ -53,7 +54,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = ErrorExtractor.forContext(e, context);
       });
     }
   }
@@ -710,7 +711,9 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         final loc = AppLocalizations.of(context);
         setState(() {
           _loadingProducts = false;
-          _error = loc.categoryLoadProductsError(e.toString());
+          _error = loc.categoryLoadProductsError(
+            ErrorExtractor.userMessage(e),
+          );
         });
       }
     }

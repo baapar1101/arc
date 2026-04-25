@@ -5,6 +5,7 @@ import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 
 class CategoryPickerField extends FormField<int?> {
@@ -320,7 +321,11 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در به‌روزرسانی لیست: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              'خطا در به‌روزرسانی لیست: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -410,7 +415,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -503,7 +508,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
@@ -544,7 +549,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: $e');
+        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }

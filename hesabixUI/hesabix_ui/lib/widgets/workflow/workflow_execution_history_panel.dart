@@ -5,6 +5,7 @@ import '../../models/workflow_editor_models.dart';
 import '../../services/workflow_service.dart';
 import 'workflow_analytics_dialog.dart';
 import 'workflow_timeline_dialog.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 
@@ -62,7 +63,11 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadHistory}: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              '${AppLocalizations.of(context).workflowErrorLoadHistory}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -79,7 +84,11 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
       });
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: '${AppLocalizations.of(context).workflowErrorLoadLogs}: $e');
+        SnackBarHelper.show(
+          context,
+          message:
+              '${AppLocalizations.of(context).workflowErrorLoadLogs}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
