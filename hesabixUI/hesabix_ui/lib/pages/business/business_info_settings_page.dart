@@ -9,6 +9,7 @@ import 'package:hesabix_ui/models/business_models.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/services/errors/api_error.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -495,32 +496,131 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
   }
 
+  /// خطای ساختاریافتهٔ API (بعد از interceptor) یا `response.data['error']`.
+  Map<String, dynamic>? _uploadErrorPayload(dio.DioException e) {
+    final inner = e.error;
+    if (inner is ApiErrorDetails && inner.details != null) {
+      return Map<String, dynamic>.from(inner.details!);
+    }
+    final r = e.response?.data;
+    if (r is Map) {
+      final err = r['error'];
+      if (err is Map) {
+        return Map<String, dynamic>.from(err);
+      }
+    }
+    return null;
+  }
+
   Future<void> _handleUploadError(dio.DioException e) async {
-    final response = e.response;
-    if (response != null && response.data is Map) {
-      final data = response.data as Map<String, dynamic>;
-      final error = data['error'];
-      
-      if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
-        await _showStorageLimitDialog(Map<String, dynamic>.from(error));
+    final err = _uploadErrorPayload(e);
+    if (err != null) {
+      final code = err['code'] as String?;
+      if (code == 'STORAGE_LIMIT_EXCEEDED') {
+        if (mounted) {
+          await _showStorageLimitDialog(err);
+        }
+        return;
+      }
+      if (code == 'NO_ACTIVE_STORAGE_PLAN') {
+        if (mounted) {
+          await _showNoStoragePlanDialog(err);
+        }
+        return;
+      }
+      if (code == 'FILE_SIZE_EXCEEDED') {
+        if (mounted) {
+          final msg = err['message'] as String? ?? 'حجم فایل بیش از حد مجاز است';
+          SnackBarHelper.showError(context, message: msg);
+        }
+        return;
+      }
+      final otherMsg = err['message'] as String?;
+      if (otherMsg != null && otherMsg.isNotEmpty) {
+        if (mounted) {
+          SnackBarHelper.showError(context, message: otherMsg);
+        }
         return;
       }
     }
-    
-    String errorMessage = 'خطا در آپلود فایل';
+
+    var errorMessage = 'خطا در آپلود فایل';
+    final response = e.response;
     if (response?.data is Map) {
       final data = response!.data as Map<String, dynamic>;
-      if (data.containsKey('message')) {
+      if (data.containsKey('message') && data['message'] is String) {
         errorMessage = data['message'] as String;
       } else if (data.containsKey('error') && data['error'] is Map) {
         final errorMap = data['error'] as Map;
-        if (errorMap.containsKey('message')) {
+        if (errorMap.containsKey('message') && errorMap['message'] is String) {
           errorMessage = errorMap['message'] as String;
         }
       }
     }
-    
-    SnackBarHelper.showError(context, message: errorMessage);
+    if (mounted) {
+      SnackBarHelper.showError(context, message: errorMessage);
+    }
+  }
+
+  Future<void> _showNoStoragePlanDialog(Map<String, dynamic> error) async {
+    final msg = error['message'] as String? ??
+        'هیچ بستهٔ فعال فضای ذخیره‌سازی برای این کسب‌وکار وجود ندارد.';
+    final theme = Theme.of(context);
+    final stateContext = context;
+    await showDialog<void>(
+      context: stateContext,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.cloud_off_outlined,
+                color: theme.colorScheme.error,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'بسته فضای ذخیره‌سازی',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            msg,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              height: 1.6,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('بستن'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (stateContext.mounted) {
+                stateContext.go('/business/${widget.businessId}/storage-files');
+              }
+            },
+            icon: const Icon(Icons.storage_outlined),
+            label: const Text('مدیریت فضا و بسته‌ها'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {

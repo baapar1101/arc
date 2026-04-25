@@ -83,6 +83,24 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 			localized = translator.t(code, default=message if isinstance(message, str) else None)
 			detail["error"]["message"] = localized
 		return JSONResponse(status_code=status_code, content=detail)
+	# ساختار قدیمی: { "error": "CODE", "message": "...", ... } (مثلاً file_storage_service)
+	if isinstance(detail, dict) and isinstance(detail.get("error"), str):
+		code = detail["error"]
+		raw_message = detail.get("message")
+		message = raw_message if isinstance(raw_message, str) else ""
+		if translator is not None and isinstance(code, str):
+			localized = translator.t(code, default=message if message else None)
+			if isinstance(localized, str) and localized.strip():
+				message = localized
+		error_obj: dict[str, Any] = {"code": code, "message": message}
+		for k, v in detail.items():
+			if k in ("error", "message"):
+				continue
+			error_obj[k] = v
+		return JSONResponse(
+			status_code=status_code,
+			content={"success": False, "error": error_obj},
+		)
 	# fallback generic shape
 	message = ""
 	if isinstance(detail, str):
