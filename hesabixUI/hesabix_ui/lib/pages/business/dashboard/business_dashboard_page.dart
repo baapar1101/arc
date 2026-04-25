@@ -174,6 +174,34 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     }
   }
 
+  /// داشتن [quick_links] در **اول** ترتیب نمایش (order از ۱ به بعد).
+  List<DashboardLayoutItem> _layoutWithQuickLinksFirst(List<DashboardLayoutItem> list) {
+    if (!list.any((e) => e.key == 'quick_links')) return list;
+    final byOrder = list.toList()..sort((a, b) => a.order.compareTo(b.order));
+    final ql = byOrder.where((e) => e.key == 'quick_links').toList();
+    final rest = byOrder.where((e) => e.key != 'quick_links').toList();
+    final merged = <DashboardLayoutItem>[...ql, ...rest];
+    return <DashboardLayoutItem>[
+      for (var i = 0; i < merged.length; i++) merged[i].copyWith(order: i + 1),
+    ];
+  }
+
+  bool _layoutItemsListEqual(List<DashboardLayoutItem> a, List<DashboardLayoutItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.key != y.key ||
+          x.order != y.order ||
+          x.hidden != y.hidden ||
+          x.colSpan != y.colSpan ||
+          x.rowSpan != y.rowSpan) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _loadAll() async {
     try {
       setState(() {
@@ -188,8 +216,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       // اطمینان از حضور ویجت‌های جدید پیش‌فرض (مثل نمودار فروش) در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();
       final missingDefaults = defs.items.where((d) => !existingKeys.contains(d.key)).toList();
+      var items = List<DashboardLayoutItem>.from(layout.items);
+      var mustPersist = false;
       if (missingDefaults.isNotEmpty) {
-        final items = List<DashboardLayoutItem>.from(layout.items);
         int maxOrder = items.fold<int>(0, (acc, it) => it.order > acc ? it.order : acc);
         for (final d in missingDefaults) {
           final dflt = d.defaults[bp] ?? const <String, int>{};
@@ -197,7 +226,29 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
           final rowSpan = dflt['rowSpan'] ?? 2;
           items.add(DashboardLayoutItem(key: d.key, order: ++maxOrder, colSpan: colSpan, rowSpan: rowSpan, hidden: false));
         }
-        // ذخیره و جایگزینی layout
+        mustPersist = true;
+        if (missingDefaults.any((d) => d.key == 'quick_links')) {
+          final next = _layoutWithQuickLinksFirst(items);
+          if (!_layoutItemsListEqual(next, items)) {
+            items = next;
+          }
+        }
+      } else {
+        // یک‌بار: چیدمان‌های قدیمی که quick_links را در انتها دارند → بالای داشبورد
+        final prefs = await SharedPreferences.getInstance();
+        final mKey = 'dashboard_ql_first_v1_${widget.businessId}';
+        if (prefs.getBool(mKey) != true) {
+          if (items.any((e) => e.key == 'quick_links')) {
+            final next = _layoutWithQuickLinksFirst(items);
+            if (!_layoutItemsListEqual(next, items)) {
+              items = next;
+              mustPersist = true;
+            }
+          }
+          await prefs.setBool(mKey, true);
+        }
+      }
+      if (mustPersist) {
         layout = await _service.putLayoutProfile(businessId: widget.businessId, breakpoint: bp, items: items);
       }
       // فیلتر ویجت‌ها بر اساس دسترسی قبل از درخواست داده

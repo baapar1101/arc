@@ -38,6 +38,21 @@ COLUMNS_BY_BREAKPOINT: Dict[str, int] = {
 # ----------------------------
 DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
     {
+        "key": "quick_links",
+        "title": "دسترسی سریع",
+        "icon": "dashboard_customize",
+        "version": 1,
+        "permissions_required": [],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 6, "rowSpan": 2},
+            "md": {"colSpan": 4, "rowSpan": 2},
+            "lg": {"colSpan": 4, "rowSpan": 2},
+            "xl": {"colSpan": 4, "rowSpan": 2},
+        },
+        "cache_ttl": 10,
+    },
+    {
         "key": "latest_sales_invoices",
         "title": "آخرین فاکتورهای فروش",
         "icon": "receipt_long",
@@ -255,21 +270,6 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
             "xl": {"colSpan": 4, "rowSpan": 2},
         },
         "cache_ttl": 60,
-    },
-    {
-        "key": "quick_links",
-        "title": "دسترسی سریع",
-        "icon": "dashboard_customize",
-        "version": 1,
-        "permissions_required": [],
-        "defaults": {
-            "xs": {"colSpan": 4, "rowSpan": 2},
-            "sm": {"colSpan": 6, "rowSpan": 2},
-            "md": {"colSpan": 4, "rowSpan": 2},
-            "lg": {"colSpan": 4, "rowSpan": 2},
-            "xl": {"colSpan": 4, "rowSpan": 2},
-        },
-        "cache_ttl": 10,
     },
 ]
 

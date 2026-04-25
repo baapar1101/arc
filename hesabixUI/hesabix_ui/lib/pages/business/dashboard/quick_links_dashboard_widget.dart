@@ -739,7 +739,7 @@ class QuickLinksDashboardBody extends StatelessWidget {
     if (payload['error'] != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Text('${payload['error']}', textAlign: TextAlign.center),
         ),
       );
@@ -757,7 +757,7 @@ class QuickLinksDashboardBody extends StatelessWidget {
 
     if (items.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -800,7 +800,7 @@ class QuickLinksDashboardBody extends StatelessWidget {
         final listLength = items.length;
         const mainExtent = 60.0;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
