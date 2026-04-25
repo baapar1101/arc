@@ -646,7 +646,10 @@ class _ProductsPageState extends State<ProductsPage> {
       if (!mounted) return;
       SnackBarHelper.showError(
         dialogContext,
-        message: 'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, dialogContext)}',
+        message: 'خطا در آپلود فایل: ${ErrorExtractor.extractErrorMessage(
+          e,
+          AppLocalizations.of(dialogContext),
+        )}',
       );
     } finally {
       onUploadingChanged(false);
@@ -672,7 +675,10 @@ class _ProductsPageState extends State<ProductsPage> {
       return;
     }
     
-    SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: ${e.message}');
+    SnackBarHelper.showError(
+      context,
+      message: ErrorExtractor.extractErrorMessage(e, AppLocalizations.of(context)),
+    );
   }
   
   Future<void> _showStorageLimitDialog(BuildContext context, Map<String, dynamic> error) async {
@@ -1518,7 +1524,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     if (!context.mounted) return;
                     SnackBarHelper.showError(
                       context,
-                      message: ErrorExtractor.forContext(e, context),
+                      message: ErrorExtractor.extractErrorMessage(e, t),
                     );
                   }
                 },
@@ -1580,7 +1586,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       if (!context.mounted) return;
                       SnackBarHelper.showError(
                         context,
-                        message: ErrorExtractor.forContext(e, context),
+                        message: ErrorExtractor.extractErrorMessage(e, t),
                       );
                     }
                   },

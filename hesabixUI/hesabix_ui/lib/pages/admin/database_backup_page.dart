@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_system_settings_service.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
@@ -102,9 +103,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: ErrorExtractor.forContext(e, context),
+          message: ErrorExtractor.extractErrorMessage(e, t),
         );
       }
     } finally {
@@ -137,9 +139,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در ارسال: ${ErrorExtractor.forContext(e, context)}',
+          message: 'خطا در ارسال: ${ErrorExtractor.extractErrorMessage(e, t)}',
         );
       }
     } finally {
@@ -242,10 +245,11 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
-        context,
-        message: 'خطا در شروع ریستور: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: 'خطا در شروع ریستور: ${ErrorExtractor.extractErrorMessage(e, t)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -280,9 +284,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در آپلود FTP: ${ErrorExtractor.forContext(e, context)}',
+          message: 'خطا در آپلود FTP: ${ErrorExtractor.extractErrorMessage(e, t)}',
         );
       }
     } finally {

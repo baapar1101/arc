@@ -22,8 +22,8 @@ import '../utils/responsive_helper.dart';
 import '../services/otp_login_service.dart';
 import '../services/password_reset_otp_service.dart';
 import '../services/errors/api_error.dart';
-import '../widgets/auth/otp_input_dialog.dart';
 import '../utils/error_extractor.dart';
+import '../widgets/auth/otp_input_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -326,7 +326,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         }
       }
     } catch (_) {}
-    return '';
+    return ErrorExtractor.extractErrorMessage(e, t);
   }
 
   void _showSnack(String message) {
@@ -460,7 +460,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   errorMessage = e.message ?? errorMessage;
                 } else {
                   errorMessage =
-                      'خطا در ورود: ${ErrorExtractor.forContext(e, context)}';
+                      'خطا در ورود: ${ErrorExtractor.extractErrorMessage(e, AppLocalizations.of(context))}';
                 }
                 
                 SnackBarHelper.showError(context, message: errorMessage);
@@ -510,7 +510,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   errorMessage = e.message ?? errorMessage;
                 } else {
                   errorMessage =
-                      'خطا در ارسال مجدد کد: ${ErrorExtractor.forContext(e, context)}';
+                      'خطا در ارسال مجدد کد: ${ErrorExtractor.extractErrorMessage(e, AppLocalizations.of(context))}';
                 }
                 
                 SnackBarHelper.showError(context, message: errorMessage);
@@ -539,7 +539,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         errorMessage = e.message ?? errorMessage;
       } else {
         errorMessage =
-            'خطا در ارسال کد: ${ErrorExtractor.forContext(e, context)}';
+            'خطا در ارسال کد: ${ErrorExtractor.extractErrorMessage(e, t)}';
       }
       
       SnackBarHelper.showError(context, message: errorMessage);
@@ -875,7 +875,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               } catch (e) {
                 SnackBarHelper.showError(
                   ctx,
-                  message: 'خطا در تایید: ${ErrorExtractor.forContext(e, ctx)}',
+                  message: 'خطا در تایید: ${ErrorExtractor.extractErrorMessage(e, AppLocalizations.of(ctx))}',
                 );
                 return false;
               }
@@ -1115,12 +1115,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   }
                 } catch (e) {
                   if (dialogContext.mounted) {
-                    final msg = _extractErrorMessage(e, AppLocalizations.of(dialogContext));
+                    final tDialog = AppLocalizations.of(dialogContext);
+                    final msg = _extractErrorMessage(e, tDialog);
                     SnackBarHelper.showError(
                       dialogContext,
                       message: msg.isNotEmpty
                           ? msg
-                          : 'خطا در تغییر رمز عبور: ${ErrorExtractor.forContext(e, dialogContext)}',
+                          : 'خطا در تغییر رمز عبور: ${ErrorExtractor.extractErrorMessage(e, tDialog)}',
                     );
                     // تازه‌سازی کپچا در صورت خطا
                     await loadCaptcha();

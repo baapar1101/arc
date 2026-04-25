@@ -90,9 +90,10 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       });
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context);
       setState(() {
         _priceLists = [];
-        _priceListsLoadError = ErrorExtractor.forContext(e, context);
+        _priceListsLoadError = ErrorExtractor.extractErrorMessage(e, t);
       });
     }
   }
@@ -236,9 +237,10 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       });
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context);
       setState(() {
         _loading = false;
-        _loadError = ErrorExtractor.forContext(e, context);
+        _loadError = ErrorExtractor.extractErrorMessage(e, t);
       });
     }
   }
@@ -334,7 +336,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      SnackBarHelper.showError(context, message: ErrorExtractor.extractErrorMessage(e, t));
     }
   }
 

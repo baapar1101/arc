@@ -5123,6 +5123,24 @@ abstract class AppLocalizations {
   /// **'Request timeout. Please try again.'**
   String get errorRequestTimeout;
 
+  /// No description provided for @errorExtractorSaveData.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save data.'**
+  String get errorExtractorSaveData;
+
+  /// No description provided for @errorExtractorFileUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'File upload error.'**
+  String get errorExtractorFileUpload;
+
+  /// No description provided for @errorInternetUnavailablePleaseRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'No internet connection. Please try again.'**
+  String get errorInternetUnavailablePleaseRetry;
+
   /// No description provided for @errorInvalidInput.
   ///
   /// In en, this message translates to:

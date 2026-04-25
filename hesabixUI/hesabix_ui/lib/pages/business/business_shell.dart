@@ -404,7 +404,8 @@ class _BusinessShellState extends State<BusinessShell> {
       await widget.authStore.setCurrentBusiness(businessData);
     } catch (e) {
       if (mounted) {
-        final msg = ErrorExtractor.forContext(e, context);
+        final t = AppLocalizations.of(context);
+        final msg = ErrorExtractor.extractErrorMessage(e, t);
         setState(() {
           _businessLoadError = msg;
         });

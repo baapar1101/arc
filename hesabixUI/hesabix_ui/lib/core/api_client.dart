@@ -33,7 +33,7 @@ class ApiClient {
     _currentLocale = locale;
   }
 
-  /// For user-facing error messages when [BuildContext] is unavailable.
+  /// همان localeای که روی MaterialApp است (و متن خطا وقتی [BuildContext] در دسترس نیست).
   static Locale? get currentLocale => _currentLocale;
 
   static void bindAuthStore(AuthStore store) {

@@ -28,8 +28,10 @@ class ErrorExtractor {
     return userMessage(e, AppLocalizations.of(context));
   }
 
-  /// معادل [userMessage] بدون [AppLocalizations] صریح (زبان از [ApiClient.currentLocale]).
-  static String extractErrorMessage(Object e) => userMessage(e, null);
+  /// همان [userMessage]؛ امضای دومین آرگومان اختیاری برای سازگاری با فراخوانی‌های `extractErrorMessage(e, t)`.
+  static String extractErrorMessage(Object e, [AppLocalizations? t]) {
+    return userMessage(e, t);
+  }
 
   static String? _extractFromResponseData(dynamic data, AppLocalizations t) {
     Map<String, dynamic>? dataMap;
@@ -72,6 +74,47 @@ class ErrorExtractor {
     return false;
   }
 
+  /// قطع/تایم‌اوت اتصال یا خطای سطح سوکت (بفراتر از صرف [DioException.message]).
+  static bool _isNetworkConnectivityFailure(dio.DioException e) {
+    final type = e.type;
+    if (type == dio.DioExceptionType.connectionTimeout ||
+        type == dio.DioExceptionType.receiveTimeout ||
+        type == dio.DioExceptionType.sendTimeout ||
+        type == dio.DioExceptionType.connectionError ||
+        type == dio.DioExceptionType.badCertificate) {
+      return true;
+    }
+    if (type == dio.DioExceptionType.badResponse || type == dio.DioExceptionType.cancel) {
+      return false;
+    }
+    if (type == dio.DioExceptionType.unknown) {
+      final m = (e.message ?? '').toLowerCase();
+      final errStr = (e.error?.toString() ?? '').toLowerCase();
+      if (m.contains('dioexception') &&
+          (m.contains('connection timeout') ||
+              m.contains('connection error') ||
+              m.contains('receive timeout') ||
+              m.contains('send timeout') ||
+              m.contains('aborted') ||
+              m.contains('took longer') ||
+              m.contains('larger than') ||
+              m.contains('requestoptions'))) {
+        return true;
+      }
+      if (m.contains('socketexception') || errStr.contains('socketexception')) {
+        return true;
+      }
+      if (m.contains('failed host lookup') ||
+          m.contains('network is unreachable') ||
+          m.contains('errno = 7') ||
+          m.contains('errno = 101') ||
+          m.contains('no address associated with hostname')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static String _dioExceptionMessage(dio.DioException e, AppLocalizations t) {
     final inner = e.error;
     if (inner is ApiErrorDetails) {
@@ -83,6 +126,10 @@ class ErrorExtractor {
     if (response != null && response.data != null) {
       final msg = _extractFromResponseData(response.data, t);
       if (msg != null && msg.isNotEmpty) return msg;
+    }
+
+    if (_isNetworkConnectivityFailure(e)) {
+      return t.errorInternetUnavailablePleaseRetry;
     }
 
     switch (e.type) {
@@ -131,6 +178,7 @@ class ErrorExtractor {
     if (e is dio.DioException) {
       return _dioExceptionMessage(e, t);
     }
+
     final errorMessage = e.toString();
     if (errorMessage == 'Exception') {
       return t.errorDataSaveFailed;

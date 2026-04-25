@@ -658,7 +658,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          _error = ErrorExtractor.forContext(e, context);
+          _error = ErrorExtractor.extractErrorMessage(
+            e,
+            AppLocalizations.of(context),
+          );
         });
       }
     } finally {
