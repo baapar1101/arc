@@ -907,6 +907,14 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            label: 'چت وب',
+            icon: Icons.chat_bubble_outline,
+            selectedIcon: Icons.chat_bubble,
+            path: '/business/${widget.businessId}/crm/web-chat',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             label: 'فرایندها و زون ارجاعات',
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
@@ -2288,7 +2296,7 @@ class _BusinessShellState extends State<BusinessShell> {
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
   String? _sectionForLabel(String label, AppLocalizations t) {
     if (label == t.people) return 'people';
-    if (label == 'CRM' || label == 'داشبورد' || label == 'فرایندها و زون ارجاعات' || label == 'سرنخ‌ها' || label == 'فرصت‌های فروش' || label == 'فعالیت‌ها' || label == 'گزارشات' || label == t.crmMenuNotesCalendar) return 'crm';
+    if (label == 'CRM' || label == 'داشبورد' || label == 'فرایندها و زون ارجاعات' || label == 'سرنخ‌ها' || label == 'فرصت‌های فروش' || label == 'فعالیت‌ها' || label == 'گزارشات' || label == t.crmMenuNotesCalendar || label == 'چت وب') return 'crm';
     if (label == t.products) return 'products';
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';

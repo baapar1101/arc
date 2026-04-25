@@ -135,3 +135,8 @@ async def redirect_public_invoice_link(
 	target_url = _flutter_public_page_url(request, configured, env_app, f"invoice-link/{code}")
 	return RedirectResponse(url=target_url, status_code=307)
 
+
+from adapters.api.v1.public.crm_chat_public import router as _crm_chat_public_router  # noqa: E402
+
+router.include_router(_crm_chat_public_router)
+

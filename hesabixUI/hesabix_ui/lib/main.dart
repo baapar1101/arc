@@ -194,6 +194,7 @@ import 'pages/business/crm/crm_deals_page.dart';
 import 'pages/business/crm/crm_activities_page.dart';
 import 'pages/business/crm/crm_reports_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
+import 'pages/business/crm/crm_web_chat_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -2044,6 +2045,20 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/crm/web-chat',
+              name: 'business_crm_web_chat',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmWebChatPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                   ),
                 );
               },

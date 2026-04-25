@@ -22,6 +22,8 @@ adapters/api/v1/categories.py
 adapters/api/v1/checks.py
 adapters/api/v1/credit.py
 adapters/api/v1/crm.py
+adapters/api/v1/crm_chat.py
+adapters/api/v1/crm_chat_ws.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customer_club.py
 adapters/api/v1/customers.py
@@ -108,6 +110,7 @@ adapters/api/v1/business/storage.py
 adapters/api/v1/helpers/product_request_helper.py
 adapters/api/v1/integrations/bale.py
 adapters/api/v1/integrations/telegram.py
+adapters/api/v1/public/crm_chat_public.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
 adapters/api/v1/schema_models/bank_account.py
@@ -115,6 +118,7 @@ adapters/api/v1/schema_models/business_notification.py
 adapters/api/v1/schema_models/check.py
 adapters/api/v1/schema_models/common.py
 adapters/api/v1/schema_models/crm.py
+adapters/api/v1/schema_models/crm_chat.py
 adapters/api/v1/schema_models/document.py
 adapters/api/v1/schema_models/document_line.py
 adapters/api/v1/schema_models/email.py
@@ -175,6 +179,7 @@ adapters/db/models/category.py
 adapters/db/models/check.py
 adapters/db/models/credit.py
 adapters/db/models/crm.py
+adapters/db/models/crm_chat.py
 adapters/db/models/currency.py
 adapters/db/models/customer_club.py
 adapters/db/models/data_table_user_column_settings.py
@@ -354,6 +359,8 @@ app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
 app/services/crm_calendar_note_service.py
+app/services/crm_chat_realtime.py
+app/services/crm_chat_service.py
 app/services/currency_admin_service.py
 app/services/currency_quant.py
 app/services/customer_club_analytics_service.py
@@ -520,6 +527,7 @@ app/services/workflow/i18n/lifecycle_triggers_i18n.py
 app/services/workflow/i18n/workflow_translations.py
 app/services/workflow/triggers/__init__.py
 app/services/workflow/triggers/base_trigger.py
+app/services/workflow/triggers/crm_chat_triggers.py
 app/services/workflow/triggers/crm_triggers.py
 app/services/workflow/triggers/distribution_triggers.py
 app/services/workflow/triggers/document_triggers.py
@@ -582,6 +590,7 @@ migrations/versions/20260502_000001_internal_firewall.py
 migrations/versions/20260503_000001_ai_config_function_calling_enabled.py
 migrations/versions/20260504_000001_business_dashboard_layout_tables.py
 migrations/versions/20260504_000002_data_table_user_column_settings.py
+migrations/versions/20260505_000001_crm_chat_embed.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

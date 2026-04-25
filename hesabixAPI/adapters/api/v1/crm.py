@@ -2449,3 +2449,8 @@ async def list_crm_note_audit(
     items = crm_cal_notes.list_audit(db, ctx, business_id, note_id)
     db.commit()
     return success_response(data={"items": format_datetime_fields(items, request)}, request=request)
+
+
+from adapters.api.v1.crm_chat import router as _crm_web_chat_router  # noqa: E402
+
+router.include_router(_crm_web_chat_router)

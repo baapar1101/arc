@@ -75,3 +75,8 @@ async def notifications_ws(websocket: WebSocket):
 	finally:
 		await realtime_manager.disconnect(user_id, websocket)
 
+
+from adapters.api.v1.crm_chat_ws import router as _crm_chat_ws_router  # noqa: E402
+
+router.include_router(_crm_chat_ws_router)
+

@@ -131,6 +131,22 @@ class TriggerRegistry:
         self.register("crm.deal.assigned", DealAssignedTrigger())
         self.register("crm.activity.created", ActivityCreatedTrigger())
 
+        from app.services.workflow.triggers.crm_chat_triggers import (
+            ChatConversationStartedTrigger,
+            ChatMessageReceivedTrigger,
+            ChatMessageSentTrigger,
+            ChatConversationAssignedTrigger,
+            ChatConversationResolvedTrigger,
+            ChatConversationReopenedTrigger,
+        )
+
+        self.register("crm.chat.conversation.started", ChatConversationStartedTrigger())
+        self.register("crm.chat.message.received", ChatMessageReceivedTrigger())
+        self.register("crm.chat.message.sent", ChatMessageSentTrigger())
+        self.register("crm.chat.conversation.assigned", ChatConversationAssignedTrigger())
+        self.register("crm.chat.conversation.resolved", ChatConversationResolvedTrigger())
+        self.register("crm.chat.conversation.reopened", ChatConversationReopenedTrigger())
+
         from app.services.workflow.triggers.distribution_triggers import DistributionVisitCompletedTrigger
 
         self.register("distribution.visit.completed", DistributionVisitCompletedTrigger())
