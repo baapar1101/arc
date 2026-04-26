@@ -1,0 +1,150 @@
+# Hesabix Chat — بسته وردپرس + مانیفست به‌روزرسانی
+# اجرای اصلی روی تگ v* (مثلاً v1.0.11)
+#
+# GitLab > Settings > CI/CD > Variables (اختیاری ولی برای انتشار خودکار لازم):
+#   HESABIX_GITLAB_TOKEN  [ماسک] — باید حداقل api، write_package_registry، write_repository
+#
+# اگر توکن نباشد، فقط build اجرا می‌شود. برای کامیت خودکار dist/update.json و آپلود zip
+# باید Package Registry و دسترسی کامیت فعال باشد.
+# لینک Generic Package باید برای وردپرس (بدون هدر) قابل GET باشد — معمولاً پروژه public.
+#
+# جریان: نسخه در hesabix-chat.php و تگ vX.Y.Z را هماهنگ کنید → تگ بزنید →
+#   build (zip) → package_publish (registry) → manifest_commit (dist/update.json روی main)
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - build
+  - publish
+  - manifest
+
+variables:
+  FF_USE_FASTZIP: "true"
+  HESABIX_MIN_WP: "5.8"
+  HESABIX_TESTED_WP: "6.6"
+  HESABIX_MIN_PHP: "7.4"
+  HESABIX_NAME: "Hesabix Web Chat"
+  HESABIX_HOMEPAGE: "https://hesabix.ir"
+  HESABIX_MANIFEST_FILE: "dist/update.json"
+  HESABIX_ZIP_BASENAME: "hesabix-chat"
+
+.build_common: &build_common
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache bash coreutils curl findutils jq rsync zip
+
+build:
+  <<: *build_common
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+  script:
+    - set -euo pipefail
+    - mkdir -p build
+    - |
+      rsync -a --delete \
+        --exclude='.git' --exclude='.git*' \
+        --exclude='.gitlab-ci.yml' \
+        --exclude='build' \
+        --exclude='hesabix-chat-*.zip' \
+        ./ "build/${HESABIX_ZIP_BASENAME}/"
+    - test -f "build/${HESABIX_ZIP_BASENAME}/hesabix-chat.php"
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ] && echo "$CI_COMMIT_TAG" | grep -qE '^v[0-9]'; then
+        export VERSION="${CI_COMMIT_TAG#v}"
+      else
+        export VERSION="${CI_COMMIT_SHORT_SHA:-dev}"
+      fi
+    - "cd build && zip -rq \"../hesabix-chat-${VERSION}.zip\" \"${HESABIX_ZIP_BASENAME}\""
+    - ls -la "hesabix-chat-${VERSION}.zip"
+  artifacts:
+    paths:
+      - "hesabix-chat-*.zip"
+    expire_in: 1 week
+
+# آپلود Generic Package
+package_publish:
+  <<: *build_common
+  stage: publish
+  needs: ["build"]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+/ && $HESABIX_GITLAB_TOKEN
+  script:
+    - set -euo pipefail
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - ZIP="hesabix-chat-${VERSION}.zip"
+    - test -f "$ZIP"
+    - 'echo "→ Upload generic package v${VERSION}..."'
+    - |
+      curl -fSsS \
+        --header "PRIVATE-TOKEN: ${HESABIX_GITLAB_TOKEN}" \
+        --upload-file "$ZIP" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hesabix-chat/${VERSION}/hesabix-chat-${VERSION}.zip" \
+        -o /dev/null
+    - "echo \"PACKAGED_URL=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hesabix-chat/${VERSION}/hesabix-chat-${VERSION}.zip\""
+
+# کامیت dist/update.json روی شاخهٔ پیش‌فرض
+manifest_commit:
+  <<: *build_common
+  stage: manifest
+  needs: ["package_publish"]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+/ && $HESABIX_GITLAB_TOKEN
+  script: |
+    set -euo pipefail
+    VERSION="${CI_COMMIT_TAG#v}"
+    BR="${CI_DEFAULT_BRANCH:-main}"
+    LASTUPD="$(date -I 2>/dev/null || date '+%Y-%m-%d')"
+    download_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hesabix-chat/${VERSION}/hesabix-chat-${VERSION}.zip"
+    jq -n \
+      --arg name "${HESABIX_NAME}" \
+      --arg ver "${VERSION}" \
+      --arg url "${download_url}" \
+      --arg req "${HESABIX_MIN_WP}" \
+      --arg tested "${HESABIX_TESTED_WP}" \
+      --arg php "${HESABIX_MIN_PHP}" \
+      --arg home "${HESABIX_HOMEPAGE}" \
+      --arg d "${LASTUPD}" \
+      '{
+        name: $name,
+        version: $ver,
+        download_url: $url,
+        requires: $req,
+        tested: $tested,
+        requires_php: $php,
+        homepage: $home,
+        last_updated: $d,
+        sections: {
+          description: "اتصال سایت وردپرس به چت وب CRM حسابیکس.",
+          changelog: ("<p>انتشار " + $ver + ".</p>")
+        }
+      }' | jq . > "tmp-m.json" && install -D "tmp-m.json" "${HESABIX_MANIFEST_FILE}"
+    echo "— ${HESABIX_MANIFEST_FILE} —" && head -c 500 "${HESABIX_MANIFEST_FILE}"; echo
+    MFILE="${HESABIX_MANIFEST_FILE}"
+    post_commit() {
+      _act="$1"
+      _body="$(jq -n \
+        --arg b "$BR" \
+        --arg msg "chore(dist): update manifest for ${CI_COMMIT_TAG}" \
+        --arg a "$_act" \
+        --arg fp "$MFILE" \
+        --rawfile c "$MFILE" \
+        '{ branch: $b, commit_message: $msg, actions: [ { action: $a, file_path: $fp, content: $c } ] }' )" || return 1
+      _code="$(curl -sS -o /tmp/mresp.json -w '%{http_code}' \
+        --request POST \
+        --header "PRIVATE-TOKEN: ${HESABIX_GITLAB_TOKEN}" \
+        --header "Content-Type: application/json" \
+        --data "$_body" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits" )" || true
+      echo "HTTP $_code"
+      if [ -f /tmp/mresp.json ]; then head -c 800 /tmp/mresp.json; echo; fi
+      if [ "$_code" = "201" ]; then return 0; fi
+      return 1
+    }
+    post_commit "update" || post_commit "create"

@@ -74,6 +74,9 @@ class ChatMessageSentTrigger(BaseTrigger):
 class ChatConversationAssignedTrigger(BaseTrigger):
 	def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
 		td = context.get("trigger_data", {})
+		if config.get("widget_id_filter") is not None:
+			if td.get("widget_id") != config.get("widget_id_filter"):
+				return {}
 		if config.get("new_assigned_to_user_id_filter") is not None:
 			if td.get("new_assigned_to_user_id") != config.get("new_assigned_to_user_id_filter"):
 				return {}
@@ -85,6 +88,11 @@ class ChatConversationAssignedTrigger(BaseTrigger):
 			"description": "تغییر کاربر مسئول مکالمه",
 			"config_schema": {
 				"enabled": {"type": "boolean", "default": True, "required": False},
+				"widget_id_filter": {
+					"type": "integer",
+					"description": "فقط برای این ویجت چت (خالی = همه)",
+					"required": False,
+				},
 				"new_assigned_to_user_id_filter": {"type": "integer", "required": False},
 				"cooldown_seconds": {"type": "integer", "default": 0, "required": False},
 			},
@@ -92,24 +100,48 @@ class ChatConversationAssignedTrigger(BaseTrigger):
 
 
 class ChatConversationResolvedTrigger(BaseTrigger):
+	def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+		td = context.get("trigger_data", {})
+		if config.get("widget_id_filter") is not None:
+			if td.get("widget_id") != config.get("widget_id_filter"):
+				return {}
+		return super().execute(context, config)
+
 	def get_metadata(self) -> Dict[str, Any]:
 		return {
 			"name": "حل‌شدن مکالمه چت وب",
 			"description": "وضعیت مکالمه به resolved تغییر کرد",
 			"config_schema": {
 				"enabled": {"type": "boolean", "default": True, "required": False},
+				"widget_id_filter": {
+					"type": "integer",
+					"description": "فقط برای این ویجت چت (خالی = همه)",
+					"required": False,
+				},
 				"cooldown_seconds": {"type": "integer", "default": 0, "required": False},
 			},
 		}
 
 
 class ChatConversationReopenedTrigger(BaseTrigger):
+	def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+		td = context.get("trigger_data", {})
+		if config.get("widget_id_filter") is not None:
+			if td.get("widget_id") != config.get("widget_id_filter"):
+				return {}
+		return super().execute(context, config)
+
 	def get_metadata(self) -> Dict[str, Any]:
 		return {
 			"name": "بازگشایی مکالمه چت وب",
 			"description": "خروج از وضعیت resolved یا تغییر وضعیت",
 			"config_schema": {
 				"enabled": {"type": "boolean", "default": True, "required": False},
+				"widget_id_filter": {
+					"type": "integer",
+					"description": "فقط برای این ویجت چت (خالی = همه)",
+					"required": False,
+				},
 				"cooldown_seconds": {"type": "integer", "default": 0, "required": False},
 			},
 		}

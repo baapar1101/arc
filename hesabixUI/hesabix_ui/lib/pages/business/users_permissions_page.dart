@@ -1119,6 +1119,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'reports': '${t.view ?? 'مشاهده'} گزارشات CRM',
         'reports_team': 'گزارش عملکرد کارمندان (همه تیم)',
       },
+      'crm_web_chat': {
+        'view': 'مشاهده چت وب',
+        'reply': 'پاسخ و ارسال در چت وب',
+        'manage_widgets': 'ساخت و ویرایش ویجت چت',
+        'edit_conversations': 'ویرایش مکالمه (وضعیت، ارجاع، لید)',
+        'delete_messages': 'حذف پیام در چت وب',
+      },
       'distribution': {
         'view': '${t.view} ${t.distributionMenu}',
         'manage': t.distributionPermissionManage,
@@ -1191,6 +1198,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     }
     if (section == 'crm' && action == 'reports' && value == false) {
       permissions[section]['reports_team'] = false;
+    }
+
+    if (section == 'crm_web_chat' && action != 'view' && value == true) {
+      permissions[section]['view'] = true;
     }
 
     if (section == 'distribution' && action == 'reports_team' && value == true) {
@@ -1405,7 +1416,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': 'CRM',
         'icon': Icons.handshake_outlined,
-        'sections': ['crm'],
+        'sections': ['crm', 'crm_web_chat'],
       },
       {
         'title': 'تنظیمات',
@@ -1520,6 +1531,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'reports': ['گزارش', 'گزارش‌ها', 'reports'],
       'fiscal_years': ['سال مالی', 'سال‌های مالی', 'fiscal year', 'fiscal years'],
       'crm': ['crm', 'CRM'],
+      'crm_web_chat': ['چت وب', 'web chat', 'crm_web_chat'],
     };
 
     final hay = ('$title $description').toLowerCase();
@@ -1569,6 +1581,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'customer_club': t.customerClubMenu,
       'distribution': t.distributionMenu,
       'crm': 'CRM',
+      'crm_web_chat': 'چت وب (ویجت)',
     };
     
     return titles[sectionKey] ?? sectionKey;

@@ -355,22 +355,63 @@ class UpdateLeadAction(ActionHandler):
         lead = db.query(Lead).filter(Lead.id == int(lead_id), Lead.business_id == business_id).first()
         if not lead:
             return {"success": False, "error": "lead not found"}
+        old_stage_id = int(lead.stage_id)
+        old_assigned_to_user_id = lead.assigned_to_user_id
+        uid = context.get("user_id")
+        if not uid:
+            from adapters.db.models.business import Business
+
+            biz = db.query(Business).filter(Business.id == business_id).first()
+            uid = biz.owner_id if biz else None
+
         sid = WorkflowEngine._resolve_value_static(config.get("stage_id"), context, node_results)
         if sid is not None:
+            new_sid = int(sid)
             st = (
                 db.query(CrmProcessStage)
                 .filter(
-                    CrmProcessStage.id == int(sid),
+                    CrmProcessStage.id == new_sid,
                     CrmProcessStage.process_definition_id == lead.process_definition_id,
                 )
                 .first()
             )
             if not st:
                 return {"success": False, "error": "invalid stage_id"}
-            lead.stage_id = int(sid)
+            if new_sid != old_stage_id:
+                lead.stage_id = new_sid
+                db.flush()
+                try:
+                    from app.services.workflow.workflow_trigger_service import trigger_lead_stage_changed
+
+                    trigger_lead_stage_changed(
+                        db,
+                        int(business_id),
+                        lead_id=int(lead.id),
+                        old_stage_id=old_stage_id,
+                        new_stage_id=new_sid,
+                        user_id=int(uid) if uid else None,
+                    )
+                except Exception:
+                    pass
         aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
         if aid is not None:
-            lead.assigned_to_user_id = int(aid) if aid else None
+            new_assign = int(aid) if aid else None
+            if new_assign != old_assigned_to_user_id:
+                lead.assigned_to_user_id = new_assign
+                db.flush()
+                try:
+                    from app.services.workflow.workflow_trigger_service import trigger_lead_assigned
+
+                    trigger_lead_assigned(
+                        db,
+                        int(business_id),
+                        lead_id=int(lead.id),
+                        old_assigned_to_user_id=old_assigned_to_user_id,
+                        new_assigned_to_user_id=new_assign,
+                        user_id=int(uid) if uid else None,
+                    )
+                except Exception:
+                    pass
         nfu = WorkflowEngine._resolve_value_static(config.get("next_follow_up_at"), context, node_results)
         if nfu:
             try:
@@ -403,6 +444,11 @@ class UpdateDealAction(ActionHandler):
                 "probability_percent": {"type": "integer", "required": False},
                 "document_id": {"type": "integer", "required": False},
                 "title": {"type": "string", "required": False},
+                "closed_at": {
+                    "type": "string",
+                    "description": "تاریخ بستن معامله (ISO). در صورت ارسال، تریگر crm.deal.closed شلیک می‌شود.",
+                    "required": False,
+                },
             },
         }
 
@@ -431,22 +477,63 @@ class UpdateDealAction(ActionHandler):
         deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
         if not deal:
             return {"success": False, "error": "deal not found"}
+        old_stage_id = int(deal.stage_id)
+        old_assigned_to_user_id = deal.assigned_to_user_id
+        uid = context.get("user_id")
+        if not uid:
+            from adapters.db.models.business import Business
+
+            biz = db.query(Business).filter(Business.id == business_id).first()
+            uid = biz.owner_id if biz else None
+
         sid = WorkflowEngine._resolve_value_static(config.get("stage_id"), context, node_results)
         if sid is not None:
+            new_sid = int(sid)
             st = (
                 db.query(CrmProcessStage)
                 .filter(
-                    CrmProcessStage.id == int(sid),
+                    CrmProcessStage.id == new_sid,
                     CrmProcessStage.process_definition_id == deal.process_definition_id,
                 )
                 .first()
             )
             if not st:
                 return {"success": False, "error": "invalid stage_id"}
-            deal.stage_id = int(sid)
+            if new_sid != old_stage_id:
+                deal.stage_id = new_sid
+                db.flush()
+                try:
+                    from app.services.workflow.workflow_trigger_service import trigger_deal_stage_changed
+
+                    trigger_deal_stage_changed(
+                        db,
+                        int(business_id),
+                        deal_id=int(deal.id),
+                        old_stage_id=old_stage_id,
+                        new_stage_id=new_sid,
+                        user_id=int(uid) if uid else None,
+                    )
+                except Exception:
+                    pass
         aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
         if aid is not None:
-            deal.assigned_to_user_id = int(aid) if aid else None
+            new_assign = int(aid) if aid else None
+            if new_assign != old_assigned_to_user_id:
+                deal.assigned_to_user_id = new_assign
+                db.flush()
+                try:
+                    from app.services.workflow.workflow_trigger_service import trigger_deal_assigned
+
+                    trigger_deal_assigned(
+                        db,
+                        int(business_id),
+                        deal_id=int(deal.id),
+                        old_assigned_to_user_id=old_assigned_to_user_id,
+                        new_assigned_to_user_id=new_assign,
+                        user_id=int(uid) if uid else None,
+                    )
+                except Exception:
+                    pass
         amt = WorkflowEngine._resolve_value_static(config.get("amount"), context, node_results)
         if amt is not None:
             deal.amount = float(amt)
@@ -459,6 +546,40 @@ class UpdateDealAction(ActionHandler):
         ttl = WorkflowEngine._resolve_value_static(config.get("title"), context, node_results)
         if ttl is not None:
             deal.title = str(ttl).strip()[:255]
+
+        closed_raw = WorkflowEngine._resolve_value_static(config.get("closed_at"), context, node_results)
+        if closed_raw is not None and str(closed_raw).strip():
+            try:
+                deal.closed_at = datetime.fromisoformat(str(closed_raw).replace("Z", "+00:00"))
+            except Exception:
+                return {"success": False, "error": "invalid closed_at (use ISO datetime)"}
+            db.flush()
+            stg = (
+                db.query(CrmProcessStage)
+                .filter(
+                    CrmProcessStage.id == deal.stage_id,
+                    CrmProcessStage.process_definition_id == deal.process_definition_id,
+                )
+                .first()
+            )
+            is_win = bool(stg and stg.is_win)
+            is_lost = bool(stg and stg.is_lost)
+            try:
+                from app.services.workflow.workflow_trigger_service import trigger_deal_closed
+
+                trigger_deal_closed(
+                    db,
+                    int(business_id),
+                    deal_id=int(deal.id),
+                    amount=float(deal.amount),
+                    is_win=is_win,
+                    document_id=deal.document_id,
+                    user_id=int(uid) if uid else None,
+                    is_lost=is_lost,
+                )
+            except Exception:
+                pass
+
         db.flush()
         db.refresh(deal)
         return {"success": True, "deal_id": deal.id}

@@ -61,11 +61,13 @@ class CrmChatService {
     return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};
   }
 
-  Future<List<dynamic>> listConversations({
+  /// Returns (items, hasMore).
+  Future<(List<dynamic>, bool)> listConversations({
     required int businessId,
     String? status,
     int limit = 50,
     int offset = 0,
+    String? search,
   }) async {
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/chat/conversations',
@@ -73,25 +75,45 @@ class CrmChatService {
         if (status != null && status.isNotEmpty) 'status': status,
         'limit': limit,
         'offset': offset,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
       },
     );
     final data = _extractData(res.data);
-    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
-    return [];
+    if (data is! Map) return (<dynamic>[], false);
+    final items = data['items'] is List ? data['items'] as List<dynamic> : <dynamic>[];
+    final hasMore = data['has_more'] == true;
+    return (items, hasMore);
   }
 
-  Future<List<dynamic>> listMessages({
+  /// Returns (items, hasMoreOlder).
+  Future<(List<dynamic>, bool)> listMessages({
     required int businessId,
     required int conversationId,
-    int limit = 500,
+    int limit = 80,
+    int? beforeMessageId,
   }) async {
     final res = await _apiClient.get<dynamic>(
       '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId/messages',
-      query: {'limit': limit},
+      query: {
+        'limit': limit,
+        if (beforeMessageId != null) 'before_message_id': beforeMessageId,
+      },
     );
     final data = _extractData(res.data);
-    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
-    return [];
+    if (data is! Map) return (<dynamic>[], false);
+    final items = data['items'] is List ? data['items'] as List<dynamic> : <dynamic>[];
+    final hasMore = data['has_more_older'] == true;
+    return (items, hasMore);
+  }
+
+  Future<void> deleteMessage({
+    required int businessId,
+    required int conversationId,
+    required int messageId,
+  }) async {
+    await _apiClient.delete<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId/messages/$messageId',
+    );
   }
 
   Future<Map<String, dynamic>> postAgentMessage({
@@ -127,6 +149,17 @@ class CrmChatService {
     );
     final d = _extractData(res.data);
     return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+  }
+
+  Future<void> markConversationRead({
+    required int businessId,
+    required int conversationId,
+    required int upToMessageId,
+  }) async {
+    await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId/read',
+      data: {'up_to_message_id': upToMessageId},
+    );
   }
 
   Future<Map<String, dynamic>> patchConversation({

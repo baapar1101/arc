@@ -8,6 +8,7 @@ abstract class CrmChatWsClient {
   });
 
   void subscribeConversation(int conversationId);
+  void sendTyping(int conversationId, {required bool active});
   void disconnect();
 }
 
@@ -24,6 +25,9 @@ class _NoopCrmChatWs implements CrmChatWsClient {
 
   @override
   void subscribeConversation(int conversationId) {}
+
+  @override
+  void sendTyping(int conversationId, {required bool active}) {}
 
   @override
   void disconnect() {}

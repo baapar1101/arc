@@ -3402,6 +3402,12 @@ def create_invoice(
         except ApiError:
             raise
 
+    # برچسب‌های فاکتور (همان تراکنش)
+    if data.get("tag_ids") is not None:
+        from app.services.invoice_tag_service import replace_document_invoice_tags
+
+        replace_document_invoice_tags(db, business_id, int(document.id), data.get("tag_ids"))
+
     # Persist invoice first
     db.commit()
     db.refresh(document)
@@ -4633,6 +4639,13 @@ def update_invoice(
         document.extra_info = _normalize_document_extra_info_for_storage(ex_fx) or ex_fx
         flag_modified(document, "extra_info")
 
+    if "tag_ids" in data:
+        from app.services.invoice_tag_service import replace_document_invoice_tags
+
+        replace_document_invoice_tags(
+            db, int(document.business_id), int(document.id), data.get("tag_ids")
+        )
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -5105,6 +5118,7 @@ def invoice_document_to_dict(
     document: Document,
     *,
     persist_link_cleanup: bool = True,
+    include_tags: bool = True,
 ) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
     item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
@@ -5253,6 +5267,16 @@ def invoice_document_to_dict(
                 result["recognized_profit_ledger"] = rp
         except Exception as e:
             logger.warning(f"recognized profit summary failed for document {document.id}: {e}")
+
+    if include_tags:
+        from app.services.invoice_tag_service import tags_for_single_document
+
+        _tlist, _tdisp = tags_for_single_document(db, int(document.business_id), int(document.id))
+        result["tags"] = _tlist
+        result["tags_display"] = _tdisp
+    else:
+        result["tags"] = []
+        result["tags_display"] = ""
 
     return result
 

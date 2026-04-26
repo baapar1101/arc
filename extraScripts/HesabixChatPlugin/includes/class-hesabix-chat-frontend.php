@@ -1,0 +1,218 @@
+<?php
+/**
+ * بارگذاری اسکریپت و ریشه ویجت در سمت بازدیدکننده.
+ *
+ * @package HesabixChat
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Class Hesabix_Chat_Frontend
+ */
+class Hesabix_Chat_Frontend {
+
+	/**
+	 * @var bool
+	 */
+	private static $shortcode_used = false;
+
+	public function __construct() {
+		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
+		add_action( 'wp_footer', array( $this, 'maybe_print_root' ), 5 );
+		add_shortcode( 'hesabix_chat', array( $this, 'shortcode' ) );
+	}
+
+	public function register_assets() {
+		$o = Hesabix_Chat_Admin::get_options();
+		if ( '' === (string) $o['public_key'] ) {
+			return;
+		}
+		if ( 'global' === $o['load_mode'] ) {
+			$this->enqueue( $o );
+			return;
+		}
+		if ( 'shortcode' === $o['load_mode'] && $this->content_has_shortcode() ) {
+			$this->enqueue( $o );
+		}
+	}
+
+	/**
+	 * بررسی شورتکد در محتوای حلقه اصلی (تقریبی) برای تازه‌سازی.
+	 */
+	private function content_has_shortcode() {
+		if ( is_singular() ) {
+			$p = get_post();
+			if ( $p && isset( $p->post_content ) && has_shortcode( $p->post_content, 'hesabix_chat' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * حالت «auto»: اگر کاربر وارد است و ایمیل معتبر دارد → مثل hidden (ارسال از پروفایل).
+	 *
+	 * @param string        $stored یکی از required|optional|hidden|auto .
+	 * @param \WP_User|null $user .
+	 * @return string required|optional|hidden
+	 */
+	private function resolve_effective_email_field( $stored, $user ) {
+		$stored = (string) $stored;
+		if ( ! in_array( $stored, array( 'required', 'optional', 'hidden', 'auto' ), true ) ) {
+			$stored = 'required';
+		}
+		if ( 'auto' === $stored ) {
+			if ( $user && (int) $user->ID > 0 && is_email( (string) $user->user_email ) ) {
+				return 'hidden';
+			}
+			return 'required';
+		}
+		return $stored;
+	}
+
+	/**
+	 * @param array<string, mixed> $o .
+	 */
+	private function enqueue( $o ) {
+		if ( '' === (string) $o['public_key'] ) {
+			return;
+		}
+
+		wp_register_style(
+			'hesabix-chat',
+			HESABIX_CHAT_URL . 'assets/css/chat-widget.css',
+			array(),
+			HESABIX_CHAT_VERSION
+		);
+		wp_register_script(
+			'hesabix-chat',
+			HESABIX_CHAT_URL . 'assets/js/chat-widget.js',
+			array(),
+			HESABIX_CHAT_VERSION,
+			true
+		);
+
+		wp_enqueue_style( 'hesabix-chat' );
+		wp_enqueue_script( 'hesabix-chat' );
+
+		$rtl = is_rtl() ? 'rtl' : 'ltr';
+		$opt = (string) $o['rtl'];
+		if ( 'rtl' === $opt ) {
+			$dir = 'rtl';
+		} elseif ( 'ltr' === $opt ) {
+			$dir = 'ltr';
+		} else {
+			$dir = $rtl;
+		}
+
+		$current_user = wp_get_current_user();
+		$prefill      = array(
+			'first_name' => '',
+			'last_name'  => '',
+			'email'      => '',
+			'phone'      => '',
+		);
+		if ( $current_user && $current_user->ID ) {
+			$fn = (string) get_user_meta( $current_user->ID, 'first_name', true );
+			$ln = (string) get_user_meta( $current_user->ID, 'last_name', true );
+			if ( $fn . $ln === '' && $current_user->display_name ) {
+				$parts = preg_split( '/\s+/u', trim( $current_user->display_name ), 2 );
+				$fn    = $parts[0] ?? '';
+				$ln    = $parts[1] ?? '';
+			}
+			$prefill['first_name'] = $fn;
+			$prefill['last_name']  = $ln;
+			$prefill['email']      = (string) $current_user->user_email;
+		}
+
+		$email_eff = $this->resolve_effective_email_field( (string) ( $o['email_field'] ?? 'required' ), $current_user );
+		$email_eff = (string) apply_filters( 'hesabix_chat_email_field', $email_eff, $o, $current_user );
+
+		wp_localize_script(
+			'hesabix-chat',
+			'HESABIX_CHAT',
+			array(
+				'apiBase'         => (string) $o['api_base'],
+				'publicKey'       => (string) $o['public_key'],
+				'buttonText'      => (string) $o['button_text'],
+				'buttonPosition'  => (string) $o['button_position'],
+				'buttonColor'     => (string) $o['button_color'],
+				'buttonTextColor' => (string) $o['button_text_color'],
+				'chatTitle'       => (string) $o['chat_title'],
+				'welcomeMessage'  => (string) ( $o['welcome_message'] ?? '' ),
+				'responseTimeText' => (string) ( $o['response_time_text'] ?? '' ),
+				'uiPreset'        => (string) ( $o['ui_preset'] ?? 'default' ),
+				'headerLogoUrl'  => (string) ( $o['header_logo_url'] ?? '' ),
+				'theme'           => (string) $o['theme'],
+				'panelWidth'      => (int) $o['panel_width'],
+				'panelHeight'     => (int) $o['panel_height'],
+				'zIndex'          => (int) $o['z_index'],
+				'offsetBottom'    => (int) $o['offset_bottom'],
+				'offsetSide'      => (int) $o['offset_side'],
+				'borderRadius'    => (int) $o['border_radius'],
+				'dir'             => $dir,
+				'showFileUpload'  => (int) $o['show_file_upload'] === 1,
+				'loadMode'        => (string) $o['load_mode'],
+				'debug'           => (bool) apply_filters( 'hesabix_chat_debug', false ),
+				'emailField'      => $email_eff,
+				'showPageContext' => (int) ( $o['show_page_context'] ?? 0 ) === 1,
+				'prefill'         => $prefill,
+				'strings'         => array(
+					'formTitle'    => __( 'شروع گفتگو', 'hesabix-chat' ),
+					'formSubtitle' => __( 'برای شروع، مشخصات خود را وارد کنید.', 'hesabix-chat' ),
+					'firstName'    => __( 'نام', 'hesabix-chat' ),
+					'lastName'     => __( 'نام خانوادگی', 'hesabix-chat' ),
+					'email'        => __( 'ایمیل', 'hesabix-chat' ),
+					'emailOptionalHint' => __( 'در صورت تمایل می‌توانید خالی بگذارید.', 'hesabix-chat' ),
+					'pageContextLabel'  => __( 'صفحهٔ فعلی', 'hesabix-chat' ),
+					'phone'        => __( 'موبایل', 'hesabix-chat' ),
+					'start'        => __( 'شروع', 'hesabix-chat' ),
+					'placeholder'  => __( 'پیام خود را بنویسید…', 'hesabix-chat' ),
+					'send'         => __( 'ارسال', 'hesabix-chat' ),
+					'close'        => __( 'بستن', 'hesabix-chat' ),
+					'back'         => __( 'مکالمه جدید', 'hesabix-chat' ),
+					'attach'       => __( 'پیوست', 'hesabix-chat' ),
+					'errorGeneric' => __( 'خطا در ارتباط با سرور.', 'hesabix-chat' ),
+					'you'          => __( 'شما', 'hesabix-chat' ),
+					'support'      => __( 'پشتیبانی', 'hesabix-chat' ),
+					'newChatHint'  => __( 'مکالمه فعلی پاک می‌شود و می‌توانید دوباره شروع کنید.', 'hesabix-chat' ),
+					'wsConnecting'     => __( 'در حال اتصال…', 'hesabix-chat' ),
+					'wsLive'           => __( 'زنده', 'hesabix-chat' ),
+					'wsLiveHint'       => __( 'اتصال لحظه‌ای برقرار است.', 'hesabix-chat' ),
+					'wsOffline'        => __( 'غیرزنده', 'hesabix-chat' ),
+					'wsOfflineHint'    => __( 'به‌روزرسانی ممکن است با تأخیر باشد.', 'hesabix-chat' ),
+					'agentTyping'      => __( 'پشتیبان در حال تایپ…', 'hesabix-chat' ),
+					'msgDelivered'     => __( 'ارسال شد', 'hesabix-chat' ),
+					'msgReadBySupport' => __( 'پشتیبان خواند', 'hesabix-chat' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * @param array<string, string> $atts .
+	 * @return string
+	 */
+	public function shortcode( $atts ) {
+		self::$shortcode_used = true;
+		$o = Hesabix_Chat_Admin::get_options();
+		if ( '' === (string) $o['public_key'] ) {
+			return '<!-- hesabix_chat: ' . esc_html__( 'public key تنظیم نشده', 'hesabix-chat' ) . ' -->';
+		}
+		$this->enqueue( $o );
+		return '<div id="hesabix-chat-host" class="hesabix-chat-host hesabix-chat-host--shortcode"></div>';
+	}
+
+	public function maybe_print_root() {
+		$o = Hesabix_Chat_Admin::get_options();
+		if ( '' === (string) $o['public_key'] ) {
+			return;
+		}
+		if ( 'global' !== $o['load_mode'] ) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<div id="hesabix-chat-host" class="hesabix-chat-host" aria-hidden="true"></div>';
+	}
+}

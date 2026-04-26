@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import 'package:hesabix_ui/services/crm_chat_ws_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// صندوق ورودی چت وب (ویجت جاسازی‌شده در سایت مشتری).
 class CrmWebChatPage extends StatefulWidget {
@@ -50,18 +52,74 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   bool _loading = true;
   bool _loadingMsgs = false;
   bool _wsLive = false;
+  bool _allowWebChatFileUpload = false;
+  bool _sendingFile = false;
   String? _statusFilter;
   Timer? _fallbackPoll;
   final FocusNode _replyFocus = FocusNode();
+  bool _peerTyping = false;
+  Timer? _typingDebounce;
+  Timer? _typingStopTimer;
+
+  String _convSearch = '';
+  Timer? _searchDebounce;
+  bool _convHasMore = false;
+  bool _loadingMoreConvs = false;
+  bool _msgHasMoreOlder = false;
+  bool _loadingOlderMsgs = false;
+  bool _mobileShowList = true;
+  final TextEditingController _convSearchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _msgScroll.addListener(_onMessageScroll);
     _svc = CrmChatService(apiClient: widget.apiClient);
     _storage = BusinessStorageService(widget.apiClient);
+    _replyCtrl.addListener(_onReplyTextChanged);
     _loadAll();
     _loadBusinessUsers();
     _initRealtime();
+  }
+
+  void _onReplyTextChanged() {
+    final cid = _selectedConvId;
+    if (cid == null || !_wsLive) return;
+    final text = _replyCtrl.text;
+    _typingDebounce?.cancel();
+    if (text.trim().isEmpty) {
+      _ws.sendTyping(cid, active: false);
+      return;
+    }
+    _typingDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      _ws.sendTyping(cid, active: true);
+      _typingStopTimer?.cancel();
+      _typingStopTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) _ws.sendTyping(cid, active: false);
+      });
+    });
+  }
+
+  Future<void> _markVisitorMessagesReadSilently() async {
+    final id = _selectedConvId;
+    if (id == null) return;
+    int? maxVid;
+    for (final x in _messages) {
+      if (x is! Map) continue;
+      if (x['sender_role']?.toString() != 'visitor') continue;
+      final mid = (x['id'] as num?)?.toInt();
+      if (mid == null) continue;
+      if (maxVid == null || mid > maxVid) maxVid = mid;
+    }
+    if (maxVid == null) return;
+    try {
+      await _svc.markConversationRead(
+        businessId: widget.businessId,
+        conversationId: id,
+        upToMessageId: maxVid,
+      );
+    } catch (_) {}
   }
 
   Future<void> _initRealtime() async {
@@ -94,6 +152,59 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   void _onWsMessage(Map<String, dynamic> msg) {
     if (msg['type']?.toString() != 'crm_chat.event') return;
     final event = msg['event']?.toString();
+    if (event == 'typing') {
+      final cid = (msg['conversation_id'] as num?)?.toInt();
+      if (cid == null || cid != _selectedConvId) return;
+      if (msg['from_role']?.toString() != 'visitor') return;
+      if (!mounted) return;
+      setState(() => _peerTyping = msg['active'] == true);
+      return;
+    }
+    if (event == 'messages.read') {
+      final cid = (msg['conversation_id'] as num?)?.toInt();
+      if (cid == null || cid != _selectedConvId) return;
+      final rawIds = msg['message_ids'];
+      if (rawIds is! List) return;
+      final idSet = rawIds
+          .map((e) => e is int ? e : int.tryParse(e.toString()))
+          .whereType<int>()
+          .toSet();
+      final readAt = msg['read_at'];
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.map((row) {
+          if (row is! Map) return row;
+          final mid = (row['id'] as num?)?.toInt();
+          if (mid != null && idSet.contains(mid)) {
+            final copy = Map<String, dynamic>.from(row);
+            copy['read_at'] = readAt;
+            return copy;
+          }
+          return row;
+        }).toList();
+      });
+      return;
+    }
+    if (event == 'message.deleted') {
+      final cid = (msg['conversation_id'] as num?)?.toInt();
+      final mid = (msg['message_id'] as num?)?.toInt();
+      if (cid == null || mid == null || cid != _selectedConvId) return;
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.map((row) {
+          if (row is! Map) return row;
+          if ((row['id'] as num?)?.toInt() == mid) {
+            final copy = Map<String, dynamic>.from(row);
+            copy['is_deleted'] = true;
+            copy['body'] = '';
+            copy['file'] = null;
+            return copy;
+          }
+          return row;
+        }).toList();
+      });
+      return;
+    }
     if (event == 'message.created') {
       final cid = (msg['conversation_id'] as num?)?.toInt() ??
           ((msg['message'] is Map ? (msg['message'] as Map)['conversation_id'] : null) as num?)?.toInt();
@@ -156,12 +267,25 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
   @override
   void dispose() {
+    _replyCtrl.removeListener(_onReplyTextChanged);
+    _typingDebounce?.cancel();
+    _typingStopTimer?.cancel();
     _stopFallback();
     _ws.disconnect();
     _replyCtrl.dispose();
+    _searchDebounce?.cancel();
+    _msgScroll.removeListener(_onMessageScroll);
     _msgScroll.dispose();
+    _convSearchCtrl.dispose();
     _replyFocus.dispose();
     super.dispose();
+  }
+
+  void _onMessageScroll() {
+    if (!_msgScroll.hasClients) return;
+    if (!_msgHasMoreOlder || _loadingOlderMsgs) return;
+    if (_msgScroll.position.pixels > 100) return;
+    unawaited(_loadOlderMessages());
   }
 
   Future<void> _loadBusinessUsers() async {
@@ -184,9 +308,15 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     try {
       await _loadConversationsList(silent: true);
       final w = await _svc.listWidgets(businessId: widget.businessId);
+      bool allowFiles = false;
+      try {
+        final st = await _svc.getCrmSettings(businessId: widget.businessId);
+        allowFiles = st['allow_web_chat_file_upload'] == true;
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _widgets = w;
+        _allowWebChatFileUpload = allowFiles;
         if (!silent) _loading = false;
       });
       if (_selectedConvId != null) {
@@ -197,9 +327,10 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       if (!mounted) return;
       if (!silent) setState(() => _loading = false);
       if (!silent && mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
       }
@@ -210,16 +341,53 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     }
   }
 
-  Future<void> _loadConversationsList({bool silent = false}) async {
-    final convs = await _svc.listConversations(
-      businessId: widget.businessId,
-      status: _statusFilter,
-      limit: 100,
-    );
-    if (!mounted) return;
-    setState(() {
-      _conversations = convs;
+  Future<void> _loadConversationsList({bool silent = false, bool reset = true}) async {
+    if (!reset) {
+      if (!_convHasMore || _loadingMoreConvs) return;
+    }
+    if (!reset) {
+      setState(() => _loadingMoreConvs = true);
+    }
+    try {
+      final offset = reset ? 0 : _conversations.length;
+      final (convs, hasMore) = await _svc.listConversations(
+        businessId: widget.businessId,
+        status: _statusFilter,
+        limit: 40,
+        offset: offset,
+        search: _convSearch.trim().isEmpty ? null : _convSearch.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (reset) {
+          _conversations = convs;
+        } else {
+          _conversations = [..._conversations, ...convs];
+        }
+        _convHasMore = hasMore;
+        _loadingMoreConvs = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMoreConvs = false);
+    }
+  }
+
+  void _onConvSearchChanged(String v) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _convSearch = v);
+      unawaited(_loadConversationsList(silent: true, reset: true));
     });
+  }
+
+  bool _onConversationsListScroll(ScrollNotification n) {
+    if (n.metrics.pixels > n.metrics.maxScrollExtent - 180) {
+      if (_convHasMore && !_loadingMoreConvs) {
+        unawaited(_loadConversationsList(silent: true, reset: false));
+      }
+    }
+    return false;
   }
 
   void _scrollToEnd() {
@@ -236,22 +404,90 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       setState(() => _loadingMsgs = true);
     }
     try {
-      final msgs = await _svc.listMessages(businessId: widget.businessId, conversationId: id);
+      final (msgs, hasOlder) = await _svc.listMessages(
+        businessId: widget.businessId,
+        conversationId: id,
+        limit: 80,
+      );
       if (!mounted) return;
       setState(() {
         _messages = msgs;
         _loadingMsgs = false;
+        _msgHasMoreOlder = hasOlder;
       });
       _scrollToEnd();
+      unawaited(_markVisitorMessagesReadSilently());
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingMsgs = false);
       if (!silent) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.show(
         context,
-        message: 'خطا در پیام‌ها: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatErrorLoadingMessages(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
+      }
+    }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final id = _selectedConvId;
+    if (id == null || !_msgHasMoreOlder || _loadingOlderMsgs) return;
+    if (_messages.isEmpty) return;
+    final first = _messages.first;
+    if (first is! Map) return;
+    final before = (first['id'] as num?)?.toInt();
+    if (before == null) return;
+    setState(() => _loadingOlderMsgs = true);
+    try {
+      final (older, hasOlder) = await _svc.listMessages(
+        businessId: widget.businessId,
+        conversationId: id,
+        limit: 40,
+        beforeMessageId: before,
+      );
+      if (!mounted) return;
+      setState(() {
+        _messages = [...older, ..._messages];
+        _msgHasMoreOlder = hasOlder;
+        _loadingOlderMsgs = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingOlderMsgs = false);
+    }
+  }
+
+  Future<void> _deleteMessage(int messageId) async {
+    final cid = _selectedConvId;
+    if (cid == null || !widget.authStore.canDeleteCrmWebChatMessages()) return;
+    try {
+      await _svc.deleteMessage(
+        businessId: widget.businessId,
+        conversationId: cid,
+        messageId: messageId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.map((row) {
+          if (row is! Map) return row;
+          if ((row['id'] as num?)?.toInt() == messageId) {
+            final c = Map<String, dynamic>.from(row);
+            c['is_deleted'] = true;
+            c['body'] = '';
+            c['file'] = null;
+            return c;
+          }
+          return row;
+        }).toList();
+      });
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
       }
     }
   }
@@ -260,6 +496,8 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     setState(() {
       _selectedConvId = id;
       _messages = [];
+      _peerTyping = false;
+      _mobileShowList = false;
     });
     _loadMessages();
     if (_wsLive) {
@@ -287,16 +525,26 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     return '#$widgetId';
   }
 
-  String _statusLabel(String? s) {
+  String _socketStatusText(AppLocalizations t) {
+    final key = widget.authStore.apiKey;
+    if (key == null || key.isEmpty) return t.crmWebChatSocketNoKey;
+    if (_wsLive) return t.crmWebChatSocketLive;
+    if (_fallbackPoll != null) return t.crmWebChatSocketPolling;
+    return t.crmWebChatSocketOffline;
+  }
+
+  bool _messageHasReadReceipt(Map<dynamic, dynamic> m) => m['read_at'] != null;
+
+  String _statusLabel(AppLocalizations t, String? s) {
     switch (s) {
       case 'open':
-        return 'باز';
+        return t.crmWebChatStatusOpen;
       case 'pending':
-        return 'در انتظار';
+        return t.crmWebChatStatusPending;
       case 'resolved':
-        return 'حل‌شده';
+        return t.crmWebChatStatusResolved;
       default:
-        return s ?? '—';
+        return s ?? t.crmWebChatUnassigned;
     }
   }
 
@@ -313,12 +561,16 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         bytes: Uint8List.fromList(bytes),
         ext: ext,
       );
-      if (mounted) SnackBarHelper.show(context, message: 'فایل ذخیره شد');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatFileSaved);
+      }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.show(
         context,
-        message: 'خطا در دانلود: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatErrorDownload(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
       }
@@ -345,12 +597,86 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     }
   }
 
+  Future<void> _pickAndSendAgentFile() async {
+    final id = _selectedConvId;
+    if (id == null || !widget.authStore.canReplyCrmWebChat()) {
+      return;
+    }
+    if (!_allowWebChatFileUpload) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatFileUploadDisabledCrm, isError: true);
+      return;
+    }
+    try {
+      final pick = await FilePicker.platform.pickFiles(
+        withData: true,
+        type: FileType.any,
+        allowMultiple: false,
+      );
+      if (pick == null || pick.files.isEmpty) return;
+      final f = pick.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) {
+        if (mounted) {
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.show(
+            context,
+            message: t.crmWebChatFileReadFailed,
+            isError: true,
+          );
+        }
+        return;
+      }
+      setState(() => _sendingFile = true);
+      final up = await _storage.uploadFile(
+        businessId: widget.businessId,
+        fileBytes: bytes,
+        filename: f.name.isNotEmpty ? f.name : 'file',
+        moduleContext: 'crm_web_chat',
+        contextId: id.toString(),
+      );
+      if (!mounted) return;
+      final fid = up['file_id']?.toString();
+      if (fid == null || fid.isEmpty) {
+        throw StateError(AppLocalizations.of(context).crmWebChatFileIdMissing);
+      }
+      final cap = _replyCtrl.text.trim();
+      await _svc.postAgentMessage(
+        businessId: widget.businessId,
+        conversationId: id,
+        body: cap.isNotEmpty ? cap : null,
+        fileStorageId: fid,
+      );
+      _replyCtrl.clear();
+      await _loadMessages();
+      await _loadConversationsList();
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatFileSent);
+        if (_wsLive) _ws.sendTyping(id, active: false);
+        unawaited(_markVisitorMessagesReadSilently());
+      }
+    } catch (e) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
+          context,
+          message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingFile = false);
+    }
+  }
+
   Future<void> _sendReply() async {
     final id = _selectedConvId;
     final text = _replyCtrl.text.trim();
     if (id == null || text.isEmpty) return;
-    if (!widget.authStore.canWriteSection('crm')) {
-      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+    if (!widget.authStore.canReplyCrmWebChat()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
     try {
@@ -358,13 +684,22 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       _replyCtrl.clear();
       await _loadMessages();
       await _loadConversationsList();
-      if (mounted) SnackBarHelper.show(context, message: 'ارسال شد');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatMessageSent);
+        final cid = _selectedConvId;
+        if (cid != null && _wsLive) _ws.sendTyping(cid, active: false);
+        unawaited(_markVisitorMessagesReadSilently());
+      }
     } catch (e) {
-      if (mounted) SnackBarHelper.show(
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
+      }
     }
   }
 
@@ -374,8 +709,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   }
 
   Future<void> _patchConv(Map<String, dynamic> c, {String? status, int? assignedTo, int? leadId, int? personId}) async {
-    if (!widget.authStore.canWriteSection('crm')) {
-      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+    if (!widget.authStore.canEditCrmWebChatConversations()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
     final id = c['id'] as int;
@@ -390,19 +726,26 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       );
       await _loadConversationsList();
       await _loadAll(silent: true);
-      if (mounted) SnackBarHelper.show(context, message: 'ذخیره شد');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatSaved);
+      }
     } catch (e) {
-      if (mounted) SnackBarHelper.show(
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
+      }
     }
   }
 
   Future<void> _showEditConvSheet(Map<String, dynamic> c) async {
-    if (!widget.authStore.canWriteSection('crm')) {
-      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+    if (!widget.authStore.canEditCrmWebChatConversations()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
     var st0 = c['status']?.toString() ?? 'open';
@@ -417,6 +760,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) {
+        final loc = AppLocalizations.of(ctx);
         return Padding(
           padding: EdgeInsets.only(
             left: 16,
@@ -430,15 +774,15 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('ویرایش مکالمه', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  Text(loc.crmWebChatEditConversationTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: st, // ignore: deprecated_member_use
-                    decoration: const InputDecoration(labelText: 'وضعیت', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'open', child: Text('باز')),
-                      DropdownMenuItem(value: 'pending', child: Text('در انتظار')),
-                      DropdownMenuItem(value: 'resolved', child: Text('حل‌شده')),
+                    decoration: InputDecoration(labelText: loc.crmWebChatFieldStatus, border: const OutlineInputBorder()),
+                    items: [
+                      DropdownMenuItem(value: 'open', child: Text(loc.crmWebChatStatusOpen)),
+                      DropdownMenuItem(value: 'pending', child: Text(loc.crmWebChatStatusPending)),
+                      DropdownMenuItem(value: 'resolved', child: Text(loc.crmWebChatStatusResolved)),
                     ],
                     onChanged: (v) {
                       if (v == null) return;
@@ -448,9 +792,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int?>(
                     value: assign, // ignore: deprecated_member_use
-                    decoration: const InputDecoration(labelText: 'تخصیص به', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: loc.crmWebChatAssignTo, border: const OutlineInputBorder()),
                     items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                      DropdownMenuItem<int?>(value: null, child: Text(loc.crmWebChatUnassigned)),
                       ..._businessUsers.map(
                         (u) => DropdownMenuItem<int?>(
                           value: (u['id'] as num?)?.toInt(),
@@ -466,25 +810,25 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                   TextField(
                     controller: leadCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'شناسه لید (اختیاری)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: loc.crmWebChatOptionalLeadId,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: personCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'شناسه شخص (اختیاری)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: loc.crmWebChatOptionalPersonId,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      int? parseId(String t) {
-                        final s = t.trim();
+                      int? parseId(String x) {
+                        final s = x.trim();
                         if (s.isEmpty) return null;
                         return int.tryParse(s);
                       }
@@ -498,7 +842,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         'person': pid,
                       });
                     },
-                    child: const Text('ذخیره'),
+                    child: Text(loc.save),
                   ),
                 ],
               );
@@ -521,65 +865,85 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     personCtrl.dispose();
   }
 
-  static String _embedSnippet(String apiBase, String publicKey) {
+  static String _embedSnippet(AppLocalizations t, String apiBase, String publicKey) {
     final base = apiBase.replaceAll(RegExp(r'/+$'), '');
-    return '''// پایه API: $base
-// مرحله ۱: POST /api/v1/public/crm-chat/conversations/start
-// بدنه: {"public_key": "$publicKey", "first_name", "last_name", "email", "phone", "page_url"}
-// سپس با visitor_token و conversation_id به POST /api/v1/public/crm-chat/messages پیام بفرستید.
-// جزئیات: مستندات CRM_WEB_CHAT در مخزن Hesabix''';
+    return t.crmWebChatEmbedSnippet(base, publicKey);
+  }
+
+  static bool _visitorFileAllowedInWidgetSettings(Map<String, dynamic> w) {
+    final s = w['settings'];
+    if (s is! Map) return true;
+    return s['allow_visitor_file_upload'] != false;
+  }
+
+  Map<String, dynamic> _mergeWidgetSettings(Map<String, dynamic> w, bool allowVisitorFile) {
+    final prev = w['settings'];
+    final m = <String, dynamic>{};
+    if (prev is Map) {
+      for (final e in prev.entries) {
+        m[e.key.toString()] = e.value;
+      }
+    }
+    if (allowVisitorFile) {
+      m.remove('allow_visitor_file_upload');
+    } else {
+      m['allow_visitor_file_upload'] = false;
+    }
+    return m;
   }
 
   Future<void> _createWidgetDialog() async {
-    if (!widget.authStore.canWriteSection('crm')) {
-      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+    if (!widget.authStore.canManageCrmWebChatWidgets()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
     final nameCtrl = TextEditingController();
     final originsCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final res = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ویجت چت جدید'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام')),
-            TextField(
-              controller: originsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'دامنه‌های مجاز (اختیاری)',
-                hintText: 'example.com، با ویرگول جدا کنید',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ایجاد')),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => _CrmWidgetFormDialog(
+        isEdit: false,
+        nameController: nameCtrl,
+        originsController: originsCtrl,
+        initialAllowVisitorFile: true,
+        initialIsActive: true,
+        businessFileUploadEnabled: _allowWebChatFileUpload,
       ),
     );
     try {
-      if (ok != true || !mounted) return;
+      if (res == null || res['save'] != true || !mounted) return;
+      final allowFile = res['allow_visitor_file'] == true;
       final raw = originsCtrl.text.trim();
       List<String>? origins;
       if (raw.isNotEmpty) {
-        origins = raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       }
+      final Map<String, dynamic>? st = _allowWebChatFileUpload
+          ? (allowFile ? null : <String, dynamic>{'allow_visitor_file_upload': false})
+          : null;
+      final t0 = AppLocalizations.of(context);
       await _svc.createWidget(
         businessId: widget.businessId,
-        name: nameCtrl.text.trim().isEmpty ? 'ویجت' : nameCtrl.text.trim(),
+        name: nameCtrl.text.trim().isEmpty ? t0.crmWebChatDefaultWidgetName : nameCtrl.text.trim(),
         allowedOrigins: origins,
+        settings: st,
       );
       await _loadAll();
-      if (mounted) SnackBarHelper.show(context, message: 'ویجت ایجاد شد');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatWidgetCreated);
+      }
     } catch (e) {
-      if (mounted) SnackBarHelper.show(
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
+      }
     } finally {
       nameCtrl.dispose();
       originsCtrl.dispose();
@@ -587,8 +951,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   }
 
   Future<void> _editWidgetDialog(Map<String, dynamic> w) async {
-    if (!widget.authStore.canWriteSection('crm')) {
-      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+    if (!widget.authStore.canManageCrmWebChatWidgets()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
     final id = w['id'] as int;
@@ -596,65 +961,51 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final originsCtrl = TextEditingController(
       text: (w['allowed_origins'] is List) ? (w['allowed_origins'] as List).map((e) => e.toString()).join('، ') : '',
     );
-    bool isActive = w['is_active'] == true;
-    final ok = await showDialog<bool>(
+    final res = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSt) {
-          return AlertDialog(
-            title: const Text('ویرایش ویجت'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام')),
-                  TextField(
-                    controller: originsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'دامنه‌های مجاز (اختیاری)',
-                      hintText: 'با ویرگول',
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('فعال'),
-                    value: isActive,
-                    onChanged: (v) => setSt(() => isActive = v),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
-            ],
-          );
-        },
+      barrierDismissible: false,
+      builder: (ctx) => _CrmWidgetFormDialog(
+        isEdit: true,
+        nameController: nameCtrl,
+        originsController: originsCtrl,
+        initialAllowVisitorFile: _visitorFileAllowedInWidgetSettings(w),
+        initialIsActive: w['is_active'] == true,
+        businessFileUploadEnabled: _allowWebChatFileUpload,
       ),
     );
     try {
-      if (ok != true || !mounted) return;
+      if (res == null || res['save'] != true || !mounted) return;
+      final allowFile = res['allow_visitor_file'] == true;
+      final isActive = res['is_active'] == true;
       final raw = originsCtrl.text.trim();
       List<String>? origins;
       if (raw.isNotEmpty) {
         origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       } else {
-        origins = const [];
+        origins = const <String>[];
       }
       await _svc.updateWidget(
         businessId: widget.businessId,
         widgetId: id,
         name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
         allowedOrigins: origins,
+        settings: _allowWebChatFileUpload ? _mergeWidgetSettings(w, allowFile) : null,
         isActive: isActive,
       );
       await _loadAll();
-      if (mounted) SnackBarHelper.show(context, message: 'ویجت به‌روز شد');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatWidgetUpdated);
+      }
     } catch (e) {
-      if (mounted) SnackBarHelper.show(
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
         isError: true,
       );
+      }
     } finally {
       nameCtrl.dispose();
       originsCtrl.dispose();
@@ -663,56 +1014,147 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.authStore.canReadSection('crm')) {
-      return const AccessDeniedPage(message: 'شما دسترسی لازم برای مشاهده CRM را ندارید');
+    if (!widget.authStore.canViewCrmWebChat()) {
+      return AccessDeniedPage(message: AppLocalizations.of(context).crmWebChatAccessDenied);
     }
 
+    final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final apiBase = AppConfig.apiBaseUrl;
+    final screenW = MediaQuery.sizeOf(context).width;
+    final wide = screenW >= 800;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('چت وب'),
+        title: Text(t.crmWebChatPageTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/crm/dashboard'),
+          onPressed: () {
+            if (!wide && _selectedConvId != null && !_mobileShowList) {
+              setState(() => _mobileShowList = true);
+            } else {
+              context.go('/business/${widget.businessId}/crm/dashboard');
+            }
+          },
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Center(
-              child: Icon(
-                _wsLive ? Icons.wifi : Icons.wifi_off,
-                size: 22,
-                color: _wsLive
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
+            padding: const EdgeInsets.only(right: 4, top: 4, bottom: 4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Icon(
+                    _wsLive ? Icons.wifi : Icons.wifi_off,
+                    size: 20,
+                    color: _wsLive
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.outline,
+                  ),
+                  Text(
+                    _socketStatusText(t),
+                    textAlign: TextAlign.end,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      height: 1.1,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'بارگذاری مجدد',
+            tooltip: t.crmWebChatRefreshTooltip,
             onPressed: () => _loadAll(),
           ),
-          if (widget.authStore.canWriteSection('crm'))
+          if (widget.authStore.canManageCrmWebChatWidgets())
             IconButton(icon: const Icon(Icons.add), onPressed: _createWidgetDialog),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Row(
-              children: [
-                SizedBox(
-                  width: 360,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+          : _buildMainBody(theme, t, cs, apiBase, wide: wide),
+    );
+  }
+
+  Widget _buildMainBody(ThemeData theme, AppLocalizations t, ColorScheme cs, String apiBase, {required bool wide}) {
+    if (!wide) {
+      if (_selectedConvId != null && !_mobileShowList) {
+        return _buildThreadPanel(context, theme, cs);
+      }
+      return _buildConversationsListColumn(
+        theme: theme,
+        t: t,
+        cs: cs,
+        apiBase: apiBase,
+        width: MediaQuery.sizeOf(context).width,
+      );
+    }
+    return Row(
+      children: [
+        _buildConversationsListColumn(
+          theme: theme,
+          t: t,
+          cs: cs,
+          apiBase: apiBase,
+          width: 380,
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(
+          child: _selectedConvId == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      t.crmWebChatSelectConversation,
+                      style: theme.textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                )
+              : _buildThreadPanel(context, theme, cs),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConversationsListColumn({
+    required ThemeData theme,
+    required AppLocalizations t,
+    required ColorScheme cs,
+    required String apiBase,
+    required double width,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextField(
+              controller: _convSearchCtrl,
+              onChanged: _onConvSearchChanged,
+              decoration: InputDecoration(
+                hintText: t.crmWebChatSearchConversationsHint,
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                         child: Text(
-                          'فیلتر وضعیت',
+                          t.crmWebChatFilterStatusLabel,
                           style: theme.textTheme.labelLarge,
                         ),
                       ),
@@ -722,35 +1164,35 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                           spacing: 4,
                           children: [
                             ChoiceChip(
-                              label: const Text('همه'),
+                              label: Text(t.crmWebChatFilterAll),
                               selected: _statusFilter == null,
                               onSelected: (_) async {
                                 setState(() => _statusFilter = null);
-                                await _loadConversationsList();
+                                await _loadConversationsList(reset: true);
                               },
                             ),
                             ChoiceChip(
-                              label: const Text('باز'),
+                              label: Text(t.crmWebChatStatusOpen),
                               selected: _statusFilter == 'open',
                               onSelected: (_) async {
                                 setState(() => _statusFilter = 'open');
-                                await _loadConversationsList();
+                                await _loadConversationsList(reset: true);
                               },
                             ),
                             ChoiceChip(
-                              label: const Text('در انتظار'),
+                              label: Text(t.crmWebChatStatusPending),
                               selected: _statusFilter == 'pending',
                               onSelected: (_) async {
                                 setState(() => _statusFilter = 'pending');
-                                await _loadConversationsList();
+                                await _loadConversationsList(reset: true);
                               },
                             ),
                             ChoiceChip(
-                              label: const Text('حل‌شده'),
+                              label: Text(t.crmWebChatStatusResolved),
                               selected: _statusFilter == 'resolved',
                               onSelected: (_) async {
                                 setState(() => _statusFilter = 'resolved');
-                                await _loadConversationsList();
+                                await _loadConversationsList(reset: true);
                               },
                             ),
                           ],
@@ -760,7 +1202,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         const Divider(height: 1),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                          child: Text('ویجت‌ها', style: theme.textTheme.titleSmall),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.crmWebChatWidgetsSectionTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              Text(
+                                t.crmWebChatWidgetsSectionHint,
+                                style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
+                              ),
+                            ],
+                          ),
                         ),
                         SizedBox(
                           height: 160,
@@ -769,37 +1221,62 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                             itemBuilder: (ctx, i) {
                               final w = _widgets[i] as Map<String, dynamic>;
                               final pk = w['public_key']?.toString() ?? '';
-                              final name = w['name']?.toString() ?? 'ویجت';
+                              final name = w['name']?.toString() ?? t.crmWebChatDefaultWidgetName;
                               final active = w['is_active'] == true;
+                              final guestFile = _visitorFileAllowedInWidgetSettings(w);
+                              final fileHint = !_allowWebChatFileUpload
+                                  ? t.crmWebChatVisitorAttachmentCrmOff
+                                  : (guestFile
+                                      ? t.crmWebChatVisitorAttachmentAllowed
+                                      : t.crmWebChatVisitorAttachmentWidgetOff);
                               return Card(
                                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                clipBehavior: Clip.antiAlias,
                                 child: ListTile(
                                   dense: true,
-                                  title: Text(name),
-                                  subtitle: Text(
-                                    active ? 'فعال' : 'غیرفعال',
-                                    style: TextStyle(color: active ? cs.primary : cs.error),
+                                  title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  isThreeLine: true,
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        active ? t.crmWebChatWidgetStateActive : t.crmWebChatWidgetStateInactive,
+                                        style: TextStyle(
+                                          color: active ? cs.primary : cs.error,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        fileHint,
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   trailing: PopupMenuButton<String>(
                                     onSelected: (k) {
                                       if (k == 'copy_pk') {
-                                        unawaited(_copyText(pk, 'کلید عمومی کپی شد'));
+                                        unawaited(_copyText(pk, t.crmWebChatPublicKeyCopied));
                                       } else if (k == 'copy_embed') {
                                         unawaited(
                                           _copyText(
-                                            _embedSnippet(apiBase, pk),
-                                            'راهنمای اتصال کپی شد',
+                                            _embedSnippet(t, apiBase, pk),
+                                            t.crmWebChatEmbedGuideCopied,
                                           ),
                                         );
-                                      } else if (k == 'edit' && widget.authStore.canWriteSection('crm')) {
+                                      } else if (k == 'edit' && widget.authStore.canManageCrmWebChatWidgets()) {
                                         _editWidgetDialog(w);
                                       }
                                     },
                                     itemBuilder: (c) => [
-                                      const PopupMenuItem(value: 'copy_pk', child: Text('کپی کلید عمومی')),
-                                      const PopupMenuItem(value: 'copy_embed', child: Text('کپی راهنمای API')),
-                                      if (widget.authStore.canWriteSection('crm'))
-                                        const PopupMenuItem(value: 'edit', child: Text('ویرایش…')),
+                                      PopupMenuItem(value: 'copy_pk', child: Text(t.crmWebChatMenuCopyPublicKey)),
+                                      PopupMenuItem(value: 'copy_embed', child: Text(t.crmWebChatMenuCopyApiGuide)),
+                                      if (widget.authStore.canManageCrmWebChatWidgets())
+                                        PopupMenuItem(value: 'edit', child: Text(t.crmWebChatMenuEdit)),
                                     ],
                                   ),
                                 ),
@@ -808,71 +1285,70 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                           ),
                         ),
                       ] else
-                        const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Text('هنوز ویجی نساخته‌اید — از + استفاده کنید.'),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(t.crmWebChatNoWidgetsYet),
                         ),
                       const Divider(height: 1),
                       Expanded(
-                        child: _conversations.isEmpty
-                            ? const Center(
-                                child: Text('مکالمه‌ای نیست — یا فیلتر را تغییر دهید'),
-                              )
-                            : ListView.builder(
-                                itemCount: _conversations.length,
-                                itemBuilder: (ctx, i) {
-                                  final c = _conversations[i] as Map<String, dynamic>;
-                                  final id = c['id'] as int;
-                                  final title =
-                                      '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}'.trim();
-                                  final sub = c['visitor_email']?.toString() ?? '';
-                                  final ph = c['visitor_phone']?.toString() ?? '';
-                                  final sel = _selectedConvId == id;
-                                  final lma = c['last_message_at']?.toString() ?? '';
-                                  return ListTile(
-                                    selected: sel,
-                                    title: Text(title.isEmpty ? 'مکالمه $id' : title,
-                                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    subtitle: Text(
-                                      [sub, ph, if (lma.isNotEmpty) lma].join(' · '),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    trailing: Text(_statusLabel(c['status']?.toString()), style: theme.textTheme.bodySmall),
-                                    onTap: () => _selectConversation(id),
-                                  );
-                                },
-                              ),
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _onConversationsListScroll,
+                          child: _conversations.isEmpty
+                              ? Center(
+                                  child: Text(t.crmWebChatNoConversations),
+                                )
+                              : ListView.builder(
+                                  itemCount: _conversations.length + (_convHasMore && _loadingMoreConvs ? 1 : 0),
+                                  itemBuilder: (ctx, i) {
+                                    if (i == _conversations.length) {
+                                      return const Padding(
+                                        padding: EdgeInsets.all(8),
+                                        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                                      );
+                                    }
+                                    final c = _conversations[i] as Map<String, dynamic>;
+                                    final id = c['id'] as int;
+                                    final title =
+                                        '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}'.trim();
+                                    final sub = c['visitor_email']?.toString() ?? '';
+                                    final ph = c['visitor_phone']?.toString() ?? '';
+                                    final purl = c['page_url']?.toString().trim() ?? '';
+                                    final sel = _selectedConvId == id;
+                                    final lma = c['last_message_at']?.toString() ?? '';
+                                    return ListTile(
+                                      selected: sel,
+                                      title: Text(title.isEmpty ? t.crmWebChatConversationNumber(id) : title,
+                                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      subtitle: Text(
+                                        [
+                                          sub,
+                                          ph,
+                                          if (purl.isNotEmpty) purl,
+                                          if (lma.isNotEmpty) lma,
+                                        ].join(' · '),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      trailing: Text(_statusLabel(t, c['status']?.toString()), style: theme.textTheme.bodySmall),
+                                      onTap: () => _selectConversation(id),
+                                    );
+                                  },
+                                ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: _selectedConvId == null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              'یک مکالمه را انتخاب کنید',
-                              style: theme.textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                          ),
-                        )
-                      : _buildThreadPanel(theme, cs),
-                ),
-              ],
-            ),
     );
   }
 
-  Widget _buildThreadPanel(ThemeData theme, ColorScheme cs) {
+  Widget _buildThreadPanel(BuildContext context, ThemeData theme, ColorScheme cs) {
+    final t = AppLocalizations.of(context);
     final c = _conversations.firstWhere(
       (e) => e is Map && (e)['id'] == _selectedConvId,
       orElse: () => <String, dynamic>{},
     );
     if (c is! Map || c['id'] == null) {
-      return const Center(child: Text('مکالمه یافت نشد — به‌روزرسانی را بزنید'));
+      return Center(child: Text(t.crmWebChatConversationNotFoundRefresh));
     }
     final conv = Map<String, dynamic>.from(c);
     final pageUrl = conv['page_url']?.toString();
@@ -883,9 +1359,11 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         if (_loadingMsgs) LinearProgressIndicator(minHeight: 2, color: cs.primary),
         Material(
           color: cs.surfaceContainerHighest,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
               children: [
                 CircleAvatar(
                   child: Text(
@@ -903,38 +1381,54 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       if (pageUrl != null && pageUrl.isNotEmpty)
-                        InkWell(
-                          onTap: () async {
-                            final u = Uri.tryParse(pageUrl);
-                            if (u != null && await canLaunchUrl(u)) {
-                              await launchUrl(u, mode: LaunchMode.externalApplication);
-                            }
-                          },
-                          child: Text(
-                            pageUrl,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.crmWebChatVisitorStartPageLabel,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () async {
+                                  final u = Uri.tryParse(pageUrl);
+                                  if (u != null && await canLaunchUrl(u)) {
+                                    await launchUrl(u, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                child: Text(
+                                  pageUrl,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       Text(
-                        '${conv['visitor_email'] ?? ''}  ·  ${conv['visitor_phone'] ?? ''}  ·  ویجت: ${_widgetName((conv['widget_id'] as num?)?.toInt())}',
+                        '${conv['visitor_email'] ?? ''}  ·  ${conv['visitor_phone'] ?? ''}  ·  ${t.crmWebChatWidgetLine(_widgetName((conv['widget_id'] as num?)?.toInt()))}',
                         style: theme.textTheme.bodySmall,
                       ),
-                      if (assignName != null) Text('مسئول: $assignName', style: theme.textTheme.bodySmall),
+                      if (assignName != null) Text(t.crmWebChatAssigneeLine(assignName), style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
-                if (widget.authStore.canWriteSection('crm'))
+                if (widget.authStore.canEditCrmWebChatConversations())
                   FilledButton.tonal(
                     onPressed: () => _showEditConvSheet(conv),
-                    child: const Text('ویرایش مکالمه'),
+                    child: Text(t.crmWebChatEditConversationButton),
                   ),
                 TextButton(
                   onPressed: () => context.push('/business/${widget.businessId}/crm/leads'),
-                  child: const Text('لیدها'),
+                  child: Text(t.crmWebChatLeads),
                 ),
               ],
+            ),
             ),
           ),
         ),
@@ -942,16 +1436,29 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
           child: ListView.builder(
             controller: _msgScroll,
             padding: const EdgeInsets.all(12),
-            itemCount: _messages.length,
+            itemCount: _messages.length + (_loadingOlderMsgs ? 1 : 0),
             itemBuilder: (ctx, i) {
-              final m = _messages[i] as Map<String, dynamic>;
+              if (_loadingOlderMsgs && i == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Center(
+                    child: Text(t.crmWebChatLoadOlder, style: theme.textTheme.labelSmall),
+                  ),
+                );
+              }
+              final mi = i - (_loadingOlderMsgs ? 1 : 0);
+              if (mi < 0 || mi >= _messages.length) {
+                return const SizedBox.shrink();
+              }
+              final m = _messages[mi] as Map<String, dynamic>;
               final role = m['sender_role']?.toString() ?? '';
               final body = m['body']?.toString() ?? '';
+              final isDeleted = m['is_deleted'] == true;
               final agent = role == 'agent';
               final uid = (m['user_id'] as num?)?.toInt();
               final who = agent
-                  ? (uid != null ? (_nameForUserId(uid) ?? 'پشتیبان') : 'پشتیبان')
-                  : 'بازدیدکننده';
+                  ? (uid != null ? (_nameForUserId(uid) ?? t.crmWebChatRoleAgent) : t.crmWebChatRoleAgent)
+                  : t.crmWebChatRoleVisitor;
               final file = m['file'];
               return Align(
                 alignment: agent ? Alignment.centerLeft : Alignment.centerRight,
@@ -960,20 +1467,22 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   constraints: const BoxConstraints(maxWidth: 520),
                   decoration: BoxDecoration(
-                    color: agent ? cs.primaryContainer : cs.secondaryContainer,
+                    color: isDeleted
+                        ? cs.surfaceContainerHighest
+                        : (agent ? cs.primaryContainer : cs.secondaryContainer),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (file is Map && file['id'] != null)
+                      if (file is Map && file['id'] != null && !isDeleted)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: InkWell(
                             onTap: () => _downloadChatFile(
                               file['id']!.toString(),
-                              file['original_name']?.toString() ?? 'file',
+                              file['original_name']?.toString() ?? t.crmWebChatFileLabel,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -982,7 +1491,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
-                                    file['original_name']?.toString() ?? 'فایل',
+                                    file['original_name']?.toString() ?? t.crmWebChatFileLabel,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -996,11 +1505,62 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                             ),
                           ),
                         ),
-                      if (body.isNotEmpty) Text(body, style: theme.textTheme.bodyMedium),
+                      if (isDeleted)
+                        Text(
+                          t.crmWebChatMessageDeleted,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else if (body.isNotEmpty)
+                        Text(body, style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 4),
-                      Text(
-                        '$who  ·  ${_formatMsgTime(m['created_at'])}',
-                        style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$who  ·  ${_formatMsgTime(m['created_at'])}',
+                              style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                          if (!isDeleted)
+                            Tooltip(
+                              message: _messageHasReadReceipt(m)
+                                  ? t.crmWebChatTooltipMessageRead
+                                  : t.crmWebChatTooltipMessageSent,
+                              child: Icon(
+                                Icons.done_all,
+                                size: 15,
+                                color: _messageHasReadReceipt(m)
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          if (widget.authStore.canDeleteCrmWebChatMessages() && !isDeleted)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              onPressed: () async {
+                                final id = (m['id'] as num?)?.toInt();
+                                if (id == null) return;
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: Text(t.crmWebChatDeleteMessage),
+                                    content: Text(t.crmWebChatDeleteMessageConfirm),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+                                    ],
+                                  ),
+                                );
+                                if (ok == true && mounted) await _deleteMessage(id);
+                              },
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -1009,7 +1569,21 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
             },
           ),
         ),
-        if (widget.authStore.canWriteSection('crm'))
+        if (_peerTyping)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                t.crmWebChatPeerTyping,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ),
+        if (widget.authStore.canReplyCrmWebChat())
           Material(
             color: cs.surface,
             elevation: 1,
@@ -1022,13 +1596,29 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (_allowWebChatFileUpload)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: IconButton.filledTonal(
+                          tooltip: t.crmWebChatAttachFileTooltip,
+                          onPressed: (_selectedConvId == null || _sendingFile) ? null : _pickAndSendAgentFile,
+                          icon: _sendingFile
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.attach_file_outlined),
+                        ),
+                      ),
+                    if (_allowWebChatFileUpload) const SizedBox(width: 4),
                     Expanded(
                       child: TextField(
                         controller: _replyCtrl,
                         focusNode: _replyFocus,
-                        decoration: const InputDecoration(
-                          hintText: 'پاسخ… (Ctrl+Enter ارسال)',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: t.crmWebChatReplyHint,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         minLines: 1,
@@ -1037,13 +1627,210 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    FilledButton(onPressed: _sendReply, child: const Text('ارسال')),
+                    FilledButton(
+                      onPressed: _sendingFile ? null : _sendReply,
+                      child: Text(t.crmWebChatSend),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// دیالوگ ایجاد / ویرایش ویجت چت (ظاهر به‌روز و گزینهٔ پیوست برای مهمان).
+class _CrmWidgetFormDialog extends StatefulWidget {
+  const _CrmWidgetFormDialog({
+    required this.isEdit,
+    required this.nameController,
+    required this.originsController,
+    required this.initialAllowVisitorFile,
+    required this.initialIsActive,
+    required this.businessFileUploadEnabled,
+  });
+
+  final bool isEdit;
+  final TextEditingController nameController;
+  final TextEditingController originsController;
+  final bool initialAllowVisitorFile;
+  final bool initialIsActive;
+  final bool businessFileUploadEnabled;
+
+  @override
+  State<_CrmWidgetFormDialog> createState() => _CrmWidgetFormDialogState();
+}
+
+class _CrmWidgetFormDialogState extends State<_CrmWidgetFormDialog> {
+  late bool _allowVisitorFile;
+  late bool _isActive;
+
+  @override
+  void initState() {
+    super.initState();
+    _allowVisitorFile = widget.initialAllowVisitorFile;
+    _isActive = widget.initialIsActive;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final t = AppLocalizations.of(context);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Icon(Icons.chat_bubble_outline_rounded, color: cs.onPrimaryContainer, size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.isEdit ? t.crmWebChatWidgetDialogTitleEdit : t.crmWebChatWidgetDialogTitleNew,
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            t.crmWebChatWidgetDialogIntro,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: widget.nameController,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: t.crmWebChatWidgetNameLabel,
+                    hintText: t.crmWebChatWidgetNameHint,
+                    helperText: t.crmWebChatWidgetNameHelper,
+                    helperMaxLines: 2,
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: widget.originsController,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: t.crmWebChatWidgetOriginsLabel,
+                    hintText: t.crmWebChatWidgetOriginsHint,
+                    helperText: t.crmWebChatWidgetOriginsHelper,
+                    helperMaxLines: 4,
+                    filled: true,
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Material(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.crmWebChatVisitorFileSwitchTitle),
+                      subtitle: Text(
+                        widget.businessFileUploadEnabled
+                            ? t.crmWebChatVisitorFileSwitchOn
+                            : t.crmWebChatVisitorFileSwitchOff,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      value: _allowVisitorFile && widget.businessFileUploadEnabled,
+                      onChanged: widget.businessFileUploadEnabled
+                          ? (v) => setState(() {
+                                _allowVisitorFile = v;
+                              })
+                          : null,
+                    ),
+                  ),
+                ),
+                if (widget.isEdit) ...[
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t.crmWebChatWidgetActiveTitle),
+                    subtitle: Text(
+                      t.crmWebChatWidgetActiveSubtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                    ),
+                    value: _isActive,
+                    onChanged: (v) => setState(() => _isActive = v),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(t.cancel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        if (widget.nameController.text.trim().isEmpty) {
+                          SnackBarHelper.show(
+                            context,
+                            message: t.crmWebChatNameRequired,
+                            isError: true,
+                          );
+                          return;
+                        }
+                        Navigator.pop(context, <String, dynamic>{
+                          'save': true,
+                          'allow_visitor_file': _allowVisitorFile,
+                          'is_active': _isActive,
+                        });
+                      },
+                      child: Text(widget.isEdit ? t.save : t.crmWebChatCreate),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

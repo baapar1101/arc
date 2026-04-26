@@ -119,7 +119,11 @@
 
 ### ۳) لیست پیام‌ها (بازدیدکننده)
 
-`GET /api/v1/public/crm-chat/conversations/{conversation_id}/messages?visitor_token=<token>&limit=100`
+`GET /api/v1/public/crm-chat/conversations/{conversation_id}/messages?limit=100`
+
+- **اقدام لازم:** ارسال توکن بازدیدکننده **در هدر** (روش جدید، توصیه‌شده): `X-Visitor-Token: <token>` **یا** `Authorization: Bearer <token>`.  
+- **سازگاری:** همچنان می‌توان `?visitor_token=<token>` فرستاد (الویت: هدر).  
+- **CORS preflight:** هدر `X-Visitor-Token` (یا `Authorization`) باید در `Access-Control-Allow-Headers` اجازه داشته باشد (بک‌اند حسابیکس `allow_headers` را باز دارد).
 
 ساختار آیتم‌ها: بخش [شکل پاسخ پیام‌ها](#شکل-پاسخ-پیام‌ها-شامل-فایل).
 
@@ -176,10 +180,11 @@ const json = await res.json();
 
 ### دانلود فایل (با همان `visitor_token`)
 
-`GET /api/v1/public/crm-chat/conversations/{conversation_id}/files/{file_id}/download?visitor_token=<token>`
+`GET /api/v1/public/crm-chat/conversations/{conversation_id}/files/{file_id}/download`
 
+- همان هدر `X-Visitor-Token` یا `Authorization: Bearer` ([یا قدیم] `?visitor_token=`).  
 - `file_id` همان `file.id` داخل آبجکت `file` در آیتم پیام است.  
-- پاسخ: باینری فایل با `Content-Disposition: attachment` (مثل دانلود معمول).
+- پاسخ: باینری فایل با `Content-Disposition: attachment` (مثل دانلود معمول)؛ در `fetch` بهتر است با هدر بگیرید و `blob` را ذخیره کنید (نه `window.open` با query توکن).
 
 ---
 
@@ -309,7 +314,7 @@ const json = await res.json();
 
 - `visitor_token` را **شبیه session** ببینید؛ در URLهای اشتراکی/لاگ تولیدی قرارش ندهید.  
 - `public_key` را **عمومی** می‌پذیرید (برای شروع مکالمه)؛ اما **مدیریت ویجت** و داده‌های حساس فقط با API Key.  
-- Rate limiting ممکن است در سطح **زیرساخت/فایروال** اعمال شود.
+- **محدودیت نرخ** این مسیرها از **فایروال مرکزی** (جدول `firewall_rate_policies` در دیتابیس، ارزیابی در `internal_firewall_middleware`) اعمال می‌شود؛ از پنل ادمین APIهای `GET/POST/PUT/DELETE .../admin/firewall/rate-policies` قابل مدیریت است. در Nginx استقرار، برای `/api/v1/public/crm-chat/` عمداً `limit_req` حذف شده تا فقط همین لایه حاکم باشد.
 
 ---
 

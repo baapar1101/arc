@@ -112,4 +112,30 @@ class AdminFirewallService {
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
+
+  /// سیاست نرخ مسیر (فایروال مرکزی / `firewall_rate_policies`)
+  Future<Map<String, dynamic>> listRatePolicies() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/firewall/rate-policies');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> createRatePolicy(Map<String, dynamic> body) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/firewall/rate-policies',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updateRatePolicy(int id, Map<String, dynamic> body) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/firewall/rate-policies/$id',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<void> deleteRatePolicy(int id) async {
+    await _api.delete<Map<String, dynamic>>('/api/v1/admin/firewall/rate-policies/$id');
+  }
 }

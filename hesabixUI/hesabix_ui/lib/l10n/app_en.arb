@@ -3227,11 +3227,21 @@
   "settingsRedisCache": "Redis Cache",
   "settingsRedisCacheDescription": "Configure Redis cache for improved performance",
   "settingsFirewall": "Application firewall",
-  "settingsFirewallDescription": "IP allow/deny rules, temporary bans, logs and reports",
+  "settingsFirewallDescription": "IP allow/deny, per-path rate limits (database), temporary bans, logs and reports",
   "firewallTabRules": "Rules",
+  "firewallTabRatePolicies": "Path rate limits",
   "firewallTabBlockLogs": "Blocked requests",
   "firewallTabAudit": "Audit log",
   "firewallTabReports": "Reports",
+  "firewallAddRatePolicy": "Add rate policy",
+  "firewallEditRatePolicy": "Edit rate policy",
+  "firewallRatePolicyPathRequired": "Path prefix (e.g. /api/v1/public/crm-chat)",
+  "firewallRateMaxRequests": "Max requests per window",
+  "firewallRateWindowSeconds": "Window size (seconds)",
+  "firewallNoRatePolicies": "No rate policies. Use this for per-IP limits on public API paths (e.g. web chat).",
+  "firewallDeleteRatePolicyTitle": "Delete rate policy?",
+  "firewallDeleteRatePolicyBody": "The rate limit for this path will be removed.",
+  "firewallEnabled": "Enabled",
   "firewallAddRule": "Add rule",
   "firewallEditRule": "Edit rule",
   "firewallActionLabel": "Action",
@@ -4202,5 +4212,142 @@
         "type": "String"
       }
     }
-  }
+  },
+  "crmWebChatError": "Error: {detail}",
+  "@crmWebChatError": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatErrorLoadingMessages": "Error loading messages: {detail}",
+  "@crmWebChatErrorLoadingMessages": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatStatusOpen": "Open",
+  "crmWebChatStatusPending": "Pending",
+  "crmWebChatStatusResolved": "Resolved",
+  "crmWebChatFileSaved": "File saved",
+  "crmWebChatErrorDownload": "Download error: {detail}",
+  "@crmWebChatErrorDownload": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatFileUploadDisabledCrm": "File uploads are disabled in CRM settings.",
+  "crmWebChatFileReadFailed": "Could not read the file (size or browser limit). Try a smaller file.",
+  "crmWebChatFileIdMissing": "File id was not returned from the server.",
+  "crmWebChatFileSent": "File sent",
+  "crmWebChatNoCrmWritePermission": "You do not have permission to change CRM data.",
+  "crmWebChatMessageSent": "Sent",
+  "crmWebChatSaved": "Saved",
+  "crmWebChatWidgetCreated": "Chat widget created",
+  "crmWebChatWidgetUpdated": "Chat widget updated",
+  "crmWebChatEditConversationTitle": "Edit conversation",
+  "crmWebChatFieldStatus": "Status",
+  "crmWebChatAssignTo": "Assign to",
+  "crmWebChatOptionalLeadId": "Lead id (optional)",
+  "crmWebChatOptionalPersonId": "Person id (optional)",
+  "crmWebChatUnassigned": "—",
+  "crmWebChatEmbedSnippet": "// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.",
+  "@crmWebChatEmbedSnippet": {
+    "placeholders": {
+      "base": {
+        "type": "String"
+      },
+      "publicKey": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatDefaultWidgetName": "Widget",
+  "crmWebChatAccessDenied": "You do not have access to view CRM.",
+  "crmWebChatPageTitle": "Web chat",
+  "crmWebChatSearchConversationsHint": "Search conversations, ID, email…",
+  "crmWebChatMessageDeleted": "This message was deleted",
+  "crmWebChatLoadOlder": "Loading…",
+  "crmWebChatDeleteMessage": "Delete message",
+  "crmWebChatDeleteMessageConfirm": "Deleting this message cannot be undone. Continue?",
+  "crmWebChatRefreshTooltip": "Reload",
+  "crmWebChatFilterStatusLabel": "Status filter",
+  "crmWebChatFilterAll": "All",
+  "crmWebChatWidgetsSectionTitle": "Chat widgets",
+  "crmWebChatWidgetsSectionHint": "Use edit for the public key and to disable file upload per site.",
+  "crmWebChatVisitorAttachmentCrmOff": "Visitor attachments: off (enable in CRM settings first).",
+  "crmWebChatVisitorAttachmentAllowed": "Visitor attachments: allowed — business storage.",
+  "crmWebChatVisitorAttachmentWidgetOff": "Visitor attachments: off for this widget.",
+  "crmWebChatWidgetStateActive": "State: active — embedded on the site",
+  "crmWebChatWidgetStateInactive": "State: inactive — new conversations cannot start with this key",
+  "crmWebChatPublicKeyCopied": "Public key copied",
+  "crmWebChatEmbedGuideCopied": "Connection guide copied",
+  "crmWebChatMenuCopyPublicKey": "Copy public key",
+  "crmWebChatMenuCopyApiGuide": "Copy API guide",
+  "crmWebChatMenuEdit": "Edit…",
+  "crmWebChatNoWidgetsYet": "No widgets yet — use + to add one.",
+  "crmWebChatNoConversations": "No conversations — try changing the filter",
+  "crmWebChatConversationNumber": "Conversation {id}",
+  "@crmWebChatConversationNumber": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "crmWebChatSelectConversation": "Select a conversation",
+  "crmWebChatConversationNotFoundRefresh": "Conversation not found — try refreshing",
+  "crmWebChatVisitorStartPageLabel": "Page where chat started (visitor)",
+  "crmWebChatWidgetLine": "Widget: {name}",
+  "@crmWebChatWidgetLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatAssigneeLine": "Owner: {name}",
+  "@crmWebChatAssigneeLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatEditConversationButton": "Edit conversation",
+  "crmWebChatLeads": "Leads",
+  "crmWebChatRoleAgent": "Agent",
+  "crmWebChatRoleVisitor": "Visitor",
+  "crmWebChatFileLabel": "File",
+  "crmWebChatAttachFileTooltip": "Attach file (business storage, context crm_web_chat)",
+  "crmWebChatReplyHint": "Reply… (Ctrl+Enter to send)",
+  "crmWebChatSend": "Send",
+  "crmWebChatWidgetDialogTitleEdit": "Edit chat widget",
+  "crmWebChatWidgetDialogTitleNew": "New chat widget",
+  "crmWebChatWidgetDialogIntro": "After creation, copy the public key and API connection guide from the widget’s ⋯ menu. Allowed domains only affect browser security (CORS).",
+  "crmWebChatWidgetNameLabel": "Widget name (internal)",
+  "crmWebChatWidgetNameHint": "e.g. My shop",
+  "crmWebChatWidgetNameHelper": "Only visible in your panel to tell widgets apart.",
+  "crmWebChatWidgetOriginsLabel": "Allowed request domains",
+  "crmWebChatWidgetOriginsHint": "shop.example.com, blog.shop.example.com",
+  "crmWebChatWidgetOriginsHelper": "Optional. Host names only (no https://), separated by a comma. If empty, domain rules follow the API docs. For a specific site, add that host here.",
+  "crmWebChatVisitorFileSwitchTitle": "Let site visitors send files",
+  "crmWebChatVisitorFileSwitchOn": "Subject to your storage plan. You can turn this off for this widget only; if left on, it matches other widgets.",
+  "crmWebChatVisitorFileSwitchOff": "Disabled at business level. In CRM settings (e.g. Communications → CRM settings), turn on web chat file upload, then return and set this switch.",
+  "crmWebChatWidgetActiveTitle": "Widget active",
+  "crmWebChatWidgetActiveSubtitle": "If off, new conversations cannot start with this public key (existing threads stay in the panel).",
+  "crmWebChatNameRequired": "Enter a widget name (e.g. site or section).",
+  "crmWebChatCreate": "Create",
+  "crmWebChatSocketLive": "Live",
+  "crmWebChatSocketPolling": "Polling",
+  "crmWebChatSocketOffline": "Offline",
+  "crmWebChatSocketNoKey": "No key",
+  "crmWebChatPeerTyping": "Visitor is typing…",
+  "crmWebChatTooltipMessageSent": "Sent",
+  "crmWebChatTooltipMessageRead": "Read"
 }

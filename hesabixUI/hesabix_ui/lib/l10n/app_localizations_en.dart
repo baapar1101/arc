@@ -8433,10 +8433,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFirewallDescription =>
-      'IP allow/deny rules, temporary bans, logs and reports';
+      'IP allow/deny, per-path rate limits (database), temporary bans, logs and reports';
 
   @override
   String get firewallTabRules => 'Rules';
+
+  @override
+  String get firewallTabRatePolicies => 'Path rate limits';
 
   @override
   String get firewallTabBlockLogs => 'Blocked requests';
@@ -8446,6 +8449,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get firewallTabReports => 'Reports';
+
+  @override
+  String get firewallAddRatePolicy => 'Add rate policy';
+
+  @override
+  String get firewallEditRatePolicy => 'Edit rate policy';
+
+  @override
+  String get firewallRatePolicyPathRequired =>
+      'Path prefix (e.g. /api/v1/public/crm-chat)';
+
+  @override
+  String get firewallRateMaxRequests => 'Max requests per window';
+
+  @override
+  String get firewallRateWindowSeconds => 'Window size (seconds)';
+
+  @override
+  String get firewallNoRatePolicies =>
+      'No rate policies. Use this for per-IP limits on public API paths (e.g. web chat).';
+
+  @override
+  String get firewallDeleteRatePolicyTitle => 'Delete rate policy?';
+
+  @override
+  String get firewallDeleteRatePolicyBody =>
+      'The rate limit for this path will be removed.';
+
+  @override
+  String get firewallEnabled => 'Enabled';
 
   @override
   String get firewallAddRule => 'Add rule';
@@ -11027,4 +11060,297 @@ class AppLocalizationsEn extends AppLocalizations {
   String invoiceFxRateRow(String rate, String effective, String idPart) {
     return '$rate — $effective$idPart';
   }
+
+  @override
+  String crmWebChatError(String detail) {
+    return 'Error: $detail';
+  }
+
+  @override
+  String crmWebChatErrorLoadingMessages(String detail) {
+    return 'Error loading messages: $detail';
+  }
+
+  @override
+  String get crmWebChatStatusOpen => 'Open';
+
+  @override
+  String get crmWebChatStatusPending => 'Pending';
+
+  @override
+  String get crmWebChatStatusResolved => 'Resolved';
+
+  @override
+  String get crmWebChatFileSaved => 'File saved';
+
+  @override
+  String crmWebChatErrorDownload(String detail) {
+    return 'Download error: $detail';
+  }
+
+  @override
+  String get crmWebChatFileUploadDisabledCrm =>
+      'File uploads are disabled in CRM settings.';
+
+  @override
+  String get crmWebChatFileReadFailed =>
+      'Could not read the file (size or browser limit). Try a smaller file.';
+
+  @override
+  String get crmWebChatFileIdMissing =>
+      'File id was not returned from the server.';
+
+  @override
+  String get crmWebChatFileSent => 'File sent';
+
+  @override
+  String get crmWebChatNoCrmWritePermission =>
+      'You do not have permission to change CRM data.';
+
+  @override
+  String get crmWebChatMessageSent => 'Sent';
+
+  @override
+  String get crmWebChatSaved => 'Saved';
+
+  @override
+  String get crmWebChatWidgetCreated => 'Chat widget created';
+
+  @override
+  String get crmWebChatWidgetUpdated => 'Chat widget updated';
+
+  @override
+  String get crmWebChatEditConversationTitle => 'Edit conversation';
+
+  @override
+  String get crmWebChatFieldStatus => 'Status';
+
+  @override
+  String get crmWebChatAssignTo => 'Assign to';
+
+  @override
+  String get crmWebChatOptionalLeadId => 'Lead id (optional)';
+
+  @override
+  String get crmWebChatOptionalPersonId => 'Person id (optional)';
+
+  @override
+  String get crmWebChatUnassigned => '—';
+
+  @override
+  String crmWebChatEmbedSnippet(String base, String publicKey) {
+    return '// API base: $base\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"$publicKey\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.';
+  }
+
+  @override
+  String get crmWebChatDefaultWidgetName => 'Widget';
+
+  @override
+  String get crmWebChatAccessDenied => 'You do not have access to view CRM.';
+
+  @override
+  String get crmWebChatPageTitle => 'Web chat';
+
+  @override
+  String get crmWebChatSearchConversationsHint =>
+      'Search conversations, ID, email…';
+
+  @override
+  String get crmWebChatMessageDeleted => 'This message was deleted';
+
+  @override
+  String get crmWebChatLoadOlder => 'Loading…';
+
+  @override
+  String get crmWebChatDeleteMessage => 'Delete message';
+
+  @override
+  String get crmWebChatDeleteMessageConfirm =>
+      'Deleting this message cannot be undone. Continue?';
+
+  @override
+  String get crmWebChatRefreshTooltip => 'Reload';
+
+  @override
+  String get crmWebChatFilterStatusLabel => 'Status filter';
+
+  @override
+  String get crmWebChatFilterAll => 'All';
+
+  @override
+  String get crmWebChatWidgetsSectionTitle => 'Chat widgets';
+
+  @override
+  String get crmWebChatWidgetsSectionHint =>
+      'Use edit for the public key and to disable file upload per site.';
+
+  @override
+  String get crmWebChatVisitorAttachmentCrmOff =>
+      'Visitor attachments: off (enable in CRM settings first).';
+
+  @override
+  String get crmWebChatVisitorAttachmentAllowed =>
+      'Visitor attachments: allowed — business storage.';
+
+  @override
+  String get crmWebChatVisitorAttachmentWidgetOff =>
+      'Visitor attachments: off for this widget.';
+
+  @override
+  String get crmWebChatWidgetStateActive =>
+      'State: active — embedded on the site';
+
+  @override
+  String get crmWebChatWidgetStateInactive =>
+      'State: inactive — new conversations cannot start with this key';
+
+  @override
+  String get crmWebChatPublicKeyCopied => 'Public key copied';
+
+  @override
+  String get crmWebChatEmbedGuideCopied => 'Connection guide copied';
+
+  @override
+  String get crmWebChatMenuCopyPublicKey => 'Copy public key';
+
+  @override
+  String get crmWebChatMenuCopyApiGuide => 'Copy API guide';
+
+  @override
+  String get crmWebChatMenuEdit => 'Edit…';
+
+  @override
+  String get crmWebChatNoWidgetsYet => 'No widgets yet — use + to add one.';
+
+  @override
+  String get crmWebChatNoConversations =>
+      'No conversations — try changing the filter';
+
+  @override
+  String crmWebChatConversationNumber(int id) {
+    return 'Conversation $id';
+  }
+
+  @override
+  String get crmWebChatSelectConversation => 'Select a conversation';
+
+  @override
+  String get crmWebChatConversationNotFoundRefresh =>
+      'Conversation not found — try refreshing';
+
+  @override
+  String get crmWebChatVisitorStartPageLabel =>
+      'Page where chat started (visitor)';
+
+  @override
+  String crmWebChatWidgetLine(String name) {
+    return 'Widget: $name';
+  }
+
+  @override
+  String crmWebChatAssigneeLine(String name) {
+    return 'Owner: $name';
+  }
+
+  @override
+  String get crmWebChatEditConversationButton => 'Edit conversation';
+
+  @override
+  String get crmWebChatLeads => 'Leads';
+
+  @override
+  String get crmWebChatRoleAgent => 'Agent';
+
+  @override
+  String get crmWebChatRoleVisitor => 'Visitor';
+
+  @override
+  String get crmWebChatFileLabel => 'File';
+
+  @override
+  String get crmWebChatAttachFileTooltip =>
+      'Attach file (business storage, context crm_web_chat)';
+
+  @override
+  String get crmWebChatReplyHint => 'Reply… (Ctrl+Enter to send)';
+
+  @override
+  String get crmWebChatSend => 'Send';
+
+  @override
+  String get crmWebChatWidgetDialogTitleEdit => 'Edit chat widget';
+
+  @override
+  String get crmWebChatWidgetDialogTitleNew => 'New chat widget';
+
+  @override
+  String get crmWebChatWidgetDialogIntro =>
+      'After creation, copy the public key and API connection guide from the widget’s ⋯ menu. Allowed domains only affect browser security (CORS).';
+
+  @override
+  String get crmWebChatWidgetNameLabel => 'Widget name (internal)';
+
+  @override
+  String get crmWebChatWidgetNameHint => 'e.g. My shop';
+
+  @override
+  String get crmWebChatWidgetNameHelper =>
+      'Only visible in your panel to tell widgets apart.';
+
+  @override
+  String get crmWebChatWidgetOriginsLabel => 'Allowed request domains';
+
+  @override
+  String get crmWebChatWidgetOriginsHint =>
+      'shop.example.com, blog.shop.example.com';
+
+  @override
+  String get crmWebChatWidgetOriginsHelper =>
+      'Optional. Host names only (no https://), separated by a comma. If empty, domain rules follow the API docs. For a specific site, add that host here.';
+
+  @override
+  String get crmWebChatVisitorFileSwitchTitle => 'Let site visitors send files';
+
+  @override
+  String get crmWebChatVisitorFileSwitchOn =>
+      'Subject to your storage plan. You can turn this off for this widget only; if left on, it matches other widgets.';
+
+  @override
+  String get crmWebChatVisitorFileSwitchOff =>
+      'Disabled at business level. In CRM settings (e.g. Communications → CRM settings), turn on web chat file upload, then return and set this switch.';
+
+  @override
+  String get crmWebChatWidgetActiveTitle => 'Widget active';
+
+  @override
+  String get crmWebChatWidgetActiveSubtitle =>
+      'If off, new conversations cannot start with this public key (existing threads stay in the panel).';
+
+  @override
+  String get crmWebChatNameRequired =>
+      'Enter a widget name (e.g. site or section).';
+
+  @override
+  String get crmWebChatCreate => 'Create';
+
+  @override
+  String get crmWebChatSocketLive => 'Live';
+
+  @override
+  String get crmWebChatSocketPolling => 'Polling';
+
+  @override
+  String get crmWebChatSocketOffline => 'Offline';
+
+  @override
+  String get crmWebChatSocketNoKey => 'No key';
+
+  @override
+  String get crmWebChatPeerTyping => 'Visitor is typing…';
+
+  @override
+  String get crmWebChatTooltipMessageSent => 'Sent';
+
+  @override
+  String get crmWebChatTooltipMessageRead => 'Read';
 }

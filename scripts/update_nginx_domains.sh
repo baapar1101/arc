@@ -190,6 +190,23 @@ ${API_SSL_BLOCK}
     proxy_send_timeout 300;
   }
 
+  location /api/v1/public/crm-chat/ {
+    proxy_pass http://127.0.0.1:8000/api/v1/public/crm-chat/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
+    client_max_body_size 1g;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+
   location /api/ {
     limit_req zone=api_limit burst=20 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;

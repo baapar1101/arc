@@ -9,6 +9,8 @@ from app.core.responses import ApiError
 from adapters.db.session import get_db
 from fastapi import Request
 
+from app.core.crm_web_chat_permissions import check_crm_web_chat_capability
+
 
 def _extract_auth_context(args, kwargs):
     """جستجوی AuthContext در آرگومان‌های تابع"""
@@ -538,3 +540,39 @@ def require_business_permission_by_entity_dep(
         logger.info(f"=== require_business_permission_by_entity_dep END ===")
     
     return _dependency
+
+
+def require_crm_web_chat_dep(capability: str, business_id_param: str = "business_id"):
+	"""دسترسی ریزدانه چت وب: view | reply | manage_widgets | edit_conversations | delete_messages + legacy crm.view/write."""
+
+	def _dependency(
+		request: Request,
+		auth_context: AuthContext = Depends(get_current_user),
+		db: Session = Depends(get_db),
+	) -> None:
+		business_id = None
+		try:
+			business_id = request.path_params.get(business_id_param)
+			if business_id:
+				business_id = int(business_id)
+		except (ValueError, TypeError, AttributeError):
+			business_id = None
+		if not business_id:
+			raise ApiError("BAD_REQUEST", "business_id parameter not found in path", http_status=400)
+		if not auth_context.can_access_business(business_id):
+			raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+		if auth_context.is_superadmin():
+			return
+		if auth_context.is_business_owner(business_id):
+			return
+		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+
+		repo = BusinessPermissionRepository(db)
+		permission_obj = repo.get_by_user_and_business(auth_context.get_user_id(), business_id)
+		if not permission_obj or not permission_obj.business_permissions:
+			raise ApiError("FORBIDDEN", f"Missing crm web chat permission: {capability}", http_status=403)
+		permissions = auth_context._normalize_permissions_value(permission_obj.business_permissions)
+		if not check_crm_web_chat_capability(permissions, capability):
+			raise ApiError("FORBIDDEN", f"Missing crm web chat permission: {capability}", http_status=403)
+
+	return _dependency

@@ -14,10 +14,13 @@ from sqlalchemy.orm import Session
 from adapters.db.models.crm_chat import CrmChatConversation
 from adapters.db.models.user import User
 from adapters.db.repositories.api_key_repo import ApiKeyRepository
+from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.session import SessionLocal
 from app.core.auth_dependency import AuthContext
+from app.core.crm_web_chat_permissions import check_crm_web_chat_capability
 from app.core.security import hash_api_key
 from app.services.crm_chat_realtime import crm_chat_realtime_manager
+from app.services import crm_chat_service as chat_svc
 from app.services.crm_chat_service import _hash_visitor_token
 from app.services.ws_api_key_handshake import WsAuthRejected, close_ws_safe
 
@@ -68,9 +71,13 @@ def _agent_may(
 		return False
 	if ctx.is_superadmin() or ctx.is_business_owner(business_id):
 		return True
-	if need_write:
-		return ctx.has_business_permission("crm", "write")
-	return ctx.has_business_permission("crm", "view")
+	repo = BusinessPermissionRepository(db)
+	perm_obj = repo.get_by_user_and_business(user.id, business_id)
+	if not perm_obj or not perm_obj.business_permissions:
+		return False
+	perms = ctx._normalize_permissions_value(perm_obj.business_permissions)
+	cap = "reply" if need_write else "view"
+	return check_crm_web_chat_capability(perms, cap)
 
 
 def _conv_belongs_to_business(db: Session, conversation_id: int, business_id: int) -> bool:
@@ -109,6 +116,7 @@ async def crm_chat_websocket(websocket: WebSocket):
 			except (TypeError, ValueError):
 				raise WsAuthRejected(4401)
 			db: Session = SessionLocal()
+			visitor_business_id: int
 			try:
 				th = _hash_visitor_token(token)
 				c = db.scalar(
@@ -119,13 +127,26 @@ async def crm_chat_websocket(websocket: WebSocket):
 				)
 				if not c:
 					raise WsAuthRejected(4403)
+				visitor_business_id = c.business_id
 			finally:
 				db.close()
 			await crm_chat_realtime_manager.add_to_conversation(cid_int, websocket)
 			await websocket.send_json({"type": "auth_ok", "role": "visitor", "conversation_id": cid_int})
 			try:
 				while True:
-					_ = await websocket.receive_text()
+					raw = await websocket.receive_text()
+					try:
+						msg = json.loads(raw)
+					except json.JSONDecodeError:
+						continue
+					if not isinstance(msg, dict) or msg.get("type") != "typing":
+						continue
+					await chat_svc.broadcast_typing(
+						cid_int,
+						visitor_business_id,
+						from_role="visitor",
+						active=bool(msg.get("active", True)),
+					)
 			except WebSocketDisconnect:
 				pass
 			finally:
@@ -159,7 +180,29 @@ async def crm_chat_websocket(websocket: WebSocket):
 						msg = json.loads(raw)
 					except json.JSONDecodeError:
 						continue
-					if not isinstance(msg, dict) or msg.get("type") != "subscribe":
+					if not isinstance(msg, dict):
+						continue
+					if msg.get("type") == "typing":
+						scid = msg.get("conversation_id")
+						if scid is None:
+							continue
+						try:
+							scid_int = int(scid)
+						except (TypeError, ValueError):
+							continue
+						db2 = SessionLocal()
+						try:
+							if not _conv_belongs_to_business(db2, scid_int, business_id):
+								continue
+							if not _agent_may(db2, agent_user, business_id, need_write=False):
+								continue
+						finally:
+							db2.close()
+						await chat_svc.broadcast_typing(
+							scid_int, business_id, from_role="agent", active=bool(msg.get("active", True))
+						)
+						continue
+					if msg.get("type") != "subscribe":
 						continue
 					scid = msg.get("conversation_id")
 					if scid is None:

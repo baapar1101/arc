@@ -796,3 +796,91 @@ msgstr "زمان مؤثر نرخ انتخاب‌شده بعد از لحظه مر
 
 msgid "FX_REVALUATION_ERROR"
 msgstr "خطا در محاسبه تسعیر ارز"
+
+# CRM web chat
+msgid "CRM_CHAT_PUBLIC_VISITOR_TOKEN_REQUIRED"
+msgstr "توکن بازدیدکننده لازم است. هدر X-Visitor-Token یا Authorization: Bearer (یا در حالت قدیم پارامتر visitor_token) را ارسال کنید."
+
+msgid "CRM_CHAT_PUBLIC_CONVERSATION_STARTED"
+msgstr "مکالمه آغاز شد؛ اکنون می‌توانید پیام بفرستید"
+
+msgid "CRM_CHAT_PUBLIC_MESSAGE_RECORDED"
+msgstr "پیام ثبت شد"
+
+msgid "CRM_CHAT_PUBLIC_FILE_RECORDED"
+msgstr "فایل ثبت شد"
+
+msgid "CRM_CHAT_SETTINGS_SAVED"
+msgstr "تنظیمات ذخیره شد"
+
+msgid "CRM_CHAT_WIDGET_CREATED"
+msgstr "ویجت ایجاد شد"
+
+msgid "CRM_CHAT_WIDGET_UPDATED"
+msgstr "ویجت به‌روز شد"
+
+msgid "CRM_CHAT_AGENT_MESSAGE_SENT"
+msgstr "پیام ارسال شد"
+
+msgid "CRM_CHAT_CONVERSATION_UPDATED"
+msgstr "مکالمه به‌روز شد"
+
+msgid "CRM_CHAT_INVALID_EMAIL"
+msgstr "ایمیل معتبر نیست"
+
+msgid "CRM_CHAT_FILE_NOT_FOUND"
+msgstr "فایل یافت نشد"
+
+msgid "CRM_CHAT_FILE_NOT_FOR_CHAT"
+msgstr "این فایل برای چت استفاده نمی‌شود"
+
+msgid "CRM_CHAT_FILE_WRONG_CONVERSATION"
+msgstr "فایل متعلق به این مکالمه نیست"
+
+msgid "CRM_CHAT_WIDGET_INACTIVE"
+msgstr "ویجت چت یافت نشد یا غیرفعال است"
+
+msgid "CRM_CHAT_WIDGET_NOT_FOUND"
+msgstr "ویجت یافت نشد"
+
+msgid "CRM_CHAT_ORIGIN_NOT_ALLOWED"
+msgstr "مبدأ درخواست برای این ویجت مجاز نیست"
+
+msgid "CRM_CHAT_VISITOR_NAME_REQUIRED"
+msgstr "نام و نام خانوادگی الزامی است"
+
+msgid "CRM_CHAT_PHONE_INVALID"
+msgstr "شماره تماس معتبر وارد کنید"
+
+msgid "CRM_CHAT_CONVERSATION_NOT_FOUND"
+msgstr "مکالمه یافت نشد"
+
+msgid "CRM_CHAT_MESSAGE_BODY_INVALID"
+msgstr "متن پیام نامعتبر است"
+
+msgid "CRM_FILE_UPLOAD_DISABLED"
+msgstr "فعلاً ارسال فایل در این چت توسط کسب‌وکار فعال نشده است."
+
+msgid "WIDGET_FILE_UPLOAD_DISABLED"
+msgstr "ارسال فایل توسط بازدیدکننده برای این ویجت غیرفعال است."
+
+msgid "CRM_CHAT_BUSINESS_NOT_FOUND"
+msgstr "کسب‌وکار یافت نشد"
+
+msgid "CRM_CHAT_FILE_NOT_AVAILABLE_GENERIC"
+msgstr "فعلاً ارسال فایل ممکن نیست. لطفاً بعداً دوباره تلاش کنید."
+
+msgid "CRM_CHAT_FILE_NOT_AVAILABLE_QUOTA"
+msgstr "فضای ذخیره‌سازی کافی نیست؛ فعلاً ارسال فایل ممکن نیست."
+
+msgid "CRM_FILE_UPLOAD_FAILED"
+msgstr "ارسال فایل انجام نشد."
+
+msgid "CRM_CHAT_CAPTION_TOO_LONG"
+msgstr "شرح خیلی طولانی است"
+
+msgid "CRM_CHAT_FILE_NOT_IN_CONVERSATION"
+msgstr "فایل در این مکالمه یافت نشد"
+
+msgid "CRM_CHAT_CONVERSATION_STATUS_INVALID"
+msgstr "وضعیت نامعتبر است"

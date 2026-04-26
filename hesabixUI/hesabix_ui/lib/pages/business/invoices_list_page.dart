@@ -21,6 +21,7 @@ import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/invoice_list_document_type_filter_bar.dart';
+import '../../models/invoice_tag_ref.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -75,6 +76,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   int? _selectedProjectId; // فیلتر پروژه
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
+  /// فیلتر برچسب
+  List<int> _selectedTagIds = [];
+  String _tagMatch = 'any'; // any | all
+  List<InvoiceTagRef> _invoiceTagsForFilter = [];
+  bool _loadingInvoiceTags = false;
   bool _showDesktopFilters = false;
   int _selectedCount = 0;
 
@@ -140,6 +146,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     InvoicesListPage._pageStates[widget.businessId] = this;
     _loadFiscalYears();
     _loadProjects();
+    _loadInvoiceTagsForFilter();
     _loadSavedInvoiceDocumentType();
   }
   
@@ -150,6 +157,31 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   }
 
   /// بارگذاری لیست پروژه‌ها برای فیلتر
+  Future<void> _loadInvoiceTagsForFilter() async {
+    if (!mounted) return;
+    setState(() => _loadingInvoiceTags = true);
+    try {
+      final response = await widget.apiClient.get<Map<String, dynamic>>(
+        '/api/v1/invoices/business/${widget.businessId}/tags',
+      );
+      final data = response.data?['data'];
+      final List<dynamic> items = (data is Map) ? (data['items'] as List<dynamic>? ?? []) : [];
+      if (mounted) {
+        setState(() {
+          _invoiceTagsForFilter = items
+              .whereType<Map<String, dynamic>>()
+              .map(InvoiceTagRef.fromJson)
+              .where((t) => t.isActive)
+              .toList();
+          _loadingInvoiceTags = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری برچسب‌های فاکتور: $e');
+      if (mounted) setState(() => _loadingInvoiceTags = false);
+    }
+  }
+
   Future<void> _loadProjects() async {
     if (!mounted) return;
     setState(() => _loadingProjects = true);
@@ -406,6 +438,16 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                 setState(() => _isProforma = v);
                 _refreshData();
               },
+              selectedTagIds: _selectedTagIds,
+              tagMatch: _tagMatch,
+              onTagIdsChanged: (v) {
+                setState(() => _selectedTagIds = v);
+                _refreshData();
+              },
+              onTagMatchChanged: (v) {
+                setState(() => _tagMatch = v);
+                _refreshData();
+              },
             ),
           ],
         ],
@@ -419,7 +461,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _toDate != null ||
         _isProforma != null ||
         _selectedFiscalYearId != null ||
-        _selectedProjectId != null;
+        _selectedProjectId != null ||
+        _selectedTagIds.isNotEmpty;
   }
 
   void _clearExternalFilters() {
@@ -429,6 +472,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       _toDate = null;
       _isProforma = null;
       _selectedProjectId = null;
+      _selectedTagIds = [];
+      _tagMatch = 'any';
       // Fiscal year is typically important; keep it unless explicitly cleared by user.
     });
     _persistInvoiceDocumentType(null);
@@ -490,6 +535,14 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       ));
     }
 
+    if (_selectedTagIds.isNotEmpty) {
+      final label = _tagMatch == 'all' ? 'برچسب: همه' : 'برچسب: هرکدام';
+      chips.add(Chip(
+        label: Text('$label (${_selectedTagIds.length})'),
+        avatar: const Icon(Icons.label, size: 16),
+      ));
+    }
+
     if (chips.isEmpty) {
       chips.add(Chip(label: Text(t.all)));
     }
@@ -505,6 +558,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     DateTime? fromDate = _fromDate;
     DateTime? toDate = _toDate;
     bool? isProforma = _isProforma;
+    List<int> tagIds = List<int>.from(_selectedTagIds);
+    String tagMatchLocal = _tagMatch;
 
     final applied = await showModalBottomSheet<bool>(
       context: context,
@@ -537,6 +592,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                             fromDate = null;
                             toDate = null;
                             isProforma = null;
+                            tagIds = [];
+                            tagMatchLocal = 'any';
                             // fiscalYearId intentionally kept
                           });
                         },
@@ -568,6 +625,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                           toDate = null;
                         }),
                         onIsProformaChanged: (v) => setModalState(() => isProforma = v),
+                        selectedTagIds: tagIds,
+                        tagMatch: tagMatchLocal,
+                        onTagIdsChanged: (v) => setModalState(() => tagIds = v),
+                        onTagMatchChanged: (v) => setModalState(() => tagMatchLocal = v),
                       ),
                     ),
                   ),
@@ -596,6 +657,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _fromDate = fromDate;
         _toDate = toDate;
         _isProforma = isProforma;
+        _selectedTagIds = tagIds;
+        _tagMatch = tagMatchLocal;
       });
       _persistInvoiceDocumentType(invoiceType);
       _refreshData();
@@ -618,6 +681,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     required ValueChanged<DateTime?> onToDateChanged,
     required VoidCallback onClearDateRange,
     required ValueChanged<bool?> onIsProformaChanged,
+    required List<int> selectedTagIds,
+    required String tagMatch,
+    required void Function(List<int>) onTagIdsChanged,
+    required ValueChanged<String> onTagMatchChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -784,6 +851,44 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               ),
             ],
           ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text('فیلتر برچسب', style: Theme.of(context).textTheme.titleSmall),
+        ),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment<String>(value: 'any', label: Text('هرکدام'), icon: Icon(Icons.filter_alt_outlined)),
+            ButtonSegment<String>(value: 'all', label: Text('همه با هم'), icon: Icon(Icons.join_inner)),
+          ],
+          selected: {tagMatch},
+          onSelectionChanged: (set) => onTagMatchChanged(set.first),
+        ),
+        const SizedBox(height: 8),
+        if (_loadingInvoiceTags)
+          const LinearProgressIndicator(minHeight: 2)
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final tag in _invoiceTagsForFilter)
+                FilterChip(
+                  label: Text(tag.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  selected: selectedTagIds.contains(tag.id),
+                  onSelected: (v) {
+                    final next = <int>{...selectedTagIds};
+                    if (v) {
+                      next.add(tag.id);
+                    } else {
+                      next.remove(tag.id);
+                    }
+                    onTagIdsChanged(next.toList()..sort());
+                  },
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -855,6 +960,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           if (_isProforma != null) 'is_proforma': _isProforma,
           if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+          if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,
+          'tag_match': _tagMatch,
         },
         // موبایل: منوی عملیات داخل کارت است؛ onRowTap سطر با PopupMenu تداخل دارد (مثل لیست کالاها که ActionColumn جدا دارد).
         onRowTap: null,
@@ -1108,6 +1215,36 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           filterType: ColumnFilterType.multiSelect,
           filterOptions: _projectFilterOptions,
         ),
+        CustomColumn(
+          'tags_display',
+          'برچسب‌ها',
+          width: ColumnWidth.large,
+          sortable: false,
+          searchable: false,
+          builder: (dynamic item, int index) {
+            final inv = item as InvoiceListItem;
+            if (inv.tags.isEmpty) {
+              return Text(
+                inv.tagsDisplay?.trim().isNotEmpty == true ? inv.tagsDisplay! : '—',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              );
+            }
+            return Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final tg in inv.tags)
+                  Chip(
+                    label: Text(tg.name, style: const TextStyle(fontSize: 12)),
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            );
+          },
+        ),
         // پیش‌فاکتور (تیک برای true، خالی برای false)
         CustomColumn(
           'is_proforma',
@@ -1150,6 +1287,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         if (_isProforma != null) 'is_proforma': _isProforma,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,
+        'tag_match': _tagMatch,
       },
       onRowTap: (item) => _onView(item as InvoiceListItem),
       emptyStateMessage: t.noInvoicesFound,
@@ -1301,6 +1440,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final badges = <Widget>[
       badge(icon: Icons.event, text: dateText),
       badge(icon: Icons.folder_open, text: project),
+      if (invoice.tags.isNotEmpty)
+        badge(
+          icon: Icons.label_outline,
+          text: invoice.tags.length <= 2
+              ? invoice.tags.map((e) => e.name).join('، ')
+              : '${invoice.tags.take(2).map((e) => e.name).join('، ')} +${invoice.tags.length - 2}',
+        ),
       badge(icon: Icons.person, text: createdBy),
       if (paidStr != null) badge(icon: Icons.payments, text: '${t.invoicePaidAmount}: $paidStr'),
       if (remainingStr != null) badge(icon: Icons.account_balance_wallet, text: '${t.invoiceRemainingAmount}: $remainingStr'),

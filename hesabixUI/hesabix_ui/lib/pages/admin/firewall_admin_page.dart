@@ -19,7 +19,7 @@ class _FirewallAdminPageState extends State<FirewallAdminPage> with SingleTicker
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -39,6 +39,7 @@ class _FirewallAdminPageState extends State<FirewallAdminPage> with SingleTicker
           isScrollable: true,
           tabs: [
             Tab(text: t.firewallTabRules),
+            Tab(text: t.firewallTabRatePolicies),
             Tab(text: t.firewallTabBlockLogs),
             Tab(text: t.firewallTabAudit),
             Tab(text: t.firewallTabReports),
@@ -49,6 +50,7 @@ class _FirewallAdminPageState extends State<FirewallAdminPage> with SingleTicker
         controller: _tabs,
         children: [
           _FirewallRulesTab(service: _svc),
+          _FirewallRatePoliciesTab(service: _svc),
           _FirewallBlockLogsTab(service: _svc),
           _FirewallAuditTab(service: _svc),
           _FirewallReportsTab(service: _svc),
@@ -298,6 +300,229 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
                                         SnackBar(
                                           content: Text(ErrorExtractor.forContext(e, context)),
                                         ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FirewallRatePoliciesTab extends StatefulWidget {
+  const _FirewallRatePoliciesTab({required this.service});
+  final AdminFirewallService service;
+
+  @override
+  State<_FirewallRatePoliciesTab> createState() => _FirewallRatePoliciesTabState();
+}
+
+class _FirewallRatePoliciesTabState extends State<_FirewallRatePoliciesTab> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await widget.service.listRatePolicies();
+      final raw = data['items'] as List<dynamic>? ?? [];
+      _items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      _error = ErrorExtractor.forContext(e, context);
+    }
+    setState(() => _loading = false);
+  }
+
+  Future<void> _openEditor({Map<String, dynamic>? existing}) async {
+    final t = AppLocalizations.of(context);
+    var enabledVal = existing?['enabled'] == true || existing?['enabled'] == 1 || existing == null;
+    final pathCtrl = TextEditingController(text: existing?['path_prefix']?.toString() ?? '/api/v1/public/crm-chat');
+    final methodsCtrl = TextEditingController(text: existing?['http_methods']?.toString() ?? '');
+    final maxCtrl = TextEditingController(text: existing?['max_requests']?.toString() ?? '100');
+    final winCtrl = TextEditingController(text: existing?['window_seconds']?.toString() ?? '60');
+    final priCtrl = TextEditingController(text: existing?['priority']?.toString() ?? '100');
+    final noteCtrl = TextEditingController(text: existing?['note']?.toString() ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: Text(existing == null ? t.firewallAddRatePolicy : t.firewallEditRatePolicy),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SwitchListTile(
+                  title: Text(t.firewallEnabled),
+                  value: enabledVal,
+                  onChanged: (v) => setSt(() => enabledVal = v),
+                ),
+                TextField(
+                  controller: pathCtrl,
+                  decoration: InputDecoration(labelText: t.firewallRatePolicyPathRequired),
+                ),
+                TextField(
+                  controller: methodsCtrl,
+                  decoration: InputDecoration(labelText: t.firewallHttpMethodsOptional),
+                ),
+                TextField(
+                  controller: maxCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: t.firewallRateMaxRequests),
+                ),
+                TextField(
+                  controller: winCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: t.firewallRateWindowSeconds),
+                ),
+                TextField(
+                  controller: priCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: t.firewallPriority),
+                ),
+                TextField(
+                  controller: noteCtrl,
+                  decoration: InputDecoration(labelText: t.firewallNoteOptional),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final maxR = int.tryParse(maxCtrl.text.trim()) ?? 1;
+      final winS = int.tryParse(winCtrl.text.trim()) ?? 60;
+      final pri = int.tryParse(priCtrl.text.trim()) ?? 100;
+      if (existing == null) {
+        await widget.service.createRatePolicy({
+          'enabled': enabledVal,
+          'priority': pri,
+          'path_prefix': pathCtrl.text.trim(),
+          'http_methods': methodsCtrl.text.trim().isEmpty ? null : methodsCtrl.text.trim(),
+          'max_requests': maxR,
+          'window_seconds': winS,
+          'note': noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+        });
+      } else {
+        await widget.service.updateRatePolicy((existing['id'] as num).toInt(), {
+          'enabled': enabledVal,
+          'priority': pri,
+          'path_prefix': pathCtrl.text.trim(),
+          'http_methods': methodsCtrl.text.trim().isEmpty ? null : methodsCtrl.text.trim(),
+          'max_requests': maxR,
+          'window_seconds': winS,
+          'note': noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+        });
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.firewallSaved)));
+        await _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.error}: ${ErrorExtractor.forContext(e, context)}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: SelectableText('${t.error}: $_error'));
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: Text(t.firewallRefresh)),
+              FilledButton.icon(onPressed: () => _openEditor(), icon: const Icon(Icons.add), label: Text(t.firewallAddRatePolicy)),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _items.isEmpty
+              ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(t.firewallNoRatePolicies)))
+              : ListView.builder(
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) {
+                    final r = _items[i];
+                    final id = (r['id'] as num).toInt();
+                    final en = r['enabled'] == true || r['enabled'] == 1;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: ListTile(
+                        title: Text('${r['path_prefix']}  •  ${r['max_requests']}/${r['window_seconds']}s'),
+                        subtitle: Text(
+                          '${t.firewallEnabled}: $en  •  ${t.firewallPriority}: ${r['priority']}  •  ${r['http_methods'] ?? 'ALL'}  •  ${r['note'] ?? '—'}',
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => _openEditor(existing: r),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                final del = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: Text(t.firewallDeleteRatePolicyTitle),
+                                    content: Text(t.firewallDeleteRatePolicyBody),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
+                                      FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.delete)),
+                                    ],
+                                  ),
+                                );
+                                if (!context.mounted) return;
+                                if (del == true) {
+                                  try {
+                                    await widget.service.deleteRatePolicy(id);
+                                    await _load();
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      messenger.showSnackBar(
+                                        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
                                       );
                                     }
                                   }

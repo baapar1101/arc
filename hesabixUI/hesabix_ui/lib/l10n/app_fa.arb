@@ -3269,11 +3269,21 @@
   "settingsRedisCache": "تنظیمات Redis Cache",
   "settingsRedisCacheDescription": "پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس",
   "settingsFirewall": "فایروال نرم‌افزار",
-  "settingsFirewallDescription": "قوانین اجازه/رد IP، بن موقت، لاگ و گزارش",
+  "settingsFirewallDescription": "قوانین اجازه/رد IP، سقف نرخ مسیر (دیتابیس)، بن موقت، لاگ و گزارش",
   "firewallTabRules": "قوانین",
+  "firewallTabRatePolicies": "سقف نرخ مسیر",
   "firewallTabBlockLogs": "درخواست‌های مسدود",
   "firewallTabAudit": "ممیزی",
   "firewallTabReports": "گزارش",
+  "firewallAddRatePolicy": "سیاست نرخ جدید",
+  "firewallEditRatePolicy": "ویرایش سیاست نرخ",
+  "firewallRatePolicyPathRequired": "پیشوند مسیر (مثال /api/v1/public/crm-chat)",
+  "firewallRateMaxRequests": "حداکثر درخواست در پنجره",
+  "firewallRateWindowSeconds": "طول پنجره (ثانیه)",
+  "firewallNoRatePolicies": "سیاست نرخی ثبت نشده. برای چت وب و مسیرهای عمومی از اینجا سقف IP تعیین کنید.",
+  "firewallDeleteRatePolicyTitle": "حذف سیاست نرخ؟",
+  "firewallDeleteRatePolicyBody": "محدودیت نرخ برای این مسیر حذف می‌شود.",
+  "firewallEnabled": "فعال",
   "firewallAddRule": "قانون جدید",
   "firewallEditRule": "ویرایش قانون",
   "firewallActionLabel": "نوع",
@@ -4244,7 +4254,144 @@
         "type": "String"
       }
     }
-  }
+  },
+  "crmWebChatError": "خطا: {detail}",
+  "@crmWebChatError": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatErrorLoadingMessages": "خطا در پیام‌ها: {detail}",
+  "@crmWebChatErrorLoadingMessages": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatStatusOpen": "باز",
+  "crmWebChatStatusPending": "در انتظار",
+  "crmWebChatStatusResolved": "حل‌شده",
+  "crmWebChatFileSaved": "فایل ذخیره شد",
+  "crmWebChatErrorDownload": "خطا در دانلود: {detail}",
+  "@crmWebChatErrorDownload": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatFileUploadDisabledCrm": "ارسال فایل در تنظیمات CRM غیرفعال است",
+  "crmWebChatFileReadFailed": "خواندن فایل ممکن نیست (حجم زیاد یا محدودیت مرورگر). فایل کوچک‌تر انتخاب کنید.",
+  "crmWebChatFileIdMissing": "شناسه فایل از سرور نیامد",
+  "crmWebChatFileSent": "فایل ارسال شد",
+  "crmWebChatNoCrmWritePermission": "مجوز نوشتن CRM ندارید",
+  "crmWebChatMessageSent": "ارسال شد",
+  "crmWebChatSaved": "ذخیره شد",
+  "crmWebChatWidgetCreated": "ویجت ایجاد شد",
+  "crmWebChatWidgetUpdated": "ویجت به‌روز شد",
+  "crmWebChatEditConversationTitle": "ویرایش مکالمه",
+  "crmWebChatFieldStatus": "وضعیت",
+  "crmWebChatAssignTo": "تخصیص به",
+  "crmWebChatOptionalLeadId": "شناسه لید (اختیاری)",
+  "crmWebChatOptionalPersonId": "شناسه شخص (اختیاری)",
+  "crmWebChatUnassigned": "—",
+  "crmWebChatEmbedSnippet": "// پایه API: {base}\n// مرحله ۱: POST /api/v1/public/crm-chat/conversations/start\n// بدنه JSON باید public_key \"{publicKey}\" و first_name و last_name و email و phone و page_url را داشته باشد.\n// مرحله ۲: با visitor_token و conversation_id به POST /api/v1/public/crm-chat/messages پیام بفرستید.\n// جزئیات: مستندات CRM_WEB_CHAT در مخزن Hesabix",
+  "@crmWebChatEmbedSnippet": {
+    "placeholders": {
+      "base": {
+        "type": "String"
+      },
+      "publicKey": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatDefaultWidgetName": "ویجت",
+  "crmWebChatAccessDenied": "شما دسترسی لازم برای مشاهده CRM را ندارید",
+  "crmWebChatPageTitle": "چت وب",
+  "crmWebChatSearchConversationsHint": "جستجوی مکالمه، شناسه، ایمیل…",
+  "crmWebChatMessageDeleted": "این پیام حذف شده است",
+  "crmWebChatLoadOlder": "در حال بارگذاری…",
+  "crmWebChatDeleteMessage": "حذف پیام",
+  "crmWebChatDeleteMessageConfirm": "حذف این پیام غیرقابل بازگردانی است. ادامه می‌دهید؟",
+  "crmWebChatRefreshTooltip": "بارگذاری مجدد",
+  "crmWebChatFilterStatusLabel": "فیلتر وضعیت",
+  "crmWebChatFilterAll": "همه",
+  "crmWebChatWidgetsSectionTitle": "ویجت‌های چت",
+  "crmWebChatWidgetsSectionHint": "برای Public Key و غیرفعال‌کردن فایل فقط روی همان سایت، ویرایش را بزنید.",
+  "crmWebChatVisitorAttachmentCrmOff": "پیوست بازدیدکننده: بسته (ابتدا در تنظیمات CRM روشن شود)",
+  "crmWebChatVisitorAttachmentAllowed": "پیوست بازدیدکننده: مجاز — فضای ذخیره کسب‌وکار",
+  "crmWebChatVisitorAttachmentWidgetOff": "پیوست بازدیدکننده: برای این ویجت بسته است",
+  "crmWebChatWidgetStateActive": "وضعیت: فعال — در سایت جاسازی می‌شود",
+  "crmWebChatWidgetStateInactive": "وضعیت: غیرفعال — مکالمه جدید با این کلید بسته است",
+  "crmWebChatPublicKeyCopied": "کلید عمومی کپی شد",
+  "crmWebChatEmbedGuideCopied": "راهنمای اتصال کپی شد",
+  "crmWebChatMenuCopyPublicKey": "کپی کلید عمومی",
+  "crmWebChatMenuCopyApiGuide": "کپی راهنمای API",
+  "crmWebChatMenuEdit": "ویرایش…",
+  "crmWebChatNoWidgetsYet": "هنوز ویجی نساخته‌اید — از + استفاده کنید.",
+  "crmWebChatNoConversations": "مکالمه‌ای نیست — یا فیلتر را تغییر دهید",
+  "crmWebChatConversationNumber": "مکالمه {id}",
+  "@crmWebChatConversationNumber": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "crmWebChatSelectConversation": "یک مکالمه را انتخاب کنید",
+  "crmWebChatConversationNotFoundRefresh": "مکالمه یافت نشد — به‌روزرسانی را بزنید",
+  "crmWebChatVisitorStartPageLabel": "صفحهٔ شروع چت (بازدیدکننده)",
+  "crmWebChatWidgetLine": "ویجت: {name}",
+  "@crmWebChatWidgetLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatAssigneeLine": "مسئول: {name}",
+  "@crmWebChatAssigneeLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatEditConversationButton": "ویرایش مکالمه",
+  "crmWebChatLeads": "لیدها",
+  "crmWebChatRoleAgent": "پشتیبان",
+  "crmWebChatRoleVisitor": "بازدیدکننده",
+  "crmWebChatFileLabel": "فایل",
+  "crmWebChatAttachFileTooltip": "پیوست فایل (فضای ذخیره‌سازی کسب‌وکار، بستر crm_web_chat)",
+  "crmWebChatReplyHint": "پاسخ… (Ctrl+Enter ارسال)",
+  "crmWebChatSend": "ارسال",
+  "crmWebChatWidgetDialogTitleEdit": "ویرایش ویجت چت",
+  "crmWebChatWidgetDialogTitleNew": "ویجت چت جدید",
+  "crmWebChatWidgetDialogIntro": "پس از ایجاد، «کلید عمومی» و راهنمای اتصال API از منوی … ویجت قابل کپی است. دامنهٔ مجاز فقط امنیت مرورگر (CORS) است.",
+  "crmWebChatWidgetNameLabel": "نام ویجت (داخلی)",
+  "crmWebChatWidgetNameHint": "مثال: فروشگاه اینترنتی",
+  "crmWebChatWidgetNameHelper": "فقط در پنل شما دیده می‌شود تا بین چند ویجت تمایز بگذارید.",
+  "crmWebChatWidgetOriginsLabel": "دامنه‌های مجاز درخواست",
+  "crmWebChatWidgetOriginsHint": "shop.ir، blog.shop.ir",
+  "crmWebChatWidgetOriginsHelper": "اختیاری. فقط نام میزبان (بدون https://)؛ جدا با ویرگول لاتین یا فارسی. اگر خالی بگذارید، محدودیت دامنه با منطق سرور طبق مستند API اعمال می‌شود. برای جاسازی روی دامنهٔ مشخص، حتماً همان دامنه را اضافه کنید.",
+  "crmWebChatVisitorFileSwitchTitle": "ارسال فایل توسط بازدیدکنندهٔ سایت",
+  "crmWebChatVisitorFileSwitchOn": "وابسته به پلن فضای ذخیره‌سازی. می‌توانید فقط برای این ویجت ببندید؛ اگر روشن بماند، مثل سایر ویجت‌هاست.",
+  "crmWebChatVisitorFileSwitchOff": "الان در سطح کسب‌وکار غیرفعال است. از مسیر «مدیریت ارتباطات → تنظیمات CRM» (یا منوی مربوط) گزینهٔ ارسال فایل در چت وب را روشن کنید، بعد برگردید و این سوییچ را تنظیم کنید.",
+  "crmWebChatWidgetActiveTitle": "ویجت فعال",
+  "crmWebChatWidgetActiveSubtitle": "اگر غیرفعال شود، با همین «کلید عمومی» مکالمهٔ جدید شروع نمی‌شود (ویجت‌های قدیم در پنل باقی می‌مانند).",
+  "crmWebChatNameRequired": "لطفاً «نام ویجت» را وارد کنید (مثلاً نام سایت یا بخش).",
+  "crmWebChatCreate": "ایجاد",
+  "crmWebChatSocketLive": "زنده (WebSocket)",
+  "crmWebChatSocketPolling": "نظرسنجی",
+  "crmWebChatSocketOffline": "قطع",
+  "crmWebChatSocketNoKey": "بدون کلید",
+  "crmWebChatPeerTyping": "بازدیدکننده در حال تایپ است…",
+  "crmWebChatTooltipMessageSent": "ارسال شد",
+  "crmWebChatTooltipMessageRead": "خوانده شد"
 }
 
 

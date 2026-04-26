@@ -1,0 +1,275 @@
+# Copyright (C) 2025 Hesabix
+# This file is distributed under the same license as the Hesabix Web Chat plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Hesabix Web Chat 1.0.2\n"
+"Report-Msgid-Bugs-To: https://hesabix.ir\n"
+"POT-Creation-Date: 2026-04-25 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Domain: hesabix-chat\n"
+
+#: includes/class-hesabix-chat-admin.php
+msgid "گفتگو با پشتیبانی"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "پشتیبانی"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "چت حسابیکس"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "آدرس پایه API (سرور)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "مثال: https://hsxn.hesabix.ir — بدون / در انتها."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "Public Key ویجت"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "نمایش ویجت"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "در تمام صفحات (دکمه شناور)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "فقط با شورتکد [hesabix_chat] در برگه/نوشته"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "متن دکمه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "عنوان پنل چت"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "رنگ دکمه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "رنگ متن دکمه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "جایگاه دکمه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "پایین · راست"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "پایین · چپ"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "بالا · راست"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "بالا · چپ"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "تم پنل"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "روشن"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "تاریک"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "جهت نوشتار"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "خودکار (از سایت وردپرس)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "راست‌به‌چپ (RTL)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "چپ‌به‌راست (LTR)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "عرض پنل (px)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "ارتفاع پنل (px)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "z-index (لایه نسبت به سایر عناصر)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "فاصله از لبه عمودی (px)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "فاصله از لبه افقی (px)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "گردی گوشه پنل (px)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "ارسال فایل"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "نمایش دکمه پیوست (در صورت فعال بودن در تنظیمات CRM و پلن کسب‌وکار)"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "شروع گفتگو"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "نام"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "نام خانوادگی"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "ایمیل"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "موبایل"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "شروع"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "پیام خود را بنویسید…"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "ارسال"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "بستن"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "مکالمه جدید"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "پیوست"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "خطا در ارتباط با سرور."
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "شما"
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "مکالمه فعلی پاک می‌شود و می‌توانید دوباره شروع کنید."
+msgstr ""
+
+#: includes/class-hesabix-chat-frontend.php
+msgid "public key تنظیم نشده"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "به بخش فروش خوش آمدید! چه کمکی از دستم برمی‌آید؟"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "ما معمولاً در کمتر از یک ساعت پاسخ می‌دهیم."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "پیام اولیه برای بازدیدکننده"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "مثال: به بخش فروش خوش آمدید! چه کمکی از دستم برمی‌آید؟"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "این متن پس از شروع چت، در بالای پنل به‌صورت نزدیک به پیام پشتیبانی نمایش داده می‌شود. چند سطر جدا با اینتر مجاز است."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "زمان پاسخ‌گویی (نمایش برای بازدیدکننده)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "مثال: «ما معمولاً در کمتر از یک ساعت پاسخ می‌دهیم.» — زیر پیام خوش‌آمد دیده می‌شود. خالی بگذارید اگر نمی‌خواهید نمایش داده شود."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "الگوی ظاهر"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "پیش‌فرض (گرادیان نرم، کارت خوش‌آمد)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "مینیمال (تخت، بوردر کم)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "رنگی (پس‌زمینه و سایهٔ پررنگ‌تر)"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "لوگو کنار عنوان پنل"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "انتخاب از رسانه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "حذف تصویر"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "لوگو برای هدر چت"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "تصویر مربع یا افقی کوچک (مثلاً ۶۴px) مناسب است. در سمت راست/چپ کنار عنوان هدر دیده می‌شود."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "رنگ اصلی (دکمه و هدر)"
+msgstr ""

@@ -8394,10 +8394,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get settingsFirewallDescription =>
-      'قوانین اجازه/رد IP، بن موقت، لاگ و گزارش';
+      'قوانین اجازه/رد IP، سقف نرخ مسیر (دیتابیس)، بن موقت، لاگ و گزارش';
 
   @override
   String get firewallTabRules => 'قوانین';
+
+  @override
+  String get firewallTabRatePolicies => 'سقف نرخ مسیر';
 
   @override
   String get firewallTabBlockLogs => 'درخواست‌های مسدود';
@@ -8407,6 +8410,36 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get firewallTabReports => 'گزارش';
+
+  @override
+  String get firewallAddRatePolicy => 'سیاست نرخ جدید';
+
+  @override
+  String get firewallEditRatePolicy => 'ویرایش سیاست نرخ';
+
+  @override
+  String get firewallRatePolicyPathRequired =>
+      'پیشوند مسیر (مثال /api/v1/public/crm-chat)';
+
+  @override
+  String get firewallRateMaxRequests => 'حداکثر درخواست در پنجره';
+
+  @override
+  String get firewallRateWindowSeconds => 'طول پنجره (ثانیه)';
+
+  @override
+  String get firewallNoRatePolicies =>
+      'سیاست نرخی ثبت نشده. برای چت وب و مسیرهای عمومی از اینجا سقف IP تعیین کنید.';
+
+  @override
+  String get firewallDeleteRatePolicyTitle => 'حذف سیاست نرخ؟';
+
+  @override
+  String get firewallDeleteRatePolicyBody =>
+      'محدودیت نرخ برای این مسیر حذف می‌شود.';
+
+  @override
+  String get firewallEnabled => 'فعال';
 
   @override
   String get firewallAddRule => 'قانون جدید';
@@ -10975,4 +11008,296 @@ class AppLocalizationsFa extends AppLocalizations {
   String invoiceFxRateRow(String rate, String effective, String idPart) {
     return 'نرخ $rate — $effective$idPart';
   }
+
+  @override
+  String crmWebChatError(String detail) {
+    return 'خطا: $detail';
+  }
+
+  @override
+  String crmWebChatErrorLoadingMessages(String detail) {
+    return 'خطا در پیام‌ها: $detail';
+  }
+
+  @override
+  String get crmWebChatStatusOpen => 'باز';
+
+  @override
+  String get crmWebChatStatusPending => 'در انتظار';
+
+  @override
+  String get crmWebChatStatusResolved => 'حل‌شده';
+
+  @override
+  String get crmWebChatFileSaved => 'فایل ذخیره شد';
+
+  @override
+  String crmWebChatErrorDownload(String detail) {
+    return 'خطا در دانلود: $detail';
+  }
+
+  @override
+  String get crmWebChatFileUploadDisabledCrm =>
+      'ارسال فایل در تنظیمات CRM غیرفعال است';
+
+  @override
+  String get crmWebChatFileReadFailed =>
+      'خواندن فایل ممکن نیست (حجم زیاد یا محدودیت مرورگر). فایل کوچک‌تر انتخاب کنید.';
+
+  @override
+  String get crmWebChatFileIdMissing => 'شناسه فایل از سرور نیامد';
+
+  @override
+  String get crmWebChatFileSent => 'فایل ارسال شد';
+
+  @override
+  String get crmWebChatNoCrmWritePermission => 'مجوز نوشتن CRM ندارید';
+
+  @override
+  String get crmWebChatMessageSent => 'ارسال شد';
+
+  @override
+  String get crmWebChatSaved => 'ذخیره شد';
+
+  @override
+  String get crmWebChatWidgetCreated => 'ویجت ایجاد شد';
+
+  @override
+  String get crmWebChatWidgetUpdated => 'ویجت به‌روز شد';
+
+  @override
+  String get crmWebChatEditConversationTitle => 'ویرایش مکالمه';
+
+  @override
+  String get crmWebChatFieldStatus => 'وضعیت';
+
+  @override
+  String get crmWebChatAssignTo => 'تخصیص به';
+
+  @override
+  String get crmWebChatOptionalLeadId => 'شناسه لید (اختیاری)';
+
+  @override
+  String get crmWebChatOptionalPersonId => 'شناسه شخص (اختیاری)';
+
+  @override
+  String get crmWebChatUnassigned => '—';
+
+  @override
+  String crmWebChatEmbedSnippet(String base, String publicKey) {
+    return '// پایه API: $base\n// مرحله ۱: POST /api/v1/public/crm-chat/conversations/start\n// بدنه JSON باید public_key \"$publicKey\" و first_name و last_name و email و phone و page_url را داشته باشد.\n// مرحله ۲: با visitor_token و conversation_id به POST /api/v1/public/crm-chat/messages پیام بفرستید.\n// جزئیات: مستندات CRM_WEB_CHAT در مخزن Hesabix';
+  }
+
+  @override
+  String get crmWebChatDefaultWidgetName => 'ویجت';
+
+  @override
+  String get crmWebChatAccessDenied =>
+      'شما دسترسی لازم برای مشاهده CRM را ندارید';
+
+  @override
+  String get crmWebChatPageTitle => 'چت وب';
+
+  @override
+  String get crmWebChatSearchConversationsHint =>
+      'جستجوی مکالمه، شناسه، ایمیل…';
+
+  @override
+  String get crmWebChatMessageDeleted => 'این پیام حذف شده است';
+
+  @override
+  String get crmWebChatLoadOlder => 'در حال بارگذاری…';
+
+  @override
+  String get crmWebChatDeleteMessage => 'حذف پیام';
+
+  @override
+  String get crmWebChatDeleteMessageConfirm =>
+      'حذف این پیام غیرقابل بازگردانی است. ادامه می‌دهید؟';
+
+  @override
+  String get crmWebChatRefreshTooltip => 'بارگذاری مجدد';
+
+  @override
+  String get crmWebChatFilterStatusLabel => 'فیلتر وضعیت';
+
+  @override
+  String get crmWebChatFilterAll => 'همه';
+
+  @override
+  String get crmWebChatWidgetsSectionTitle => 'ویجت‌های چت';
+
+  @override
+  String get crmWebChatWidgetsSectionHint =>
+      'برای Public Key و غیرفعال‌کردن فایل فقط روی همان سایت، ویرایش را بزنید.';
+
+  @override
+  String get crmWebChatVisitorAttachmentCrmOff =>
+      'پیوست بازدیدکننده: بسته (ابتدا در تنظیمات CRM روشن شود)';
+
+  @override
+  String get crmWebChatVisitorAttachmentAllowed =>
+      'پیوست بازدیدکننده: مجاز — فضای ذخیره کسب‌وکار';
+
+  @override
+  String get crmWebChatVisitorAttachmentWidgetOff =>
+      'پیوست بازدیدکننده: برای این ویجت بسته است';
+
+  @override
+  String get crmWebChatWidgetStateActive =>
+      'وضعیت: فعال — در سایت جاسازی می‌شود';
+
+  @override
+  String get crmWebChatWidgetStateInactive =>
+      'وضعیت: غیرفعال — مکالمه جدید با این کلید بسته است';
+
+  @override
+  String get crmWebChatPublicKeyCopied => 'کلید عمومی کپی شد';
+
+  @override
+  String get crmWebChatEmbedGuideCopied => 'راهنمای اتصال کپی شد';
+
+  @override
+  String get crmWebChatMenuCopyPublicKey => 'کپی کلید عمومی';
+
+  @override
+  String get crmWebChatMenuCopyApiGuide => 'کپی راهنمای API';
+
+  @override
+  String get crmWebChatMenuEdit => 'ویرایش…';
+
+  @override
+  String get crmWebChatNoWidgetsYet =>
+      'هنوز ویجی نساخته‌اید — از + استفاده کنید.';
+
+  @override
+  String get crmWebChatNoConversations =>
+      'مکالمه‌ای نیست — یا فیلتر را تغییر دهید';
+
+  @override
+  String crmWebChatConversationNumber(int id) {
+    return 'مکالمه $id';
+  }
+
+  @override
+  String get crmWebChatSelectConversation => 'یک مکالمه را انتخاب کنید';
+
+  @override
+  String get crmWebChatConversationNotFoundRefresh =>
+      'مکالمه یافت نشد — به‌روزرسانی را بزنید';
+
+  @override
+  String get crmWebChatVisitorStartPageLabel => 'صفحهٔ شروع چت (بازدیدکننده)';
+
+  @override
+  String crmWebChatWidgetLine(String name) {
+    return 'ویجت: $name';
+  }
+
+  @override
+  String crmWebChatAssigneeLine(String name) {
+    return 'مسئول: $name';
+  }
+
+  @override
+  String get crmWebChatEditConversationButton => 'ویرایش مکالمه';
+
+  @override
+  String get crmWebChatLeads => 'لیدها';
+
+  @override
+  String get crmWebChatRoleAgent => 'پشتیبان';
+
+  @override
+  String get crmWebChatRoleVisitor => 'بازدیدکننده';
+
+  @override
+  String get crmWebChatFileLabel => 'فایل';
+
+  @override
+  String get crmWebChatAttachFileTooltip =>
+      'پیوست فایل (فضای ذخیره‌سازی کسب‌وکار، بستر crm_web_chat)';
+
+  @override
+  String get crmWebChatReplyHint => 'پاسخ… (Ctrl+Enter ارسال)';
+
+  @override
+  String get crmWebChatSend => 'ارسال';
+
+  @override
+  String get crmWebChatWidgetDialogTitleEdit => 'ویرایش ویجت چت';
+
+  @override
+  String get crmWebChatWidgetDialogTitleNew => 'ویجت چت جدید';
+
+  @override
+  String get crmWebChatWidgetDialogIntro =>
+      'پس از ایجاد، «کلید عمومی» و راهنمای اتصال API از منوی … ویجت قابل کپی است. دامنهٔ مجاز فقط امنیت مرورگر (CORS) است.';
+
+  @override
+  String get crmWebChatWidgetNameLabel => 'نام ویجت (داخلی)';
+
+  @override
+  String get crmWebChatWidgetNameHint => 'مثال: فروشگاه اینترنتی';
+
+  @override
+  String get crmWebChatWidgetNameHelper =>
+      'فقط در پنل شما دیده می‌شود تا بین چند ویجت تمایز بگذارید.';
+
+  @override
+  String get crmWebChatWidgetOriginsLabel => 'دامنه‌های مجاز درخواست';
+
+  @override
+  String get crmWebChatWidgetOriginsHint => 'shop.ir، blog.shop.ir';
+
+  @override
+  String get crmWebChatWidgetOriginsHelper =>
+      'اختیاری. فقط نام میزبان (بدون https://)؛ جدا با ویرگول لاتین یا فارسی. اگر خالی بگذارید، محدودیت دامنه با منطق سرور طبق مستند API اعمال می‌شود. برای جاسازی روی دامنهٔ مشخص، حتماً همان دامنه را اضافه کنید.';
+
+  @override
+  String get crmWebChatVisitorFileSwitchTitle =>
+      'ارسال فایل توسط بازدیدکنندهٔ سایت';
+
+  @override
+  String get crmWebChatVisitorFileSwitchOn =>
+      'وابسته به پلن فضای ذخیره‌سازی. می‌توانید فقط برای این ویجت ببندید؛ اگر روشن بماند، مثل سایر ویجت‌هاست.';
+
+  @override
+  String get crmWebChatVisitorFileSwitchOff =>
+      'الان در سطح کسب‌وکار غیرفعال است. از مسیر «مدیریت ارتباطات → تنظیمات CRM» (یا منوی مربوط) گزینهٔ ارسال فایل در چت وب را روشن کنید، بعد برگردید و این سوییچ را تنظیم کنید.';
+
+  @override
+  String get crmWebChatWidgetActiveTitle => 'ویجت فعال';
+
+  @override
+  String get crmWebChatWidgetActiveSubtitle =>
+      'اگر غیرفعال شود، با همین «کلید عمومی» مکالمهٔ جدید شروع نمی‌شود (ویجت‌های قدیم در پنل باقی می‌مانند).';
+
+  @override
+  String get crmWebChatNameRequired =>
+      'لطفاً «نام ویجت» را وارد کنید (مثلاً نام سایت یا بخش).';
+
+  @override
+  String get crmWebChatCreate => 'ایجاد';
+
+  @override
+  String get crmWebChatSocketLive => 'زنده (WebSocket)';
+
+  @override
+  String get crmWebChatSocketPolling => 'نظرسنجی';
+
+  @override
+  String get crmWebChatSocketOffline => 'قطع';
+
+  @override
+  String get crmWebChatSocketNoKey => 'بدون کلید';
+
+  @override
+  String get crmWebChatPeerTyping => 'بازدیدکننده در حال تایپ است…';
+
+  @override
+  String get crmWebChatTooltipMessageSent => 'ارسال شد';
+
+  @override
+  String get crmWebChatTooltipMessageRead => 'خوانده شد';
 }

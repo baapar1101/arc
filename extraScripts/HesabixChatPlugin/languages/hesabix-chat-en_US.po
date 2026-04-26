@@ -1,0 +1,214 @@
+# English (United States) — Hesabix Web Chat
+# Copyright (C) 2025 Hesabix
+msgid ""
+msgstr ""
+"Project-Id-Version: Hesabix Web Chat 1.0.0\n"
+"Report-Msgid-Bugs-To: https://hesabix.ir\n"
+"POT-Creation-Date: 2026-04-25 12:00+0000\n"
+"PO-Revision-Date: 2026-04-25 12:00+0000\n"
+"Last-Translator: Hesabix <https://hesabix.ir>\n"
+"Language-Team: English\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: hesabix-chat\n"
+
+msgid "گفتگو با پشتیبانی"
+msgstr "Chat with support"
+
+msgid "پشتیبانی"
+msgstr "Support"
+
+msgid "چت حسابیکس"
+msgstr "Hesabix chat"
+
+msgid "اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد."
+msgstr "Connect to Hesabix: enter the API base URL and the chat widget public key from the CRM &gt; Web chat panel. Your WordPress site domain must be listed in that widget’s “allowed domains” (allowed origins)."
+
+msgid "آدرس پایه API (سرور)"
+msgstr "API base URL (server)"
+
+msgid "مثال: https://hsxn.hesabix.ir — بدون / در انتها."
+msgstr "Example: https://hsxn.hesabix.ir — do not add a trailing slash."
+
+msgid "Public Key ویجت"
+msgstr "Widget public key"
+
+msgid "نمایش ویجت"
+msgstr "Widget display"
+
+msgid "در تمام صفحات (دکمه شناور)"
+msgstr "All pages (floating button)"
+
+msgid "فقط با شورتکد [hesabix_chat] در برگه/نوشته"
+msgstr "Only via shortcode [hesabix_chat] in pages or posts"
+
+msgid "متن دکمه"
+msgstr "Button text"
+
+msgid "عنوان پنل چت"
+msgstr "Chat panel title"
+
+msgid "رنگ دکمه"
+msgstr "Button color"
+
+msgid "رنگ متن دکمه"
+msgstr "Button text color"
+
+msgid "جایگاه دکمه"
+msgstr "Button position"
+
+msgid "پایین · راست"
+msgstr "Bottom · right"
+
+msgid "پایین · چپ"
+msgstr "Bottom · left"
+
+msgid "بالا · راست"
+msgstr "Top · right"
+
+msgid "بالا · چپ"
+msgstr "Top · left"
+
+msgid "تم پنل"
+msgstr "Panel theme"
+
+msgid "روشن"
+msgstr "Light"
+
+msgid "تاریک"
+msgstr "Dark"
+
+msgid "جهت نوشتار"
+msgstr "Text direction"
+
+msgid "خودکار (از سایت وردپرس)"
+msgstr "Auto (from WordPress site)"
+
+msgid "راست‌به‌چپ (RTL)"
+msgstr "Right-to-left (RTL)"
+
+msgid "چپ‌به‌راست (LTR)"
+msgstr "Left-to-right (LTR)"
+
+msgid "عرض پنل (px)"
+msgstr "Panel width (px)"
+
+msgid "ارتفاع پنل (px)"
+msgstr "Panel height (px)"
+
+msgid "z-index (لایه نسبت به سایر عناصر)"
+msgstr "z-index (stacking order)"
+
+msgid "فاصله از لبه عمودی (px)"
+msgstr "Offset from vertical edge (px)"
+
+msgid "فاصله از لبه افقی (px)"
+msgstr "Offset from horizontal edge (px)"
+
+msgid "گردی گوشه پنل (px)"
+msgstr "Panel corner radius (px)"
+
+msgid "ارسال فایل"
+msgstr "File upload"
+
+msgid "نمایش دکمه پیوست (در صورت فعال بودن در تنظیمات CRM و پلن کسب‌وکار)"
+msgstr "Show attach button (only if allowed in CRM settings and the business plan)"
+
+msgid "شروع گفتگو"
+msgstr "Start conversation"
+
+msgid "نام"
+msgstr "First name"
+
+msgid "نام خانوادگی"
+msgstr "Last name"
+
+msgid "ایمیل"
+msgstr "Email"
+
+msgid "موبایل"
+msgstr "Mobile"
+
+msgid "شروع"
+msgstr "Start"
+
+msgid "پیام خود را بنویسید…"
+msgstr "Type your message…"
+
+msgid "ارسال"
+msgstr "Send"
+
+msgid "بستن"
+msgstr "Close"
+
+msgid "مکالمه جدید"
+msgstr "New conversation"
+
+msgid "پیوست"
+msgstr "Attachment"
+
+msgid "خطا در ارتباط با سرور."
+msgstr "Could not reach the server."
+
+msgid "شما"
+msgstr "You"
+
+msgid "مکالمه فعلی پاک می‌شود و می‌توانید دوباره شروع کنید."
+msgstr "The current chat will be cleared and you can start over."
+
+msgid "public key تنظیم نشده"
+msgstr "public key is not set"
+
+msgid "به بخش فروش خوش آمدید! چه کمکی از دستم برمی‌آید؟"
+msgstr "Welcome to sales! How can I help?"
+
+msgid "ما معمولاً در کمتر از یک ساعت پاسخ می‌دهیم."
+msgstr "We usually respond within an hour."
+
+msgid "پیام اولیه برای بازدیدکننده"
+msgstr "Initial message for the visitor"
+
+msgid "مثال: به بخش فروش خوش آمدید! چه کمکی از دستم برمی‌آید؟"
+msgstr "Example: Welcome to sales! How can I help?"
+
+msgid "این متن پس از شروع چت، در بالای پنل به‌صورت نزدیک به پیام پشتیبانی نمایش داده می‌شود. چند سطر جدا با اینتر مجاز است."
+msgstr "Shown near the support welcome at the top of the panel after the chat starts. You may use several lines (Enter)."
+
+msgid "زمان پاسخ‌گویی (نمایش برای بازدیدکننده)"
+msgstr "Response time (shown to the visitor)"
+
+msgid "مثال: «ما معمولاً در کمتر از یک ساعت پاسخ می‌دهیم.» — زیر پیام خوش‌آمد دیده می‌شود. خالی بگذارید اگر نمی‌خواهید نمایش داده شود."
+msgstr "Example: “We usually respond within an hour.” It appears under the welcome. Leave empty to hide."
+
+msgid "الگوی ظاهر"
+msgstr "UI preset"
+
+msgid "پیش‌فرض (گرادیان نرم، کارت خوش‌آمد)"
+msgstr "Default (soft gradient, welcome card)"
+
+msgid "مینیمال (تخت، بوردر کم)"
+msgstr "Minimal (flat, light borders)"
+
+msgid "رنگی (پس‌زمینه و سایهٔ پررنگ‌تر)"
+msgstr "Colorful (stronger background and shadow)"
+
+msgid "لوگو کنار عنوان پنل"
+msgstr "Logo next to the panel title"
+
+msgid "انتخاب از رسانه"
+msgstr "Choose from media library"
+
+msgid "حذف تصویر"
+msgstr "Remove image"
+
+msgid "لوگو برای هدر چت"
+msgstr "Chat header logo"
+
+msgid "تصویر مربع یا افقی کوچک (مثلاً ۶۴px) مناسب است. در سمت راست/چپ کنار عنوان هدر دیده می‌شود."
+msgstr "A small square or wide logo (e.g. 64px) works well. It appears beside the title in the header (RTL/LTR)."
+
+msgid "رنگ اصلی (دکمه و هدر)"
+msgstr "Primary color (button and header)"

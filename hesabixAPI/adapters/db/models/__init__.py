@@ -7,6 +7,7 @@ from .captcha import Captcha  # noqa: F401
 from .auth_security_event import AuthSecurityEvent  # noqa: F401
 from .sms_destination_send_log import SmsDestinationSendLog  # noqa: F401
 from .firewall_rule import FirewallRule, FirewallRequestLog, FirewallAuditLog  # noqa: F401
+from .firewall_rate_policy import FirewallRatePolicy  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .email_verification import EmailVerificationToken  # noqa: F401
 from .mobile_verification import MobileVerificationToken  # noqa: F401
@@ -45,6 +46,7 @@ from .business_currency_rate import BusinessCurrencyRate  # noqa: F401
 
 # Documents
 from .document import Document  # noqa: F401
+from .document_invoice_tag import DocumentInvoiceTag, DocumentInvoiceTagLink  # noqa: F401
 from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401

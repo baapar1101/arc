@@ -15902,7 +15902,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFirewallDescription.
   ///
   /// In en, this message translates to:
-  /// **'IP allow/deny rules, temporary bans, logs and reports'**
+  /// **'IP allow/deny, per-path rate limits (database), temporary bans, logs and reports'**
   String get settingsFirewallDescription;
 
   /// No description provided for @firewallTabRules.
@@ -15910,6 +15910,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rules'**
   String get firewallTabRules;
+
+  /// No description provided for @firewallTabRatePolicies.
+  ///
+  /// In en, this message translates to:
+  /// **'Path rate limits'**
+  String get firewallTabRatePolicies;
 
   /// No description provided for @firewallTabBlockLogs.
   ///
@@ -15928,6 +15934,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reports'**
   String get firewallTabReports;
+
+  /// No description provided for @firewallAddRatePolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rate policy'**
+  String get firewallAddRatePolicy;
+
+  /// No description provided for @firewallEditRatePolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit rate policy'**
+  String get firewallEditRatePolicy;
+
+  /// No description provided for @firewallRatePolicyPathRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Path prefix (e.g. /api/v1/public/crm-chat)'**
+  String get firewallRatePolicyPathRequired;
+
+  /// No description provided for @firewallRateMaxRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Max requests per window'**
+  String get firewallRateMaxRequests;
+
+  /// No description provided for @firewallRateWindowSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Window size (seconds)'**
+  String get firewallRateWindowSeconds;
+
+  /// No description provided for @firewallNoRatePolicies.
+  ///
+  /// In en, this message translates to:
+  /// **'No rate policies. Use this for per-IP limits on public API paths (e.g. web chat).'**
+  String get firewallNoRatePolicies;
+
+  /// No description provided for @firewallDeleteRatePolicyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete rate policy?'**
+  String get firewallDeleteRatePolicyTitle;
+
+  /// No description provided for @firewallDeleteRatePolicyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The rate limit for this path will be removed.'**
+  String get firewallDeleteRatePolicyBody;
+
+  /// No description provided for @firewallEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get firewallEnabled;
 
   /// No description provided for @firewallAddRule.
   ///
@@ -20596,6 +20656,516 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{rate} — {effective}{idPart}'**
   String invoiceFxRateRow(String rate, String effective, String idPart);
+
+  /// No description provided for @crmWebChatError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {detail}'**
+  String crmWebChatError(String detail);
+
+  /// No description provided for @crmWebChatErrorLoadingMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading messages: {detail}'**
+  String crmWebChatErrorLoadingMessages(String detail);
+
+  /// No description provided for @crmWebChatStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get crmWebChatStatusOpen;
+
+  /// No description provided for @crmWebChatStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get crmWebChatStatusPending;
+
+  /// No description provided for @crmWebChatStatusResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get crmWebChatStatusResolved;
+
+  /// No description provided for @crmWebChatFileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved'**
+  String get crmWebChatFileSaved;
+
+  /// No description provided for @crmWebChatErrorDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download error: {detail}'**
+  String crmWebChatErrorDownload(String detail);
+
+  /// No description provided for @crmWebChatFileUploadDisabledCrm.
+  ///
+  /// In en, this message translates to:
+  /// **'File uploads are disabled in CRM settings.'**
+  String get crmWebChatFileUploadDisabledCrm;
+
+  /// No description provided for @crmWebChatFileReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the file (size or browser limit). Try a smaller file.'**
+  String get crmWebChatFileReadFailed;
+
+  /// No description provided for @crmWebChatFileIdMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'File id was not returned from the server.'**
+  String get crmWebChatFileIdMissing;
+
+  /// No description provided for @crmWebChatFileSent.
+  ///
+  /// In en, this message translates to:
+  /// **'File sent'**
+  String get crmWebChatFileSent;
+
+  /// No description provided for @crmWebChatNoCrmWritePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to change CRM data.'**
+  String get crmWebChatNoCrmWritePermission;
+
+  /// No description provided for @crmWebChatMessageSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get crmWebChatMessageSent;
+
+  /// No description provided for @crmWebChatSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get crmWebChatSaved;
+
+  /// No description provided for @crmWebChatWidgetCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat widget created'**
+  String get crmWebChatWidgetCreated;
+
+  /// No description provided for @crmWebChatWidgetUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat widget updated'**
+  String get crmWebChatWidgetUpdated;
+
+  /// No description provided for @crmWebChatEditConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit conversation'**
+  String get crmWebChatEditConversationTitle;
+
+  /// No description provided for @crmWebChatFieldStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get crmWebChatFieldStatus;
+
+  /// No description provided for @crmWebChatAssignTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign to'**
+  String get crmWebChatAssignTo;
+
+  /// No description provided for @crmWebChatOptionalLeadId.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead id (optional)'**
+  String get crmWebChatOptionalLeadId;
+
+  /// No description provided for @crmWebChatOptionalPersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Person id (optional)'**
+  String get crmWebChatOptionalPersonId;
+
+  /// No description provided for @crmWebChatUnassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get crmWebChatUnassigned;
+
+  /// No description provided for @crmWebChatEmbedSnippet.
+  ///
+  /// In en, this message translates to:
+  /// **'// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.'**
+  String crmWebChatEmbedSnippet(String base, String publicKey);
+
+  /// No description provided for @crmWebChatDefaultWidgetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Widget'**
+  String get crmWebChatDefaultWidgetName;
+
+  /// No description provided for @crmWebChatAccessDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to view CRM.'**
+  String get crmWebChatAccessDenied;
+
+  /// No description provided for @crmWebChatPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web chat'**
+  String get crmWebChatPageTitle;
+
+  /// No description provided for @crmWebChatSearchConversationsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search conversations, ID, email…'**
+  String get crmWebChatSearchConversationsHint;
+
+  /// No description provided for @crmWebChatMessageDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'This message was deleted'**
+  String get crmWebChatMessageDeleted;
+
+  /// No description provided for @crmWebChatLoadOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get crmWebChatLoadOlder;
+
+  /// No description provided for @crmWebChatDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message'**
+  String get crmWebChatDeleteMessage;
+
+  /// No description provided for @crmWebChatDeleteMessageConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting this message cannot be undone. Continue?'**
+  String get crmWebChatDeleteMessageConfirm;
+
+  /// No description provided for @crmWebChatRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get crmWebChatRefreshTooltip;
+
+  /// No description provided for @crmWebChatFilterStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status filter'**
+  String get crmWebChatFilterStatusLabel;
+
+  /// No description provided for @crmWebChatFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get crmWebChatFilterAll;
+
+  /// No description provided for @crmWebChatWidgetsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat widgets'**
+  String get crmWebChatWidgetsSectionTitle;
+
+  /// No description provided for @crmWebChatWidgetsSectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use edit for the public key and to disable file upload per site.'**
+  String get crmWebChatWidgetsSectionHint;
+
+  /// No description provided for @crmWebChatVisitorAttachmentCrmOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor attachments: off (enable in CRM settings first).'**
+  String get crmWebChatVisitorAttachmentCrmOff;
+
+  /// No description provided for @crmWebChatVisitorAttachmentAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor attachments: allowed — business storage.'**
+  String get crmWebChatVisitorAttachmentAllowed;
+
+  /// No description provided for @crmWebChatVisitorAttachmentWidgetOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor attachments: off for this widget.'**
+  String get crmWebChatVisitorAttachmentWidgetOff;
+
+  /// No description provided for @crmWebChatWidgetStateActive.
+  ///
+  /// In en, this message translates to:
+  /// **'State: active — embedded on the site'**
+  String get crmWebChatWidgetStateActive;
+
+  /// No description provided for @crmWebChatWidgetStateInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'State: inactive — new conversations cannot start with this key'**
+  String get crmWebChatWidgetStateInactive;
+
+  /// No description provided for @crmWebChatPublicKeyCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key copied'**
+  String get crmWebChatPublicKeyCopied;
+
+  /// No description provided for @crmWebChatEmbedGuideCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection guide copied'**
+  String get crmWebChatEmbedGuideCopied;
+
+  /// No description provided for @crmWebChatMenuCopyPublicKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy public key'**
+  String get crmWebChatMenuCopyPublicKey;
+
+  /// No description provided for @crmWebChatMenuCopyApiGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy API guide'**
+  String get crmWebChatMenuCopyApiGuide;
+
+  /// No description provided for @crmWebChatMenuEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit…'**
+  String get crmWebChatMenuEdit;
+
+  /// No description provided for @crmWebChatNoWidgetsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No widgets yet — use + to add one.'**
+  String get crmWebChatNoWidgetsYet;
+
+  /// No description provided for @crmWebChatNoConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations — try changing the filter'**
+  String get crmWebChatNoConversations;
+
+  /// No description provided for @crmWebChatConversationNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation {id}'**
+  String crmWebChatConversationNumber(int id);
+
+  /// No description provided for @crmWebChatSelectConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a conversation'**
+  String get crmWebChatSelectConversation;
+
+  /// No description provided for @crmWebChatConversationNotFoundRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation not found — try refreshing'**
+  String get crmWebChatConversationNotFoundRefresh;
+
+  /// No description provided for @crmWebChatVisitorStartPageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Page where chat started (visitor)'**
+  String get crmWebChatVisitorStartPageLabel;
+
+  /// No description provided for @crmWebChatWidgetLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Widget: {name}'**
+  String crmWebChatWidgetLine(String name);
+
+  /// No description provided for @crmWebChatAssigneeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner: {name}'**
+  String crmWebChatAssigneeLine(String name);
+
+  /// No description provided for @crmWebChatEditConversationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit conversation'**
+  String get crmWebChatEditConversationButton;
+
+  /// No description provided for @crmWebChatLeads.
+  ///
+  /// In en, this message translates to:
+  /// **'Leads'**
+  String get crmWebChatLeads;
+
+  /// No description provided for @crmWebChatRoleAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get crmWebChatRoleAgent;
+
+  /// No description provided for @crmWebChatRoleVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor'**
+  String get crmWebChatRoleVisitor;
+
+  /// No description provided for @crmWebChatFileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get crmWebChatFileLabel;
+
+  /// No description provided for @crmWebChatAttachFileTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach file (business storage, context crm_web_chat)'**
+  String get crmWebChatAttachFileTooltip;
+
+  /// No description provided for @crmWebChatReplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply… (Ctrl+Enter to send)'**
+  String get crmWebChatReplyHint;
+
+  /// No description provided for @crmWebChatSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get crmWebChatSend;
+
+  /// No description provided for @crmWebChatWidgetDialogTitleEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit chat widget'**
+  String get crmWebChatWidgetDialogTitleEdit;
+
+  /// No description provided for @crmWebChatWidgetDialogTitleNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat widget'**
+  String get crmWebChatWidgetDialogTitleNew;
+
+  /// No description provided for @crmWebChatWidgetDialogIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'After creation, copy the public key and API connection guide from the widget’s ⋯ menu. Allowed domains only affect browser security (CORS).'**
+  String get crmWebChatWidgetDialogIntro;
+
+  /// No description provided for @crmWebChatWidgetNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Widget name (internal)'**
+  String get crmWebChatWidgetNameLabel;
+
+  /// No description provided for @crmWebChatWidgetNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. My shop'**
+  String get crmWebChatWidgetNameHint;
+
+  /// No description provided for @crmWebChatWidgetNameHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Only visible in your panel to tell widgets apart.'**
+  String get crmWebChatWidgetNameHelper;
+
+  /// No description provided for @crmWebChatWidgetOriginsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed request domains'**
+  String get crmWebChatWidgetOriginsLabel;
+
+  /// No description provided for @crmWebChatWidgetOriginsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'shop.example.com, blog.shop.example.com'**
+  String get crmWebChatWidgetOriginsHint;
+
+  /// No description provided for @crmWebChatWidgetOriginsHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Host names only (no https://), separated by a comma. If empty, domain rules follow the API docs. For a specific site, add that host here.'**
+  String get crmWebChatWidgetOriginsHelper;
+
+  /// No description provided for @crmWebChatVisitorFileSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let site visitors send files'**
+  String get crmWebChatVisitorFileSwitchTitle;
+
+  /// No description provided for @crmWebChatVisitorFileSwitchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject to your storage plan. You can turn this off for this widget only; if left on, it matches other widgets.'**
+  String get crmWebChatVisitorFileSwitchOn;
+
+  /// No description provided for @crmWebChatVisitorFileSwitchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled at business level. In CRM settings (e.g. Communications → CRM settings), turn on web chat file upload, then return and set this switch.'**
+  String get crmWebChatVisitorFileSwitchOff;
+
+  /// No description provided for @crmWebChatWidgetActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Widget active'**
+  String get crmWebChatWidgetActiveTitle;
+
+  /// No description provided for @crmWebChatWidgetActiveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If off, new conversations cannot start with this public key (existing threads stay in the panel).'**
+  String get crmWebChatWidgetActiveSubtitle;
+
+  /// No description provided for @crmWebChatNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a widget name (e.g. site or section).'**
+  String get crmWebChatNameRequired;
+
+  /// No description provided for @crmWebChatCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get crmWebChatCreate;
+
+  /// No description provided for @crmWebChatSocketLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get crmWebChatSocketLive;
+
+  /// No description provided for @crmWebChatSocketPolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Polling'**
+  String get crmWebChatSocketPolling;
+
+  /// No description provided for @crmWebChatSocketOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get crmWebChatSocketOffline;
+
+  /// No description provided for @crmWebChatSocketNoKey.
+  ///
+  /// In en, this message translates to:
+  /// **'No key'**
+  String get crmWebChatSocketNoKey;
+
+  /// No description provided for @crmWebChatPeerTyping.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor is typing…'**
+  String get crmWebChatPeerTyping;
+
+  /// No description provided for @crmWebChatTooltipMessageSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get crmWebChatTooltipMessageSent;
+
+  /// No description provided for @crmWebChatTooltipMessageRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get crmWebChatTooltipMessageRead;
 }
 
 class _AppLocalizationsDelegate

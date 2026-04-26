@@ -2207,6 +2207,11 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _hasAccessToMenuItem(_MenuItem item) {
     final section = _sectionForLabel(item.label, AppLocalizations.of(context));
+
+    if (item.path != null && item.path!.contains('/crm/web-chat')) {
+      if (widget.authStore.currentBusiness?.isOwner == true) return true;
+      return widget.authStore.canViewCrmWebChat();
+    }
     
     // داشبورد همیشه قابل مشاهده است
     if (item.path != null && item.path!.endsWith('/dashboard')) {

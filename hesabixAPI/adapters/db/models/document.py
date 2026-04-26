@@ -38,5 +38,8 @@ class Document(Base):
 	created_by = relationship("User", foreign_keys=[created_by_user_id])
 	project = relationship("Project")
 	lines = relationship("DocumentLine", back_populates="document", cascade="all, delete-orphan")
+	invoice_tag_links = relationship(
+		"DocumentInvoiceTagLink", back_populates="document", cascade="all, delete-orphan"
+	)
 
 

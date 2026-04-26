@@ -24,13 +24,22 @@ class CrmChatConversationStartPublic(BaseModel):
 	public_key: str = Field(..., min_length=8, max_length=64)
 	first_name: str = Field(..., min_length=1, max_length=120)
 	last_name: str = Field(..., min_length=1, max_length=120)
-	email: str = Field(..., min_length=3, max_length=255)
+	email: str = Field(default="", max_length=255, description="خالی اگر در ویجت اختیاری/پنهان باشد")
 	phone: str = Field(..., min_length=5, max_length=64)
 	page_url: Optional[str] = Field(None, max_length=2048)
 
+	@field_validator("email", mode="before")
+	@classmethod
+	def email_none(cls, v: object) -> str:
+		if v is None:
+			return ""
+		if isinstance(v, str):
+			return v
+		return str(v)
+
 	@field_validator("email")
 	@classmethod
-	def email_strip(cls, v: str) -> str:
+	def email_norm(cls, v: str) -> str:
 		return (v or "").strip().lower()
 
 
@@ -66,3 +75,7 @@ class CrmChatConversationPatch(BaseModel):
 
 class BusinessCrmSettingsUpdate(BaseModel):
 	allow_web_chat_file_upload: bool = Field(..., description="ارسال فایل توسط بازدیدکننده در چت وب")
+
+
+class CrmChatMarkReadBody(BaseModel):
+	up_to_message_id: int = Field(..., gt=0, description="Mark incoming messages up to this id as read")

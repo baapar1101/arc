@@ -773,3 +773,91 @@ msgstr "The selected rate is effective after the document revaluation reference 
 
 msgid "FX_REVALUATION_ERROR"
 msgstr "Error calculating foreign exchange revaluation"
+
+# CRM web chat
+msgid "CRM_CHAT_PUBLIC_VISITOR_TOKEN_REQUIRED"
+msgstr "Visitor token is required. Send X-Visitor-Token or Authorization: Bearer, or the legacy visitor_token query parameter."
+
+msgid "CRM_CHAT_PUBLIC_CONVERSATION_STARTED"
+msgstr "Conversation started. You can send messages now."
+
+msgid "CRM_CHAT_PUBLIC_MESSAGE_RECORDED"
+msgstr "Message recorded."
+
+msgid "CRM_CHAT_PUBLIC_FILE_RECORDED"
+msgstr "File recorded."
+
+msgid "CRM_CHAT_SETTINGS_SAVED"
+msgstr "Settings saved."
+
+msgid "CRM_CHAT_WIDGET_CREATED"
+msgstr "Chat widget created."
+
+msgid "CRM_CHAT_WIDGET_UPDATED"
+msgstr "Chat widget updated."
+
+msgid "CRM_CHAT_AGENT_MESSAGE_SENT"
+msgstr "Message sent."
+
+msgid "CRM_CHAT_CONVERSATION_UPDATED"
+msgstr "Conversation updated."
+
+msgid "CRM_CHAT_INVALID_EMAIL"
+msgstr "Invalid email address"
+
+msgid "CRM_CHAT_FILE_NOT_FOUND"
+msgstr "File not found"
+
+msgid "CRM_CHAT_FILE_NOT_FOR_CHAT"
+msgstr "This file is not used for chat"
+
+msgid "CRM_CHAT_FILE_WRONG_CONVERSATION"
+msgstr "The file does not belong to this conversation"
+
+msgid "CRM_CHAT_WIDGET_INACTIVE"
+msgstr "Chat widget not found or inactive"
+
+msgid "CRM_CHAT_WIDGET_NOT_FOUND"
+msgstr "Widget not found"
+
+msgid "CRM_CHAT_ORIGIN_NOT_ALLOWED"
+msgstr "The request origin is not allowed for this widget"
+
+msgid "CRM_CHAT_VISITOR_NAME_REQUIRED"
+msgstr "First and last name are required"
+
+msgid "CRM_CHAT_PHONE_INVALID"
+msgstr "Enter a valid phone number"
+
+msgid "CRM_CHAT_CONVERSATION_NOT_FOUND"
+msgstr "Conversation not found"
+
+msgid "CRM_CHAT_MESSAGE_BODY_INVALID"
+msgstr "Invalid message text"
+
+msgid "CRM_FILE_UPLOAD_DISABLED"
+msgstr "File upload is not enabled for web chat for this business."
+
+msgid "WIDGET_FILE_UPLOAD_DISABLED"
+msgstr "File upload by visitors is disabled for this widget."
+
+msgid "CRM_CHAT_BUSINESS_NOT_FOUND"
+msgstr "Business not found"
+
+msgid "CRM_CHAT_FILE_NOT_AVAILABLE_GENERIC"
+msgstr "File upload is not available right now. Please try again later."
+
+msgid "CRM_CHAT_FILE_NOT_AVAILABLE_QUOTA"
+msgstr "Not enough storage space; file upload is not available right now."
+
+msgid "CRM_FILE_UPLOAD_FAILED"
+msgstr "File upload failed."
+
+msgid "CRM_CHAT_CAPTION_TOO_LONG"
+msgstr "Caption is too long"
+
+msgid "CRM_CHAT_FILE_NOT_IN_CONVERSATION"
+msgstr "File not found in this conversation"
+
+msgid "CRM_CHAT_CONVERSATION_STATUS_INVALID"
+msgstr "Invalid status"

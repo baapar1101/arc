@@ -45,6 +45,13 @@ from app.services.invoice_service import (
     export_installments_csv,
     export_installments_xlsx,
 )
+from app.services.invoice_tag_service import (
+    apply_invoice_tag_filters_to_query,
+    attach_tags_to_invoice_items,
+    create_invoice_tag,
+    list_invoice_tags,
+    update_invoice_tag,
+)
 from app.services.tax_submission_service import send_document_to_tax_system, inquire_tax_status
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
@@ -733,6 +740,62 @@ def get_invoice_delete_info(
         request=request,
         message="INVOICE_DELETE_INFO"
     )
+
+
+# مسیرهای ثابت مثل /tags باید قبل از /{invoice_id} تعریف شوند وگرنه «tags» به‌عنوان شناسه فاکتور گرفته می‌شود.
+@router.get(
+    "/business/{business_id}/tags",
+    summary="لیست برچسب‌های فاکتور",
+    description="برچسب‌های قابل انتساب به فاکتور برای این کسب‌وکار (با ایجاد خودکار پیش‌فرض در اولین بار)",
+)
+@require_business_access("business_id")
+def list_invoice_tags_endpoint(
+    request: Request,
+    business_id: int,
+    include_inactive: bool = False,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
+):
+    items = list_invoice_tags(db, business_id, include_inactive=include_inactive)
+    return success_response(data={"items": items}, request=request, message="INVOICE_TAGS_LIST")
+
+
+@router.post(
+    "/business/{business_id}/tags",
+    summary="ایجاد برچسب فاکتور",
+)
+@require_business_access("business_id")
+def create_invoice_tag_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "edit")),
+):
+    name = body.get("name")
+    color = body.get("color")
+    item = create_invoice_tag(db, business_id, str(name or ""), color=(str(color) if color else None))
+    return success_response(data={"item": item}, request=request, message="INVOICE_TAG_CREATED")
+
+
+@router.patch(
+    "/business/{business_id}/tags/{tag_id}",
+    summary="ویرایش برچسب فاکتور",
+)
+@require_business_access("business_id")
+def update_invoice_tag_endpoint(
+    request: Request,
+    business_id: int,
+    tag_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "edit")),
+):
+    item = update_invoice_tag(db, business_id, tag_id, body)
+    return success_response(data={"item": item}, request=request, message="INVOICE_TAG_UPDATED")
 
 
 @router.get("/business/{business_id}/{invoice_id}")
@@ -2212,6 +2275,8 @@ async def search_invoices_endpoint(
 	except Exception:
 		pass
 
+	q = apply_invoice_tag_filters_to_query(q, body)
+
 	# Date range from filters or flat body
 	# 1) From QueryInfo.filters operators
 	try:
@@ -2309,7 +2374,7 @@ async def search_invoices_endpoint(
 	_log = logging.getLogger(__name__)
 	for d in items:
 		try:
-			item = invoice_document_to_dict(db, d)
+			item = invoice_document_to_dict(db, d, include_tags=False)
 		except Exception as e:
 			_log.exception("invoice_document_to_dict failed for document_id=%s business_id=%s", d.id, business_id)
 			raise ApiError(
@@ -2397,6 +2462,8 @@ async def search_invoices_endpoint(
 		_add_counterparty_to_invoice_item(db, item)
 
 		data_items.append(format_datetime_fields(item, request))
+
+	attach_tags_to_invoice_items(db, business_id, data_items)
 
 	# مرتب‌سازی بر اساس مانده: برای فاکتورهای اقساطی اگر sort_by=remaining_amount باشد
 	sort_by_val = getattr(query_info, 'sort_by', None) or body.get('sort_by')
@@ -2554,6 +2621,8 @@ async def search_tax_workspace_endpoint(
     if fiscal_year_id is not None:
         q = q.filter(Document.fiscal_year_id == fiscal_year_id)
 
+    q = apply_invoice_tag_filters_to_query(q, body)
+
     # Date range filters from QueryInfo.filters
     try:
         filters = getattr(query_info, "filters", None)
@@ -2624,7 +2693,7 @@ async def search_tax_workspace_endpoint(
 
     data_items: List[Dict[str, Any]] = []
     for d in page_docs:
-        item = invoice_document_to_dict(db, d)
+        item = invoice_document_to_dict(db, d, include_tags=False)
         extra = item.get("extra_info") or {}
         tax_status = extra.get("tax_status")
         if isinstance(tax_status, str):
@@ -2668,6 +2737,8 @@ async def search_tax_workspace_endpoint(
         _add_counterparty_to_invoice_item(db, item)
         
         data_items.append(format_datetime_fields(item, request))
+
+    attach_tags_to_invoice_items(db, business_id, data_items)
 
     page = (skip // take) + 1 if take > 0 else 1
     total_pages = (total + take - 1) // take if take > 0 else 1
@@ -3345,6 +3416,8 @@ async def export_invoices_excel(
     except Exception:
         pass
 
+    q = apply_invoice_tag_filters_to_query(q, body)
+
     # Date range
     from app.services.transfer_service import _parse_iso_date as _p
     if isinstance(body.get("from_date"), str):
@@ -3472,7 +3545,7 @@ async def export_invoices_excel(
 
     items: List[Dict[str, Any]] = []
     for d in docs:
-        item = invoice_document_to_dict(db, d)
+        item = invoice_document_to_dict(db, d, include_tags=False)
         # total_amount
         total_amount = None
         try:
@@ -3506,6 +3579,8 @@ async def export_invoices_excel(
         _add_counterparty_to_invoice_item(db, item)
         
         items.append(format_datetime_fields(item, request))
+
+    attach_tags_to_invoice_items(db, business_id, items)
 
     # Handle selected rows
     selected_only = bool(body.get('selected_only', False))
@@ -3549,6 +3624,7 @@ async def export_invoices_excel(
             ('code', 'کد سند' if is_fa else 'Code'),
             ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
             ('counterparty', 'طرف حساب' if is_fa else 'Counterparty'),
+            ('tags_display', 'برچسب‌ها' if is_fa else 'Tags'),
             ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
             ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
             ('currency_code', 'ارز' if is_fa else 'Currency'),
@@ -3714,6 +3790,8 @@ async def export_invoices_pdf(
     except Exception:
         pass
 
+    q = apply_invoice_tag_filters_to_query(q, body)
+
     from app.services.transfer_service import _parse_iso_date as _p
     if isinstance(body.get("from_date"), str):
         try:
@@ -3774,7 +3852,7 @@ async def export_invoices_pdf(
         except Exception:
             return None
     for d in docs:
-        item = invoice_document_to_dict(db, d)
+        item = invoice_document_to_dict(db, d, include_tags=False)
         total_amount = None
         try:
             totals = (item.get('extra_info') or {}).get('totals') or {}
@@ -3819,6 +3897,8 @@ async def export_invoices_pdf(
             item["counterparty"] = ""
         items.append(format_datetime_fields(item, request))
 
+    attach_tags_to_invoice_items(db, business_id, items)
+
     # Handle selected rows
     selected_only = bool(body.get('selected_only', False))
     selected_indices = body.get('selected_indices')
@@ -3861,6 +3941,7 @@ async def export_invoices_pdf(
             ('code', 'کد سند' if is_fa else 'Code'),
             ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
             ('counterparty', 'طرف حساب' if is_fa else 'Counterparty'),
+            ('tags_display', 'برچسب‌ها' if is_fa else 'Tags'),
             ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
             ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
             ('currency_code', 'ارز' if is_fa else 'Currency'),

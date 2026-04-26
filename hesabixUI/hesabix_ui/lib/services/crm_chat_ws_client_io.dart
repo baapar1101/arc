@@ -101,6 +101,16 @@ class IoCrmChatWs implements CrmChatWsClient {
   }
 
   @override
+  void sendTyping(int conversationId, {required bool active}) {
+    if (!_authed) return;
+    _sendJson(<String, Object?>{
+      'type': 'typing',
+      'conversation_id': conversationId,
+      'active': active,
+    });
+  }
+
+  @override
   void disconnect() {
     try {
       _socket?.close();

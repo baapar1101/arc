@@ -7,11 +7,12 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Literal, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
-from sqlalchemy import Date, and_, cast, desc, func, or_
+from sqlalchemy import Date, and_, cast, desc, func, or_, select
 from sqlalchemy.orm import Session
 
+from adapters.db.models.firewall_rate_policy import FirewallRatePolicy
 from adapters.db.models.firewall_rule import FirewallAuditLog, FirewallRequestLog, FirewallRule
 from adapters.db.session import get_db_session
 
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 CACHE_TTL_SEC = 8.0
 _rules_cache: dict[str, Any] = {"compiled": [], "loaded_at": 0.0}
+_rate_policies_cache: dict[str, Any] = {"items": [], "loaded_at": 0.0}
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,14 @@ def is_firewall_globally_disabled() -> bool:
 
 def invalidate_rules_cache() -> None:
 	_rules_cache["loaded_at"] = 0.0
+
+
+def invalidate_rate_policies_cache() -> None:
+	_rate_policies_cache["loaded_at"] = 0.0
+
+
+def should_refresh_rate_policies_cache() -> bool:
+	return (time.monotonic() - float(_rate_policies_cache["loaded_at"])) > CACHE_TTL_SEC
 
 
 def should_refresh_rules_cache() -> bool:
@@ -490,3 +500,156 @@ def reports_summary(db: Session, *, days: int = 7) -> dict:
 		"blocks_by_day": blocks_by_day,
 		"active_deny_rules": int(active_deny or 0),
 	}
+
+
+def refresh_rate_policies_cache_sync() -> None:
+	from adapters.db.session import SessionLocal
+
+	db = SessionLocal()
+	try:
+		rows = list(
+			db.scalars(
+				select(FirewallRatePolicy)
+				.where(FirewallRatePolicy.enabled.is_(True))
+				.order_by(FirewallRatePolicy.priority.asc(), FirewallRatePolicy.id.asc())
+			).all()
+		)
+		_rate_policies_cache["items"] = rows
+		_rate_policies_cache["loaded_at"] = time.monotonic()
+	finally:
+		db.close()
+
+
+def _rate_policy_allows_method(row: FirewallRatePolicy, method_u: str) -> bool:
+	raw = (row.http_methods or "").strip()
+	if not raw:
+		return True
+	allowed = _parse_methods(raw)
+	if allowed is None:
+		return True
+	return method_u in allowed
+
+
+def find_applicable_rate_policy(path: str, method: str) -> Optional[Dict[str, Any]]:
+	"""طولانی‌ترین path_prefix هم‌خوان + نزدیک‌ترین اولویت (عدد کمتر)."""
+	items: List[FirewallRatePolicy] = _rate_policies_cache.get("items") or []
+	method_u = (method or "GET").upper()
+	candidates: List[FirewallRatePolicy] = []
+	for p in items:
+		if not path.startswith(p.path_prefix):
+			continue
+		if not _rate_policy_allows_method(p, method_u):
+			continue
+		candidates.append(p)
+	if not candidates:
+		return None
+	candidates.sort(key=lambda x: (-len(x.path_prefix), x.priority, x.id))
+	best = candidates[0]
+	return {
+		"id": int(best.id),
+		"max_requests": int(best.max_requests),
+		"window_seconds": int(best.window_seconds),
+		"note": best.note,
+	}
+
+
+def rate_policy_to_dict(r: FirewallRatePolicy) -> dict:
+	return {
+		"id": r.id,
+		"enabled": r.enabled,
+		"priority": r.priority,
+		"path_prefix": r.path_prefix,
+		"http_methods": r.http_methods,
+		"max_requests": r.max_requests,
+		"window_seconds": r.window_seconds,
+		"note": r.note,
+		"created_at": r.created_at.isoformat() if r.created_at else None,
+		"updated_at": r.updated_at.isoformat() if r.updated_at else None,
+	}
+
+
+def list_rate_policies(db: Session) -> list[dict]:
+	q = db.query(FirewallRatePolicy).order_by(FirewallRatePolicy.priority.asc(), FirewallRatePolicy.id.asc())
+	return [rate_policy_to_dict(x) for x in q.all()]
+
+
+def create_rate_policy(
+	db: Session,
+	*,
+	enabled: bool,
+	priority: int,
+	path_prefix: str,
+	http_methods: Optional[str],
+	max_requests: int,
+	window_seconds: int,
+	note: Optional[str],
+) -> FirewallRatePolicy:
+	pp = (path_prefix or "").strip()
+	if not pp.startswith("/"):
+		raise ValueError("path_prefix must start with /")
+	if max_requests < 1 or window_seconds < 1:
+		raise ValueError("max_requests and window_seconds must be >= 1")
+	now = datetime.utcnow()
+	row = FirewallRatePolicy(
+		enabled=enabled,
+		priority=int(priority),
+		path_prefix=pp,
+		http_methods=http_methods.strip() if http_methods and http_methods.strip() else None,
+		max_requests=int(max_requests),
+		window_seconds=int(window_seconds),
+		note=note,
+		created_at=now,
+		updated_at=now,
+	)
+	db.add(row)
+	db.flush()
+	return row
+
+
+def update_rate_policy(
+	db: Session,
+	policy_id: int,
+	*,
+	enabled: Optional[bool] = None,
+	priority: Optional[int] = None,
+	path_prefix: Optional[str] = None,
+	http_methods: Optional[str] = None,
+	max_requests: Optional[int] = None,
+	window_seconds: Optional[int] = None,
+	note: Optional[str] = None,
+) -> Optional[FirewallRatePolicy]:
+	row = db.get(FirewallRatePolicy, policy_id)
+	if not row:
+		return None
+	if path_prefix is not None:
+		pp = path_prefix.strip()
+		if not pp.startswith("/"):
+			raise ValueError("path_prefix must start with /")
+		row.path_prefix = pp
+	if enabled is not None:
+		row.enabled = enabled
+	if priority is not None:
+		row.priority = int(priority)
+	if http_methods is not None:
+		st = (http_methods or "").strip()
+		row.http_methods = st if st else None
+	if max_requests is not None:
+		if max_requests < 1:
+			raise ValueError("max_requests must be >= 1")
+		row.max_requests = int(max_requests)
+	if window_seconds is not None:
+		if window_seconds < 1:
+			raise ValueError("window_seconds must be >= 1")
+		row.window_seconds = int(window_seconds)
+	if note is not None:
+		row.note = note
+	row.updated_at = datetime.utcnow()
+	return row
+
+
+def delete_rate_policy(db: Session, policy_id: int) -> bool:
+	row = db.get(FirewallRatePolicy, policy_id)
+	if not row:
+		return False
+	db.delete(row)
+	return True

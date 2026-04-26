@@ -514,6 +514,41 @@ class AuthStore with ChangeNotifier {
     return _currentBusiness!.id == businessId;
   }
 
+  /// چت وب CRM: مشاهده (جدید) + سازگاری با crm.view
+  bool canViewCrmWebChat() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('crm_web_chat', 'view') ||
+        hasBusinessPermission('crm', 'view');
+  }
+
+  /// ارسال پیام/تایپ/فایل + legacy crm.write
+  bool canReplyCrmWebChat() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('crm_web_chat', 'reply') ||
+        hasBusinessPermission('crm', 'write');
+  }
+
+  /// ساخت/ویرایش ویجت + legacy crm.write
+  bool canManageCrmWebChatWidgets() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('crm_web_chat', 'manage_widgets') ||
+        hasBusinessPermission('crm', 'write');
+  }
+
+  /// ویرایش مکالمه (وضعیت، ارجاع، لید) + legacy crm.write
+  bool canEditCrmWebChatConversations() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('crm_web_chat', 'edit_conversations') ||
+        hasBusinessPermission('crm', 'write');
+  }
+
+  /// حذف پیام + legacy crm.write
+  bool canDeleteCrmWebChatMessages() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('crm_web_chat', 'delete_messages') ||
+        hasBusinessPermission('crm', 'write');
+  }
+
   // دریافت دسترسی‌های موجود برای یک بخش
   List<String> getAvailableActions(String section) {
     if (_currentBusiness?.isOwner == true) {

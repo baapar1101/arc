@@ -1,0 +1,782 @@
+/**
+ * Hesabix Web Chat – استایل پایه (رنگ و اندازه از JS به صورت inline تنظیم می‌شود)
+ */
+#hesabix-chat-host,
+.hesabix-chat-host {
+	position: relative;
+}
+
+.hesabix-chat-launcher {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border: none;
+	cursor: pointer;
+	font-size: 0.95rem;
+	font-weight: 600;
+	padding: 0.7rem 1.2rem 0.7rem 0.95rem;
+	border-radius: 999px;
+	box-shadow: 0 6px 24px rgba( 79, 70, 229, 0.4 );
+	z-index: var( --hesabix-z, 99999 );
+	transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.hesabix-chat-launcher:hover {
+	transform: translateY( -1px );
+	box-shadow: 0 10px 28px rgba( 79, 70, 229, 0.45 );
+}
+
+.hesabix-chat-launcher-ico {
+	display: flex;
+	line-height: 0;
+}
+
+.hesabix-chat-launcher-txt {
+	white-space: nowrap;
+}
+
+.hesabix-chat-launcher:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
+
+.hesabix-chat-floating .hesabix-chat-launcher {
+	position: fixed;
+}
+
+.hesabix-chat-floating.hesabix-pos-bottom-right .hesabix-chat-launcher {
+	right: var( --hesabix-side, 24px );
+	bottom: var( --hesabix-bottom, 24px );
+}
+
+.hesabix-chat-floating.hesabix-pos-bottom-left .hesabix-chat-launcher {
+	left: var( --hesabix-side, 24px );
+	bottom: var( --hesabix-bottom, 24px );
+}
+
+.hesabix-chat-floating.hesabix-pos-top-right .hesabix-chat-launcher {
+	right: var( --hesabix-side, 24px );
+	top: var( --hesabix-bottom, 24px );
+}
+
+.hesabix-chat-floating.hesabix-pos-top-left .hesabix-chat-launcher {
+	left: var( --hesabix-side, 24px );
+	top: var( --hesabix-bottom, 24px );
+}
+
+.hesabix-chat-panel {
+	position: absolute;
+	width: 100%;
+	max-width: var( --hesabix-panel-w, 380px );
+	height: var( --hesabix-panel-h, 520px );
+	/* پنل از viewport کوتاه‌تر نماند تا دیالوگ فرم (مثلاً با بلوک «صفحهٔ فعلی») داخلش اسکرول شود */
+	max-height: min( var( --hesabix-panel-h, 520px ), calc( 100vh - var( --hesabix-bottom, 24px ) - 5.5rem ) );
+	max-height: min( var( --hesabix-panel-h, 520px ), calc( 100dvh - var( --hesabix-bottom, 24px ) - 5.5rem ) );
+	z-index: calc( var( --hesabix-z, 99999 ) + 1 );
+}
+
+.hesabix-chat-floating.hesabix-pos-bottom-right .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-top-right .hesabix-chat-panel {
+	right: var( --hesabix-side, 24px );
+}
+
+.hesabix-chat-floating.hesabix-pos-bottom-left .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-top-left .hesabix-chat-panel {
+	left: var( --hesabix-side, 24px );
+}
+
+.hesabix-chat-floating.hesabix-pos-bottom-right .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-bottom-left .hesabix-chat-panel {
+	bottom: calc( var( --hesabix-bottom, 24px ) + 56px );
+}
+
+.hesabix-chat-floating.hesabix-pos-top-right .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-top-left .hesabix-chat-panel {
+	top: calc( var( --hesabix-bottom, 24px ) + 56px );
+}
+
+/* اگر نسخه قدیمی JS فقط در حافظه بود: پنل باید مثل دکمه fixed به viewport بچسبد، نه absolute به host رقیق */
+.hesabix-chat-floating.hesabix-pos-bottom-right .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-bottom-left .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-top-right .hesabix-chat-panel,
+.hesabix-chat-floating.hesabix-pos-top-left .hesabix-chat-panel {
+	position: fixed;
+}
+
+.hesabix-chat-host--shortcode .hesabix-chat-floating {
+	position: relative;
+	min-height: 1px;
+}
+
+.hesabix-chat-host--shortcode .hesabix-chat-launcher {
+	position: relative;
+	right: auto;
+	left: auto;
+	bottom: auto;
+	top: auto;
+	margin: 0 0 0.5rem 0;
+}
+
+.hesabix-chat-host--shortcode .hesabix-chat-panel {
+	position: fixed;
+}
+
+/* پنل پس از append به body: fixed نسبت به viewport (global + shortcode) */
+.hesabix-chat-panel.hesabix-chat-panel--portaled {
+	position: fixed;
+	z-index: calc( var( --hesabix-z, 99999 ) + 1 );
+}
+
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-bottom-right,
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-top-right {
+	right: var( --hesabix-side, 24px );
+	left: auto;
+}
+
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-bottom-left,
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-top-left {
+	left: var( --hesabix-side, 24px );
+	right: auto;
+}
+
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-bottom-right,
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-bottom-left {
+	bottom: calc( var( --hesabix-bottom, 24px ) + 56px );
+	top: auto;
+}
+
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-top-right,
+.hesabix-chat-panel.hesabix-chat-panel--portaled.hesabix-pos-top-left {
+	top: calc( var( --hesabix-bottom, 24px ) + 56px );
+	bottom: auto;
+}
+
+.hesabix-chat-surface {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	border-radius: var( --hesabix-radius, 16px );
+	overflow: hidden;
+	box-shadow: 0 20px 50px -12px rgba( 15, 23, 42, 0.18 ), 0 0 0 1px rgba( 15, 23, 42, 0.06 );
+}
+
+.hesabix-chat--theme-light .hesabix-chat-surface--default {
+	background: linear-gradient( 165deg, #f8fbff 0%, #f1f5f9 45%, #eef2ff 100% );
+	color: #0f172a;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-surface {
+	background: linear-gradient( 180deg, #1e293b 0%, #0f172a 100% );
+	color: #f1f5f9;
+}
+
+.hesabix-chat-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.85rem 1.05rem;
+	background: var( --hesabix-btn, #4f46e5 );
+	color: var( --hesabix-btn-txt, #fff );
+}
+
+/* پس‌زمینه هدر: بدون color-mix برای مرورگر قدیمی */
+.hesabix-chat-header {
+	background-image: linear-gradient( 120deg, var( --hesabix-btn, #4f46e5 ) 0%, #5b5bd6 50%, #4338ca 100% );
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat--preset-default .hesabix-chat-header,
+	.hesabix-chat--preset-colorful .hesabix-chat-header {
+		background-image: linear-gradient( 120deg, var( --hesabix-btn, #4f46e5 ) 0%, #6366f1 55%, color-mix( in srgb, var( --hesabix-btn, #4f46e5 ) 75%, #312e81 ) 100% );
+	}
+}
+
+.hesabix-chat--preset-minimal .hesabix-chat-header {
+	background-image: none;
+	background: var( --hesabix-btn, #4f46e5 );
+}
+
+.hesabix-chat-header-brand {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	min-width: 0;
+}
+
+.hesabix-chat-header-logo {
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	object-fit: cover;
+	background: rgba( 255, 255, 255, 0.2 );
+	border: 1px solid rgba( 255, 255, 255, 0.3 );
+}
+
+.hesabix-chat-header h2 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+.hesabix-chat-header-actions {
+	display: flex;
+	gap: 0.35rem;
+}
+
+.hesabix-chat-header button {
+	background: rgba( 255, 255, 255, 0.2 );
+	color: inherit;
+	border: none;
+	border-radius: 6px;
+	padding: 0.3rem 0.5rem;
+	cursor: pointer;
+	font-size: 0.8rem;
+}
+
+.hesabix-chat-header button:hover {
+	background: rgba( 255, 255, 255, 0.3 );
+}
+
+.hesabix-chat-messages {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 0.8rem 0.9rem 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	-webkit-overflow-scrolling: touch;
+}
+
+.hesabix-chat--step-form .hesabix-chat-messages {
+	flex: 0 0 0;
+	min-height: 0;
+	max-height: 0;
+	padding: 0;
+	margin: 0;
+	overflow: hidden;
+	gap: 0;
+}
+
+.hesabix-chat--step-form .hesabix-chat-form {
+	flex: 1 1 auto;
+	min-height: 0;
+	/* وقتی فیلدها + بلوک نمایش صفحه بلند است، بقیه داخل ناحیه قابل دیدن بماند */
+	overflow-y: auto;
+	overflow-x: hidden;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior: contain;
+}
+
+.hesabix-chat-welcome {
+	display: flex;
+	gap: 0.6rem;
+	align-items: flex-start;
+	padding: 0.7rem 0.75rem;
+	margin-bottom: 0.1rem;
+	border-radius: 12px;
+	/* جایگزین بدون color-mix (مرورگر قدیمی) */
+	background: rgba( 79, 70, 229, 0.09 );
+	border: 1px solid rgba( 79, 70, 229, 0.2 );
+	box-shadow: 0 1px 0 rgba( 255, 255, 255, 0.6 ) inset;
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat-welcome {
+		background: color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 9%, #fff 91% );
+		border: 1px solid color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 22%, transparent );
+	}
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-welcome {
+	background: rgba( 99, 102, 241, 0.14 );
+	border-color: #475569;
+	box-shadow: none;
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat--theme-dark .hesabix-chat-welcome {
+		background: color-mix( in srgb, var( --hesabix-accent, #6366f1 ) 12%, #1e293b 88% );
+		border-color: color-mix( in srgb, var( --hesabix-accent, #6366f1 ) 32%, #334155 );
+	}
+}
+
+.hesabix-chat-welcome-main {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.hesabix-chat-welcome-ico {
+	flex-shrink: 0;
+	color: var( --hesabix-accent, #4f46e5 );
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-welcome-ico {
+	color: #a5b4fc;
+}
+
+.hesabix-chat-welcome-kicker {
+	font-size: 0.68rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var( --hesabix-accent, #4f46e5 );
+	margin-bottom: 0.2rem;
+	opacity: 0.95;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-welcome-kicker {
+	color: #a5b4fc;
+}
+
+.hesabix-chat-welcome-text {
+	font-size: 0.9rem;
+	line-height: 1.55;
+}
+
+.hesabix-chat-welcome-text p {
+	margin: 0 0 0.4rem 0;
+}
+
+.hesabix-chat-welcome-text p:last-child {
+	margin-bottom: 0;
+}
+
+.hesabix-chat-bubble {
+	max-width: 90%;
+	padding: 0.5rem 0.7rem;
+	border-radius: 10px;
+	font-size: 0.9rem;
+	line-height: 1.45;
+	word-break: break-word;
+}
+
+.hesabix-chat--theme-light .hesabix-chat-bubble--visitor {
+	align-self: flex-end;
+	background: #e0e7ff;
+	border: 1px solid #c7d2fe;
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat--theme-light .hesabix-chat-bubble--visitor {
+		background: color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 15%, #e0e7ff 85% );
+		border: 1px solid color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 18%, #c7d2fe );
+	}
+}
+
+.hesabix-chat--theme-light .hesabix-chat-bubble--agent {
+	align-self: flex-start;
+	background: #fff;
+	border: 1px solid #e2e8f0;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-bubble--visitor {
+	align-self: flex-end;
+	background: #334155;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-bubble--agent {
+	align-self: flex-start;
+	background: #334155;
+}
+
+.hesabix-chat-bubble-meta {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.35rem;
+	margin-top: 0.2rem;
+	font-size: 0.7rem;
+}
+
+.hesabix-chat-bubble-meta .hesabix-chat-msg-time {
+	opacity: 0.7;
+}
+
+.hesabix-chat-msg-receipt {
+	display: inline-flex;
+	align-items: center;
+	color: #94a3b8;
+}
+
+.hesabix-chat-msg-receipt--read {
+	color: var( --hesabix-accent, #4f46e5 );
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-msg-receipt {
+	color: #94a3b8;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-msg-receipt--read {
+	color: color-mix( in srgb, var( --hesabix-accent, #38bdf8 ) 85%, #e2e8f0 15% );
+}
+
+.hesabix-chat-tick-ico {
+	display: block;
+}
+
+.hesabix-chat-peer-typing {
+	padding: 0.2rem 0.65rem 0.3rem;
+	font-size: 0.75rem;
+	opacity: 0.86;
+	color: #475569;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-peer-typing {
+	color: #cbd5e1;
+}
+
+.hesabix-chat-ws-conn {
+	font-size: 0.62rem;
+	margin-inline-end: 0.25rem;
+	padding: 0.12rem 0.4rem;
+	border-radius: 4px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+}
+
+.hesabix-chat-ws-conn:empty {
+	display: none;
+}
+
+.hesabix-chat-ws-conn--live {
+	background: rgba( 22, 163, 74, 0.16 );
+	color: #14532d;
+}
+
+.hesabix-chat-ws-conn--connecting {
+	background: rgba( 234, 179, 8, 0.2 );
+	color: #854d0e;
+}
+
+.hesabix-chat-ws-conn--offline {
+	background: rgba( 148, 163, 184, 0.22 );
+	color: #475569;
+}
+
+.hesabix-chat-form,
+.hesabix-chat-composer {
+	padding: 0.8rem 0.9rem 1rem;
+	border-top: 1px solid rgba( 0, 0, 0, 0.06 );
+}
+
+.hesabix-chat--step-form .hesabix-chat-form {
+	border-top: none;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-form,
+.hesabix-chat--theme-dark .hesabix-chat-composer {
+	border-top-color: rgba( 255, 255, 255, 0.1 );
+}
+
+.hesabix-chat-form-lead {
+	margin-bottom: 0.7rem;
+}
+
+.hesabix-chat-form-title {
+	margin: 0 0 0.25rem 0;
+	font-size: 1.1rem;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+
+.hesabix-chat-form-hint {
+	margin: 0;
+	font-size: 0.8rem;
+	opacity: 0.78;
+	line-height: 1.45;
+}
+
+.hesabix-chat-page-ctx {
+	margin: 0 0 0.65rem 0;
+	padding: 0.5rem 0.55rem;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	border-radius: var( --hesabix-radius, 10px );
+	background: rgba( 79, 70, 229, 0.08 );
+	border: 1px solid rgba( 79, 70, 229, 0.15 );
+}
+
+.hesabix-chat-page-ctx-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.35rem;
+}
+
+.hesabix-chat-page-ctx-l {
+	font-weight: 600;
+	opacity: 0.9;
+}
+
+.hesabix-chat-page-ctx-a {
+	font-weight: 600;
+	text-decoration: underline;
+	word-break: break-word;
+}
+
+.hesabix-chat-page-ctx-url {
+	margin-top: 0.25rem;
+	font-size: 0.68rem;
+	opacity: 0.75;
+	word-break: break-all;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-page-ctx {
+	background: rgba( 255, 255, 255, 0.06 );
+	border-color: rgba( 255, 255, 255, 0.1 );
+}
+
+.hesabix-chat-fld-hint--email {
+	margin: -0.15rem 0 0.2rem 0;
+	font-size: 0.68rem;
+	opacity: 0.75;
+	line-height: 1.35;
+}
+
+.hesabix-chat-file-row {
+	margin-top: 0.35rem;
+}
+
+.hesabix-chat-form-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.hesabix-chat-fld {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	margin: 0;
+}
+
+.hesabix-chat-fld-l {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: #475569;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-fld-l {
+	color: #94a3b8;
+}
+
+.hesabix-chat-form input {
+	width: 100%;
+	padding: 0.5rem 0.6rem;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+	font: inherit;
+	box-sizing: border-box;
+	background: #fff;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hesabix-chat-form input:focus {
+	outline: none;
+	border-color: #a5b4fc;
+	box-shadow: 0 0 0 3px rgba( 79, 70, 229, 0.2 );
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat-form input:focus {
+		border-color: color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 35%, #cbd5e1 );
+		box-shadow: 0 0 0 3px color-mix( in srgb, var( --hesabix-accent, #4f46e5 ) 18%, transparent );
+	}
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-form input {
+	background: #0f172a;
+	border-color: #334155;
+	color: #f1f5f9;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-form input:focus {
+	border-color: #6366f1;
+	box-shadow: 0 0 0 3px rgba( 99, 102, 241, 0.2 );
+}
+
+.hesabix-chat-form .hesabix-chat-form-submit,
+.hesabix-chat-form button[type="submit"] {
+	width: 100%;
+	margin-top: 0.3rem;
+	padding: 0.6rem 0.8rem;
+	background: var( --hesabix-btn, #4f46e5 );
+	color: #fff;
+	border: none;
+	border-radius: 12px;
+	font-weight: 600;
+	font-size: 0.95rem;
+	cursor: pointer;
+	box-shadow: 0 4px 12px rgba( 79, 70, 229, 0.35 );
+	transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+@supports ( background: color-mix( in srgb, red, blue ) ) {
+	.hesabix-chat-form .hesabix-chat-form-submit,
+	.hesabix-chat-form button[type="submit"] {
+		box-shadow: 0 4px 12px color-mix( in srgb, var( --hesabix-btn, #4f46e5 ) 35%, transparent );
+	}
+}
+
+.hesabix-chat-form .hesabix-chat-form-submit:hover,
+.hesabix-chat-form button[type="submit"]:hover {
+	filter: brightness( 1.05 );
+}
+
+.hesabix-chat-form .hesabix-chat-form-submit:active,
+.hesabix-chat-form button[type="submit"]:active {
+	transform: scale( 0.99 );
+}
+
+.hesabix-chat-composer-row {
+	display: flex;
+	gap: 0.4rem;
+	align-items: flex-end;
+}
+
+.hesabix-chat-composer textarea {
+	flex: 1;
+	resize: none;
+	min-height: 2.4rem;
+	max-height: 6rem;
+	padding: 0.5rem 0.6rem;
+	border-radius: 8px;
+	border: 1px solid #cbd5e1;
+	font: inherit;
+	box-sizing: border-box;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-composer textarea {
+	background: #0f172a;
+	border-color: #475569;
+	color: #f1f5f9;
+}
+
+.hesabix-chat-composer button.hesabix-chat-send {
+	background: var( --hesabix-btn, #4f46e5 );
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.45rem 0.8rem;
+	cursor: pointer;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.hesabix-chat-attach {
+	font-size: 0.85rem;
+}
+
+.hesabix-chat--hidden {
+	display: none !important;
+}
+
+.hesabix-chat-error {
+	color: #b91c1c;
+	font-size: 0.8rem;
+	margin: 0.25rem 0 0.5rem;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-error {
+	color: #fca5a5;
+}
+
+.hesabix-chat-file a,
+.hesabix-chat-file .hesabix-chat-file-dl {
+	color: var( --hesabix-btn, #4f46e5 );
+}
+
+.hesabix-chat-file .hesabix-chat-file-dl {
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+	font: inherit;
+	cursor: pointer;
+	text-align: start;
+	text-decoration: underline;
+}
+
+.hesabix-chat-file .hesabix-chat-file-dl:hover {
+	text-decoration: none;
+}
+
+/* الگو: مینیمال — سطح تخت‌تر */
+.hesabix-chat--theme-light .hesabix-chat-surface--minimal {
+	background: #fff;
+}
+
+.hesabix-chat--preset-minimal .hesabix-chat-surface {
+	box-shadow: 0 10px 28px -10px rgba( 15, 23, 42, 0.12 );
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-surface--minimal {
+	background: #1e293b;
+}
+
+.hesabix-chat--preset-minimal .hesabix-chat-messages,
+.hesabix-chat--preset-minimal .hesabix-chat-form,
+.hesabix-chat--preset-minimal .hesabix-chat-composer {
+	padding-left: 0.85rem;
+	padding-right: 0.85rem;
+}
+
+.hesabix-chat--preset-minimal .hesabix-chat-bubble,
+.hesabix-chat--preset-minimal .hesabix-chat-welcome {
+	border-radius: 8px;
+}
+
+/* الگو: رنگی — پس‌زمینه غنی‌تر */
+.hesabix-chat--theme-light .hesabix-chat-surface--colorful {
+	background: linear-gradient( 160deg, #fff7ed 0%, #fae8ff 38%, #e0e7ff 100% );
+	color: #0f172a;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-surface--colorful {
+	background: linear-gradient( 180deg, #312e81 0%, #1e1b4b 50%, #0f172a 100% );
+}
+
+.hesabix-chat--preset-colorful .hesabix-chat-launcher {
+	box-shadow: 0 8px 30px rgba( 79, 70, 229, 0.45 );
+}
+
+.hesabix-chat-response-eta {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	margin-top: 0.55rem;
+	margin-bottom: 0.1rem;
+	padding: 0.5rem 0.65rem;
+	border-radius: 10px;
+	font-size: 0.8rem;
+	line-height: 1.45;
+	background: rgba( 255, 255, 255, 0.55 );
+	border: 1px solid rgba( 0, 0, 0, 0.06 );
+	color: #475569;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-response-eta {
+	background: rgba( 15, 23, 42, 0.45 );
+	border-color: rgba( 255, 255, 255, 0.1 );
+	color: #cbd5e1;
+}
+
+.hesabix-chat-response-eta-ico {
+	flex-shrink: 0;
+	color: var( --hesabix-accent, #4f46e5 );
+	margin-top: 0.1rem;
+	line-height: 0;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-response-eta-ico {
+	color: #a5b4fc;
+}
+
+.hesabix-chat-response-eta-txt {
+	min-width: 0;
+}

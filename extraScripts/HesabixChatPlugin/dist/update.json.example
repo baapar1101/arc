@@ -1,0 +1,14 @@
+{
+  "name": "Hesabix Web Chat",
+  "version": "1.0.10",
+  "download_url": "https://source.hesabix.ir/hesabix/HesabixChatPlugin/uploads/7b3c7a2/hesabix-chat-1.0.10.zip",
+  "requires": "5.8",
+  "tested": "6.6",
+  "requires_php": "7.4",
+  "homepage": "https://hesabix.ir",
+  "last_updated": "2026-04-26",
+  "sections": {
+    "description": "اتصال سایت وردپرس به چت وب CRM حسابیکس.",
+    "changelog": "<ul><li>نمونه تغییرات</li></ul>"
+  }
+}

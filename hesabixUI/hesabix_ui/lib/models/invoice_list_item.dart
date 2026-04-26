@@ -1,3 +1,4 @@
+import 'invoice_tag_ref.dart';
 
 /// مدل سطر لیست فاکتورها برای استفاده در DataTableWidget
 class InvoiceListItem {
@@ -17,6 +18,9 @@ class InvoiceListItem {
   final String? counterparty;
   final int? projectId;
   final String? projectName;
+  /// برچسب‌های فاکتور
+  final List<InvoiceTagRef> tags;
+  final String? tagsDisplay;
   // فیلدهای سود
   final double? totalProfit;
   final double? totalProfitPercent;
@@ -45,6 +49,8 @@ class InvoiceListItem {
     this.counterparty,
     this.projectId,
     this.projectName,
+    this.tags = const [],
+    this.tagsDisplay,
     this.totalProfit,
     this.totalProfitPercent,
     this.grossProfit,
@@ -86,6 +92,15 @@ class InvoiceListItem {
       counterparty: json['counterparty']?.toString(),
       projectId: json['project_id'] as int?,
       projectName: json['project_name']?.toString(),
+      tags: () {
+        final raw = json['tags'];
+        if (raw is! List) return const <InvoiceTagRef>[];
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map(InvoiceTagRef.fromJson)
+            .toList();
+      }(),
+      tagsDisplay: json['tags_display']?.toString(),
       totalProfit: _toDouble(json['total_profit']),
       totalProfitPercent: _toDouble(json['total_profit_percent']),
       grossProfit: _toDouble(json['gross_profit']),

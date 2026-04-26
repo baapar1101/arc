@@ -56,6 +56,26 @@ class FirewallUnbanPayload(BaseModel):
 	only_source: Optional[str] = Field(None, description="فقط قوانین با این source")
 
 
+class FirewallRatePolicyCreatePayload(BaseModel):
+	enabled: bool = True
+	priority: int = 100
+	path_prefix: str = Field(..., description="مثال /api/v1/public/crm-chat")
+	http_methods: Optional[str] = Field(None, description="GET,POST یا خالی = همه")
+	max_requests: int = Field(..., ge=1)
+	window_seconds: int = Field(..., ge=1)
+	note: Optional[str] = None
+
+
+class FirewallRatePolicyUpdatePayload(BaseModel):
+	enabled: Optional[bool] = None
+	priority: Optional[int] = None
+	path_prefix: Optional[str] = None
+	http_methods: Optional[str] = None
+	max_requests: Optional[int] = Field(None, ge=1)
+	window_seconds: Optional[int] = Field(None, ge=1)
+	note: Optional[str] = None
+
+
 @router.get("/rules", summary="لیست قوانین فایروال")
 def list_rules(
 	request: Request,
@@ -189,6 +209,86 @@ def unban_endpoint(
 		raise ApiError("VALIDATION_ERROR", str(e), http_status=400)
 	fw.invalidate_rules_cache()
 	return success_response({"removed_rules": n}, request, message="FIREWALL_UNBAN_APPLIED")
+
+
+@router.get("/rate-policies", summary="سیاست‌های نرخ (فایروال مرکزی / دیتابیس)")
+def list_rate_policies(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_perm(ctx)
+	items = fw.list_rate_policies(db)
+	return success_response({"items": items, "count": len(items)}, request)
+
+
+@router.post("/rate-policies", summary="ایجاد سیاست نرخ")
+def create_rate_policy_endpoint(
+	request: Request,
+	payload: FirewallRatePolicyCreatePayload,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_perm(ctx)
+	try:
+		row = fw.create_rate_policy(
+			db,
+			enabled=payload.enabled,
+			priority=payload.priority,
+			path_prefix=payload.path_prefix,
+			http_methods=payload.http_methods,
+			max_requests=payload.max_requests,
+			window_seconds=payload.window_seconds,
+			note=payload.note,
+		)
+	except ValueError as e:
+		raise ApiError("VALIDATION_ERROR", str(e), http_status=400) from e
+	fw.invalidate_rate_policies_cache()
+	return success_response(fw.rate_policy_to_dict(row), request, message="FIREWALL_RATE_POLICY_CREATED")
+
+
+@router.put("/rate-policies/{policy_id}", summary="ویرایش سیاست نرخ")
+def update_rate_policy_endpoint(
+	request: Request,
+	policy_id: int,
+	payload: FirewallRatePolicyUpdatePayload,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_perm(ctx)
+	try:
+		row = fw.update_rate_policy(
+			db,
+			policy_id,
+			enabled=payload.enabled,
+			priority=payload.priority,
+			path_prefix=payload.path_prefix,
+			http_methods=payload.http_methods,
+			max_requests=payload.max_requests,
+			window_seconds=payload.window_seconds,
+			note=payload.note,
+		)
+	except ValueError as e:
+		raise ApiError("VALIDATION_ERROR", str(e), http_status=400) from e
+	if not row:
+		raise ApiError("NOT_FOUND", "Policy not found", http_status=404)
+	fw.invalidate_rate_policies_cache()
+	return success_response(fw.rate_policy_to_dict(row), request, message="FIREWALL_RATE_POLICY_UPDATED")
+
+
+@router.delete("/rate-policies/{policy_id}", summary="حذف سیاست نرخ")
+def delete_rate_policy_endpoint(
+	request: Request,
+	policy_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_perm(ctx)
+	ok = fw.delete_rate_policy(db, policy_id)
+	if not ok:
+		raise ApiError("NOT_FOUND", "Policy not found", http_status=404)
+	fw.invalidate_rate_policies_cache()
+	return success_response({"deleted": True, "id": policy_id}, request, message="FIREWALL_RATE_POLICY_DELETED")
 
 
 @router.get("/logs/requests", summary="لاگ درخواست‌های مسدود شده")

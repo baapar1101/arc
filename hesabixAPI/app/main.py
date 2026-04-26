@@ -1201,6 +1201,9 @@ def create_app() -> FastAPI:
            request.url.path.startswith("/openapi.json") or \
            request.url.path.startswith("/assets"):
             return await call_next(request)
+        # نرخ چت وب عمومی فقط از طریق firewall_rate_policies (فایروال مرکزی + دیتابیس)
+        if request.url.path.startswith("/api/v1/public/crm-chat"):
+            return await call_next(request)
         
         from app.core.rate_limiter import get_rate_limiter, get_client_ip
         

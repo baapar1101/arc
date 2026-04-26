@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 from uuid import UUID
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException, UploadFile
@@ -37,7 +37,7 @@ def _hash_visitor_token(token: str) -> str:
 
 def _validate_email(email: str) -> None:
 	if not _EMAIL_RE.match((email or "").strip()):
-		raise ApiError("VALIDATION_ERROR", "ایمیل معتبر نیست", http_status=422)
+		raise ApiError("CRM_CHAT_INVALID_EMAIL", "Invalid email address", http_status=422)
 
 
 def _normalize_host_from_origin(origin: Optional[str]) -> Optional[str]:
@@ -90,6 +90,20 @@ def widget_to_dict(w: CrmChatWidget) -> Dict[str, Any]:
 	}
 
 
+def visitor_file_upload_effective_for_widget(db: Session, w: CrmChatWidget) -> bool:
+	"""
+	ارسال فایل توسط بازدیدکننده: ابتدا تنظیم کسب‌وکار، سپس settings ویجت
+	(allow_visitor_file_upload == False برای غیرفعال کردن فقط این ویجت).
+	"""
+	s = get_or_create_crm_settings(db, w.business_id)
+	if not s.allow_web_chat_file_upload:
+		return False
+	st = w.settings or {}
+	if st.get("allow_visitor_file_upload") is False:
+		return False
+	return True
+
+
 def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
 	return {
 		"id": c.id,
@@ -111,19 +125,26 @@ def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
 
 
 def message_to_dict(m: CrmChatMessage) -> Dict[str, Any]:
+	is_del = m.deleted_at is not None
 	return {
 		"id": m.id,
 		"conversation_id": m.conversation_id,
 		"sender_role": m.sender_role,
-		"body": m.body,
+		"body": "" if is_del else (m.body or ""),
 		"user_id": m.user_id,
-		"file_storage_id": m.file_storage_id,
+		"file_storage_id": None if is_del else m.file_storage_id,
 		"created_at": m.created_at,
+		"read_at": m.read_at,
+		"deleted_at": m.deleted_at,
+		"is_deleted": is_del,
 	}
 
 
 def _message_to_dict_enriched(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
 	d = message_to_dict(m)
+	if m.deleted_at is not None:
+		d["file"] = None
+		return d
 	if m.file_storage_id:
 		fs = db.get(FileStorage, m.file_storage_id)
 		if fs:
@@ -191,18 +212,18 @@ def _assert_crm_file_for_conversation(
 ) -> FileStorage:
 	fs = db.get(FileStorage, file_id)
 	if not fs or fs.business_id != business_id:
-		raise ApiError("NOT_FOUND", "فایل یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_FILE_NOT_FOUND", "File not found", http_status=404)
 	if (fs.module_context or "") != "crm_web_chat":
-		raise ApiError("VALIDATION_ERROR", "این فایل برای چت استفاده نمی‌شود", http_status=422)
+		raise ApiError("CRM_CHAT_FILE_NOT_FOR_CHAT", "This file is not used for chat", http_status=422)
 	if str(fs.context_id or "") != str(conversation_id):
-		raise ApiError("VALIDATION_ERROR", "فایل متعلق به این مکالمه نیست", http_status=422)
+		raise ApiError("CRM_CHAT_FILE_WRONG_CONVERSATION", "The file does not belong to this conversation", http_status=422)
 	return fs
 
 
 def get_widget_by_public_key(db: Session, public_key: str) -> CrmChatWidget:
 	w = db.scalar(select(CrmChatWidget).where(CrmChatWidget.public_key == public_key.strip()))
 	if not w or not w.is_active:
-		raise ApiError("NOT_FOUND", "ویجت چت یافت نشد یا غیرفعال است", http_status=404)
+		raise ApiError("CRM_CHAT_WIDGET_INACTIVE", "Chat widget not found or inactive", http_status=404)
 	return w
 
 
@@ -249,7 +270,7 @@ def update_widget(
 ) -> CrmChatWidget:
 	w = db.get(CrmChatWidget, widget_id)
 	if not w or w.business_id != business_id:
-		raise ApiError("NOT_FOUND", "ویجت یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_WIDGET_NOT_FOUND", "Widget not found", http_status=404)
 	if name is not None:
 		w.name = name.strip()
 	if allowed_origins is not None:
@@ -277,15 +298,19 @@ async def start_conversation_public(
 ) -> Dict[str, Any]:
 	w = get_widget_by_public_key(db, public_key)
 	if not origin_allowed(w, origin_header):
-		raise ApiError("FORBIDDEN", "مبدأ درخواست برای این ویجت مجاز نیست", http_status=403)
-	_validate_email(email)
+		raise ApiError("CRM_CHAT_ORIGIN_NOT_ALLOWED", "The request origin is not allowed for this widget", http_status=403)
+	email_st = (email or "").strip().lower()
+	if email_st:
+		_validate_email(email_st)
+	else:
+		email_st = ""
 	fn = first_name.strip()
 	ln = last_name.strip()
 	ph = phone.strip()
 	if len(fn) < 1 or len(ln) < 1:
-		raise ApiError("VALIDATION_ERROR", "نام و نام خانوادگی الزامی است", http_status=422)
+		raise ApiError("CRM_CHAT_VISITOR_NAME_REQUIRED", "First and last name are required", http_status=422)
 	if len(ph) < 5:
-		raise ApiError("VALIDATION_ERROR", "شماره تماس معتبر وارد کنید", http_status=422)
+		raise ApiError("CRM_CHAT_PHONE_INVALID", "Enter a valid phone number", http_status=422)
 
 	visitor_token = secrets.token_urlsafe(32)
 	th = _hash_visitor_token(visitor_token)
@@ -296,7 +321,7 @@ async def start_conversation_public(
 		status="open",
 		visitor_first_name=fn,
 		visitor_last_name=ln,
-		visitor_email=email.strip().lower(),
+		visitor_email=email_st,
 		visitor_phone=ph,
 		visitor_token_hash=th,
 		page_url=(page_url or None) if page_url else None,
@@ -346,14 +371,23 @@ def _get_conversation_by_visitor(db: Session, visitor_token: str, conversation_i
 		)
 	)
 	if not c:
-		raise ApiError("NOT_FOUND", "مکالمه یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_CONVERSATION_NOT_FOUND", "Conversation not found", http_status=404)
 	return c
+
+
+def _assert_widget_origin(db: Session, c: CrmChatConversation, origin_header: Optional[str]) -> None:
+	"""مبدأ درخواست باید با allowed_origins ویجت سازگار باشد (مثل ارسال پیام)."""
+	w = db.get(CrmChatWidget, c.widget_id)
+	if not w:
+		raise ApiError("CRM_CHAT_WIDGET_NOT_FOUND", "Widget not found", http_status=404)
+	if not origin_allowed(w, origin_header):
+		raise ApiError("CRM_CHAT_ORIGIN_NOT_ALLOWED", "The request origin is not allowed for this widget", http_status=403)
 
 
 def _get_conversation_business(db: Session, business_id: int, conversation_id: int) -> CrmChatConversation:
 	c = db.get(CrmChatConversation, conversation_id)
 	if not c or c.business_id != business_id:
-		raise ApiError("NOT_FOUND", "مکالمه یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_CONVERSATION_NOT_FOUND", "Conversation not found", http_status=404)
 	return c
 
 
@@ -366,14 +400,10 @@ async def post_visitor_message(
 	origin_header: Optional[str],
 ) -> Dict[str, Any]:
 	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
-	w = db.get(CrmChatWidget, c.widget_id)
-	if not w:
-		raise ApiError("NOT_FOUND", "ویجت یافت نشد", http_status=404)
-	if not origin_allowed(w, origin_header):
-		raise ApiError("FORBIDDEN", "مبدأ درخواست برای این ویجت مجاز نیست", http_status=403)
+	_assert_widget_origin(db, c, origin_header)
 	text = (body or "").strip()
 	if not text or len(text) > _MAX_BODY:
-		raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+		raise ApiError("CRM_CHAT_MESSAGE_BODY_INVALID", "Invalid message text", http_status=422)
 
 	msg = CrmChatMessage(conversation_id=c.id, sender_role="visitor", body=text, user_id=None, file_storage_id=None)
 	db.add(msg)
@@ -412,23 +442,28 @@ async def post_visitor_file(
 	origin_header: Optional[str],
 ) -> Dict[str, Any]:
 	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
-	w = db.get(CrmChatWidget, c.widget_id)
-	if not w:
-		raise ApiError("NOT_FOUND", "ویجت یافت نشد", http_status=404)
-	if not origin_allowed(w, origin_header):
-		raise ApiError("FORBIDDEN", "مبدأ درخواست برای این ویجت مجاز نیست", http_status=403)
+	_assert_widget_origin(db, c, origin_header)
 
-	bsettings = get_or_create_crm_settings(db, c.business_id)
-	if not bsettings.allow_web_chat_file_upload:
+	wgt = db.get(CrmChatWidget, c.widget_id)
+	if not wgt:
+		raise ApiError("CRM_CHAT_WIDGET_NOT_FOUND", "Widget not found", http_status=404)
+	if not visitor_file_upload_effective_for_widget(db, wgt):
+		bsettings = get_or_create_crm_settings(db, c.business_id)
+		if not bsettings.allow_web_chat_file_upload:
+			raise ApiError(
+				"CRM_FILE_UPLOAD_DISABLED",
+				"File upload is not enabled for web chat for this business.",
+				http_status=403,
+			)
 		raise ApiError(
-			"CRM_FILE_UPLOAD_DISABLED",
-			"فعلاً ارسال فایل در این چت توسط کسب‌وکار فعال نشده است.",
+			"WIDGET_FILE_UPLOAD_DISABLED",
+			"File upload by visitors is disabled for this widget.",
 			http_status=403,
 		)
 
 	biz = db.get(Business, c.business_id)
 	if not biz or biz.owner_id is None:
-		raise ApiError("NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_BUSINESS_NOT_FOUND", "Business not found", http_status=404)
 	owner_id = int(biz.owner_id)
 
 	storage = FileStorageService(db)
@@ -441,7 +476,7 @@ async def post_visitor_file(
 			developer_data={
 				"business_id": c.business_id,
 				"conversation_id": c.id,
-				"widget_id": w.id,
+				"widget_id": wgt.id,
 				"visitor": True,
 			},
 			is_temporary=False,
@@ -456,38 +491,38 @@ async def post_visitor_file(
 			_notify_business_crm_storage(
 				db,
 				c.business_id,
-				title="چت وب CRM — محدودیت فضا",
+				title="CRM web chat: storage limit",
 				message=(
-					"یک بازدیدکننده تلاش به ارسال فایل داشت اما پلن/فضای ذخیره‌سازی اجازه نداد. "
-					"لطفاً پکیج ذخیره‌سازی را بررسی یا ارتقا دهید."
+					"A visitor tried to upload a file but the storage plan or quota does not allow it. "
+					"Please review or upgrade your storage package."
 				),
 			)
 		# پاسخ قابل فهم به بازدیدکننده
 		if err_code == "NO_ACTIVE_STORAGE_PLAN":
 			raise ApiError(
-				"CRM_FILE_NOT_AVAILABLE",
-				"فعلاً ارسال فایل ممکن نیست. لطفاً بعداً دوباره تلاش کنید.",
+				"CRM_CHAT_FILE_NOT_AVAILABLE_GENERIC",
+				"File upload is not available right now. Please try again later.",
 				http_status=400,
 				details={"storage_error": "no_plan"},
 			) from None
 		if err_code == "STORAGE_LIMIT_EXCEEDED":
 			raise ApiError(
-				"CRM_FILE_NOT_AVAILABLE",
-				"فضای ذخیره‌سازی کافی نیست؛ فعلاً ارسال فایل ممکن نیست.",
+				"CRM_CHAT_FILE_NOT_AVAILABLE_QUOTA",
+				"Not enough storage space; file upload is not available right now.",
 				http_status=400,
 				details={"storage_error": "quota"},
 			) from None
 		if err_code == "FILE_SIZE_EXCEEDED":
-			msg_s = str(detail.get("message") if isinstance(detail, dict) else "حجم فایل مجاز نیست")
+			msg_s = str(detail.get("message") if isinstance(detail, dict) else "File size is not allowed")
 			raise ApiError("CRM_FILE_TOO_LARGE", msg_s, http_status=400) from None
-		raise ApiError("CRM_FILE_UPLOAD_FAILED", "ارسال فایل انجام نشد.", http_status=400) from None
+		raise ApiError("CRM_FILE_UPLOAD_FAILED", "File upload failed.", http_status=400) from None
 
 	fid = str(saved.get("file_id", ""))
 	orig_name = saved.get("original_name") or "file"
 	cap = (caption or "").strip()
 	text = cap if cap else f"📎 {orig_name}"
 	if len(text) > _MAX_BODY:
-		raise ApiError("VALIDATION_ERROR", "شرح خیلی طولانی است", http_status=422)
+		raise ApiError("CRM_CHAT_CAPTION_TOO_LONG", "Caption is too long", http_status=422)
 
 	msg = CrmChatMessage(
 		conversation_id=c.id,
@@ -541,14 +576,14 @@ async def post_agent_message(
 		)
 		fid = str(fs.id)
 		cap = (body or "").strip()
-		bname = cap if cap else f"📎 {fs.original_name or 'فایل'}"
+		bname = cap if cap else f"📎 {fs.original_name or 'file'}"
 		if len(bname) > _MAX_BODY:
-			raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+			raise ApiError("CRM_CHAT_MESSAGE_BODY_INVALID", "Invalid message text", http_status=422)
 		text_combined = bname
 	else:
 		text = (body or "").strip()
 		if not text or len(text) > _MAX_BODY:
-			raise ApiError("VALIDATION_ERROR", "متن پیام نامعتبر است", http_status=422)
+			raise ApiError("CRM_CHAT_MESSAGE_BODY_INVALID", "Invalid message text", http_status=422)
 		text_combined = text
 
 	msg = CrmChatMessage(
@@ -592,8 +627,10 @@ async def download_visitor_crm_file(
 	visitor_token: str,
 	conversation_id: int,
 	file_id: str,
+	origin_header: Optional[str] = None,
 ) -> Dict[str, Any]:
 	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	_assert_widget_origin(db, c, origin_header)
 	m = db.scalar(
 		select(CrmChatMessage)
 		.where(
@@ -603,33 +640,63 @@ async def download_visitor_crm_file(
 		.limit(1)
 	)
 	if m is None:
-		raise ApiError("NOT_FOUND", "فایل در این مکالمه یافت نشد", http_status=404)
+		raise ApiError("CRM_CHAT_FILE_NOT_IN_CONVERSATION", "File not found in this conversation", http_status=404)
 	storage = FileStorageService(db)
 	return await storage.download_file(UUID(str(file_id)))
 
 
-def list_messages_public(db: Session, visitor_token: str, conversation_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+def list_messages_public(
+	db: Session,
+	visitor_token: str,
+	conversation_id: int,
+	limit: int = 100,
+	origin_header: Optional[str] = None,
+	before_message_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
 	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	_assert_widget_origin(db, c, origin_header)
+	lim = min(max(limit, 1), 500)
+	base = and_(
+		CrmChatMessage.conversation_id == c.id,
+		CrmChatMessage.deleted_at.is_(None),
+	)
+	if before_message_id is not None:
+		base = and_(base, CrmChatMessage.id < before_message_id)
 	q = (
 		select(CrmChatMessage)
-		.where(CrmChatMessage.conversation_id == c.id)
-		.order_by(CrmChatMessage.created_at.asc())
-		.limit(min(max(limit, 1), 500))
+		.where(base)
+		.order_by(CrmChatMessage.id.desc())
+		.limit(lim)
 	)
 	rows = list(db.scalars(q).all())
+	rows.reverse()
 	return [_message_to_dict_enriched(db, m) for m in rows]
 
 
-def list_messages_agent(db: Session, business_id: int, conversation_id: int, limit: int = 500) -> List[Dict[str, Any]]:
+def list_messages_agent(
+	db: Session,
+	business_id: int,
+	conversation_id: int,
+	limit: int = 80,
+	before_message_id: Optional[int] = None,
+) -> tuple[List[Dict[str, Any]], bool]:
+	"""آخرین پیام‌ها (نزدیک‌تر به حال)؛ با before_message_id بارگذاری قدیمی‌تر. has_more_older اگر پیام قدیمی‌تر وجود داشته باشد."""
 	c = _get_conversation_business(db, business_id, conversation_id)
+	lim = min(max(limit, 1), 1000)
+	base = CrmChatMessage.conversation_id == c.id
+	if before_message_id is not None:
+		base = and_(base, CrmChatMessage.id < before_message_id)
 	q = (
 		select(CrmChatMessage)
-		.where(CrmChatMessage.conversation_id == c.id)
-		.order_by(CrmChatMessage.created_at.asc())
-		.limit(min(max(limit, 1), 1000))
+		.where(base)
+		.order_by(CrmChatMessage.id.desc())
+		.limit(lim + 1)
 	)
 	rows = list(db.scalars(q).all())
-	return [_message_to_dict_enriched(db, m) for m in rows]
+	has_more_older = len(rows) > lim
+	rows = rows[:lim]
+	rows.reverse()
+	return ([_message_to_dict_enriched(db, m) for m in rows], has_more_older)
 
 
 def list_conversations_agent(
@@ -639,14 +706,60 @@ def list_conversations_agent(
 	status: Optional[str] = None,
 	limit: int = 50,
 	offset: int = 0,
-) -> List[Dict[str, Any]]:
+	search: Optional[str] = None,
+) -> tuple[List[Dict[str, Any]], bool]:
+	sort_ts = func.coalesce(CrmChatConversation.last_message_at, CrmChatConversation.created_at)
+	lim = min(max(limit, 1), 200)
 	q = select(CrmChatConversation).where(CrmChatConversation.business_id == business_id)
 	if status:
 		q = q.where(CrmChatConversation.status == status)
-	sort_ts = func.coalesce(CrmChatConversation.last_message_at, CrmChatConversation.created_at)
-	q = q.order_by(desc(sort_ts), desc(CrmChatConversation.id)).limit(min(limit, 200)).offset(max(offset, 0))
+	term2 = (search or "").strip()
+	if term2:
+		pat2 = f"%{term2}%"
+		id_m = int(term2) if term2.isdigit() else None
+		conds: List[Any] = [
+			CrmChatConversation.visitor_first_name.ilike(pat2),
+			CrmChatConversation.visitor_last_name.ilike(pat2),
+			CrmChatConversation.visitor_email.ilike(pat2),
+			CrmChatConversation.visitor_phone.ilike(pat2),
+			CrmChatConversation.page_url.ilike(pat2),
+		]
+		if id_m is not None:
+			conds.append(CrmChatConversation.id == id_m)
+		q = q.where(or_(*conds))
+	q = q.order_by(desc(sort_ts), desc(CrmChatConversation.id)).limit(lim + 1).offset(max(offset, 0))
 	rows = list(db.scalars(q).all())
-	return [conversation_to_dict(c) for c in rows]
+	has_more = len(rows) > lim
+	rows = rows[:lim]
+	return ([conversation_to_dict(c) for c in rows], has_more)
+
+
+async def delete_message_agent(
+	db: Session,
+	business_id: int,
+	conversation_id: int,
+	message_id: int,
+) -> Dict[str, Any]:
+	c = _get_conversation_business(db, business_id, conversation_id)
+	m = db.get(CrmChatMessage, message_id)
+	if not m or m.conversation_id != c.id:
+		raise ApiError("CRM_CHAT_MESSAGE_NOT_FOUND", "Message not found", http_status=404)
+	if m.deleted_at is not None:
+		return {"id": m.id, "deleted": True}
+	m.deleted_at = datetime.utcnow()
+	m.body = ""
+	m.file_storage_id = None
+	db.commit()
+	db.refresh(m)
+	payload = {
+		"type": "crm_chat.event",
+		"event": "message.deleted",
+		"conversation_id": c.id,
+		"message_id": m.id,
+	}
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
+	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
+	return {"id": m.id, "deleted": True}
 
 
 async def patch_conversation_agent(
@@ -666,7 +779,7 @@ async def patch_conversation_agent(
 
 	if status is not None:
 		if status not in ("open", "pending", "resolved"):
-			raise ApiError("VALIDATION_ERROR", "وضعیت نامعتبر است", http_status=422)
+			raise ApiError("CRM_CHAT_CONVERSATION_STATUS_INVALID", "Invalid status", http_status=422)
 		c.status = status
 	if assigned_to_user_id is not None:
 		c.assigned_to_user_id = assigned_to_user_id
@@ -723,3 +836,115 @@ async def patch_conversation_agent(
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
 
 	return conversation_to_dict(c)
+
+
+async def broadcast_typing(
+	conversation_id: int,
+	business_id: int,
+	*,
+	from_role: str,
+	active: bool,
+) -> None:
+	payload: Dict[str, Any] = {
+		"type": "crm_chat.event",
+		"event": "typing",
+		"conversation_id": conversation_id,
+		"from_role": from_role,
+		"active": bool(active),
+	}
+	await crm_chat_realtime_manager.broadcast_conversation(conversation_id, payload)
+	await crm_chat_realtime_manager.broadcast_business(business_id, {**payload, "conversation_id": conversation_id})
+
+
+async def _broadcast_messages_read(
+	conversation_id: int,
+	business_id: int,
+	*,
+	message_ids: List[int],
+	read_at: datetime,
+	reader_role: str,
+) -> None:
+	if not message_ids:
+		return
+	payload: Dict[str, Any] = {
+		"type": "crm_chat.event",
+		"event": "messages.read",
+		"conversation_id": conversation_id,
+		"message_ids": message_ids,
+		"read_at": read_at,
+		"reader_role": reader_role,
+	}
+	await crm_chat_realtime_manager.broadcast_conversation(conversation_id, payload)
+	await crm_chat_realtime_manager.broadcast_business(
+		business_id, {**payload, "conversation_id": conversation_id}
+	)
+
+
+async def mark_messages_read_by_visitor(
+	db: Session,
+	*,
+	visitor_token: str,
+	conversation_id: int,
+	up_to_message_id: int,
+	origin_header: Optional[str],
+) -> Dict[str, Any]:
+	"""بازدیدکننده پیام‌های عامل را تا شناسه داده‌شده «خوانده» علامت می‌زند."""
+	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	_assert_widget_origin(db, c, origin_header)
+	if up_to_message_id < 1:
+		raise ApiError("VALIDATION_ERROR", "Invalid message id", http_status=422)
+	msg_ids = list(
+		db.scalars(
+			select(CrmChatMessage.id)
+			.where(
+				CrmChatMessage.conversation_id == c.id,
+				CrmChatMessage.id <= up_to_message_id,
+				CrmChatMessage.sender_role == "agent",
+				CrmChatMessage.read_at.is_(None),
+			)
+		)
+		.all()
+	)
+	if not msg_ids:
+		return {"updated": 0, "message_ids": [], "read_at": None}
+	now = datetime.utcnow()
+	db.execute(update(CrmChatMessage).where(CrmChatMessage.id.in_(msg_ids)).values(read_at=now))
+	db.commit()
+	await _broadcast_messages_read(
+		c.id, c.business_id, message_ids=msg_ids, read_at=now, reader_role="visitor"
+	)
+	return {"updated": len(msg_ids), "message_ids": msg_ids, "read_at": now}
+
+
+async def mark_messages_read_by_agent(
+	db: Session,
+	*,
+	business_id: int,
+	conversation_id: int,
+	up_to_message_id: int,
+) -> Dict[str, Any]:
+	"""عامل CRM پیام‌های بازدیدکننده را تا شناسه داده‌شده «خوانده» علامت می‌زند."""
+	c = _get_conversation_business(db, business_id, conversation_id)
+	if up_to_message_id < 1:
+		raise ApiError("VALIDATION_ERROR", "Invalid message id", http_status=422)
+	msg_ids = list(
+		db.scalars(
+			select(CrmChatMessage.id)
+			.where(
+				CrmChatMessage.conversation_id == c.id,
+				CrmChatMessage.id <= up_to_message_id,
+				CrmChatMessage.sender_role == "visitor",
+				CrmChatMessage.read_at.is_(None),
+			)
+		)
+		.all()
+	)
+	if not msg_ids:
+		return {"updated": 0, "message_ids": [], "read_at": None}
+	now = datetime.utcnow()
+	db.execute(update(CrmChatMessage).where(CrmChatMessage.id.in_(msg_ids)).values(read_at=now))
+	db.commit()
+	await _broadcast_messages_read(
+		c.id, c.business_id, message_ids=msg_ids, read_at=now, reader_role="agent"
+	)
+	return {"updated": len(msg_ids), "message_ids": msg_ids, "read_at": now}

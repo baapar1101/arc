@@ -12,6 +12,7 @@ import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/project/project_selector_widget.dart';
+import '../../widgets/invoice/invoice_tags_field.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../utils/number_formatters.dart';
@@ -75,6 +76,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   int _invoiceCurrencyDecimalPlaces = 2;
   bool _invoiceCurrencyRoundMonetary = true;
   int? _selectedProjectId;
+  List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   /// none | draft | posted
@@ -306,6 +308,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       _invoiceDate = DateTime.tryParse(item['document_date']?.toString() ?? '') ?? DateTime.now();
       _selectedCurrencyId = (item['currency_id'] as num?)?.toInt();
       _selectedProjectId = (item['project_id'] as num?)?.toInt();
+      final tagList = item['tags'];
+      if (tagList is List) {
+        _selectedTagIds = tagList
+            .whereType<Map<String, dynamic>>()
+            .map((m) => (m['id'] as num).toInt())
+            .toList();
+      } else {
+        _selectedTagIds = [];
+      }
       _invoiceTitle = item['description']?.toString();
 
       // extra_info
@@ -975,6 +986,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        InvoiceTagsField(
+                          businessId: widget.businessId,
+                          apiClient: ApiClient(),
+                          selectedTagIds: _selectedTagIds,
+                          onChanged: (v) => setState(() => _selectedTagIds = v),
+                        ),
                         const SizedBox(height: 8),
                         InvoiceFxRateField(
                           show: _showInvoiceFxField,
@@ -1497,6 +1515,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'extra_info': mergedExtra,
       if ((_invoiceTitle ?? '').isNotEmpty) 'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      'tag_ids': _selectedTagIds,
       if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };

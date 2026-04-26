@@ -19,6 +19,7 @@ import '../../widgets/invoice/commission_amount_field.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/project/project_selector_widget.dart';
+import '../../widgets/invoice/invoice_tags_field.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
@@ -100,6 +101,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   int _invoiceCurrencyDecimalPlaces = 2;
   bool _invoiceCurrencyRoundMonetary = true;
   int? _selectedProjectId;
+  List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   String? _invoiceReference;
   // جمع‌های محاسباتی ردیف‌ها
@@ -2022,6 +2024,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        InvoiceTagsField(
+                          businessId: widget.businessId,
+                          apiClient: ApiClient(),
+                          selectedTagIds: _selectedTagIds,
+                          onChanged: (v) => setState(() => _selectedTagIds = v),
+                        ),
                         const SizedBox(height: 24),
 
                         // ردیف سوم: فروشنده و کارمزد (فقط برای فروش و برگشت فروش)
@@ -2641,6 +2650,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'extra_info': extraInfo,
       if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,
       if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };

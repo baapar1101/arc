@@ -5,15 +5,17 @@ from __future__ import annotations
 import io
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Header, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.crm_chat import (
 	CrmChatConversationStartPublic,
+	CrmChatMarkReadBody,
 	CrmChatVisitorMessageCreate,
 )
 from adapters.db.session import get_db
+from app.core.i18n import get_request_translator
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import crm_chat_service as chat_svc
 
@@ -22,6 +24,67 @@ router = APIRouter(tags=["عمومی — چت وب CRM"])
 
 def _origin(request: Request) -> Optional[str]:
 	return request.headers.get("Origin") or request.headers.get("Referer")
+
+
+def _resolve_public_visitor_token(
+	request: Request,
+	authorization: Optional[str],
+	x_visitor_token: Optional[str],
+	visitor_token_query: Optional[str],
+) -> str:
+	"""
+	الویت: X-Visitor-Token، سپس Authorization: Bearer، سپس ?visitor_token (سازگاری قدیمی).
+	"""
+	if x_visitor_token:
+		t = x_visitor_token.strip()
+		if len(t) >= 16:
+			return t
+	if authorization:
+		low = authorization.strip()
+		if low.lower().startswith("bearer "):
+			t = low[7:].strip()
+			if len(t) >= 16:
+				return t
+	if visitor_token_query:
+		tq = visitor_token_query.strip()
+		if len(tq) >= 16:
+			return tq
+	tr = get_request_translator(request)
+	raise HTTPException(
+		status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+		detail={
+			"success": False,
+			"error": {
+				"code": "CRM_CHAT_PUBLIC_VISITOR_TOKEN_REQUIRED",
+				"message": tr.t(
+					"CRM_CHAT_PUBLIC_VISITOR_TOKEN_REQUIRED",
+					default=(
+						"Visitor token is required. Send X-Visitor-Token or Authorization: Bearer, "
+						"or the legacy visitor_token query parameter."
+					),
+				),
+			},
+		},
+	)
+
+
+@router.get("/api/v1/public/crm-chat/widget-options")
+async def public_widget_options(
+	request: Request,
+	public_key: str = Query(..., min_length=8, max_length=64),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""گزینه‌های نمایشی ویجت برای کلاینت بدون لاگین (هم‌راستا با تنظیمات CRM کسب‌وکار)."""
+	try:
+		w = chat_svc.get_widget_by_public_key(db, public_key.strip())
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	allow = chat_svc.visitor_file_upload_effective_for_widget(db, w)
+	return success_response(
+		data={"allow_file_upload": allow},
+		request=request,
+		message="",
+	)
 
 
 @router.post("/api/v1/public/crm-chat/conversations/start")
@@ -46,7 +109,7 @@ async def public_start_conversation(
 	return success_response(
 		data=format_datetime_fields(data, request),
 		request=request,
-		message="مکالمه آغاز شد؛ اکنون می‌توانید پیام بفرستید",
+		message="CRM_CHAT_PUBLIC_CONVERSATION_STARTED",
 	)
 
 
@@ -66,24 +129,72 @@ async def public_post_message(
 		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-	return success_response(data=format_datetime_fields(msg, request), request=request, message="پیام ثبت شد")
+	return success_response(data=format_datetime_fields(msg, request), request=request, message="CRM_CHAT_PUBLIC_MESSAGE_RECORDED")
 
 
 @router.get("/api/v1/public/crm-chat/conversations/{conversation_id}/messages")
 async def public_list_messages(
 	request: Request,
 	conversation_id: int,
-	visitor_token: str = Query(..., min_length=16),
+	authorization: Optional[str] = Header(default=None),
+	x_visitor_token: Optional[str] = Header(default=None, alias="X-Visitor-Token", convert_underscores=False),
+	visitor_token: Optional[str] = Query(
+		default=None,
+		description="(قدیمی) اگر هدر ارسال نمی‌کنید",
+	),
 	limit: int = Query(100, ge=1, le=500),
+	before_message_id: Optional[int] = Query(
+		None,
+		description="بارگذاری پیام‌های قدیمی‌تر (id کوچک‌تر از این مقدار)",
+	),
 	db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
+	tok = _resolve_public_visitor_token(request, authorization, x_visitor_token, visitor_token)
 	try:
-		items = chat_svc.list_messages_public(db, visitor_token, conversation_id, limit=limit)
+		items = chat_svc.list_messages_public(
+			db,
+			tok,
+			conversation_id,
+			limit=limit,
+			origin_header=_origin(request),
+			before_message_id=before_message_id,
+		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 	return success_response(
 		data={"items": [format_datetime_fields(x, request) for x in items]},
 		request=request,
+	)
+
+
+@router.post("/api/v1/public/crm-chat/conversations/{conversation_id}/read")
+async def public_mark_messages_read(
+	request: Request,
+	conversation_id: int,
+	body: CrmChatMarkReadBody = Body(...),
+	authorization: Optional[str] = Header(default=None),
+	x_visitor_token: Optional[str] = Header(default=None, alias="X-Visitor-Token", convert_underscores=False),
+	visitor_token: Optional[str] = Query(
+		default=None,
+		description="(قدیمی) اگر هدر ارسال نمی‌کنید",
+	),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	tok = _resolve_public_visitor_token(request, authorization, x_visitor_token, visitor_token)
+	try:
+		data = await chat_svc.mark_messages_read_by_visitor(
+			db,
+			visitor_token=tok,
+			conversation_id=conversation_id,
+			up_to_message_id=body.up_to_message_id,
+			origin_header=_origin(request),
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(
+		data=format_datetime_fields(data, request),
+		request=request,
+		message="",
 	)
 
 
@@ -108,7 +219,7 @@ async def public_post_message_file(
 		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-	return success_response(data=format_datetime_fields(msg, request), request=request, message="فایل ثبت شد")
+	return success_response(data=format_datetime_fields(msg, request), request=request, message="CRM_CHAT_PUBLIC_FILE_RECORDED")
 
 
 @router.get("/api/v1/public/crm-chat/conversations/{conversation_id}/files/{file_id}/download")
@@ -116,13 +227,23 @@ async def public_download_crm_file(
 	request: Request,
 	conversation_id: int,
 	file_id: str,
-	visitor_token: str = Query(..., min_length=16),
+	authorization: Optional[str] = Header(default=None),
+	x_visitor_token: Optional[str] = Header(default=None, alias="X-Visitor-Token", convert_underscores=False),
+	visitor_token: Optional[str] = Query(
+		default=None,
+		description="(قدیمی) اگر هدر ارسال نمی‌کنید",
+	),
 	db: Session = Depends(get_db),
 ):
 	"""دانلود فایل ضمیمه برای بازدیدکننده (همان مکالمه)."""
+	tok = _resolve_public_visitor_token(request, authorization, x_visitor_token, visitor_token)
 	try:
 		data = await chat_svc.download_visitor_crm_file(
-			db, visitor_token=visitor_token, conversation_id=conversation_id, file_id=file_id
+			db,
+			visitor_token=tok,
+			conversation_id=conversation_id,
+			file_id=file_id,
+			origin_header=_origin(request),
 		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
