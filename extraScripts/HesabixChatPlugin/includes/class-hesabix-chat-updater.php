@@ -10,11 +10,17 @@ defined( 'ABSPATH' ) || exit;
 
 class Hesabix_Chat_Updater {
 
-	/** @var string */
-	const CACHE_KEY = 'hesabix_chat_update_info';
-
 	/** ۱۲ ساعت */
 	const CACHE_TTL = 43200;
+
+	/**
+	 * کلید کش وابسته به آدرس‌های به‌روزرسانی تا بعد از تغییر wp-config یا فیلتر، نتیجهٔ تازه گرفته شود.
+	 *
+	 * @return string
+	 */
+	private function get_update_cache_key() {
+		return 'hesabix_chat_upd_' . md5( $this->get_raw_php_url() . '|' . $this->get_archive_zip_url() . '|' . $this->get_manifest_url() );
+	}
 
 	/**
 	 * @return void
@@ -195,11 +201,11 @@ class Hesabix_Chat_Updater {
 	 */
 	private function get_remote_info() {
 		if ( (bool) apply_filters( 'hesabix_chat_update_force_check', false ) ) {
-			delete_site_transient( self::CACHE_KEY );
+			delete_site_transient( $this->get_update_cache_key() );
 			delete_site_transient( 'hesabix_chat_update_manifest' );
 		}
 
-		$cached = get_site_transient( self::CACHE_KEY );
+		$cached = get_site_transient( $this->get_update_cache_key() );
 		if ( is_array( $cached ) && ! empty( $cached['version'] ) && ! empty( $cached['download_url'] ) ) {
 			return $cached;
 		}
@@ -225,7 +231,7 @@ class Hesabix_Chat_Updater {
 			return null;
 		}
 
-		set_site_transient( self::CACHE_KEY, $info, (int) apply_filters( 'hesabix_chat_update_cache_ttl', self::CACHE_TTL ) );
+		set_site_transient( $this->get_update_cache_key(), $info, (int) apply_filters( 'hesabix_chat_update_cache_ttl', self::CACHE_TTL ) );
 		return $info;
 	}
 

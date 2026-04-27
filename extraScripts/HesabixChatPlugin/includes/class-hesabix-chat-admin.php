@@ -393,6 +393,36 @@ class Hesabix_Chat_Admin {
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 			<p><?php esc_html_e( 'اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد.', 'hesabix-chat' ); ?></p>
+			<div class="notice notice-info inline" style="margin:12px 0;padding:10px 12px;">
+				<p style="margin:0 0 8px;"><strong><?php esc_html_e( 'به‌روزرسانی از داخل وردپرس', 'hesabix-chat' ); ?></strong></p>
+				<p style="margin:0;">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: 1: current plugin version */
+							__( 'نسخهٔ نصب‌شده روی این سایت: %1$s. اعلان «به‌روزرسانی موجود» فقط وقتی نشان داده می‌شود که نسخهٔ خوانده‌شده از آدرس رسمی افزونه (فایل hesabix-chat.php در مخزن) از این عدد بزرگتر باشد؛ اگر هر دو یکسان باشند، پیامی نمی‌بینید.', 'hesabix-chat' ),
+							defined( 'HESABIX_CHAT_VERSION' ) ? HESABIX_CHAT_VERSION : '—'
+						)
+					);
+					?>
+				</p>
+				<p style="margin:8px 0 0;">
+					<?php
+					esc_html_e(
+						'به‌طور پیش‌فرض نسخه از سرور source.hesabix.ir خوانده می‌شود، نه از هر مخزن گیت که خودتان push می‌کنید. اگر افزونه را از مخزن دیگری نصب یا توسعه می‌دهید، در wp-config.php ثابت‌های HESABIX_CHAT_UPDATE_RAW_PHP_URL و HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL را به همان مخزن نشانه بگیرید (یا مانیفست JSON با HESABIX_CHAT_UPDATE_MANIFEST_URL).',
+						'hesabix-chat'
+					);
+					?>
+				</p>
+				<p style="margin:8px 0 0;font-size:12px;color:#50575e;">
+					<?php
+					esc_html_e(
+						'برای یک‌بار نادیده گرفتن کش (حداکثر ~۱۲ ساعت): افزودن add_filter( \'hesabix_chat_update_force_check\', \'__return_true\' ); موقتاً در یک افزونه/کد سفارشی و سپس باز کردن صفحهٔ به‌روزرسانی‌ها.',
+						'hesabix-chat'
+					);
+					?>
+				</p>
+			</div>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'hesabix_chat_group' ); ?>
 				<table class="form-table" role="presentation">

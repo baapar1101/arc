@@ -24,17 +24,18 @@ define( 'HESABIX_CHAT_URL', plugin_dir_url( __FILE__ ) );
 /**
  * به‌روزرسانی: نسخه از فایل اصلی به‌صورت raw، بسته از archive همان شاخه (آدرس ثابت).
  * اختیاری: HESABIX_CHAT_UPDATE_MANIFEST_URL برای مانیفست JSON (اگر خالی باشد استفاده نمی‌شود).
+ * برای مخزن اختصاصی: قبل از بارگذاری این فایل در wp-config مقدار HESABIX_CHAT_UPDATE_RAW_PHP_URL و HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL را تعریف کنید.
  */
 if ( ! defined( 'HESABIX_CHAT_UPDATE_RAW_PHP_URL' ) ) {
 	define(
 		'HESABIX_CHAT_UPDATE_RAW_PHP_URL',
-		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/-/raw/master/hesabix-chat.php'
+		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/raw/master/hesabix-chat.php'
 	);
 }
 if ( ! defined( 'HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL' ) ) {
 	define(
 		'HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL',
-		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/-/archive/master.zip'
+		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/archive/master.zip'
 	);
 }
 
