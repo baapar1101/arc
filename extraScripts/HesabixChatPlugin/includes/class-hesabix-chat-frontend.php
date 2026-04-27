@@ -29,12 +29,61 @@ class Hesabix_Chat_Frontend {
 			return;
 		}
 		if ( 'global' === $o['load_mode'] ) {
+			if ( ! $this->should_show_floating_launcher( $o ) ) {
+				return;
+			}
 			$this->enqueue( $o );
 			return;
 		}
 		if ( 'shortcode' === $o['load_mode'] && $this->content_has_shortcode() ) {
 			$this->enqueue( $o );
 		}
+	}
+
+	/**
+	 * مسیر درخواست فعلی (بدون کوئری) برای تطبیق پیشوند مسیر.
+	 *
+	 * @return string
+	 */
+	private function current_request_path() {
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+		$path = wp_parse_url( esc_url_raw( $uri ), PHP_URL_PATH );
+		if ( ! is_string( $path ) || $path === '' ) {
+			$path = '/';
+		}
+		$path = untrailingslashit( $path );
+		return ( $path !== '' ) ? $path : '/';
+	}
+
+	/**
+	 * نمایش دکمه/ریشهٔ شناور در حالت load_mode=global
+	 *
+	 * @param array<string, mixed> $o .
+	 * @return bool
+	 */
+	private function should_show_floating_launcher( $o ) {
+		if ( ! apply_filters( 'hesabix_chat_show_floating_launcher', true, $o ) ) {
+			return false;
+		}
+		if ( ! empty( $o['hide_launcher_front'] ) && is_front_page() ) {
+			return false;
+		}
+		if ( is_singular() ) {
+			$ids = Hesabix_Chat_Admin::parse_post_id_list( (string) ( $o['hide_launcher_post_ids'] ?? '' ) );
+			if ( $ids && in_array( (int) get_queried_object_id(), $ids, true ) ) {
+				return false;
+			}
+		}
+		$prefixes = Hesabix_Chat_Admin::parse_path_prefix_lines( (string) ( $o['hide_launcher_paths'] ?? '' ) );
+		if ( $prefixes ) {
+			$req = $this->current_request_path();
+			foreach ( $prefixes as $pref ) {
+				if ( $pref !== '' && strpos( $req, $pref ) === 0 ) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -129,6 +178,20 @@ class Hesabix_Chat_Frontend {
 		$email_eff = $this->resolve_effective_email_field( (string) ( $o['email_field'] ?? 'required' ), $current_user );
 		$email_eff = (string) apply_filters( 'hesabix_chat_email_field', $email_eff, $o, $current_user );
 
+		$agent_reply_sound_url = '';
+		$sn                    = (string) ( $o['agent_reply_sound'] ?? '' );
+		if ( $sn !== '' ) {
+			$allowed_sounds = Hesabix_Chat_Admin::list_agent_reply_sound_files();
+			if ( in_array( $sn, $allowed_sounds, true ) ) {
+				$agent_reply_sound_url = apply_filters(
+					'hesabix_chat_agent_reply_sound_url',
+					HESABIX_CHAT_URL . 'assets/sounds/' . rawurlencode( $sn ),
+					$sn,
+					$o
+				);
+			}
+		}
+
 		wp_localize_script(
 			'hesabix-chat',
 			'HESABIX_CHAT',
@@ -149,7 +212,12 @@ class Hesabix_Chat_Frontend {
 				'panelHeight'     => (int) $o['panel_height'],
 				'zIndex'          => (int) $o['z_index'],
 				'offsetBottom'    => (int) $o['offset_bottom'],
-				'offsetSide'      => (int) $o['offset_side'],
+				'offsetSideDesktop'  => (int) ( $o['offset_side_desktop'] ?? 24 ),
+				'offsetSideMobile'   => (int) ( $o['offset_side_mobile'] ?? 24 ),
+				'marginLeftDesktop'  => (int) ( $o['margin_left_desktop'] ?? 0 ),
+				'marginRightDesktop' => (int) ( $o['margin_right_desktop'] ?? 0 ),
+				'marginLeftMobile'   => (int) ( $o['margin_left_mobile'] ?? 0 ),
+				'marginRightMobile'  => (int) ( $o['margin_right_mobile'] ?? 0 ),
 				'borderRadius'    => (int) $o['border_radius'],
 				'dir'             => $dir,
 				'showFileUpload'  => (int) $o['show_file_upload'] === 1,
@@ -158,6 +226,16 @@ class Hesabix_Chat_Frontend {
 				'emailField'      => $email_eff,
 				'showPageContext' => (int) ( $o['show_page_context'] ?? 0 ) === 1,
 				'prefill'         => $prefill,
+				'quickReplies'    => (array) apply_filters(
+					'hesabix_chat_quick_replies',
+					Hesabix_Chat_Admin::parse_quick_replies_text( (string) ( $o['quick_replies_text'] ?? '' ) ),
+					$o
+				),
+				'agentReplySoundUrl' => (string) $agent_reply_sound_url,
+				'launcherIdleAnimation'      => (string) ( $o['launcher_idle_animation'] ?? 'none' ),
+				'launcherAttentionDelaySec'  => (int) ( $o['launcher_attention_delay_sec'] ?? 0 ),
+				'openPanelOnLoad'            => (int) ( $o['open_panel_on_load'] ?? 0 ) === 1,
+				'openPanelDelaySec'          => (int) ( $o['open_panel_delay_sec'] ?? 0 ),
 				'strings'         => array(
 					'formTitle'    => __( 'شروع گفتگو', 'hesabix-chat' ),
 					'formSubtitle' => __( 'برای شروع، مشخصات خود را وارد کنید.', 'hesabix-chat' ),
@@ -185,6 +263,8 @@ class Hesabix_Chat_Frontend {
 					'agentTyping'      => __( 'پشتیبان در حال تایپ…', 'hesabix-chat' ),
 					'msgDelivered'     => __( 'ارسال شد', 'hesabix-chat' ),
 					'msgReadBySupport' => __( 'پشتیبان خواند', 'hesabix-chat' ),
+					'quickRepliesTitle' => __( 'پرسش‌های پرتکرار', 'hesabix-chat' ),
+					'cannedAnswerLabel' => __( 'پاسخ خودکار', 'hesabix-chat' ),
 				),
 			)
 		);
@@ -210,6 +290,9 @@ class Hesabix_Chat_Frontend {
 			return;
 		}
 		if ( 'global' !== $o['load_mode'] ) {
+			return;
+		}
+		if ( ! $this->should_show_floating_launcher( $o ) ) {
 			return;
 		}
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped

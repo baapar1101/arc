@@ -33,7 +33,15 @@ class Hesabix_Chat_Admin {
 			'panel_height'         => 520,
 			'z_index'              => 99999,
 			'offset_bottom'        => 24,
-			'offset_side'          => 24,
+			'offset_side_desktop'  => 24,
+			'offset_side_mobile'   => 24,
+			'margin_left_desktop'  => 0,
+			'margin_right_desktop' => 0,
+			'margin_left_mobile'   => 0,
+			'margin_right_mobile'  => 0,
+			'hide_launcher_front'  => 0,
+			'hide_launcher_post_ids' => '',
+			'hide_launcher_paths'  => '',
 			'border_radius'        => 16,
 			'chat_title'           => __( 'پشتیبانی', 'hesabix-chat' ),
 			'welcome_message'      => __( 'به بخش فروش خوش آمدید! چه کمکی از دستم برمی‌آید؟', 'hesabix-chat' ),
@@ -44,7 +52,81 @@ class Hesabix_Chat_Admin {
 			'show_file_upload'     => 0,
 			'email_field'         => 'required',
 			'show_page_context'   => 0,
+			'quick_replies_text'  => '',
+			'agent_reply_sound'   => '',
+			'launcher_idle_animation'     => 'none',
+			'launcher_attention_delay_sec' => 3,
+			'open_panel_on_load'          => 0,
+			'open_panel_delay_sec'        => 0,
 		);
+	}
+
+	/**
+	 * فایل‌های صوتی مجاز در assets/sounds (برای اعلان پیام پشتیبان).
+	 *
+	 * @return string[] نام فایل‌ها
+	 */
+	public static function list_agent_reply_sound_files() {
+		$dir = HESABIX_CHAT_PATH . 'assets/sounds/';
+		if ( ! is_dir( $dir ) ) {
+			return array();
+		}
+		$ext_ok = array( 'mp3' => true, 'm4a' => true, 'wav' => true, 'ogg' => true );
+		$out    = array();
+		$dh     = opendir( $dir );
+		if ( ! $dh ) {
+			return array();
+		}
+		while ( false !== ( $f = readdir( $dh ) ) ) {
+			if ( $f === '.' || $f === '..' || $f === 'index.php' ) {
+				continue;
+			}
+			$ext = strtolower( pathinfo( $f, PATHINFO_EXTENSION ) );
+			if ( isset( $ext_ok[ $ext ] ) ) {
+				$out[] = $f;
+			}
+		}
+		closedir( $dh );
+		sort( $out, SORT_NATURAL | SORT_FLAG_CASE );
+		return $out;
+	}
+
+	/**
+	 * هر خط: پرسش|پاسخ (اولین | جداکننده). حداکثر ۱۲ مورد.
+	 *
+	 * @param string $raw .
+	 * @return array<int, array{q: string, a: string}>
+	 */
+	public static function parse_quick_replies_text( $raw ) {
+		$lines = preg_split( '/\R/u', (string) $raw );
+		$out   = array();
+		foreach ( $lines as $line ) {
+			if ( count( $out ) >= 12 ) {
+				break;
+			}
+			$line = trim( $line );
+			if ( $line === '' ) {
+				continue;
+			}
+			$parts = explode( '|', $line, 2 );
+			$q     = trim( $parts[0] );
+			$a     = isset( $parts[1] ) ? trim( $parts[1] ) : '';
+			if ( $q === '' || $a === '' ) {
+				continue;
+			}
+			if ( function_exists( 'mb_substr' ) ) {
+				$q = mb_substr( $q, 0, 200 );
+				$a = mb_substr( $a, 0, 2000 );
+			} else {
+				$q = substr( $q, 0, 200 );
+				$a = substr( $a, 0, 2000 );
+			}
+			$out[] = array(
+				'q' => $q,
+				'a' => $a,
+			);
+		}
+		return $out;
 	}
 
 	/**
@@ -55,7 +137,56 @@ class Hesabix_Chat_Admin {
 		if ( ! is_array( $opts ) ) {
 			$opts = array();
 		}
-		return array_replace_recursive( self::defaults(), $opts );
+		$out = array_replace_recursive( self::defaults(), $opts );
+		if ( isset( $opts['offset_side'] ) && ! isset( $opts['offset_side_desktop'] ) && ! isset( $opts['offset_side_mobile'] ) ) {
+			$legacy = max( 0, min( 200, (int) $opts['offset_side'] ) );
+			$out['offset_side_desktop'] = $legacy;
+			$out['offset_side_mobile']  = $legacy;
+		}
+		$sound_ok = self::list_agent_reply_sound_files();
+		if ( ! empty( $out['agent_reply_sound'] ) && ! in_array( (string) $out['agent_reply_sound'], $sound_ok, true ) ) {
+			$out['agent_reply_sound'] = '';
+		}
+		return $out;
+	}
+
+	/**
+	 * @param string $raw .
+	 * @return int[]
+	 */
+	public static function parse_post_id_list( $raw ) {
+		$out = array();
+		foreach ( preg_split( '/[\s,]+/', (string) $raw, -1, PREG_SPLIT_NO_EMPTY ) as $p ) {
+			$n = (int) $p;
+			if ( $n > 0 ) {
+				$out[] = $n;
+			}
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * @param string $raw .
+	 * @return string[]
+	 */
+	public static function parse_path_prefix_lines( $raw ) {
+		$lines = preg_split( '/\R/u', (string) $raw );
+		$out   = array();
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			if ( $line === '' ) {
+				continue;
+			}
+			if ( isset( $line[0] ) && $line[0] !== '/' ) {
+				$line = '/' . $line;
+			}
+			$line = untrailingslashit( $line );
+			if ( $line === '' ) {
+				continue;
+			}
+			$out[] = $line;
+		}
+		return array_values( array_unique( $out ) );
 	}
 
 	public function __construct() {
@@ -161,7 +292,21 @@ class Hesabix_Chat_Admin {
 		$out['panel_height'] = $this->int_range( $input['panel_height'] ?? null, 320, 800, (int) $defaults['panel_height'] );
 		$out['z_index']      = $this->int_range( $input['z_index'] ?? null, 1, 2147483647, (int) $defaults['z_index'] );
 		$out['offset_bottom'] = $this->int_range( $input['offset_bottom'] ?? null, 0, 200, (int) $defaults['offset_bottom'] );
-		$out['offset_side']  = $this->int_range( $input['offset_side'] ?? null, 0, 200, (int) $defaults['offset_side'] );
+		$out['offset_side_desktop']  = $this->int_range( $input['offset_side_desktop'] ?? null, 0, 200, (int) $defaults['offset_side_desktop'] );
+		$out['offset_side_mobile']   = $this->int_range( $input['offset_side_mobile'] ?? null, 0, 200, (int) $defaults['offset_side_mobile'] );
+		$out['margin_left_desktop']  = $this->int_range( $input['margin_left_desktop'] ?? null, 0, 200, (int) $defaults['margin_left_desktop'] );
+		$out['margin_right_desktop'] = $this->int_range( $input['margin_right_desktop'] ?? null, 0, 200, (int) $defaults['margin_right_desktop'] );
+		$out['margin_left_mobile']   = $this->int_range( $input['margin_left_mobile'] ?? null, 0, 200, (int) $defaults['margin_left_mobile'] );
+		$out['margin_right_mobile']  = $this->int_range( $input['margin_right_mobile'] ?? null, 0, 200, (int) $defaults['margin_right_mobile'] );
+		$out['hide_launcher_front'] = ! empty( $input['hide_launcher_front'] ) ? 1 : 0;
+		if ( isset( $input['hide_launcher_post_ids'] ) ) {
+			$ids = self::parse_post_id_list( (string) $input['hide_launcher_post_ids'] );
+			$out['hide_launcher_post_ids'] = $ids ? implode( ',', $ids ) : '';
+		}
+		if ( isset( $input['hide_launcher_paths'] ) ) {
+			$lines = self::parse_path_prefix_lines( sanitize_textarea_field( (string) $input['hide_launcher_paths'] ) );
+			$out['hide_launcher_paths'] = $lines ? implode( "\n", $lines ) : '';
+		}
 		$out['border_radius'] = $this->int_range( $input['border_radius'] ?? null, 0, 40, (int) $defaults['border_radius'] );
 
 		$rtl = isset( $input['rtl'] ) ? (string) $input['rtl'] : 'auto';
@@ -172,6 +317,29 @@ class Hesabix_Chat_Admin {
 		$ef = isset( $input['email_field'] ) ? (string) $input['email_field'] : (string) $defaults['email_field'];
 		$out['email_field'] = in_array( $ef, array( 'required', 'optional', 'hidden', 'auto' ), true ) ? $ef : 'required';
 		$out['show_page_context'] = ! empty( $input['show_page_context'] ) ? 1 : 0;
+
+		if ( isset( $input['quick_replies_text'] ) ) {
+			$qt = sanitize_textarea_field( (string) $input['quick_replies_text'] );
+			if ( function_exists( 'mb_substr' ) ) {
+				$qt = mb_substr( $qt, 0, 50000 );
+			} else {
+				$qt = substr( $qt, 0, 50000 );
+			}
+			$out['quick_replies_text'] = $qt;
+		}
+
+		if ( isset( $input['agent_reply_sound'] ) ) {
+			$sn = sanitize_file_name( (string) $input['agent_reply_sound'] );
+			$ok = self::list_agent_reply_sound_files();
+			$out['agent_reply_sound'] = ( $sn !== '' && in_array( $sn, $ok, true ) ) ? $sn : '';
+		}
+
+		$allowed_anim = array( 'none', 'bounce', 'pulse', 'shake', 'wiggle', 'glow', 'ring', 'float' );
+		$anim         = isset( $input['launcher_idle_animation'] ) ? (string) $input['launcher_idle_animation'] : (string) $defaults['launcher_idle_animation'];
+		$out['launcher_idle_animation'] = in_array( $anim, $allowed_anim, true ) ? $anim : 'none';
+		$out['launcher_attention_delay_sec'] = $this->int_range( $input['launcher_attention_delay_sec'] ?? null, 0, 600, (int) $defaults['launcher_attention_delay_sec'] );
+		$out['open_panel_on_load']   = ! empty( $input['open_panel_on_load'] ) ? 1 : 0;
+		$out['open_panel_delay_sec'] = $this->int_range( $input['open_panel_delay_sec'] ?? null, 0, 120, (int) $defaults['open_panel_delay_sec'] );
 
 		return $out;
 	}
@@ -271,6 +439,13 @@ class Hesabix_Chat_Admin {
 						</td>
 					</tr>
 					<tr>
+						<th scope="row"><label for="hesabix_quick_replies"><?php esc_html_e( 'پرسش و پاسخ آماده (در چت)', 'hesabix-chat' ); ?></label></th>
+						<td>
+							<textarea name="<?php echo esc_attr( self::OPTION_NAME . '[quick_replies_text]' ); ?>" id="hesabix_quick_replies" class="large-text code" rows="8" placeholder="<?php echo esc_attr__( "ساعت کاری شما؟|شنبه تا چهارشنبه ۹ تا ۱۷\nارسال چقدر طول می‌کشد؟|معمولاً ۲ تا ۴ روز کاری", 'hesabix-chat' ); ?>"><?php echo esc_textarea( (string) ( $o['quick_replies_text'] ?? '' ) ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'هر خط یک جفت: متن دکمه (پرسش) سپس | سپس پاسخ آماده. با کلیک بازدیدکننده، پرسش مثل پیام عادی به مکالمه ارسال می‌شود و پاسخ در همان پنل به‌صورت حباب پشتیبانی نمایش داده می‌شود (فقط در مرورگر؛ در CRM فقط همان پرسش دیده می‌شود). حداکثر ۱۲ خط؛ در هر بخش حدود ۲۰۰ و ۲۰۰۰ نویسه.', 'hesabix-chat' ); ?></p>
+						</td>
+					</tr>
+					<tr>
 						<th scope="row"><label for="hesabix_ui_preset"><?php esc_html_e( 'الگوی ظاهر', 'hesabix-chat' ); ?></label></th>
 						<td>
 							<select name="<?php echo esc_attr( self::OPTION_NAME . '[ui_preset]' ); ?>" id="hesabix_ui_preset">
@@ -322,6 +497,43 @@ class Hesabix_Chat_Admin {
 						</td>
 					</tr>
 					<tr>
+						<th scope="row"><?php esc_html_e( 'جلب توجه به دکمه (وقتی پنل بسته است)', 'hesabix-chat' ); ?></th>
+						<td>
+							<p class="description" style="margin-top:0;"><?php esc_html_e( 'انیمیشن روی دکمهٔ گفتگو فقط وقتی پنل بسته باشد اجرا می‌شود؛ با باز کردن پنل متوقف می‌شود و با بستن دوباره (فوری) از سر گرفته می‌شود. در حالت «کاهش حرکت» سیستم‌عامل غیرفعال می‌شود.', 'hesabix-chat' ); ?></p>
+							<p>
+								<label for="hesabix_launcher_anim"><?php esc_html_e( 'نوع انیمیشن', 'hesabix-chat' ); ?></label><br />
+								<select name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_idle_animation]' ); ?>" id="hesabix_launcher_anim">
+									<option value="none" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'none' ); ?>><?php esc_html_e( 'بدون انیمیشن', 'hesabix-chat' ); ?></option>
+									<option value="bounce" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'bounce' ); ?>><?php esc_html_e( 'جهش عمودی (بالا–پایین)', 'hesabix-chat' ); ?></option>
+									<option value="pulse" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'pulse' ); ?>><?php esc_html_e( 'تپش (بزرگ‌وشدن)', 'hesabix-chat' ); ?></option>
+									<option value="shake" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'shake' ); ?>><?php esc_html_e( 'لرزش افقی', 'hesabix-chat' ); ?></option>
+									<option value="wiggle" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'wiggle' ); ?>><?php esc_html_e( 'تکان چرخشی آیکون', 'hesabix-chat' ); ?></option>
+									<option value="glow" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'glow' ); ?>><?php esc_html_e( 'درخشش سایه', 'hesabix-chat' ); ?></option>
+									<option value="ring" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'ring' ); ?>><?php esc_html_e( 'حلقهٔ نبض (پالس)', 'hesabix-chat' ); ?></option>
+									<option value="float" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'float' ); ?>><?php esc_html_e( 'شناور ملایم', 'hesabix-chat' ); ?></option>
+								</select>
+							</p>
+							<p>
+								<label for="hesabix_launcher_anim_delay"><?php esc_html_e( 'تأخیر شروع انیمیشن پس از لود صفحه (ثانیه)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_attention_delay_sec]' ); ?>" type="number" id="hesabix_launcher_anim_delay" min="0" max="600" value="<?php echo (int) ( $o['launcher_attention_delay_sec'] ?? 3 ); ?>" />
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'باز بودن خودکار پنل', 'hesabix-chat' ); ?></th>
+						<td>
+							<label>
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_on_load]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['open_panel_on_load'] ?? 0 ) ); ?> />
+								<?php esc_html_e( 'با بارگذاری صفحه، پنل گفتگو از همان ابتدا باز باشد (دیالوگ باز).', 'hesabix-chat' ); ?>
+							</label>
+							<p>
+								<label for="hesabix_open_panel_delay"><?php esc_html_e( 'تأخیر باز شدن پنل (ثانیه)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_delay_sec]' ); ?>" type="number" id="hesabix_open_panel_delay" min="0" max="120" value="<?php echo (int) ( $o['open_panel_delay_sec'] ?? 0 ); ?>" />
+								<span class="description"><?php esc_html_e( '۰ یعنی بلافاصله پس از آماده‌شدن ویجت.', 'hesabix-chat' ); ?></span>
+							</p>
+						</td>
+					</tr>
+					<tr>
 						<th scope="row"><label for="hesabix_theme"><?php esc_html_e( 'تم پنل', 'hesabix-chat' ); ?></label></th>
 						<td>
 							<select name="<?php echo esc_attr( self::OPTION_NAME . '[theme]' ); ?>" id="hesabix_theme">
@@ -357,8 +569,56 @@ class Hesabix_Chat_Admin {
 						<td><input name="<?php echo esc_attr( self::OPTION_NAME . '[offset_bottom]' ); ?>" type="number" id="hesabix_offset_b" min="0" max="200" value="<?php echo (int) $o['offset_bottom']; ?>" /></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="hesabix_offset_s"><?php esc_html_e( 'فاصله از لبه افقی (px)', 'hesabix-chat' ); ?></label></th>
-						<td><input name="<?php echo esc_attr( self::OPTION_NAME . '[offset_side]' ); ?>" type="number" id="hesabix_offset_s" min="0" max="200" value="<?php echo (int) $o['offset_side']; ?>" /></td>
+						<th scope="row"><?php esc_html_e( 'فاصله و مارجین افقی دکمه/پنل', 'hesabix-chat' ); ?></th>
+						<td>
+							<p class="description" style="margin-top:0;"><?php esc_html_e( 'برای نمایش سراسری (دکمه شناور): فاصله از کنار همان لبه‌ای که دکمه به آن چسبیده است؛ مارجین چپ/راست برای جابه‌جایی اضافی (مثلاً دور از نوار کناری قالب). در موبایل: عرض viewport تا ۷۶۸px.', 'hesabix-chat' ); ?></p>
+							<fieldset style="border:1px solid #c3c4c7;padding:10px 12px;margin:0 0 10px 0;">
+								<legend><?php esc_html_e( 'دسکتاپ (عرض بیشتر از ۷۶۸px)', 'hesabix-chat' ); ?></legend>
+								<p>
+									<label for="hesabix_offset_side_d"><?php esc_html_e( 'فاصله از لبه (px)', 'hesabix-chat' ); ?></label><br />
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[offset_side_desktop]' ); ?>" type="number" id="hesabix_offset_side_d" min="0" max="200" value="<?php echo (int) $o['offset_side_desktop']; ?>" />
+								</p>
+								<p>
+									<label for="hesabix_ml_d"><?php esc_html_e( 'مارجین چپ (px)', 'hesabix-chat' ); ?></label>
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[margin_left_desktop]' ); ?>" type="number" id="hesabix_ml_d" min="0" max="200" style="width:5em;" value="<?php echo (int) $o['margin_left_desktop']; ?>" />
+									&nbsp;
+									<label for="hesabix_mr_d"><?php esc_html_e( 'مارجین راست (px)', 'hesabix-chat' ); ?></label>
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[margin_right_desktop]' ); ?>" type="number" id="hesabix_mr_d" min="0" max="200" style="width:5em;" value="<?php echo (int) $o['margin_right_desktop']; ?>" />
+								</p>
+							</fieldset>
+							<fieldset style="border:1px solid #c3c4c7;padding:10px 12px;margin:0;">
+								<legend><?php esc_html_e( 'موبایل (حداکثر ۷۶۸px)', 'hesabix-chat' ); ?></legend>
+								<p>
+									<label for="hesabix_offset_side_m"><?php esc_html_e( 'فاصله از لبه (px)', 'hesabix-chat' ); ?></label><br />
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[offset_side_mobile]' ); ?>" type="number" id="hesabix_offset_side_m" min="0" max="200" value="<?php echo (int) $o['offset_side_mobile']; ?>" />
+								</p>
+								<p>
+									<label for="hesabix_ml_m"><?php esc_html_e( 'مارجین چپ (px)', 'hesabix-chat' ); ?></label>
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[margin_left_mobile]' ); ?>" type="number" id="hesabix_ml_m" min="0" max="200" style="width:5em;" value="<?php echo (int) $o['margin_left_mobile']; ?>" />
+									&nbsp;
+									<label for="hesabix_mr_m"><?php esc_html_e( 'مارجین راست (px)', 'hesabix-chat' ); ?></label>
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[margin_right_mobile]' ); ?>" type="number" id="hesabix_mr_m" min="0" max="200" style="width:5em;" value="<?php echo (int) $o['margin_right_mobile']; ?>" />
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'مخفی کردن دکمه شناور', 'hesabix-chat' ); ?></th>
+						<td>
+							<p class="description" style="margin-top:0;"><?php esc_html_e( 'فقط وقتی «نمایش ویجت» روی «در تمام صفحات» است اعمال می‌شود. صفحه‌ای که فقط با شورتکد چت دارد تحت این قواعد نیست.', 'hesabix-chat' ); ?></p>
+							<label>
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_front]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['hide_launcher_front'] ?? 0 ) ); ?> />
+								<?php esc_html_e( 'مخفی در صفحهٔ اصلی', 'hesabix-chat' ); ?>
+							</label>
+							<p>
+								<label for="hesabix_hide_ids"><?php esc_html_e( 'شناسه برگه/نوشته (با ویرگول یا فاصله)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_post_ids]' ); ?>" type="text" id="hesabix_hide_ids" class="large-text" value="<?php echo esc_attr( (string) ( $o['hide_launcher_post_ids'] ?? '' ) ); ?>" placeholder="12, 45" />
+							</p>
+							<p>
+								<label for="hesabix_hide_paths"><?php esc_html_e( 'مسیر URL (هر خط یک پیشوند، از / شروع کنید)', 'hesabix-chat' ); ?></label><br />
+								<textarea name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_paths]' ); ?>" id="hesabix_hide_paths" class="large-text" rows="4" placeholder="/cart&#10;/checkout"><?php echo esc_textarea( (string) ( $o['hide_launcher_paths'] ?? '' ) ); ?></textarea>
+							</p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="hesabix_radius"><?php esc_html_e( 'گردی گوشه پنل (px)', 'hesabix-chat' ); ?></label></th>
@@ -371,6 +631,22 @@ class Hesabix_Chat_Admin {
 								<input name="<?php echo esc_attr( self::OPTION_NAME . '[show_file_upload]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) $o['show_file_upload'] ); ?> />
 								<?php esc_html_e( 'اجازه اتصال به ارسال فایل (ابتدا در CRM: تنظیمات چت > ارسال فایل باید فعال و فضای ذخیره‌سازی کافی باشد؛ سپس ویجت فقط اگر API تأیید کند input را نشان می‌دهد).', 'hesabix-chat' ); ?>
 							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="hesabix_agent_reply_sound"><?php esc_html_e( 'صدای اعلان پاسخ پشتیبان', 'hesabix-chat' ); ?></label></th>
+						<td>
+							<select name="<?php echo esc_attr( self::OPTION_NAME . '[agent_reply_sound]' ); ?>" id="hesabix_agent_reply_sound">
+								<option value="" <?php selected( (string) ( $o['agent_reply_sound'] ?? '' ), '' ); ?>><?php esc_html_e( 'بدون صدا', 'hesabix-chat' ); ?></option>
+								<?php
+								$sound_files = self::list_agent_reply_sound_files();
+								$cur_sound   = (string) ( $o['agent_reply_sound'] ?? '' );
+								foreach ( $sound_files as $sf ) {
+									echo '<option value="' . esc_attr( $sf ) . '" ' . selected( $cur_sound, $sf, false ) . '>' . esc_html( $sf ) . '</option>';
+								}
+								?>
+							</select>
+							<p class="description"><?php esc_html_e( 'فایل‌های mp3، ogg، wav یا m4a را در پوشهٔ افزونه: assets/sounds قرار دهید؛ اینجا انتخاب می‌شوند. با رسیدن پیام جدید از پشتیبان (نه بارگذاری اولیهٔ تاریخچه) یک‌بار پخش می‌شود. مرورگر ممکن است تا اولین تعامل کاربر با صفحه اجازهٔ پخش خودکار ندهد.', 'hesabix-chat' ); ?></p>
 						</td>
 					</tr>
 					<tr>

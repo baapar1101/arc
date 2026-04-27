@@ -125,6 +125,7 @@ from .warranty import (  # noqa: F401
 from .project import Project  # noqa: F401
 # Bale messenger linking
 from .bale import BaleLinkToken  # noqa: F401
+from .messenger_operator_session import MessengerOperatorSession  # noqa: F401
 from .business_ftp_backup_setting import BusinessFtpBackupSetting  # noqa: F401
 from .business_crm_settings import BusinessCrmSettings  # noqa: F401
 # CRM

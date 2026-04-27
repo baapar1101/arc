@@ -244,6 +244,37 @@
 		return m;
 	}
 
+	function playAgentReplySound() {
+		var url = ( cfg.agentReplySoundUrl || '' ).toString();
+		if ( ! url ) {
+			return;
+		}
+		try {
+			var a = new Audio( url );
+			a.volume = 0.85;
+			var p = a.play();
+			if ( p && typeof p.catch === 'function' ) {
+				p.catch( function () {} );
+			}
+		} catch ( ePlay ) {}
+	}
+
+	function maybePlayAgentReplySound( items ) {
+		var maxId = maxAgentMessageId( items );
+		var url = ( cfg.agentReplySoundUrl || '' ).toString();
+		if ( ! state.agentSoundPrimed ) {
+			state.lastAgentMsgNotifiedId = maxId;
+			state.agentSoundPrimed = true;
+			return;
+		}
+		if ( maxId > state.lastAgentMsgNotifiedId ) {
+			state.lastAgentMsgNotifiedId = maxId;
+			if ( url ) {
+				playAgentReplySound();
+			}
+		}
+	}
+
 	function syncMarkAgentRead( items ) {
 		if ( ! state.session ) {
 			return;
@@ -333,6 +364,9 @@
 		open: false,
 		session: null,
 		messages: [],
+		localSyntheticAgentTail: [],
+		agentSoundPrimed: false,
+		lastAgentMsgNotifiedId: 0,
 		ws: null,
 		pollTimer: null,
 		usePoll: false,
@@ -341,6 +375,8 @@
 		visitorTypingSendTimer: null,
 		visitorTypingStopTimer: null
 	};
+
+	var launcherAttentionTimer = null;
 
 	function stopPoll() {
 		if ( state.pollTimer ) {
@@ -353,7 +389,11 @@
 		stopPoll();
 		state.pollTimer = setInterval( function () {
 			listMessages( convId, token, 100 ).then( function ( items ) {
-				if ( items.length !== state.messages.length ) {
+				maybePlayAgentReplySound( items );
+				var prevMax = maxAgentMessageId( state.messages );
+				var nextMax = maxAgentMessageId( items );
+				var changed = items.length !== state.messages.length || nextMax !== prevMax;
+				if ( changed ) {
 					state.messages = items;
 					renderMessages();
 					syncMarkAgentRead( items );
@@ -382,7 +422,14 @@
 	root.style.setProperty( '--hesabix-panel-h', ( cfg.panelHeight || 520 ) + 'px' );
 	root.style.setProperty( '--hesabix-z', String( cfg.zIndex || 99999 ) );
 	root.style.setProperty( '--hesabix-bottom', ( cfg.offsetBottom || 24 ) + 'px' );
-	root.style.setProperty( '--hesabix-side', ( cfg.offsetSide || 24 ) + 'px' );
+	var sideDesk = cfg.offsetSideDesktop != null ? cfg.offsetSideDesktop : ( cfg.offsetSide != null ? cfg.offsetSide : 24 );
+	var sideMob = cfg.offsetSideMobile != null ? cfg.offsetSideMobile : sideDesk;
+	root.style.setProperty( '--hesabix-side', sideDesk + 'px' );
+	root.style.setProperty( '--hesabix-side-mobile', sideMob + 'px' );
+	root.style.setProperty( '--hesabix-margin-left', ( cfg.marginLeftDesktop || 0 ) + 'px' );
+	root.style.setProperty( '--hesabix-margin-right', ( cfg.marginRightDesktop || 0 ) + 'px' );
+	root.style.setProperty( '--hesabix-margin-left-mobile', ( cfg.marginLeftMobile || 0 ) + 'px' );
+	root.style.setProperty( '--hesabix-margin-right-mobile', ( cfg.marginRightMobile || 0 ) + 'px' );
 	root.style.setProperty( '--hesabix-radius', ( cfg.borderRadius || 12 ) + 'px' );
 	root.style.setProperty( '--hesabix-accent', cfg.buttonColor );
 
@@ -534,7 +581,11 @@
 	wrap.appendChild( panel );
 	/* پرتال پنل: در حالت global دکمه fixed است و پنل absolute نسبت به host با ارتفاع صفر اشتباه جا می‌گرفت؛ پنل در body. */
 	{
-		var hesabixChatVars = [ '--hesabix-btn', '--hesabix-btn-txt', '--hesabix-panel-w', '--hesabix-panel-h', '--hesabix-z', '--hesabix-bottom', '--hesabix-side', '--hesabix-radius', '--hesabix-accent' ];
+		var hesabixChatVars = [
+			'--hesabix-btn', '--hesabix-btn-txt', '--hesabix-panel-w', '--hesabix-panel-h', '--hesabix-z', '--hesabix-bottom',
+			'--hesabix-side', '--hesabix-side-mobile', '--hesabix-margin-left', '--hesabix-margin-right',
+			'--hesabix-margin-left-mobile', '--hesabix-margin-right-mobile', '--hesabix-radius', '--hesabix-accent'
+		];
 		for ( var vi = 0; vi < hesabixChatVars.length; vi++ ) {
 			var vnm = hesabixChatVars[ vi ];
 			panel.style.setProperty( vnm, root.style.getPropertyValue( vnm ) );
@@ -853,7 +904,74 @@
 			eta.appendChild( etx );
 			msgBox.appendChild( eta );
 		}
-		state.messages.forEach( function ( m ) {
+		var qrList = cfg.quickReplies;
+		if ( qrList && qrList.length && surface.classList.contains( 'hesabix-chat--step-chat' ) ) {
+			var qrRow = document.createElement( 'div' );
+			qrRow.className = 'hesabix-chat-quick-replies-row';
+			qrList.forEach( function ( item ) {
+				if ( ! item || ! item.q ) {
+					return;
+				}
+				var chip = document.createElement( 'button' );
+				chip.type = 'button';
+				chip.className = 'hesabix-chat-quick-chip';
+				chip.textContent = item.q;
+				chip.addEventListener( 'click', function () {
+					pickQuickReply( item.q, item.a || '' );
+				} );
+				qrRow.appendChild( chip );
+			} );
+			if ( qrRow.firstChild ) {
+				var qrWrap = document.createElement( 'div' );
+				qrWrap.className = 'hesabix-chat-quick-replies';
+				var qrTitle = document.createElement( 'div' );
+				qrTitle.className = 'hesabix-chat-quick-replies-title';
+				qrTitle.textContent = sUi.quickRepliesTitle || '';
+				qrWrap.appendChild( qrTitle );
+				qrWrap.appendChild( qrRow );
+				msgBox.appendChild( qrWrap );
+			}
+		}
+		var merged = state.messages.slice();
+		( state.localSyntheticAgentTail || [] ).forEach( function ( syn ) {
+			merged.push( {
+				sender_role: 'agent',
+				body: syn.body,
+				created_at: syn.created_at,
+				_canned: true
+			} );
+		} );
+		merged.sort( function ( a, b ) {
+			var ta = new Date( a.created_at || 0 ).getTime();
+			var tb = new Date( b.created_at || 0 ).getTime();
+			return ta - tb;
+		} );
+		merged.forEach( function ( m ) {
+			if ( m._canned ) {
+				var divS = document.createElement( 'div' );
+				divS.className = 'hesabix-chat-bubble hesabix-chat-bubble--agent hesabix-chat-bubble--canned';
+				var strongS = document.createElement( 'strong' );
+				strongS.textContent = cfg.strings.support;
+				var bodyS = document.createElement( 'div' );
+				bodyS.className = 'hesabix-chat-bubble-body';
+				bodyS.textContent = ( m.body || '' ).toString();
+				bodyS.style.whiteSpace = 'pre-wrap';
+				var smallS = document.createElement( 'small' );
+				smallS.className = 'hesabix-chat-msg-time';
+				smallS.textContent = formatTime( m.created_at );
+				var metaS = document.createElement( 'div' );
+				metaS.className = 'hesabix-chat-bubble-meta hesabix-chat-bubble-meta--agent';
+				var cannedLbl = document.createElement( 'span' );
+				cannedLbl.className = 'hesabix-chat-canned-badge';
+				cannedLbl.textContent = sUi.cannedAnswerLabel || '';
+				metaS.appendChild( cannedLbl );
+				metaS.appendChild( smallS );
+				divS.appendChild( strongS );
+				divS.appendChild( bodyS );
+				divS.appendChild( metaS );
+				msgBox.appendChild( divS );
+				return;
+			}
 			var role = ( m.sender_role || '' ).toString();
 			var div = document.createElement( 'div' );
 			div.className = 'hesabix-chat-bubble hesabix-chat-bubble--' + ( role === 'visitor' ? 'visitor' : 'agent' );
@@ -916,11 +1034,44 @@
 		msgBox.scrollTop = msgBox.scrollHeight;
 	}
 
+	function pickQuickReply( questionText, answerText ) {
+		if ( ! state.session ) {
+			return;
+		}
+		showFormError( errC, '' );
+		postMessage( state.session.conversation_id, state.session.visitor_token, questionText )
+			.then( function () {
+				return refreshMessages();
+			} )
+			.then( function () {
+				var t = Date.now();
+				var lastTs = 0;
+				state.messages.forEach( function ( x ) {
+					var tt = new Date( x.created_at || 0 ).getTime();
+					if ( tt > lastTs ) {
+						lastTs = tt;
+					}
+				} );
+				if ( t <= lastTs ) {
+					t = lastTs + 1;
+				}
+				state.localSyntheticAgentTail.push( {
+					body: answerText,
+					created_at: new Date( t ).toISOString()
+				} );
+				renderMessages();
+			} )
+			.catch( function ( e ) {
+				showFormError( errC, e.message || cfg.strings.errorGeneric );
+			} );
+	}
+
 	function refreshMessages() {
 		if ( ! state.session ) {
 			return;
 		}
 		return listMessages( state.session.conversation_id, state.session.visitor_token, 100 ).then( function ( items ) {
+			maybePlayAgentReplySound( items );
 			state.messages = items;
 			renderMessages();
 			syncMarkAgentRead( items );
@@ -939,6 +1090,9 @@
 
 	function enterFormMode() {
 		state.messages = [];
+		state.localSyntheticAgentTail = [];
+		state.agentSoundPrimed = false;
+		state.lastAgentMsgNotifiedId = 0;
 		msgBox.innerHTML = '';
 		formEl.classList.remove( 'hesabix-chat--hidden' );
 		comp.classList.add( 'hesabix-chat--hidden' );
@@ -1106,10 +1260,58 @@
 		enterFormMode();
 	} );
 
+	function applyLauncherIdleIfNeeded() {
+		if ( ! btn ) {
+			return;
+		}
+		btn.classList.remove( 'hesabix-chat-launcher--idle' );
+		btn.removeAttribute( 'data-hesabix-idle-anim' );
+		var anim = ( cfg.launcherIdleAnimation || 'none' ).toString();
+		if ( state.open || anim === 'none' || ! anim ) {
+			return;
+		}
+		btn.classList.add( 'hesabix-chat-launcher--idle' );
+		btn.setAttribute( 'data-hesabix-idle-anim', anim );
+	}
+
+	function clearLauncherAttentionTimer() {
+		if ( launcherAttentionTimer ) {
+			clearTimeout( launcherAttentionTimer );
+			launcherAttentionTimer = null;
+		}
+	}
+
+	function scheduleLauncherAttention() {
+		clearLauncherAttentionTimer();
+		if ( ! btn ) {
+			return;
+		}
+		var anim = ( cfg.launcherIdleAnimation || 'none' ).toString();
+		if ( anim === 'none' || ! anim ) {
+			return;
+		}
+		btn.classList.remove( 'hesabix-chat-launcher--idle' );
+		btn.removeAttribute( 'data-hesabix-idle-anim' );
+		var d = Number( cfg.launcherAttentionDelaySec );
+		if ( isNaN( d ) || d < 0 ) {
+			d = 0;
+		}
+		if ( d > 600 ) {
+			d = 600;
+		}
+		launcherAttentionTimer = setTimeout( function () {
+			launcherAttentionTimer = null;
+			applyLauncherIdleIfNeeded();
+		}, d * 1000 );
+	}
+
 	function setOpen( v ) {
 		state.open = v;
 		btn.setAttribute( 'aria-expanded', v ? 'true' : 'false' );
 		if ( v ) {
+			clearLauncherAttentionTimer();
+			btn.classList.remove( 'hesabix-chat-launcher--idle' );
+			btn.removeAttribute( 'data-hesabix-idle-anim' );
 			panel.classList.remove( 'hesabix-chat--hidden' );
 			( function () {
 				var st = ( typeof getComputedStyle === 'function' ) ? getComputedStyle( panel ) : null;
@@ -1132,6 +1334,7 @@
 			panel.classList.add( 'hesabix-chat--hidden' );
 			chatLogV( 'پنل بسته' );
 			unbindRealtime();
+			applyLauncherIdleIfNeeded();
 		}
 	}
 
@@ -1149,4 +1352,20 @@
 			setOpen( false );
 		}
 	} );
+
+	scheduleLauncherAttention();
+
+	var opl = cfg.openPanelOnLoad;
+	if ( opl === true || opl === 1 || opl === '1' ) {
+		var odl = Number( cfg.openPanelDelaySec );
+		if ( isNaN( odl ) || odl < 0 ) {
+			odl = 0;
+		}
+		if ( odl > 120 ) {
+			odl = 120;
+		}
+		setTimeout( function () {
+			setOpen( true );
+		}, odl * 1000 );
+	}
 } )();

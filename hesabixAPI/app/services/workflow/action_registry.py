@@ -90,6 +90,7 @@ class ActionRegistry:
             UpdateLeadAction,
             UpdateDealAction,
             CrmLinkDealDocumentAction,
+            CrmWebChatSendMessageAction,
         )
         from app.services.workflow.actions.backup_action import BusinessBackupAction
         from app.services.workflow.actions.hesabix_query_actions import (
@@ -133,6 +134,7 @@ class ActionRegistry:
         self.register("crm_update_lead", UpdateLeadAction())
         self.register("crm_update_deal", UpdateDealAction())
         self.register("crm_link_deal_document", CrmLinkDealDocumentAction())
+        self.register("crm_web_chat_send_message", CrmWebChatSendMessageAction())
 
         # HTTP actions
         self.register("http_request", HttpRequestAction())

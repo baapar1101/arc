@@ -171,55 +171,66 @@ def telegram_webhook(
 	# پردازش پیام‌های AI Chat
 	if "message" in payload:
 		message = payload["message"]
-		# فقط پیام‌های متنی را پردازش می‌کنیم (نه دستورات /start و /unlink)
-		text = message.get("text", "").strip()
-		if text and not text.startswith("/"):
-			# پردازش پیام به عنوان سوال از AI
-			from app.services.telegram_ai_chat_handler import handle_telegram_message
-			import asyncio
-			chat = message.get("chat", {})
-			chat_id = chat.get("id")
-			try:
-				# استفاده از asyncio.run برای ایجاد event loop جدید
-				result = asyncio.run(handle_telegram_message(message, db, provider))
-				if not result and chat_id:
-					logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
-			except RuntimeError:
-				# اگر event loop از قبل وجود دارد، از get_event_loop استفاده می‌کنیم
-				try:
-					loop = asyncio.get_event_loop()
-					if loop.is_running():
-						# اگر loop در حال اجرا است، از create_task استفاده می‌کنیم
-						import concurrent.futures
-						with concurrent.futures.ThreadPoolExecutor() as executor:
-							future = executor.submit(asyncio.run, handle_telegram_message(message, db, provider))
-							result = future.result(timeout=60)
-							if not result and chat_id:
-								logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
-					else:
-						result = loop.run_until_complete(handle_telegram_message(message, db, provider))
+		chat = message.get("chat", {})
+		chat_id_inner = chat.get("id")
+		# پل اپراتور (چت وب CRM و فلوهای بعدی)
+		if chat_id_inner:
+			from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
+
+			if dispatch_operator_messenger_message(
+				db,
+				platform="telegram",
+				message=message,
+				send_text=lambda t, _cid=int(chat_id_inner): provider.send_text(chat_id=_cid, text=t),
+			):
+				pass
+			else:
+				# فقط پیام‌های متنی را به AI بفرست (نه دستورات /)
+				text_ai = message.get("text", "").strip()
+				if text_ai and not text_ai.startswith("/"):
+					from app.services.telegram_ai_chat_handler import handle_telegram_message
+					import asyncio
+
+					chat_id = chat_id_inner
+					try:
+						result = asyncio.run(handle_telegram_message(message, db, provider))
 						if not result and chat_id:
 							logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
-				except Exception as e:
-					logger.error(f"Error handling telegram message: {e}", exc_info=True)
-					if chat_id:
+					except RuntimeError:
 						try:
-							provider.send_text(
-								chat_id=chat_id,
-								text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید."
-							)
-						except Exception as send_error:
-							logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
-			except Exception as e:
-				logger.error(f"Error handling telegram message: {e}", exc_info=True)
-				if chat_id:
-					try:
-						provider.send_text(
-							chat_id=chat_id,
-							text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید."
-						)
-					except Exception as send_error:
-						logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
+							loop = asyncio.get_event_loop()
+							if loop.is_running():
+								import concurrent.futures
+
+								with concurrent.futures.ThreadPoolExecutor() as executor:
+									future = executor.submit(asyncio.run, handle_telegram_message(message, db, provider))
+									result = future.result(timeout=60)
+									if not result and chat_id:
+										logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
+							else:
+								result = loop.run_until_complete(handle_telegram_message(message, db, provider))
+								if not result and chat_id:
+									logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
+						except Exception as e:
+							logger.error(f"Error handling telegram message: {e}", exc_info=True)
+							if chat_id:
+								try:
+									provider.send_text(
+										chat_id=chat_id,
+										text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید.",
+									)
+								except Exception as send_error:
+									logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
+					except Exception as e:
+						logger.error(f"Error handling telegram message: {e}", exc_info=True)
+						if chat_id:
+							try:
+								provider.send_text(
+									chat_id=chat_id,
+									text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید.",
+								)
+							except Exception as send_error:
+								logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
 	
 	# پردازش Callback Query (فشار دادن دکمه)
 	if "callback_query" in payload:

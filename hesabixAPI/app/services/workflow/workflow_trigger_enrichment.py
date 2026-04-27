@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.crm_chat import CrmChatConversation
 
 logger = logging.getLogger(__name__)
 
@@ -168,3 +169,25 @@ def build_document_trigger_enrichment(
         out["person_id"] = min(person_ids)
 
     return {k: v for k, v in out.items() if v is not None and v != ""}
+
+
+def build_crm_chat_visitor_message_trigger_enrichment(
+    db: Session,
+    business_id: int,
+    conversation_id: int,
+) -> Dict[str, Any]:
+    """فیلدهای مکالمه/بازدیدکننده برای تریگر پیام دریافتی چت وب."""
+    c = db.query(CrmChatConversation).filter(CrmChatConversation.id == int(conversation_id)).first()
+    if not c or int(c.business_id) != int(business_id):
+        return {}
+    return {
+        "visitor_first_name": c.visitor_first_name,
+        "visitor_last_name": c.visitor_last_name,
+        "visitor_email": c.visitor_email or "",
+        "visitor_phone": c.visitor_phone,
+        "conversation_status": c.status,
+        "assigned_to_user_id": c.assigned_to_user_id,
+        "lead_id": c.lead_id,
+        "person_id": c.person_id,
+        "page_url": c.page_url,
+    }

@@ -2,7 +2,7 @@
 Actionهای مربوط به CRM (سرنخ، فرصت فروش، فعالیت)
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime, date
 from decimal import Decimal
 from app.services.workflow.action_registry import ActionHandler
@@ -627,3 +627,141 @@ class CrmLinkDealDocumentAction(ActionHandler):
         deal.document_id = int(document_id)
         db.flush()
         return {"success": True, "deal_id": deal.id, "document_id": int(document_id)}
+
+
+class CrmWebChatSendMessageAction(ActionHandler):
+    """ارسال پیام عامل در چت وب CRM (همان کانال پنل / ویجت)."""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "ارسال پیام در چت وب CRM",
+            "description": (
+                "پیام متنی (یا فایل پیوست‌شده) را به عنوان عامل در همان مکالمه چت وب ارسال می‌کند؛ "
+                "بازدیدکننده در ویجت آن را فوراً می‌بیند. پیش‌فرض: بدون شلیک ورک‌فلو روی «پاسخ عامل» تا از حلقه جلوگیری شود."
+            ),
+            "config_schema": {
+                "conversation_id": {
+                    "type": "integer",
+                    "description": "شناسه مکالمه (مثلاً از نود تریگر: $trigger_node.conversation_id)",
+                    "required": True,
+                },
+                "body": {
+                    "type": "string",
+                    "description": "متن پیام (برای پیام فقط‌فایل می‌تواند خالی باشد اگر file_storage_id باشد)",
+                    "required": False,
+                },
+                "file_storage_id": {
+                    "type": "string",
+                    "description": "شناسه فایل پیوست (اختیاری، همان فضای فایل کسب‌وکار)",
+                    "required": False,
+                },
+                "agent_user_id": {
+                    "type": "integer",
+                    "description": "کاربر ارسال‌کننده در سیستم؛ اگر خالی باشد از اجراکننده ورک‌فلو یا مالک کسب‌وکار استفاده می‌شود",
+                    "required": False,
+                },
+                "fire_message_sent_workflow_trigger": {
+                    "type": "boolean",
+                    "description": "در صورت true تریگر crm.chat.message.sent هم اجرا می‌شود (احتیاط: حلقه ورک‌فلو)",
+                    "default": False,
+                    "required": False,
+                },
+                "mark_as_workflow_automation": {
+                    "type": "boolean",
+                    "description": "اگر fire_message_sent_workflow_trigger فعال باشد، automation_source=workflow به payload تریگر اضافه می‌شود",
+                    "default": True,
+                    "required": False,
+                },
+            },
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from app.services.workflow.dry_run import dry_run_skip
+        from app.services.workflow.workflow_engine import WorkflowEngine
+        from app.services import crm_chat_service as chat_svc
+        from app.services.async_isolated import run_coroutine_isolated
+        from app.core.responses import ApiError
+        from adapters.db.models.business import Business
+
+        sk = dry_run_skip(context, "ارسال پیام چت وب CRM")
+        if sk is not None:
+            return sk
+
+        db = context.get("db")
+        business_id = context.get("business_id")
+        if not db or business_id is None:
+            return {"success": False, "error": "db or business_id missing in context"}
+
+        conversation_id = WorkflowEngine._resolve_value_static(config.get("conversation_id"), context, node_results)
+        if conversation_id is None:
+            return {"success": False, "error": "conversation_id is required"}
+        body_raw = WorkflowEngine._resolve_value_static(config.get("body"), context, node_results)
+        body: Optional[str] = str(body_raw).strip() if body_raw is not None else None
+        if body == "":
+            body = None
+        file_storage_id = WorkflowEngine._resolve_value_static(config.get("file_storage_id"), context, node_results)
+        if file_storage_id is not None:
+            file_storage_id = str(file_storage_id).strip() or None
+
+        if not body and not file_storage_id:
+            return {"success": False, "error": "body or file_storage_id is required"}
+
+        agent_uid = WorkflowEngine._resolve_value_static(config.get("agent_user_id"), context, node_results)
+        if agent_uid is not None:
+            agent_uid = int(agent_uid)
+        else:
+            uid = context.get("user_id")
+            if uid:
+                agent_uid = int(uid)
+            else:
+                biz = db.query(Business).filter(Business.id == business_id).first()
+                agent_uid = int(biz.owner_id) if biz and biz.owner_id else None
+        if not agent_uid:
+            return {"success": False, "error": "agent_user_id or business owner required"}
+
+        fire_sent = bool(config.get("fire_message_sent_workflow_trigger", False))
+        mark_auto = bool(config.get("mark_as_workflow_automation", True))
+        automation_context: Optional[Dict[str, Any]] = None
+        if fire_sent and mark_auto:
+            automation_context = {
+                "automation_source": "workflow",
+                "workflow_id": context.get("workflow_id"),
+                "workflow_execution_id": context.get("execution_id"),
+            }
+
+        async def _run() -> Dict[str, Any]:
+            return await chat_svc.post_agent_message(
+                db,
+                business_id=int(business_id),
+                conversation_id=int(conversation_id),
+                body=body,
+                user_id=int(agent_uid),
+                file_storage_id=file_storage_id,
+                fire_workflow_trigger_message_sent=fire_sent,
+                automation_context=automation_context,
+            )
+
+        try:
+            msg = run_coroutine_isolated(lambda: _run())
+        except ApiError as e:
+            detail = e.detail
+            if isinstance(detail, dict):
+                err = detail.get("error")
+                if isinstance(err, dict):
+                    return {"success": False, "error": err.get("message", str(err)), "code": err.get("code")}
+            return {"success": False, "error": str(detail)}
+        except Exception as ex:
+            return {"success": False, "error": str(ex)}
+
+        return {
+            "success": True,
+            "message": msg,
+            "message_id": msg.get("id"),
+            "conversation_id": int(conversation_id),
+        }

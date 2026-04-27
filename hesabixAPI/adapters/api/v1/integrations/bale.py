@@ -162,4 +162,16 @@ def bale_webhook(
 		provider.send_text(chat_id=int(chat_id), text="اتصال بله شما قطع شد.")
 		return {"ok": True}
 
+	# پل اپراتور (چت وب CRM و فلوهای بعدی)
+	if chat_id and message:
+		from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
+
+		if dispatch_operator_messenger_message(
+			db,
+			platform="bale",
+			message=message,
+			send_text=lambda t, _cid=int(chat_id): provider.send_text(chat_id=_cid, text=t),
+		):
+			return {"ok": True}
+
 	return {"ok": True}

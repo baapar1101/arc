@@ -23,6 +23,7 @@ from adapters.db.models.file_storage import FileStorage
 from app.core.responses import ApiError
 from app.services.crm_chat_realtime import crm_chat_realtime_manager
 from app.services.file_storage_service import FileStorageService
+from app.services.workflow.workflow_trigger_enrichment import build_crm_chat_visitor_message_trigger_enrichment
 from app.services.workflow.workflow_trigger_service import trigger_workflows
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,27 @@ def _fire(
 		trigger_workflows(db, business_id, trigger_type, trigger_data, user_id)
 	except Exception:
 		logger.exception("crm chat workflow trigger failed type=%s business_id=%s", trigger_type, business_id)
+
+
+def _visitor_message_workflow_payload(
+	db: Session,
+	business_id: int,
+	c: CrmChatConversation,
+	msg: CrmChatMessage,
+	text: str,
+	file_storage_id: Optional[str] = None,
+) -> Dict[str, Any]:
+	payload: Dict[str, Any] = {
+		"conversation_id": c.id,
+		"widget_id": c.widget_id,
+		"message_id": msg.id,
+		"body": text,
+		"sender_role": "visitor",
+	}
+	if file_storage_id:
+		payload["file_storage_id"] = file_storage_id
+	payload.update(build_crm_chat_visitor_message_trigger_enrichment(db, business_id, c.id))
+	return payload
 
 
 def widget_to_dict(w: CrmChatWidget) -> Dict[str, Any]:
@@ -420,13 +442,7 @@ async def post_visitor_message(
 		db,
 		c.business_id,
 		"crm.chat.message.received",
-		{
-			"conversation_id": c.id,
-			"widget_id": c.widget_id,
-			"message_id": msg.id,
-			"body": text,
-			"sender_role": "visitor",
-		},
+		_visitor_message_workflow_payload(db, c.business_id, c, msg, text),
 	)
 
 	return _message_to_dict_enriched(db, msg)
@@ -545,14 +561,7 @@ async def post_visitor_file(
 		db,
 		c.business_id,
 		"crm.chat.message.received",
-		{
-			"conversation_id": c.id,
-			"widget_id": c.widget_id,
-			"message_id": msg.id,
-			"body": text,
-			"sender_role": "visitor",
-			"file_storage_id": fid,
-		},
+		_visitor_message_workflow_payload(db, c.business_id, c, msg, text, file_storage_id=fid),
 	)
 
 	return _message_to_dict_enriched(db, msg)
@@ -566,6 +575,8 @@ async def post_agent_message(
 	body: Optional[str],
 	user_id: int,
 	file_storage_id: Optional[str] = None,
+	fire_workflow_trigger_message_sent: bool = True,
+	automation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 	c = _get_conversation_business(db, business_id, conversation_id)
 	fid: Optional[str] = None
@@ -603,20 +614,18 @@ async def post_agent_message(
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
-	_fire(
-		db,
-		business_id,
-		"crm.chat.message.sent",
-		{
+	if fire_workflow_trigger_message_sent:
+		sent_payload: Dict[str, Any] = {
 			"conversation_id": c.id,
 			"widget_id": c.widget_id,
 			"message_id": msg.id,
 			"body": text_combined,
 			"sender_role": "agent",
 			"agent_user_id": user_id,
-		},
-		user_id,
-	)
+		}
+		if automation_context:
+			sent_payload.update(automation_context)
+		_fire(db, business_id, "crm.chat.message.sent", sent_payload, user_id)
 
 	return _message_to_dict_enriched(db, msg)
 

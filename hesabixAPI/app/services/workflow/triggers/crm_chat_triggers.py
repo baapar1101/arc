@@ -60,11 +60,27 @@ class ChatMessageSentTrigger(BaseTrigger):
 				"enabled": {"type": "boolean", "default": True, "required": False},
 				"widget_id_filter": {"type": "integer", "required": False},
 				"cooldown_seconds": {"type": "integer", "default": 0, "required": False},
+				"ignore_workflow_automation": {
+					"type": "boolean",
+					"default": False,
+					"required": False,
+					"description": "اگر فعال باشد، پیام‌های ارسال‌شده توسط ورک‌فلو (اتوماسیون) اجرا نمی‌شوند",
+				},
+				"ignore_operator_relay": {
+					"type": "boolean",
+					"default": False,
+					"required": False,
+					"description": "اگر فعال باشد، پاسخ‌های ارسالی از تلگرام/بله (پل اپراتور) تریگر نمی‌شوند",
+				},
 			},
 		}
 
 	def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
 		td = context.get("trigger_data", {})
+		if config.get("ignore_workflow_automation") and td.get("automation_source") == "workflow":
+			return {}
+		if config.get("ignore_operator_relay") and td.get("operator_relay") is True:
+			return {}
 		if config.get("widget_id_filter") is not None:
 			if td.get("widget_id") != config.get("widget_id_filter"):
 				return {}

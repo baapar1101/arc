@@ -1004,6 +1004,8 @@ async def get_actions_metadata(
             translation_context = "ai_agent"
         elif action_key == "business_backup":
             translation_context = "business_backup"
+        elif action_key == "crm_web_chat_send_message":
+            translation_context = "crm_web_chat_send_message"
         elif "invoice" in action_key and "create" in action_key:
             translation_context = "create_invoice"
         elif "bale" in action_key:
@@ -1050,7 +1052,10 @@ async def get_workflow_translations(
         BUSINESS_BACKUP_TRANSLATIONS,
     )
     from app.services.workflow.i18n.hesabix_data_actions_i18n import WORKFLOW_ACTION_TRANSLATIONS
-    from app.services.workflow.i18n.workflow_translations import TRIGGER_TRANSLATIONS_BY_KEY
+    from app.services.workflow.i18n.workflow_translations import (
+        TRIGGER_TRANSLATIONS_BY_KEY,
+        CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS,
+    )
 
     all_translations: dict = {}
     all_translations.update(COMMON_TRANSLATIONS.get(lang, {}))
@@ -1059,6 +1064,7 @@ async def get_workflow_translations(
     all_translations["send_email"] = SEND_EMAIL_TRANSLATIONS.get(lang, {})
     all_translations["others"] = OTHER_ACTIONS_TRANSLATIONS.get(lang, {})
     all_translations["business_backup"] = BUSINESS_BACKUP_TRANSLATIONS.get(lang, {})
+    all_translations["crm_web_chat_send_message"] = CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS.get(lang, {})
 
     for _tk, _bundle in TRIGGER_TRANSLATIONS_BY_KEY.items():
         all_translations[_tk] = _bundle.get(lang, {})

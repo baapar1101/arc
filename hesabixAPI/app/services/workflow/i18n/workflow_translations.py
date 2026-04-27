@@ -926,6 +926,41 @@ BUSINESS_BACKUP_TRANSLATIONS = {
     },
 }
 
+CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS = {
+    "fa": {
+        "action_name": "ارسال پیام در چت وب CRM",
+        "action_description": "ارسال پاسخ عامل در همان مکالمه چت وب (ویجت). پیش‌فرض بدون تریگر «پاسخ عامل» برای جلوگیری از حلقه اتوماسیون.",
+        "field_conversation_id": "شناسه مکالمه",
+        "field_conversation_id_desc": "معمولاً از نود تریگر: $id_nod_trigger.conversation_id",
+        "field_body": "متن پیام",
+        "field_body_desc": "متن قابل حل با $node.field؛ برای پیام فقط فایل می‌تواند خالی باشد",
+        "field_file_storage_id": "شناسه فایل پیوست",
+        "field_file_storage_id_desc": "اختیاری؛ همان شناسه file_storage در سیستم",
+        "field_agent_user_id": "کاربر عامل",
+        "field_agent_user_id_desc": "خالی = مالک کسب‌وکار یا کاربر اجراکننده ورک‌فلو",
+        "field_fire_message_sent_workflow_trigger": "شلیک تریگر پاسخ عامل",
+        "field_fire_message_sent_workflow_trigger_desc": "اگر روشن باشد، ورک‌فلوهایی با تریگر «پاسخ عامل» هم اجرا می‌شوند (احتمال حلقه)",
+        "field_mark_as_workflow_automation": "علامت اتوماسیون ورک‌فلو",
+        "field_mark_as_workflow_automation_desc": "در payload تریگر، automation_source=workflow برای فیلتر در تریگر",
+    },
+    "en": {
+        "action_name": "Send CRM web chat message",
+        "action_description": "Post an agent reply in the same web chat conversation (widget). Default: do not fire the agent-reply workflow trigger to avoid automation loops.",
+        "field_conversation_id": "Conversation ID",
+        "field_conversation_id_desc": "Usually from trigger node: $trigger_node.conversation_id",
+        "field_body": "Message body",
+        "field_body_desc": "Resolvable text; may be empty if only sending file_storage_id",
+        "field_file_storage_id": "Attachment file ID",
+        "field_file_storage_id_desc": "Optional file_storage id",
+        "field_agent_user_id": "Agent user",
+        "field_agent_user_id_desc": "Empty = business owner or workflow runner",
+        "field_fire_message_sent_workflow_trigger": "Fire agent-reply trigger",
+        "field_fire_message_sent_workflow_trigger_desc": "If true, workflows on agent message sent may run (loop risk)",
+        "field_mark_as_workflow_automation": "Mark as workflow automation",
+        "field_mark_as_workflow_automation_desc": "When firing trigger, set automation_source=workflow for filtering",
+    },
+}
+
 TRIGGER_TRANSLATIONS_BY_KEY: Dict[str, Any] = {
     "receipt_payment.created": RECEIPT_PAYMENT_CREATED_TRANSLATIONS,
     "receipt_payment.updated": RECEIPT_PAYMENT_UPDATED_TRANSLATIONS,
@@ -978,6 +1013,7 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
             "send_email": SEND_EMAIL_TRANSLATIONS,
             "ai_agent": AI_AGENT_TRANSLATIONS,
             "business_backup": BUSINESS_BACKUP_TRANSLATIONS,
+            "crm_web_chat_send_message": CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS,
             "others": OTHER_ACTIONS_TRANSLATIONS,
         }
         
