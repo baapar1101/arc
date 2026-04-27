@@ -166,6 +166,10 @@ class Hesabix_Chat_Admin {
 		$sound_ok = self::list_agent_reply_sound_files();
 		$resolved = self::resolve_agent_reply_sound_choice( (string) ( $out['agent_reply_sound'] ?? '' ), $sound_ok );
 		$out['agent_reply_sound'] = $resolved;
+		$allowed_th               = array( 'light', 'dark', 'cream', 'ocean', 'midnight' );
+		if ( ! in_array( (string) ( $out['theme'] ?? 'light' ), $allowed_th, true ) ) {
+			$out['theme'] = 'light';
+		}
 		return $out;
 	}
 
@@ -305,7 +309,9 @@ class Hesabix_Chat_Admin {
 		$pr = isset( $input['ui_preset'] ) ? (string) $input['ui_preset'] : 'default';
 		$out['ui_preset'] = in_array( $pr, array( 'default', 'minimal', 'colorful' ), true ) ? $pr : 'default';
 
-		$out['theme'] = ( isset( $input['theme'] ) && 'dark' === $input['theme'] ) ? 'dark' : 'light';
+		$th = isset( $input['theme'] ) ? (string) $input['theme'] : (string) $defaults['theme'];
+		$allowed_themes = array( 'light', 'dark', 'cream', 'ocean', 'midnight' );
+		$out['theme']   = in_array( $th, $allowed_themes, true ) ? $th : 'light';
 
 		$out['panel_width']  = $this->int_range( $input['panel_width'] ?? null, 280, 560, (int) $defaults['panel_width'] );
 		$out['panel_height'] = $this->int_range( $input['panel_height'] ?? null, 320, 800, (int) $defaults['panel_height'] );
@@ -417,6 +423,17 @@ class Hesabix_Chat_Admin {
 					.hesabix-chat-settings-tabs { margin: 1em 0 0; padding-top: 4px; }
 					.hesabix-chat-tab-panel { margin-top: 0.5em; }
 					.hesabix-chat-tab-panel[hidden] { display: none !important; }
+					.hesabix-chat-settings-submit-wrap {
+						margin-top: 1.5em;
+						padding: 14px 0 6px;
+						border-top: 1px solid #c3c4c7;
+						position: sticky;
+						bottom: 0;
+						background: #fff;
+						box-shadow: 0 -6px 16px rgba( 0, 0, 0, 0.06 );
+						z-index: 100;
+					}
+					.hesabix-chat-settings-submit-wrap .submit { margin: 0; padding: 0; }
 				</style>
 				<h2 class="nav-tab-wrapper hesabix-chat-settings-tabs wp-clearfix">
 					<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e( 'اتصال', 'hesabix-chat' ); ?></a>
@@ -566,8 +583,11 @@ class Hesabix_Chat_Admin {
 						<th scope="row"><label for="hesabix_theme"><?php esc_html_e( 'تم پنل', 'hesabix-chat' ); ?></label></th>
 						<td>
 							<select name="<?php echo esc_attr( self::OPTION_NAME . '[theme]' ); ?>" id="hesabix_theme">
-								<option value="light" <?php selected( $o['theme'], 'light' ); ?>><?php esc_html_e( 'روشن', 'hesabix-chat' ); ?></option>
+								<option value="light" <?php selected( $o['theme'], 'light' ); ?>><?php esc_html_e( 'روشن (پیش‌فرض)', 'hesabix-chat' ); ?></option>
 								<option value="dark" <?php selected( $o['theme'], 'dark' ); ?>><?php esc_html_e( 'تاریک', 'hesabix-chat' ); ?></option>
+								<option value="cream" <?php selected( $o['theme'], 'cream' ); ?>><?php esc_html_e( 'کرمی / گرم', 'hesabix-chat' ); ?></option>
+								<option value="ocean" <?php selected( $o['theme'], 'ocean' ); ?>><?php esc_html_e( 'آبی اقیانوسی', 'hesabix-chat' ); ?></option>
+								<option value="midnight" <?php selected( $o['theme'], 'midnight' ); ?>><?php esc_html_e( 'نیمه‌شب (تیرهٔ عمیق)', 'hesabix-chat' ); ?></option>
 							</select>
 						</td>
 					</tr>
@@ -729,7 +749,10 @@ class Hesabix_Chat_Admin {
 						</td>
 					</tr>
 				</table>
-				<?php submit_button(); ?>
+				</div>
+				<div class="hesabix-chat-settings-submit-wrap">
+					<?php submit_button(); ?>
+				</div>
 			</form>
 		</div>
 		<?php

@@ -4278,6 +4278,28 @@
   "crmWebChatRefreshTooltip": "Reload",
   "crmWebChatFilterStatusLabel": "Status filter",
   "crmWebChatFilterAll": "All",
+  "crmWebChatFilterLongPressHint": "To delete conversations in bulk, press and hold the status filter title.",
+  "crmWebChatCrmSettingsWidgetsIntro": "Manage the public key, allowed domains, and visitor file upload for each widget.",
+  "crmWebChatCrmSettingsNoWidgets": "No widgets yet. Create one with the button below.",
+  "crmWebChatAddWidgetButton": "New widget",
+  "crmWebChatBulkDeleteTitle": "Delete conversations in bulk",
+  "crmWebChatBulkDeleteConfirmAll": "All conversations and messages for this business will be permanently deleted. This cannot be undone. Continue?",
+  "crmWebChatBulkDeleteConfirmStatus": "All conversations with status «{statusLabel}» and their messages will be permanently deleted. This cannot be undone. Continue?",
+  "@crmWebChatBulkDeleteConfirmStatus": {
+    "placeholders": {
+      "statusLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatBulkDeleteDone": "{count} conversation(s) deleted",
+  "@crmWebChatBulkDeleteDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "crmWebChatWidgetsSectionTitle": "Chat widgets",
   "crmWebChatWidgetsSectionHint": "Use edit for the public key and to disable file upload per site.",
   "crmWebChatVisitorAttachmentCrmOff": "Visitor attachments: off (enable in CRM settings first).",

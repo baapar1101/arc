@@ -372,6 +372,9 @@
 		usePoll: false,
 		agentTyping: false,
 		agentTypingTimer: null,
+		agentTypingName: '',
+		seenAgentJoinIds: {},
+		agentJoinBannerText: '',
 		visitorTypingSendTimer: null,
 		visitorTypingStopTimer: null
 	};
@@ -414,7 +417,20 @@
 	if ( [ 'default', 'minimal', 'colorful' ].indexOf( uiPreset ) < 0 ) {
 		uiPreset = 'default';
 	}
-	root.className = 'hesabix-chat-root hesabix-chat--theme-' + ( cfg.theme === 'dark' ? 'dark' : 'light' ) + ' hesabix-chat--preset-' + uiPreset;
+	var themeKey = ( cfg.theme && cfg.theme.toString() ) || 'light';
+	var themeClasses;
+	if ( themeKey === 'cream' ) {
+		themeClasses = [ 'hesabix-chat--theme-light', 'hesabix-chat--theme-cream' ];
+	} else if ( themeKey === 'ocean' ) {
+		themeClasses = [ 'hesabix-chat--theme-light', 'hesabix-chat--theme-ocean' ];
+	} else if ( themeKey === 'midnight' ) {
+		themeClasses = [ 'hesabix-chat--theme-dark', 'hesabix-chat--theme-midnight' ];
+	} else if ( themeKey === 'dark' ) {
+		themeClasses = [ 'hesabix-chat--theme-dark' ];
+	} else {
+		themeClasses = [ 'hesabix-chat--theme-light' ];
+	}
+	root.className = 'hesabix-chat-root ' + themeClasses.join( ' ' ) + ' hesabix-chat--preset-' + uiPreset;
 	root.setAttribute( 'dir', cfg.dir || 'rtl' );
 	root.style.setProperty( '--hesabix-btn', cfg.buttonColor );
 	root.style.setProperty( '--hesabix-btn-txt', cfg.buttonTextColor );
@@ -492,7 +508,14 @@
 	btnNew.title = cfg.strings.newChatHint;
 	var btnClose = document.createElement( 'button' );
 	btnClose.type = 'button';
-	btnClose.textContent = cfg.strings.close;
+	btnClose.className = 'hesabix-chat-header-close';
+	btnClose.setAttribute( 'aria-label', cfg.strings.close || '' );
+	btnClose.setAttribute(
+		'title',
+		( cfg.strings.closeTooltip && String( cfg.strings.closeTooltip ) ) || ( cfg.strings.close || '' )
+	);
+	btnClose.innerHTML =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 	hact.appendChild( wsConnLabel );
 	hact.appendChild( btnNew );
 	hact.appendChild( btnClose );
@@ -597,11 +620,10 @@
 			panel.style.setProperty( vnm, root.style.getPropertyValue( vnm ) );
 		}
 		panel.setAttribute( 'dir', root.getAttribute( 'dir' ) || 'rtl' );
-		panel.classList.add(
-			cfg.theme === 'dark' ? 'hesabix-chat--theme-dark' : 'hesabix-chat--theme-light',
-			'hesabix-chat--preset-' + uiPreset,
-			'hesabix-chat-panel--portaled'
-		);
+		for ( var ti = 0; ti < themeClasses.length; ti++ ) {
+			panel.classList.add( themeClasses[ ti ] );
+		}
+		panel.classList.add( 'hesabix-chat--preset-' + uiPreset, 'hesabix-chat-panel--portaled' );
 		wrap.removeChild( panel );
 		document.body.appendChild( panel );
 	}
@@ -696,31 +718,55 @@
 		}
 	}
 
+	function ensureWsConnDot() {
+		var dot = wsConnLabel.querySelector( '.hesabix-chat-ws-dot' );
+		if ( ! dot ) {
+			dot = document.createElement( 'span' );
+			dot.className = 'hesabix-chat-ws-dot';
+			dot.setAttribute( 'aria-hidden', 'true' );
+			wsConnLabel.appendChild( dot );
+		}
+		return dot;
+	}
+
 	function updateWsConn( code ) {
 		var s = ( cfg.strings && cfg.strings ) || {};
 		var isRtl = ( ( cfg.dir || 'rtl' ) + '' ) === 'rtl';
 		if ( ! wsConnLabel ) {
 			return;
 		}
+		wsConnLabel.textContent = '';
+		ensureWsConnDot();
 		if ( code === 'connecting' ) {
 			wsConnLabel.className = 'hesabix-chat-ws-conn hesabix-chat-ws-conn--connecting';
-			wsConnLabel.textContent = s.wsConnecting || ( isRtl ? 'در حال اتصال…' : 'Connecting…' );
-			wsConnLabel.title = wsConnLabel.textContent;
+			var tCon = s.wsConnecting || ( isRtl ? 'در حال اتصال…' : 'Connecting…' );
+			wsConnLabel.title = tCon;
+			wsConnLabel.setAttribute( 'aria-label', tCon );
 		} else if ( code === 'live' ) {
 			wsConnLabel.className = 'hesabix-chat-ws-conn hesabix-chat-ws-conn--live';
-			wsConnLabel.textContent = s.wsLive || ( isRtl ? 'زنده' : 'Live' );
-			wsConnLabel.title = s.wsLiveHint || s.wsLive || ( isRtl ? 'اتصال بلادرنگ برقرار است' : 'Real-time link active' );
+			var tLive = s.wsLiveHint || s.wsLive || ( isRtl ? 'اتصال لحظه‌ای برقرار است' : 'Real-time link active' );
+			wsConnLabel.title = tLive;
+			wsConnLabel.setAttribute( 'aria-label', tLive );
 		} else {
 			wsConnLabel.className = 'hesabix-chat-ws-conn hesabix-chat-ws-conn--offline';
-			wsConnLabel.textContent = s.wsOffline || ( isRtl ? 'غیرزنده' : 'Offline' );
-			wsConnLabel.title = s.wsOfflineHint || s.wsOffline || ( isRtl ? 'فقط وقفهٔ اعلان؛ پیام هنوز ارسال می‌شود' : 'Polling; messages still work' );
+			var tOff = s.wsOfflineHint || s.wsOffline || ( isRtl ? 'به‌روزرسانی ممکن است با تأخیر باشد' : 'Polling; messages still work' );
+			wsConnLabel.title = tOff;
+			wsConnLabel.setAttribute( 'aria-label', tOff );
 		}
 	}
 
 	function updatePeerTypingUI() {
 		var s2 = ( cfg.strings && cfg.strings ) || {};
 		var isRtl2 = ( ( cfg.dir || 'rtl' ) + '' ) === 'rtl';
-		var t = s2.agentTyping || ( isRtl2 ? 'پشتیبان در حال تایپ…' : 'Support is typing…' );
+		var fallback = s2.agentTyping || ( isRtl2 ? 'پشتیبان در حال تایپ…' : 'Support is typing…' );
+		var name = ( state.agentTypingName || '' ).trim();
+		var tpl = s2.agentTypingNamed;
+		var t = fallback;
+		if ( name && tpl ) {
+			t = tpl.replace( /\%s/g, name );
+		} else if ( name ) {
+			t = name + ( isRtl2 ? ' در حال تایپ است…' : ' is typing…' );
+		}
 		if ( state.agentTyping && peerTypingEl && t ) {
 			peerTypingEl.textContent = t;
 			peerTypingEl.classList.remove( 'hesabix-chat--hidden' );
@@ -841,13 +887,31 @@
 						state.agentTypingTimer = null;
 					}
 					state.agentTyping = Boolean( msg.active );
+					state.agentTypingName = msg.active
+						? ( ( msg.actor_name && String( msg.actor_name ) ) || '' ).trim()
+						: '';
 					updatePeerTypingUI();
 					if ( state.agentTyping ) {
 						state.agentTypingTimer = setTimeout( function () {
 							state.agentTypingTimer = null;
 							state.agentTyping = false;
+							state.agentTypingName = '';
 							updatePeerTypingUI();
 						}, 4000 );
+					}
+				}
+				return;
+			}
+			if ( msg.type === 'crm_chat.event' && msg.event === 'agent.joined' ) {
+				if ( +msg.conversation_id === +convId && msg.agent ) {
+					var ag = msg.agent;
+					var aid = ag.id != null ? String( ag.id ) : '';
+					var aname = ( ag.name && String( ag.name ).trim() ) || '';
+					var tplJ = ( cfg.strings && cfg.strings.agentJoinedNotice ) || '';
+					if ( aname && aid && ! state.seenAgentJoinIds[ aid ] ) {
+						state.seenAgentJoinIds[ aid ] = 1;
+						state.agentJoinBannerText = tplJ ? tplJ.replace( /\%s/g, aname ) : aname + ' وارد گفتگو شد';
+						renderMessages();
 					}
 				}
 				return;
@@ -945,6 +1009,13 @@
 				msgBox.appendChild( qrWrap );
 			}
 		}
+		if ( state.agentJoinBannerText ) {
+			var noticeEl = document.createElement( 'div' );
+			noticeEl.className = 'hesabix-chat-chat-notice';
+			noticeEl.setAttribute( 'role', 'status' );
+			noticeEl.textContent = state.agentJoinBannerText;
+			msgBox.appendChild( noticeEl );
+		}
 		var merged = state.messages.slice();
 		( state.localSyntheticAgentTail || [] ).forEach( function ( syn ) {
 			merged.push( {
@@ -988,7 +1059,8 @@
 			var role = ( m.sender_role || '' ).toString();
 			var div = document.createElement( 'div' );
 			div.className = 'hesabix-chat-bubble hesabix-chat-bubble--' + ( role === 'visitor' ? 'visitor' : 'agent' );
-			var label = role === 'visitor' ? cfg.strings.you : cfg.strings.support;
+			var sn = ( m.sender_name && String( m.sender_name ).trim() ) || '';
+			var label = role === 'visitor' ? cfg.strings.you : ( sn || cfg.strings.support );
 			var strong = document.createElement( 'strong' );
 			strong.textContent = label;
 			var bodyP = document.createElement( 'div' );
@@ -1106,15 +1178,19 @@
 		state.localSyntheticAgentTail = [];
 		state.agentSoundPrimed = false;
 		state.lastAgentMsgNotifiedId = 0;
+		state.seenAgentJoinIds = {};
+		state.agentJoinBannerText = '';
+		state.agentTypingName = '';
 		msgBox.innerHTML = '';
 		formEl.classList.remove( 'hesabix-chat--hidden' );
 		comp.classList.add( 'hesabix-chat--hidden' );
 		surface.classList.remove( 'hesabix-chat--step-chat' );
 		surface.classList.add( 'hesabix-chat--step-form' );
 		if ( wsConnLabel ) {
-			wsConnLabel.textContent = '';
+			wsConnLabel.innerHTML = '';
 			wsConnLabel.className = 'hesabix-chat-ws-conn';
 			wsConnLabel.title = '';
+			wsConnLabel.removeAttribute( 'aria-label' );
 		}
 		unbindRealtime();
 	}
@@ -1138,6 +1214,7 @@
 		}
 		sendVisitorTyping( false );
 		state.agentTyping = false;
+		state.agentTypingName = '';
 		if ( state.agentTypingTimer ) {
 			clearTimeout( state.agentTypingTimer );
 			state.agentTypingTimer = null;
@@ -1216,6 +1293,9 @@
 				if ( ! cid || ! tok ) {
 					throw new Error( cfg.strings.errorGeneric );
 				}
+				state.seenAgentJoinIds = {};
+				state.agentJoinBannerText = '';
+				state.agentTypingName = '';
 				saveSession( cid, tok );
 				state.session = { conversation_id: cid, visitor_token: tok };
 				return afterSessionReady( false );

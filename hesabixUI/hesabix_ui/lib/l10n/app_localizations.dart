@@ -20861,6 +20861,54 @@ abstract class AppLocalizations {
   /// **'All'**
   String get crmWebChatFilterAll;
 
+  /// No description provided for @crmWebChatFilterLongPressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To delete conversations in bulk, press and hold the status filter title.'**
+  String get crmWebChatFilterLongPressHint;
+
+  /// No description provided for @crmWebChatCrmSettingsWidgetsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage the public key, allowed domains, and visitor file upload for each widget.'**
+  String get crmWebChatCrmSettingsWidgetsIntro;
+
+  /// No description provided for @crmWebChatCrmSettingsNoWidgets.
+  ///
+  /// In en, this message translates to:
+  /// **'No widgets yet. Create one with the button below.'**
+  String get crmWebChatCrmSettingsNoWidgets;
+
+  /// No description provided for @crmWebChatAddWidgetButton.
+  ///
+  /// In en, this message translates to:
+  /// **'New widget'**
+  String get crmWebChatAddWidgetButton;
+
+  /// No description provided for @crmWebChatBulkDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversations in bulk'**
+  String get crmWebChatBulkDeleteTitle;
+
+  /// No description provided for @crmWebChatBulkDeleteConfirmAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All conversations and messages for this business will be permanently deleted. This cannot be undone. Continue?'**
+  String get crmWebChatBulkDeleteConfirmAll;
+
+  /// No description provided for @crmWebChatBulkDeleteConfirmStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'All conversations with status «{statusLabel}» and their messages will be permanently deleted. This cannot be undone. Continue?'**
+  String crmWebChatBulkDeleteConfirmStatus(String statusLabel);
+
+  /// No description provided for @crmWebChatBulkDeleteDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} conversation(s) deleted'**
+  String crmWebChatBulkDeleteDone(int count);
+
   /// No description provided for @crmWebChatWidgetsSectionTitle.
   ///
   /// In en, this message translates to:

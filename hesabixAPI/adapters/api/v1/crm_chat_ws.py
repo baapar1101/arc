@@ -199,7 +199,11 @@ async def crm_chat_websocket(websocket: WebSocket):
 						finally:
 							db2.close()
 						await chat_svc.broadcast_typing(
-							scid_int, business_id, from_role="agent", active=bool(msg.get("active", True))
+							scid_int,
+							business_id,
+							from_role="agent",
+							active=bool(msg.get("active", True)),
+							actor_name=chat_svc.agent_display_name(agent_user),
 						)
 						continue
 					if msg.get("type") != "subscribe":
@@ -220,6 +224,12 @@ async def crm_chat_websocket(websocket: WebSocket):
 					finally:
 						db2.close()
 					await crm_chat_realtime_manager.add_to_conversation(scid_int, websocket)
+					await chat_svc.broadcast_agent_joined(
+						scid_int,
+						business_id,
+						agent_user_id=int(agent_user.id),
+						agent_name=chat_svc.agent_display_name(agent_user),
+					)
 			except WebSocketDisconnect:
 				pass
 			finally:

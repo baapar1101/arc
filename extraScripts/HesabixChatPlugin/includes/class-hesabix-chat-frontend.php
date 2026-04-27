@@ -256,6 +256,7 @@ class Hesabix_Chat_Frontend {
 						__( 'میانبر: Ctrl یا ⌘ + Enter', 'hesabix-chat' )
 					),
 					'close'        => __( 'بستن', 'hesabix-chat' ),
+					'closeTooltip' => __( 'بستن پنل گفتگو', 'hesabix-chat' ),
 					'back'         => __( 'مکالمه جدید', 'hesabix-chat' ),
 					'attach'       => __( 'پیوست', 'hesabix-chat' ),
 					'errorGeneric' => __( 'خطا در ارتباط با سرور.', 'hesabix-chat' ),
@@ -268,6 +269,8 @@ class Hesabix_Chat_Frontend {
 					'wsOffline'        => __( 'غیرزنده', 'hesabix-chat' ),
 					'wsOfflineHint'    => __( 'به‌روزرسانی ممکن است با تأخیر باشد.', 'hesabix-chat' ),
 					'agentTyping'      => __( 'پشتیبان در حال تایپ…', 'hesabix-chat' ),
+					'agentTypingNamed' => __( '%s در حال تایپ است…', 'hesabix-chat' ),
+					'agentJoinedNotice' => __( '%s وارد گفتگو شد', 'hesabix-chat' ),
 					'msgDelivered'     => __( 'ارسال شد', 'hesabix-chat' ),
 					'msgReadBySupport' => __( 'پشتیبان خواند', 'hesabix-chat' ),
 					'quickRepliesTitle' => __( 'پرسش‌های پرتکرار', 'hesabix-chat' ),

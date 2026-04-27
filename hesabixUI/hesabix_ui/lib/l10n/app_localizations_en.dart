@@ -11178,6 +11178,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatFilterAll => 'All';
 
   @override
+  String get crmWebChatFilterLongPressHint =>
+      'To delete conversations in bulk, press and hold the status filter title.';
+
+  @override
+  String get crmWebChatCrmSettingsWidgetsIntro =>
+      'Manage the public key, allowed domains, and visitor file upload for each widget.';
+
+  @override
+  String get crmWebChatCrmSettingsNoWidgets =>
+      'No widgets yet. Create one with the button below.';
+
+  @override
+  String get crmWebChatAddWidgetButton => 'New widget';
+
+  @override
+  String get crmWebChatBulkDeleteTitle => 'Delete conversations in bulk';
+
+  @override
+  String get crmWebChatBulkDeleteConfirmAll =>
+      'All conversations and messages for this business will be permanently deleted. This cannot be undone. Continue?';
+
+  @override
+  String crmWebChatBulkDeleteConfirmStatus(String statusLabel) {
+    return 'All conversations with status «$statusLabel» and their messages will be permanently deleted. This cannot be undone. Continue?';
+  }
+
+  @override
+  String crmWebChatBulkDeleteDone(int count) {
+    return '$count conversation(s) deleted';
+  }
+
+  @override
   String get crmWebChatWidgetsSectionTitle => 'Chat widgets';
 
   @override
@@ -11220,7 +11252,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatMenuEdit => 'Edit…';
 
   @override
-  String get crmWebChatNoWidgetsYet => 'No widgets yet — use + to add one.';
+  String get crmWebChatNoWidgetsYet => 'No widgets yet — create one in CRM settings.';
 
   @override
   String get crmWebChatNoConversations =>

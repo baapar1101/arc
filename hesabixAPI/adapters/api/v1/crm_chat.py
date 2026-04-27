@@ -136,6 +136,28 @@ async def list_chat_conversations(
 	)
 
 
+@router.delete("/businesses/{business_id}/chat/conversations")
+@require_business_access("business_id")
+async def delete_chat_conversations_bulk(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	status: Optional[str] = Query(
+		None,
+		description="اگر ارسال شود فقط مکالمات با این وضعیت (open|pending|resolved) حذف می‌شوند؛ در غیر این صورت همه",
+	),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_crm_web_chat_dep("edit_conversations")),
+) -> Dict[str, Any]:
+	if status is not None and status not in ("open", "pending", "resolved"):
+		raise HTTPException(status_code=422, detail="INVALID_STATUS")
+	try:
+		data = await chat_svc.delete_conversations_bulk_agent(db, business_id, status=status)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATIONS_BULK_DELETED")
+
+
 @router.get("/businesses/{business_id}/chat/conversations/{conversation_id}/messages")
 @require_business_access("business_id")
 async def list_chat_messages_agent(

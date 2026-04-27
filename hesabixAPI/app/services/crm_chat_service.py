@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 from uuid import UUID
 
-from sqlalchemy import and_, desc, func, or_, select, update
+from sqlalchemy import and_, delete, desc, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException, UploadFile
@@ -20,6 +20,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_crm_settings import BusinessCrmSettings
 from adapters.db.models.crm_chat import CrmChatConversation, CrmChatMessage, CrmChatWidget
 from adapters.db.models.file_storage import FileStorage
+from adapters.db.models.user import User
 from app.core.responses import ApiError
 from app.services.crm_chat_realtime import crm_chat_realtime_manager
 from app.services.file_storage_service import FileStorageService
@@ -34,6 +35,19 @@ _MAX_BODY = 8000
 
 def _hash_visitor_token(token: str) -> str:
 	return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def agent_display_name(user: User) -> str:
+	"""نام نمایشی عامل برای ویجت و رویدادهای بلادرنگ."""
+	parts = [p for p in (user.first_name or "", user.last_name or "") if p]
+	s = " ".join(parts).strip()
+	if s:
+		return s
+	if user.email:
+		return user.email.strip()
+	if user.mobile:
+		return user.mobile.strip()
+	return "پشتیبان"
 
 
 def _validate_email(email: str) -> None:
@@ -180,6 +194,10 @@ def _message_to_dict_enriched(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
 			d["file"] = None
 	else:
 		d["file"] = None
+	if m.sender_role == "agent" and m.user_id:
+		u = db.get(User, m.user_id)
+		if u:
+			d["sender_name"] = agent_display_name(u)
 	return d
 
 
@@ -771,6 +789,40 @@ async def delete_message_agent(
 	return {"id": m.id, "deleted": True}
 
 
+async def delete_conversations_bulk_agent(
+	db: Session,
+	business_id: int,
+	*,
+	status: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""حذف دسته‌جمعی مکالمه‌ها؛ در صورت ارسال status فقط همان وضعیت. پیام‌ها با CASCADE حذف می‌شوند."""
+	if status is not None and status not in ("open", "pending", "resolved"):
+		raise ApiError(
+			"CRM_CHAT_CONVERSATION_STATUS_INVALID",
+			"Invalid status",
+			http_status=422,
+		)
+	filters = [CrmChatConversation.business_id == business_id]
+	if status:
+		filters.append(CrmChatConversation.status == status)
+	base = and_(*filters)
+	cnt_q = select(func.count()).select_from(CrmChatConversation).where(base)
+	total = int(db.scalar(cnt_q) or 0)
+	if total == 0:
+		return {"deleted": 0}
+	db.execute(delete(CrmChatConversation).where(base))
+	db.commit()
+	ev = {
+		"type": "crm_chat.event",
+		"event": "conversations.bulk_deleted",
+		"business_id": business_id,
+		"count": total,
+		"status_filter": status,
+	}
+	await crm_chat_realtime_manager.broadcast_business(business_id, ev)
+	return {"deleted": total}
+
+
 async def patch_conversation_agent(
 	db: Session,
 	business_id: int,
@@ -853,6 +905,7 @@ async def broadcast_typing(
 	*,
 	from_role: str,
 	active: bool,
+	actor_name: Optional[str] = None,
 ) -> None:
 	payload: Dict[str, Any] = {
 		"type": "crm_chat.event",
@@ -860,6 +913,25 @@ async def broadcast_typing(
 		"conversation_id": conversation_id,
 		"from_role": from_role,
 		"active": bool(active),
+	}
+	if actor_name:
+		payload["actor_name"] = actor_name
+	await crm_chat_realtime_manager.broadcast_conversation(conversation_id, payload)
+	await crm_chat_realtime_manager.broadcast_business(business_id, {**payload, "conversation_id": conversation_id})
+
+
+async def broadcast_agent_joined(
+	conversation_id: int,
+	business_id: int,
+	*,
+	agent_user_id: int,
+	agent_name: str,
+) -> None:
+	payload: Dict[str, Any] = {
+		"type": "crm_chat.event",
+		"event": "agent.joined",
+		"conversation_id": conversation_id,
+		"agent": {"id": agent_user_id, "name": agent_name},
 	}
 	await crm_chat_realtime_manager.broadcast_conversation(conversation_id, payload)
 	await crm_chat_realtime_manager.broadcast_business(business_id, {**payload, "conversation_id": conversation_id})

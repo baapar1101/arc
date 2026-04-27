@@ -4320,6 +4320,28 @@
   "crmWebChatRefreshTooltip": "بارگذاری مجدد",
   "crmWebChatFilterStatusLabel": "فیلتر وضعیت",
   "crmWebChatFilterAll": "همه",
+  "crmWebChatFilterLongPressHint": "برای حذف دسته‌جمعی مکالمات، عنوان «فیلتر وضعیت» را چند ثانیه نگه دارید.",
+  "crmWebChatCrmSettingsWidgetsIntro": "کلید عمومی، دامنه‌های مجاز و ارسال فایل بازدیدکننده را برای هر ویجت مدیریت کنید.",
+  "crmWebChatCrmSettingsNoWidgets": "هنوز ویجی ندارید. با دکمهٔ زیر یک ویجت بسازید.",
+  "crmWebChatAddWidgetButton": "ویجت جدید",
+  "crmWebChatBulkDeleteTitle": "حذف دسته‌جمعی مکالمات",
+  "crmWebChatBulkDeleteConfirmAll": "همهٔ مکالمات این کسب‌وکار و تمام پیام‌ها برای همیشه حذف می‌شوند. این کار برگشت‌ناپذیر است. ادامه می‌دهید؟",
+  "crmWebChatBulkDeleteConfirmStatus": "همهٔ مکالمات با وضعیت «{statusLabel}» و پیام‌هایشان برای همیشه حذف می‌شوند. برگشت‌ناپذیر است. ادامه می‌دهید؟",
+  "@crmWebChatBulkDeleteConfirmStatus": {
+    "placeholders": {
+      "statusLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatBulkDeleteDone": "{count} مکالمه حذف شد",
+  "@crmWebChatBulkDeleteDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "crmWebChatWidgetsSectionTitle": "ویجت‌های چت",
   "crmWebChatWidgetsSectionHint": "برای Public Key و غیرفعال‌کردن فایل فقط روی همان سایت، ویرایش را بزنید.",
   "crmWebChatVisitorAttachmentCrmOff": "پیوست بازدیدکننده: بسته (ابتدا در تنظیمات CRM روشن شود)",

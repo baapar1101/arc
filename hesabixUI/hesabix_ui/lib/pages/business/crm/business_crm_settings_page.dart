@@ -1,14 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_chat_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_web_chat_widget_form_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 
-/// تنظیمات CRM سطح کسب‌وکار (مثلاً ارسال فایل در چت وب).
+/// تنظیمات CRM سطح کسب‌وکار (مثلاً ارسال فایل در چت وب و ویجت‌های چت).
 class BusinessCrmSettingsPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -30,6 +36,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   bool _loading = true;
   bool _allowFiles = false;
   bool _saving = false;
+  List<dynamic> _widgets = [];
 
   @override
   void initState() {
@@ -38,14 +45,51 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     _load();
   }
 
+  static String _embedSnippet(AppLocalizations t, String apiBase, String publicKey) {
+    final base = apiBase.replaceAll(RegExp(r'/+$'), '');
+    return t.crmWebChatEmbedSnippet(base, publicKey);
+  }
+
+  static bool _visitorFileAllowedInWidgetSettings(Map<String, dynamic> w) {
+    final s = w['settings'];
+    if (s is! Map) return true;
+    return s['allow_visitor_file_upload'] != false;
+  }
+
+  Map<String, dynamic> _mergeWidgetSettings(Map<String, dynamic> w, bool allowVisitorFile) {
+    final prev = w['settings'];
+    final m = <String, dynamic>{};
+    if (prev is Map) {
+      for (final e in prev.entries) {
+        m[e.key.toString()] = e.value;
+      }
+    }
+    if (allowVisitorFile) {
+      m.remove('allow_visitor_file_upload');
+    } else {
+      m['allow_visitor_file_upload'] = false;
+    }
+    return m;
+  }
+
+  Future<void> _copyText(String text, String successMsg) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) SnackBarHelper.show(context, message: successMsg);
+  }
+
   Future<void> _load() async {
     if (!widget.authStore.canReadSection('crm')) return;
     setState(() => _loading = true);
     try {
       final d = await _svc.getCrmSettings(businessId: widget.businessId);
+      List<dynamic> w = [];
+      if (widget.authStore.canViewCrmWebChat()) {
+        w = await _svc.listWidgets(businessId: widget.businessId);
+      }
       if (!mounted) return;
       setState(() {
         _allowFiles = d['allow_web_chat_file_upload'] == true;
+        _widgets = w;
         _loading = false;
       });
     } catch (e) {
@@ -77,11 +121,131 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
       if (mounted) {
         setState(() => _saving = false);
         SnackBarHelper.show(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-        isError: true,
-      );
+          context,
+          message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
       }
+    }
+  }
+
+  Future<void> _createWidgetDialog() async {
+    if (!widget.authStore.canManageCrmWebChatWidgets()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
+      return;
+    }
+    final nameCtrl = TextEditingController();
+    final originsCtrl = TextEditingController();
+    final res = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => CrmWebChatWidgetFormDialog(
+        isEdit: false,
+        nameController: nameCtrl,
+        originsController: originsCtrl,
+        initialAllowVisitorFile: true,
+        initialIsActive: true,
+        businessFileUploadEnabled: _allowFiles,
+      ),
+    );
+    try {
+      if (res == null || res['save'] != true || !mounted) return;
+      final allowFile = res['allow_visitor_file'] == true;
+      final raw = originsCtrl.text.trim();
+      List<String>? origins;
+      if (raw.isNotEmpty) {
+        origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+      final Map<String, dynamic>? st = _allowFiles
+          ? (allowFile ? null : <String, dynamic>{'allow_visitor_file_upload': false})
+          : null;
+      final t0 = AppLocalizations.of(context);
+      await _svc.createWidget(
+        businessId: widget.businessId,
+        name: nameCtrl.text.trim().isEmpty ? t0.crmWebChatDefaultWidgetName : nameCtrl.text.trim(),
+        allowedOrigins: origins,
+        settings: st,
+      );
+      await _load();
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatWidgetCreated);
+      }
+    } catch (e) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
+          context,
+          message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    } finally {
+      nameCtrl.dispose();
+      originsCtrl.dispose();
+    }
+  }
+
+  Future<void> _editWidgetDialog(Map<String, dynamic> w) async {
+    if (!widget.authStore.canManageCrmWebChatWidgets()) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
+      return;
+    }
+    final id = (w['id'] as num).toInt();
+    final nameCtrl = TextEditingController(text: w['name']?.toString() ?? '');
+    final originsCtrl = TextEditingController(
+      text: (w['allowed_origins'] is List) ? (w['allowed_origins'] as List).map((e) => e.toString()).join('، ') : '',
+    );
+    final res = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => CrmWebChatWidgetFormDialog(
+        isEdit: true,
+        nameController: nameCtrl,
+        originsController: originsCtrl,
+        initialAllowVisitorFile: _visitorFileAllowedInWidgetSettings(w),
+        initialIsActive: w['is_active'] == true,
+        businessFileUploadEnabled: _allowFiles,
+      ),
+    );
+    try {
+      if (res == null || res['save'] != true || !mounted) return;
+      final allowFile = res['allow_visitor_file'] == true;
+      final isActive = res['is_active'] == true;
+      final raw = originsCtrl.text.trim();
+      List<String>? origins;
+      if (raw.isNotEmpty) {
+        origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      } else {
+        origins = const <String>[];
+      }
+      await _svc.updateWidget(
+        businessId: widget.businessId,
+        widgetId: id,
+        name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
+        allowedOrigins: origins,
+        settings: _allowFiles ? _mergeWidgetSettings(w, allowFile) : null,
+        isActive: isActive,
+      );
+      await _load();
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.crmWebChatWidgetUpdated);
+      }
+    } catch (e) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
+          context,
+          message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    } finally {
+      nameCtrl.dispose();
+      originsCtrl.dispose();
     }
   }
 
@@ -92,6 +256,10 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     }
 
     final canWrite = widget.authStore.canWriteSection('crm');
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final apiBase = AppConfig.apiBaseUrl;
 
     return Scaffold(
       appBar: AppBar(
@@ -122,6 +290,129 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                           },
                   ),
                 ),
+                if (widget.authStore.canViewCrmWebChat()) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.widgets_outlined, color: cs.primary, size: 28),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      t.crmWebChatWidgetsSectionTitle,
+                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      t.crmWebChatCrmSettingsWidgetsIntro,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (widget.authStore.canManageCrmWebChatWidgets()) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              onPressed: _createWidgetDialog,
+                              icon: const Icon(Icons.add),
+                              label: Text(t.crmWebChatAddWidgetButton),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          if (_widgets.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                t.crmWebChatCrmSettingsNoWidgets,
+                                style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            )
+                          else
+                            ..._widgets.map((raw) {
+                              final w = raw as Map<String, dynamic>;
+                              final pk = w['public_key']?.toString() ?? '';
+                              final name = w['name']?.toString() ?? t.crmWebChatDefaultWidgetName;
+                              final active = w['is_active'] == true;
+                              final guestFile = _visitorFileAllowedInWidgetSettings(w);
+                              final fileHint = !_allowFiles
+                                  ? t.crmWebChatVisitorAttachmentCrmOff
+                                  : (guestFile
+                                      ? t.crmWebChatVisitorAttachmentAllowed
+                                      : t.crmWebChatVisitorAttachmentWidgetOff);
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                elevation: 0,
+                                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                                child: ListTile(
+                                  dense: true,
+                                  title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  isThreeLine: true,
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        active ? t.crmWebChatWidgetStateActive : t.crmWebChatWidgetStateInactive,
+                                        style: TextStyle(
+                                          color: active ? cs.primary : cs.error,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        fileHint,
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (k) {
+                                      if (k == 'copy_pk') {
+                                        unawaited(_copyText(pk, t.crmWebChatPublicKeyCopied));
+                                      } else if (k == 'copy_embed') {
+                                        unawaited(
+                                          _copyText(
+                                            _embedSnippet(t, apiBase, pk),
+                                            t.crmWebChatEmbedGuideCopied,
+                                          ),
+                                        );
+                                      } else if (k == 'edit' && widget.authStore.canManageCrmWebChatWidgets()) {
+                                        _editWidgetDialog(w);
+                                      }
+                                    },
+                                    itemBuilder: (c) => [
+                                      PopupMenuItem(value: 'copy_pk', child: Text(t.crmWebChatMenuCopyPublicKey)),
+                                      PopupMenuItem(value: 'copy_embed', child: Text(t.crmWebChatMenuCopyApiGuide)),
+                                      if (widget.authStore.canManageCrmWebChatWidgets())
+                                        PopupMenuItem(value: 'edit', child: Text(t.crmWebChatMenuEdit)),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
     );

@@ -116,6 +116,24 @@ class CrmChatService {
     );
   }
 
+  /// حذف دسته‌جمعی مکالمه‌ها؛ [status] اختیاری — فقط همان وضعیت؛ null یعنی همه.
+  Future<int> deleteAllConversations({
+    required int businessId,
+    String? status,
+  }) async {
+    final res = await _apiClient.delete<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/conversations',
+      query: {
+        if (status != null && status.isNotEmpty) 'status': status,
+      },
+    );
+    final d = _extractData(res.data);
+    if (d is Map && d['deleted'] is num) {
+      return (d['deleted'] as num).toInt();
+    }
+    return 0;
+  }
+
   Future<Map<String, dynamic>> postAgentMessage({
     required int businessId,
     required int conversationId,

@@ -11125,6 +11125,38 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatFilterAll => 'همه';
 
   @override
+  String get crmWebChatFilterLongPressHint =>
+      'برای حذف دسته‌جمعی مکالمات، عنوان «فیلتر وضعیت» را چند ثانیه نگه دارید.';
+
+  @override
+  String get crmWebChatCrmSettingsWidgetsIntro =>
+      'کلید عمومی، دامنه‌های مجاز و ارسال فایل بازدیدکننده را برای هر ویجت مدیریت کنید.';
+
+  @override
+  String get crmWebChatCrmSettingsNoWidgets =>
+      'هنوز ویجی ندارید. با دکمهٔ زیر یک ویجت بسازید.';
+
+  @override
+  String get crmWebChatAddWidgetButton => 'ویجت جدید';
+
+  @override
+  String get crmWebChatBulkDeleteTitle => 'حذف دسته‌جمعی مکالمات';
+
+  @override
+  String get crmWebChatBulkDeleteConfirmAll =>
+      'همهٔ مکالمات این کسب‌وکار و تمام پیام‌ها برای همیشه حذف می‌شوند. این کار برگشت‌ناپذیر است. ادامه می‌دهید؟';
+
+  @override
+  String crmWebChatBulkDeleteConfirmStatus(String statusLabel) {
+    return 'همهٔ مکالمات با وضعیت «$statusLabel» و پیام‌هایشان برای همیشه حذف می‌شوند. برگشت‌ناپذیر است. ادامه می‌دهید؟';
+  }
+
+  @override
+  String crmWebChatBulkDeleteDone(int count) {
+    return '$count مکالمه حذف شد';
+  }
+
+  @override
   String get crmWebChatWidgetsSectionTitle => 'ویجت‌های چت';
 
   @override
@@ -11168,7 +11200,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmWebChatNoWidgetsYet =>
-      'هنوز ویجی نساخته‌اید — از + استفاده کنید.';
+      'هنوز ویجی ندارید — از تنظیمات CRM ویجت بسازید.';
 
   @override
   String get crmWebChatNoConversations =>

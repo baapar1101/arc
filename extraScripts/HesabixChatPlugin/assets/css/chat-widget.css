@@ -260,6 +260,20 @@
 	background: rgba( 255, 255, 255, 0.3 );
 }
 
+.hesabix-chat-header-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.35rem !important;
+	min-width: 2rem;
+	min-height: 2rem;
+	line-height: 0;
+}
+
+.hesabix-chat-header-close svg {
+	display: block;
+}
+
 .hesabix-chat-messages {
 	flex: 1 1 auto;
 	min-height: 0;
@@ -438,6 +452,24 @@
 	display: block;
 }
 
+.hesabix-chat-chat-notice {
+	margin: 0.35rem 0 0.5rem;
+	padding: 0.45rem 0.65rem;
+	font-size: 0.78rem;
+	line-height: 1.45;
+	text-align: center;
+	border-radius: 10px;
+	background: rgba( 79, 70, 229, 0.1 );
+	border: 1px solid rgba( 79, 70, 229, 0.22 );
+	color: #4338ca;
+}
+
+.hesabix-chat--theme-dark .hesabix-chat-chat-notice {
+	background: rgba( 99, 102, 241, 0.15 );
+	border-color: rgba( 129, 140, 248, 0.35 );
+	color: #c7d2fe;
+}
+
 .hesabix-chat-peer-typing {
 	padding: 0.2rem 0.65rem 0.3rem;
 	font-size: 0.75rem;
@@ -450,32 +482,51 @@
 }
 
 .hesabix-chat-ws-conn {
-	font-size: 0.62rem;
-	margin-inline-end: 0.25rem;
-	padding: 0.12rem 0.4rem;
-	border-radius: 4px;
-	font-weight: 600;
-	letter-spacing: 0.02em;
-	white-space: nowrap;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-inline-end: 0.35rem;
+	padding: 0;
+	min-width: 1.1rem;
+	min-height: 1.1rem;
+	line-height: 0;
 }
 
 .hesabix-chat-ws-conn:empty {
 	display: none;
 }
 
-.hesabix-chat-ws-conn--live {
-	background: rgba( 22, 163, 74, 0.16 );
-	color: #14532d;
+.hesabix-chat-ws-dot {
+	display: block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 2px rgba( 255, 255, 255, 0.45 );
+	flex-shrink: 0;
 }
 
-.hesabix-chat-ws-conn--connecting {
-	background: rgba( 234, 179, 8, 0.2 );
-	color: #854d0e;
+.hesabix-chat-ws-conn--live .hesabix-chat-ws-dot {
+	background: #22c55e;
 }
 
-.hesabix-chat-ws-conn--offline {
-	background: rgba( 148, 163, 184, 0.22 );
-	color: #475569;
+.hesabix-chat-ws-conn--connecting .hesabix-chat-ws-dot {
+	background: #f59e0b;
+	animation: hesabix-ws-dot-pulse 1s ease-in-out infinite;
+}
+
+.hesabix-chat-ws-conn--offline .hesabix-chat-ws-dot {
+	background: #94a3b8;
+}
+
+@keyframes hesabix-ws-dot-pulse {
+	0%, 100% {
+		opacity: 1;
+		transform: scale( 1 );
+	}
+	50% {
+		opacity: 0.72;
+		transform: scale( 0.88 );
+	}
 }
 
 .hesabix-chat-form,
@@ -1016,4 +1067,54 @@
 	.hesabix-chat-launcher--idle[data-hesabix-idle-anim="wiggle"] .hesabix-chat-launcher-ico {
 		animation: none !important;
 	}
+
+	.hesabix-chat-ws-conn--connecting .hesabix-chat-ws-dot {
+		animation: none;
+	}
+}
+
+/* تم‌های اضافه (کلاس‌های flavor روی پایهٔ روشن / تاریک) */
+.hesabix-chat--theme-cream .hesabix-chat-surface--default {
+	background: linear-gradient( 165deg, #fffbeb 0%, #fef3c7 42%, #ffedd5 100% );
+	color: #1c1917;
+}
+
+.hesabix-chat--theme-cream .hesabix-chat-surface--minimal {
+	background: #fffbf5;
+	color: #1c1917;
+}
+
+.hesabix-chat--theme-cream .hesabix-chat-surface--colorful {
+	background: linear-gradient( 160deg, #fff7ed 0%, #fef9c3 38%, #fde68a 100% );
+	color: #1c1917;
+}
+
+.hesabix-chat--theme-ocean .hesabix-chat-surface--default {
+	background: linear-gradient( 165deg, #ecfeff 0%, #e0f2fe 45%, #dbeafe 100% );
+	color: #0f172a;
+}
+
+.hesabix-chat--theme-ocean .hesabix-chat-surface--minimal {
+	background: #f0f9ff;
+	color: #0c4a6e;
+}
+
+.hesabix-chat--theme-ocean .hesabix-chat-surface--colorful {
+	background: linear-gradient( 160deg, #cffafe 0%, #e0f2fe 40%, #ddd6fe 100% );
+	color: #0f172a;
+}
+
+.hesabix-chat--theme-midnight .hesabix-chat-surface {
+	background: linear-gradient( 180deg, #0f172a 0%, #020617 100% );
+	color: #e2e8f0;
+}
+
+.hesabix-chat--theme-midnight .hesabix-chat-surface--minimal {
+	background: #020617;
+	color: #e2e8f0;
+}
+
+.hesabix-chat--theme-midnight .hesabix-chat-surface--colorful {
+	background: linear-gradient( 180deg, #1e1b4b 0%, #0f172a 50%, #020617 100% );
+	color: #e2e8f0;
 }
