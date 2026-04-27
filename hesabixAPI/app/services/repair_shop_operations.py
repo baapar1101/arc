@@ -203,9 +203,12 @@ def add_parts_to_repair_order(
             current_stock = get_product_stock(db, business_id, product_id, warehouse_id)
             
             if current_stock < Decimal(str(quantity)):
+                from app.services.invoice_service import _format_quantity_for_user_message
+
                 raise ApiError(
                     "INSUFFICIENT_STOCK",
-                    f"موجودی کافی نیست. موجودی فعلی: {current_stock}، مقدار درخواستی: {quantity}",
+                    f"موجودی کافی نیست. موجودی فعلی: {_format_quantity_for_user_message(current_stock)}، "
+                    f"مقدار درخواستی: {_format_quantity_for_user_message(quantity)}",
                     http_status=409,
                     extra_data={
                         "product_id": product_id,

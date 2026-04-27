@@ -41,6 +41,24 @@ import csv
 logger = logging.getLogger(__name__)
 
 
+def _format_quantity_for_user_message(value: Any) -> str:
+    """نمایش تعداد/موجودی در پیام کاربر؛ اگر مقدار صحیح است بدون قسمت اعشاری."""
+    try:
+        d = Decimal(str(value))
+    except Exception:
+        return str(value)
+    try:
+        iv = d.to_integral_value(rounding=ROUND_HALF_UP)
+        if d == iv:
+            return str(int(iv))
+    except Exception:
+        pass
+    s = format(d, "f")
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s if s else "0"
+
+
 def _validate_invoice_line_custom_attributes(db: Session, business_id: int, line: Dict[str, Any]) -> None:
     """اعتبارسنجی extra_info.line_custom_attributes نسبت به ویژگی‌های لینک‌شده به کالا."""
     from app.services.product_attribute_service import validate_custom_attributes
@@ -596,8 +614,9 @@ def _remove_old_invoice_warehouse_documents(
     user_id: int,
 ) -> None:
     """
-    حذف حوالهٔ پیش‌نویس یا لغو+پست معکوس برای حوالهٔ قطعی،
-    فقط برای اسنادی که source_type=invoice و source_document_id همین فاکتور است.
+    حذف حوالهٔ پیش‌نویس یا لغو+پست معکوس برای حوالهٔ قطعی.
+    شناسه‌ها از links فاکتور می‌آید؛ اگر source_document_id با فاکتور دیگری ست شده باشد رد می‌شود.
+    (source_type قدیمی اجباری نیست تا حواله‌های قدیمی بدون متادیتای درست لغو شوند.)
     """
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
@@ -615,9 +634,7 @@ def _remove_old_invoice_warehouse_documents(
         wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wid).first()
         if not wh or int(wh.business_id) != int(business_id):
             continue
-        if (wh.source_type or "") != "invoice":
-            continue
-        if wh.source_document_id is None or int(wh.source_document_id) != int(invoice_document_id):
+        if wh.source_document_id is not None and int(wh.source_document_id) != int(invoice_document_id):
             continue
         st = (wh.status or "").strip().lower()
         if st == "draft":
@@ -664,6 +681,8 @@ def _create_warehouse_documents_for_invoice(
     user_id: int,
     lines_input: List[Dict[str, Any]],
     invoice_type: str,
+    *,
+    stock_exclude_warehouse_document_ids: Optional[List[int]] = None,
 ) -> List[int]:
     """
     ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
@@ -683,6 +702,10 @@ def _create_warehouse_documents_for_invoice(
     if not lines_for_wh:
         return []
 
+    _stock_ex_wh: Optional[List[int]] = None
+    if stock_exclude_warehouse_document_ids:
+        _stock_ex_wh = sorted({int(x) for x in stock_exclude_warehouse_document_ids if x is not None})
+
     created_wh_ids: List[int] = []
     auto_post_warehouse = bool((document.extra_info or {}).get("auto_post_warehouse", False))
 
@@ -693,12 +716,16 @@ def _create_warehouse_documents_for_invoice(
             wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
             created_wh_ids.append(int(wh_issue.id))
             if auto_post_warehouse:
-                post_warehouse_document(db, int(wh_issue.id))
+                post_warehouse_document(
+                    db, int(wh_issue.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
+                )
         if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
             wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
             created_wh_ids.append(int(wh_receipt.id))
             if auto_post_warehouse:
-                post_warehouse_document(db, int(wh_receipt.id))
+                post_warehouse_document(
+                    db, int(wh_receipt.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
+                )
     elif invoice_lines_have_trackable_inventory_products(db, business_id, lines_for_wh):
         if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
             wh_type = "issue"
@@ -710,7 +737,9 @@ def _create_warehouse_documents_for_invoice(
         created_wh_ids.append(int(wh.id))
 
         if auto_post_warehouse:
-            post_warehouse_document(db, int(wh.id))
+            post_warehouse_document(
+                db, int(wh.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
+            )
 
             if invoice_type == INVOICE_SALES:
                 for line in lines_for_wh:
@@ -877,6 +906,9 @@ def _compute_available_stock(
     warehouse_id: Optional[int],
     up_to_date: date,
     exclude_document_id: Optional[int] = None,
+    *,
+    exclude_invoice_source_document_id: Optional[int] = None,
+    exclude_warehouse_document_ids: Optional[List[int]] = None,
 ) -> Decimal:
     movements = _iter_product_movements(
         db,
@@ -915,7 +947,24 @@ def _compute_available_stock(
         wh_movements_query = wh_movements_query.filter(
             WarehouseDocumentLine.warehouse_id == warehouse_id
         )
-    
+
+    if exclude_warehouse_document_ids:
+        _xwh = sorted({int(x) for x in exclude_warehouse_document_ids if x is not None})
+        if _xwh:
+            wh_movements_query = wh_movements_query.filter(~WarehouseDocument.id.in_(_xwh))
+
+    # هنگام پست مجدد حوالهٔ همان فاکتور، حرکات تمام حواله‌های قطعی با source_document_id = همان سند
+    # از محاسبه حذف می‌شود (حواله لغو/دستی معمولاً به شناسه حواله دیگر اشاره می‌کند، نه فاکتور).
+    if exclude_invoice_source_document_id is not None:
+        inv_doc_id = int(exclude_invoice_source_document_id)
+        if inv_doc_id:
+            wh_movements_query = wh_movements_query.filter(
+                or_(
+                    WarehouseDocument.source_document_id.is_(None),
+                    WarehouseDocument.source_document_id != inv_doc_id,
+                )
+            )
+
     wh_movements = wh_movements_query.all()
     for wh_mv in wh_movements:
         if wh_mv.movement == "in":
@@ -989,6 +1038,9 @@ def _ensure_stock_sufficient(
     document_date: date,
     outgoing_lines: List[Dict[str, Any]],
     exclude_document_id: Optional[int] = None,
+    *,
+    exclude_invoice_source_document_id: Optional[int] = None,
+    exclude_warehouse_document_ids: Optional[List[int]] = None,
 ) -> None:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
     required: Dict[Tuple[int, Optional[int]], Decimal] = {}
@@ -1000,15 +1052,170 @@ def _ensure_stock_sufficient(
         key = (pid, int(wh_id) if wh_id is not None else None)
         required[key] = required.get(key, Decimal(0)) + qty
 
+    from adapters.db.models.warehouse import Warehouse
+
+    pids = list({k[0] for k in required})
+    wh_ids_unique = sorted({int(k[1]) for k in required if k[1] is not None})
+    product_labels: Dict[int, Tuple[str, str]] = {}
+    if pids:
+        for row in (
+            db.query(Product.id, Product.name, Product.code)
+            .filter(Product.business_id == business_id, Product.id.in_(pids))
+            .all()
+        ):
+            product_labels[int(row.id)] = (str(row.name or ""), str(row.code or ""))
+    warehouse_labels: Dict[int, str] = {}
+    if wh_ids_unique:
+        for row in (
+            db.query(Warehouse.id, Warehouse.name)
+            .filter(Warehouse.business_id == business_id, Warehouse.id.in_(wh_ids_unique))
+            .all()
+        ):
+            warehouse_labels[int(row.id)] = str(row.name or "")
+
     # بررسی موجودی
     for (pid, wh_id), req in required.items():
-        avail = _compute_available_stock(db, business_id, pid, wh_id, document_date, exclude_document_id)
+        avail = _compute_available_stock(
+            db,
+            business_id,
+            pid,
+            wh_id,
+            document_date,
+            exclude_document_id,
+            exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+            exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+        )
         if avail < req:
+            pname, pcode = product_labels.get(pid, ("", ""))
+            if not pname:
+                pname = "کالا"
+            p_disp = f"«{pname}»" + (f" (کد {pcode})" if pcode else f" (شناسه {pid})")
+            if wh_id is not None:
+                wn = warehouse_labels.get(int(wh_id), "")
+                wh_disp = f"«{wn}»" if wn else f"انبار (شناسه {wh_id})"
+            else:
+                wh_disp = "—"
             raise ApiError(
                 "INSUFFICIENT_STOCK",
-                f"موجودی کافی برای کالا {pid} در انبار {wh_id or '-'} موجود نیست. موجودی: {float(avail)}, موردنیاز: {float(req)}",
+                f"موجودی کافی برای کالا {p_disp} در انبار {wh_disp} موجود نیست. "
+                f"موجودی قابل استفاده: {_format_quantity_for_user_message(avail)}، "
+                f"موردنیاز: {_format_quantity_for_user_message(req)}",
                 http_status=409,
+                details={"product_id": pid, "warehouse_id": wh_id},
             )
+
+
+def _validate_outgoing_stock_before_invoice_commit(
+    db: Session,
+    business_id: int,
+    document: Document,
+    invoice_type: str,
+    lines_input: List[Dict[str, Any]],
+    data: Dict[str, Any],
+) -> None:
+    """
+    اگر فاکتور با post_inventory و auto_post_warehouse ذخیره شود، قبل از commit همان کنترل کسری
+    که در post_warehouse_document انجام می‌شود را اجرا می‌کند تا فاکتور بدون حواله قطعی ثبت نشود.
+    """
+    if document.is_proforma:
+        return
+    if not _is_inventory_posting_enabled(data):
+        return
+    if not bool((document.extra_info or {}).get("auto_post_warehouse", False)):
+        return
+
+    from app.services.warehouse_service import invoice_lines_have_trackable_inventory_products
+
+    if invoice_type == INVOICE_PRODUCTION:
+        lines_candidates = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
+    elif invoice_type in {
+        INVOICE_SALES,
+        INVOICE_PURCHASE_RETURN,
+        INVOICE_WASTE,
+        INVOICE_DIRECT_CONSUMPTION,
+    }:
+        lines_candidates = list(lines_input)
+    else:
+        return
+
+    if not lines_candidates:
+        return
+    if not invoice_lines_have_trackable_inventory_products(db, business_id, lines_candidates):
+        return
+
+    inv_wh = (document.extra_info or {}).get("warehouse_id")
+    try:
+        inv_wh_int = int(inv_wh) if inv_wh is not None else None
+    except (TypeError, ValueError):
+        inv_wh_int = None
+
+    outgoing_lines: List[Dict[str, Any]] = []
+    for ln in lines_candidates:
+        pid = ln.get("product_id")
+        try:
+            qty = Decimal(str(ln.get("quantity", 0) or 0))
+        except Exception:
+            qty = Decimal(0)
+        if not pid or qty <= 0:
+            continue
+        product = db.query(Product).filter(
+            and_(Product.id == int(pid), Product.business_id == business_id)
+        ).first()
+        if not product or not getattr(product, "track_inventory", False):
+            continue
+        extra = dict(ln.get("extra_info") or {})
+        wh_raw = extra.get("warehouse_id")
+        if wh_raw is None:
+            wh_raw = inv_wh_int
+        if wh_raw is None:
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                "برای اقلام با کنترل موجودی، انبار (در خط یا سربرگ فاکتور) الزامی است",
+                http_status=400,
+            )
+        try:
+            wh_id = int(wh_raw)
+        except (TypeError, ValueError):
+            raise ApiError("WAREHOUSE_REQUIRED", "شناسه انبار نامعتبر است", http_status=400)
+        outgoing_lines.append(
+            {
+                "product_id": int(pid),
+                "quantity": float(qty),
+                "extra_info": {
+                    "warehouse_id": wh_id,
+                    "movement": "out",
+                    "inventory_tracked": True,
+                },
+            }
+        )
+
+    if not outgoing_lines:
+        return
+
+    biz = db.query(Business).filter(Business.id == int(business_id)).first()
+    allow_bulk = bool(getattr(biz, "allow_negative_inventory_for_bulk", False)) if biz else False
+    allow_unique = bool(getattr(biz, "allow_negative_inventory_for_unique", False)) if biz else False
+    transfer_strict = bool(getattr(biz, "warehouse_transfer_require_positive_stock", True)) if biz else True
+    lines_to_check = filter_outgoing_lines_for_stock_enforcement(
+        db,
+        int(business_id),
+        outgoing_lines,
+        allow_negative_for_bulk=allow_bulk,
+        allow_negative_for_unique=allow_unique,
+        warehouse_doc_type="issue",
+        transfer_require_positive_stock=transfer_strict,
+    )
+    if not lines_to_check:
+        return
+    _ensure_stock_sufficient(
+        db,
+        business_id,
+        document.document_date,
+        lines_to_check,
+        exclude_document_id=None,
+        exclude_invoice_source_document_id=None,
+        exclude_warehouse_document_ids=None,
+    )
 
 
 def _product_inventory_mode_is_unique(inventory_mode: Optional[str]) -> bool:
@@ -2808,9 +3015,6 @@ def create_invoice(
         ln["extra_info"] = info
     # انبار از فاکتور جدا شده است؛ انتخاب انبار در فاکتور اجباری نیست
 
-
-    # بدون کنترل کسری در مرحله فاکتور؛ کنترل در پست حواله انجام می‌شود
-
     # Costing method (only for tracked products)
     costing_method = _get_costing_method(data)
     # محاسبه COGS به پست حواله منتقل می‌شود
@@ -3407,6 +3611,10 @@ def create_invoice(
         from app.services.invoice_tag_service import replace_document_invoice_tags
 
         replace_document_invoice_tags(db, business_id, int(document.id), data.get("tag_ids"))
+
+    _validate_outgoing_stock_before_invoice_commit(
+        db, business_id, document, invoice_type, lines_input, data
+    )
 
     # Persist invoice first
     db.commit()
@@ -4541,7 +4749,13 @@ def update_invoice(
 
         if not document.is_proforma:
             _create_warehouse_documents_for_invoice(
-                db, int(document.business_id), document, user_id, lines_input, inv_type
+                db,
+                int(document.business_id),
+                document,
+                user_id,
+                lines_input,
+                inv_type,
+                stock_exclude_warehouse_document_ids=_old_warehouse_document_ids,
             )
     except ApiError:
         raise

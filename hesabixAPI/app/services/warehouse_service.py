@@ -1635,7 +1635,12 @@ def update_warehouse_document_line(
 	return wline
 
 
-def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
+def post_warehouse_document(
+	db: Session,
+	wh_id: int,
+	*,
+	stock_exclude_warehouse_document_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
 	"""پست حواله: کنترل کسری برای خروج‌ها و به‌روزرسانی موجودی انبار.
 	اگر doc_type='transfer' باشد، یک سند حسابداری هم ایجاد می‌شود.
 	توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود.
@@ -1701,17 +1706,47 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 			transfer_require_positive_stock=transfer_strict,
 		)
 		if lines_to_check:
+			exclude_fin_doc: Optional[int] = None
+			exclude_inv_src: Optional[int] = None
+			if wh.source_document_id is not None:
+				src_id = int(wh.source_document_id)
+				st = (wh.source_type or "").strip().lower()
+				if st == "invoice":
+					exclude_fin_doc = src_id
+					exclude_inv_src = src_id
+				else:
+					# حواله‌های قدیمی: source_type خالی یا نادرست ولی سند مبدا فاکتور است
+					_src_row = (
+						db.query(Document.document_type)
+						.filter(
+							Document.id == src_id,
+							Document.business_id == int(wh.business_id),
+						)
+						.first()
+					)
+					_sdt = _src_row[0] if _src_row is not None else None
+					if _sdt is not None and str(_sdt).startswith("invoice_"):
+						exclude_fin_doc = src_id
+						exclude_inv_src = src_id
+			_ex_wh: Optional[List[int]] = None
+			if stock_exclude_warehouse_document_ids:
+				_ex_wh = sorted(
+					{int(x) for x in stock_exclude_warehouse_document_ids if x is not None}
+				)
+				if not _ex_wh:
+					_ex_wh = None
 			try:
 				_ensure_stock_sufficient(
 					db,
 					wh.business_id,
 					wh.document_date,
 					lines_to_check,
-					exclude_document_id=None,  # این حواله هنوز پست نشده
+					exclude_document_id=exclude_fin_doc,
+					exclude_invoice_source_document_id=exclude_inv_src,
+					exclude_warehouse_document_ids=_ex_wh,
 				)
-			except ApiError as e:
-				# خطای کسری موجودی را به صورت واضح نمایش بده
-				raise ApiError("INSUFFICIENT_STOCK", str(e), http_status=409)
+			except ApiError:
+				raise
 
 	# برای حواله‌های transfer، به‌روزرسانی instance های کالاهای یونیک
 	if wh.doc_type == "transfer":
