@@ -92,6 +92,26 @@ class Hesabix_Chat_Admin {
 	}
 
 	/**
+	 * تطبیق نام فایل صدا با لیست واقعی روی دیسک (بدون sanitize_file_name که پرانتز و … را عوض می‌کند).
+	 *
+	 * @param string   $raw           مقدار ارسال‌شده از فرم.
+	 * @param string[] $allowed_files خروجی list_agent_reply_sound_files().
+	 * @return string نام دقیق فایل از دیسک یا رشته خالی.
+	 */
+	public static function resolve_agent_reply_sound_choice( $raw, array $allowed_files ) {
+		$name = basename( str_replace( '\\', '/', trim( (string) $raw ) ) );
+		if ( $name === '' || $name === '.' || $name === '..' ) {
+			return '';
+		}
+		foreach ( $allowed_files as $f ) {
+			if ( is_string( $f ) && strcasecmp( $name, $f ) === 0 ) {
+				return $f;
+			}
+		}
+		return '';
+	}
+
+	/**
 	 * هر خط: پرسش|پاسخ (اولین | جداکننده). حداکثر ۱۲ مورد.
 	 *
 	 * @param string $raw .
@@ -144,9 +164,8 @@ class Hesabix_Chat_Admin {
 			$out['offset_side_mobile']  = $legacy;
 		}
 		$sound_ok = self::list_agent_reply_sound_files();
-		if ( ! empty( $out['agent_reply_sound'] ) && ! in_array( (string) $out['agent_reply_sound'], $sound_ok, true ) ) {
-			$out['agent_reply_sound'] = '';
-		}
+		$resolved = self::resolve_agent_reply_sound_choice( (string) ( $out['agent_reply_sound'] ?? '' ), $sound_ok );
+		$out['agent_reply_sound'] = $resolved;
 		return $out;
 	}
 
@@ -329,9 +348,8 @@ class Hesabix_Chat_Admin {
 		}
 
 		if ( isset( $input['agent_reply_sound'] ) ) {
-			$sn = sanitize_file_name( (string) $input['agent_reply_sound'] );
-			$ok = self::list_agent_reply_sound_files();
-			$out['agent_reply_sound'] = ( $sn !== '' && in_array( $sn, $ok, true ) ) ? $sn : '';
+			$ok                       = self::list_agent_reply_sound_files();
+			$out['agent_reply_sound'] = self::resolve_agent_reply_sound_choice( (string) $input['agent_reply_sound'], $ok );
 		}
 
 		$allowed_anim = array( 'none', 'bounce', 'pulse', 'shake', 'wiggle', 'glow', 'ring', 'float' );
@@ -393,39 +411,24 @@ class Hesabix_Chat_Admin {
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 			<p><?php esc_html_e( 'اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد.', 'hesabix-chat' ); ?></p>
-			<div class="notice notice-info inline" style="margin:12px 0;padding:10px 12px;">
-				<p style="margin:0 0 8px;"><strong><?php esc_html_e( 'به‌روزرسانی از داخل وردپرس', 'hesabix-chat' ); ?></strong></p>
-				<p style="margin:0;">
-					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: 1: current plugin version */
-							__( 'نسخهٔ نصب‌شده روی این سایت: %1$s. اعلان «به‌روزرسانی موجود» فقط وقتی نشان داده می‌شود که نسخهٔ خوانده‌شده از آدرس رسمی افزونه (فایل hesabix-chat.php در مخزن) از این عدد بزرگتر باشد؛ اگر هر دو یکسان باشند، پیامی نمی‌بینید.', 'hesabix-chat' ),
-							defined( 'HESABIX_CHAT_VERSION' ) ? HESABIX_CHAT_VERSION : '—'
-						)
-					);
-					?>
-				</p>
-				<p style="margin:8px 0 0;">
-					<?php
-					esc_html_e(
-						'به‌طور پیش‌فرض نسخه از سرور source.hesabix.ir خوانده می‌شود، نه از هر مخزن گیت که خودتان push می‌کنید. اگر افزونه را از مخزن دیگری نصب یا توسعه می‌دهید، در wp-config.php ثابت‌های HESABIX_CHAT_UPDATE_RAW_PHP_URL و HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL را به همان مخزن نشانه بگیرید (یا مانیفست JSON با HESABIX_CHAT_UPDATE_MANIFEST_URL).',
-						'hesabix-chat'
-					);
-					?>
-				</p>
-				<p style="margin:8px 0 0;font-size:12px;color:#50575e;">
-					<?php
-					esc_html_e(
-						'برای یک‌بار نادیده گرفتن کش (حداکثر ~۱۲ ساعت): افزودن add_filter( \'hesabix_chat_update_force_check\', \'__return_true\' ); موقتاً در یک افزونه/کد سفارشی و سپس باز کردن صفحهٔ به‌روزرسانی‌ها.',
-						'hesabix-chat'
-					);
-					?>
-				</p>
-			</div>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'hesabix_chat_group' ); ?>
-				<table class="form-table" role="presentation">
+				<style>
+					.hesabix-chat-settings-tabs { margin: 1em 0 0; padding-top: 4px; }
+					.hesabix-chat-tab-panel { margin-top: 0.5em; }
+					.hesabix-chat-tab-panel[hidden] { display: none !important; }
+				</style>
+				<h2 class="nav-tab-wrapper hesabix-chat-settings-tabs wp-clearfix">
+					<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e( 'اتصال', 'hesabix-chat' ); ?></a>
+					<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="display"><?php esc_html_e( 'نمایش', 'hesabix-chat' ); ?></a>
+					<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="content"><?php esc_html_e( 'متن و محتوا', 'hesabix-chat' ); ?></a>
+					<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="appearance"><?php esc_html_e( 'ظاهر', 'hesabix-chat' ); ?></a>
+					<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="behavior"><?php esc_html_e( 'رفتار', 'hesabix-chat' ); ?></a>
+					<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="chat"><?php esc_html_e( 'چت و فرم', 'hesabix-chat' ); ?></a>
+				</h2>
+				<div class="hesabix-chat-tab-panel" data-tab="connection">
+					<h2 class="screen-reader-text"><?php esc_html_e( 'اتصال به سرور', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><label for="hesabix_api_base"><?php esc_html_e( 'آدرس پایه API (سرور)', 'hesabix-chat' ); ?></label></th>
 						<td>
@@ -439,6 +442,11 @@ class Hesabix_Chat_Admin {
 							<input name="<?php echo esc_attr( self::OPTION_NAME . '[public_key]' ); ?>" type="text" id="hesabix_public_key" class="large-text" value="<?php echo esc_attr( $o['public_key'] ); ?>" autocomplete="off" />
 						</td>
 					</tr>
+					</table>
+				</div>
+				<div class="hesabix-chat-tab-panel" data-tab="display" hidden>
+					<h2 class="screen-reader-text"><?php esc_html_e( 'محل و نحوهٔ نمایش', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><?php esc_html_e( 'نمایش ویجت', 'hesabix-chat' ); ?></th>
 						<td>
@@ -446,6 +454,29 @@ class Hesabix_Chat_Admin {
 							<label><input name="<?php echo esc_attr( self::OPTION_NAME . '[load_mode]' ); ?>" type="radio" value="shortcode" <?php checked( $o['load_mode'], 'shortcode' ); ?> /> <?php esc_html_e( 'فقط با شورتکد [hesabix_chat] در برگه/نوشته', 'hesabix-chat' ); ?></label>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'مخفی کردن دکمه شناور', 'hesabix-chat' ); ?></th>
+						<td>
+							<p class="description" style="margin-top:0;"><?php esc_html_e( 'فقط وقتی «نمایش ویجت» روی «در تمام صفحات» است اعمال می‌شود. صفحه‌ای که فقط با شورتکد چت دارد تحت این قواعد نیست.', 'hesabix-chat' ); ?></p>
+							<label>
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_front]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['hide_launcher_front'] ?? 0 ) ); ?> />
+								<?php esc_html_e( 'مخفی در صفحهٔ اصلی', 'hesabix-chat' ); ?>
+							</label>
+							<p>
+								<label for="hesabix_hide_ids"><?php esc_html_e( 'شناسه برگه/نوشته (با ویرگول یا فاصله)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_post_ids]' ); ?>" type="text" id="hesabix_hide_ids" class="large-text" value="<?php echo esc_attr( (string) ( $o['hide_launcher_post_ids'] ?? '' ) ); ?>" placeholder="12, 45" />
+							</p>
+							<p>
+								<label for="hesabix_hide_paths"><?php esc_html_e( 'مسیر URL (هر خط یک پیشوند، از / شروع کنید)', 'hesabix-chat' ); ?></label><br />
+								<textarea name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_paths]' ); ?>" id="hesabix_hide_paths" class="large-text" rows="4" placeholder="/cart&#10;/checkout"><?php echo esc_textarea( (string) ( $o['hide_launcher_paths'] ?? '' ) ); ?></textarea>
+							</p>
+						</td>
+					</tr>
+					</table>
+				</div>
+				<div class="hesabix-chat-tab-panel" data-tab="content" hidden>
+					<h2 class="screen-reader-text"><?php esc_html_e( 'متن و تجربهٔ بازدیدکننده', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><label for="hesabix_button_text"><?php esc_html_e( 'متن دکمه', 'hesabix-chat' ); ?></label></th>
 						<td><input name="<?php echo esc_attr( self::OPTION_NAME . '[button_text]' ); ?>" type="text" id="hesabix_button_text" class="regular-text" value="<?php echo esc_attr( $o['button_text'] ); ?>" /></td>
@@ -475,6 +506,11 @@ class Hesabix_Chat_Admin {
 							<p class="description"><?php esc_html_e( 'هر خط یک جفت: متن دکمه (پرسش) سپس | سپس پاسخ آماده. با کلیک بازدیدکننده، پرسش مثل پیام عادی به مکالمه ارسال می‌شود و پاسخ در همان پنل به‌صورت حباب پشتیبانی نمایش داده می‌شود (فقط در مرورگر؛ در CRM فقط همان پرسش دیده می‌شود). حداکثر ۱۲ خط؛ در هر بخش حدود ۲۰۰ و ۲۰۰۰ نویسه.', 'hesabix-chat' ); ?></p>
 						</td>
 					</tr>
+					</table>
+				</div>
+				<div class="hesabix-chat-tab-panel" data-tab="appearance" hidden>
+					<h2 class="screen-reader-text"><?php esc_html_e( 'ظاهر، ابعاد و جایگاه', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><label for="hesabix_ui_preset"><?php esc_html_e( 'الگوی ظاهر', 'hesabix-chat' ); ?></label></th>
 						<td>
@@ -524,43 +560,6 @@ class Hesabix_Chat_Admin {
 								<option value="top-right" <?php selected( $o['button_position'], 'top-right' ); ?>><?php esc_html_e( 'بالا · راست', 'hesabix-chat' ); ?></option>
 								<option value="top-left" <?php selected( $o['button_position'], 'top-left' ); ?>><?php esc_html_e( 'بالا · چپ', 'hesabix-chat' ); ?></option>
 							</select>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'جلب توجه به دکمه (وقتی پنل بسته است)', 'hesabix-chat' ); ?></th>
-						<td>
-							<p class="description" style="margin-top:0;"><?php esc_html_e( 'انیمیشن روی دکمهٔ گفتگو فقط وقتی پنل بسته باشد اجرا می‌شود؛ با باز کردن پنل متوقف می‌شود و با بستن دوباره (فوری) از سر گرفته می‌شود. در حالت «کاهش حرکت» سیستم‌عامل غیرفعال می‌شود.', 'hesabix-chat' ); ?></p>
-							<p>
-								<label for="hesabix_launcher_anim"><?php esc_html_e( 'نوع انیمیشن', 'hesabix-chat' ); ?></label><br />
-								<select name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_idle_animation]' ); ?>" id="hesabix_launcher_anim">
-									<option value="none" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'none' ); ?>><?php esc_html_e( 'بدون انیمیشن', 'hesabix-chat' ); ?></option>
-									<option value="bounce" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'bounce' ); ?>><?php esc_html_e( 'جهش عمودی (بالا–پایین)', 'hesabix-chat' ); ?></option>
-									<option value="pulse" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'pulse' ); ?>><?php esc_html_e( 'تپش (بزرگ‌وشدن)', 'hesabix-chat' ); ?></option>
-									<option value="shake" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'shake' ); ?>><?php esc_html_e( 'لرزش افقی', 'hesabix-chat' ); ?></option>
-									<option value="wiggle" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'wiggle' ); ?>><?php esc_html_e( 'تکان چرخشی آیکون', 'hesabix-chat' ); ?></option>
-									<option value="glow" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'glow' ); ?>><?php esc_html_e( 'درخشش سایه', 'hesabix-chat' ); ?></option>
-									<option value="ring" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'ring' ); ?>><?php esc_html_e( 'حلقهٔ نبض (پالس)', 'hesabix-chat' ); ?></option>
-									<option value="float" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'float' ); ?>><?php esc_html_e( 'شناور ملایم', 'hesabix-chat' ); ?></option>
-								</select>
-							</p>
-							<p>
-								<label for="hesabix_launcher_anim_delay"><?php esc_html_e( 'تأخیر شروع انیمیشن پس از لود صفحه (ثانیه)', 'hesabix-chat' ); ?></label><br />
-								<input name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_attention_delay_sec]' ); ?>" type="number" id="hesabix_launcher_anim_delay" min="0" max="600" value="<?php echo (int) ( $o['launcher_attention_delay_sec'] ?? 3 ); ?>" />
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'باز بودن خودکار پنل', 'hesabix-chat' ); ?></th>
-						<td>
-							<label>
-								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_on_load]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['open_panel_on_load'] ?? 0 ) ); ?> />
-								<?php esc_html_e( 'با بارگذاری صفحه، پنل گفتگو از همان ابتدا باز باشد (دیالوگ باز).', 'hesabix-chat' ); ?>
-							</label>
-							<p>
-								<label for="hesabix_open_panel_delay"><?php esc_html_e( 'تأخیر باز شدن پنل (ثانیه)', 'hesabix-chat' ); ?></label><br />
-								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_delay_sec]' ); ?>" type="number" id="hesabix_open_panel_delay" min="0" max="120" value="<?php echo (int) ( $o['open_panel_delay_sec'] ?? 0 ); ?>" />
-								<span class="description"><?php esc_html_e( '۰ یعنی بلافاصله پس از آماده‌شدن ویجت.', 'hesabix-chat' ); ?></span>
-							</p>
 						</td>
 					</tr>
 					<tr>
@@ -633,27 +632,56 @@ class Hesabix_Chat_Admin {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><?php esc_html_e( 'مخفی کردن دکمه شناور', 'hesabix-chat' ); ?></th>
+						<th scope="row"><label for="hesabix_radius"><?php esc_html_e( 'گردی گوشه پنل (px)', 'hesabix-chat' ); ?></label></th>
+						<td><input name="<?php echo esc_attr( self::OPTION_NAME . '[border_radius]' ); ?>" type="number" id="hesabix_radius" min="0" max="40" value="<?php echo (int) $o['border_radius']; ?>" /></td>
+					</tr>
+					</table>
+				</div>
+				<div class="hesabix-chat-tab-panel" data-tab="behavior" hidden>
+					<h2 class="screen-reader-text"><?php esc_html_e( 'رفتار دکمه و پنل', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'جلب توجه به دکمه (وقتی پنل بسته است)', 'hesabix-chat' ); ?></th>
 						<td>
-							<p class="description" style="margin-top:0;"><?php esc_html_e( 'فقط وقتی «نمایش ویجت» روی «در تمام صفحات» است اعمال می‌شود. صفحه‌ای که فقط با شورتکد چت دارد تحت این قواعد نیست.', 'hesabix-chat' ); ?></p>
-							<label>
-								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_front]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['hide_launcher_front'] ?? 0 ) ); ?> />
-								<?php esc_html_e( 'مخفی در صفحهٔ اصلی', 'hesabix-chat' ); ?>
-							</label>
+							<p class="description" style="margin-top:0;"><?php esc_html_e( 'انیمیشن روی دکمهٔ گفتگو فقط وقتی پنل بسته باشد اجرا می‌شود؛ با باز کردن پنل متوقف می‌شود و با بستن دوباره (فوری) از سر گرفته می‌شود. در حالت «کاهش حرکت» سیستم‌عامل غیرفعال می‌شود.', 'hesabix-chat' ); ?></p>
 							<p>
-								<label for="hesabix_hide_ids"><?php esc_html_e( 'شناسه برگه/نوشته (با ویرگول یا فاصله)', 'hesabix-chat' ); ?></label><br />
-								<input name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_post_ids]' ); ?>" type="text" id="hesabix_hide_ids" class="large-text" value="<?php echo esc_attr( (string) ( $o['hide_launcher_post_ids'] ?? '' ) ); ?>" placeholder="12, 45" />
+								<label for="hesabix_launcher_anim"><?php esc_html_e( 'نوع انیمیشن', 'hesabix-chat' ); ?></label><br />
+								<select name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_idle_animation]' ); ?>" id="hesabix_launcher_anim">
+									<option value="none" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'none' ); ?>><?php esc_html_e( 'بدون انیمیشن', 'hesabix-chat' ); ?></option>
+									<option value="bounce" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'bounce' ); ?>><?php esc_html_e( 'جهش عمودی (بالا–پایین)', 'hesabix-chat' ); ?></option>
+									<option value="pulse" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'pulse' ); ?>><?php esc_html_e( 'تپش (بزرگ‌وشدن)', 'hesabix-chat' ); ?></option>
+									<option value="shake" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'shake' ); ?>><?php esc_html_e( 'لرزش افقی', 'hesabix-chat' ); ?></option>
+									<option value="wiggle" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'wiggle' ); ?>><?php esc_html_e( 'تکان چرخشی آیکون', 'hesabix-chat' ); ?></option>
+									<option value="glow" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'glow' ); ?>><?php esc_html_e( 'درخشش سایه', 'hesabix-chat' ); ?></option>
+									<option value="ring" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'ring' ); ?>><?php esc_html_e( 'حلقهٔ نبض (پالس)', 'hesabix-chat' ); ?></option>
+									<option value="float" <?php selected( (string) ( $o['launcher_idle_animation'] ?? 'none' ), 'float' ); ?>><?php esc_html_e( 'شناور ملایم', 'hesabix-chat' ); ?></option>
+								</select>
 							</p>
 							<p>
-								<label for="hesabix_hide_paths"><?php esc_html_e( 'مسیر URL (هر خط یک پیشوند، از / شروع کنید)', 'hesabix-chat' ); ?></label><br />
-								<textarea name="<?php echo esc_attr( self::OPTION_NAME . '[hide_launcher_paths]' ); ?>" id="hesabix_hide_paths" class="large-text" rows="4" placeholder="/cart&#10;/checkout"><?php echo esc_textarea( (string) ( $o['hide_launcher_paths'] ?? '' ) ); ?></textarea>
+								<label for="hesabix_launcher_anim_delay"><?php esc_html_e( 'تأخیر شروع انیمیشن پس از لود صفحه (ثانیه)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[launcher_attention_delay_sec]' ); ?>" type="number" id="hesabix_launcher_anim_delay" min="0" max="600" value="<?php echo (int) ( $o['launcher_attention_delay_sec'] ?? 3 ); ?>" />
 							</p>
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="hesabix_radius"><?php esc_html_e( 'گردی گوشه پنل (px)', 'hesabix-chat' ); ?></label></th>
-						<td><input name="<?php echo esc_attr( self::OPTION_NAME . '[border_radius]' ); ?>" type="number" id="hesabix_radius" min="0" max="40" value="<?php echo (int) $o['border_radius']; ?>" /></td>
+						<th scope="row"><?php esc_html_e( 'باز بودن خودکار پنل', 'hesabix-chat' ); ?></th>
+						<td>
+							<label>
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_on_load]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['open_panel_on_load'] ?? 0 ) ); ?> />
+								<?php esc_html_e( 'با بارگذاری صفحه، پنل گفتگو از همان ابتدا باز باشد (دیالوگ باز).', 'hesabix-chat' ); ?>
+							</label>
+							<p>
+								<label for="hesabix_open_panel_delay"><?php esc_html_e( 'تأخیر باز شدن پنل (ثانیه)', 'hesabix-chat' ); ?></label><br />
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_delay_sec]' ); ?>" type="number" id="hesabix_open_panel_delay" min="0" max="120" value="<?php echo (int) ( $o['open_panel_delay_sec'] ?? 0 ); ?>" />
+								<span class="description"><?php esc_html_e( '۰ یعنی بلافاصله پس از آماده‌شدن ویجت.', 'hesabix-chat' ); ?></span>
+							</p>
+						</td>
 					</tr>
+					</table>
+				</div>
+				<div class="hesabix-chat-tab-panel" data-tab="chat" hidden>
+					<h2 class="screen-reader-text"><?php esc_html_e( 'گزینه‌های چت و فرم', 'hesabix-chat' ); ?></h2>
+					<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><?php esc_html_e( 'ارسال فایل', 'hesabix-chat' ); ?></th>
 						<td>

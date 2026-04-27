@@ -56,7 +56,7 @@
 		}
 	}
 
-	chatLog( 'راه\u200cاندازی', {
+	chatLogV( 'راه\u200cاندازی', {
 		loadMode: cfg.loadMode,
 		hasApiBase: Boolean( cfg.apiBase && String( cfg.apiBase ).length ),
 		hasPublicKey: Boolean( cfg.publicKey && String( cfg.publicKey ).length ),
@@ -559,7 +559,13 @@
 	var sendBtn = document.createElement( 'button' );
 	sendBtn.type = 'button';
 	sendBtn.className = 'hesabix-chat-send';
-	sendBtn.textContent = cfg.strings.send;
+	var sendLabel = ( cfg.strings && cfg.strings.send ) ? String( cfg.strings.send ) : '';
+	var sendTip = ( cfg.strings && cfg.strings.sendTooltip ) ? String( cfg.strings.sendTooltip ) : sendLabel;
+	sendBtn.setAttribute( 'aria-label', sendLabel );
+	sendBtn.setAttribute( 'title', sendTip );
+	sendBtn.innerHTML =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+		'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
 	row.appendChild( ta );
 	row.appendChild( sendBtn );
 	comp.appendChild( errC );
@@ -611,6 +617,7 @@
 			return;
 		}
 		var optUrl = base + '/api/v1/public/crm-chat/widget-options?public_key=' + encodeURIComponent( cfg.publicKey );
+		var runFetch = function () {
 		fetch( optUrl, { method: 'GET', credentials: 'omit' } )
 			.then( function ( res ) {
 				return res.text().then( function ( t ) {
@@ -651,10 +658,16 @@
 				} );
 			} )
 			.catch( function () {} );
+		};
+		if ( typeof window.requestIdleCallback === 'function' ) {
+			window.requestIdleCallback( runFetch, { timeout: 4000 } );
+		} else {
+			setTimeout( runFetch, 1 );
+		}
 	}
 	setupVisitorFileUpload();
 
-	chatLog( 'DOM آماده', {
+	chatLogV( 'DOM آماده', {
 		hostId: host.id,
 		hostClass: host.className,
 		shortcode: host.classList.contains( 'hesabix-chat-host--shortcode' ),
@@ -1165,15 +1178,25 @@
 			conversation_id: existing.conversation_id,
 			visitor_token: existing.visitor_token
 		};
-		enterChatMode();
 		afterSessionReady( true )
-			.then( function () {} )
+			.then( function () {
+				deferUntilPagePaint( function () {
+					runLauncherBoot( true );
+				} );
+			} )
 			.catch( function ( se ) {
 				chatLogV( 'بازیابی نشست محلی ناموفق', se );
 				clearSession();
 				state.session = null;
 				enterFormMode();
+				deferUntilPagePaint( function () {
+					runLauncherBoot( false );
+				} );
 			} );
+	} else {
+		deferUntilPagePaint( function () {
+			runLauncherBoot( false );
+		} );
 	}
 
 	formEl.addEventListener( 'submit', function ( ev ) {
@@ -1203,7 +1226,7 @@
 			} );
 	} );
 
-	sendBtn.addEventListener( 'click', function () {
+	function submitComposerMessage() {
 		if ( ! state.session ) {
 			return;
 		}
@@ -1225,6 +1248,17 @@
 			.catch( function ( e ) {
 				showFormError( errC, e.message || cfg.strings.errorGeneric );
 			} );
+	}
+	sendBtn.addEventListener( 'click', submitComposerMessage );
+	ta.addEventListener( 'keydown', function ( e ) {
+		if ( e.key !== 'Enter' ) {
+			return;
+		}
+		if ( ! ( e.ctrlKey || e.metaKey ) ) {
+			return;
+		}
+		e.preventDefault();
+		submitComposerMessage();
 	} );
 
 	ta.addEventListener( 'input', function () {
@@ -1305,7 +1339,7 @@
 		}, d * 1000 );
 	}
 
-	function setOpen( v ) {
+	function setOpen( v, skipDataRefresh ) {
 		state.open = v;
 		btn.setAttribute( 'aria-expanded', v ? 'true' : 'false' );
 		if ( v ) {
@@ -1316,7 +1350,7 @@
 			( function () {
 				var st = ( typeof getComputedStyle === 'function' ) ? getComputedStyle( panel ) : null;
 				var r = ( typeof panel.getBoundingClientRect === 'function' ) ? panel.getBoundingClientRect() : null;
-				chatLog( 'پنل باز', {
+				chatLogV( 'پنل باز', {
 					hasSession: Boolean( state.session ),
 					className: panel.className,
 					rect: r ? { w: r.width, h: r.height, top: r.top, left: r.left } : null,
@@ -1324,11 +1358,15 @@
 				} );
 			} )();
 			if ( state.session ) {
-				refreshMessages()
-					.then( function () {
-						bindRealtime();
-					} )
-					.catch( function () {} );
+				if ( skipDataRefresh ) {
+					bindRealtime();
+				} else {
+					refreshMessages()
+						.then( function () {
+							bindRealtime();
+						} )
+						.catch( function () {} );
+				}
 			}
 		} else {
 			panel.classList.add( 'hesabix-chat--hidden' );
@@ -1353,10 +1391,29 @@
 		}
 	} );
 
-	scheduleLauncherAttention();
+	function deferUntilPagePaint( fn ) {
+		var run = function () {
+			if ( typeof window.requestAnimationFrame === 'function' ) {
+				window.requestAnimationFrame( function () {
+					window.requestAnimationFrame( fn );
+				} );
+			} else {
+				setTimeout( fn, 0 );
+			}
+		};
+		if ( document.readyState === 'complete' ) {
+			run();
+		} else {
+			window.addEventListener( 'load', run, { once: true } );
+		}
+	}
 
-	var opl = cfg.openPanelOnLoad;
-	if ( opl === true || opl === 1 || opl === '1' ) {
+	function wantsOpenOnLoad() {
+		var opl = cfg.openPanelOnLoad;
+		return opl === true || opl === 1 || opl === '1';
+	}
+
+	function openPanelDelayMs() {
 		var odl = Number( cfg.openPanelDelaySec );
 		if ( isNaN( odl ) || odl < 0 ) {
 			odl = 0;
@@ -1364,8 +1421,17 @@
 		if ( odl > 120 ) {
 			odl = 120;
 		}
+		return odl * 1000;
+	}
+
+	function runLauncherBoot( skipRefreshOnOpen ) {
+		scheduleLauncherAttention();
+		if ( ! wantsOpenOnLoad() ) {
+			return;
+		}
+		var ms = openPanelDelayMs();
 		setTimeout( function () {
-			setOpen( true );
-		}, odl * 1000 );
+			setOpen( true, skipRefreshOnOpen === true );
+		}, ms );
 	}
 } )();

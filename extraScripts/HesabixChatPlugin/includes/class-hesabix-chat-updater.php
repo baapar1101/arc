@@ -23,6 +23,41 @@ class Hesabix_Chat_Updater {
 	}
 
 	/**
+	 * آرگومان‌های مشترک wp_remote_get (قابل تغییر با فیلتر برای میزبان‌های خاص).
+	 *
+	 * @param string $context raw_php|manifest|zip_head .
+	 * @return array<string, mixed>
+	 */
+	private function remote_get_args( $context = 'raw_php' ) {
+		$accept = 'text/plain';
+		if ( 'manifest' === $context ) {
+			$accept = 'application/json';
+		}
+		$args = array(
+			'timeout'     => 15,
+			'redirection' => 8,
+			'sslverify'   => true,
+			'headers'     => array(
+				'Accept'     => $accept,
+				'User-Agent' => 'HesabixChat-WordPress/' . HESABIX_CHAT_VERSION . '; ' . get_bloginfo( 'url' ),
+			),
+		);
+		return (array) apply_filters( 'hesabix_chat_update_http_args', $args, $context );
+	}
+
+	/**
+	 * @param string $body .
+	 * @return string
+	 */
+	private function strip_utf8_bom( $body ) {
+		$body = (string) $body;
+		if ( strncmp( $body, "\xEF\xBB\xBF", 3 ) === 0 ) {
+			return substr( $body, 3 );
+		}
+		return $body;
+	}
+
+	/**
 	 * @return void
 	 */
 	public function __construct() {
@@ -66,7 +101,9 @@ class Hesabix_Chat_Updater {
 		if ( $r === '' || $z === '' ) {
 			return false;
 		}
-		if ( 0 !== strpos( $r, 'https://' ) || 0 !== strpos( $z, 'https://' ) ) {
+		$ok_r = ( 0 === strpos( $r, 'https://' ) || 0 === strpos( $r, 'http://' ) );
+		$ok_z = ( 0 === strpos( $z, 'https://' ) || 0 === strpos( $z, 'http://' ) );
+		if ( ! $ok_r || ! $ok_z ) {
 			return false;
 		}
 		return true;
@@ -104,21 +141,15 @@ class Hesabix_Chat_Updater {
 	private function get_info_from_source() {
 		$url = $this->get_raw_php_url();
 		$zip = $this->get_archive_zip_url();
-		$resp = wp_remote_get(
-			$url,
-			array(
-				'timeout'    => 15,
-				'redirection'=> 2,
-				'sslverify'  => true,
-				'headers'    => array( 'Accept' => 'text/plain' ),
-				'user-agent' => 'HesabixChat-WordPress/' . HESABIX_CHAT_VERSION . '; ' . get_bloginfo( 'url' ),
-			)
-		);
+		$resp = wp_remote_get( $url, $this->remote_get_args( 'raw_php' ) );
 		if ( is_wp_error( $resp ) || (int) wp_remote_retrieve_response_code( $resp ) !== 200 ) {
 			return null;
 		}
-		$body = wp_remote_retrieve_body( $resp );
+		$body = $this->strip_utf8_bom( wp_remote_retrieve_body( $resp ) );
 		if ( $body === null || $body === '' ) {
+			return null;
+		}
+		if ( stripos( $body, '<html' ) !== false && stripos( $body, '<?php' ) === false ) {
 			return null;
 		}
 		$headers = $this->parse_main_file_headers( $body );
@@ -149,19 +180,10 @@ class Hesabix_Chat_Updater {
 	 */
 	private function get_info_from_json_manifest() {
 		$url = $this->get_manifest_url();
-		if ( $url === '' || 0 !== strpos( $url, 'https://' ) ) {
+		if ( $url === '' || ( 0 !== strpos( $url, 'https://' ) && 0 !== strpos( $url, 'http://' ) ) ) {
 			return null;
 		}
-		$resp = wp_remote_get(
-			$url,
-			array(
-				'timeout'     => 12,
-				'redirection' => 2,
-				'sslverify'   => true,
-				'headers'     => array( 'Accept' => 'application/json' ),
-				'user-agent'  => 'HesabixChat-WordPress/' . HESABIX_CHAT_VERSION . '; ' . get_bloginfo( 'url' ),
-			)
-		);
+		$resp = wp_remote_get( $url, $this->remote_get_args( 'manifest' ) );
 		if ( is_wp_error( $resp ) || (int) wp_remote_retrieve_response_code( $resp ) !== 200 ) {
 			return null;
 		}
@@ -174,7 +196,7 @@ class Hesabix_Chat_Updater {
 			return null;
 		}
 		$dl = esc_url_raw( (string) $data['download_url'] );
-		if ( $dl === '' || 0 !== strpos( $dl, 'https://' ) ) {
+		if ( $dl === '' || ( 0 !== strpos( $dl, 'https://' ) && 0 !== strpos( $dl, 'http://' ) ) ) {
 			return null;
 		}
 		return array(

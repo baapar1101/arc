@@ -3,7 +3,7 @@
  * Plugin Name:       Hesabix Web Chat
  * Plugin URI:        https://hesabix.ir
  * Description:       اتصال سایت وردپرس به چت وب CRM حسابیکس؛ ارتباط بازدیدکننده با کسب‌وکار از طریق API عمومی.
- * Version:           1.0.15
+ * Version:           1.0.18
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Hesabix
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'HESABIX_CHAT_VERSION', '1.0.15' );
+define( 'HESABIX_CHAT_VERSION', '1.0.18' );
 define( 'HESABIX_CHAT_FILE', __FILE__ );
 define( 'HESABIX_CHAT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'HESABIX_CHAT_URL', plugin_dir_url( __FILE__ ) );
@@ -29,7 +29,7 @@ define( 'HESABIX_CHAT_URL', plugin_dir_url( __FILE__ ) );
 if ( ! defined( 'HESABIX_CHAT_UPDATE_RAW_PHP_URL' ) ) {
 	define(
 		'HESABIX_CHAT_UPDATE_RAW_PHP_URL',
-		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/raw/master/hesabix-chat.php'
+		'https://source.hesabix.ir/hesabix/HesabixChatPlugin/raw/branch/master/hesabix-chat.php'
 	);
 }
 if ( ! defined( 'HESABIX_CHAT_UPDATE_ARCHIVE_ZIP_URL' ) ) {

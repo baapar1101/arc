@@ -678,14 +678,24 @@
 }
 
 .hesabix-chat-composer button.hesabix-chat-send {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	background: var( --hesabix-btn, #4f46e5 );
 	color: #fff;
 	border: none;
 	border-radius: 8px;
-	padding: 0.45rem 0.8rem;
+	padding: 0.45rem 0.55rem;
+	min-width: 2.5rem;
+	min-height: 2.25rem;
 	cursor: pointer;
 	font-weight: 600;
 	white-space: nowrap;
+}
+
+.hesabix-chat-composer button.hesabix-chat-send svg {
+	display: block;
+	flex-shrink: 0;
 }
 
 .hesabix-chat-attach {

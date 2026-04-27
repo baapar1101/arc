@@ -30,5 +30,31 @@
 			$( '#hesabix_logo_preview' ).attr( 'src', '' );
 			$( '#hesabix_logo_preview_wrap' ).hide();
 		} );
+
+		var $tabWrap = $( '.hesabix-chat-settings-tabs' );
+		if ( $tabWrap.length ) {
+			var $tabs = $tabWrap.find( '.nav-tab' );
+			var $panels = $( '.hesabix-chat-tab-panel' );
+			function activateTab( id ) {
+				$tabs.removeClass( 'nav-tab-active' ).attr( 'aria-selected', 'false' );
+				$tabs.filter( '[data-tab="' + id + '"]' ).addClass( 'nav-tab-active' ).attr( 'aria-selected', 'true' );
+				$panels.attr( 'hidden', true );
+				$panels.filter( '[data-tab="' + id + '"]' ).removeAttr( 'hidden' );
+				if ( window.history && window.history.replaceState ) {
+					window.history.replaceState( null, '', '#hesabix-tab-' + id );
+				}
+			}
+			$tabWrap.on( 'click', '.nav-tab', function ( e ) {
+				e.preventDefault();
+				var id = $( this ).data( 'tab' );
+				if ( id ) {
+					activateTab( id );
+				}
+			} );
+			var m = /^#hesabix-tab-(.+)$/.exec( window.location.hash || '' );
+			if ( m && m[1] && $panels.filter( '[data-tab="' + m[1] + '"]' ).length ) {
+				activateTab( m[1] );
+			}
+		}
 	} );
 } )( jQuery );

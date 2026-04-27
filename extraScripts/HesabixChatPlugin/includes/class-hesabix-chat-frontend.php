@@ -182,11 +182,12 @@ class Hesabix_Chat_Frontend {
 		$sn                    = (string) ( $o['agent_reply_sound'] ?? '' );
 		if ( $sn !== '' ) {
 			$allowed_sounds = Hesabix_Chat_Admin::list_agent_reply_sound_files();
-			if ( in_array( $sn, $allowed_sounds, true ) ) {
+			$resolved       = Hesabix_Chat_Admin::resolve_agent_reply_sound_choice( $sn, $allowed_sounds );
+			if ( $resolved !== '' ) {
 				$agent_reply_sound_url = apply_filters(
 					'hesabix_chat_agent_reply_sound_url',
-					HESABIX_CHAT_URL . 'assets/sounds/' . rawurlencode( $sn ),
-					$sn,
+					HESABIX_CHAT_URL . 'assets/sounds/' . rawurlencode( $resolved ),
+					$resolved,
 					$o
 				);
 			}
@@ -248,6 +249,12 @@ class Hesabix_Chat_Frontend {
 					'start'        => __( 'شروع', 'hesabix-chat' ),
 					'placeholder'  => __( 'پیام خود را بنویسید…', 'hesabix-chat' ),
 					'send'         => __( 'ارسال', 'hesabix-chat' ),
+					'sendTooltip'  => sprintf(
+						/* translators: 1: Send action, 2: keyboard shortcut hint */
+						__( '%1$s — %2$s', 'hesabix-chat' ),
+						__( 'ارسال', 'hesabix-chat' ),
+						__( 'میانبر: Ctrl یا ⌘ + Enter', 'hesabix-chat' )
+					),
 					'close'        => __( 'بستن', 'hesabix-chat' ),
 					'back'         => __( 'مکالمه جدید', 'hesabix-chat' ),
 					'attach'       => __( 'پیوست', 'hesabix-chat' ),
