@@ -11200,7 +11200,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmWebChatNoWidgetsYet =>
-      'هنوز ویجی ندارید — از تنظیمات CRM ویجت بسازید.';
+      'هنوز ویجی نساخته‌اید — از + استفاده کنید.';
 
   @override
   String get crmWebChatNoConversations =>

@@ -11252,7 +11252,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatMenuEdit => 'Edit…';
 
   @override
-  String get crmWebChatNoWidgetsYet => 'No widgets yet — create one in CRM settings.';
+  String get crmWebChatNoWidgetsYet => 'No widgets yet — use + to add one.';
 
   @override
   String get crmWebChatNoConversations =>

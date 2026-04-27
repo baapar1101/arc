@@ -167,12 +167,14 @@ adapters/db/models/auth_security_event.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
+adapters/db/models/business_crm_settings.py
 adapters/db/models/business_currency_rate.py
 adapters/db/models/business_dashboard_layout.py
 adapters/db/models/business_ftp_backup_setting.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
 adapters/db/models/business_print_settings.py
+adapters/db/models/business_user_quick_links.py
 adapters/db/models/captcha.py
 adapters/db/models/cash_register.py
 adapters/db/models/category.py
@@ -185,6 +187,7 @@ adapters/db/models/customer_club.py
 adapters/db/models/data_table_user_column_settings.py
 adapters/db/models/distribution.py
 adapters/db/models/document.py
+adapters/db/models/document_invoice_tag.py
 adapters/db/models/document_line.py
 adapters/db/models/document_monetization.py
 adapters/db/models/document_numbering.py
@@ -192,10 +195,12 @@ adapters/db/models/document_share_link.py
 adapters/db/models/email_config.py
 adapters/db/models/email_verification.py
 adapters/db/models/file_storage.py
+adapters/db/models/firewall_rate_policy.py
 adapters/db/models/firewall_rule.py
 adapters/db/models/fiscal_year.py
 adapters/db/models/invoice_item_line.py
 adapters/db/models/marketplace.py
+adapters/db/models/messenger_operator_session.py
 adapters/db/models/mobile_verification.py
 adapters/db/models/monitoring.py
 adapters/db/models/notification.py
@@ -296,6 +301,7 @@ app/core/batch_operations.py
 app/core/cache.py
 app/core/calendar.py
 app/core/calendar_middleware.py
+app/core/crm_web_chat_permissions.py
 app/core/customer_club_plugin_dependency.py
 app/core/db_pool_monitor.py
 app/core/distribution_plugin_dependency.py
@@ -350,6 +356,7 @@ app/services/business_ftp_access.py
 app/services/business_ftp_queue_jobs.py
 app/services/business_ftp_service.py
 app/services/business_notification_service.py
+app/services/business_quick_links_service.py
 app/services/business_sample_data_service.py
 app/services/business_service.py
 app/services/cache_invalidation_subscriber.py
@@ -392,6 +399,7 @@ app/services/invoice_global_discount_service.py
 app/services/invoice_product_price_sync_service.py
 app/services/invoice_profit_ledger_service.py
 app/services/invoice_service.py
+app/services/invoice_tag_service.py
 app/services/invoice_warehouse_bulk_service.py
 app/services/job_manager.py
 app/services/journal_ledger_service.py
@@ -483,6 +491,11 @@ app/services/jobs/invoice_profit_job.py
 app/services/jobs/invoice_profit_ledger_backfill_job.py
 app/services/jobs/report_job.py
 app/services/jobs/tax_submission_job.py
+app/services/messenger_operator/__init__.py
+app/services/messenger_operator/crm_web_chat_access.py
+app/services/messenger_operator/crm_web_chat_flow.py
+app/services/messenger_operator/dispatch.py
+app/services/messenger_operator/session_store.py
 app/services/pdf/__init__.py
 app/services/pdf/base_pdf_service.py
 app/services/pdf/template_renderer.py
@@ -581,6 +594,7 @@ migrations/versions/20260424_000001_customer_club_loyalty_rfm_integration.py
 migrations/versions/20260425_000001_currency_decimal_places.py
 migrations/versions/20260426_000001_business_currency_rates.py
 migrations/versions/20260427_000001_business_fx_revaluation_policy.py
+migrations/versions/20260427_000001_document_invoice_tags.py
 migrations/versions/20260428_000001_sms_destination_rate_limit_log.py
 migrations/versions/20260429_000001_business_print_settings_show_share_qr.py
 migrations/versions/20260429_000002_document_share_links.py
@@ -591,6 +605,14 @@ migrations/versions/20260503_000001_ai_config_function_calling_enabled.py
 migrations/versions/20260504_000001_business_dashboard_layout_tables.py
 migrations/versions/20260504_000002_data_table_user_column_settings.py
 migrations/versions/20260505_000001_crm_chat_embed.py
+migrations/versions/20260525_000001_crm_chat_files_settings.py
+migrations/versions/20260526_000001_person_social_contacts.py
+migrations/versions/20260527_000001_business_user_quick_links.py
+migrations/versions/20260528_000001_firewall_rate_policies.py
+migrations/versions/20260529_000001_crm_chat_message_read_at.py
+migrations/versions/20260601_000001_crm_chat_message_deleted_at.py
+migrations/versions/20260602_000001_messenger_operator_sessions.py
+migrations/versions/20260602_000002_merge_heads_document_invoice_tags_and_messenger_operator_sessions.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
