@@ -16,6 +16,26 @@ log_info() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 log_ok()   { echo "${CHECK_MARK} $*" | tee -a "${LOG_FILE}"; }
 log_err()  { echo "${CROSS_MARK} $*" >&2; echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "${LOG_FILE}"; }
 
+# اگر checkout/pull معمولی شکست بخورد (فایل جنریت لوکال، merge، شاخهٔ منحرف)، کلون را با remote هم‌راستا می‌کند.
+hesabix_force_sync_origin() {
+  log_info "هم‌راستاسازی اجباری با origin/${BRANCH}: git reset --hard (تغییرات و commitهای لوکال این clone از بین می‌روند)."
+  git fetch origin --prune
+  if ! git show-ref -q "origin/${BRANCH}"; then
+    log_err "origin/${BRANCH} بعد از fetch پیدا نشد."
+    return 1
+  fi
+  if git show-ref -q "refs/heads/${BRANCH}"; then
+    git checkout -f "${BRANCH}"
+  else
+    git checkout -b "${BRANCH}" "origin/${BRANCH}"
+  fi
+  if ! git reset --hard "origin/${BRANCH}"; then
+    log_err "git reset --hard origin/${BRANCH} ناموفق بود."
+    return 1
+  fi
+  return 0
+}
+
 # همان منطق deploy.sh: PATH فلاتر برای شِل‌های جدید (/etc/profile.d + خط idempotent در bash.bashrc)
 persist_flutter_path_in_profile_d() {
   local f="/etc/profile.d/hesabix-flutter.sh"
@@ -101,12 +121,17 @@ if [[ "${current_remote}" != "${REPO_URL}" ]]; then
   git remote set-url origin "${REPO_URL}"
 fi
 git fetch origin --prune
-if git show-ref -q "origin/${BRANCH}"; then
-  git checkout -B "${BRANCH}" "origin/${BRANCH}" 2>/dev/null || git checkout "${BRANCH}"
-  git pull origin "${BRANCH}" --ff-only 2>/dev/null || true
+if ! git show-ref -q "origin/${BRANCH}"; then
+  log_err "شاخه origin/${BRANCH} روی remote نیست. BRANCH و REPO_URL را در ${APP_ROOT}/.deploy_env بررسی کنید."
+  exit 1
+fi
+if git checkout -B "${BRANCH}" "origin/${BRANCH}" && git pull origin "${BRANCH}" --ff-only; then
+  :
 else
-  git checkout "${BRANCH}" 2>/dev/null || true
-  git pull origin "${BRANCH}" --ff-only 2>/dev/null || true
+  log_info "به‌روزرسانی معمولی Git ناموفق (مثلاً تغییرات محلی یا هم‌نشانی نشدن شاخه). در حال بازیابی با reset --hard..."
+  if ! hesabix_force_sync_origin; then
+    exit 1
+  fi
 fi
 log_ok "Source updated."
 
