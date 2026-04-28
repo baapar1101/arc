@@ -4067,6 +4067,18 @@ abstract class AppLocalizations {
   /// **'Add Product or Service'**
   String get addProduct;
 
+  /// No description provided for @duplicateProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Product / Service'**
+  String get duplicateProduct;
+
+  /// No description provided for @productDuplicatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Product copy was created successfully'**
+  String get productDuplicatedSuccessfully;
+
   /// No description provided for @viewProducts.
   ///
   /// In en, this message translates to:
@@ -4654,6 +4666,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add Invoice'**
   String get addInvoice;
+
+  /// No description provided for @invoiceCopyOpenNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to new invoice'**
+  String get invoiceCopyOpenNew;
 
   /// No description provided for @viewInvoices.
   ///
@@ -20842,6 +20860,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deleting this message cannot be undone. Continue?'**
   String get crmWebChatDeleteMessageConfirm;
+
+  /// No description provided for @crmWebChatDeleteConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation'**
+  String get crmWebChatDeleteConversation;
+
+  /// No description provided for @crmWebChatDeleteConversationConfirm.
+  String get crmWebChatDeleteConversationConfirm;
+
+  /// No description provided for @crmWebChatConversationDeleted.
+  String get crmWebChatConversationDeleted;
+
+  /// No description provided for @crmWebChatEditMessageTitle.
+  String get crmWebChatEditMessageTitle;
+
+  /// No description provided for @crmWebChatEditMessageHint.
+  String get crmWebChatEditMessageHint;
+
+  /// No description provided for @crmWebChatEditMessageSaved.
+  String get crmWebChatEditMessageSaved;
+
+  /// No description provided for @crmWebChatMessageEditedBadge.
+  String get crmWebChatMessageEditedBadge;
 
   /// No description provided for @crmWebChatRefreshTooltip.
   ///

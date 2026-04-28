@@ -2066,6 +2066,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get addProduct => 'افزودن کالا یا خدمت';
 
   @override
+  String get duplicateProduct => 'کپی کالا یا خدمت';
+
+  @override
+  String get productDuplicatedSuccessfully => 'کپی کالا با موفقیت ثبت شد';
+
+  @override
   String get viewProducts => 'مشاهده کالاها و خدمات';
 
   @override
@@ -2366,6 +2372,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get addInvoice => 'افزودن فاکتور';
+
+  @override
+  String get invoiceCopyOpenNew => 'کپی به فاکتور جدید';
 
   @override
   String get viewInvoices => 'صورت حساب‌ها';
@@ -11114,6 +11123,28 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get crmWebChatDeleteMessageConfirm =>
       'حذف این پیام غیرقابل بازگردانی است. ادامه می‌دهید؟';
+
+  @override
+  String get crmWebChatDeleteConversation => 'حذف مکالمه';
+
+  @override
+  String get crmWebChatDeleteConversationConfirm =>
+      'این مکالمه و تمام پیام‌هایش برای همیشه حذف می‌شوند. ادامه می‌دهید؟';
+
+  @override
+  String get crmWebChatConversationDeleted => 'مکالمه حذف شد';
+
+  @override
+  String get crmWebChatEditMessageTitle => 'ویرایش پیام';
+
+  @override
+  String get crmWebChatEditMessageHint => 'متن جدید…';
+
+  @override
+  String get crmWebChatEditMessageSaved => 'پیام به‌روز شد';
+
+  @override
+  String get crmWebChatMessageEditedBadge => '(ویرایش‌شده)';
 
   @override
   String get crmWebChatRefreshTooltip => 'بارگذاری مجدد';

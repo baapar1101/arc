@@ -85,6 +85,11 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-mapper.php';
 
 		/**
+		 * Invoice / tag helpers for sync.
+		 */
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-invoice-helper.php';
+
+		/**
 		 * The class responsible for validation.
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-validation.php';
@@ -140,10 +145,10 @@ class Hesabix_V2
 			$this->loader->add_action('woocommerce_new_product', $plugin_admin, 'on_product_create');
 			$this->loader->add_action('before_delete_post', $plugin_admin, 'on_product_delete');
 			
-			// Order sync hooks (همگام‌سازی بعد از تکمیل چک‌اوت — woocommerce_new_order قبل از ذخیره آیتم‌ها اجرا می‌شود)
-			$this->loader->add_action('woocommerce_new_order', $plugin_admin, 'on_order_create', 10, 2);
-			$this->loader->add_action('woocommerce_checkout_order_processed', $plugin_admin, 'on_checkout_order_processed', 20, 3);
-			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'on_order_status_change', 10, 4);
+			// Order → invoice: زمان‌بندی از تنظیمات (چک‌اوت، پرداخت، تغییر وضعیت)
+			$this->loader->add_action('woocommerce_checkout_order_processed', $plugin_admin, 'maybe_sync_order_on_checkout', 20, 3);
+			$this->loader->add_action('woocommerce_payment_complete', $plugin_admin, 'maybe_sync_order_on_payment_complete', 10, 1);
+			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_sync_order_on_status_change', 10, 4);
 			
 			// Customer sync hooks
 			$this->loader->add_action('user_register', $plugin_admin, 'on_customer_register');
@@ -156,6 +161,7 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_products', $plugin_admin, 'ajax_sync_products');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_customers', $plugin_admin, 'ajax_sync_customers');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_warehouses_and_banks', $plugin_admin, 'ajax_get_warehouses_and_banks');
+		$this->loader->add_action('wp_ajax_hesabix_v2_get_invoice_tags', $plugin_admin, 'ajax_get_invoice_tags');
 
 		// Setup wizard AJAX
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_verify_api_key', $plugin_admin, 'ajax_setup_verify_api_key');

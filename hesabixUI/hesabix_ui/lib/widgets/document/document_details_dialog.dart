@@ -898,6 +898,79 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             ? Colors.red
             : theme.colorScheme.onSurfaceVariant;
 
+    // رنگ نشانگر «پیش‌نویس / قطعی» در چیپ وضعیت (مستقل از تراز سند)
+    Color documentStatusChipColor(ThemeData t) {
+      final doc = _document;
+      if (doc == null) return t.colorScheme.onSurfaceVariant;
+      return doc.isProforma
+          ? (t.brightness == Brightness.dark ? Colors.amberAccent : Colors.deepOrange.shade700)
+          : Colors.green.shade700;
+    }
+
+    final headerChips = <Widget>[
+      if (_document != null)
+        _buildHeaderChip(
+          _document!.getDocumentTypeName(),
+          theme,
+        ),
+      if (_document?.documentDateDisplay != null)
+        _buildHeaderChip(
+          'تاریخ: ${_document!.documentDateDisplay}',
+          theme,
+          icon: Icons.calendar_today,
+        ),
+      if (isInvoice && _document != null)
+        _buildHeaderChip(
+          'مبلغ: ${formatter.format((_document!.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0)}',
+          theme,
+          icon: Icons.attach_money,
+          iconColor: balanceColor,
+        ),
+      if (_document?.statusText != null)
+        _buildHeaderChip(
+          'وضعیت: ${_document!.statusText}',
+          theme,
+          icon: Icons.circle,
+          iconColor: documentStatusChipColor(theme),
+        ),
+      if (_isLoading)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 6),
+            Text('در حال بروزرسانی...'),
+          ],
+        ),
+    ];
+
+    Widget chipsArea;
+    if (dense) {
+      chipsArea = SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < headerChips.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              headerChips[i],
+            ],
+          ],
+        ),
+      );
+    } else {
+      chipsArea = Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: headerChips,
+      );
+    }
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: dense ? 8 : 24, vertical: dense ? 8 : 16),
       decoration: BoxDecoration(
@@ -932,50 +1005,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   ),
                 ),
                 const SizedBox(height: 4),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    if (_document != null)
-                      _buildHeaderChip(
-                        _document!.getDocumentTypeName(),
-                        theme,
-                      ),
-                    if (_document?.documentDateDisplay != null)
-                      _buildHeaderChip(
-                        'تاریخ: ${_document!.documentDateDisplay}',
-                        theme,
-                        icon: Icons.calendar_today,
-                      ),
-                    if (isInvoice && _document != null)
-                      _buildHeaderChip(
-                        'مبلغ: ${formatter.format((_document!.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0)}',
-                        theme,
-                        icon: Icons.attach_money,
-                        iconColor: balanceColor,
-                      ),
-                    if (_document?.statusText != null)
-                      _buildHeaderChip(
-                        'وضعیت: ${_document!.statusText}',
-                        theme,
-                        icon: Icons.circle,
-                        iconColor: balanceColor,
-                      ),
-                    if (_isLoading)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: 6),
-                          Text('در حال بروزرسانی...'),
-                        ],
-                      ),
-                  ],
-                ),
+                chipsArea,
               ],
             ),
           ),

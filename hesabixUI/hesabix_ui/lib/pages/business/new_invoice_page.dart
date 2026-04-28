@@ -47,18 +47,22 @@ import '../../models/credit_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
+import '../../utils/invoice_form_prefill.dart';
 
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
   final CalendarController calendarController;
+  /// پر کردن فرم با دادهٔ این فاکتور؛ ذخیره، سند تازه می‌سازد.
+  final int? copyFromInvoiceId;
 
   const NewInvoicePage({
     super.key,
     required this.businessId,
     required this.authStore,
     required this.calendarController,
+    this.copyFromInvoiceId,
   });
 
   @override
@@ -151,6 +155,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   // پلن‌های اقساط
   List<InstallmentPlan> _installmentPlans = <InstallmentPlan>[];
   InstallmentPlan? _selectedInstallmentPlan;
+
+  /// بارگذاری اول دادهٔ کپی از فاکتور دیگر (API)
+  bool _copyFromLoading = false;
+  String? _copyFromErrorMessage;
   
   // Controller های فیلدهای اقساطی برای جلوگیری از از دست رفتن فوکوس
   late final TextEditingController _numInstallmentsController;
@@ -231,6 +239,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
+    _copyFromLoading = widget.copyFromInvoiceId != null;
     _tabController = TabController(length: 4, vsync: this); // شروع با 4 تب
     _attachTabListener();
     // تنظیم نوع فاکتور پیش‌فرض
@@ -241,16 +250,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // تنظیم تاریخ‌های پیش‌فرض
     _invoiceDate = DateTime.now();
     _dueDate = DateTime.now();
-    // افزودن یک ردیف پیش‌فرض کالا
-    _lineItems = [
-      InvoiceLineItem(
-        quantity: 1,
-        unitPrice: 0,
-        unitPriceSource: 'manual',
-        discountValue: 0,
-        taxRate: 0,
-      ),
-    ];
+    // افزودن یک ردیف پیش‌فرض کالا (در حالت کپی از API پر می‌شود)
+    _lineItems = widget.copyFromInvoiceId != null
+        ? <InvoiceLineItem>[]
+        : <InvoiceLineItem>[
+            InvoiceLineItem(
+              quantity: 1,
+              unitPrice: 0,
+              unitPriceSource: 'manual',
+              discountValue: 0,
+              taxRate: 0,
+            ),
+          ];
     // مقداردهی اولیه Controller های اقساطی
     _numInstallmentsController = TextEditingController();
     _downPaymentController = TextEditingController();
@@ -265,15 +276,438 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // بارگذاری تنظیمات چاپ کسب‌وکار
     _loadPrintSettings();
     _loadPrintTemplates();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _applySavedInvoiceLineDiscountType();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.copyFromInvoiceId != null) {
+        await _loadInvoiceCopyFrom(widget.copyFromInvoiceId!);
+      }
+      await _applySavedInvoiceLineDiscountType();
     });
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  DateTime? _parseInvoiceIsoDay(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString();
+    if (s.length < 10) return null;
+    return DateTime.tryParse(s.substring(0, 10));
+  }
+
+  void _disposeInstallmentRowControllersFully() {
+    for (final c in _installmentPrincipalControllers.values) {
+      c.dispose();
+    }
+    for (final c in _installmentInterestControllers.values) {
+      c.dispose();
+    }
+    for (final c in _installmentTotalControllers.values) {
+      c.dispose();
+    }
+    _installmentPrincipalControllers.clear();
+    _installmentInterestControllers.clear();
+    _installmentTotalControllers.clear();
+  }
+
+  void _adjustTabBarLengthAfterPrefill() {
+    final newLen = _getTabCountForType(_selectedInvoiceType);
+    final prevIdx = _tabController.index;
+    if (newLen != _tabController.length) {
+      _tabController.dispose();
+      _tabController = TabController(
+        length: newLen,
+        vsync: this,
+        initialIndex: prevIdx.clamp(0, newLen - 1),
+      );
+      _attachTabListener();
+    }
+  }
+
+  /// باز کردن فاکتور مبدأ فقط برای خواندن؛ تراکنش پرداخت کپی نمی‌شود؛ اقساط به‌صورت طرح تازه ارسال می‌شود؛ نمونهٔ یونیک کالا منتقل نمی‌شود.
+  Future<void> _loadInvoiceCopyFrom(int sourceInvoiceId) async {
+    setState(() {
+      _copyFromLoading = true;
+      _copyFromErrorMessage = null;
+    });
+
+    void showErr(String msg) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: msg);
+      setState(() {
+        _copyFromErrorMessage = msg;
+        _copyFromLoading = false;
+        _transactions = [];
+        _lineItems = [
+          InvoiceLineItem(
+            quantity: 1,
+            unitPrice: 0,
+            unitPriceSource: 'manual',
+            discountValue: 0,
+            taxRate: 0,
+          ),
+        ];
+      });
+    }
+
+    try {
+      final data = await InvoiceService(apiClient: ApiClient()).getInvoice(
+        businessId: widget.businessId,
+        invoiceId: sourceInvoiceId,
+      );
+      final item = Map<String, dynamic>.from(data['item'] ?? const {});
+      final String docType = (item['document_type']?.toString() ?? '');
+      final String typeValue =
+          docType.startsWith('invoice_') ? docType.substring('invoice_'.length) : docType;
+      final invType = InvoiceType.fromValue(typeValue) ?? InvoiceType.sales;
+      final ei = Map<String, dynamic>.from(item['extra_info'] ?? const {});
+
+      final invoiceDateToday = DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+      );
+      final oldDocDate = _parseInvoiceIsoDay(item['document_date']);
+
+      DateTime dueOut = invoiceDateToday;
+      final dueRaw = ei['due_date'];
+      if (oldDocDate != null && dueRaw != null) {
+        final parsedDue = _parseInvoiceIsoDay(dueRaw);
+        if (parsedDue != null) {
+          dueOut = invoiceDateToday.add(parsedDue.difference(_dateOnly(oldDocDate)));
+        }
+      } else {
+        final fb = _parseInvoiceIsoDay(dueRaw);
+        if (fb != null) dueOut = fb;
+      }
+
+      final linesRaw = List<dynamic>.from(item['product_lines'] ?? const []);
+      var mappedLines = invoiceLineItemsFromProductLinesForCopy(linesRaw);
+      if (mappedLines.isEmpty) {
+        mappedLines = [
+          InvoiceLineItem(
+            quantity: 1,
+            unitPrice: 0,
+            unitPriceSource: 'manual',
+            discountValue: 0,
+            taxRate: 0,
+          ),
+        ];
+      }
+
+      final postOk = ei['post_inventory'];
+      final autop = ei['auto_post_warehouse'];
+      final pinv = postOk is bool ? postOk : true;
+      final autoPostResolved = autop is bool ? autop : false;
+      final warehouseMode =
+          pinv ? (autoPostResolved ? 'posted' : 'draft') : 'none';
+
+      int? fxRateIdExtra;
+      final fxx = ei['fx'];
+      if (fxx is Map && fxx['mode']?.toString() == 'selected') {
+        final rrid = fxx['rate_row_id'];
+        if (rrid != null) {
+          fxRateIdExtra =
+              rrid is num ? rrid.toInt() : int.tryParse(rrid.toString());
+        }
+      }
+
+      Customer? cust;
+      Person? supplier;
+      Person? seller;
+
+      final personId = (ei['person_id'] as num?)?.toInt();
+      if (personId != null) {
+        try {
+          final ps = PersonService(apiClient: ApiClient());
+          final person = await ps.getPerson(personId);
+          if (invType == InvoiceType.sales || invType == InvoiceType.salesReturn) {
+            cust = Customer(
+              id: person.id!,
+              name: person.displayName,
+              code: person.code?.toString(),
+              phone: person.mobile ?? person.phone,
+              email: person.email,
+              address: person.address,
+              isActive: person.isActive,
+              createdAt: person.createdAt,
+            );
+          } else if (invType == InvoiceType.purchase ||
+              invType == InvoiceType.purchaseReturn) {
+            supplier = person;
+          }
+        } catch (_) {}
+      }
+
+      final sellerRaw = ei['seller_id'];
+      final sellerId = sellerRaw == null
+          ? null
+          : (sellerRaw is num
+              ? sellerRaw.toInt()
+              : int.tryParse(sellerRaw.toString()));
+      if ((invType == InvoiceType.sales || invType == InvoiceType.salesReturn) &&
+          sellerId != null) {
+        try {
+          seller =
+              await PersonService(apiClient: ApiClient()).getPerson(sellerId);
+        } catch (_) {}
+      }
+
+      CommissionType? commType = _commissionType;
+      double? commPct = _commissionPercentage;
+      double? commAmt = _commissionAmount;
+      final commission = ei['commission'];
+      if (commission is Map) {
+        final cm = Map<String, dynamic>.from(commission as Map);
+        final ts = cm['type']?.toString();
+        final val = cm['value'];
+        if (ts == 'percentage') {
+          commType = CommissionType.percentage;
+          commPct = (val as num?)?.toDouble();
+        } else if (ts == 'amount') {
+          commType = CommissionType.amount;
+          commAmt = (val as num?)?.toDouble();
+        }
+      }
+
+      final gdBusiness = InvoiceGlobalDiscountPolicy.fromBusiness(
+        await BusinessApiService.getBusiness(widget.businessId),
+      );
+
+      String gdText = '';
+      var gdTyp = _globalDiscountType;
+      final gd = ei['global_discount'];
+      if (gd is Map) {
+        final gm = Map<String, dynamic>.from(gd as Map);
+        final tt = gm['type']?.toString() ?? 'amount';
+        if (tt == 'percent' || tt == 'amount') gdTyp = tt;
+        final gv = gm['value'];
+        if (gv != null) gdText = gv.toString();
+      }
+
+      final hydrateInstall = installmentPlanPresentInExtra(ei) &&
+          (invType == InvoiceType.sales || invType == InvoiceType.salesReturn);
+
+      _disposeInstallmentRowControllersFully();
+      var useInstallmentsLoad = hydrateInstall;
+
+      double? dp;
+      int? ni;
+      double? ir;
+      var ipHydr = _installmentPeriod;
+      var ipdHydr = _installmentPeriodDays ?? 30;
+      DateTime? firstDueHydr;
+      var instalRowsOut = <Map<String, dynamic>>[];
+
+      if (hydrateInstall) {
+        final rp = ei['installment_plan'];
+        if (rp is Map<String, dynamic>) {
+          final planSnap = Map<String, dynamic>.from(rp);
+          dp = (planSnap['down_payment'] as num?)?.toDouble() ?? 0.0;
+          ni = (planSnap['num_installments'] as num?)?.toInt();
+          ir = (planSnap['interest_rate'] as num?)?.toDouble();
+          if (ir == null &&
+              planSnap['interest_total'] != null &&
+              ((ni ?? 0) > 0)) {
+            final pt = (planSnap['principal_total'] as num?)?.toDouble();
+            if (pt != null && pt > 0) {
+              final it = (planSnap['interest_total'] as num?)?.toDouble() ?? 0;
+              ir = (it / pt) * 100.0;
+            }
+          }
+          final pd0 = planSnap['period_days'];
+          if (pd0 != null) {
+            ipHydr = 'days';
+            ipdHydr = (pd0 as num).toInt();
+          } else {
+            final per = planSnap['period']?.toString().toLowerCase();
+            ipHydr = per == 'days' ? 'days' : 'monthly';
+            final ipdex = planSnap['period_days'];
+            ipdHydr = (ipdex is num ? ipdex.toInt() : int.tryParse(ipdex?.toString() ?? '')) ??
+                (_installmentPeriodDays ?? 30);
+          }
+
+          DateTime baseFirstDue = invoiceDateToday;
+          final fd = planSnap['first_due_date']?.toString();
+          if (fd != null && fd.length >= 10 && oldDocDate != null) {
+            final oldFirst =
+                DateTime.tryParse(fd.length >= 10 ? fd.substring(0, 10) : fd);
+            if (oldFirst != null) {
+              baseFirstDue =
+                  invoiceDateToday.add(oldFirst.difference(_dateOnly(oldDocDate)));
+            }
+          }
+          firstDueHydr = baseFirstDue;
+
+          final sch = planSnap['schedule'];
+          final rows = <Map<String, dynamic>>[];
+          if (sch is List) {
+            for (var i = 0; i < sch.length; i++) {
+              final it0 = sch[i];
+              if (it0 is! Map) continue;
+              final m = Map<String, dynamic>.from(it0 as Map);
+              DateTime? due;
+              final ds = m['due_date']?.toString();
+              if (ds != null && ds.length >= 10) {
+                due = DateTime.tryParse(ds.substring(0, 10));
+              }
+              if (due != null && oldDocDate != null) {
+                final delta =
+                    _dateOnly(due).difference(_dateOnly(oldDocDate));
+                due = invoiceDateToday.add(delta);
+              }
+              rows.add({
+                'seq': (m['seq'] as num?)?.toInt() ?? (i + 1),
+                'due_date': due ?? firstDueHydr ?? invoiceDateToday,
+                'principal': (m['principal'] as num?)?.toDouble() ?? 0.0,
+                'interest': (m['interest'] as num?)?.toDouble() ?? 0.0,
+                'total': (m['total'] as num?)?.toDouble() ??
+                    (((m['principal'] as num?)?.toDouble() ?? 0) +
+                        ((m['interest'] as num?)?.toDouble() ?? 0)),
+                'paid_amount': 0.0,
+              });
+            }
+          }
+          instalRowsOut = rows;
+          ni ??= rows.isNotEmpty ? rows.length : ni;
+        } else {
+          useInstallmentsLoad = false;
+        }
+      } else {
+        useInstallmentsLoad = false;
+      }
+
+      List<int> tagIds = [];
+      final tl = item['tags'];
+      if (tl is List) {
+        for (final el in tl) {
+          if (el is Map && el['id'] != null) {
+            tagIds.add((el['id'] as num).toInt());
+          }
+        }
+      }
+
+      final bomSrc = ei['bom_ids'];
+      final bomResolved = <int>{};
+      if (bomSrc is List) {
+        for (final e in bomSrc) {
+          final id = e is num ? e.toInt() : int.tryParse(e.toString());
+          if (id != null && id > 0) bomResolved.add(id);
+        }
+      }
+      double? prodOp =
+          (ei['production_operations_total'] as num?)?.toDouble();
+
+      if (!mounted) return;
+
+      setState(() {
+        _copyFromLoading = false;
+        _transactions = [];
+
+        _globalDiscountPolicy = gdBusiness;
+
+        _selectedInvoiceType = invType;
+        _isDraft = item['is_proforma'] == true;
+        _invoiceDate = invoiceDateToday;
+        _dueDate = dueOut;
+        _selectedCurrencyId =
+            (item['currency_id'] as num?)?.toInt() ?? _selectedCurrencyId;
+        _selectedProjectId = (item['project_id'] as num?)?.toInt();
+        _selectedTagIds = tagIds;
+        _invoiceTitle =
+            item['description']?.toString().trim().isNotEmpty == true
+                ? item['description'].toString()
+                : null;
+
+        _invoiceWarehouseReleaseMode = warehouseMode;
+        final wid = ei['warehouse_id'];
+        _documentWarehouseId =
+            wid == null ? null : (wid is num ? wid.toInt() : int.tryParse(wid.toString()));
+
+        _manualFxRateId = fxRateIdExtra;
+
+        _lineItems = mappedLines;
+
+        _globalDiscountType =
+            gdTyp == 'percent' || gdTyp == 'amount' ? gdTyp : 'percent';
+        _globalDiscountValueController.text = gdText;
+
+        _bomIds.clear();
+        _bomIds.addAll(bomResolved);
+        _productionOperationsTotal = prodOp;
+
+        _useInstallments = useInstallmentsLoad;
+        if (_useInstallments && hydrateInstall) {
+          _downPayment = dp;
+          _numInstallments = ni;
+          _interestRate = ir;
+          _installmentPeriod = ipHydr;
+          _installmentPeriodDays = ipdHydr;
+          _firstInstallmentDueDate = firstDueHydr ?? invoiceDateToday;
+          _installmentRows = instalRowsOut;
+          _numInstallmentsController.text =
+              formatNumberForInput(_numInstallments, decimalPlaces: 0);
+          _downPaymentController.text = formatNumberForInput(_downPayment);
+          _interestRateController.text = formatNumberForInput(_interestRate);
+          _installmentPeriodDaysController.text =
+              formatNumberForInput(ipdHydr, decimalPlaces: 0);
+          for (int idx = 0; idx < _installmentRows.length; idx++) {
+            final principal =
+                (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
+            final interest =
+                (_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0;
+            final total =
+                (_installmentRows[idx]['total'] as num?)?.toDouble() ?? 0.0;
+            _getInstallmentController(_installmentPrincipalControllers, idx,
+                principal,
+                updateIfChanged: false);
+            _getInstallmentController(_installmentInterestControllers, idx,
+                interest,
+                updateIfChanged: false);
+            _getInstallmentController(_installmentTotalControllers, idx, total,
+                updateIfChanged: false);
+          }
+        } else {
+          _downPayment = null;
+          _numInstallments = null;
+          _interestRate = null;
+          _firstInstallmentDueDate = null;
+          _installmentRows = [];
+          _numInstallmentsController.clear();
+          _downPaymentController.clear();
+          _interestRateController.clear();
+          _installmentPeriodDaysController.text =
+              formatNumberForInput(_installmentPeriodDays ?? 30, decimalPlaces: 0);
+        }
+
+        _commissionType = commType;
+        _commissionPercentage = commPct;
+        _commissionAmount = commAmt;
+        _selectedCustomer = cust;
+        _selectedSupplier = supplier;
+        _selectedSeller = seller;
+
+        _recalculateTotalsFromLines();
+      });
+
+      _adjustTabBarLengthAfterPrefill();
+      await _reloadFxRates();
+      if (_selectedCustomer != null) {
+        await _loadCustomerBalance();
+        await _loadCustomerCreditIfNeeded();
+      }
+      if (mounted) {
+        setState(_applyCurrencyMetaFromCache);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showErr(ErrorExtractor.forContext(e, context));
+    }
   }
 
   /// آخرین نوع تخفیف ذخیره‌شده (درصدی/مقداری) را روی ردیف‌های اولیه اعمال می‌کند.
   Future<void> _applySavedInvoiceLineDiscountType() async {
     final dt = await InvoiceLinePreferences.getDefaultDiscountType();
     if (!mounted) return;
+    if (widget.copyFromInvoiceId != null) return;
     setState(() {
       if (_lineItems.isEmpty) return;
       _lineItems[0] = _lineItems[0].copyWith(discountType: dt);
@@ -1430,6 +1864,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
     if (!widget.authStore.canWriteSection('invoices')) {
       return AccessDeniedPage(message: t.accessDenied);
+    }
+
+    if (_copyFromLoading && widget.copyFromInvoiceId != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.addInvoice),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('در حال بارگذاری اطلاعات فاکتور برای کپی…'),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(

@@ -12,6 +12,7 @@ from adapters.api.v1.schema_models.crm_chat import (
 	CrmChatWidgetCreate,
 	CrmChatWidgetUpdate,
 	CrmChatAgentMessageCreate,
+	CrmChatAgentMessagePatch,
 	CrmChatConversationPatch,
 	CrmChatMarkReadBody,
 )
@@ -158,6 +159,23 @@ async def delete_chat_conversations_bulk(
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATIONS_BULK_DELETED")
 
 
+@router.delete("/businesses/{business_id}/chat/conversations/{conversation_id}")
+@require_business_access("business_id")
+async def delete_chat_conversation_one(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	conversation_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_crm_web_chat_dep("edit_conversations")),
+) -> Dict[str, Any]:
+	try:
+		data = await chat_svc.delete_conversation_agent(db, business_id, conversation_id)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATION_DELETED")
+
+
 @router.get("/businesses/{business_id}/chat/conversations/{conversation_id}/messages")
 @require_business_access("business_id")
 async def list_chat_messages_agent(
@@ -224,6 +242,33 @@ async def post_chat_message_agent(
 		file_storage_id=body.file_storage_id,
 	)
 	return success_response(data=_fmt(request, msg), request=request, message="CRM_CHAT_AGENT_MESSAGE_SENT")
+
+
+@router.patch(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages/{message_id}"
+)
+@require_business_access("business_id")
+async def patch_chat_message_agent(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	conversation_id: int = Path(..., gt=0),
+	message_id: int = Path(..., gt=0),
+	body: CrmChatAgentMessagePatch = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_crm_web_chat_dep("reply")),
+) -> Dict[str, Any]:
+	try:
+		msg = await chat_svc.patch_agent_message(
+			db,
+			business_id=business_id,
+			conversation_id=conversation_id,
+			message_id=message_id,
+			body=body.body,
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(data=_fmt(request, msg), request=request, message="CRM_CHAT_AGENT_MESSAGE_UPDATED")
 
 
 @router.delete(

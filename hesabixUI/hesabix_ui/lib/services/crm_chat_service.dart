@@ -116,6 +116,29 @@ class CrmChatService {
     );
   }
 
+  Future<Map<String, dynamic>> patchAgentMessage({
+    required int businessId,
+    required int conversationId,
+    required int messageId,
+    required String body,
+  }) async {
+    final res = await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId/messages/$messageId',
+      data: {'body': body},
+    );
+    final d = _extractData(res.data);
+    return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+  }
+
+  Future<void> deleteConversation({
+    required int businessId,
+    required int conversationId,
+  }) async {
+    await _apiClient.delete<dynamic>(
+      '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId',
+    );
+  }
+
   /// حذف دسته‌جمعی مکالمه‌ها؛ [status] اختیاری — فقط همان وضعیت؛ null یعنی همه.
   Future<int> deleteAllConversations({
     required int businessId,

@@ -22,6 +22,42 @@ import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
+/// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
+/// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
+bool _additionalParamsDeepEquals(
+  Map<String, dynamic>? a,
+  Map<String, dynamic>? b,
+) {
+  if (identical(a, b)) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (final k in a.keys) {
+    if (!b.containsKey(k)) return false;
+    if (!_additionalParamValuesEqual(a[k], b[k])) return false;
+  }
+  return true;
+}
+
+bool _additionalParamValuesEqual(dynamic a, dynamic b) {
+  if (a == b) return true;
+  if (a == null || b == null) return a == b;
+  if (a is Map && b is Map) {
+    return _additionalParamsDeepEquals(
+      Map<String, dynamic>.from(a),
+      Map<String, dynamic>.from(b),
+    );
+  }
+  if (a is List && b is List) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!_additionalParamValuesEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 /// Main reusable data table widget
 class DataTableWidget<T> extends StatefulWidget {
   final DataTableConfig<T> config;
@@ -691,6 +727,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         });
         unawaited(_bootstrapWithoutPersistedPageSize());
       }
+      return;
+    }
+    // فیلترهای بیرونی والد از طریق additionalParams — بدون این، تا تعامل بعدی با جدول دادهٔ قدیمی می‌ماند
+    if (widget.localRawItems == null &&
+        !_additionalParamsDeepEquals(
+          oldWidget.config.additionalParams,
+          widget.config.additionalParams,
+        )) {
+      _page = 1;
+      _fetchData();
       return;
     }
     // If local data changes, refresh immediately.

@@ -368,34 +368,27 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
               toDate: _toDate,
               onDocumentTypeChanged: (v) {
                 setState(() => _selectedDocumentType = v);
-                _refreshData();
               },
               onFiscalYearChanged: (v) {
                 setState(() => _selectedFiscalYearId = v);
-                _refreshData();
               },
               onProjectChanged: (v) {
                 setState(() => _selectedProjectId = v);
-                _refreshData();
               },
               onPersonChanged: (v) {
                 setState(() => _filterPerson = v);
-                _refreshData();
               },
               onFromDateChanged: (v) {
                 setState(() => _fromDate = v);
-                _refreshData();
               },
               onToDateChanged: (v) {
                 setState(() => _toDate = v);
-                _refreshData();
               },
               onClearDateRange: () {
                 setState(() {
                   _fromDate = null;
                   _toDate = null;
                 });
-                _refreshData();
               },
             ),
           ],
@@ -421,7 +414,6 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       _selectedProjectId = null;
       _filterPerson = null;
     });
-    _refreshData();
   }
 
   List<Widget> _buildExternalFilterChips(AppLocalizations t) {
@@ -609,7 +601,6 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         _fromDate = fromDate;
         _toDate = toDate;
       });
-      _refreshData();
     }
   }
 

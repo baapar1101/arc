@@ -2074,6 +2074,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addProduct => 'Add Product or Service';
 
   @override
+  String get duplicateProduct => 'Copy Product / Service';
+
+  @override
+  String get productDuplicatedSuccessfully => 'Product copy was created successfully';
+
+  @override
   String get viewProducts => 'View Products and Services';
 
   @override
@@ -2375,6 +2381,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addInvoice => 'Add Invoice';
+
+  @override
+  String get invoiceCopyOpenNew => 'Copy to new invoice';
 
   @override
   String get viewInvoices => 'View Invoices';
@@ -11167,6 +11176,28 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get crmWebChatDeleteMessageConfirm =>
       'Deleting this message cannot be undone. Continue?';
+
+  @override
+  String get crmWebChatDeleteConversation => 'Delete conversation';
+
+  @override
+  String get crmWebChatDeleteConversationConfirm =>
+      'This conversation and all its messages will be permanently deleted. Continue?';
+
+  @override
+  String get crmWebChatConversationDeleted => 'Conversation deleted';
+
+  @override
+  String get crmWebChatEditMessageTitle => 'Edit message';
+
+  @override
+  String get crmWebChatEditMessageHint => 'New text…';
+
+  @override
+  String get crmWebChatEditMessageSaved => 'Message updated';
+
+  @override
+  String get crmWebChatMessageEditedBadge => '(edited)';
 
   @override
   String get crmWebChatRefreshTooltip => 'Reload';

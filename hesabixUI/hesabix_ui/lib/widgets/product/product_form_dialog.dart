@@ -11,7 +11,10 @@ import '../../utils/responsive_helper.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
+  /// ردیف محصول برای ویرایش؛ با [cloneSourceProductId] هم‌زمان نباید پر شود.
   final Map<String, dynamic>? product;
+  /// اگر مقدار داشته باشد، فرم مانند «افزودن» باز می‌شود و داده از این شناسه بارگذاری می‌شود (کپی).
+  final int? cloneSourceProductId;
   final VoidCallback? onSuccess;
   final AuthStore authStore;
 
@@ -20,8 +23,12 @@ class ProductFormDialog extends StatefulWidget {
     required this.businessId,
     required this.authStore,
     this.product,
+    this.cloneSourceProductId,
     this.onSuccess,
-  });
+  }) : assert(
+          product == null || cloneSourceProductId == null,
+          'product و cloneSourceProductId هم‌زمان معتبر نیستند',
+        );
 
   @override
   State<ProductFormDialog> createState() => _ProductFormDialogState();
@@ -31,18 +38,37 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final ProductFormController _controller;
 
+  bool get _isCloneMode =>
+      widget.cloneSourceProductId != null && widget.product == null;
+
+  bool get _isEditMode => widget.product != null;
+
   @override
   void initState() {
     super.initState();
     _controller = ProductFormController(businessId: widget.businessId);
-    // استفاده از unawaited برای جلوگیری از warning
     _initializeForm();
   }
 
   Future<void> _initializeForm() async {
     if (mounted) {
-      await _controller.initializeWithProduct(widget.product);
+      await _controller.initializeWithProduct(
+        widget.product,
+        cloneSourceProductId: widget.cloneSourceProductId,
+      );
     }
+  }
+
+  String _dialogTitle(AppLocalizations t) {
+    if (_isEditMode) return t.edit;
+    if (_isCloneMode) return t.duplicateProduct;
+    return t.addProduct;
+  }
+
+  IconData _dialogLeadingIcon() {
+    if (_isEditMode) return Icons.edit;
+    if (_isCloneMode) return Icons.copy_outlined;
+    return Icons.add;
   }
 
   @override
@@ -72,7 +98,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 // Header
                 if (isMobile)
                   AppBar(
-                    title: Text(widget.product == null ? t.addProduct : t.edit),
+                    title: Text(_dialogTitle(t)),
                     leading: IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(false),
@@ -85,12 +111,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                       Row(
                         children: [
                           Icon(
-                            widget.product == null ? Icons.add : Icons.edit,
+                            _dialogLeadingIcon(),
                             color: Theme.of(context).primaryColor,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            widget.product == null ? t.addProduct : t.edit,
+                            _dialogTitle(t),
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const Spacer(),
@@ -386,9 +412,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       // نمایش پیام موفقیت
       SnackBarHelper.show(
         context,
-        message: widget.product != null 
-            ? 'کالا/خدمت با موفقیت ویرایش شد' 
-            : 'کالا/خدمت با موفقیت ایجاد شد',
+        message: widget.product != null
+            ? 'کالا/خدمت با موفقیت ویرایش شد'
+            : (_isCloneMode
+                ? t.productDuplicatedSuccessfully
+                : 'کالا/خدمت با موفقیت ایجاد شد'),
       );
       // پاک کردن فرم
       _controller.resetForm();

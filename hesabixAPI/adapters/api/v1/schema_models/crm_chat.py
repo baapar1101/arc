@@ -66,6 +66,10 @@ class CrmChatAgentMessageCreate(BaseModel):
 		return self
 
 
+class CrmChatAgentMessagePatch(BaseModel):
+	body: str = Field(..., max_length=8000, description="متن جدید پیام اپراتور (برای پیام با فایل، عنوان/توضیح)")
+
+
 class CrmChatConversationPatch(BaseModel):
 	status: Optional[str] = Field(None, description="open | pending | resolved")
 	assigned_to_user_id: Optional[int] = Field(None, ge=1)

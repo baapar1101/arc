@@ -310,6 +310,30 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       });
       return;
     }
+    if (event == 'message.updated') {
+      final raw = msg['message'];
+      if (raw is! Map) return;
+      final m = Map<String, dynamic>.from(raw);
+      final cid = (m['conversation_id'] as num?)?.toInt();
+      if (cid == null) return;
+      if (cid != _selectedConvId) {
+        unawaited(_loadConversationsList(silent: true));
+        return;
+      }
+      final mid = (m['id'] as num?)?.toInt();
+      if (mid == null || !mounted) return;
+      setState(() {
+        _messages = _messages.map((row) {
+          if (row is! Map) return row;
+          if ((row['id'] as num?)?.toInt() == mid) {
+            return Map<String, dynamic>.from(m);
+          }
+          return row;
+        }).toList();
+      });
+      unawaited(_loadConversationsList(silent: true));
+      return;
+    }
     if (event == 'message.created') {
       final cid = (msg['conversation_id'] as num?)?.toInt() ??
           ((msg['message'] is Map ? (msg['message'] as Map)['conversation_id'] : null) as num?)?.toInt();
@@ -349,6 +373,23 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       unawaited(_loadConversationsList(silent: true, reset: true));
       return;
     }
+    if (event == 'conversation.deleted') {
+      final bid = (msg['business_id'] as num?)?.toInt();
+      final cid = (msg['conversation_id'] as num?)?.toInt();
+      if (bid == null || cid == null || bid != widget.businessId) return;
+      if (!mounted) return;
+      setState(() {
+        _conversations = _conversations.where((e) {
+          if (e is! Map) return true;
+          return (e['id'] as num?)?.toInt() != cid;
+        }).toList();
+        if (_selectedConvId == cid) {
+          _selectedConvId = null;
+          _messages = [];
+        }
+      });
+      return;
+    }
   }
 
   void _mergeConversationInList(Map<String, dynamic> c) {
@@ -368,7 +409,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   void _startFallback() {
     _fallbackPoll?.cancel();
     if (_wsLive) return;
-    _fallbackPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+    _fallbackPoll = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!mounted) return;
       unawaited(_loadConversationsList(silent: true));
       if (_selectedConvId != null) {
@@ -386,7 +427,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   void _startBackupPoll() {
     _backupPoll?.cancel();
     if (!_wsLive) return;
-    _backupPoll = Timer.periodic(const Duration(seconds: 6), (_) {
+    _backupPoll = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || !_wsLive) return;
       unawaited(_loadConversationsList(silent: true));
       if (_selectedConvId != null) {
@@ -616,6 +657,95 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
           return row;
         }).toList();
       });
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteConversation(int conversationId) async {
+    if (!widget.authStore.canEditCrmWebChatConversations()) return;
+    try {
+      await _svc.deleteConversation(
+        businessId: widget.businessId,
+        conversationId: conversationId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _conversations = _conversations.where((e) {
+          if (e is! Map) return true;
+          return (e['id'] as num?)?.toInt() != conversationId;
+        }).toList();
+        if (_selectedConvId == conversationId) {
+          _selectedConvId = null;
+          _messages = [];
+        }
+      });
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).crmWebChatConversationDeleted,
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _editAgentMessage(Map<String, dynamic> msg) async {
+    if (!widget.authStore.canReplyCrmWebChat()) return;
+    final cid = _selectedConvId;
+    final mid = (msg['id'] as num?)?.toInt();
+    if (cid == null || mid == null) return;
+    final controller = TextEditingController(text: msg['body']?.toString() ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final loc = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(loc.crmWebChatEditMessageTitle),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: loc.crmWebChatEditMessageHint,
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: 6,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.save)),
+          ],
+        );
+      },
+    );
+    final text = controller.text.trim();
+    controller.dispose();
+    if (ok != true || !mounted) return;
+    try {
+      await _svc.patchAgentMessage(
+        businessId: widget.businessId,
+        conversationId: cid,
+        messageId: mid,
+        body: text,
+      );
+      await _loadMessages(silent: true);
+      await _loadConversationsList(silent: true, reset: true);
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).crmWebChatEditMessageSaved,
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -1255,7 +1385,48 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          trailing: Text(_statusLabel(t, c['status']?.toString()), style: theme.textTheme.bodySmall),
+                          trailing: SizedBox(
+                            width: 112,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    _statusLabel(t, c['status']?.toString()),
+                                    style: theme.textTheme.bodySmall,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (widget.authStore.canEditCrmWebChatConversations())
+                                  PopupMenuButton<String>(
+                                    icon: Icon(Icons.more_vert, size: 20, color: cs.onSurfaceVariant),
+                                    padding: EdgeInsets.zero,
+                                    onSelected: (v) async {
+                                      if (v != 'delete') return;
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: Text(t.crmWebChatDeleteConversation),
+                                          content: Text(t.crmWebChatDeleteConversationConfirm),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+                                          ],
+                                        ),
+                                      );
+                                      if (ok == true && mounted) await _deleteConversation(id);
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      PopupMenuItem<String>(
+                                        value: 'delete',
+                                        child: Text(t.crmWebChatDeleteConversation),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
                           onTap: () => _selectConversation(id),
                         );
                       },
@@ -1446,11 +1617,12 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              '$who  ·  ${_formatMsgTime(m['created_at'])}',
+                              '$who  ·  ${_formatMsgTime(m['created_at'])}'
+                              '${m['edited_at'] != null ? '  ${t.crmWebChatMessageEditedBadge}' : ''}',
                               style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                             ),
                           ),
-                          if (!isDeleted)
+                          if (!isDeleted && !agent)
                             Tooltip(
                               message: _messageHasReadReceipt(m)
                                   ? t.crmWebChatTooltipMessageRead
@@ -1462,6 +1634,15 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                                     ? cs.primary
                                     : cs.onSurfaceVariant.withValues(alpha: 0.75),
                               ),
+                            ),
+                          if (widget.authStore.canReplyCrmWebChat() && agent && !isDeleted)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: t.crmWebChatEditMessageTitle,
+                              onPressed: () => unawaited(_editAgentMessage(m)),
                             ),
                           if (widget.authStore.canDeleteCrmWebChatMessages() && !isDeleted)
                             IconButton(

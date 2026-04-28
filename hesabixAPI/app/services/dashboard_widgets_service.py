@@ -271,6 +271,21 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         },
         "cache_ttl": 60,
     },
+    {
+        "key": "crm_calendar",
+        "title": "تقویم CRM",
+        "icon": "calendar_month",
+        "version": 1,
+        "permissions_required": ["crm.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 4},
+            "sm": {"colSpan": 6, "rowSpan": 4},
+            "md": {"colSpan": 8, "rowSpan": 4},
+            "lg": {"colSpan": 12, "rowSpan": 4},
+            "xl": {"colSpan": 12, "rowSpan": 4},
+        },
+        "cache_ttl": 30,
+    },
 ]
 
 
@@ -1045,6 +1060,19 @@ def get_widgets_batch_data(
             except Exception as ex:
                 result[key] = {"error": str(ex)}
             continue
+        if key == "crm_calendar":
+            ctx = auth_ctx
+            if ctx is None:
+                u = db.get(User, user_id)
+                if u is None:
+                    result[key] = {"error": "NO_USER", "events": []}
+                    continue
+                ctx = AuthContext(user=u, api_key_id=0, business_id=business_id, db=db)
+            try:
+                result[key] = _resolve_crm_calendar(db, business_id, ctx, filters_with_calendar)
+            except Exception as ex:
+                result[key] = {"error": str(ex), "events": []}
+            continue
         resolver = WIDGET_RESOLVERS.get(key)
         if not resolver:
             result[key] = {"error": "UNKNOWN_WIDGET"}
@@ -1316,6 +1344,139 @@ def _get_month_range_by_calendar(calendar_type: str) -> tuple[date, date]:
         else:
             end_date = date(today.year, today.month + 1, 1) - timedelta(days=1)
         return (start_date, end_date)
+
+
+def _crm_calendar_resolve_month_range(filters: Dict[str, Any]) -> tuple[date, date, int, int]:
+    """
+    بازهٔ یک ماه در تقویم نمایشی کاربر (شمسی/میلادی) به تاریخ میلادی برای کوئری DB.
+    خروجی: (شروع میلادی، پایان میلادی، سال نمایشی، ماه نمایشی).
+    """
+    calendar_type = str(filters.get("calendar_type", "gregorian")).lower()
+    y_raw, m_raw = filters.get("crm_calendar_year"), filters.get("crm_calendar_month")
+    if calendar_type == "jalali":
+        if y_raw is not None and m_raw is not None:
+            y, m = int(y_raw), int(m_raw)
+        else:
+            jn = jdatetime.datetime.now()
+            y, m = int(jn.year), int(jn.month)
+        jalali_start = jdatetime.datetime(y, m, 1)
+        days_in_month = jdatetime.j_days_in_month[m - 1]
+        if m == 12 and jalali_start.isleap():
+            days_in_month = 30
+        jalali_end = jdatetime.datetime(y, m, days_in_month)
+        gs = jalali_start.togregorian()
+        ge = jalali_end.togregorian()
+        return (
+            date(gs.year, gs.month, gs.day),
+            date(ge.year, ge.month, ge.day),
+            y,
+            m,
+        )
+    if y_raw is not None and m_raw is not None:
+        gy, gm = int(y_raw), int(m_raw)
+    else:
+        t = date.today()
+        gy, gm = t.year, t.month
+    start_date = date(gy, gm, 1)
+    if gm == 12:
+        end_date = date(gy, 12, 31)
+    else:
+        end_date = date(gy, gm + 1, 1) - timedelta(days=1)
+    return (start_date, end_date, gy, gm)
+
+
+def _resolve_crm_calendar(
+    db: Session,
+    business_id: int,
+    ctx: Any,
+    filters: Dict[str, Any],
+) -> Dict[str, Any]:
+    """فعالیت‌ها و یادداشت‌های تقویم CRM در بازهٔ یک ماه (تقویم نمایشی کاربر)."""
+    from datetime import datetime, time
+    from adapters.db.models.crm import CrmActivity
+    from app.services import crm_calendar_note_service as crm_cal_notes
+
+    if ctx is None:
+        return {"error": "NO_CONTEXT", "events": []}
+
+    if (
+        not ctx.is_superadmin()
+        and not ctx.is_business_owner(business_id)
+        and not ctx.has_business_permission("crm", "view")
+    ):
+        return {
+            "events": [],
+            "month_start": None,
+            "month_end": None,
+            "display_year": None,
+            "display_month": None,
+            "forbidden": True,
+        }
+
+    start_d, end_d, disp_y, disp_m = _crm_calendar_resolve_month_range(filters)
+    start_dt = datetime.combine(start_d, time.min)
+    end_dt_excl = datetime.combine(end_d + timedelta(days=1), time.min)
+
+    activities = (
+        db.query(CrmActivity)
+        .filter(
+            CrmActivity.business_id == business_id,
+            CrmActivity.activity_date >= start_dt,
+            CrmActivity.activity_date < end_dt_excl,
+        )
+        .order_by(CrmActivity.activity_date.asc())
+        .limit(500)
+        .all()
+    )
+    events: List[Dict[str, Any]] = []
+    for a in activities:
+        ad = a.activity_date
+        if ad is None:
+            continue
+        day_g = ad.date() if isinstance(ad, datetime) else ad
+        events.append({
+            "kind": "activity",
+            "id": a.id,
+            "at": ad.isoformat() if hasattr(ad, "isoformat") else str(ad),
+            "day": day_g.isoformat(),
+            "title": (a.subject or "").strip() or (a.activity_type or ""),
+            "activity_type": a.activity_type,
+        })
+
+    lang = getattr(ctx, "language", None) or "fa"
+    try:
+        notes = crm_cal_notes.list_notes(db, ctx, business_id, start_d, end_d, lang)
+    except Exception:
+        notes = []
+    for n in notes:
+        od = n.get("occurs_on")
+        if isinstance(od, date):
+            day_s = od.isoformat()
+        elif isinstance(od, datetime):
+            day_s = od.date().isoformat()
+        elif isinstance(od, str):
+            day_s = od[:10]
+        else:
+            continue
+        title = (n.get("title") or n.get("note_type_title") or "")
+        if isinstance(title, str):
+            title = title.strip()
+        events.append({
+            "kind": "note",
+            "id": n.get("id"),
+            "day": day_s,
+            "title": title or (n.get("note_type_title") or ""),
+            "note_type_title": n.get("note_type_title"),
+        })
+
+    return {
+        "events": events,
+        "month_start": start_d.isoformat(),
+        "month_end": end_d.isoformat(),
+        "display_year": disp_y,
+        "display_month": disp_m,
+        "calendar_type": str(filters.get("calendar_type", "gregorian")).lower(),
+    }
 
 
 def _resolve_checks_today(db: Session, business_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:

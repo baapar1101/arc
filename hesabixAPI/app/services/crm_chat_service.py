@@ -170,6 +170,7 @@ def message_to_dict(m: CrmChatMessage) -> Dict[str, Any]:
 		"user_id": m.user_id,
 		"file_storage_id": None if is_del else m.file_storage_id,
 		"created_at": m.created_at,
+		"edited_at": m.edited_at,
 		"read_at": m.read_at,
 		"deleted_at": m.deleted_at,
 		"is_deleted": is_del,
@@ -787,6 +788,58 @@ async def delete_message_agent(
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 	return {"id": m.id, "deleted": True}
+
+
+async def patch_agent_message(
+	db: Session,
+	business_id: int,
+	conversation_id: int,
+	message_id: int,
+	*,
+	body: str,
+) -> Dict[str, Any]:
+	c = _get_conversation_business(db, business_id, conversation_id)
+	m = db.get(CrmChatMessage, message_id)
+	if not m or m.conversation_id != c.id:
+		raise ApiError("CRM_CHAT_MESSAGE_NOT_FOUND", "Message not found", http_status=404)
+	if m.deleted_at is not None:
+		raise ApiError("CRM_CHAT_MESSAGE_NOT_FOUND", "Message not found", http_status=404)
+	if m.sender_role != "agent":
+		raise ApiError("CRM_CHAT_MESSAGE_EDIT_DENIED", "Only agent messages can be edited", http_status=422)
+	text = (body or "").strip()
+	if not text and not m.file_storage_id:
+		raise ApiError("CRM_CHAT_MESSAGE_BODY_INVALID", "Invalid message text", http_status=422)
+	if len(text) > _MAX_BODY:
+		raise ApiError("CRM_CHAT_MESSAGE_BODY_INVALID", "Invalid message text", http_status=422)
+	m.body = text
+	m.edited_at = datetime.utcnow()
+	db.commit()
+	db.refresh(m)
+	payload = {"type": "crm_chat.event", "event": "message.updated", "message": _message_to_dict_enriched(db, m)}
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
+	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
+	return _message_to_dict_enriched(db, m)
+
+
+async def delete_conversation_agent(
+	db: Session,
+	business_id: int,
+	conversation_id: int,
+) -> Dict[str, Any]:
+	c = _get_conversation_business(db, business_id, conversation_id)
+	cid = c.id
+	bid = c.business_id
+	ev = {
+		"type": "crm_chat.event",
+		"event": "conversation.deleted",
+		"conversation_id": cid,
+		"business_id": bid,
+	}
+	await crm_chat_realtime_manager.broadcast_conversation(cid, ev)
+	await crm_chat_realtime_manager.broadcast_business(bid, ev)
+	db.delete(c)
+	db.commit()
+	return {"id": cid, "deleted": True}
 
 
 async def delete_conversations_bulk_agent(

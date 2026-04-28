@@ -9,6 +9,18 @@ from app.core.responses import success_response, ApiError
 from adapters.db.repositories.category_repository import CategoryRepository
 
 
+def _category_label_from_request_body(body: Dict[str, Any]) -> str:
+    """برچسب دسته از body؛ پشتیبانی از name_fa برای کلاینت‌های قدیمی."""
+    for key in ("label", "name_fa"):
+        v = body.get(key)
+        if v is None:
+            continue
+        s = v.strip() if isinstance(v, str) else str(v).strip()
+        if s:
+            return s
+    return ""
+
+
 router = APIRouter(prefix="/categories", tags=["محصولات و کالاها"])
 
 
@@ -55,7 +67,7 @@ def create_category(
     _: None = Depends(require_business_permission_dep("categories", "add")),
 ) -> Dict[str, Any]:
     parent_id = body.get("parent_id")
-    label: str = (body.get("label") or "").strip()
+    label: str = _category_label_from_request_body(body)
     description: str | None = body.get("description")
     if description:
         description = description.strip() if isinstance(description, str) else None

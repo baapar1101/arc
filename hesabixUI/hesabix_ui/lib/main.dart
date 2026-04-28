@@ -453,6 +453,7 @@ class _MyAppState extends State<MyApp> {
         businessId: dummyBusinessId,
         authStore: authStore,
         calendarController: calendarController,
+        copyFromInvoiceId: null,
       );
       EditInvoicePage(
         businessId: dummyBusinessId,
@@ -2107,11 +2108,17 @@ class _MyAppState extends State<MyApp> {
               name: 'business_new_invoice',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                final copyFromRaw = state.uri.queryParameters['copy_from'];
+                final copyFromId =
+                    copyFromRaw != null && copyFromRaw.trim().isNotEmpty
+                        ? int.tryParse(copyFromRaw.trim())
+                        : null;
                 return NoTransitionPage(
                   child: NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
+                    copyFromInvoiceId: copyFromId,
                   ),
                 );
               },

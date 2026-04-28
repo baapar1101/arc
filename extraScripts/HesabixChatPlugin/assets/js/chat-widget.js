@@ -259,6 +259,21 @@
 		} catch ( ePlay ) {}
 	}
 
+	function primeAgentSoundForAutoplay() {
+		var url = ( cfg.agentReplySoundUrl || '' ).toString();
+		if ( ! url ) {
+			return;
+		}
+		try {
+			var a = new Audio( url );
+			a.volume = 0.001;
+			var p = a.play();
+			if ( p && typeof p.catch === 'function' ) {
+				p.catch( function () {} );
+			}
+		} catch ( eIgn ) {}
+	}
+
 	function maybePlayAgentReplySound( items ) {
 		var maxId = maxAgentMessageId( items );
 		var url = ( cfg.agentReplySoundUrl || '' ).toString();
@@ -364,7 +379,7 @@
 		open: false,
 		session: null,
 		messages: [],
-		localSyntheticAgentTail: [],
+		localCannedAfterVisitor: [],
 		agentSoundPrimed: false,
 		lastAgentMsgNotifiedId: 0,
 		ws: null,
@@ -402,7 +417,7 @@
 					syncMarkAgentRead( items );
 				}
 			} ).catch( function () {} );
-		}, 25000 );
+		}, 4000 );
 	}
 
 	var host = document.getElementById( 'hesabix-chat-host' );
@@ -876,6 +891,22 @@
 				refreshMessages().catch( function () {} );
 				return;
 			}
+			if ( msg.type === 'crm_chat.event' && msg.event === 'message.updated' ) {
+				refreshMessages().catch( function () {} );
+				return;
+			}
+			if ( msg.type === 'crm_chat.event' && msg.event === 'message.deleted' ) {
+				refreshMessages().catch( function () {} );
+				return;
+			}
+			if ( msg.type === 'crm_chat.event' && msg.event === 'conversation.deleted' ) {
+				if ( state.session && +msg.conversation_id === +convId ) {
+					clearSession();
+					state.session = null;
+					enterFormMode();
+				}
+				return;
+			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'messages.read' ) {
 				applyMessagesReadFromEvent( msg );
 				return;
@@ -981,34 +1012,6 @@
 			eta.appendChild( etx );
 			msgBox.appendChild( eta );
 		}
-		var qrList = cfg.quickReplies;
-		if ( qrList && qrList.length && surface.classList.contains( 'hesabix-chat--step-chat' ) ) {
-			var qrRow = document.createElement( 'div' );
-			qrRow.className = 'hesabix-chat-quick-replies-row';
-			qrList.forEach( function ( item ) {
-				if ( ! item || ! item.q ) {
-					return;
-				}
-				var chip = document.createElement( 'button' );
-				chip.type = 'button';
-				chip.className = 'hesabix-chat-quick-chip';
-				chip.textContent = item.q;
-				chip.addEventListener( 'click', function () {
-					pickQuickReply( item.q, item.a || '' );
-				} );
-				qrRow.appendChild( chip );
-			} );
-			if ( qrRow.firstChild ) {
-				var qrWrap = document.createElement( 'div' );
-				qrWrap.className = 'hesabix-chat-quick-replies';
-				var qrTitle = document.createElement( 'div' );
-				qrTitle.className = 'hesabix-chat-quick-replies-title';
-				qrTitle.textContent = sUi.quickRepliesTitle || '';
-				qrWrap.appendChild( qrTitle );
-				qrWrap.appendChild( qrRow );
-				msgBox.appendChild( qrWrap );
-			}
-		}
 		if ( state.agentJoinBannerText ) {
 			var noticeEl = document.createElement( 'div' );
 			noticeEl.className = 'hesabix-chat-chat-notice';
@@ -1016,46 +1019,29 @@
 			noticeEl.textContent = state.agentJoinBannerText;
 			msgBox.appendChild( noticeEl );
 		}
-		var merged = state.messages.slice();
-		( state.localSyntheticAgentTail || [] ).forEach( function ( syn ) {
-			merged.push( {
-				sender_role: 'agent',
-				body: syn.body,
-				created_at: syn.created_at,
-				_canned: true
-			} );
-		} );
-		merged.sort( function ( a, b ) {
-			var ta = new Date( a.created_at || 0 ).getTime();
-			var tb = new Date( b.created_at || 0 ).getTime();
-			return ta - tb;
-		} );
-		merged.forEach( function ( m ) {
-			if ( m._canned ) {
-				var divS = document.createElement( 'div' );
-				divS.className = 'hesabix-chat-bubble hesabix-chat-bubble--agent hesabix-chat-bubble--canned';
-				var strongS = document.createElement( 'strong' );
-				strongS.textContent = cfg.strings.support;
-				var bodyS = document.createElement( 'div' );
-				bodyS.className = 'hesabix-chat-bubble-body';
-				bodyS.textContent = ( m.body || '' ).toString();
-				bodyS.style.whiteSpace = 'pre-wrap';
-				var smallS = document.createElement( 'small' );
-				smallS.className = 'hesabix-chat-msg-time';
-				smallS.textContent = formatTime( m.created_at );
-				var metaS = document.createElement( 'div' );
-				metaS.className = 'hesabix-chat-bubble-meta hesabix-chat-bubble-meta--agent';
-				var cannedLbl = document.createElement( 'span' );
-				cannedLbl.className = 'hesabix-chat-canned-badge';
-				cannedLbl.textContent = sUi.cannedAnswerLabel || '';
-				metaS.appendChild( cannedLbl );
-				metaS.appendChild( smallS );
-				divS.appendChild( strongS );
-				divS.appendChild( bodyS );
-				divS.appendChild( metaS );
-				msgBox.appendChild( divS );
-				return;
-			}
+
+		function appendCannedAnswerBubble( cannedBody ) {
+			var divS = document.createElement( 'div' );
+			divS.className = 'hesabix-chat-bubble hesabix-chat-bubble--agent hesabix-chat-bubble--canned';
+			var strongS = document.createElement( 'strong' );
+			strongS.textContent = cfg.strings.support;
+			var bodyS = document.createElement( 'div' );
+			bodyS.className = 'hesabix-chat-bubble-body';
+			bodyS.textContent = ( cannedBody || '' ).toString();
+			bodyS.style.whiteSpace = 'pre-wrap';
+			var metaS = document.createElement( 'div' );
+			metaS.className = 'hesabix-chat-bubble-meta hesabix-chat-bubble-meta--agent';
+			var cannedLbl = document.createElement( 'span' );
+			cannedLbl.className = 'hesabix-chat-canned-badge';
+			cannedLbl.textContent = sUi.cannedAnswerLabel || '';
+			metaS.appendChild( cannedLbl );
+			divS.appendChild( strongS );
+			divS.appendChild( bodyS );
+			divS.appendChild( metaS );
+			msgBox.appendChild( divS );
+		}
+
+		state.messages.forEach( function ( m ) {
 			var role = ( m.sender_role || '' ).toString();
 			var div = document.createElement( 'div' );
 			div.className = 'hesabix-chat-bubble hesabix-chat-bubble--' + ( role === 'visitor' ? 'visitor' : 'agent' );
@@ -1095,6 +1081,12 @@
 			meta.className =
 				'hesabix-chat-bubble-meta' +
 				( role === 'visitor' ? ' hesabix-chat-bubble-meta--visitor' : ' hesabix-chat-bubble-meta--agent' );
+			if ( m.edited_at ) {
+				var edSpan = document.createElement( 'span' );
+				edSpan.className = 'hesabix-chat-msg-edited';
+				edSpan.textContent = ( sUi.msgEdited || ( isRtl3 ? 'ویرایش‌شده' : 'edited' ) ) + ' · ';
+				meta.appendChild( edSpan );
+			}
 			if ( role === 'visitor' ) {
 				var readBy = m.read_at;
 				var tSent = sUi.msgDelivered || ( isRtl3 ? 'ارسال شد' : 'Sent' );
@@ -1115,7 +1107,46 @@
 			div.appendChild( bodyP );
 			div.appendChild( meta );
 			msgBox.appendChild( div );
+
+			var mid = m.id != null ? +m.id : null;
+			if ( mid != null ) {
+				for ( var ci = 0; ci < state.localCannedAfterVisitor.length; ci++ ) {
+					var ce = state.localCannedAfterVisitor[ ci ];
+					if ( ce && +ce.afterVisitorMessageId === mid && ce.body ) {
+						appendCannedAnswerBubble( ce.body );
+					}
+				}
+			}
 		} );
+
+		var qrList = cfg.quickReplies;
+		if ( qrList && qrList.length && surface.classList.contains( 'hesabix-chat--step-chat' ) ) {
+			var qrRow = document.createElement( 'div' );
+			qrRow.className = 'hesabix-chat-quick-replies-row';
+			qrList.forEach( function ( item ) {
+				if ( ! item || ! item.q ) {
+					return;
+				}
+				var chip = document.createElement( 'button' );
+				chip.type = 'button';
+				chip.className = 'hesabix-chat-quick-chip';
+				chip.textContent = item.q;
+				chip.addEventListener( 'click', function () {
+					pickQuickReply( item.q, item.a || '' );
+				} );
+				qrRow.appendChild( chip );
+			} );
+			if ( qrRow.firstChild ) {
+				var qrWrap = document.createElement( 'div' );
+				qrWrap.className = 'hesabix-chat-quick-replies';
+				var qrTitle = document.createElement( 'div' );
+				qrTitle.className = 'hesabix-chat-quick-replies-title';
+				qrTitle.textContent = sUi.quickRepliesTitle || '';
+				qrWrap.appendChild( qrTitle );
+				qrWrap.appendChild( qrRow );
+				msgBox.appendChild( qrWrap );
+			}
+		}
 		msgBox.scrollTop = msgBox.scrollHeight;
 	}
 
@@ -1125,26 +1156,15 @@
 		}
 		showFormError( errC, '' );
 		postMessage( state.session.conversation_id, state.session.visitor_token, questionText )
-			.then( function () {
-				return refreshMessages();
-			} )
-			.then( function () {
-				var t = Date.now();
-				var lastTs = 0;
-				state.messages.forEach( function ( x ) {
-					var tt = new Date( x.created_at || 0 ).getTime();
-					if ( tt > lastTs ) {
-						lastTs = tt;
+			.then( function ( msgData ) {
+				var vid = msgData && msgData.id != null ? +msgData.id : null;
+				var ans = ( answerText || '' ).toString().trim();
+				return refreshMessages().then( function () {
+					if ( vid != null && ans ) {
+						state.localCannedAfterVisitor.push( { afterVisitorMessageId: vid, body: ans } );
 					}
+					renderMessages();
 				} );
-				if ( t <= lastTs ) {
-					t = lastTs + 1;
-				}
-				state.localSyntheticAgentTail.push( {
-					body: answerText,
-					created_at: new Date( t ).toISOString()
-				} );
-				renderMessages();
 			} )
 			.catch( function ( e ) {
 				showFormError( errC, e.message || cfg.strings.errorGeneric );
@@ -1158,6 +1178,15 @@
 		return listMessages( state.session.conversation_id, state.session.visitor_token, 100 ).then( function ( items ) {
 			maybePlayAgentReplySound( items );
 			state.messages = items;
+			var have = {};
+			( items || [] ).forEach( function ( x ) {
+				if ( x && x.id != null ) {
+					have[ +x.id ] = 1;
+				}
+			} );
+			state.localCannedAfterVisitor = ( state.localCannedAfterVisitor || [] ).filter( function ( e ) {
+				return e && e.afterVisitorMessageId != null && have[ +e.afterVisitorMessageId ];
+			} );
 			renderMessages();
 			syncMarkAgentRead( items );
 		} );
@@ -1175,7 +1204,7 @@
 
 	function enterFormMode() {
 		state.messages = [];
-		state.localSyntheticAgentTail = [];
+		state.localCannedAfterVisitor = [];
 		state.agentSoundPrimed = false;
 		state.lastAgentMsgNotifiedId = 0;
 		state.seenAgentJoinIds = {};
@@ -1423,6 +1452,7 @@
 		state.open = v;
 		btn.setAttribute( 'aria-expanded', v ? 'true' : 'false' );
 		if ( v ) {
+			primeAgentSoundForAutoplay();
 			clearLauncherAttentionTimer();
 			btn.classList.remove( 'hesabix-chat-launcher--idle' );
 			btn.removeAttribute( 'data-hesabix-idle-anim' );
@@ -1457,6 +1487,7 @@
 	}
 
 	btn.addEventListener( 'click', function ( ev ) {
+		primeAgentSoundForAutoplay();
 		chatLog( 'کلیک لانچر', { wasOpen: state.open, target: ev.target && ev.target.nodeName } );
 		setOpen( ! state.open );
 	} );

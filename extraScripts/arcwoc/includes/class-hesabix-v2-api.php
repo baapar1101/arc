@@ -563,6 +563,41 @@ class Hesabix_V2_Api
 	// ==================== Invoices ====================
 
 	/**
+	 * لیست برچسب‌های فاکتور کسب‌وکار
+	 *
+	 * @param    bool    $include_inactive
+	 * @return   array
+	 */
+	public function list_invoice_tags($include_inactive = false)
+	{
+		$q = $include_inactive ? 'true' : 'false';
+		return $this->request(
+			'GET',
+			"/invoices/business/{$this->business_id}/tags?include_inactive={$q}"
+		);
+	}
+
+	/**
+	 * ایجاد برچسب فاکتور
+	 *
+	 * @param    string      $name
+	 * @param    string|null $color
+	 * @return   array
+	 */
+	public function create_invoice_tag($name, $color = null)
+	{
+		$body = array('name' => $name);
+		if ($color !== null && $color !== '') {
+			$body['color'] = $color;
+		}
+		return $this->request(
+			'POST',
+			"/invoices/business/{$this->business_id}/tags",
+			$body
+		);
+	}
+
+	/**
 	 * Create invoice
 	 *
 	 * @since    2.0.0

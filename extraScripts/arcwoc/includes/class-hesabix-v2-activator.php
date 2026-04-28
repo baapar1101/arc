@@ -110,15 +110,27 @@ class Hesabix_V2_Activator
 			'auto_sync_customers' => true,
 			'auto_sync_orders' => true,
 			'sync_on_product_update' => true,
-			'sync_on_order_create' => true,
 			'sync_product_price' => true,
 			'sync_product_stock' => true,
 			'sync_product_categories' => true,
 			'create_customer_on_order' => true,
+			'sync_order_on_checkout' => true,
+			'sync_order_on_payment_complete' => false,
+			'sync_order_on_statuses' => array('processing', 'completed'),
+			'invoice_is_proforma' => false,
+			'invoice_tag_website_enabled' => true,
+			'invoice_tag_website_name' => 'فروش سایت',
+			'invoice_extra_tag_ids' => '',
 		);
 
 		if (!get_option('hesabix_v2_sync_settings')) {
 			update_option('hesabix_v2_sync_settings', $default_sync_settings);
+		} else {
+			$existing = get_option('hesabix_v2_sync_settings', array());
+			if (is_array($existing)) {
+				$merged = array_merge($default_sync_settings, $existing);
+				update_option('hesabix_v2_sync_settings', $merged);
+			}
 		}
 
 		// Show setup wizard on first activation

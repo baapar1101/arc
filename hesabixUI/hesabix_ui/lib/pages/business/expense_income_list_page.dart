@@ -299,10 +299,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
             if (_hasExternalFiltersActive()) ...[
               const SizedBox(width: 8),
               IconButton(
-                onPressed: () {
-                  _clearExternalFilters();
-                  _refreshData();
-                },
+                onPressed: _clearExternalFilters,
                 icon: const Icon(Icons.clear_all),
                 tooltip: t.clear,
               ),
@@ -341,10 +338,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: () {
-                    _clearExternalFilters();
-                    _refreshData();
-                  },
+                  onPressed: _clearExternalFilters,
                   icon: const Icon(Icons.clear_all),
                   tooltip: t.clear,
                 ),
@@ -364,11 +358,9 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               toDate: _toDate,
               onDocumentTypeChanged: (v) {
                 setState(() => _selectedDocumentType = v);
-                _refreshData();
               },
               onFiscalYearChanged: (v) {
                 setState(() => _selectedFiscalYearId = v);
-                _refreshData();
               },
               onProjectChanged: (v) async {
                 setState(() {
@@ -376,26 +368,21 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
                   _selectedProjectName = null;
                 });
                 await _hydrateSelectedProjectName();
-                _refreshData();
               },
               onAccountChanged: (v) {
                 setState(() => _filterAccount = v);
-                _refreshData();
               },
               onFromDateChanged: (v) {
                 setState(() => _fromDate = v);
-                _refreshData();
               },
               onToDateChanged: (v) {
                 setState(() => _toDate = v);
-                _refreshData();
               },
               onClearDateRange: () {
                 setState(() {
                   _fromDate = null;
                   _toDate = null;
                 });
-                _refreshData();
               },
             ),
           ],
@@ -509,7 +496,6 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       _selectedProjectName = null;
       _filterAccount = null;
     });
-    _refreshData();
   }
 
   Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
@@ -622,7 +608,6 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         _toDate = toDate;
       });
       await _hydrateSelectedProjectName();
-      _refreshData();
     }
   }
 

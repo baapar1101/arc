@@ -1485,6 +1485,38 @@ class _ProductsPageState extends State<ProductsPage> {
                   );
                 },
               ),
+              if (widget.authStore.canWriteSection('products'))
+                DataTableAction(
+                  icon: Icons.copy_outlined,
+                  label: t.duplicateProduct,
+                  onTap: (row) async {
+                    final rawId = row['id'];
+                    final productId = rawId is int
+                        ? rawId
+                        : (rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''));
+                    if (productId == null) {
+                      if (!context.mounted) return;
+                      SnackBarHelper.showError(
+                        context,
+                        message: '${AppLocalizations.of(context).error}: شناسه کالا نامعتبر است',
+                      );
+                      return;
+                    }
+                    await showDialog<Object?>(
+                      context: context,
+                      builder: (ctx) => ProductFormDialog(
+                        businessId: widget.businessId,
+                        authStore: widget.authStore,
+                        cloneSourceProductId: productId,
+                        onSuccess: () {
+                          try {
+                            (_tableKey.currentState as dynamic)?.refresh();
+                          } catch (_) {}
+                        },
+                      ),
+                    );
+                  },
+                ),
               DataTableAction(
                 icon: Icons.delete_outline,
                 label: AppLocalizations.of(context).delete,

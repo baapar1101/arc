@@ -167,7 +167,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
     }
   }
 
-  /// تازه‌سازی داده‌های جدول
+  /// تازه‌سازی صریح جدول پس از عملیات روی داده (حذف، ثبت از دیالوگ و غیره).
+  /// تغییر فیلترهای بیرونی بدون این فراخوانی هم با `additionalParams` در [DataTableWidget] به‌روز می‌شود.
   void _refreshData() {
     final state = _tableKey.currentState;
     if (state != null) {
@@ -355,7 +356,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
       _selectedProjectId = null;
       _filterPerson = null;
     });
-    _refreshData();
   }
 
   List<Widget> _buildExternalFilterChips(AppLocalizations t) {
@@ -450,7 +450,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
             }).toList(),
             onChanged: (value) {
               setState(() => _selectedDocumentType = value);
-              _refreshData();
             },
           ),
         ),
@@ -485,7 +484,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                   }).toList(),
                   onChanged: (v) {
                     setState(() => _selectedFiscalYearId = v);
-                    _refreshData();
                   },
                 ),
               ),
@@ -497,7 +495,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 selectedProjectId: _selectedProjectId,
                 onChanged: (v) {
                   setState(() => _selectedProjectId = v);
-                  _refreshData();
                 },
                 authStore: widget.authStore,
                 calendarController: widget.calendarController,
@@ -512,7 +509,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 selectedPerson: _filterPerson,
                 onChanged: (person) {
                   setState(() => _filterPerson = person);
-                  _refreshData();
                 },
                 label: 'شخص',
                 hintText: 'همه اشخاص',
@@ -530,7 +526,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 value: _fromDate,
                 onChanged: (date) {
                   setState(() => _fromDate = date);
-                  _refreshData();
                 },
                 labelText: t.dateFrom,
                 hintText: t.selectDate,
@@ -543,7 +538,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 value: _toDate,
                 onChanged: (date) {
                   setState(() => _toDate = date);
-                  _refreshData();
                 },
                 labelText: t.dateTo,
                 hintText: t.selectDate,
@@ -556,7 +550,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
                   _fromDate = null;
                   _toDate = null;
                 });
-                _refreshData();
               },
               icon: const Icon(Icons.clear),
               tooltip: t.clearDateFilter,

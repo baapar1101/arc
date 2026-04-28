@@ -21,6 +21,7 @@ from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.user import User
+from adapters.db.models.person import Person
 from adapters.db.models.category import BusinessCategory
 from adapters.db.repositories.warehouse_repository import WarehouseRepository
 from adapters.api.v1.schema_models.warehouse import WarehouseCreateRequest, WarehouseUpdateRequest
@@ -28,6 +29,33 @@ from adapters.api.v1.schemas import QueryInfo, FilterItem
 from app.services.query_service import QueryService
 from app.services.product_attribute_service import validate_custom_attributes
 from app.services.document_numbering_service import generate_document_code
+
+_INVOICE_TYPE_LABELS_FA = {
+	"invoice_sales": "فاکتور فروش",
+	"invoice_sales_return": "برگشت از فروش",
+	"invoice_purchase": "فاکتور خرید",
+	"invoice_purchase_return": "برگشت از خرید",
+	"invoice_direct_consumption": "مصرف مستقیم",
+	"invoice_production": "فاکتور تولید",
+	"invoice_waste": "فاکتور ضایعات",
+}
+
+_SOURCE_TYPE_LABELS_FA = {
+	"manual": "دستی",
+	"invoice": "فاکتور",
+	"api": "API",
+}
+
+
+def _person_display_name_invoice_party(p: Person) -> str:
+	if getattr(p, "company_name", None) and str(p.company_name).strip():
+		return str(p.company_name).strip()
+	parts = [getattr(p, "first_name", None) or "", getattr(p, "last_name", None) or ""]
+	name = " ".join(x for x in parts if x).strip()
+	if name:
+		return name
+	alias = getattr(p, "alias_name", None)
+	return (str(alias).strip() if alias else "") or ""
 
 
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
@@ -2101,12 +2129,39 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 			warehouses_map[int(w.id)] = w
 
 	source_document_code: Optional[str] = None
-	if wh.source_type == "invoice" and wh.source_document_id:
+	source_invoice_document_type: Optional[str] = None
+	source_invoice_type_label_fa: Optional[str] = None
+	source_invoice_party_name: Optional[str] = None
+	st_wh = (wh.source_type or "").strip().lower()
+	if st_wh == "invoice" and wh.source_document_id:
 		src_doc = db.query(Document).filter(
 			and_(Document.id == int(wh.source_document_id), Document.business_id == wh.business_id)
 		).first()
 		if src_doc is not None:
 			source_document_code = src_doc.code
+			source_invoice_document_type = src_doc.document_type
+			dt_raw = src_doc.document_type or ""
+			source_invoice_type_label_fa = _INVOICE_TYPE_LABELS_FA.get(dt_raw) or (dt_raw or None)
+			extra_inv = src_doc.extra_info or {}
+			if isinstance(extra_inv, dict):
+				pn = extra_inv.get("person_name")
+				if pn and str(pn).strip():
+					source_invoice_party_name = str(pn).strip()
+				else:
+					pid = extra_inv.get("person_id")
+					if pid:
+						try:
+							per = db.query(Person).filter(
+								and_(Person.id == int(pid), Person.business_id == wh.business_id)
+							).first()
+							if per is not None:
+								source_invoice_party_name = _person_display_name_invoice_party(per) or None
+						except Exception:
+							pass
+
+	source_type_label_fa: Optional[str] = None
+	if wh.source_type:
+		source_type_label_fa = _SOURCE_TYPE_LABELS_FA.get(st_wh) or wh.source_type
 
 	fiscal_year_title: Optional[str] = None
 	if wh.fiscal_year_id:
@@ -2170,8 +2225,12 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		"warehouse_name_from": _warehouse_label(wh.warehouse_id_from),
 		"warehouse_name_to": _warehouse_label(wh.warehouse_id_to),
 		"source_type": wh.source_type,
+		"source_type_label_fa": source_type_label_fa,
 		"source_document_id": wh.source_document_id,
 		"source_document_code": source_document_code,
+		"source_invoice_document_type": source_invoice_document_type,
+		"source_invoice_type_label_fa": source_invoice_type_label_fa,
+		"source_invoice_party_name": source_invoice_party_name,
 		"extra_info": wh.extra_info,
 		"description": delivery_info["description"],
 		"delivery_method": delivery_info["delivery_method"],

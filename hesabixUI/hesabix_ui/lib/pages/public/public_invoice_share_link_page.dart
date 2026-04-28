@@ -20,6 +20,7 @@ class PublicInvoiceShareLinkPage extends StatefulWidget {
 
 class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage> {
   final _service = PublicInvoiceShareService();
+  final ScrollController _linesTableHorizontalScroll = ScrollController();
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _payload;
@@ -30,6 +31,12 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   void initState() {
     super.initState();
     _fetch();
+  }
+
+  @override
+  void dispose() {
+    _linesTableHorizontalScroll.dispose();
+    super.dispose();
   }
 
   Future<void> _fetch() async {
@@ -204,7 +211,6 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 720;
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -224,7 +230,6 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               _buildLinesSection(
                 theme: theme,
                 lines: lines,
-                isWide: isWide,
                 currencySuffix: curSuffix,
               ),
               const SizedBox(height: 16),
@@ -564,7 +569,6 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   Widget _buildLinesSection({
     required ThemeData theme,
     required List<dynamic> lines,
-    required bool isWide,
     String? currencySuffix,
   }) {
     return Column(
@@ -579,21 +583,8 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               child: Text('اقلامی ثبت نشده است.', style: theme.textTheme.bodyMedium),
             ),
           )
-        else if (isWide)
-          _buildLinesTable(theme, lines, currencySuffix)
         else
-          Column(
-            children: [
-              for (var i = 0; i < lines.length; i++)
-                if (lines[i] is Map)
-                  _lineCard(
-                    theme,
-                    lines[i] as Map<dynamic, dynamic>,
-                    i + 1,
-                    currencySuffix,
-                  ),
-            ],
-          ),
+          _buildLinesTable(theme, lines, currencySuffix),
       ],
     );
   }
@@ -601,43 +592,49 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   Widget _buildLinesTable(ThemeData theme, List<dynamic> lines, String? currencySuffix) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(theme.colorScheme.surfaceContainerHighest),
-          columns: [
-            DataColumn(label: Text('ردیف', style: theme.textTheme.labelLarge)),
-            DataColumn(label: Text('کد', style: theme.textTheme.labelLarge)),
-            DataColumn(label: Text('شرح / کالا', style: theme.textTheme.labelLarge)),
-            DataColumn(
-              label: Text('تعداد / واحد', style: theme.textTheme.labelLarge),
-            ),
-            const DataColumn(
-              label: Text('قیمت واحد', textAlign: TextAlign.end),
-              numeric: true,
-            ),
-            const DataColumn(
-              label: Text('تخفیف', textAlign: TextAlign.end),
-              numeric: true,
-            ),
-            const DataColumn(
-              label: Text('مالیات', textAlign: TextAlign.end),
-              numeric: true,
-            ),
-            const DataColumn(
-              label: Text('مبلغ ردیف', textAlign: TextAlign.end),
-              numeric: true,
-            ),
-          ],
-          rows: [
-            for (var i = 0; i < lines.length; i++)
-              if (lines[i] is Map)
-                _dataRow(
-                  lines[i] as Map<dynamic, dynamic>,
-                  i + 1,
-                  currencySuffix,
-                ),
-          ],
+      child: Scrollbar(
+        controller: _linesTableHorizontalScroll,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _linesTableHorizontalScroll,
+          scrollDirection: Axis.horizontal,
+          primary: false,
+          child: DataTable(
+            headingRowColor: WidgetStatePropertyAll(theme.colorScheme.surfaceContainerHighest),
+            columns: [
+              DataColumn(label: Text('ردیف', style: theme.textTheme.labelLarge)),
+              DataColumn(label: Text('کد', style: theme.textTheme.labelLarge)),
+              DataColumn(label: Text('شرح / کالا', style: theme.textTheme.labelLarge)),
+              DataColumn(
+                label: Text('تعداد / واحد', style: theme.textTheme.labelLarge),
+              ),
+              const DataColumn(
+                label: Text('قیمت واحد', textAlign: TextAlign.end),
+                numeric: true,
+              ),
+              const DataColumn(
+                label: Text('تخفیف', textAlign: TextAlign.end),
+                numeric: true,
+              ),
+              const DataColumn(
+                label: Text('مالیات', textAlign: TextAlign.end),
+                numeric: true,
+              ),
+              const DataColumn(
+                label: Text('مبلغ ردیف', textAlign: TextAlign.end),
+                numeric: true,
+              ),
+            ],
+            rows: [
+              for (var i = 0; i < lines.length; i++)
+                if (lines[i] is Map)
+                  _dataRow(
+                    lines[i] as Map<dynamic, dynamic>,
+                    i + 1,
+                    currencySuffix,
+                  ),
+            ],
+          ),
         ),
       ),
     );
@@ -697,83 +694,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     );
   }
 
-  Widget _lineCard(ThemeData theme, Map<dynamic, dynamic> row, int index, String? currencySuffix) {
-    final name = (row['product_name'] ?? row['description'] ?? '-').toString();
-    final code = row['product_code']?.toString();
-    final unit = (row['product_main_unit']?.toString() ?? '').trim();
-    final desc = row['description']?.toString();
-    final qty = _asNum(row['quantity']);
-    final up = _asNum(row['unit_price']);
-    final disc = _asNum(row['line_discount']);
-    final tax = _asNum(row['tax_amount']);
-    final lineTotal = _asNum(row['line_total']);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  child: Text(_formatInt(index), style: const TextStyle(fontSize: 12)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            if (code != null && code.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text('کد: $code', style: theme.textTheme.bodySmall),
-            ],
-            if (desc != null && desc.isNotEmpty && desc != name) ...[
-              const SizedBox(height: 4),
-              Text(desc, style: theme.textTheme.bodySmall),
-            ],
-            const SizedBox(height: 8),
-            _mobileAmountRow('تعداد', unit.isNotEmpty ? '${_formatAmount(qty)} $unit' : _formatAmount(qty)),
-            _mobileAmountRow('قیمت واحد${_suffix(currencySuffix)}', up != null ? _formatAmount(up) : '—'),
-            _mobileAmountRow('تخفیف${_suffix(currencySuffix)}', disc != null ? _formatAmount(disc) : '—'),
-            _mobileAmountRow('مالیات${_suffix(currencySuffix)}', tax != null ? _formatAmount(tax) : '—'),
-            const Divider(),
-            _mobileAmountRow('جمع ردیف${_suffix(currencySuffix)}', lineTotal != null ? _formatAmount(lineTotal) : '—', strong: true),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _suffix(String? c) => c != null && c.isNotEmpty ? ' ($c)' : '';
-
-  Widget _mobileAmountRow(String label, String value, {bool strong = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontWeight: strong ? FontWeight.w600 : null)),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontWeight: strong ? FontWeight.bold : null,
-                fontSize: strong ? 15 : null,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildTotalsCard(ThemeData theme, Map<String, dynamic> totals, String? curSuffix) {
     final s = _suffix(curSuffix);

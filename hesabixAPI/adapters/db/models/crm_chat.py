@@ -89,6 +89,7 @@ class CrmChatMessage(Base):
 		String(36), ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True, index=True
 	)
 	created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False, index=True)
+	edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 	read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 	deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 

@@ -111,8 +111,20 @@ class ProductFormController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Initialize form with existing product data
-  Future<void> initializeWithProduct(Map<String, dynamic>? product) async {
+  /// عنوان پیشنهادی برای کپی کالا (بدون تکرار پسوند «کپی»).
+  static String cloneSuggestedDisplayName(String rawName) {
+    final t = rawName.trim();
+    if (t.isEmpty) return '';
+    const suffix = ' (کپی)';
+    if (t.endsWith(suffix)) return t;
+    return '$t$suffix';
+  }
+
+  // Initialize form with existing product data یا حالت کپی از محصول موجود
+  Future<void> initializeWithProduct(
+    Map<String, dynamic>? product, {
+    int? cloneSourceProductId,
+  }) async {
     _setLoading(true);
     try {
       // موازی کردن بارگذاری داده‌های مرجع برای بهبود عملکرد
@@ -121,8 +133,26 @@ class ProductFormController extends ChangeNotifier {
         _loadPriceListsAndCurrencies(),
         _loadWarehouses(),
       ]);
-      
-      if (product != null) {
+
+      if (cloneSourceProductId != null) {
+        _editingProductId = null;
+        final full = await _productService.getProduct(
+          businessId: businessId,
+          productId: cloneSourceProductId,
+        );
+        if (full.isEmpty || full['id'] == null) {
+          throw Exception('کالای مبدأ یافت نشد یا حذف شده است');
+        }
+        final parsed = ProductFormData.fromProduct(full);
+        _formData = parsed.copyWith(
+          autoGenerateCode: true,
+          code: null,
+          name: cloneSuggestedDisplayName(parsed.name),
+        );
+        _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
+        await _loadExistingPriceItems(productId: cloneSourceProductId);
+        await _autoSave.clearFormData(businessId, null);
+      } else if (product != null) {
         _editingProductId = product['id'] as int?;
         _formData = ProductFormData.fromProduct(product);
         // ذخیره inventory_mode اولیه برای تشخیص تغییر
@@ -147,6 +177,7 @@ class ProductFormController extends ChangeNotifier {
         }
         _originalInventoryMode = 'bulk';
       }
+
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
       // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
       

@@ -351,7 +351,6 @@ class _ChecksPageState extends State<ChecksPage> {
             selectedPerson: _selectedPerson,
             onChanged: (p) {
               setState(() { _selectedPerson = p; });
-              _refresh();
             },
             isRequired: false,
             label: 'شخص',

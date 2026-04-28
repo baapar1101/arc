@@ -355,11 +355,14 @@ class Hesabix_V2_Mapper
 		$order_discount = (float) $order->get_discount_total();
 		$gross = $order_total + $order_discount - $order_tax;
 
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$is_proforma = !empty($sync['invoice_is_proforma']);
+
 		$payload = array(
 			'invoice_type' => 'invoice_sales',
 			'document_date' => $order->get_date_created()->format('Y-m-d'),
 			'currency_id' => (int) get_option('hesabix_v2_currency_id', 1),
-			'is_proforma' => false,
+			'is_proforma' => $is_proforma,
 			'extra_info' => array(
 				'totals' => array(
 					'gross' => round($gross, 0),
@@ -370,13 +373,19 @@ class Hesabix_V2_Mapper
 				'post_inventory' => true,
 				'ignore_credit_check' => false,
 				'person_id' => $person_id,
+				'source' => 'woocommerce',
+				'wc_order_id' => $order->get_id(),
 			),
 			'lines' => $lines,
 		);
 
-		// در صورت پرداخت شده بودن سفارش، یک پرداخت ثبت می‌کنیم (شناسه بانک از تنظیمات اختیاری)
+		$tag_ids = Hesabix_V2_Invoice_Helper::resolve_invoice_tag_ids();
+		if (!empty($tag_ids)) {
+			$payload['tag_ids'] = $tag_ids;
+		}
+
 		$payments = array();
-		if ($order->is_paid()) {
+		if (!$is_proforma && $order->is_paid()) {
 			$bank_id = get_option('hesabix_v2_default_bank_id', null);
 			$payments[] = array(
 				'type' => 'bank',
@@ -413,17 +422,34 @@ class Hesabix_V2_Mapper
 			return null;
 		}
 
-		// Create category in Hesabix
+		// تطبیق والد ووکامرس با دستهٔ والد در حسابیکس (در صورت وجود)
+		$parent_hesabix_id = null;
+		if (!empty($term->parent) && (int) $term->parent > 0) {
+			$parent_hesabix_id = self::get_or_create_category_mapping((int) $term->parent);
+		}
+
+		// Create category in Hesabix (API از فیلد label برای title_translations استفاده می‌کند)
 		$api = new Hesabix_V2_Api();
 		$result = $api->create_category(array(
-			'name_fa' => $term->name,
-			'parent_id' => null, // TODO: Handle parent categories
+			'label' => $term->name,
+			'parent_id' => $parent_hesabix_id,
 		));
 
 		if (isset($result['success']) && $result['success']) {
-			$hesabix_category_id = $result['data']['id'];
-			
-			// Save mapping
+			$item = (isset($result['data']['item']) && is_array($result['data']['item']))
+				? $result['data']['item']
+				: null;
+			$hesabix_category_id = null;
+			if ($item && isset($item['id'])) {
+				$hesabix_category_id = (int) $item['id'];
+			} elseif (isset($result['data']['id'])) {
+				$hesabix_category_id = (int) $result['data']['id'];
+			}
+
+			if (!$hesabix_category_id) {
+				return null;
+			}
+
 			$db_service->save_mapping(
 				'category',
 				$wc_category_id,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
@@ -155,6 +156,63 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       case 'cancelled': return Colors.red;
       default: return Colors.grey;
     }
+  }
+
+  String _movementNarrativeText(Map<String, dynamic> doc) {
+    final docType = doc['doc_type'] as String? ?? '';
+    final wf = doc['warehouse_name_from'] as String?;
+    final wt = doc['warehouse_name_to'] as String?;
+    final party = doc['source_invoice_party_name'] as String?;
+    final invLabel = doc['source_invoice_type_label_fa'] as String?;
+    final invCode = doc['source_document_code'] as String?;
+    final st = doc['source_type'] as String?;
+    final srcFa = doc['source_type_label_fa'] as String?;
+
+    if (docType == 'transfer') {
+      final from = wf ?? '';
+      final to = wt ?? '';
+      if (from.isEmpty && to.isEmpty) return '';
+      return 'انتقال موجودی از «${from.isEmpty ? '—' : from}» به «${to.isEmpty ? '—' : to}».';
+    }
+    if (docType == 'issue' || docType == 'production_out') {
+      final w = wf ?? wt;
+      final parts = <String>['خروج کالا'];
+      if (w != null && w.isNotEmpty) parts.add('از انبار «$w»');
+      if (st == 'invoice') {
+        final bits = <String>[];
+        if (invLabel != null && invLabel.isNotEmpty) bits.add(invLabel);
+        if (invCode != null && invCode.isNotEmpty) bits.add(invCode);
+        if (bits.isNotEmpty) parts.add(bits.join(' '));
+        if (party != null && party.isNotEmpty) parts.add('طرف: $party');
+      } else {
+        parts.add('منشأ: ${srcFa ?? st ?? '—'}');
+      }
+      return parts.join(' — ');
+    }
+    if (docType == 'receipt' || docType == 'production_in') {
+      final w = wt ?? wf;
+      final parts = <String>['ورود کالا'];
+      if (w != null && w.isNotEmpty) parts.add('به انبار «$w»');
+      if (st == 'invoice') {
+        final bits = <String>[];
+        if (invLabel != null && invLabel.isNotEmpty) bits.add(invLabel);
+        if (invCode != null && invCode.isNotEmpty) bits.add(invCode);
+        if (bits.isNotEmpty) parts.add(bits.join(' '));
+        if (party != null && party.isNotEmpty) parts.add('طرف: $party');
+      } else {
+        parts.add('منشأ: ${srcFa ?? st ?? '—'}');
+      }
+      return parts.join(' — ');
+    }
+    return '';
+  }
+
+  void _openSourceInvoice(Map<String, dynamic> doc) {
+    final sid = doc['source_document_id'];
+    if (sid == null) return;
+    final id = sid is int ? sid : int.tryParse('$sid');
+    if (id == null) return;
+    context.push('/business/${widget.businessId}/invoice/$id/edit');
   }
 
   Future<void> _updateLineWarehouse(int lineId, int? warehouseId) async {
@@ -527,7 +585,28 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                     _buildInfoRow(theme, 'سال مالی', doc['fiscal_year_title'].toString()),
                   if (doc['total_quantity'] != null)
                     _buildInfoRow(theme, 'جمع تعداد (طبق نوع حواله)', _formatQuantity(doc['total_quantity'] as num?)),
+                  if (doc['source_type'] != null || doc['source_type_label_fa'] != null)
+                    _buildInfoRow(
+                      theme,
+                      'منشأ',
+                      '${doc['source_type_label_fa'] ?? doc['source_type'] ?? '—'}',
+                    ),
                   if (doc['doc_type'] == 'transfer') ...[
+                    if (doc['warehouse_name_from'] != null || doc['warehouse_id_from'] != null)
+                      _buildInfoRow(
+                        theme,
+                        'انبار مبدأ',
+                        doc['warehouse_name_from']?.toString() ??
+                            (doc['warehouse_id_from'] != null ? 'شناسه ${doc['warehouse_id_from']}' : '-'),
+                      ),
+                    if (doc['warehouse_name_to'] != null || doc['warehouse_id_to'] != null)
+                      _buildInfoRow(
+                        theme,
+                        'انبار مقصد',
+                        doc['warehouse_name_to']?.toString() ??
+                            (doc['warehouse_id_to'] != null ? 'شناسه ${doc['warehouse_id_to']}' : '-'),
+                      ),
+                  ] else ...[
                     if (doc['warehouse_name_from'] != null || doc['warehouse_id_from'] != null)
                       _buildInfoRow(
                         theme,
@@ -623,6 +702,74 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
               ),
             ),
           ),
+          if (_movementNarrativeText(doc).isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Card(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.alt_route, color: theme.colorScheme.primary, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'خلاصهٔ مسیر و طرف',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _movementNarrativeText(doc),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (doc['source_type'] == 'invoice' && doc['source_document_id'] != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.receipt_long, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'فاکتور مرتبط',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(theme, 'کد فاکتور', doc['source_document_code']?.toString() ?? '—'),
+                    _buildInfoRow(theme, 'نوع فاکتور', doc['source_invoice_type_label_fa']?.toString() ?? '—'),
+                    if ((doc['source_invoice_party_name'] as String?)?.isNotEmpty == true)
+                      _buildInfoRow(theme, 'طرف حساب', doc['source_invoice_party_name'].toString()),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton.icon(
+                        onPressed: () => _openSourceInvoice(doc),
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: const Text('باز کردن فاکتور'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           // اطلاعات ارسال (در صورت وجود)
           if (_hasDeliveryInfo(doc)) ...[
             const SizedBox(height: 16),

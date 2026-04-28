@@ -577,9 +577,29 @@ def search_warehouse_docs(
 			return success_response(data=cached, request=request)
 	
 	q = db.query(WarehouseDocument).filter(WarehouseDocument.business_id == business_id)
+
+	# فیلترهای چندانتخابی جدول (QueryInfo.filters با operator=in)
+	filters_list = body.get("filters") if isinstance(body.get("filters"), list) else []
+	ms_doc_types: List[str] = []
+	ms_statuses: List[str] = []
+	ms_source_types: List[str] = []
+	for f in filters_list:
+		if not isinstance(f, dict):
+			continue
+		prop = f.get("property")
+		op = f.get("operator")
+		val = f.get("value")
+		if prop == "doc_type" and op == "in" and isinstance(val, list):
+			ms_doc_types = [str(x) for x in val if x]
+		elif prop == "status" and op == "in" and isinstance(val, list):
+			ms_statuses = [str(x) for x in val if x]
+		elif prop == "source_type" and op == "in" and isinstance(val, list):
+			ms_source_types = [str(x) for x in val if x]
 	
 	# فیلتر بر اساس نوع حواله
-	if isinstance(doc_type, str) and doc_type:
+	if ms_doc_types:
+		q = q.filter(WarehouseDocument.doc_type.in_(ms_doc_types))
+	elif isinstance(doc_type, str) and doc_type:
 		q = q.filter(WarehouseDocument.doc_type == doc_type)
 	elif isinstance(body.get("doc_type"), list):
 		doc_type_list = body.get("doc_type")
@@ -587,7 +607,9 @@ def search_warehouse_docs(
 			q = q.filter(WarehouseDocument.doc_type.in_(doc_type_list))
 	
 	# فیلتر بر اساس وضعیت
-	if isinstance(status, str) and status:
+	if ms_statuses:
+		q = q.filter(WarehouseDocument.status.in_(ms_statuses))
+	elif isinstance(status, str) and status:
 		q = q.filter(WarehouseDocument.status == status)
 	elif isinstance(body.get("status"), list):
 		status_list = body.get("status")
@@ -600,7 +622,9 @@ def search_warehouse_docs(
 		q = q.filter(WarehouseDocument.source_document_id == source_document_id)
 	
 	source_type = body.get("source_type")
-	if isinstance(source_type, str) and source_type:
+	if ms_source_types:
+		q = q.filter(WarehouseDocument.source_type.in_(ms_source_types))
+	elif isinstance(source_type, str) and source_type:
 		q = q.filter(WarehouseDocument.source_type == source_type)
 	
 	# فیلتر بر اساس تاریخ
@@ -632,11 +656,29 @@ def search_warehouse_docs(
 				)
 			)
 	
-	# جستجو در کد
+	# جستجو در کد حواله یا کد فاکتور مرتبط
 	search = body.get("search")
 	if isinstance(search, str) and search.strip():
 		search_term = f"%{search.strip()}%"
-		q = q.filter(WarehouseDocument.code.like(search_term))
+		invoice_ids_matching = [
+			r[0]
+			for r in db.query(Document.id)
+			.filter(and_(Document.business_id == business_id, Document.code.like(search_term)))
+			.limit(500)
+			.all()
+		]
+		if invoice_ids_matching:
+			q = q.filter(
+				or_(
+					WarehouseDocument.code.like(search_term),
+					and_(
+						WarehouseDocument.source_type == "invoice",
+						WarehouseDocument.source_document_id.in_(invoice_ids_matching),
+					),
+				)
+			)
+		else:
+			q = q.filter(WarehouseDocument.code.like(search_term))
 	
 	# مرتب‌سازی (چندستونه sort / تک‌ستونه sort_by)
 	from adapters.api.v1.schemas import QueryInfo

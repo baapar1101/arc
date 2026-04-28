@@ -333,16 +333,37 @@ class Hesabix_V2_Admin
 	 */
 	private function save_settings()
 	{
-		// Sync settings
+		// Sync settings (قالب واحد با Hesabix_V2_Invoice_Helper::normalize_sync_settings)
+		$status_choices = Hesabix_V2_Invoice_Helper::get_wc_order_status_choices();
+		$sync_order_on_statuses = array();
+		if (isset($_POST['sync_order_on_statuses']) && is_array($_POST['sync_order_on_statuses'])) {
+			foreach ($_POST['sync_order_on_statuses'] as $st) {
+				$st = sanitize_text_field(wp_unslash($st));
+				if ($st !== '' && isset($status_choices[$st])) {
+					$sync_order_on_statuses[] = $st;
+				}
+			}
+		}
+
 		$sync_settings = array(
 			'auto_sync_products' => isset($_POST['auto_sync_products']),
 			'auto_sync_customers' => isset($_POST['auto_sync_customers']),
 			'auto_sync_orders' => isset($_POST['auto_sync_orders']),
 			'sync_on_product_update' => isset($_POST['sync_on_product_update']),
-			'sync_on_order_create' => isset($_POST['sync_on_order_create']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
 			'sync_product_stock' => isset($_POST['sync_product_stock']),
 			'create_customer_on_order' => isset($_POST['create_customer_on_order']),
+			'sync_order_on_checkout' => isset($_POST['sync_order_on_checkout']),
+			'sync_order_on_payment_complete' => isset($_POST['sync_order_on_payment_complete']),
+			'sync_order_on_statuses' => $sync_order_on_statuses,
+			'invoice_is_proforma' => isset($_POST['invoice_doc_mode']) && sanitize_text_field(wp_unslash($_POST['invoice_doc_mode'])) === 'proforma',
+			'invoice_tag_website_enabled' => isset($_POST['invoice_tag_website_enabled']),
+			'invoice_tag_website_name' => isset($_POST['invoice_tag_website_name'])
+				? sanitize_text_field(wp_unslash($_POST['invoice_tag_website_name']))
+				: 'فروش سایت',
+			'invoice_extra_tag_ids' => isset($_POST['invoice_extra_tag_ids'])
+				? sanitize_text_field(wp_unslash($_POST['invoice_extra_tag_ids']))
+				: '',
 		);
 
 		update_option('hesabix_v2_sync_settings', $sync_settings);
@@ -432,36 +453,30 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * On order create (توجه: این hook قبل از ذخیره آیتم‌های سفارش اجرا می‌شود، پس برای چک‌اوت از on_checkout_order_processed استفاده می‌شود)
+	 * آیا همگام‌سازی خودکار سفارش فعال است؟
 	 *
-	 * @since    2.0.0
-	 * @param    int         $order_id
-	 * @param    WC_Order    $order
+	 * @return bool
 	 */
-	public function on_order_create($order_id, $order)
+	private function is_auto_sync_orders_enabled()
 	{
 		$sync_settings = get_option('hesabix_v2_sync_settings', array());
-		if (empty($sync_settings['auto_sync_orders'])) {
-			return;
-		}
-		if (isset($sync_settings['sync_on_order_create']) && $sync_settings['sync_on_order_create']) {
-			$sync_service = new Hesabix_V2_Sync_Service();
-			$sync_service->sync_order($order_id);
-		}
+		return !empty($sync_settings['auto_sync_orders']);
 	}
 
 	/**
-	 * بعد از تکمیل چک‌اوت — سفارش و آیتم‌ها ذخیره شده‌اند؛ این زمان درست برای همگام‌سازی با حسابیکس است.
+	 * بعد از تکمیل چک‌اوت — در صورت فعال بودن در تنظیمات
 	 *
-	 * @since    2.0.0
-	 * @param    int         $order_id
-	 * @param    array       $posted_data
-	 * @param    WC_Order    $order
+	 * @param int         $order_id
+	 * @param array|null  $posted_data
+	 * @param WC_Order|null $order
 	 */
-	public function on_checkout_order_processed($order_id, $posted_data = null, $order = null)
+	public function maybe_sync_order_on_checkout($order_id, $posted_data = null, $order = null)
 	{
-		$sync_settings = get_option('hesabix_v2_sync_settings', array());
-		if (empty($sync_settings['auto_sync_orders'])) {
+		if (!$this->is_auto_sync_orders_enabled()) {
+			return;
+		}
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (empty($sync['sync_order_on_checkout'])) {
 			return;
 		}
 		$sync_service = new Hesabix_V2_Sync_Service();
@@ -469,25 +484,73 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * On order status change
+	 * پس از پرداخت کامل سفارش (woocommerce_payment_complete)
 	 *
-	 * @since    2.0.0
-	 * @param    int         $order_id
-	 * @param    string      $old_status
-	 * @param    string      $new_status
-	 * @param    WC_Order    $order
+	 * @param int $order_id
 	 */
-	public function on_order_status_change($order_id, $old_status, $new_status, $order)
+	public function maybe_sync_order_on_payment_complete($order_id)
 	{
-		$sync_settings = get_option('hesabix_v2_sync_settings', array());
-		if (empty($sync_settings['auto_sync_orders'])) {
+		if (!$this->is_auto_sync_orders_enabled()) {
 			return;
 		}
-		// Sync order when status changes to processing or completed
-		if (in_array($new_status, array('processing', 'completed'))) {
-			$sync_service = new Hesabix_V2_Sync_Service();
-			$sync_service->sync_order($order_id);
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (empty($sync['sync_order_on_payment_complete'])) {
+			return;
 		}
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$sync_service->sync_order($order_id);
+	}
+
+	/**
+	 * تغییر وضعیت سفارش — در صورت انتخاب در تنظیمات
+	 *
+	 * @param int       $order_id
+	 * @param string    $old_status
+	 * @param string    $new_status
+	 * @param WC_Order  $order
+	 */
+	public function maybe_sync_order_on_status_change($order_id, $old_status, $new_status, $order)
+	{
+		if (!$this->is_auto_sync_orders_enabled()) {
+			return;
+		}
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$allowed = isset($sync['sync_order_on_statuses']) && is_array($sync['sync_order_on_statuses'])
+			? $sync['sync_order_on_statuses']
+			: array();
+		if (empty($allowed) || !in_array($new_status, $allowed, true)) {
+			return;
+		}
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$sync_service->sync_order($order_id);
+	}
+
+	/**
+	 * AJAX: لیست برچسب‌های فاکتور از حسابیکس (برای مرجع در تنظیمات)
+	 */
+	public function ajax_get_invoice_tags()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+
+		$api = new Hesabix_V2_Api();
+		$res = $api->list_invoice_tags(false);
+		$items = array();
+		if (!empty($res['success']) && isset($res['data']['items']) && is_array($res['data']['items'])) {
+			foreach ($res['data']['items'] as $row) {
+				if (isset($row['id'], $row['name'])) {
+					$items[] = array(
+						'id' => (int) $row['id'],
+						'name' => (string) $row['name'],
+					);
+				}
+			}
+		}
+
+		wp_send_json(array(
+			'success' => !empty($res['success']),
+			'message' => isset($res['message']) ? $res['message'] : '',
+			'tags' => $items,
+		));
 	}
 
 	/**

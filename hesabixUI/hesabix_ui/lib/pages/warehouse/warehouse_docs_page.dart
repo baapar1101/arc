@@ -229,6 +229,52 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     return null;
   }
 
+  String _warehouseMovementSummary(WarehouseDocument d) {
+    switch (d.docType) {
+      case 'transfer':
+        final from = d.warehouseNameFrom ?? '';
+        final to = d.warehouseNameTo ?? '';
+        if (from.isEmpty && to.isEmpty) return '—';
+        return '$from ← $to';
+      case 'issue':
+      case 'production_out':
+        final w = d.warehouseNameFrom ?? d.warehouseNameTo;
+        if (w != null && w.isNotEmpty) return 'خروج: $w';
+        return '—';
+      case 'receipt':
+      case 'production_in':
+        final w = d.warehouseNameTo ?? d.warehouseNameFrom;
+        if (w != null && w.isNotEmpty) return 'ورود: $w';
+        return '—';
+      default:
+        final parts = <String>[];
+        if (d.warehouseNameFrom != null && d.warehouseNameFrom!.isNotEmpty) {
+          parts.add(d.warehouseNameFrom!);
+        }
+        if (d.warehouseNameTo != null && d.warehouseNameTo!.isNotEmpty) {
+          parts.add(d.warehouseNameTo!);
+        }
+        return parts.isEmpty ? '—' : parts.join(' / ');
+    }
+  }
+
+  String _invoiceRelatedSummary(WarehouseDocument d) {
+    if ((d.sourceType ?? '') != 'invoice') {
+      return '—';
+    }
+    final parts = <String>[];
+    if (d.sourceInvoiceTypeLabelFa != null && d.sourceInvoiceTypeLabelFa!.isNotEmpty) {
+      parts.add(d.sourceInvoiceTypeLabelFa!);
+    }
+    if (d.sourceDocumentCode != null && d.sourceDocumentCode!.isNotEmpty) {
+      parts.add(d.sourceDocumentCode!);
+    }
+    if (d.sourceInvoicePartyName != null && d.sourceInvoicePartyName!.isNotEmpty) {
+      parts.add('طرف: ${d.sourceInvoicePartyName}');
+    }
+    return parts.isEmpty ? 'فاکتور' : parts.join(' · ');
+  }
+
   String _getDocTypeLabel(String docType, AppLocalizations t) {
     switch (docType) {
       case 'receipt':
@@ -420,7 +466,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           defaultSortBy: 'document_date',
           defaultSortDesc: true,
           searchFields: const ['code'],
-          filterFields: const ['doc_type', 'status', 'document_date'],
+          filterFields: const ['doc_type', 'status', 'document_date', 'source_type'],
           dateRangeField: 'document_date',
           enableDateRangeFilter: true,
           showFiltersButton: true,
@@ -549,6 +595,37 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                 FilterOption(value: 'production_in', label: t.docTypeProductionIn),
                 FilterOption(value: 'production_out', label: t.docTypeProductionOut),
               ],
+            ),
+            TextColumn(
+              'movement_summary',
+              'مسیر انبار',
+              sortable: false,
+              searchable: false,
+              formatter: (item) => _warehouseMovementSummary(item as WarehouseDocument),
+              width: ColumnWidth.medium,
+            ),
+            TextColumn(
+              'source_type',
+              'منشأ',
+              formatter: (item) {
+                final d = item as WarehouseDocument;
+                return d.sourceTypeLabelFa ?? d.sourceType ?? '—';
+              },
+              width: ColumnWidth.small,
+              filterType: ColumnFilterType.multiSelect,
+              filterOptions: const [
+                FilterOption(value: 'manual', label: 'دستی'),
+                FilterOption(value: 'invoice', label: 'فاکتور'),
+                FilterOption(value: 'api', label: 'API'),
+              ],
+            ),
+            TextColumn(
+              'invoice_related',
+              'فاکتور / طرف',
+              sortable: false,
+              searchable: false,
+              formatter: (item) => _invoiceRelatedSummary(item as WarehouseDocument),
+              width: ColumnWidth.large,
             ),
             TextColumn(
               'status',

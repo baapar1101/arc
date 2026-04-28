@@ -21,6 +21,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/document/document_details_dialog.dart';
 import 'quick_links_dashboard_widget.dart';
+import 'crm_calendar_dashboard_widget.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -49,11 +50,39 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   double _columnUnitPx = 0;
   String _salesChartType = 'bar'; // bar | line
   String _salesChartGroup = 'day'; // day | week | month
+  int? _crmCalendarYear;
+  int? _crmCalendarMonth;
+
+  Map<String, dynamic> _dashboardBatchFilters(List<String> keys) {
+    final m = <String, dynamic>{'group': _salesChartGroup};
+    if (keys.contains('crm_calendar') && _crmCalendarYear != null && _crmCalendarMonth != null) {
+      m['crm_calendar_year'] = _crmCalendarYear;
+      m['crm_calendar_month'] = _crmCalendarMonth;
+    }
+    return m;
+  }
+
+  void _onCalendarTypeChanged() {
+    if (!mounted) return;
+    setState(() {
+      _crmCalendarYear = null;
+      _crmCalendarMonth = null;
+    });
+    _reloadDataOnly();
+  }
 
   @override
   void initState() {
     super.initState();
+    widget.calendarController?.addListener(_onCalendarTypeChanged);
     _init();
+  }
+
+  @override
+  void dispose() {
+    widget.calendarController?.removeListener(_onCalendarTypeChanged);
+    _saveDebounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -272,7 +301,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       final data = await _service.getWidgetsBatchData(
         businessId: widget.businessId,
         widgetKeys: keys,
-        filters: {'group': _salesChartGroup},
+        filters: _dashboardBatchFilters(keys),
       );
       if (!mounted) return;
       setState(() {
@@ -314,7 +343,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return _hasWidgetPermission(widgetDef);
       }).map((e) => e.key).toList();
       
-      final data = await _service.getWidgetsBatchData(businessId: widget.businessId, widgetKeys: keys);
+      final data = await _service.getWidgetsBatchData(
+        businessId: widget.businessId,
+        widgetKeys: keys,
+        filters: _dashboardBatchFilters(keys),
+      );
       if (!mounted) return;
       setState(() {
         _data = data;
@@ -886,6 +919,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return _pnlSummaryWidget;
       case 'quick_links':
         return _quickLinksWidget;
+      case 'crm_calendar':
+        return _crmCalendarWidget;
       default:
         return null;
     }
@@ -907,6 +942,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         'top_suppliers': _topSuppliersWidget,
         'pnl_summary': _pnlSummaryWidget,
         'quick_links': _quickLinksWidget,
+        'crm_calendar': _crmCalendarWidget,
       };
 
   Widget _quickLinksWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
@@ -924,6 +960,21 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             _reloadDataOnly();
           },
         );
+      },
+    );
+  }
+
+  Widget _crmCalendarWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    final isJalali = widget.calendarController?.isJalali ?? true;
+    return CrmCalendarDashboardWidget(
+      data: data,
+      isJalali: isJalali,
+      onMonthChanged: (y, m) {
+        setState(() {
+          _crmCalendarYear = y;
+          _crmCalendarMonth = m;
+        });
+        _reloadDataOnly();
       },
     );
   }
@@ -2152,7 +2203,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     _applyItems(list);
     // داده‌ی ویجت‌های جدید
     try {
-      final newData = await _service.getWidgetsBatchData(businessId: widget.businessId, widgetKeys: keys);
+      final newData = await _service.getWidgetsBatchData(
+        businessId: widget.businessId,
+        widgetKeys: keys,
+        filters: _dashboardBatchFilters(keys),
+      );
       if (!mounted) return;
       setState(() {
         _data.addAll(newData);
@@ -2174,7 +2229,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
           _layout = businessDefault;
         });
         final keys = businessDefault.items.where((e) => !e.hidden).map((e) => e.key).toList();
-        final data = await _service.getWidgetsBatchData(businessId: widget.businessId, widgetKeys: keys);
+        final data = await _service.getWidgetsBatchData(
+          businessId: widget.businessId,
+          widgetKeys: keys,
+          filters: _dashboardBatchFilters(keys),
+        );
         if (!mounted) return;
         setState(() => _data = data);
         _scheduleSaveLayout();
@@ -2195,7 +2254,11 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     // بازخوانی داده‌ها
     final keys = items.where((e) => !e.hidden).map((e) => e.key).toList();
     try {
-      final data = await _service.getWidgetsBatchData(businessId: widget.businessId, widgetKeys: keys);
+      final data = await _service.getWidgetsBatchData(
+        businessId: widget.businessId,
+        widgetKeys: keys,
+        filters: _dashboardBatchFilters(keys),
+      );
       if (!mounted) return;
       setState(() => _data = data);
     } catch (_) {}
@@ -2253,6 +2316,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'خلاصه سود و زیان';
       case 'quick_links':
         return 'دسترسی سریع';
+      case 'crm_calendar':
+        return 'تقویم CRM';
       default:
         return key;
     }

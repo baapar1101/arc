@@ -7,8 +7,15 @@ class WarehouseDocument {
   final DateTime? documentDate;
   final int? warehouseIdFrom;
   final int? warehouseIdTo;
+  final String? warehouseNameFrom;
+  final String? warehouseNameTo;
   final String? sourceType;
+  final String? sourceTypeLabelFa;
   final int? sourceDocumentId;
+  final String? sourceDocumentCode;
+  final String? sourceInvoiceDocumentType;
+  final String? sourceInvoiceTypeLabelFa;
+  final String? sourceInvoicePartyName;
   final String? notes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -30,8 +37,15 @@ class WarehouseDocument {
     this.documentDate,
     this.warehouseIdFrom,
     this.warehouseIdTo,
+    this.warehouseNameFrom,
+    this.warehouseNameTo,
     this.sourceType,
+    this.sourceTypeLabelFa,
     this.sourceDocumentId,
+    this.sourceDocumentCode,
+    this.sourceInvoiceDocumentType,
+    this.sourceInvoiceTypeLabelFa,
+    this.sourceInvoicePartyName,
     this.notes,
     this.createdAt,
     this.updatedAt,
@@ -63,8 +77,15 @@ class WarehouseDocument {
           : null,
       warehouseIdFrom: json['warehouse_id_from'] as int?,
       warehouseIdTo: json['warehouse_id_to'] as int?,
+      warehouseNameFrom: json['warehouse_name_from'] as String?,
+      warehouseNameTo: json['warehouse_name_to'] as String?,
       sourceType: json['source_type'] as String?,
+      sourceTypeLabelFa: json['source_type_label_fa'] as String?,
       sourceDocumentId: json['source_document_id'] as int?,
+      sourceDocumentCode: json['source_document_code'] as String?,
+      sourceInvoiceDocumentType: json['source_invoice_document_type'] as String?,
+      sourceInvoiceTypeLabelFa: json['source_invoice_type_label_fa'] as String?,
+      sourceInvoicePartyName: json['source_invoice_party_name'] as String?,
       notes: json['notes'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -94,8 +115,15 @@ class WarehouseDocument {
       'document_date': documentDate?.toIso8601String(),
       'warehouse_id_from': warehouseIdFrom,
       'warehouse_id_to': warehouseIdTo,
+      'warehouse_name_from': warehouseNameFrom,
+      'warehouse_name_to': warehouseNameTo,
       'source_type': sourceType,
+      'source_type_label_fa': sourceTypeLabelFa,
       'source_document_id': sourceDocumentId,
+      'source_document_code': sourceDocumentCode,
+      'source_invoice_document_type': sourceInvoiceDocumentType,
+      'source_invoice_type_label_fa': sourceInvoiceTypeLabelFa,
+      'source_invoice_party_name': sourceInvoicePartyName,
       'notes': notes,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),

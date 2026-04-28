@@ -104,9 +104,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       if (!mounted) return;
       if (saved != null && saved.isNotEmpty && isKnownInvoiceDocumentType(saved)) {
         setState(() => _selectedInvoiceType = saved);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _refreshData();
-        });
       }
     } catch (_) {}
   }
@@ -114,24 +111,18 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   void _onInvoiceTypeFilterChanged(String? v) {
     setState(() => _selectedInvoiceType = v);
     _persistInvoiceDocumentType(v);
-    _refreshData();
   }
 
   void _refreshData() {
-    // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
-    // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final state = _tableKey.currentState;
-      if (state != null) {
-        try {
-          // ignore: avoid_dynamic_calls
-          (state as dynamic).refresh();
-          return;
-        } catch (_) {}
-      }
-      if (mounted) setState(() {});
-    });
+    final state = _tableKey.currentState;
+    if (state != null) {
+      try {
+        // ignore: avoid_dynamic_calls
+        (state as dynamic).refresh();
+        return;
+      } catch (_) {}
+    }
+    if (mounted) setState(() {});
   }
   
   /// Public method to refresh the data table
@@ -413,40 +404,32 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               onInvoiceTypeChanged: (v) => _onInvoiceTypeFilterChanged(v),
               onFiscalYearChanged: (v) {
                 setState(() => _selectedFiscalYearId = v);
-                _refreshData();
               },
               onProjectChanged: (v) {
                 setState(() => _selectedProjectId = v);
-                _refreshData();
               },
               onFromDateChanged: (v) {
                 setState(() => _fromDate = v);
-                _refreshData();
               },
               onToDateChanged: (v) {
                 setState(() => _toDate = v);
-                _refreshData();
               },
               onClearDateRange: () {
                 setState(() {
                   _fromDate = null;
                   _toDate = null;
                 });
-                _refreshData();
               },
               onIsProformaChanged: (v) {
                 setState(() => _isProforma = v);
-                _refreshData();
               },
               selectedTagIds: _selectedTagIds,
               tagMatch: _tagMatch,
               onTagIdsChanged: (v) {
                 setState(() => _selectedTagIds = v);
-                _refreshData();
               },
               onTagMatchChanged: (v) {
                 setState(() => _tagMatch = v);
-                _refreshData();
               },
             ),
           ],
@@ -477,7 +460,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       // Fiscal year is typically important; keep it unless explicitly cleared by user.
     });
     _persistInvoiceDocumentType(null);
-    _refreshData();
   }
 
   List<Widget> _buildExternalFilterChips(AppLocalizations t) {
@@ -661,7 +643,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _tagMatch = tagMatchLocal;
       });
       _persistInvoiceDocumentType(invoiceType);
-      _refreshData();
     }
   }
 
@@ -902,7 +883,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         setState(() {
           _selectedProjectId = projectId;
         });
-        _refreshData();
       },
       authStore: widget.authStore, // برای بررسی دسترسی به ایجاد پروژه
       calendarController: widget.calendarController, // برای دیالوگ ایجاد پروژه
@@ -1027,6 +1007,26 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                     pathParameters: {
                       'business_id': widget.businessId.toString(),
                       'invoice_id': invoice.id.toString(),
+                    },
+                  );
+                  if (!mounted) return;
+                  _refreshData();
+                },
+              ),
+            if (widget.authStore.canWriteSection('invoices'))
+              DataTableAction(
+                icon: Icons.copy_outlined,
+                label: t.invoiceCopyOpenNew,
+                onTap: (item) async {
+                  final invoice = item as InvoiceListItem;
+                  if (!mounted) return;
+                  await context.pushNamed(
+                    'business_new_invoice',
+                    pathParameters: {
+                      'business_id': widget.businessId.toString(),
+                    },
+                    queryParameters: {
+                      'copy_from': '${invoice.id}',
                     },
                   );
                   if (!mounted) return;
@@ -1387,6 +1387,24 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             icon: Icons.edit,
             label: t.edit,
             onTap: () => _onEdit(invoice),
+          ),
+          _InvoiceActionItem(
+            icon: Icons.copy_outlined,
+            label: t.invoiceCopyOpenNew,
+            onTap: () async {
+              if (!mounted) return;
+              await context.pushNamed(
+                'business_new_invoice',
+                pathParameters: {
+                  'business_id': widget.businessId.toString(),
+                },
+                queryParameters: {
+                  'copy_from': '${invoice.id}',
+                },
+              );
+              if (!mounted) return;
+              _refreshData();
+            },
           ),
           _InvoiceActionItem(
             icon: Icons.delete,
