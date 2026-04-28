@@ -53,6 +53,24 @@ class InvoicesListPage extends StatefulWidget {
   static void clearPageState(int businessId) {
     _pageStates.remove(businessId);
   }
+
+  /// بازگشت به لیست فاکتورها و تازه‌سازی جدول بعد از ثبت/ویرایش.
+  /// اگر با [push] به صفحهٔ فعال آمده باشیم با [pop] برمی‌گردیم تا همان نمونهٔ لیست
+  /// دوباره ساخته نشود و داده از سرور دوباره خوانده شود.
+  static void popOrGoToInvoiceList(BuildContext context, int businessId) {
+    if (!context.mounted) return;
+    if (context.canPop()) {
+      context.pop(true);
+      return;
+    }
+    context.goNamed(
+      'business_invoice',
+      pathParameters: {'business_id': businessId.toString()},
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      getPageState(businessId)?.refresh();
+    });
+  }
 }
 
 class _InvoicesListPageState extends State<InvoicesListPage> {
@@ -113,7 +131,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     _persistInvoiceDocumentType(v);
   }
 
-  void _refreshData() {
+  void _refreshData([int attempt = 0]) {
     final state = _tableKey.currentState;
     if (state != null) {
       try {
@@ -121,6 +139,16 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         (state as dynamic).refresh();
         return;
       } catch (_) {}
+    }
+    // جدول ممکن است هنوز بعد از بارگذاری سال مالی ساخته نشده باشد؛ چند فریم بعد دوباره امتحان کن.
+    if (attempt < 24 && mounted) {
+      Future<void>.delayed(
+        const Duration(milliseconds: 50),
+        () {
+          if (mounted) _refreshData(attempt + 1);
+        },
+      );
+      return;
     }
     if (mounted) setState(() {});
   }

@@ -339,6 +339,7 @@ app/services/ai_background_jobs.py
 app/services/ai_moderation_service.py
 app/services/ai_plan_service.py
 app/services/alert_service.py
+app/services/announcement_retention_jobs.py
 app/services/announcement_service.py
 app/services/api_key_service.py
 app/services/async_isolated.py
@@ -613,6 +614,7 @@ migrations/versions/20260529_000001_crm_chat_message_read_at.py
 migrations/versions/20260601_000001_crm_chat_message_deleted_at.py
 migrations/versions/20260602_000001_messenger_operator_sessions.py
 migrations/versions/20260602_000002_merge_heads_document_invoice_tags_and_messenger_operator_sessions.py
+migrations/versions/20260603_000001_crm_chat_message_edited_at.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

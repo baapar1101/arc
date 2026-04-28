@@ -35,7 +35,7 @@ class OpeningBalanceService {
   Future<Map<String, dynamic>> post({required int businessId, int? fiscalYearId}) async {
     final resp = await _apiClient.post(
       '/businesses/$businessId/opening-balance/post',
-      data: {
+      query: {
         if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
       },
     );

@@ -4390,6 +4390,7 @@
   "crmWebChatSelectConversation": "یک مکالمه را انتخاب کنید",
   "crmWebChatConversationNotFoundRefresh": "مکالمه یافت نشد — به‌روزرسانی را بزنید",
   "crmWebChatVisitorStartPageLabel": "صفحهٔ شروع چت (بازدیدکننده)",
+  "crmWebChatVisitorCurrentPageLabel": "صفحهٔ فعلی بازدیدکننده",
   "crmWebChatWidgetLine": "ویجت: {name}",
   "@crmWebChatWidgetLine": {
     "placeholders": {

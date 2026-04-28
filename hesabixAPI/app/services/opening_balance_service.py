@@ -55,6 +55,29 @@ def get_opening_balance(
     return repo.to_dict_with_lines(existing)
 
 
+def _merge_opening_balance_extra_info(
+    existing: Optional[Document],
+    data: Dict[str, Any],
+    inventory_lines: List[Dict[str, Any]],
+    inventory_account_id: Optional[int],
+    equity_account_id: Optional[int],
+    auto_balance_to_equity: bool,
+) -> Dict[str, Any]:
+    """ادغام extra_info تا posted و سایر کلیدها با ذخیرهٔ ناقص از کلاینت از بین نروند."""
+    merged: Dict[str, Any] = dict(existing.extra_info or {}) if existing else {}
+    incoming = data.get("extra_info")
+    if isinstance(incoming, dict):
+        merged.update(incoming)
+    merged["auto_balance_to_equity"] = bool(auto_balance_to_equity)
+    if inventory_account_id is not None:
+        merged["inventory_account_id"] = int(inventory_account_id)
+    elif not inventory_lines:
+        merged.pop("inventory_account_id", None)
+    if equity_account_id is not None:
+        merged["equity_account_id"] = int(equity_account_id)
+    return merged
+
+
 def upsert_opening_balance(
     db: Session,
     business_id: int,
@@ -63,6 +86,13 @@ def upsert_opening_balance(
 ) -> Dict[str, Any]:
     repo = DocumentRepository(db)
     fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
+    existing = _find_existing_ob_document(db, business_id, fy_id)
+    if existing and (existing.extra_info or {}).get("posted") is True:
+        raise ApiError(
+            "OPENING_BALANCE_POSTED",
+            "سند تراز افتتاحیه نهایی شده و قابل ویرایش نیست",
+            http_status=409,
+        )
 
     document_date = data.get("document_date") or fy_start_date
     currency_id = data.get("currency_id")
@@ -180,12 +210,19 @@ def upsert_opening_balance(
                 )
 
     # Validate balance
-    is_valid, err = repo.validate_document_balance(lines)
+    is_valid, err = repo.validate_document_balance(lines, allow_zero_amount_product_lines=True)
     if not is_valid:
         raise ApiError("INVALID_DOCUMENT", err, http_status=400)
 
-    # Upsert
-    existing = _find_existing_ob_document(db, business_id, fy_id)
+    extra_info = _merge_opening_balance_extra_info(
+        existing,
+        data,
+        inventory_lines,
+        inventory_account_id,
+        equity_account_id,
+        auto_balance_to_equity,
+    )
+
     document_payload = {
         "code": (existing.code if existing and existing.code else repo.generate_document_code(business_id, "opening_balance")),
         "business_id": int(business_id),
@@ -196,7 +233,7 @@ def upsert_opening_balance(
         "document_type": "opening_balance",
         "is_proforma": False,
         "description": data.get("description"),
-        "extra_info": data.get("extra_info") or {},
+        "extra_info": extra_info,
         "lines": lines,
     }
 
@@ -335,7 +372,7 @@ def preview_opening_balance(
                 )
 
     # Validate balance
-    is_valid, err = repo.validate_document_balance(lines)
+    is_valid, err = repo.validate_document_balance(lines, allow_zero_amount_product_lines=True)
     if not is_valid:
         raise ApiError("INVALID_DOCUMENT", err, http_status=400)
 

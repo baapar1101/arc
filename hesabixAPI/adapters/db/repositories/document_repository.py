@@ -420,6 +420,13 @@ class DocumentRepository:
         doc_dict["total_credit"] = total_credit
         doc_dict["lines_count"] = len(lines)
 
+        # فیلدهای تنظیمات تراز افتتاحیه در extra_info را روی ریشهٔ پاسخ هم برگردان (راحتی کلاینت)
+        if document.document_type == "opening_balance":
+            ei = document.extra_info or {}
+            for key in ("inventory_account_id", "equity_account_id", "auto_balance_to_equity"):
+                if key in ei:
+                    doc_dict[key] = ei[key]
+
         return doc_dict
 
     def _document_line_to_dict(self, line: DocumentLine) -> Dict[str, Any]:
@@ -599,12 +606,19 @@ class DocumentRepository:
         year = datetime.now().year % 100  # دو رقم آخر سال
         return f"{document_type.upper()}-{year}{1:04d}"
 
-    def validate_document_balance(self, lines_data: List[Dict[str, Any]]) -> tuple[bool, str]:
+    def validate_document_balance(
+        self,
+        lines_data: List[Dict[str, Any]],
+        *,
+        allow_zero_amount_product_lines: bool = False,
+    ) -> tuple[bool, str]:
         """
         اعتبارسنجی متوازن بودن سند
         
         Args:
             lines_data: لیست سطرهای سند
+            allow_zero_amount_product_lines: اگر True باشد، سطرهای دارای product_id با بدهکار و
+                بستانکار صفر (فقط حرکت کالا) مجازند — برای تراز افتتاحیه / اسناد با جزئیات انبار.
         
         Returns:
             tuple: (متوازن است؟, پیام خطا)
@@ -633,6 +647,8 @@ class DocumentRepository:
             debit = float(line.get("debit", 0))
             credit = float(line.get("credit", 0))
             if debit == 0 and credit == 0:
+                if allow_zero_amount_product_lines and line.get("product_id") is not None:
+                    continue
                 return False, f"سطر {i} باید مقدار بدهکار یا بستانکار داشته باشد"
             # نمی‌تواند هم بدهکار هم بستانکار داشته باشد
             if debit > 0 and credit > 0:

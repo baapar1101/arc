@@ -406,6 +406,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     return s[0].toUpperCase();
   }
 
+  /// نمایش خلاصه از URLهای بسیار بلند: ابتدا/انتها + … وسط (بدون اسکرول افقی).
+  String _shortenUrlForDisplay(String url, {int maxChars = 80}) {
+    final u = url.trim();
+    if (u.length <= maxChars) return u;
+    final inner = maxChars - 1;
+    final head = (inner * 55 ~/ 100).clamp(24, inner - 16);
+    final tail = inner - head;
+    if (tail < 8) return '${u.substring(0, inner)}…';
+    return '${u.substring(0, head)}…${u.substring(u.length - tail)}';
+  }
+
   void _startFallback() {
     _fallbackPoll?.cancel();
     if (_wsLive) return;
@@ -1450,82 +1461,123 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final conv = Map<String, dynamic>.from(c);
     final pageUrl = conv['page_url']?.toString();
     final assignName = _nameForUserId((conv['assigned_to_user_id'] as num?)?.toInt());
+    final visitorName = '${conv['visitor_first_name'] ?? ''} ${conv['visitor_last_name'] ?? ''}'.trim();
+    final email = (conv['visitor_email']?.toString() ?? '').trim();
+    final phone = (conv['visitor_phone']?.toString() ?? '').trim();
+    final metaParts = <String>[
+      if (email.isNotEmpty) email,
+      if (phone.isNotEmpty) phone,
+      t.crmWebChatWidgetLine(_widgetName((conv['widget_id'] as num?)?.toInt())),
+    ];
 
     return Column(
       children: [
         if (_loadingMsgs) LinearProgressIndicator(minHeight: 2, color: cs.primary),
         Material(
           color: cs.surfaceContainerHighest,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                CircleAvatar(
-                  child: Text(
-                    _firstCharForAvatar(conv['visitor_first_name']?.toString()),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${conv['visitor_first_name'] ?? ''} ${conv['visitor_last_name'] ?? ''}'.trim(),
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      child: Text(
+                        _firstCharForAvatar(conv['visitor_first_name']?.toString()),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      if (pageUrl != null && pageUrl.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                t.crmWebChatVisitorStartPageLabel,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            visitorName.isEmpty ? '—' : visitorName,
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (pageUrl != null && pageUrl.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              t.crmWebChatVisitorCurrentPageLabel,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
                               ),
-                              InkWell(
+                            ),
+                            const SizedBox(height: 2),
+                            Tooltip(
+                              message: pageUrl,
+                              child: InkWell(
                                 onTap: () async {
                                   final u = Uri.tryParse(pageUrl);
                                   if (u != null && await canLaunchUrl(u)) {
                                     await launchUrl(u, mode: LaunchMode.externalApplication);
                                   }
                                 },
-                                child: Text(
-                                  pageUrl,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Text(
+                                    _shortenUrlForDisplay(pageUrl),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: cs.primary,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: cs.primary.withValues(alpha: 0.4),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      Text(
-                        '${conv['visitor_email'] ?? ''}  ·  ${conv['visitor_phone'] ?? ''}  ·  ${t.crmWebChatWidgetLine(_widgetName((conv['widget_id'] as num?)?.toInt()))}',
-                        style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                          if (metaParts.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              metaParts.join(' · '),
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (assignName != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              t.crmWebChatAssigneeLine(assignName),
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
                       ),
-                      if (assignName != null) Text(t.crmWebChatAssigneeLine(assignName), style: theme.textTheme.bodySmall),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                if (widget.authStore.canEditCrmWebChatConversations())
-                  FilledButton.tonal(
-                    onPressed: () => _showEditConvSheet(conv),
-                    child: Text(t.crmWebChatEditConversationButton),
-                  ),
-                TextButton(
-                  onPressed: () => context.push('/business/${widget.businessId}/crm/leads'),
-                  child: Text(t.crmWebChatLeads),
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (widget.authStore.canEditCrmWebChatConversations())
+                      FilledButton.tonal(
+                        onPressed: () => _showEditConvSheet(conv),
+                        child: Text(t.crmWebChatEditConversationButton),
+                      ),
+                    TextButton(
+                      onPressed: () => context.push('/business/${widget.businessId}/crm/leads'),
+                      child: Text(t.crmWebChatLeads),
+                    ),
+                  ],
                 ),
               ],
-            ),
             ),
           ),
         ),

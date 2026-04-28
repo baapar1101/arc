@@ -13,6 +13,7 @@ from adapters.api.v1.schema_models.crm_chat import (
 	CrmChatConversationStartPublic,
 	CrmChatMarkReadBody,
 	CrmChatVisitorMessageCreate,
+	CrmChatVisitorPageUrlPatch,
 )
 from adapters.db.session import get_db
 from app.core.i18n import get_request_translator
@@ -164,6 +165,38 @@ async def public_list_messages(
 	return success_response(
 		data={"items": [format_datetime_fields(x, request) for x in items]},
 		request=request,
+	)
+
+
+@router.patch("/api/v1/public/crm-chat/conversations/{conversation_id}/current-page")
+async def public_patch_visitor_current_page(
+	request: Request,
+	conversation_id: int,
+	body: CrmChatVisitorPageUrlPatch = Body(...),
+	authorization: Optional[str] = Header(default=None),
+	x_visitor_token: Optional[str] = Header(default=None, alias="X-Visitor-Token", convert_underscores=False),
+	visitor_token: Optional[str] = Query(
+		default=None,
+		description="(قدیمی) اگر هدر ارسال نمی‌کنید",
+	),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""به‌روزرسانی URL صفحهٔ فعلی بازدیدکننده (ویجت وب؛ برای نمایش زنده نزد اپراتور)."""
+	tok = _resolve_public_visitor_token(request, authorization, x_visitor_token, visitor_token)
+	try:
+		data = await chat_svc.update_visitor_current_page_url(
+			db,
+			visitor_token=tok,
+			conversation_id=conversation_id,
+			page_url=body.page_url,
+			origin_header=_origin(request),
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return success_response(
+		data=format_datetime_fields(data, request),
+		request=request,
+		message="CRM_CHAT_PUBLIC_PAGE_URL_UPDATED",
 	)
 
 

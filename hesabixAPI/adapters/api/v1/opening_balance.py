@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Body, Request
+from fastapi import APIRouter, Depends, Body, Request, Query
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -79,7 +79,7 @@ async def preview_opening_balance_endpoint(
 async def post_opening_balance_endpoint(
     request: Request,
     business_id: int,
-    fiscal_year_id: Optional[int] = None,
+    fiscal_year_id: Optional[int] = Query(None, description="شناسه سال مالی (در غیر این صورت سال جاری)"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("opening_balance", "edit")),

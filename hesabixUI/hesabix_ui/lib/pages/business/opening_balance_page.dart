@@ -64,8 +64,14 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   void initState() {
     super.initState();
     _service = OpeningBalanceService(ApiClient());
-    _initializeAccounts();
-    _load();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _initializeAccounts();
+    if (mounted) {
+      await _load();
+    }
   }
 
   Future<void> _initializeAccounts() async {
@@ -88,11 +94,13 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final doc = await _service.fetch(businessId: widget.businessId);
       setState(() {
         _document = doc;
-        // بارگذاری خطوط از document
-        if (doc != null) {
+        if (doc.isNotEmpty) {
           _loadLinesFromDocument(doc);
         }
       });
+      if (mounted && doc.isNotEmpty) {
+        await _applyOpeningBalanceAccountObjects(doc);
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -113,9 +121,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     _inventoryLines.clear();
     _otherAccountLines.clear();
 
-    // بارگذاری تنظیمات
-    final extraInfo = doc['extra_info'] as Map<String, dynamic>? ?? {};
-    _autoBalance = extraInfo['auto_balance_to_equity'] as bool? ?? true;
+    // بارگردانی تنظیمات (ریشهٔ پاسخ API و extra_info پس از ادغام در سرور)
+    final docExtra = doc['extra_info'] as Map<String, dynamic>? ?? {};
+    _autoBalance = (doc['auto_balance_to_equity'] as bool?) ??
+        docExtra['auto_balance_to_equity'] as bool? ??
+        true;
 
     // بارگذاری خطوط
     final lines = doc['lines'] as List<dynamic>? ?? [];
@@ -197,7 +207,15 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         final debit = (lineMap['debit'] as num?)?.toDouble() ?? 0.0;
         final credit = (lineMap['credit'] as num?)?.toDouble() ?? 0.0;
         final description = lineMap['description'] as String? ?? '';
-        
+
+        // سطر تجمیعی بهای موجودی — فقط در تب کالا نمایش داده می‌شود؛ در «سایر حساب» تکرار نشود
+        if (description == 'موجودی ابتدای دوره') {
+          if (_inventoryAccountId == null && accountId != null) {
+            _inventoryAccountId = accountId;
+          }
+          continue;
+        }
+
         // خطوط auto-balance را نادیده بگیر (دارای description خاص هستند)
         if (description.contains('بستن اختلاف تراز افتتاحیه')) {
           // این خط auto-balance است، فقط account_id را برای equity ذخیره کن
@@ -223,13 +241,48 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       }
     }
 
-    // بارگذاری inventory_account_id و equity_account_id از extra_info
-    if (doc['inventory_account_id'] != null) {
-      _inventoryAccountId = doc['inventory_account_id'] as int?;
+    _inventoryAccountId =
+        (doc['inventory_account_id'] as int?) ?? docExtra['inventory_account_id'] as int?;
+    _equityAccountId = (doc['equity_account_id'] as int?) ?? docExtra['equity_account_id'] as int?;
+  }
+
+  Future<void> _applyOpeningBalanceAccountObjects(Map<String, dynamic> doc) async {
+    final docExtra = doc['extra_info'] as Map<String, dynamic>? ?? {};
+    final invId = (doc['inventory_account_id'] as int?) ?? docExtra['inventory_account_id'] as int?;
+    final eqId = (doc['equity_account_id'] as int?) ?? docExtra['equity_account_id'] as int?;
+    if (invId == null && eqId == null) return;
+
+    final accountService = AccountService();
+    Future<Account?> loadAccountById(int id) async {
+      try {
+        final data = await accountService.getAccount(businessId: widget.businessId, accountId: id);
+        return Account.fromJson(data);
+      } catch (_) {
+        try {
+          final res = await accountService.getAccounts(businessId: widget.businessId);
+          final items = (res['items'] as List<dynamic>? ?? const <dynamic>[]);
+          for (final it in items) {
+            final acc = Account.fromJson(Map<String, dynamic>.from(it as Map));
+            if (acc.id == id) return acc;
+          }
+        } catch (_) {}
+        return null;
+      }
     }
-    if (doc['equity_account_id'] != null) {
-      _equityAccountId = doc['equity_account_id'] as int?;
-    }
+
+    final invAcc = invId != null ? await loadAccountById(invId) : null;
+    final eqAcc = eqId != null ? await loadAccountById(eqId) : null;
+    if (!mounted) return;
+    setState(() {
+      if (invAcc != null) {
+        _inventoryAccount = invAcc;
+        _inventoryAccountId = invAcc.id;
+      }
+      if (eqAcc != null) {
+        _equityAccount = eqAcc;
+        _equityAccountId = eqAcc.id;
+      }
+    });
   }
 
   Future<void> _loadDefaultAccounts() async {
@@ -270,8 +323,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         return null;
       }
 
-      // بارگذاری حساب‌ها با fallback
-      final inv = await findByCodeWithFallback('10101', ['101', '1010']);
+      // موجودی: 10102 (نمودار استاندارد فاکتورها)، سپس 12101 (بستن سال / OB خودکار)، سپس سایر
+      final inv = await findByCodeWithFallback('10102', ['12101', '10101', '101', '1010']);
       final bank = await findByCodeWithFallback('10203', ['102', '1020']);
       final cash = await findByCodeWithFallback('10202', ['102', '1020']);
       final petty = await findByCodeWithFallback('10201', ['102', '1020']);
@@ -846,6 +899,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Widget _buildInventoryTab() {
+    final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+    final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
+    final allowEditInventory = canEdit && !isPosted;
+
     return Column(
       children: [
         Row(
@@ -903,6 +960,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   itemBuilder: (context, index) {
               final m = _inventoryLines[index];
               return ListTile(
+                key: ObjectKey(m),
                 leading: const Icon(Icons.inventory_outlined),
                 title: Text('${m['product']?['code'] ?? ''} - ${m['product']?['name'] ?? ''}'),
                 subtitle: Row(
@@ -913,12 +971,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                         selectedWarehouseId: m['warehouseId'] as int?,
                         selectDefaultWhenUnset: true,
                         onChanged: (wid) {
+                          if (!allowEditInventory) return;
                           final product = m['product'] as Map<String, dynamic>?;
                           final pid = product?['id'] as int?;
                           if (pid != null && wid != null) {
-                            // چک می‌کنیم که آیا این کالا با این انبار در سایر موارد (غیر از مورد فعلی) وجود دارد
                             final isDuplicate = _inventoryLines.asMap().entries.any((entry) {
-                              if (entry.key == index) return false; // مورد فعلی را نادیده بگیر
+                              if (entry.key == index) return false;
                               final otherLine = entry.value;
                               final otherProduct = otherLine['product'] as Map<String, dynamic>?;
                               final otherPid = otherProduct?['id'] as int?;
@@ -944,41 +1002,25 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['quantity'] as double?, decimalPlaces: 2),
-                        ),
-                        decoration: const InputDecoration(isDense: true, labelText: 'تعداد'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
-                        ],
-                        onChanged: (v) {
-                          m['quantity'] = parseFormattedDouble(v) ?? 0.0;
-                          setState(() {});
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['cost_price'] as double?, decimalPlaces: 2),
-                        ),
-                        decoration: const InputDecoration(isDense: true, labelText: 'بهای واحد'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
-                        ],
-                        onChanged: (v) {
-                          m['cost_price'] = parseFormattedDouble(v) ?? 0.0;
-                          setState(() {});
+                      child: _OpeningBalanceInventoryQtyPriceFields(
+                        line: m,
+                        enabled: allowEditInventory,
+                        onModelChanged: () {
+                          if (mounted) setState(() {});
                         },
                       ),
                     ),
                   ],
                 ),
-                trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _inventoryLines.removeAt(index); setState(() {}); }),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: allowEditInventory
+                      ? () {
+                          _inventoryLines.removeAt(index);
+                          setState(() {});
+                        }
+                      : null,
+                ),
               );
             },
           ),
@@ -1536,4 +1578,101 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 }
 
+/// ورودی تعداد و بهای واحد با کنترلر پایدار و جهت LTR (رفع مشکل تایپ برعکس در RTL).
+class _OpeningBalanceInventoryQtyPriceFields extends StatefulWidget {
+  final Map<String, dynamic> line;
+  final bool enabled;
+  final VoidCallback onModelChanged;
+
+  const _OpeningBalanceInventoryQtyPriceFields({
+    required this.line,
+    required this.enabled,
+    required this.onModelChanged,
+  });
+
+  @override
+  State<_OpeningBalanceInventoryQtyPriceFields> createState() =>
+      _OpeningBalanceInventoryQtyPriceFieldsState();
+}
+
+class _OpeningBalanceInventoryQtyPriceFieldsState extends State<_OpeningBalanceInventoryQtyPriceFields> {
+  late final TextEditingController _quantityController;
+  late final TextEditingController _costPriceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityController = TextEditingController(
+      text: formatNumberForInput(widget.line['quantity'] as double?, decimalPlaces: 2),
+    );
+    _costPriceController = TextEditingController(
+      text: formatNumberForInput(widget.line['cost_price'] as double?, decimalPlaces: 2),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _OpeningBalanceInventoryQtyPriceFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.line, widget.line)) {
+      _quantityController.text = formatNumberForInput(
+        widget.line['quantity'] as double?,
+        decimalPlaces: 2,
+      );
+      _costPriceController.text = formatNumberForInput(
+        widget.line['cost_price'] as double?,
+        decimalPlaces: 2,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _costPriceController.dispose();
+    super.dispose();
+  }
+
+  void _onQuantityChanged(String v) {
+    widget.line['quantity'] = parseFormattedDouble(v) ?? 0.0;
+    widget.onModelChanged();
+  }
+
+  void _onCostChanged(String v) {
+    widget.line['cost_price'] = parseFormattedDouble(v) ?? 0.0;
+    widget.onModelChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _quantityController,
+            enabled: widget.enabled,
+            decoration: const InputDecoration(isDense: true, labelText: 'تعداد'),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
+            inputFormatters: const [NumberInputFormatter(allowDecimal: true)],
+            onChanged: _onQuantityChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: _costPriceController,
+            enabled: widget.enabled,
+            decoration: const InputDecoration(isDense: true, labelText: 'بهای واحد'),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
+            inputFormatters: const [NumberInputFormatter(allowDecimal: true)],
+            onChanged: _onCostChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
 

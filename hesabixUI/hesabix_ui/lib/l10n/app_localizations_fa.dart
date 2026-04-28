@@ -9663,7 +9663,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationCenterCleared => 'اعلان‌ها پاک شد';
 
   @override
-  String get notificationsInappRetentionTitle => 'نگهداری اعلان‌های درون‌برنامه';
+  String get notificationsInappRetentionTitle =>
+      'نگهداری اعلان‌های درون‌برنامه';
 
   @override
   String get notificationsInappRetentionSubtitle =>
@@ -11289,6 +11290,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmWebChatVisitorStartPageLabel => 'صفحهٔ شروع چت (بازدیدکننده)';
+
+  @override
+  String get crmWebChatVisitorCurrentPageLabel => 'صفحهٔ فعلی بازدیدکننده';
 
   @override
   String crmWebChatWidgetLine(String name) {

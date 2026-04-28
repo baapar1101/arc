@@ -28,6 +28,7 @@ import '../../services/person_service.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'invoices_list_page.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
 import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
@@ -1333,15 +1334,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         );
         if (!mounted) return;
         SnackBarHelper.show(context, message: 'تغییرات فاکتور با موفقیت ذخیره شد');
-        // بازگشت به لیست فاکتورها بعد از ذخیره موفق
         if (mounted) {
-          // هدایت به لیست فاکتورها بعد از ویرایش موفق
-          context.goNamed(
-            'business_invoice',
-            pathParameters: {
-              'business_id': widget.businessId.toString(),
-            },
-          );
+          InvoicesListPage.popOrGoToInvoiceList(context, widget.businessId);
         }
       } catch (e) {
         if (!mounted) return;

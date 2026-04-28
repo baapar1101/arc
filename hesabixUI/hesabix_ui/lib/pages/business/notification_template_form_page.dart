@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
@@ -24,13 +25,14 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   final _formKey = GlobalKey<FormState>();
   final _apiClient = ApiClient();
   
-  bool _isLoading = false;
   bool _isSaving = false;
   bool _showPreview = false;
+  bool _bootstrapComplete = false;
   
-  // Event types
+  // Event types (فقط از سرور؛ بدون دادهٔ ساختگی)
   List<Map<String, dynamic>> _eventTypes = [];
   Map<String, dynamic>? _selectedEventType;
+  String? _eventTypesError;
   
   // Form controllers
   final _codeController = TextEditingController();
@@ -51,10 +53,46 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   @override
   void initState() {
     super.initState();
-    _loadEventTypes();
+    _bodyController.addListener(() {
+      if (mounted) setState(() {});
+    });
+    Future<void>.microtask(_bootstrap);
+  }
+
+  /// ابتدا کاتالوگ رویدادها، سپس در حالت ویرایش بارگذاری قالب (جلوگیری از race و نقشهٔ `{}` نامعتبر)
+  Future<void> _bootstrap() async {
+    await _loadEventTypes();
+    if (!mounted) return;
     if (widget.templateId != null) {
-      _loadTemplate();
+      await _loadTemplate();
     }
+    if (mounted) {
+      setState(() => _bootstrapComplete = true);
+    }
+  }
+
+  List<Map<String, dynamic>> get _sortedEventTypes {
+    final list = List<Map<String, dynamic>>.from(_eventTypes);
+    list.sort((a, b) {
+      final ca = '${a['category'] ?? ''}';
+      final cb = '${b['category'] ?? ''}';
+      final c = ca.compareTo(cb);
+      if (c != 0) return c;
+      return '${a['name']}'.compareTo('${b['name']}');
+    });
+    return list;
+  }
+
+  /// فقط اگر همان شیء در لیست سرور باشد معتبر است (برای Dropdown و ذخیره)
+  Map<String, dynamic>? get _resolvedSelectedEvent {
+    final raw = _selectedEventType;
+    if (raw == null) return null;
+    final code = raw['code'];
+    if (code is! String || code.isEmpty) return null;
+    for (final et in _eventTypes) {
+      if (et['code'] == code) return et;
+    }
+    return null;
   }
 
   @override
@@ -69,126 +107,36 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   }
 
   Future<void> _loadEventTypes() async {
+    setState(() {
+      _eventTypesError = null;
+    });
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
         '/api/v1/business-notifications/event-types',
       );
-      
+
       final data = response.data?['data'] as Map<String, dynamic>?;
       final items = data?['items'] as List? ?? [];
-      
+
+      if (!mounted) return;
       setState(() {
         _eventTypes = items.map((e) => e as Map<String, dynamic>).toList();
+        if (_eventTypes.isEmpty) {
+          _eventTypesError =
+              'هیچ نوع رویدادی در سرور ثبت نشده است. پس از به‌روزرسانی سیستم (مهاجرت دیتابیس) دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.';
+        }
       });
-      
-      // اگر خالی بود، از داده‌های پیش‌فرض استفاده کن
-      if (_eventTypes.isEmpty) {
-        _loadDefaultEventTypes();
-      }
     } catch (e) {
-      // در صورت خطا، از داده‌های پیش‌فرض استفاده کن
-      _loadDefaultEventTypes();
-      
-      if (mounted) {
-        SnackBarHelper.show(context, message: '⚠️ رویدادها از حافظه محلی بارگذاری شدند. جداول سیستم ممکن است ایجاد نشده باشند.');
-      }
+      if (!mounted) return;
+      setState(() {
+        _eventTypes = [];
+        _eventTypesError =
+            'بارگذاری رویدادها ناموفق بود. اتصال اینترنت یا دسترسی API را بررسی کنید. جزئیات: $e';
+      });
     }
-  }
-  
-  void _loadDefaultEventTypes() {
-    // Event types پیش‌فرض (fallback)
-    setState(() {
-      _eventTypes = [
-        {
-          'id': 0,
-          'code': 'invoice.created',
-          'name': 'ثبت فاکتور فروش',
-          'description': 'هنگامی که فاکتور فروش جدیدی ثبت می‌شود',
-          'category': 'sales',
-          'available_variables': [
-            {'key': 'invoice_number', 'type': 'string', 'description': 'شماره فاکتور'},
-            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
-            {'key': 'amount', 'type': 'number', 'description': 'مبلغ کل'},
-            {'key': 'invoice_date', 'type': 'date', 'description': 'تاریخ فاکتور'},
-            {'key': 'business_name', 'type': 'string', 'description': 'نام کسب‌وکار'},
-            {'key': 'business_phone', 'type': 'string', 'description': 'تلفن کسب‌وکار'},
-          ],
-          'default_sms_template': 'سلام {{ customer_name }}، فاکتور {{ invoice_number }} به مبلغ {{ amount | format_currency }} ثبت شد. {{ business_name }}',
-          'default_email_subject': 'فاکتور جدید - {{ invoice_number }}',
-        },
-        {
-          'id': 0,
-          'code': 'repair_shop.received',
-          'name': 'دریافت کالا در تعمیرگاه',
-          'description': 'هنگامی که کالای مشتری برای تعمیر دریافت می‌شود',
-          'category': 'repair_shop',
-          'available_variables': [
-            {'key': 'repair_code', 'type': 'string', 'description': 'کد رسید تعمیر'},
-            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
-            {'key': 'product_name', 'type': 'string', 'description': 'نام کالا'},
-            {'key': 'estimated_delivery', 'type': 'date', 'description': 'تاریخ تحویل تقریبی'},
-            {'key': 'business_name', 'type': 'string', 'description': 'نام تعمیرگاه'},
-            {'key': 'business_phone', 'type': 'string', 'description': 'تلفن تعمیرگاه'},
-          ],
-          'default_sms_template': 'سلام {{ customer_name }}، {{ product_name }} با کد {{ repair_code }} دریافت شد. تحویل تقریبی: {{ estimated_delivery | format_date }}. {{ business_name }}',
-          'default_email_subject': 'دریافت کالا - {{ repair_code }}',
-        },
-        {
-          'id': 0,
-          'code': 'repair_shop.ready',
-          'name': 'آماده تحویل از تعمیرگاه',
-          'description': 'هنگامی که کالای تعمیر شده آماده تحویل است',
-          'category': 'repair_shop',
-          'available_variables': [
-            {'key': 'repair_code', 'type': 'string', 'description': 'کد رسید'},
-            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
-            {'key': 'product_name', 'type': 'string', 'description': 'نام کالا'},
-            {'key': 'final_cost', 'type': 'number', 'description': 'هزینه نهایی'},
-            {'key': 'business_name', 'type': 'string', 'description': 'نام تعمیرگاه'},
-            {'key': 'business_phone', 'type': 'string', 'description': 'تلفن تعمیرگاه'},
-          ],
-          'default_sms_template': 'سلام {{ customer_name }}، {{ product_name }} (کد {{ repair_code }}) آماده تحویل است. هزینه: {{ final_cost | format_currency }}. {{ business_name }}',
-          'default_email_subject': 'کالای شما آماده تحویل است',
-        },
-        {
-          'id': 0,
-          'code': 'payment.received',
-          'name': 'دریافت پرداخت',
-          'description': 'هنگامی که پرداختی از مشتری دریافت می‌شود',
-          'category': 'financial',
-          'available_variables': [
-            {'key': 'receipt_number', 'type': 'string', 'description': 'شماره رسید'},
-            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
-            {'key': 'amount', 'type': 'number', 'description': 'مبلغ دریافتی'},
-            {'key': 'payment_date', 'type': 'date', 'description': 'تاریخ پرداخت'},
-            {'key': 'business_name', 'type': 'string', 'description': 'نام کسب‌وکار'},
-          ],
-          'default_sms_template': 'سلام {{ customer_name }}، پرداخت شما به مبلغ {{ amount | format_currency }} دریافت شد. رسید: {{ receipt_number }}. {{ business_name }}',
-          'default_email_subject': 'رسید پرداخت - {{ receipt_number }}',
-        },
-        {
-          'id': 0,
-          'code': 'person_share_link.sms',
-          'name': 'ارسال لینک کارت حساب به مشتری',
-          'description': 'ارسال لینک مشاهده کارت حساب به مشتری از طریق پیامک',
-          'category': 'people',
-          'available_variables': [
-            {'key': 'share_link', 'type': 'string', 'description': 'لینک کوتاه کارت حساب'},
-            {'key': 'customer_name', 'type': 'string', 'description': 'نام مشتری'},
-            {'key': 'customer_mobile', 'type': 'string', 'description': 'شماره موبایل مشتری'},
-            {'key': 'business_name', 'type': 'string', 'description': 'نام کسب‌وکار'},
-            {'key': 'business_phone', 'type': 'string', 'description': 'تلفن کسب‌وکار'},
-          ],
-          'default_sms_template': 'سلام {{ customer_name }}، لینک کارت حساب شما: {{ share_link }} — {{ business_name }}',
-          'default_email_subject': 'لینک کارت حساب — {{ business_name }}',
-        },
-      ];
-    });
   }
 
   Future<void> _loadTemplate() async {
-    setState(() => _isLoading = true);
-
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
         '/api/v1/business-notifications/businesses/${widget.businessId}/templates/${widget.templateId}',
@@ -207,21 +155,21 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
           _selectedChannel = data['channel'] as String? ?? 'sms';
           _selectedRecipientType = data['recipient_type'] as String? ?? 'customer';
           _isAutomated = data['is_automated'] as bool? ?? false;
-          
-          // پیدا کردن event type
+
           final eventTypeCode = data['event_type'] as String?;
+          Map<String, dynamic>? match;
           if (eventTypeCode != null) {
-            _selectedEventType = _eventTypes.firstWhere(
-              (et) => et['code'] == eventTypeCode,
-              orElse: () => {},
-            );
+            for (final et in _eventTypes) {
+              if (et['code'] == eventTypeCode) {
+                match = et;
+                break;
+              }
+            }
           }
+          _selectedEventType = match;
         });
       }
-      
-      setState(() => _isLoading = false);
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         SnackBarHelper.show(
           context,
@@ -235,8 +183,8 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   Future<void> _saveTemplate() async {
     if (!_formKey.currentState!.validate()) return;
     
-    if (_selectedEventType == null) {
-      SnackBarHelper.show(context, message: 'لطفاً نوع رویداد را انتخاب کنید');
+    if (_resolvedSelectedEvent == null) {
+      SnackBarHelper.show(context, message: 'لطفاً نوع رویداد را از فهرست سرور انتخاب کنید');
       return;
     }
 
@@ -246,7 +194,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       // تولید کد خودکار اگر خالی باشد
       String code = _codeController.text;
       if (code.isEmpty && widget.templateId == null) {
-        final eventCode = _selectedEventType!['code'] as String;
+        final eventCode = _resolvedSelectedEvent!['code'] as String;
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         code = '${eventCode}_${_selectedChannel}_$timestamp';
       }
@@ -255,7 +203,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
         'code': code,
         'name': _nameController.text,
         'description': _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-        'event_type': _selectedEventType!['code'],
+        'event_type': _resolvedSelectedEvent!['code'],
         'channel': _selectedChannel,
         'recipient_type': _selectedRecipientType,
         'subject': _subjectController.text.isNotEmpty ? _subjectController.text : null,
@@ -299,13 +247,13 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   }
 
   Future<void> _generatePreview() async {
-    if (_selectedEventType == null || _bodyController.text.isEmpty) {
+    if (_resolvedSelectedEvent == null || _bodyController.text.isEmpty) {
       SnackBarHelper.show(context, message: 'لطفاً رویداد و محتوای قالب را وارد کنید');
       return;
     }
 
     // ساخت context نمونه از متغیرها
-    final variables = _selectedEventType!['available_variables'] as List? ?? [];
+    final variables = _resolvedSelectedEvent!['available_variables'] as List? ?? [];
     final sampleContext = <String, dynamic>{};
     
     for (var v in variables) {
@@ -431,14 +379,58 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     }
   }
 
+  String _categoryLabel(String? code) {
+    switch (code) {
+      case 'sales':
+        return 'فروش';
+      case 'purchases':
+        return 'خرید';
+      case 'financial':
+        return 'مالی';
+      case 'repair_shop':
+        return 'تعمیرگاه';
+      case 'warranty':
+        return 'گارانتی';
+      case 'people':
+        return 'اشخاص';
+      case 'crm':
+        return 'CRM';
+      case 'documents':
+        return 'اسناد';
+      case 'warehouse':
+        return 'انبار';
+      case 'distribution':
+        return 'پخش مویرگی';
+      default:
+        if (code != null && code.isNotEmpty) return code;
+        return 'سایر';
+    }
+  }
+
+  Future<void> _retryCatalogAndTemplate() async {
+    if (!mounted) return;
+    setState(() => _bootstrapComplete = false);
+    await _bootstrap();
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      SnackBarHelper.show(context, message: 'در کلیپ‌بورد کپی شد');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    if (!_bootstrapComplete) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.templateId == null ? 'قالب جدید' : 'ویرایش قالب'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -476,6 +468,59 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Material(
+                color: colorScheme.primaryContainer.withOpacity(0.28),
+                borderRadius: BorderRadius.circular(12),
+                child: ExpansionTile(
+                  leading: Icon(Icons.menu_book_outlined, color: colorScheme.onPrimaryContainer),
+                  title: Text(
+                    'راهنما و نکات مهم',
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('پیش از ذخیره بخوانید تا خطای رویداد نامعتبر تکرار نشود'),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text(
+                        '• نوع رویداد باید فقط از فهرست زیر انتخاب شود؛ اگر سرور هنوز رویدادی ثبت نکرده باشد، ابتدا باید دیتابیس با مهاجرت یا اسکریپت seed به‌روز شود.\n'
+                        '• برای اتوماسیون فاکتور: «invoice.sales.created» فقط فروش، «invoice.purchase.created» فقط خرید، «invoice.created» برای همه فاکتورها در تریگر عمومی.\n'
+                        '• قالب‌ها با Jinja2 رندر می‌شوند؛ مثال متغیر: {{ customer_name }} و فیلترها: {{ amount | format_currency }}، {{ invoice_date | format_date }}.\n'
+                        '• پس از ذخیره، قالب پیش‌نویس است و برای ارسال انبوه باید از مسیر تأیید مدیر عبور کند.',
+                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_eventTypesError != null) ...[
+                Card(
+                  color: colorScheme.errorContainer.withOpacity(0.38),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _eventTypesError!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _retryCatalogAndTemplate,
+                          child: const Text('تلاش مجدد'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // اطلاعات اولیه
               Card(
                 child: Padding(
@@ -546,20 +591,21 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                       
                       // انتخاب event type
                       DropdownButtonFormField<Map<String, dynamic>>(
-                        value: _selectedEventType,
+                        value: _resolvedSelectedEvent,
                         decoration: const InputDecoration(
                           labelText: 'نوع رویداد *',
                           prefixIcon: Icon(Icons.event),
                           helperText: 'رویدادی که باعث ارسال نوتیفیکیشن می‌شود',
                         ),
-                        items: _eventTypes.map((et) {
+                        items: _sortedEventTypes.map((et) {
                           return DropdownMenuItem(
                             value: et,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(et['name'] as String),
+                              Text(
+                                  '${_categoryLabel(et['category'] as String?)} • ${et['name'] as String}'),
                                 Text(
                                   et['code'] as String,
                                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -641,7 +687,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const Spacer(),
-                          if (_selectedEventType != null)
+                          if (_resolvedSelectedEvent != null)
                             TextButton.icon(
                               onPressed: _showVariablesHelp,
                               icon: const Icon(Icons.help_outline, size: 18),
@@ -883,14 +929,15 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
   }
 
   void _showVariablesHelp() {
-    if (_selectedEventType == null) return;
-    
-    final variables = _selectedEventType!['available_variables'] as List? ?? [];
-    
+    final et = _resolvedSelectedEvent;
+    if (et == null) return;
+
+    final variables = et['available_variables'] as List? ?? [];
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('متغیرهای قابل استفاده'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('متغیرها و فیلترها'),
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -898,42 +945,72 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('در محتوای قالب می‌توانید از متغیرهای زیر استفاده کنید:'),
+                Text(
+                  'رویداد: ${et['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'کد فنی: ${et['code']}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  et['description']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
                 const SizedBox(height: 16),
+                const Text('در متن قالب بکار ببرید (ضربه روی دکمه کپی):'),
+                const SizedBox(height: 8),
                 ...variables.map((v) {
+                  final key = v['key'] as String;
+                  final tpl = '{{ $key }}';
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '{{ ${v['key']} }}',
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  tpl,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              v['type'] as String,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            IconButton(
+                              tooltip: 'کپی',
+                              icon: const Icon(Icons.copy, size: 20),
+                              onPressed: () => _copyToClipboard(tpl),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          v['description'] as String,
-                          style: const TextStyle(fontSize: 13),
+                        Row(
+                          children: [
+                            Text(
+                              v['type'] as String,
+                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                v['description'] as String,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -942,18 +1019,38 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
-                const Text('فیلترها:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('فیلترهای پرکاربرد:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text('• {{ amount | format_currency }} → 1,500,000 تومان'),
-                const Text('• {{ date | format_date }} → 1403/12/15'),
-                const Text('• {{ count | format_number }} → 1,500'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text('مبلغ + واحد'),
+                      onPressed: () => _copyToClipboard(r'{{ amount | format_currency }}'),
+                    ),
+                    ActionChip(
+                      label: const Text('تاریخ'),
+                      onPressed: () => _copyToClipboard(r'{{ invoice_date | format_date }}'),
+                    ),
+                    ActionChip(
+                      label: const Text('عدد با جداکننده'),
+                      onPressed: () => _copyToClipboard(r'{{ amount | format_number }}'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'فاصله دور | در الگو مهم است (مثل Jinja2).',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
               ],
             ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('بستن'),
           ),
         ],

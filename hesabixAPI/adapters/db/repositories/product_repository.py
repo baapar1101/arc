@@ -148,23 +148,40 @@ class ProductRepository(BaseRepository[Product]):
             # جدا کردن کالاهای unique و bulk
             unique_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) == "unique"]
             bulk_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) != "unique"]
-            
+
             unique_product_ids = [p.id for p in unique_products]
             bulk_product_ids = [p.id for p in bulk_products]
-            
-            # محاسبه موجودی برای کالاهای unique (از ProductInstance)
+            all_tracked_product_ids = unique_product_ids + bulk_product_ids
+
+            # موجودی حسابداری: فقط از خطوط اسناد مالی (فاکتور خرید/فروش و ...)؛ بدون حواله انبار
+            if all_tracked_product_ids:
+                try:
+                    from app.services.invoice_service import get_financial_stock_bulk
+
+                    with query_timeout(self.db, timeout_seconds=30):
+                        accounting_stocks = get_financial_stock_bulk(
+                            db=self.db,
+                            business_id=business_id,
+                            product_ids=all_tracked_product_ids,
+                            as_of_date=as_of_date_obj,
+                            warehouse_id=None,
+                        )
+                    for pid, stock in accounting_stocks.items():
+                        inventory_data.setdefault(pid, {})
+                        inventory_data[pid]["accounting"] = float(stock)
+                except Exception:
+                    pass
+
+            # موجودی انبارداری (فیزیکی) برای unique: شمارش نمونه‌های available در انبار
             if unique_product_ids:
                 try:
                     from adapters.db.models.product_instance import ProductInstance
-                    
-                    # استفاده از timeout برای query های موجودی
+
                     with query_timeout(self.db, timeout_seconds=30):
-                        # شمارش ProductInstance های available برای موجودی حسابداری
-                        # (برای unique، موجودی حسابداری و انبارداری یکسان است - تعداد instance های available)
-                        accounting_counts = (
+                        warehouse_counts = (
                             self.db.query(
                                 ProductInstance.product_id,
-                                func.count(ProductInstance.id).label('count')
+                                func.count(ProductInstance.id).label("count"),
                             )
                             .filter(
                                 and_(
@@ -176,54 +193,24 @@ class ProductRepository(BaseRepository[Product]):
                             .group_by(ProductInstance.product_id)
                             .all()
                         )
-                    
-                    for pid, count in accounting_counts:
-                        inventory_data[pid] = {
-                            'accounting': float(count),
-                            'warehouse': float(count),  # برای unique، هر دو یکسان هستند
-                        }
-                    
-                    # برای کالاهای unique که instance ندارند، موجودی 0 است
+
+                    for pid, count in warehouse_counts:
+                        inventory_data.setdefault(pid, {})
+                        inventory_data[pid]["warehouse"] = float(count)
+
                     for pid in unique_product_ids:
-                        if pid not in inventory_data:
-                            inventory_data[pid] = {
-                                'accounting': 0.0,
-                                'warehouse': 0.0,
-                            }
+                        inv = inventory_data.setdefault(pid, {})
+                        inv.setdefault("warehouse", 0.0)
                 except Exception:
-                    # در صورت خطا، موجودی 0 برای همه unique products
                     for pid in unique_product_ids:
-                        if pid not in inventory_data:
-                            inventory_data[pid] = {
-                                'accounting': 0.0,
-                                'warehouse': 0.0,
-                            }
-            
-            # محاسبه موجودی برای کالاهای bulk (از حرکات اسناد)
+                        inv = inventory_data.setdefault(pid, {})
+                        inv.setdefault("warehouse", 0.0)
+
+            # موجودی انبارداری برای bulk: حواله‌های انبار
             if bulk_product_ids:
-                # محاسبه موجودی حسابداری (از اسناد حسابداری)
-                try:
-                    from app.services.invoice_service import get_financial_stock_bulk
-                    # استفاده از timeout برای query های موجودی
-                    with query_timeout(self.db, timeout_seconds=30):
-                        accounting_stocks = get_financial_stock_bulk(
-                            db=self.db,
-                            business_id=business_id,
-                            product_ids=bulk_product_ids,
-                            as_of_date=as_of_date_obj,
-                            warehouse_id=None,  # موجودی کل (بدون تفکیک انبار)
-                        )
-                    for pid, stock in accounting_stocks.items():
-                        if pid not in inventory_data:
-                            inventory_data[pid] = {}
-                        inventory_data[pid]['accounting'] = float(stock)
-                except Exception:
-                    pass
-                
-                # محاسبه موجودی انبارداری (از حواله‌های انبار)
                 try:
                     from app.services.warehouse_service import get_physical_stock_bulk
-                    # استفاده از timeout برای query های موجودی
+
                     with query_timeout(self.db, timeout_seconds=30):
                         warehouse_stocks = get_physical_stock_bulk(
                             db=self.db,
@@ -232,9 +219,8 @@ class ProductRepository(BaseRepository[Product]):
                             as_of_date=as_of_date_obj,
                         )
                     for pid, stock in warehouse_stocks.items():
-                        if pid not in inventory_data:
-                            inventory_data[pid] = {}
-                        inventory_data[pid]['warehouse'] = float(stock)
+                        inventory_data.setdefault(pid, {})
+                        inventory_data[pid]["warehouse"] = float(stock)
                 except Exception:
                     pass
 

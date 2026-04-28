@@ -83,3 +83,9 @@ class BusinessCrmSettingsUpdate(BaseModel):
 
 class CrmChatMarkReadBody(BaseModel):
 	up_to_message_id: int = Field(..., gt=0, description="Mark incoming messages up to this id as read")
+
+
+class CrmChatVisitorPageUrlPatch(BaseModel):
+	"""به‌روزرسانی نشانی صفحهٔ فعلی بازدیدکننده (برای نمایش زنده نزد اپراتور)."""
+
+	page_url: str = Field(..., min_length=1, max_length=2048)

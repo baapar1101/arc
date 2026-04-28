@@ -105,7 +105,21 @@
 - `visitor_token` (رشته محرمانه — **فقط** در سمت کلاینت/جلسه نگه دارید)  
 - `widget_id`  
 
-### ۲) ارسال پیام متنی
+### ۲) به‌روزرسانی صفحهٔ فعلی بازدیدکننده (برای اپراتور)
+
+`PATCH /api/v1/public/crm-chat/conversations/{conversation_id}/current-page`
+
+پس از شروع مکالمه، هر بار که بازدیدکننده در سایت شما به صفحهٔ دیگری می‌رود، این مسیر را با **همان الویت توکن** (`X-Visitor-Token` یا `Authorization: Bearer`) صدا بزنید تا فیلد `page_url` مکالمه به‌روز شود و از طریق رویداد WebSocket `conversation.updated` نزد اپراتور هم‌زمان دیده شود.
+
+**بدنه (JSON):**
+
+```json
+{
+  "page_url": "https://shop.example.com/products/42?utm=..."
+}
+```
+
+### ۳) ارسال پیام متنی
 
 `POST /api/v1/public/crm-chat/messages`
 
@@ -117,7 +131,7 @@
 }
 ```
 
-### ۳) لیست پیام‌ها (بازدیدکننده)
+### ۴) لیست پیام‌ها (بازدیدکننده)
 
 `GET /api/v1/public/crm-chat/conversations/{conversation_id}/messages?limit=100`
 

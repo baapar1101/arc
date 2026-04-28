@@ -416,6 +416,43 @@ def _get_conversation_by_visitor(db: Session, visitor_token: str, conversation_i
 	return c
 
 
+_MAX_PAGE_URL_LEN = 2048
+
+
+async def update_visitor_current_page_url(
+	db: Session,
+	*,
+	visitor_token: str,
+	conversation_id: int,
+	page_url: str,
+	origin_header: Optional[str],
+) -> Dict[str, Any]:
+	"""نشانی فعلی صفحهٔ مرورگر بازدیدکننده؛ پس از ذخیره، رویداد conversation.updated منتشر می‌شود."""
+	c = _get_conversation_by_visitor(db, visitor_token, conversation_id)
+	_assert_widget_origin(db, c, origin_header)
+	raw = (page_url or "").strip()
+	if not raw:
+		raise ApiError("CRM_CHAT_PAGE_URL_INVALID", "page_url is required", http_status=422)
+	if len(raw) > _MAX_PAGE_URL_LEN:
+		raw = raw[:_MAX_PAGE_URL_LEN]
+	if c.page_url == raw:
+		return conversation_to_dict(c)
+	c.page_url = raw
+	c.updated_at = datetime.utcnow()
+	db.commit()
+	db.refresh(c)
+
+	ev = {
+		"type": "crm_chat.event",
+		"event": "conversation.updated",
+		"conversation": conversation_to_dict(c),
+	}
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, ev)
+	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
+
+	return conversation_to_dict(c)
+
+
 def _assert_widget_origin(db: Session, c: CrmChatConversation, origin_header: Optional[str]) -> None:
 	"""مبدأ درخواست باید با allowed_origins ویجت سازگار باشد (مثل ارسال پیام)."""
 	w = db.get(CrmChatWidget, c.widget_id)

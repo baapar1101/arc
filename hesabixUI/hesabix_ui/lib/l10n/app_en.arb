@@ -4348,6 +4348,7 @@
   "crmWebChatSelectConversation": "Select a conversation",
   "crmWebChatConversationNotFoundRefresh": "Conversation not found — try refreshing",
   "crmWebChatVisitorStartPageLabel": "Page where chat started (visitor)",
+  "crmWebChatVisitorCurrentPageLabel": "Visitor's current page",
   "crmWebChatWidgetLine": "Widget: {name}",
   "@crmWebChatWidgetLine": {
     "placeholders": {

@@ -18197,15 +18197,64 @@ abstract class AppLocalizations {
   /// **'{level}'**
   String notificationCenterLevelUnknown(String level);
 
+  /// No description provided for @notificationCenterClearAllTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear in-app notifications from your inbox'**
   String get notificationCenterClearAllTooltip;
+
+  /// No description provided for @notificationCenterClearAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear notifications?'**
   String get notificationCenterClearAllTitle;
+
+  /// No description provided for @notificationCenterClearAllMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'All visible announcements will be hidden. Live-only messages (not stored on the server) will also be removed from this list.'**
   String get notificationCenterClearAllMessage;
+
+  /// No description provided for @notificationCenterClearAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
   String get notificationCenterClearAllConfirm;
+
+  /// No description provided for @notificationCenterClearAllCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
   String get notificationCenterClearAllCancel;
+
+  /// No description provided for @notificationCenterCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications cleared'**
   String get notificationCenterCleared;
+
+  /// No description provided for @notificationsInappRetentionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app announcement retention'**
   String get notificationsInappRetentionTitle;
+
+  /// No description provided for @notificationsInappRetentionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System announcements you have read will be automatically removed or hidden after the number of days you set.'**
   String get notificationsInappRetentionSubtitle;
+
+  /// No description provided for @notificationsInappRetentionEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable automatic cleanup of read items'**
   String get notificationsInappRetentionEnabled;
+
+  /// No description provided for @notificationsInappRetentionDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days after read before cleanup'**
   String get notificationsInappRetentionDays;
 
   /// No description provided for @apiKeysPageTitle.
@@ -20885,21 +20934,39 @@ abstract class AppLocalizations {
   String get crmWebChatDeleteConversation;
 
   /// No description provided for @crmWebChatDeleteConversationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation and all its messages will be permanently deleted. Continue?'**
   String get crmWebChatDeleteConversationConfirm;
 
   /// No description provided for @crmWebChatConversationDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation deleted'**
   String get crmWebChatConversationDeleted;
 
   /// No description provided for @crmWebChatEditMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit message'**
   String get crmWebChatEditMessageTitle;
 
   /// No description provided for @crmWebChatEditMessageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'New text…'**
   String get crmWebChatEditMessageHint;
 
   /// No description provided for @crmWebChatEditMessageSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Message updated'**
   String get crmWebChatEditMessageSaved;
 
   /// No description provided for @crmWebChatMessageEditedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'(edited)'**
   String get crmWebChatMessageEditedBadge;
 
   /// No description provided for @crmWebChatRefreshTooltip.
@@ -21075,6 +21142,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Page where chat started (visitor)'**
   String get crmWebChatVisitorStartPageLabel;
+
+  /// No description provided for @crmWebChatVisitorCurrentPageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor\'s current page'**
+  String get crmWebChatVisitorCurrentPageLabel;
 
   /// No description provided for @crmWebChatWidgetLine.
   ///

@@ -46,6 +46,7 @@ import '../../services/credit_api_service.dart';
 import '../../models/credit_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'invoices_list_page.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../utils/invoice_form_prefill.dart';
 
@@ -2731,14 +2732,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           }
         }
 
-        // هدایت به لیست فاکتورها بعد از ثبت موفق
+        // هدایت به لیست فاکتورها بعد از ثبت موفق (pop اگر از لیست push شده تا جدول به‌روز شود)
         if (mounted) {
-          context.goNamed(
-            'business_invoice',
-            pathParameters: {
-              'business_id': widget.businessId.toString(),
-            },
-          );
+          InvoicesListPage.popOrGoToInvoiceList(context, widget.businessId);
         }
       } catch (e) {
         _showError(

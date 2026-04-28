@@ -203,6 +203,17 @@
 		} );
 	}
 
+	function patchVisitorCurrentPage( convId, token, pageUrl ) {
+		var path = '/api/v1/public/crm-chat/conversations/' + encodeURIComponent( convId ) + '/current-page';
+		return apiFetch( apiPath( path ), {
+			method: 'PATCH',
+			headers: Object.assign( { 'Content-Type': 'application/json' }, visitorTokenHeaders( token ) ),
+			body: JSON.stringify( { page_url: pageUrl } )
+		} ).then( function ( j ) {
+			return j.data || j;
+		} );
+	}
+
 	function visitorTokenHeaders( token ) {
 		return { 'X-Visitor-Token': token };
 	}
@@ -391,8 +402,101 @@
 		seenAgentJoinIds: {},
 		agentJoinBannerText: '',
 		visitorTypingSendTimer: null,
-		visitorTypingStopTimer: null
+		visitorTypingStopTimer: null,
+		pageUrlReportTimer: null
 	};
+
+	/** همگام‌سازی نشانی صفحهٔ فعلی با سرور (SPA: pushState/popstate/hashchange + interval). */
+	var visitorPageUrlHook = {
+		installed: false,
+		lastSent: '',
+		interval: null,
+		pushState: null,
+		replaceState: null
+	};
+
+	function scheduleVisitorPageUrlReport() {
+		if ( state.pageUrlReportTimer ) {
+			clearTimeout( state.pageUrlReportTimer );
+		}
+		state.pageUrlReportTimer = setTimeout( function () {
+			state.pageUrlReportTimer = null;
+			reportVisitorPageUrlIfChanged();
+		}, 380 );
+	}
+
+	function reportVisitorPageUrlIfChanged() {
+		if ( ! state.session || typeof window === 'undefined' || typeof location === 'undefined' ) {
+			return;
+		}
+		var href = String( location.href || '' );
+		if ( ! href || href === visitorPageUrlHook.lastSent ) {
+			return;
+		}
+		visitorPageUrlHook.lastSent = href;
+		var cid = state.session.conversation_id;
+		var tok = state.session.visitor_token;
+		patchVisitorCurrentPage( cid, tok, href ).catch( function ( e ) {
+			visitorPageUrlHook.lastSent = '';
+			chatLogV( 'current-page PATCH', e && e.message );
+		} );
+	}
+
+	function installVisitorPageUrlTracking() {
+		if ( typeof window === 'undefined' ) {
+			return;
+		}
+		if ( ! visitorPageUrlHook.installed ) {
+			window.addEventListener( 'popstate', scheduleVisitorPageUrlReport );
+			window.addEventListener( 'hashchange', scheduleVisitorPageUrlReport );
+			visitorPageUrlHook.pushState = history.pushState;
+			visitorPageUrlHook.replaceState = history.replaceState;
+			history.pushState = function () {
+				var r = visitorPageUrlHook.pushState.apply( history, arguments );
+				scheduleVisitorPageUrlReport();
+				return r;
+			};
+			history.replaceState = function () {
+				var r = visitorPageUrlHook.replaceState.apply( history, arguments );
+				scheduleVisitorPageUrlReport();
+				return r;
+			};
+			visitorPageUrlHook.installed = true;
+		}
+		visitorPageUrlHook.lastSent = '';
+		if ( ! visitorPageUrlHook.interval ) {
+			visitorPageUrlHook.interval = window.setInterval( scheduleVisitorPageUrlReport, 3200 );
+		}
+		scheduleVisitorPageUrlReport();
+	}
+
+	function teardownVisitorPageUrlTracking() {
+		if ( typeof window === 'undefined' ) {
+			return;
+		}
+		if ( visitorPageUrlHook.interval ) {
+			window.clearInterval( visitorPageUrlHook.interval );
+			visitorPageUrlHook.interval = null;
+		}
+		if ( state.pageUrlReportTimer ) {
+			clearTimeout( state.pageUrlReportTimer );
+			state.pageUrlReportTimer = null;
+		}
+		if ( visitorPageUrlHook.installed ) {
+			window.removeEventListener( 'popstate', scheduleVisitorPageUrlReport );
+			window.removeEventListener( 'hashchange', scheduleVisitorPageUrlReport );
+			if ( visitorPageUrlHook.pushState ) {
+				history.pushState = visitorPageUrlHook.pushState;
+				visitorPageUrlHook.pushState = null;
+			}
+			if ( visitorPageUrlHook.replaceState ) {
+				history.replaceState = visitorPageUrlHook.replaceState;
+				visitorPageUrlHook.replaceState = null;
+			}
+			visitorPageUrlHook.installed = false;
+		}
+		visitorPageUrlHook.lastSent = '';
+	}
 
 	var launcherAttentionTimer = null;
 
@@ -1203,6 +1307,7 @@
 	}
 
 	function enterFormMode() {
+		teardownVisitorPageUrlTracking();
 		state.messages = [];
 		state.localCannedAfterVisitor = [];
 		state.agentSoundPrimed = false;
@@ -1257,6 +1362,7 @@
 
 	function afterSessionReady( skipRealtime ) {
 		enterChatMode();
+		installVisitorPageUrlTracking();
 		return refreshMessages().then( function () {
 			if ( ! skipRealtime && state.open ) {
 				bindRealtime();

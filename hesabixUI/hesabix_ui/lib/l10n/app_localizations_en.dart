@@ -2077,7 +2077,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get duplicateProduct => 'Copy Product / Service';
 
   @override
-  String get productDuplicatedSuccessfully => 'Product copy was created successfully';
+  String get productDuplicatedSuccessfully =>
+      'Product copy was created successfully';
 
   @override
   String get viewProducts => 'View Products and Services';
@@ -9706,7 +9707,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationCenterCleared => 'Notifications cleared';
 
   @override
-  String get notificationsInappRetentionTitle => 'In-app announcement retention';
+  String get notificationsInappRetentionTitle =>
+      'In-app announcement retention';
 
   @override
   String get notificationsInappRetentionSubtitle =>
@@ -9717,7 +9719,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable automatic cleanup of read items';
 
   @override
-  String get notificationsInappRetentionDays => 'Days after read before cleanup';
+  String get notificationsInappRetentionDays =>
+      'Days after read before cleanup';
 
   @override
   String get apiKeysPageTitle => 'Manage API Keys';
@@ -11342,6 +11345,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get crmWebChatVisitorStartPageLabel =>
       'Page where chat started (visitor)';
+
+  @override
+  String get crmWebChatVisitorCurrentPageLabel => 'Visitor\'s current page';
 
   @override
   String crmWebChatWidgetLine(String name) {
