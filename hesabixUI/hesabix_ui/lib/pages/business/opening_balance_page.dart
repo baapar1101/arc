@@ -91,15 +91,18 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final doc = await _service.fetch(businessId: widget.businessId);
-      setState(() {
-        _document = doc;
-        if (doc != null && doc.isNotEmpty) {
+      final docNullable = await _service.fetch(businessId: widget.businessId);
+      if (docNullable != null && docNullable.isNotEmpty) {
+        final doc = docNullable;
+        setState(() {
+          _document = doc;
           _loadLinesFromDocument(doc);
+        });
+        if (mounted) {
+          await _applyOpeningBalanceAccountObjects(doc);
         }
-      });
-      if (mounted && doc != null && doc.isNotEmpty) {
-        await _applyOpeningBalanceAccountObjects(doc);
+      } else {
+        setState(() => _document = docNullable);
       }
     } catch (e) {
       if (mounted) {
