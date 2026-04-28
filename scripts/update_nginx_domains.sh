@@ -332,6 +332,18 @@ ${UI_SSL_BLOCK}
     try_files \$uri =404;
   }
 
+  location = /flutter_bootstrap.js {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
+  location = /main.dart.js {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+    try_files \$uri =404;
+  }
+
   location / {
     try_files \$uri \$uri/ /index.html;
   }

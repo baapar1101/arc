@@ -46,6 +46,44 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   final List<Map<String, dynamic>> _notifications = <Map<String, dynamic>>[];
   int _unreadCount = 0;
   final Set<int> _busyAnnIds = <int>{};
+  bool _clearingAll = false;
+
+  Future<void> _confirmClearAllNotifications(BuildContext dialogContext, StateSetter dialogSetState) async {
+    final t = AppLocalizations.of(dialogContext);
+    final ok = await showDialog<bool>(
+      context: dialogContext,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.notificationCenterClearAllTitle),
+        content: Text(t.notificationCenterClearAllMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.notificationCenterClearAllCancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.notificationCenterClearAllConfirm)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _clearingAll = true);
+    dialogSetState(() {});
+    try {
+      await AnnouncementsService(ApiClient()).clearAllVisible();
+      if (!mounted) return;
+      setState(() {
+        _notifications.clear();
+        _unreadCount = 0;
+        _clearingAll = false;
+      });
+      dialogSetState(() {});
+      if (mounted) {
+        SnackBarHelper.show(context, message: t.notificationCenterCleared);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _clearingAll = false);
+        dialogSetState(() {});
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -153,6 +191,13 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                     const SizedBox(width: 8),
                     Text('مرکز اعلان‌ها', style: TextStyle(color: headerOn, fontWeight: FontWeight.bold)),
                     const Spacer(),
+                    IconButton(
+                      tooltip: AppLocalizations.of(context).notificationCenterClearAllTooltip,
+                      icon: _clearingAll
+                          ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: headerOn))
+                          : Icon(Icons.delete_outline, color: headerOn),
+                      onPressed: _clearingAll ? null : () => _confirmClearAllNotifications(context, dialogSetState),
+                    ),
                     IconButton(
                       tooltip: 'بستن',
                       icon: Icon(Icons.close, color: headerOn),

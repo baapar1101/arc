@@ -1172,6 +1172,10 @@ def create_app() -> FastAPI:
         # AI subscription check: هر 6 ساعت یکبار
         asyncio.create_task(ai_subscription_check_loop(6))
 
+        # حذف/پنهان خودکار اعلان‌های in-app خوانده‌شده (تنظیم مدیر)
+        from app.services.announcement_retention_jobs import announcement_read_retention_loop
+        asyncio.create_task(announcement_read_retention_loop(24))
+
         # Notification moderation worker بهتر است جداگانه با systemd اجرا شود.
         # اگر نیاز بود داخل API هم اجرا شود، می‌توان با env فعالش کرد.
         run_inline_moderation = os.getenv("HESABIX_RUN_NOTIFICATION_MODERATION_IN_API", "false").strip().lower()

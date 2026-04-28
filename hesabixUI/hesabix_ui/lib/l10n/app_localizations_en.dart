@@ -2386,6 +2386,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invoiceCopyOpenNew => 'Copy to new invoice';
 
   @override
+  String get invoiceCopyLoading =>
+      'Preparing the new invoice form from the selected document…';
+
+  @override
   String get viewInvoices => 'View Invoices';
 
   @override
@@ -9680,6 +9684,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String notificationCenterLevelUnknown(String level) {
     return '$level';
   }
+
+  @override
+  String get notificationCenterClearAllTooltip =>
+      'Clear in-app notifications from your inbox';
+
+  @override
+  String get notificationCenterClearAllTitle => 'Clear notifications?';
+
+  @override
+  String get notificationCenterClearAllMessage =>
+      'All visible announcements will be hidden. Live-only messages (not stored on the server) will also be removed from this list.';
+
+  @override
+  String get notificationCenterClearAllConfirm => 'Clear';
+
+  @override
+  String get notificationCenterClearAllCancel => 'Cancel';
+
+  @override
+  String get notificationCenterCleared => 'Notifications cleared';
+
+  @override
+  String get notificationsInappRetentionTitle => 'In-app announcement retention';
+
+  @override
+  String get notificationsInappRetentionSubtitle =>
+      'System announcements you have read will be automatically removed or hidden after the number of days you set.';
+
+  @override
+  String get notificationsInappRetentionEnabled =>
+      'Enable automatic cleanup of read items';
+
+  @override
+  String get notificationsInappRetentionDays => 'Days after read before cleanup';
 
   @override
   String get apiKeysPageTitle => 'Manage API Keys';

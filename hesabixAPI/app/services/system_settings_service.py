@@ -32,6 +32,8 @@ NOTIFY_TG_PROXY_API_KEY = "telegram_proxy_api_key"
 NOTIFY_BALE_BOT_TOKEN = "bale_bot_token"
 NOTIFY_BALE_BOT_USERNAME = "bale_bot_username"
 NOTIFY_BALE_WEBHOOK_SECRET = "bale_webhook_secret"
+NOTIFY_INAPP_READ_RETENTION_ENABLED = "inapp_read_retention_enabled"
+NOTIFY_INAPP_READ_RETENTION_DAYS = "inapp_read_retention_days"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 
@@ -231,6 +233,8 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 	bale_token = _get_setting(db, NOTIFY_BALE_BOT_TOKEN)
 	bale_username = _get_setting(db, NOTIFY_BALE_BOT_USERNAME)
 	bale_webhook = _get_setting(db, NOTIFY_BALE_WEBHOOK_SECRET)
+	inapp_retention_enabled = _get_setting_bool(db, NOTIFY_INAPP_READ_RETENTION_ENABLED)
+	inapp_retention_days = _get_setting_int(db, NOTIFY_INAPP_READ_RETENTION_DAYS)
 	return {
 		"telegram_bot_token": (tg_token.value_string if tg_token and tg_token.value_string else None),
 		"telegram_bot_username": (tg_username.value_string if tg_username and tg_username.value_string else None),
@@ -248,6 +252,8 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 		"bale_bot_token": (bale_token.value_string if bale_token and bale_token.value_string else None),
 		"bale_bot_username": (bale_username.value_string if bale_username and bale_username.value_string else None),
 		"bale_webhook_secret": (bale_webhook.value_string if bale_webhook and bale_webhook.value_string else None),
+		"inapp_read_retention_enabled": bool(inapp_retention_enabled) if inapp_retention_enabled is not None else False,
+		"inapp_read_retention_days": int(inapp_retention_days) if inapp_retention_days is not None else 0,
 	}
 
 
@@ -300,6 +306,8 @@ def set_notifications_settings(
 	telegram_proxy_enabled: bool | None = None,
 	telegram_proxy_base_url: str | None = None,
 	telegram_proxy_api_key: str | None = None,
+	inapp_read_retention_enabled: bool | None = None,
+	inapp_read_retention_days: int | None = None,
 ) -> Dict[str, Any]:
 	if telegram_bot_token is not None:
 		_upsert_setting_string(db, NOTIFY_TG_BOT_TOKEN, telegram_bot_token)
@@ -333,6 +341,15 @@ def set_notifications_settings(
 		_upsert_setting_string(db, NOTIFY_TG_PROXY_BASE_URL, telegram_proxy_base_url)
 	if telegram_proxy_api_key is not None:
 		_upsert_setting_string(db, NOTIFY_TG_PROXY_API_KEY, telegram_proxy_api_key)
+	if inapp_read_retention_enabled is not None:
+		_upsert_setting_bool(db, NOTIFY_INAPP_READ_RETENTION_ENABLED, inapp_read_retention_enabled)
+	if inapp_read_retention_days is not None:
+		d = int(inapp_read_retention_days)
+		if d < 0:
+			raise ApiError("INVALID_RETENTION_DAYS", "تعداد روز باید غیرمنفی باشد", http_status=400)
+		if d > 3650:
+			raise ApiError("INVALID_RETENTION_DAYS", "تعداد روز بیش از حد مجاز است", http_status=400)
+		_upsert_setting_int(db, NOTIFY_INAPP_READ_RETENTION_DAYS, d)
 	db.commit()
 	return get_notifications_settings(db)
 

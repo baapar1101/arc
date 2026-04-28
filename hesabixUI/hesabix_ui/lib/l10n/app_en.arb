@@ -873,6 +873,7 @@
   "manageTransferDrafts": "Manage Transfer Drafts",
   "addInvoice": "Add Invoice",
   "invoiceCopyOpenNew": "Copy to new invoice",
+  "invoiceCopyLoading": "Preparing the new invoice form from the selected document…",
   "viewInvoices": "View Invoices",
   "editInvoices": "Edit Invoices",
   "deleteInvoices": "Delete Invoices",
@@ -3693,7 +3694,17 @@
       }
     }
   },
-  
+  "notificationCenterClearAllTooltip": "Clear in-app notifications from your inbox",
+  "notificationCenterClearAllTitle": "Clear notifications?",
+  "notificationCenterClearAllMessage": "All visible announcements will be hidden. Live-only messages (not stored on the server) will also be removed from this list.",
+  "notificationCenterClearAllConfirm": "Clear",
+  "notificationCenterClearAllCancel": "Cancel",
+  "notificationCenterCleared": "Notifications cleared",
+  "notificationsInappRetentionTitle": "In-app announcement retention",
+  "notificationsInappRetentionSubtitle": "System announcements you have read will be automatically removed or hidden after the number of days you set.",
+  "notificationsInappRetentionEnabled": "Enable automatic cleanup of read items",
+  "notificationsInappRetentionDays": "Days after read before cleanup",
+
   "apiKeysPageTitle": "Manage API Keys",
   "apiKeyErrorLoadingKeys": "Error loading keys",
   "apiKeyErrorCreatingKey": "Error creating key",

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:reorderables/reorderables.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../services/business_dashboard_service.dart';
 import '../../../core/api_client.dart';
@@ -676,7 +677,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final data = _data[item.key];
     if (data == null) {
       return _buildCard(
-        title: _titleForKey(item.key),
+        title: _displayTitleForDashboardItem(item),
         trailing: _editMode
             ? const Icon(Icons.tune)
             : IconButton(
@@ -685,13 +686,6 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                 onPressed: _reloadDataOnly,
               ),
         child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
-      );
-    }
-    final builder = _getWidgetBuilder(item.key);
-    if (builder == null) {
-      return _buildCard(
-        title: 'ویجت ناشناخته: ${item.key}',
-        child: Center(child: Text('این ویجت ثبت نشده است')),
       );
     }
     final trailing = _editMode
@@ -720,13 +714,28 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             icon: const Icon(Icons.refresh),
             onPressed: _reloadDataOnly,
           );
-    // برای ویجت top_selling_products، کل _data را پاس می‌دهیم چون به تنظیمات و فیلترها نیاز دارد
-    final widgetData = item.key == 'top_selling_products' ? _data : data;
-    final card = _buildCard(
-      title: _titleForKey(item.key),
-      trailing: trailing,
-      child: builder(context, widgetData, item, onRefresh: _reloadDataOnly),
-    );
+    final builder = _getWidgetBuilder(item.key);
+    final Widget card;
+    if (builder == null) {
+      card = _buildCard(
+        title: _displayTitleForDashboardItem(item),
+        trailing: trailing,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: _buildServerDrivenFallbackWidgetBody(item.key, data),
+          ),
+        ),
+      );
+    } else {
+      // برای ویجت top_selling_products، کل _data را پاس می‌دهیم چون به تنظیمات و فیلترها نیاز دارد
+      final widgetData = item.key == 'top_selling_products' ? _data : data;
+      card = _buildCard(
+        title: _titleForKey(item.key),
+        trailing: trailing,
+        child: builder(context, widgetData, item, onRefresh: _reloadDataOnly),
+      );
+    }
     if (!_editMode) return card;
     // دستگیره رزایز افقی در حالت ویرایش (لبه راست کارت)
     return Stack(
@@ -2282,6 +2291,103 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         message: 'خطا در انتشار: ${ErrorExtractor.forContext(e, context)}',
       );
     }
+  }
+
+  /// عنوان نمایشی: اول از تعریف سرور، در غیر این صورت برچسب محلی ثابت.
+  String _displayTitleForDashboardItem(DashboardLayoutItem item) {
+    final defs = _definitions;
+    if (defs != null) {
+      for (final d in defs.items) {
+        if (d.key == item.key) {
+          final t = d.title.trim();
+          if (t.isNotEmpty) return t;
+          break;
+        }
+      }
+    }
+    return _titleForKey(item.key);
+  }
+
+  String _stringifyDashboardValue(dynamic v, {int maxLen = 400}) {
+    if (v == null) return '—';
+    if (v is num || v is bool) return v.toString();
+    if (v is String) {
+      return v.length > maxLen ? '${v.substring(0, maxLen)}…' : v;
+    }
+    if (v is Map || v is List) {
+      try {
+        final s = jsonEncode(v);
+        return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+      } catch (_) {
+        final s = v.toString();
+        return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+      }
+    }
+    final s = v.toString();
+    return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+  }
+
+  /// وقتی کلاینت هنوز ویجت اختصاصی ندارد ولی سرور داده برمی‌گرداند (مثلاً قبل از به‌روزرسانی وب).
+  Widget _buildServerDrivenFallbackWidgetBody(String widgetKey, dynamic data) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final children = <Widget>[
+      Text(
+        'این ویجت در این نسخهٔ برنامه فقط به‌صورت ساده نمایش داده می‌شود. پس از به‌روزرسانی، نمای اختصاصی فعال می‌شود.',
+        style: muted,
+      ),
+      const SizedBox(height: 12),
+    ];
+
+    if (data is List) {
+      children.add(Text('تعداد: ${data.length}', style: theme.textTheme.titleSmall));
+      const preview = 8;
+      for (var i = 0; i < data.length && i < preview; i++) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(_stringifyDashboardValue(data[i], maxLen: 280), style: theme.textTheme.bodyMedium),
+          ),
+        ));
+      }
+      if (data.length > preview) {
+        children.add(Padding(padding: const EdgeInsets.only(top: 8), child: Text('…', style: muted)));
+      }
+    } else if (data is Map) {
+      final entries = data.entries.take(28).toList();
+      for (final e in entries) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text('${e.key}', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 3,
+                child: Text(_stringifyDashboardValue(e.value), style: theme.textTheme.bodyMedium),
+              ),
+            ],
+          ),
+        ));
+      }
+      if (data.length > entries.length) {
+        children.add(Padding(padding: const EdgeInsets.only(top: 8), child: Text('…', style: muted)));
+      }
+    } else {
+      children.add(Text(_stringifyDashboardValue(data), style: theme.textTheme.bodyMedium));
+    }
+
+    children.add(Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Text('کلید: $widgetKey', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+    ));
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 
   String _titleForKey(String key) {

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -202,6 +202,10 @@ def user_list(
 		Announcement.is_active == True,
 		or_(Announcement.starts_at == None, Announcement.starts_at <= now),
 		or_(Announcement.ends_at == None, Announcement.ends_at >= now),
+		or_(
+			UserAnnouncement.id == None,
+			UserAnnouncement.dismissed_at == None,
+		),
 	)
 	if level:
 		q = q.filter(Announcement.level == level)
@@ -275,6 +279,97 @@ def mark_read(db: Session, user_id: int, announcement_id: int) -> bool:
 	db.commit()
 	db.refresh(ua)
 	return True
+
+
+def dismiss_all_visible_for_user(db: Session, user_id: int) -> int:
+	"""
+	پنهان‌سازی یکجای همهٔ اعلان‌های فعالی که کاربر مجاز به دیدنشان است (خوانده یا نخوانده).
+	برای ردیف‌های بدون UserAnnouncement، رکورد جدید با dismissed_at ایجاد می‌شود.
+	"""
+	from adapters.db.models.user import User
+
+	user = db.query(User).filter(User.id == int(user_id)).first()
+	if not user:
+		return 0
+	now = datetime.utcnow()
+	uid = int(user_id)
+	q = db.query(Announcement, UserAnnouncement).outerjoin(
+		UserAnnouncement,
+		and_(
+			UserAnnouncement.announcement_id == Announcement.id,
+			UserAnnouncement.user_id == uid,
+		),
+	).filter(
+		Announcement.is_active == True,
+		or_(Announcement.starts_at == None, Announcement.starts_at <= now),
+		or_(Announcement.ends_at == None, Announcement.ends_at >= now),
+		or_(
+			UserAnnouncement.id == None,
+			UserAnnouncement.dismissed_at == None,
+		),
+	)
+	n = 0
+	for a, ua in q.all():
+		if not _check_user_can_see_announcement(uid, user.app_permissions, a.audience_filters):
+			continue
+		if ua:
+			if ua.dismissed_at is not None:
+				continue
+			ua.dismissed_at = now
+			if ua.first_seen_at is None:
+				ua.first_seen_at = now
+		else:
+			db.add(UserAnnouncement(
+				user_id=uid,
+				announcement_id=a.id,
+				dismissed_at=now,
+				first_seen_at=now,
+			))
+		n += 1
+	db.commit()
+	return n
+
+
+def purge_read_announcements_after_retention(db: Session, days: int) -> int:
+	"""
+	اعمال نگهداری خودکار: اعلان‌هایی که read_at قدیمی‌تر از days دارند.
+	- اگر اعلان فقط برای یک کاربر هدف‌گذاری شده (allowed_user_ids): حذف اعلان (و آبشاری UserAnnouncement).
+	- در غیر این صورت: dismissed_at برای پنهان ماندن از لیست کاربر.
+	"""
+	if days <= 0:
+		return 0
+	cutoff = datetime.utcnow() - timedelta(days=days)
+	candidates = db.query(UserAnnouncement).filter(
+		UserAnnouncement.read_at.isnot(None),
+		UserAnnouncement.read_at < cutoff,
+	).all()
+	dedicated_ann_ids: set[int] = set()
+	changed = 0
+	for ua in candidates:
+		ann = db.query(Announcement).filter(Announcement.id == ua.announcement_id).first()
+		if not ann:
+			db.delete(ua)
+			changed += 1
+			continue
+		allowed = (ann.audience_filters or {}).get("allowed_user_ids")
+		dedicated = False
+		if isinstance(allowed, list) and len(allowed) == 1:
+			dedicated = int(allowed[0]) == int(ua.user_id)
+		elif isinstance(allowed, int):
+			dedicated = int(allowed) == int(ua.user_id)
+		if dedicated:
+			dedicated_ann_ids.add(int(ann.id))
+		else:
+			if ua.dismissed_at is None:
+				ua.dismissed_at = datetime.utcnow()
+				changed += 1
+	for aid in dedicated_ann_ids:
+		row = db.query(Announcement).filter(Announcement.id == aid).first()
+		if row:
+			db.delete(row)
+			changed += 1
+	db.commit()
+	return changed
 
 
 def dismiss(db: Session, user_id: int, announcement_id: int) -> bool:

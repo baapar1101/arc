@@ -196,10 +196,12 @@ api_url="${api_scheme}://${API_DOMAIN}"
 cd "${app_dir}"
 if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
     PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
+    SKIP_NGINX_ENSURE=1 \
     bash build_web.sh --mode release --api-base-url "${api_url}" --clean --install-deps; then
   log_err "Frontend build failed."
   exit 1
 fi
+# اطمینان از nginx برای UI در «گام ۴» انجام می‌شود (یک‌بار، idempotent)؛ اینجا عمداً SKIP_NGINX_ENSURE تا دوباره‌کاری نشود.
 build_output="${app_dir}/hesabixUI/hesabix_ui/build/web"
 if [[ ! -f "${build_output}/index.html" ]]; then
   log_err "Build output missing index.html."
@@ -219,6 +221,20 @@ if [[ -f /etc/nginx/sites-available/hesabix-api.conf ]]; then
     sed -i '/proxy_send_timeout 300;/a\    client_max_body_size 1g;' /etc/nginx/sites-available/hesabix-api.conf
   fi
   log_info "Ensured client_max_body_size 1g (database restore uploads)."
+fi
+# UI: version.json، service worker، flutter_bootstrap.js و main.dart.js بدون کش یک‌سالهٔ immutable
+# اگر هر دو location ورودی JS از قبل باشد، اسکریپت بلافاصله خارج می‌شود و فایل nginx را دست نمی‌زند.
+ensure_ui_nginx="${app_dir}/scripts/ensure_nginx_ui_version_probe.sh"
+if [[ -f "${ensure_ui_nginx}" ]]; then
+  chmod +x "${ensure_ui_nginx}" 2>/dev/null || true
+  log_info "Step 4 (UI): Ensuring nginx cache rules for Flutter web (idempotent)..."
+  if bash "${ensure_ui_nginx}"; then
+    log_ok "Nginx UI version/SW/entry-JS rules verified or updated."
+  else
+    log_info "Nginx UI ensure skipped or failed (e.g. no hesabix-ui.conf on this host); non-fatal."
+  fi
+else
+  log_info "ensure_nginx_ui_version_probe.sh not found at ${ensure_ui_nginx}; skipped."
 fi
 if ! nginx -t 2>/dev/null; then
   log_err "Nginx config test failed."

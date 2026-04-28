@@ -2377,6 +2377,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceCopyOpenNew => 'کپی به فاکتور جدید';
 
   @override
+  String get invoiceCopyLoading =>
+      'در حال آماده‌سازی فرم فاکتور جدید از روی سند انتخاب‌شده…';
+
+  @override
   String get viewInvoices => 'صورت حساب‌ها';
 
   @override
@@ -9637,6 +9641,40 @@ class AppLocalizationsFa extends AppLocalizations {
   String notificationCenterLevelUnknown(String level) {
     return '$level';
   }
+
+  @override
+  String get notificationCenterClearAllTooltip =>
+      'پاک کردن اعلان‌های ذخیره‌شده در برنامه';
+
+  @override
+  String get notificationCenterClearAllTitle => 'پاک کردن اعلان‌ها؟';
+
+  @override
+  String get notificationCenterClearAllMessage =>
+      'همه اعلان‌های قابل مشاهده برای شما پنهان می‌شوند. پیام‌های فقط بلادرنگ (بدون ذخیره در سرور) هم از این لیست پاک می‌شوند.';
+
+  @override
+  String get notificationCenterClearAllConfirm => 'پاک کردن';
+
+  @override
+  String get notificationCenterClearAllCancel => 'انصراف';
+
+  @override
+  String get notificationCenterCleared => 'اعلان‌ها پاک شد';
+
+  @override
+  String get notificationsInappRetentionTitle => 'نگهداری اعلان‌های درون‌برنامه';
+
+  @override
+  String get notificationsInappRetentionSubtitle =>
+      'اعلان سیستمی که خوانده شده‌اند بعد از تعداد روز تعیین‌شده به‌طور خودکار حذف یا پنهان می‌شوند.';
+
+  @override
+  String get notificationsInappRetentionEnabled =>
+      'فعال‌سازی حذف خودکار خوانده‌شده‌ها';
+
+  @override
+  String get notificationsInappRetentionDays => 'تعداد روز بعد از خوانده شدن';
 
   @override
   String get apiKeysPageTitle => 'مدیریت کلیدهای API';

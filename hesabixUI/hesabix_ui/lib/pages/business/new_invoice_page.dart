@@ -1869,15 +1869,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (_copyFromLoading && widget.copyFromInvoiceId != null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(t.addInvoice),
+          title: Text(t.invoiceCopyOpenNew),
         ),
-        body: const Center(
+        body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('در حال بارگذاری اطلاعات فاکتور برای کپی…'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  t.invoiceCopyLoading,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           ),
         ),

@@ -3699,39 +3699,49 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     
     // جمع‌آوری اطلاعات تراکنش‌ها از account_lines
     final transactionMethods = <String>[];
+    String? eiStr(AccountLine line, String key) {
+      final v = line.extraInfo?[key];
+      if (v == null) return null;
+      final s = v.toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
+    String? accountTitle(AccountLine line) {
+      final n = line.accountName.trim();
+      return n.isEmpty ? null : n;
+    }
+
     for (final line in doc.accountLines) {
       if (line.transactionType != null) {
         String methodName;
         switch (line.transactionType) {
           case 'bank':
-            methodName = 'بانک';
-            if (line.extraInfo?['bank_name'] != null) {
-              methodName += ' (${line.extraInfo!['bank_name']})';
-            }
+            final detail = eiStr(line, 'bank_name') ?? accountTitle(line);
+            methodName = detail != null ? 'بانک ($detail)' : 'بانک';
             break;
           case 'cash_register':
-            methodName = 'صندوق';
-            if (line.extraInfo?['cash_register_name'] != null) {
-              methodName += ' (${line.extraInfo!['cash_register_name']})';
-            }
+            final detail = eiStr(line, 'cash_register_name') ?? accountTitle(line);
+            methodName = detail != null ? 'صندوق ($detail)' : 'صندوق';
             break;
           case 'petty_cash':
-            methodName = 'تنخواهگردان';
-            if (line.extraInfo?['petty_cash_name'] != null) {
-              methodName += ' (${line.extraInfo!['petty_cash_name']})';
-            }
+            final detail = eiStr(line, 'petty_cash_name') ?? accountTitle(line);
+            methodName = detail != null ? 'تنخواهگردان ($detail)' : 'تنخواهگردان';
             break;
           case 'check':
-            methodName = 'چک';
-            if (line.extraInfo?['check_number'] != null) {
-              methodName += ' (${line.extraInfo!['check_number']})';
-            }
+          case 'check_expense':
+            final detail = eiStr(line, 'check_number') ?? accountTitle(line);
+            methodName = detail != null ? 'چک ($detail)' : 'چک';
             break;
           case 'person':
-            methodName = 'شخص';
+            final detail = eiStr(line, 'person_name') ?? accountTitle(line);
+            methodName = detail != null ? 'شخص ($detail)' : 'شخص';
+            break;
+          case 'wallet':
+            final detail = accountTitle(line);
+            methodName = detail != null ? 'کیف پول ($detail)' : 'کیف پول';
             break;
           case 'account':
-            methodName = line.accountName;
+            methodName = line.accountName.trim().isNotEmpty ? line.accountName : 'حساب';
             break;
           default:
             methodName = line.transactionType ?? 'نامشخص';

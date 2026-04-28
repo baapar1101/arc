@@ -972,6 +972,7 @@
   "manageTransferDrafts": "مدیریت پیش‌نویس‌های انتقال",
   "addInvoice": "افزودن فاکتور",
   "invoiceCopyOpenNew": "کپی به فاکتور جدید",
+  "invoiceCopyLoading": "در حال آماده‌سازی فرم فاکتور جدید از روی سند انتخاب‌شده…",
   "viewInvoices": "صورت حساب‌ها",
   "editInvoices": "ویرایش فاکتورها",
   "deleteInvoices": "حذف فاکتورها",
@@ -3735,7 +3736,17 @@
       }
     }
   },
-  
+  "notificationCenterClearAllTooltip": "پاک کردن اعلان‌های ذخیره‌شده در برنامه",
+  "notificationCenterClearAllTitle": "پاک کردن اعلان‌ها؟",
+  "notificationCenterClearAllMessage": "همه اعلان‌های قابل مشاهده برای شما پنهان می‌شوند. پیام‌های فقط بلادرنگ (بدون ذخیره در سرور) هم از این لیست پاک می‌شوند.",
+  "notificationCenterClearAllConfirm": "پاک کردن",
+  "notificationCenterClearAllCancel": "انصراف",
+  "notificationCenterCleared": "اعلان‌ها پاک شد",
+  "notificationsInappRetentionTitle": "نگهداری اعلان‌های درون‌برنامه",
+  "notificationsInappRetentionSubtitle": "اعلان سیستمی که خوانده شده‌اند بعد از تعداد روز تعیین‌شده به‌طور خودکار حذف یا پنهان می‌شوند.",
+  "notificationsInappRetentionEnabled": "فعال‌سازی حذف خودکار خوانده‌شده‌ها",
+  "notificationsInappRetentionDays": "تعداد روز بعد از خوانده شدن",
+
   "apiKeysPageTitle": "مدیریت کلیدهای API",
   "apiKeyErrorLoadingKeys": "خطا در بارگذاری کلیدها",
   "apiKeyErrorCreatingKey": "خطا در ایجاد کلید",

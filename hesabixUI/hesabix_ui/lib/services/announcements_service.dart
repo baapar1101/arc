@@ -34,6 +34,12 @@ class AnnouncementsService {
     await _apiClient.post<Map<String, dynamic>>('/api/v1/announcements/$id/dismiss');
   }
 
+  /// پنهان‌سازی یکجای همه اعلان‌های قابل مشاهده (in-app / مرکز اعلان)
+  Future<Map<String, dynamic>> clearAllVisible() async {
+    final res = await _apiClient.post<Map<String, dynamic>>('/api/v1/announcements/clear-all');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
   // ===== Admin endpoints =====
   Future<Map<String, dynamic>> adminList({
     int page = 1,

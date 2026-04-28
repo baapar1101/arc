@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
@@ -830,6 +832,8 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                 else
                   LayoutBuilder(
                     builder: (context, constraints) {
+                      final productColW =
+                          _warehouseLinesProductColumnWidth(lines, constraints.maxWidth);
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
@@ -864,15 +868,15 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                               return DataRow(
                                 cells: [
                                   DataCell(
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(maxWidth: 220),
+                                    SizedBox(
+                                      width: productColW,
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
                                             productName ?? (productId != null ? 'شناسه $productId' : '-'),
-                                            maxLines: 2,
+                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           if (productCode != null && productCode.isNotEmpty)
@@ -881,6 +885,8 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                                               style: theme.textTheme.bodySmall?.copyWith(
                                                 color: theme.colorScheme.onSurfaceVariant,
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           if (productCategoryName != null && productCategoryName.isNotEmpty)
                                             Text(
@@ -888,7 +894,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                                               style: theme.textTheme.bodySmall?.copyWith(
                                                 color: theme.colorScheme.onSurfaceVariant,
                                               ),
-                                              maxLines: 2,
+                                              maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                         ],
@@ -953,6 +959,35 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         ],
       ),
     );
+  }
+
+  /// عرض ستون «کالا»: در عرض عادی باقیماندهٔ ویو را می‌گیرد؛ برای نام‌های خیلی بلند
+  /// عرض را زیاد می‌کند تا جدول از `SingleChildScrollView` افقی اسکرول بخورد.
+  double _warehouseLinesProductColumnWidth(List<dynamic> lines, double viewportWidth) {
+    const otherColumnsReserve = 440.0;
+    final base = math.max(200.0, viewportWidth - otherColumnsReserve);
+    double result = base;
+    double approxLineWidth(String s) => math.max(40.0, s.runes.length * 8.5);
+    for (final line in lines) {
+      final m = Map<String, dynamic>.from(line as Map);
+      final productId = m['product_id'] as int?;
+      final name = m['product_name'] as String?;
+      final display = (name != null && name.isNotEmpty)
+          ? name
+          : (productId != null ? 'شناسه $productId' : '-');
+      final code = m['product_code'] as String?;
+      final cat = m['product_category_name'] as String?;
+      var w = approxLineWidth(display);
+      if (code != null && code.isNotEmpty) {
+        w = math.max(w, approxLineWidth('کد: $code'));
+      }
+      if (cat != null && cat.isNotEmpty) {
+        w = math.max(w, approxLineWidth('دسته: $cat'));
+      }
+      w = (w + 28).clamp(base, 1600.0);
+      result = math.max(result, w);
+    }
+    return result;
   }
 
   bool _hasDeliveryInfo(Map<String, dynamic> doc) {

@@ -133,6 +133,40 @@ class HesabixDateUtils {
     return DateTime(l.year, l.month, l.day);
   }
 
+  /// پایان سال مالی به‌صورت **شامل**: یک سال بعد از تاریخ شروع در همان تقویم (شمسی یا میلادی)، منهای یک روز.
+  ///
+  /// مثال شمسی: شروع ۱۴۰۴/۰۱/۰۴ → سالگرد ۱۴۰۵/۰۱/۰۴ منهای یک روز → ۱۴۰۵/۰۱/۰۳.
+  /// میلادی: در سال کبیسه و روزهای ماه‌ها به‌درستی در نظر گرفته می‌شود (۲۹ فوریه، غیرهم‌طول ماه‌ها).
+  static DateTime fiscalYearInclusiveEndFromStart(DateTime start, bool isJalali) {
+    final startDay = toDateOnlyLocal(start);
+    if (isJalali) {
+      final j = Jalali.fromDateTime(startDay);
+      final ty = j.year + 1;
+      final tm = j.month;
+      var td = j.day;
+      final maxDay = Jalali(ty, tm, 1).monthLength;
+      if (td > maxDay) td = maxDay;
+      final jAnniversary = Jalali(ty, tm, td);
+      return toDateOnlyLocal(
+        jAnniversary.toDateTime().subtract(const Duration(days: 1)),
+      );
+    }
+    final anniv = _gregorianSameCalendarDayNextYear(startDay);
+    return toDateOnlyLocal(anniv.subtract(const Duration(days: 1)));
+  }
+
+  /// همان روز تقویمی در سال میلادی بعد؛ اگر ۲۹ فوریه در سال مقصد وجود نداشته باشد، آخر فوریه همان سال.
+  static DateTime _gregorianSameCalendarDayNextYear(DateTime d) {
+    final y = d.year + 1;
+    final m = d.month;
+    var day = d.day;
+    if (m == 2 && day == 29) {
+      final lastFeb = DateTime(y, 3, 0).day;
+      if (day > lastFeb) day = lastFeb;
+    }
+    return DateTime(y, m, day);
+  }
+
   /// آیا [date] (فقط روز) بین [firstDate] و [lastDate] (شامل) است؟
   static bool isDateOnlyInRange(
     DateTime date,

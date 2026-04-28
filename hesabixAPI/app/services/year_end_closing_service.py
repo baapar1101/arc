@@ -12,6 +12,7 @@ import zipfile
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import date, timedelta, datetime
 from decimal import Decimal
+import calendar
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_, inspect, text
@@ -40,6 +41,20 @@ def _json_default(o: Any):
     if isinstance(o, Decimal):
         return str(o)
     return str(o)
+
+
+def _gregorian_same_calendar_day_next_year(d: date) -> date:
+    """همان روز تقویمی در سال میلادی بعد (۲۹ فوریهٔ سال غیر کبیسه به آخر فوریه آن سال)."""
+    y = d.year + 1
+    if d.month == 2 and d.day == 29:
+        rd = 29 if calendar.isleap(y) else 28
+        return date(y, 2, rd)
+    return date(y, d.month, d.day)
+
+
+def _fiscal_year_end_inclusive_from_start_gregorian(start: date) -> date:
+    """پایان سال مالی شامل: سالگرد میلادی یک سال بعد منهای یک روز."""
+    return _gregorian_same_calendar_day_next_year(start) - timedelta(days=1)
 
 
 def _discover_scoped_tables(db: Session) -> Dict[str, Dict[str, Any]]:
@@ -824,16 +839,7 @@ async def close_fiscal_year(
     else:
         # استفاده از منطق خودکار در صورت عدم ارسال تاریخ
         new_start_date = fiscal_year.end_date + timedelta(days=1)
-        # محاسبه end_date: یک سال بعد از start_date
-        try:
-            # اگر سال بعد 29 فوریه داشته باشد، باید مدیریت شود
-            if new_start_date.month == 2 and new_start_date.day == 29:
-                new_end_date = date(new_start_date.year + 1, 2, 28)
-            else:
-                new_end_date = date(new_start_date.year + 1, new_start_date.month, new_start_date.day)
-        except ValueError:
-            # اگر روز معتبر نبود (مثلاً 29 فوریه در سال غیر کبیسه)
-            new_end_date = date(new_start_date.year + 1, new_start_date.month, new_start_date.day - 1)
+        new_end_date = _fiscal_year_end_inclusive_from_start_gregorian(new_start_date)
     
     # تغییر is_last سال قبلی به False
     fiscal_year.is_last = False

@@ -63,6 +63,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   String? _baleWebhookLastUrl;
   bool _tgProxyEnabled = false;
   bool _isAdmin = false;
+  bool _inappRetentionEnabled = false;
+  final _inappRetentionDaysCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -94,6 +96,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     _smsSenderCtrl.dispose();
     _smsUsernameCtrl.dispose();
     _smsPasswordCtrl.dispose();
+    _inappRetentionDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -139,6 +142,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           _smsProviderIsCustom = false;
           _smsProviderCtrl.text = '';
         }
+        _inappRetentionEnabled = (admin['inapp_read_retention_enabled'] ?? false) == true;
+        final rd = admin['inapp_read_retention_days'];
+        _inappRetentionDaysCtrl.text = '${rd is int ? rd : int.tryParse('$rd') ?? 0}';
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -316,6 +322,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       'sms_provider_username': _smsUsernameCtrl.text.trim(),
       'sms_provider_password': _smsPasswordCtrl.text.trim(),
       'sms_is_flash': _smsIsFlash,
+      'inapp_read_retention_enabled': _inappRetentionEnabled,
+      'inapp_read_retention_days': int.tryParse(_inappRetentionDaysCtrl.text.trim()) ?? 0,
     };
   }
 
@@ -607,13 +615,79 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _testChannel('inapp', t.notificationsChannelInApp, t),
-                  icon: const Icon(Icons.send_outlined, size: 20),
-                  label: Text(t.notificationsTestButton(t.notificationsChannelInApp)),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _testChannel('inapp', t.notificationsChannelInApp, t),
+                      icon: const Icon(Icons.send_outlined, size: 20),
+                      label: Text(t.notificationsTestButton(t.notificationsChannelInApp)),
+                    ),
+                  ),
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _buildInappRetentionSection(t, theme, colorScheme),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInappRetentionSection(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(Icons.admin_panel_settings_outlined, color: colorScheme.primary),
+        title: Text(
+          t.notificationsInappRetentionTitle,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          t.notificationsInappRetentionSubtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          if (_adminLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _inappRetentionEnabled,
+              onChanged: (v) => setState(() => _inappRetentionEnabled = v),
+              title: Text(t.notificationsInappRetentionEnabled),
+            ),
+            TextField(
+              controller: _inappRetentionDaysCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: t.notificationsInappRetentionDays,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              t.notificationsAdvancedRestartHint,
+              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: FilledButton.icon(
+                onPressed: _adminSaving ? null : () => _saveAdvanced(t),
+                icon: _adminSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(t.notificationsAdvancedSave),
               ),
             ),
           ],

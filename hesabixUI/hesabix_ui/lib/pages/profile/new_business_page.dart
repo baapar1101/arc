@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:shamsi_date/shamsi_date.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import '../../models/business_models.dart';
@@ -319,14 +318,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               setState(() {
                                 fiscal.startDate = d;
                                 if (fiscal.startDate != null) {
-                                  if (widget.calendarController.isJalali) {
-                                    final j = Jalali.fromDateTime(fiscal.startDate!);
-                                    final jNext = Jalali(j.year + 1, j.month, j.day);
-                                    fiscal.endDate = jNext.toDateTime();
-                                  } else {
-                                    final s = fiscal.startDate!;
-                                    fiscal.endDate = DateTime(s.year + 1, s.month, s.day);
-                                  }
+                                  fiscal.endDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                                    fiscal.startDate!,
+                                    widget.calendarController.isJalali,
+                                  );
                                   fiscal.title = autoTitle();
                                   _fiscalTitleController.text = fiscal.title;
                                 }

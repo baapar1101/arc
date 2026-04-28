@@ -419,15 +419,11 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                         setState(() {
                                           _startDate = d;
                                           if (_startDate != null) {
-                                            // تنظیم خودکار تاریخ پایان (یک سال بعد)
-                                            if (_calendarController!.isJalali) {
-                                              final j = Jalali.fromDateTime(_startDate!);
-                                              final jNext = Jalali(j.year + 1, j.month, j.day);
-                                              _endDate = jNext.toDateTime();
-                                            } else {
-                                              final s = _startDate!;
-                                              _endDate = DateTime(s.year + 1, s.month, s.day);
-                                            }
+                                            // تنظیم خودکار تاریخ پایان (سالگرد یک سال بعد منهای یک روز)
+                                            _endDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                                              _startDate!,
+                                              _calendarController!.isJalali,
+                                            );
                                             // تولید خودکار عنوان
                                             const autoPrefix = 'سال مالی منتهی به';
                                             if (_titleController.text.trim().isEmpty || 

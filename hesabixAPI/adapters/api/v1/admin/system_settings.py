@@ -97,6 +97,8 @@ class NotificationsConfigPayload(BaseModel):
 	telegram_proxy_enabled: bool | None = None
 	telegram_proxy_base_url: str | None = None
 	telegram_proxy_api_key: str | None = None
+	inapp_read_retention_enabled: bool | None = None
+	inapp_read_retention_days: int | None = None
 
 
 @router.get(
@@ -183,6 +185,8 @@ def put_notifications_settings_endpoint(
 		telegram_proxy_enabled=payload.telegram_proxy_enabled,
 		telegram_proxy_base_url=payload.telegram_proxy_base_url,
 		telegram_proxy_api_key=payload.telegram_proxy_api_key,
+		inapp_read_retention_enabled=payload.inapp_read_retention_enabled,
+		inapp_read_retention_days=payload.inapp_read_retention_days,
 	)
 	return success_response(data, request)
 

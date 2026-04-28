@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from typing import Any, Dict
-from fastapi import APIRouter, Depends, Request, Body
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
-from app.services.announcement_service import user_list, mark_read, dismiss
+from app.services.announcement_service import user_list, mark_read, dismiss, dismiss_all_visible_for_user
 from app.core.cache import get_cache
 
 router = APIRouter(prefix="/announcements", tags=["announcements"])
@@ -28,6 +28,20 @@ def list_announcements_endpoint(
 	data = user_list(db, ctx.get_user_id(), page=page, limit=limit, level=level, only_unread=only_unread, locale=locale)
 
 	return success_response(data, request)
+
+
+@router.post("/clear-all", summary="پنهان‌سازی یکجای اعلان‌های درون‌برنامه")
+def clear_all_announcements_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	user_id = ctx.get_user_id()
+	n = dismiss_all_visible_for_user(db, user_id)
+	cache = get_cache()
+	if cache.enabled:
+		cache.delete_pattern(f"announcements:user:{user_id}:*")
+	return success_response({"ok": True, "dismissed_count": n}, request)
 
 
 @router.post("/{announcement_id}/mark-read", summary="علامت خوانده شد")

@@ -98,6 +98,44 @@ class AccountLine {
 
   factory AccountLine.fromJson(dynamic json) {
     final m = json is Map ? Map<String, dynamic>.from(json) : <String, dynamic>{};
+    // API فیلدهای توصیفی را گاهی در ریشهٔ خط و نه فقط داخل extra_info برمی‌گرداند.
+    final baseExtra = m['extra_info'] is Map
+        ? Map<String, dynamic>.from(m['extra_info'] as Map)
+        : <String, dynamic>{};
+    final mergedExtra = Map<String, dynamic>.from(baseExtra);
+    void mergeRoot(String key) {
+      if (!m.containsKey(key)) return;
+      final v = m[key];
+      if (v == null) return;
+      if (v is String && v.trim().isEmpty) return;
+      mergedExtra.putIfAbsent(key, () => v);
+    }
+    mergeRoot('bank_name');
+    mergeRoot('bank_id');
+    mergeRoot('cash_register_name');
+    mergeRoot('cash_register_id');
+    mergeRoot('petty_cash_name');
+    mergeRoot('petty_cash_id');
+    mergeRoot('check_number');
+    mergeRoot('check_id');
+    mergeRoot('person_name');
+    mergeRoot('person_id');
+    mergeRoot('transaction_type');
+    mergeRoot('transaction_date');
+    mergeRoot('commission');
+    mergeRoot('invoice_id');
+    mergeRoot('invoice_code');
+    mergeRoot('link_to_invoice');
+
+    final transactionType = m['transaction_type'] as String? ?? mergedExtra['transaction_type'] as String?;
+    DateTime? transactionDate;
+    if (m['transaction_date'] != null) {
+      transactionDate = DateTime.tryParse(m['transaction_date'].toString());
+    }
+    transactionDate ??= mergedExtra['transaction_date'] != null
+        ? DateTime.tryParse(mergedExtra['transaction_date'].toString())
+        : null;
+
     return AccountLine(
       id: (m['id'] as num?)?.toInt() ?? 0,
       accountId: (m['account_id'] as num?)?.toInt() ?? 0,
@@ -106,12 +144,10 @@ class AccountLine {
       accountType: m['account_type'] as String?,
       amount: _jsonAmountToDouble(m['amount']),
       description: m['description'] as String?,
-      transactionType: m['transaction_type'] as String?,
-      transactionDate: m['transaction_date'] != null
-          ? DateTime.tryParse(m['transaction_date'].toString())
-          : null,
-      commission: _jsonAmountToDoubleNullable(m['commission']),
-      extraInfo: m['extra_info'] is Map ? Map<String, dynamic>.from(m['extra_info'] as Map) : null,
+      transactionType: transactionType,
+      transactionDate: transactionDate,
+      commission: _jsonAmountToDoubleNullable(m['commission'] ?? mergedExtra['commission']),
+      extraInfo: mergedExtra.isEmpty && m['extra_info'] == null ? null : mergedExtra,
     );
   }
 

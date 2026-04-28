@@ -4673,6 +4673,12 @@ abstract class AppLocalizations {
   /// **'Copy to new invoice'**
   String get invoiceCopyOpenNew;
 
+  /// No description provided for @invoiceCopyLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the new invoice form from the selected document…'**
+  String get invoiceCopyLoading;
+
   /// No description provided for @viewInvoices.
   ///
   /// In en, this message translates to:
@@ -18190,6 +18196,17 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{level}'**
   String notificationCenterLevelUnknown(String level);
+
+  String get notificationCenterClearAllTooltip;
+  String get notificationCenterClearAllTitle;
+  String get notificationCenterClearAllMessage;
+  String get notificationCenterClearAllConfirm;
+  String get notificationCenterClearAllCancel;
+  String get notificationCenterCleared;
+  String get notificationsInappRetentionTitle;
+  String get notificationsInappRetentionSubtitle;
+  String get notificationsInappRetentionEnabled;
+  String get notificationsInappRetentionDays;
 
   /// No description provided for @apiKeysPageTitle.
   ///

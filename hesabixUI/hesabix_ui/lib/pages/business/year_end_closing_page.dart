@@ -10,7 +10,6 @@ import 'package:hesabix_ui/services/year_end_closing_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
-import 'package:shamsi_date/shamsi_date.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/models/person_model.dart';
@@ -255,17 +254,11 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
             if (endDate != null) {
               // تاریخ شروع: یک روز بعد از پایان سال مالی فعلی
               final newStartDate = endDate.add(const Duration(days: 1));
-              // تاریخ پایان: یک سال بعد از تاریخ شروع
-              DateTime newEndDate;
-              if (_calendarController!.isJalali) {
-                // برای تقویم شمسی
-                final jStart = Jalali.fromDateTime(newStartDate);
-                final jEnd = Jalali(jStart.year + 1, jStart.month, jStart.day);
-                newEndDate = jEnd.toDateTime();
-              } else {
-                // برای تقویم میلادی
-                newEndDate = DateTime(newStartDate.year + 1, newStartDate.month, newStartDate.day);
-              }
+              // تاریخ پایان: سالگرد یک سال بعد از شروع، منهای یک روز (بازهٔ شامل)
+              final newEndDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                newStartDate,
+                _calendarController!.isJalali,
+              );
               
               setState(() {
                 _newFiscalYearStartDate = newStartDate;
@@ -1492,15 +1485,12 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                       onChanged: (date) {
                         setState(() {
                           _newFiscalYearStartDate = date;
-                          // تنظیم خودکار تاریخ پایان (یک سال بعد)
+                          // تنظیم خودکار تاریخ پایان (سالگرد یک سال بعد منهای یک روز)
                           if (date != null) {
-                            if (_calendarController!.isJalali) {
-                              final j = Jalali.fromDateTime(date);
-                              final jNext = Jalali(j.year + 1, j.month, j.day);
-                              _newFiscalYearEndDate = jNext.toDateTime();
-                            } else {
-                              _newFiscalYearEndDate = DateTime(date.year + 1, date.month, date.day);
-                            }
+                            _newFiscalYearEndDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                              date,
+                              _calendarController!.isJalali,
+                            );
                           }
                         });
                       },
