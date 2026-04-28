@@ -94,11 +94,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final doc = await _service.fetch(businessId: widget.businessId);
       setState(() {
         _document = doc;
-        if (doc.isNotEmpty) {
+        if (doc != null && doc.isNotEmpty) {
           _loadLinesFromDocument(doc);
         }
       });
-      if (mounted && doc.isNotEmpty) {
+      if (mounted && doc != null && doc.isNotEmpty) {
         await _applyOpeningBalanceAccountObjects(doc);
       }
     } catch (e) {

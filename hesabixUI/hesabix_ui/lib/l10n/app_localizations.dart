@@ -21146,7 +21146,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmWebChatVisitorCurrentPageLabel.
   ///
   /// In en, this message translates to:
-  /// **'Visitor\'s current page'**
+  /// **'Visitor\'\'s current page'**
   String get crmWebChatVisitorCurrentPageLabel;
 
   /// No description provided for @crmWebChatWidgetLine.
