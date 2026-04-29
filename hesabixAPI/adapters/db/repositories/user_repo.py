@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Optional, List
+from datetime import datetime, timedelta
 
-from sqlalchemy import select, func, and_, or_, text
+from sqlalchemy import select, func, and_, or_, update
 from sqlalchemy.orm import Session
 
 from adapters.db.models.user import User
@@ -21,6 +22,26 @@ class UserRepository(BaseRepository[User]):
 	def get_by_mobile(self, mobile: str) -> Optional[User]:
 		stmt = select(User).where(User.mobile == mobile)
 		return self.db.execute(stmt).scalars().first()
+
+	def touch_last_activity(self, user_id: int, throttle_seconds: int = 45) -> Optional[datetime]:
+		"""
+		به‌روزرسانی زمان آخرین فعالیت کاربر؛ اگر قبلاً در بازهٔ throttle به‌روز شده باشد، UPDATE زده نمی‌شود.
+		برمی‌گرداند timestamp فعالیت ثبت‌شده (جدید یا از DB در صورت throttle).
+		"""
+		now = datetime.utcnow()
+		threshold = now - timedelta(seconds=throttle_seconds)
+		stmt = (
+			update(User)
+			.where(User.id == user_id)
+			.where(or_(User.last_activity_at.is_(None), User.last_activity_at < threshold))
+			.values(last_activity_at=now)
+		)
+		result = self.db.execute(stmt)
+		self.db.commit()
+		if getattr(result, "rowcount", 0):
+			return now
+		u = self.get_by_id(user_id)
+		return u.last_activity_at if u else None
 
 	def get_by_referral_code(self, referral_code: str) -> Optional[User]:
 		stmt = select(User).where(User.referral_code == referral_code)
@@ -194,6 +215,7 @@ class UserRepository(BaseRepository[User]):
 				"businesses_count": businesses_count,
 				"last_login_ip": last_login_ip,
 				"last_login_at": last_login_at,
+				"last_activity_at": user.last_activity_at,
 			})
 		
 		return result

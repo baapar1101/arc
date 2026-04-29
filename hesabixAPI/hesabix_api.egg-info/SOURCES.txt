@@ -495,6 +495,7 @@ app/services/jobs/invoice_profit_ledger_backfill_job.py
 app/services/jobs/report_job.py
 app/services/jobs/tax_submission_job.py
 app/services/messenger_operator/__init__.py
+app/services/messenger_operator/crm_callback_map.py
 app/services/messenger_operator/crm_web_chat_access.py
 app/services/messenger_operator/crm_web_chat_flow.py
 app/services/messenger_operator/dispatch.py
@@ -538,6 +539,7 @@ app/services/workflow/actions/hesabix_query_actions.py
 app/services/workflow/actions/merge_split_actions.py
 app/services/workflow/actions/utility_actions.py
 app/services/workflow/i18n/__init__.py
+app/services/workflow/i18n/crm_chat_triggers_i18n.py
 app/services/workflow/i18n/hesabix_data_actions_i18n.py
 app/services/workflow/i18n/lifecycle_triggers_i18n.py
 app/services/workflow/i18n/workflow_translations.py

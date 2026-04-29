@@ -34,6 +34,8 @@ class User(Base):
 	bale_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+	# آخرین فعالیت اپ (ضربان از کلاینت؛ برای نمایش آنلاین/اخیر بدون Redis)
+	last_activity_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 	# شناسه فایل ذخیره‌سازی شده برای امضای کاربر (ارجاع به جدول file_storage)
 	signature_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 	

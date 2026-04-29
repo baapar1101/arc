@@ -6,6 +6,7 @@ from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.repositories.user_repo import UserRepository
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.captcha_service import create_captcha, validate_captcha
 from app.services.auth_service import register_user, login_user, create_password_reset, reset_password, change_password, referral_stats
@@ -128,6 +129,31 @@ def get_current_user_info(
 ) -> dict:
     """دریافت اطلاعات کاربر کنونی"""
     return success_response(ctx.to_dict(), request)
+
+
+@router.post(
+	"/activity",
+	summary="ثبت ضربان فعالیت (آخرین فعالیت در اپ)",
+	description="""
+کلاینت به‌صورت دوره‌ای (مثلاً هر یک دقیقه) این endpoint را با همان کلید ApiKey فراخوانی کند.
+سرور فیلد «آخرین فعالیت» را با به‌روزرسانی محدود (throttle پیش‌فرض ~۴۵ ثانیه) در پایگاه داده ذخیره می‌کند.
+بدون نیاز به Redis؛ برای نمایش «کاربران اخیراً فعال» در مدیریت سیستم قابل استفاده است.
+""",
+)
+def post_user_activity(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	user_id = ctx.get_user_id()
+	if not user_id:
+		raise ApiError("UNAUTHORIZED", "احراز هویت الزامی است", http_status=401)
+	repo = UserRepository(db)
+	ts = repo.touch_last_activity(user_id)
+	if ts is None:
+		raise ApiError("USER_NOT_FOUND", "کاربر یافت نشد", http_status=404)
+	payload = format_datetime_fields({"last_activity_at": ts}, request)
+	return success_response(payload, request, message=None)
 
 
 @router.post("/register", 

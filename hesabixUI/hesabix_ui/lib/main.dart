@@ -158,6 +158,7 @@ import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
+import 'widgets/user_activity_heartbeat.dart';
 import 'utils/route_prefetcher.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/year_end_closing_page.dart';
@@ -3369,7 +3370,9 @@ class _MyAppState extends State<MyApp> {
       builder: (context, _) {
         return UrlTracker(
           authStore: _authStore!,
-          child: MaterialApp.router(
+          child: UserActivityHeartbeat(
+            authStore: _authStore!,
+            child: MaterialApp.router(
             title: 'Hesabix',
             theme: AppTheme.build(
               isDark: false,
@@ -3397,6 +3400,7 @@ class _MyAppState extends State<MyApp> {
                 child: child ?? const SizedBox(),
               );
             },
+          ),
           ),
         );
       },
