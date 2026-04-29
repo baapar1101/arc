@@ -72,6 +72,13 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   bool _mobileShowList = true;
   final TextEditingController _convSearchCtrl = TextEditingController();
 
+  static int? _intFrom(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.round();
+    return int.tryParse(v.toString());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -393,9 +400,14 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   }
 
   void _mergeConversationInList(Map<String, dynamic> c) {
-    final id = c['id'] as int?;
+    final id = _intFrom(c['id']);
     if (id == null) return;
-    final idx = _conversations.indexWhere((e) => e is Map && (e)['id'] == id);
+    final idx = _conversations.indexWhere(
+      (e) {
+        if (e is! Map) return false;
+        return _intFrom(e['id']) == id;
+      },
+    );
     if (idx >= 0) {
       _conversations[idx] = c;
     }
@@ -985,7 +997,8 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
       return;
     }
-    final id = c['id'] as int;
+    final id = _intFrom(c['id']);
+    if (id == null) return;
     try {
       await _svc.patchConversation(
         businessId: widget.businessId,
@@ -1146,7 +1159,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final screenW = MediaQuery.sizeOf(context).width;
-    final wide = screenW >= 800;
+    final wide = screenW >= 720;
 
     return Scaffold(
       appBar: AppBar(
@@ -1218,13 +1231,15 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         width: MediaQuery.sizeOf(context).width,
       );
     }
+    final screenW = MediaQuery.sizeOf(context).width;
+    final sidebarW = (screenW * 0.38).clamp(272.0, 420.0);
     return Row(
       children: [
         _buildConversationsListColumn(
           theme: theme,
           t: t,
           cs: cs,
-          width: 380,
+          width: sidebarW,
         ),
         const VerticalDivider(width: 1),
         Expanded(
@@ -1371,7 +1386,10 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                           );
                         }
                         final c = _conversations[i] as Map<String, dynamic>;
-                        final id = c['id'] as int;
+                        final id = _intFrom(c['id']);
+                        if (id == null) {
+                          return const SizedBox.shrink();
+                        }
                         final title =
                             '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}'.trim();
                         final sub = c['visitor_email']?.toString() ?? '';
@@ -1452,7 +1470,10 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   Widget _buildThreadPanel(BuildContext context, ThemeData theme, ColorScheme cs) {
     final t = AppLocalizations.of(context);
     final c = _conversations.firstWhere(
-      (e) => e is Map && (e)['id'] == _selectedConvId,
+      (e) {
+        if (e is! Map) return false;
+        return _intFrom(e['id']) == _selectedConvId;
+      },
       orElse: () => <String, dynamic>{},
     );
     if (c is! Map || c['id'] == null) {

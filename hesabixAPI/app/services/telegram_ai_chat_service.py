@@ -13,6 +13,7 @@ from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository,
 from adapters.db.repositories.business_repo import BusinessRepository
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from app.services.business_service import get_user_businesses
+from app.services.messenger_operator.crm_web_chat_access import user_has_crm_web_chat_messenger_access
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,12 @@ class TelegramAIChatService:
 		# دکمه تیکت‌ها (فقط برای اپراتورها)
 		if user_context.can_access_support_operator():
 			buttons.append([{"text": "🎫 تیکت‌های پشتیبانی", "callback_data": "menu:tickets"}])
-		
+
+		# چت وب CRM (ویجت) — کاربران با مجوز پاسخ
+		u = user_context.user
+		if u is not None and user_has_crm_web_chat_messenger_access(self.db, u):
+			buttons.append([{"text": "🖥 چت وب CRM", "callback_data": "crm:start"}])
+
 		# دکمه مدیریت (فقط برای SuperAdmin)
 		if user_context.is_superadmin():
 			buttons.append([{"text": "👥 مدیریت سیستم", "callback_data": "menu:admin"}])

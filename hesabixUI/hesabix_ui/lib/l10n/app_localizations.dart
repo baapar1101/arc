@@ -15041,6 +15041,210 @@ abstract class AppLocalizations {
   /// **'Whether the Bale action sent a document from file storage'**
   String get workflowFieldDescSendFileAttachment;
 
+  /// No description provided for @workflowFieldCrmChatConversationId.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat conversation ID'**
+  String get workflowFieldCrmChatConversationId;
+
+  /// No description provided for @workflowFieldDescCrmChatConversationId.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM web chat conversation record ID in trigger_data'**
+  String get workflowFieldDescCrmChatConversationId;
+
+  /// No description provided for @workflowFieldCrmChatWidgetId.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat widget ID'**
+  String get workflowFieldCrmChatWidgetId;
+
+  /// No description provided for @workflowFieldDescCrmChatWidgetId.
+  ///
+  /// In en, this message translates to:
+  /// **'Web chat widget linked to this conversation'**
+  String get workflowFieldDescCrmChatWidgetId;
+
+  /// No description provided for @workflowFieldCrmChatMessageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat message ID'**
+  String get workflowFieldCrmChatMessageId;
+
+  /// No description provided for @workflowFieldDescCrmChatMessageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded web chat message ID'**
+  String get workflowFieldDescCrmChatMessageId;
+
+  /// No description provided for @workflowFieldCrmChatBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Message body'**
+  String get workflowFieldCrmChatBody;
+
+  /// No description provided for @workflowFieldDescCrmChatBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor or agent message text in web chat'**
+  String get workflowFieldDescCrmChatBody;
+
+  /// No description provided for @workflowFieldCrmChatSenderRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender role'**
+  String get workflowFieldCrmChatSenderRole;
+
+  /// No description provided for @workflowFieldDescCrmChatSenderRole.
+  ///
+  /// In en, this message translates to:
+  /// **'visitor or agent depending on the message'**
+  String get workflowFieldDescCrmChatSenderRole;
+
+  /// No description provided for @workflowFieldCrmChatVisitorFirstName.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor first name'**
+  String get workflowFieldCrmChatVisitorFirstName;
+
+  /// No description provided for @workflowFieldDescCrmChatVisitorFirstName.
+  ///
+  /// In en, this message translates to:
+  /// **'First name from the chat widget form'**
+  String get workflowFieldDescCrmChatVisitorFirstName;
+
+  /// No description provided for @workflowFieldCrmChatVisitorLastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor last name'**
+  String get workflowFieldCrmChatVisitorLastName;
+
+  /// No description provided for @workflowFieldDescCrmChatVisitorLastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name from the chat widget form'**
+  String get workflowFieldDescCrmChatVisitorLastName;
+
+  /// No description provided for @workflowFieldCrmChatPageUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Page URL'**
+  String get workflowFieldCrmChatPageUrl;
+
+  /// No description provided for @workflowFieldDescCrmChatPageUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Site page URL when the event occurred (if present)'**
+  String get workflowFieldDescCrmChatPageUrl;
+
+  /// No description provided for @workflowFieldCrmChatConversationStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation status'**
+  String get workflowFieldCrmChatConversationStatus;
+
+  /// No description provided for @workflowFieldDescCrmChatConversationStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. open or resolved'**
+  String get workflowFieldDescCrmChatConversationStatus;
+
+  /// No description provided for @workflowFieldCrmChatAssignedToUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned user ID'**
+  String get workflowFieldCrmChatAssignedToUserId;
+
+  /// No description provided for @workflowFieldDescCrmChatAssignedToUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Responsible agent user when assigned'**
+  String get workflowFieldDescCrmChatAssignedToUserId;
+
+  /// No description provided for @workflowFieldCrmChatAgentUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent user ID'**
+  String get workflowFieldCrmChatAgentUserId;
+
+  /// No description provided for @workflowFieldDescCrmChatAgentUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending user for agent-role messages (agent reply trigger)'**
+  String get workflowFieldDescCrmChatAgentUserId;
+
+  /// No description provided for @workflowFieldAutomationSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation source'**
+  String get workflowFieldAutomationSource;
+
+  /// No description provided for @workflowFieldDescAutomationSource.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. workflow when the message was sent by automation'**
+  String get workflowFieldDescAutomationSource;
+
+  /// No description provided for @workflowFieldOperatorRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator relay'**
+  String get workflowFieldOperatorRelay;
+
+  /// No description provided for @workflowFieldDescOperatorRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'When sent via operator bridge (Telegram/Bale)'**
+  String get workflowFieldDescOperatorRelay;
+
+  /// No description provided for @workflowFieldCrmChatOldAssignedUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous assignee ID'**
+  String get workflowFieldCrmChatOldAssignedUserId;
+
+  /// No description provided for @workflowFieldDescCrmChatOldAssignedUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Before assignment changed'**
+  String get workflowFieldDescCrmChatOldAssignedUserId;
+
+  /// No description provided for @workflowFieldCrmChatNewAssignedUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'New assignee ID'**
+  String get workflowFieldCrmChatNewAssignedUserId;
+
+  /// No description provided for @workflowFieldDescCrmChatNewAssignedUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'After assignment changed'**
+  String get workflowFieldDescCrmChatNewAssignedUserId;
+
+  /// No description provided for @workflowFieldCrmChatOldStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous conversation status'**
+  String get workflowFieldCrmChatOldStatus;
+
+  /// No description provided for @workflowFieldDescCrmChatOldStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Before status update'**
+  String get workflowFieldDescCrmChatOldStatus;
+
+  /// No description provided for @workflowFieldCrmChatNewStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation status'**
+  String get workflowFieldCrmChatNewStatus;
+
+  /// No description provided for @workflowFieldDescCrmChatNewStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'After status update'**
+  String get workflowFieldDescCrmChatNewStatus;
+
   /// No description provided for @workflowFieldEmailTo.
   ///
   /// In en, this message translates to:

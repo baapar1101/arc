@@ -372,20 +372,19 @@ async def start_conversation_public(
 	db.commit()
 	db.refresh(c)
 
-	_fire(
-		db,
-		w.business_id,
-		"crm.chat.conversation.started",
-		{
-			"conversation_id": c.id,
-			"widget_id": w.id,
-			"visitor_first_name": fn,
-			"visitor_last_name": ln,
-			"visitor_email": c.visitor_email,
-			"visitor_phone": ph,
-			"page_url": c.page_url,
-		},
+	start_trigger_payload: Dict[str, Any] = {
+		"conversation_id": c.id,
+		"widget_id": w.id,
+		"visitor_first_name": fn,
+		"visitor_last_name": ln,
+		"visitor_email": c.visitor_email,
+		"visitor_phone": ph,
+		"page_url": c.page_url,
+	}
+	start_trigger_payload.update(
+		build_crm_chat_visitor_message_trigger_enrichment(db, w.business_id, c.id)
 	)
+	_fire(db, w.business_id, "crm.chat.conversation.started", start_trigger_payload)
 
 	await crm_chat_realtime_manager.broadcast_business(
 		w.business_id,

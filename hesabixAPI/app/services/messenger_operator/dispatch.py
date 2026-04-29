@@ -37,7 +37,7 @@ def dispatch_operator_messenger_message(
 	*,
 	platform: str,
 	message: Dict[str, Any],
-	send_text: Callable[[str], Any],
+	send: Callable[..., Any],
 ) -> bool:
 	"""اگر پیام توسط پل اپراتور مصرف شد True."""
 	chat = message.get("chat") or {}
@@ -62,14 +62,14 @@ def dispatch_operator_messenger_message(
 				user,
 				platform,
 				text,
-				send_text,
+				send,
 				raw_message=message,
 			)
 		)
 	except Exception:
 		logger.exception("messenger operator dispatch failed platform=%s user_id=%s", platform, user.id)
 		try:
-			send_text("خطای داخلی پل اپراتور. بعداً تلاش کنید.")
+			send("خطای داخلی پل اپراتور. بعداً تلاش کنید.")
 		except Exception:
 			pass
 		return True

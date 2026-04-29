@@ -16,6 +16,8 @@ from adapters.db.repositories.user_repo import UserRepository
 from adapters.db.models.user import User
 from app.services.providers.bale_provider import BaleProvider
 from app.services.system_settings_service import get_effective_notifications_settings
+from app.services.messenger_operator.crm_callback_map import crm_callback_data_to_command
+from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/bale", tags=["integrations.bale"])
@@ -53,11 +55,14 @@ def create_link(
 	# لینک ble.ir اپ موبایل را باز می‌کند؛ web.bale.ai همیشه نسخه وب را باز می‌کند
 	if bot_username:
 		deep_link = f"https://ble.ir/{bot_username}?start={link.token}"
+		deep_link_crm = f"https://ble.ir/{bot_username}?start=crm"
 	else:
 		deep_link = None
+		deep_link_crm = None
 	return success_response(
 		{
 			"deep_link": deep_link,
+			"deep_link_crm": deep_link_crm,
 			"link_token": link.token,
 			"expires_at": _iso_expires_at(link.expires_at),
 		},
@@ -97,6 +102,62 @@ def unlink(
 	return success_response({"unlinked": True}, request)
 
 
+def _handle_bale_callback_query(
+	db: Session,
+	provider: BaleProvider,
+	payload: Dict[str, Any],
+) -> bool:
+	"""کلیک دکمه‌های اینلاین (مثل crm:*)؛ True یعنی آپدیت مصرف شد."""
+	cq = payload.get("callback_query")
+	if not cq:
+		return False
+	data = (cq.get("data") or "").strip()
+	if not data:
+		return False
+	qid = cq.get("id") or ""
+	msg = cq.get("message") or {}
+	chat = msg.get("chat") or {}
+	cid = chat.get("id")
+	if cid is None:
+		from_cb = cq.get("from") or {}
+		cid = from_cb.get("id")
+	try:
+		cid = int(cid)
+	except (TypeError, ValueError):
+		return False
+
+	provider.answer_callback_query(str(qid))
+	user = db.execute(select(User).where(User.bale_chat_id == cid)).scalars().first()
+	if not user:
+		provider.send_text(
+			chat_id=cid,
+			text="❌ کاربری با این اتصال بله یافت نشد. ابتدا از برنامه متصل شوید.",
+		)
+		return True
+
+	parts = data.split(":")
+	if parts[0] != "crm":
+		provider.send_text(chat_id=cid, text="این دکمه توسط ربات پشتیبانی نمی‌شود.")
+		return True
+
+	cmd = crm_callback_data_to_command(parts[1:])
+	if not cmd:
+		provider.send_text(chat_id=cid, text="دکمه نامعتبر است.")
+		return True
+
+	def _send(msg: str, inline_keyboard: Any = None) -> Any:
+		rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+		return provider.send_text(cid, msg, reply_markup=rm)
+
+	dispatch_operator_messenger_message(
+		db,
+		platform="bale",
+		message={"chat": {"id": cid}, "text": cmd},
+		send=_send,
+	)
+	return True
+
+
 @router.post("/webhook/{secret}", summary="وب‌هوک بله", name="bale_webhook")
 def bale_webhook(
 	secret: str,
@@ -113,6 +174,10 @@ def bale_webhook(
 		raise HTTPException(status_code=403, detail="Forbidden")
 
 	provider = BaleProvider(bot_token=settings.get("bale_bot_token"))
+
+	if _handle_bale_callback_query(db, provider, payload):
+		return {"ok": True}
+
 	# بله Update می‌فرستد: message یا edited_message
 	message = payload.get("message") or payload.get("edited_message") or {}
 	text: str = (message.get("text") or "").strip()
@@ -125,27 +190,51 @@ def bale_webhook(
 	chat = message.get("chat") or {}
 	chat_id = chat.get("id")
 
-	# /start <token> -> لینک کردن کاربر
-	if text.startswith("/start "):
-		token = text.split(" ", 1)[1].strip()
-		b_repo = BaleRepository(db)
-		link_obj = b_repo.get_by_token(token)
-		if not link_obj or link_obj.used_at is not None or link_obj.expires_at < datetime.utcnow():
-			if chat_id:
-				provider.send_text(chat_id=int(chat_id), text="⛔ لینک اتصال نامعتبر یا منقضی است. لطفاً از داخل برنامه، لینک جدید بسازید.")
-			return {"ok": False}
-		u_repo = UserRepository(db)
-		user = u_repo.db.get(u_repo.model_class, link_obj.user_id)
-		if user is None:
-			return {"ok": False}
-		user.bale_chat_id = int(chat_id) if chat_id else None  # type: ignore[attr-defined]
-		user.bale_connected_at = datetime.utcnow()  # type: ignore[attr-defined]
-		u_repo.db.add(user)
-		u_repo.db.commit()
-		b_repo.mark_used(link_obj)
-		if chat_id:
-			provider.send_text(chat_id=int(chat_id), text="✅ اتصال بله شما با موفقیت برقرار شد.")
-		return {"ok": True}
+	_chat_id_val = int(chat_id) if chat_id is not None else None
+
+	# /start — اتصال، یا ورود مستقیم به چت وب CRM
+	if text.startswith("/start"):
+		_sp = text.split(maxsplit=1)
+		if len(_sp) == 2 and _sp[1].strip().lower() == "crm" and _chat_id_val is not None:
+			u_crm = db.execute(select(User).where(User.bale_chat_id == _chat_id_val)).scalars().first()
+			if u_crm:
+
+				def _bale_crm_send(msg: str, inline_keyboard: Any = None) -> Any:
+					rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+					return provider.send_text(_chat_id_val, msg, reply_markup=rm)
+
+				dispatch_operator_messenger_message(
+					db,
+					platform="bale",
+					message={"chat": {"id": _chat_id_val}, "text": "/crmchat"},
+					send=_bale_crm_send,
+				)
+			else:
+				provider.send_text(
+					chat_id=_chat_id_val,
+					text="❌ ابتدا بله را از داخل برنامه متصل کنید.",
+				)
+			return {"ok": True}
+		if len(_sp) == 2:
+			token = _sp[1].strip()
+			b_repo = BaleRepository(db)
+			link_obj = b_repo.get_by_token(token)
+			if not link_obj or link_obj.used_at is not None or link_obj.expires_at < datetime.utcnow():
+				if _chat_id_val is not None:
+					provider.send_text(chat_id=_chat_id_val, text="⛔ لینک اتصال نامعتبر یا منقضی است. لطفاً از داخل برنامه، لینک جدید بسازید.")
+				return {"ok": False}
+			u_repo = UserRepository(db)
+			user = u_repo.db.get(u_repo.model_class, link_obj.user_id)
+			if user is None:
+				return {"ok": False}
+			user.bale_chat_id = int(chat_id) if chat_id else None  # type: ignore[attr-defined]
+			user.bale_connected_at = datetime.utcnow()  # type: ignore[attr-defined]
+			u_repo.db.add(user)
+			u_repo.db.commit()
+			b_repo.mark_used(link_obj)
+			if _chat_id_val is not None:
+				provider.send_text(chat_id=_chat_id_val, text="✅ اتصال بله شما با موفقیت برقرار شد.")
+			return {"ok": True}
 
 	# /unlink
 	if text.startswith("/unlink"):
@@ -163,15 +252,35 @@ def bale_webhook(
 		return {"ok": True}
 
 	# پل اپراتور (چت وب CRM و فلوهای بعدی)
-	if chat_id and message:
-		from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
+	if _chat_id_val is not None and message:
+
+		def _bale_send(msg: str, inline_keyboard: Any = None) -> Any:
+			rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+			return provider.send_text(_chat_id_val, msg, reply_markup=rm)
 
 		if dispatch_operator_messenger_message(
 			db,
 			platform="bale",
 			message=message,
-			send_text=lambda t, _cid=int(chat_id): provider.send_text(chat_id=_cid, text=t),
+			send=_bale_send,
 		):
 			return {"ok": True}
+
+		plain = (message.get("text") or message.get("caption") or "").strip()
+		if plain and not plain.startswith("/"):
+			user_linked = db.execute(select(User).where(User.bale_chat_id == _chat_id_val)).scalars().first()
+			if user_linked:
+				provider.send_text(
+					chat_id=_chat_id_val,
+					text=(
+						"🖥 این پیام برای چت وب CRM تشخیص داده نشد.\n\n"
+						"برای پاسخ به بازدیدکنندگان ویجت:\n"
+						"/crmchat — شروع\n"
+						"/crmhelp — راهنما و دکمه‌ها\n"
+						"/list — فهرست مکالمات\n"
+						"/open شناسه — باز کردن مکالمه\n\n"
+						"برای فقط متن در حالت «داخل مکالمه» پیام بفرستید (بدون /)."
+					),
+				)
 
 	return {"ok": True}

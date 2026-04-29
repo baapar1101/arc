@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -55,8 +57,21 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
         setState(() => _currentTab = _tabController.index);
       }
     });
-    _loadProcessDefs();
-    _loadAll();
+    unawaited(_bootstrap());
+  }
+
+  /// شناسه‌های عددی JSON ممکن است `int` یا `double` باشند.
+  int? _crmInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.round();
+    return int.tryParse(v.toString());
+  }
+
+  Future<void> _bootstrap() async {
+    await _loadProcessDefs();
+    if (!mounted) return;
+    await _loadAll();
   }
 
   @override
@@ -73,7 +88,14 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
       setState(() {
         _processDefs = list.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
       });
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: 'بارگذاری فهرست فرایندها ناموفق بود: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
+    }
   }
 
   Future<void> _loadAll() async {
@@ -83,9 +105,13 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
       _error = null;
     });
     try {
-      final pipelineDefId = _processDefs.isNotEmpty && _processDefs.any((e) => e['process_type'] == 'sales_pipeline')
-          ? (_processDefs.firstWhere((e) => e['process_type'] == 'sales_pipeline', orElse: () => <String, dynamic>{})['id'] as int?)
-          : null;
+      int? pipelineDefId;
+      for (final e in _processDefs) {
+        if (e['process_type'] == 'sales_pipeline') {
+          pipelineDefId = _crmInt(e['id']);
+          break;
+        }
+      }
       final futures = await Future.wait([
         _crmService.getSummary(businessId: widget.businessId),
         _crmService.getPipelineReport(businessId: widget.businessId, processDefinitionId: pipelineDefId, fromDate: _pipelineFromDate, toDate: _pipelineToDate),
@@ -114,11 +140,6 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
         _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(
-        context,
-        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
-        isError: true,
-      );
     }
   }
 
@@ -138,7 +159,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _loadAll,
+            onPressed: _loading ? null : _bootstrap,
             tooltip: 'بروزرسانی',
           ),
         ],
@@ -162,14 +183,17 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      ),
                       const SizedBox(height: 16),
-                      FilledButton.icon(onPressed: _loadAll, icon: const Icon(Icons.refresh), label: const Text('تلاش مجدد')),
+                      FilledButton.icon(onPressed: _bootstrap, icon: const Icon(Icons.refresh), label: const Text('تلاش مجدد')),
                     ],
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _loadAll,
+                  onRefresh: _bootstrap,
                   child: TabBarView(
                     controller: _tabController,
                     children: [
@@ -188,45 +212,61 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
   Widget _buildSummaryTab() {
     final s = _summary ?? {};
     final formatter = NumberFormat('#,##0');
+    final items = <(String, String, IconData)>[
+      ('سرنخ‌ها', '${s['total_leads'] ?? 0}', Icons.contact_phone),
+      ('تبدیل شده', '${s['converted_leads'] ?? 0}', Icons.person_add),
+      ('نرخ تبدیل', '${s['conversion_rate'] ?? 0}%', Icons.percent),
+      ('فرصت فروش', '${s['total_deals'] ?? 0}', Icons.trending_up),
+      ('بسته شده', '${s['closed_deals'] ?? 0}', Icons.check_circle),
+      ('مبلغ کل', formatter.format((s['total_deals_amount'] as num?) ?? 0), Icons.account_balance_wallet),
+      ('پیش‌بینی درآمد (موزون)', formatter.format((_weightedForecast['weighted_total'] as num?) ?? 0), Icons.insights),
+    ];
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _summaryCard('سرنخ‌ها', '${s['total_leads'] ?? 0}', Icons.contact_phone),
-              _summaryCard('تبدیل شده', '${s['converted_leads'] ?? 0}', Icons.person_add),
-              _summaryCard('نرخ تبدیل', '${s['conversion_rate'] ?? 0}%', Icons.percent),
-              _summaryCard('فرصت فروش', '${s['total_deals'] ?? 0}', Icons.trending_up),
-              _summaryCard('بسته شده', '${s['closed_deals'] ?? 0}', Icons.check_circle),
-              _summaryCard('مبلغ کل', formatter.format((s['total_deals_amount'] as num?) ?? 0), Icons.account_balance_wallet),
-              _summaryCard('پیش‌بینی درآمد (موزون)', formatter.format((_weightedForecast['weighted_total'] as num?) ?? 0), Icons.insights),
-            ],
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final inner = box.maxWidth;
+          const gap = 12.0;
+          final nCols =
+              inner < 420 ? 1 : inner < 760 ? 2 : inner < 1100 ? 3 : 4;
+          final cardW = (inner - gap * (nCols - 1)) / nCols;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: items
+                .map(
+                  (e) => SizedBox(
+                    width: cardW,
+                    child: _summaryCard(e.$1, e.$2, e.$3),
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
     );
   }
 
   Widget _summaryCard(String title, String value, IconData icon) {
     return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: 140,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 8),
-              Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              Text(title, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 26, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(title, style: Theme.of(context).textTheme.bodySmall),
+          ],
         ),
       ),
     );
@@ -242,11 +282,10 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Text('بازه تاریخ (بر اساس ایجاد فرصت):'),
-                  const SizedBox(width: 8),
-                  TextButton(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final narrow = constraints.maxWidth < 480;
+                  final fromBtn = TextButton(
                     onPressed: () async {
                       final d = await showAdaptiveDatePicker(
                         context: context,
@@ -254,38 +293,96 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2030),
                       );
-                      if (d != null) setState(() { _pipelineFromDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
+                      if (d != null) {
+                        setState(() {
+                          _pipelineFromDate =
+                              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                          _loadAll();
+                        });
+                      }
                     },
-                    child: Text(_pipelineFromDate != null && HesabixDateUtils.parseFromAPI(_pipelineFromDate) != null
-                        ? HesabixDateUtils.formatForDisplay(
-                            HesabixDateUtils.parseFromAPI(_pipelineFromDate),
-                            ApiClient.getCalendarController()?.isJalali ?? true,
-                          )
-                        : 'از'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final d = await showAdaptiveDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (d != null) setState(() { _pipelineToDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
-                    },
-                    child: Text(_pipelineToDate != null && HesabixDateUtils.parseFromAPI(_pipelineToDate) != null
-                        ? HesabixDateUtils.formatForDisplay(
-                            HesabixDateUtils.parseFromAPI(_pipelineToDate),
-                            ApiClient.getCalendarController()?.isJalali ?? true,
-                          )
-                        : 'تا'),
-                  ),
-                  if (_pipelineFromDate != null || _pipelineToDate != null)
-                    TextButton(
-                      onPressed: () => setState(() { _pipelineFromDate = null; _pipelineToDate = null; _loadAll(); }),
-                      child: const Text('پاک کردن'),
+                    child: Text(
+                      _pipelineFromDate != null && HesabixDateUtils.parseFromAPI(_pipelineFromDate) != null
+                          ? HesabixDateUtils.formatForDisplay(
+                              HesabixDateUtils.parseFromAPI(_pipelineFromDate),
+                              ApiClient.getCalendarController()?.isJalali ?? true,
+                            )
+                          : 'از',
                     ),
-                ],
+                  );
+                  final toBtn = TextButton(
+                    onPressed: () async {
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (d != null) {
+                        setState(() {
+                          _pipelineToDate =
+                              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                          _loadAll();
+                        });
+                      }
+                    },
+                    child: Text(
+                      _pipelineToDate != null && HesabixDateUtils.parseFromAPI(_pipelineToDate) != null
+                          ? HesabixDateUtils.formatForDisplay(
+                              HesabixDateUtils.parseFromAPI(_pipelineToDate),
+                              ApiClient.getCalendarController()?.isJalali ?? true,
+                            )
+                          : 'تا',
+                    ),
+                  );
+                  final clearBtn = (_pipelineFromDate != null || _pipelineToDate != null)
+                      ? TextButton(
+                          onPressed: () => setState(() {
+                            _pipelineFromDate = null;
+                            _pipelineToDate = null;
+                            _loadAll();
+                          }),
+                          child: const Text('پاک کردن'),
+                        )
+                      : null;
+                  if (narrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'بازه تاریخ (بر اساس ایجاد فرصت):',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            fromBtn,
+                            toBtn,
+                            if (clearBtn != null) clearBtn,
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'بازه تاریخ (بر اساس ایجاد فرصت):',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      fromBtn,
+                      toBtn,
+                      if (clearBtn != null) clearBtn,
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -295,59 +392,75 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: 250,
-                  child: BarChart(
-                    BarChartData(
-                      alignment: BarChartAlignment.spaceAround,
-                      maxY: (_pipelineData.map((e) => ((e['deal_count'] as num?) ?? 0).toDouble()).fold<double>(0, (a, b) => a > b ? a : b) * 1.2).clamp(1.0, double.infinity),
-                      barTouchData: BarTouchData(enabled: true),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        bottomTitles: AxisTitles(sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (v, meta) {
-                            final i = v.toInt();
-                            if (i >= 0 && i < _pipelineData.length) {
-                              final name = _pipelineData[i]['stage_name']?.toString() ?? '';
-                              return Padding(padding: const EdgeInsets.only(top: 8), child: Text(name.length > 8 ? '${name.substring(0, 8)}...' : name, style: const TextStyle(fontSize: 10)));
-                            }
-                            return const SizedBox();
-                          },
-                        )),
-                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, getTitlesWidget: (v, meta) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)))),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final chartH = box.maxWidth < 400 ? 220.0 : 260.0;
+                    return SizedBox(
+                      height: chartH,
+                      child: BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY: (_pipelineData.map((e) => ((e['deal_count'] as num?) ?? 0).toDouble()).fold<double>(0, (a, b) => a > b ? a : b) * 1.2).clamp(1.0, double.infinity),
+                          barTouchData: BarTouchData(enabled: true),
+                          titlesData: FlTitlesData(
+                            show: true,
+                            bottomTitles: AxisTitles(sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (v, meta) {
+                                final i = v.toInt();
+                                if (i >= 0 && i < _pipelineData.length) {
+                                  final name = _pipelineData[i]['stage_name']?.toString() ?? '';
+                                  return Padding(padding: const EdgeInsets.only(top: 8), child: Text(name.length > 8 ? '${name.substring(0, 8)}...' : name, style: const TextStyle(fontSize: 10)));
+                                }
+                                return const SizedBox();
+                              },
+                            )),
+                            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, getTitlesWidget: (v, meta) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)))),
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          gridData: FlGridData(show: true, drawVerticalLine: false),
+                          borderData: FlBorderData(show: false),
+                          barGroups: List.generate(_pipelineData.length, (i) {
+                            final cnt = ((_pipelineData[i]['deal_count'] as num?) ?? 0).toDouble();
+                            return BarChartGroupData(
+                              x: i,
+                              barRods: [BarChartRodData(toY: cnt, width: 20, color: Theme.of(context).colorScheme.primary)],
+                              showingTooltipIndicators: [0],
+                            );
+                          }),
+                        ),
                       ),
-                      gridData: FlGridData(show: true, drawVerticalLine: false),
-                      borderData: FlBorderData(show: false),
-                      barGroups: List.generate(_pipelineData.length, (i) {
-                        final cnt = ((_pipelineData[i]['deal_count'] as num?) ?? 0).toDouble();
-                        return BarChartGroupData(
-                          x: i,
-                          barRods: [BarChartRodData(toY: cnt, width: 20, color: Theme.of(context).colorScheme.primary)],
-                          showingTooltipIndicators: [0],
-                        );
-                      }),
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 Card(
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('مرحله')),
-                      DataColumn(label: Text('تعداد')),
-                      DataColumn(label: Text('مبلغ (ریال)')),
-                    ],
-                    rows: _pipelineData.map<DataRow>((e) {
-                      final amt = (e['total_amount'] as num?) ?? 0;
-                      return DataRow(cells: [
-                        DataCell(Text(e['stage_name']?.toString() ?? '')),
-                        DataCell(Text('${e['deal_count'] ?? 0}')),
-                        DataCell(Text(NumberFormat('#,##0').format(amt))),
-                      ]);
-                    }).toList(),
+                  clipBehavior: Clip.antiAlias,
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: box.maxWidth),
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('مرحله')),
+                              DataColumn(label: Text('تعداد')),
+                              DataColumn(label: Text('مبلغ (ریال)')),
+                            ],
+                            rows: _pipelineData.map<DataRow>((e) {
+                              final amt = (e['total_amount'] as num?) ?? 0;
+                              return DataRow(cells: [
+                                DataCell(Text(e['stage_name']?.toString() ?? '')),
+                                DataCell(Text('${e['deal_count'] ?? 0}')),
+                                DataCell(Text(NumberFormat('#,##0').format(amt))),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -367,11 +480,10 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Text('بازه تاریخ (بر اساس ایجاد سرنخ):'),
-                  const SizedBox(width: 8),
-                  TextButton(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final narrow = constraints.maxWidth < 480;
+                  final fromBtn = TextButton(
                     onPressed: () async {
                       final d = await showAdaptiveDatePicker(
                         context: context,
@@ -379,38 +491,95 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2030),
                       );
-                      if (d != null) setState(() { _leadFunnelFromDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
+                      if (d != null) {
+                        setState(() {
+                          _leadFunnelFromDate =
+                              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                          _loadAll();
+                        });
+                      }
                     },
-                    child: Text(_leadFunnelFromDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelFromDate) != null
-                        ? HesabixDateUtils.formatForDisplay(
-                            HesabixDateUtils.parseFromAPI(_leadFunnelFromDate),
-                            ApiClient.getCalendarController()?.isJalali ?? true,
-                          )
-                        : 'از'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final d = await showAdaptiveDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (d != null) setState(() { _leadFunnelToDate = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; _loadAll(); });
-                    },
-                    child: Text(_leadFunnelToDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelToDate) != null
-                        ? HesabixDateUtils.formatForDisplay(
-                            HesabixDateUtils.parseFromAPI(_leadFunnelToDate),
-                            ApiClient.getCalendarController()?.isJalali ?? true,
-                          )
-                        : 'تا'),
-                  ),
-                  if (_leadFunnelFromDate != null || _leadFunnelToDate != null)
-                    TextButton(
-                      onPressed: () => setState(() { _leadFunnelFromDate = null; _leadFunnelToDate = null; _loadAll(); }),
-                      child: const Text('پاک کردن'),
+                    child: Text(
+                      _leadFunnelFromDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelFromDate) != null
+                          ? HesabixDateUtils.formatForDisplay(
+                              HesabixDateUtils.parseFromAPI(_leadFunnelFromDate),
+                              ApiClient.getCalendarController()?.isJalali ?? true,
+                            )
+                          : 'از',
                     ),
-                ],
+                  );
+                  final toBtn = TextButton(
+                    onPressed: () async {
+                      final d = await showAdaptiveDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (d != null) {
+                        setState(() {
+                          _leadFunnelToDate =
+                              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                          _loadAll();
+                        });
+                      }
+                    },
+                    child: Text(
+                      _leadFunnelToDate != null && HesabixDateUtils.parseFromAPI(_leadFunnelToDate) != null
+                          ? HesabixDateUtils.formatForDisplay(
+                              HesabixDateUtils.parseFromAPI(_leadFunnelToDate),
+                              ApiClient.getCalendarController()?.isJalali ?? true,
+                            )
+                          : 'تا',
+                    ),
+                  );
+                  final clearBtn = (_leadFunnelFromDate != null || _leadFunnelToDate != null)
+                      ? TextButton(
+                          onPressed: () => setState(() {
+                            _leadFunnelFromDate = null;
+                            _leadFunnelToDate = null;
+                            _loadAll();
+                          }),
+                          child: const Text('پاک کردن'),
+                        )
+                      : null;
+                  if (narrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'بازه تاریخ (بر اساس ایجاد سرنخ):',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            fromBtn,
+                            toBtn,
+                            if (clearBtn != null) clearBtn,
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'بازه تاریخ (بر اساس ایجاد سرنخ):',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      fromBtn,
+                      toBtn,
+                      if (clearBtn != null) clearBtn,
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -420,51 +589,67 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: 250,
-                  child: BarChart(
-                    BarChartData(
-                      alignment: BarChartAlignment.spaceAround,
-                      maxY: (_leadFunnelData.map((e) => ((e['lead_count'] as num?) ?? 0).toDouble()).fold<double>(0, (a, b) => a > b ? a : b) * 1.2).clamp(1.0, double.infinity),
-                      barTouchData: BarTouchData(enabled: true),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        bottomTitles: AxisTitles(sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (v, meta) {
-                            final i = v.toInt();
-                            if (i >= 0 && i < _leadFunnelData.length) {
-                              final name = _leadFunnelData[i]['stage_name']?.toString() ?? '';
-                              return Padding(padding: const EdgeInsets.only(top: 8), child: Text(name.length > 8 ? '${name.substring(0, 8)}...' : name, style: const TextStyle(fontSize: 10)));
-                            }
-                            return const SizedBox();
-                          },
-                        )),
-                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, getTitlesWidget: (v, meta) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)))),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final chartH = box.maxWidth < 400 ? 220.0 : 260.0;
+                    return SizedBox(
+                      height: chartH,
+                      child: BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY: (_leadFunnelData.map((e) => ((e['lead_count'] as num?) ?? 0).toDouble()).fold<double>(0, (a, b) => a > b ? a : b) * 1.2).clamp(1.0, double.infinity),
+                          barTouchData: BarTouchData(enabled: true),
+                          titlesData: FlTitlesData(
+                            show: true,
+                            bottomTitles: AxisTitles(sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (v, meta) {
+                                final i = v.toInt();
+                                if (i >= 0 && i < _leadFunnelData.length) {
+                                  final name = _leadFunnelData[i]['stage_name']?.toString() ?? '';
+                                  return Padding(padding: const EdgeInsets.only(top: 8), child: Text(name.length > 8 ? '${name.substring(0, 8)}...' : name, style: const TextStyle(fontSize: 10)));
+                                }
+                                return const SizedBox();
+                              },
+                            )),
+                            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, getTitlesWidget: (v, meta) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)))),
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          gridData: FlGridData(show: true, drawVerticalLine: false),
+                          borderData: FlBorderData(show: false),
+                          barGroups: List.generate(_leadFunnelData.length, (i) {
+                            final cnt = ((_leadFunnelData[i]['lead_count'] as num?) ?? 0).toDouble();
+                            return BarChartGroupData(
+                              x: i,
+                              barRods: [BarChartRodData(toY: cnt, width: 20, color: Theme.of(context).colorScheme.secondary)],
+                              showingTooltipIndicators: [0],
+                            );
+                          }),
+                        ),
                       ),
-                      gridData: FlGridData(show: true, drawVerticalLine: false),
-                      borderData: FlBorderData(show: false),
-                      barGroups: List.generate(_leadFunnelData.length, (i) {
-                        final cnt = ((_leadFunnelData[i]['lead_count'] as num?) ?? 0).toDouble();
-                        return BarChartGroupData(
-                          x: i,
-                          barRods: [BarChartRodData(toY: cnt, width: 20, color: Theme.of(context).colorScheme.secondary)],
-                          showingTooltipIndicators: [0],
-                        );
-                      }),
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 Card(
-                  child: DataTable(
-                    columns: const [DataColumn(label: Text('مرحله')), DataColumn(label: Text('تعداد سرنخ'))],
-                    rows: _leadFunnelData.map<DataRow>((e) => DataRow(cells: [
-                      DataCell(Text(e['stage_name']?.toString() ?? '')),
-                      DataCell(Text('${e['lead_count'] ?? 0}')),
-                    ])).toList(),
+                  clipBehavior: Clip.antiAlias,
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: box.maxWidth),
+                          child: DataTable(
+                            columns: const [DataColumn(label: Text('مرحله')), DataColumn(label: Text('تعداد سرنخ'))],
+                            rows: _leadFunnelData.map<DataRow>((e) => DataRow(cells: [
+                              DataCell(Text(e['stage_name']?.toString() ?? '')),
+                              DataCell(Text('${e['lead_count'] ?? 0}')),
+                            ])).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -485,37 +670,57 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 220,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: List.generate(_leadSourcesData.length, (i) {
-                  final cnt = (_leadSourcesData[i]['count'] as num?) ?? 0;
-                  final pct = total > 0 ? (cnt / total * 100) : 0;
-                  return PieChartSectionData(
-                    value: cnt.toDouble(),
-                    title: '${pct.toStringAsFixed(0)}%',
-                    color: _chartColor(i),
-                  );
-                }),
-              ),
-            ),
+          LayoutBuilder(
+            builder: (context, box) {
+              final h = box.maxWidth < 400 ? 200.0 : 240.0;
+              return SizedBox(
+                height: h,
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: box.maxWidth < 400 ? 32 : 40,
+                    sections: List.generate(_leadSourcesData.length, (i) {
+                      final cnt = (_leadSourcesData[i]['count'] as num?) ?? 0;
+                      final pct = total > 0 ? (cnt / total * 100) : 0;
+                      return PieChartSectionData(
+                        value: cnt.toDouble(),
+                        title: '${pct.toStringAsFixed(0)}%',
+                        color: _chartColor(i),
+                      );
+                    }),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 24),
           Card(
-            child: DataTable(
-              columns: const [DataColumn(label: Text('منبع')), DataColumn(label: Text('تعداد')), DataColumn(label: Text('درصد'))],
-              rows: _leadSourcesData.map<DataRow>((e) {
-                final cnt = (e['count'] as num?) ?? 0;
-                final pct = total > 0 ? (cnt / total * 100).toStringAsFixed(1) : '0';
-                return DataRow(cells: [
-                  DataCell(Text(e['source_code']?.toString() ?? 'نامشخص')),
-                  DataCell(Text('$cnt')),
-                  DataCell(Text('$pct%')),
-                ]);
-              }).toList(),
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('منبع')),
+                        DataColumn(label: Text('تعداد')),
+                        DataColumn(label: Text('درصد')),
+                      ],
+                      rows: _leadSourcesData.map<DataRow>((e) {
+                        final cnt = (e['count'] as num?) ?? 0;
+                        final pct = total > 0 ? (cnt / total * 100).toStringAsFixed(1) : '0';
+                        return DataRow(cells: [
+                          DataCell(Text(e['source_code']?.toString() ?? 'نامشخص')),
+                          DataCell(Text('$cnt')),
+                          DataCell(Text('$pct%')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -557,32 +762,40 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
               ),
             ),
           Card(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('کارمند')),
-              DataColumn(label: Text('سرنخ')),
-              DataColumn(label: Text('تبدیل شده')),
-              DataColumn(label: Text('نرخ تبدیل')),
-              DataColumn(label: Text('فرصت')),
-              DataColumn(label: Text('بسته شده')),
-              DataColumn(label: Text('مبلغ کل')),
-              DataColumn(label: Text('فعالیت')),
-            ],
-            rows: _employeeData.map<DataRow>((e) => DataRow(cells: [
-              DataCell(Text(e['user_name']?.toString() ?? '')),
-              DataCell(Text('${e['leads_count'] ?? 0}')),
-              DataCell(Text('${e['converted_leads'] ?? 0}')),
-              DataCell(Text('${e['conversion_rate'] ?? 0}%')),
-              DataCell(Text('${e['deals_count'] ?? 0}')),
-              DataCell(Text('${e['closed_deals'] ?? 0}')),
-              DataCell(Text(formatter.format((e['total_amount'] as num?) ?? 0))),
-              DataCell(Text('${e['activities_count'] ?? 0}')),
-            ])).toList(),
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('کارمند')),
+                        DataColumn(label: Text('سرنخ')),
+                        DataColumn(label: Text('تبدیل شده')),
+                        DataColumn(label: Text('نرخ تبدیل')),
+                        DataColumn(label: Text('فرصت')),
+                        DataColumn(label: Text('بسته شده')),
+                        DataColumn(label: Text('مبلغ کل')),
+                        DataColumn(label: Text('فعالیت')),
+                      ],
+                      rows: _employeeData.map<DataRow>((e) => DataRow(cells: [
+                        DataCell(Text(e['user_name']?.toString() ?? '')),
+                        DataCell(Text('${e['leads_count'] ?? 0}')),
+                        DataCell(Text('${e['converted_leads'] ?? 0}')),
+                        DataCell(Text('${e['conversion_rate'] ?? 0}%')),
+                        DataCell(Text('${e['deals_count'] ?? 0}')),
+                        DataCell(Text('${e['closed_deals'] ?? 0}')),
+                        DataCell(Text(formatter.format((e['total_amount'] as num?) ?? 0))),
+                        DataCell(Text('${e['activities_count'] ?? 0}')),
+                      ])).toList(),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        ),
         ],
       ),
     );
@@ -602,51 +815,71 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 250,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: (maxAmt * 1.2).clamp(1.0, double.infinity),
-                barTouchData: BarTouchData(enabled: true),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (v, meta) {
-                      final i = v.toInt();
-                      if (i >= 0 && i < _salesTrendData.length) {
-                        return Padding(padding: const EdgeInsets.only(top: 8), child: Text(_salesTrendData[i]['period']?.toString() ?? '', style: const TextStyle(fontSize: 10)));
-                      }
-                      return const SizedBox();
-                    },
-                  )),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (v, meta) => Text(NumberFormat.compact().format(v), style: const TextStyle(fontSize: 9)))),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          LayoutBuilder(
+            builder: (context, box) {
+              final chartH = box.maxWidth < 400 ? 220.0 : 260.0;
+              return SizedBox(
+                height: chartH,
+                child: BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: (maxAmt * 1.2).clamp(1.0, double.infinity),
+                    barTouchData: BarTouchData(enabled: true),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, meta) {
+                          final i = v.toInt();
+                          if (i >= 0 && i < _salesTrendData.length) {
+                            return Padding(padding: const EdgeInsets.only(top: 8), child: Text(_salesTrendData[i]['period']?.toString() ?? '', style: const TextStyle(fontSize: 10)));
+                          }
+                          return const SizedBox();
+                        },
+                      )),
+                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (v, meta) => Text(NumberFormat.compact().format(v), style: const TextStyle(fontSize: 9)))),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    gridData: FlGridData(show: true, drawVerticalLine: false),
+                    borderData: FlBorderData(show: false),
+                    barGroups: List.generate(_salesTrendData.length, (i) {
+                      final amt = ((_salesTrendData[i]['amount'] as num?) ?? 0).toDouble();
+                      return BarChartGroupData(
+                        x: i,
+                        barRods: [BarChartRodData(toY: amt, width: 16, color: Theme.of(context).colorScheme.tertiary)],
+                        showingTooltipIndicators: [0],
+                      );
+                    }),
+                  ),
                 ),
-                gridData: FlGridData(show: true, drawVerticalLine: false),
-                borderData: FlBorderData(show: false),
-                barGroups: List.generate(_salesTrendData.length, (i) {
-                  final amt = ((_salesTrendData[i]['amount'] as num?) ?? 0).toDouble();
-                  return BarChartGroupData(
-                    x: i,
-                    barRods: [BarChartRodData(toY: amt, width: 16, color: Theme.of(context).colorScheme.tertiary)],
-                    showingTooltipIndicators: [0],
-                  );
-                }),
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(height: 24),
           Card(
-            child: DataTable(
-              columns: const [DataColumn(label: Text('بازه')), DataColumn(label: Text('تعداد')), DataColumn(label: Text('مبلغ'))],
-              rows: _salesTrendData.map<DataRow>((e) => DataRow(cells: [
-                DataCell(Text(e['period']?.toString() ?? '')),
-                DataCell(Text('${e['count'] ?? 0}')),
-                DataCell(Text(NumberFormat('#,##0').format((e['amount'] as num?) ?? 0))),
-              ])).toList(),
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('بازه')),
+                        DataColumn(label: Text('تعداد')),
+                        DataColumn(label: Text('مبلغ')),
+                      ],
+                      rows: _salesTrendData.map<DataRow>((e) => DataRow(cells: [
+                            DataCell(Text(e['period']?.toString() ?? '')),
+                            DataCell(Text('${e['count'] ?? 0}')),
+                            DataCell(Text(NumberFormat('#,##0').format((e['amount'] as num?) ?? 0))),
+                          ])).toList(),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],

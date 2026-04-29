@@ -667,8 +667,8 @@ class BusinessUpdateRequest(BaseModel):
 	invoice_profit_calculation_basis: Optional[str] = Field(
 		default=None,
 		description=(
-			"مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, "
-			"weighted_average, moving_weighted_average (WMA دائمی), standard_cost, actual_cost"
+			"مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, fifo_jbfn (FIFO با پیش‌خور از خریدهای بعدی)، "
+			"lifo, weighted_average, moving_weighted_average (WMA دائمی), standard_cost, actual_cost"
 		),
 	)
 	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
@@ -817,6 +817,7 @@ class BusinessUpdateRequest(BaseModel):
 			"cost_price",
 			"average_cost",
 			"fifo",
+			"fifo_jbfn",
 			"lifo",
 			"weighted_average",
 			"moving_weighted_average",

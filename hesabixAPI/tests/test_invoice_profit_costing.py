@@ -10,6 +10,7 @@ from app.services.invoice_service import (
     _normalize_invoice_profit_method,
     _normalize_invoice_profit_overhead_type,
     _normalize_invoice_profit_type,
+    _unit_cost_fifo_jbfn_at_target_outbound_line,
     _unit_wma_cost_at_target_outbound_line,
 )
 
@@ -179,11 +180,94 @@ def test_wma_shortage_uses_average_purchase_when_configured() -> None:
     assert unit == (Decimal("1000") + Decimal("20") * Decimal("25")) / Decimal("120")
 
 
+def _mv_jbfn(
+    doc_id: int,
+    line_id: int,
+    d: str,
+    movement: str,
+    qty: str,
+    cost: str | None = None,
+    reg_at: datetime | None = None,
+):
+    return {
+        "document_id": doc_id,
+        "document_date": d,
+        "registered_at": reg_at or datetime.min,
+        "invoice_item_line_id": line_id,
+        "movement": movement,
+        "quantity": Decimal(qty),
+        "cost_price": Decimal(cost) if cost is not None else None,
+    }
+
+
+def test_fifo_jbfn_sale_before_purchase_borrows_future_in() -> None:
+    """خروج پیش از ورود: هزینه از خرید بعدی در همان زنجیره."""
+    movements = [
+        _mv_jbfn(1, 101, "2026-01-02", "out", "10"),
+        _mv_jbfn(2, 201, "2026-01-05", "in", "10", "100"),
+    ]
+    unit = _unit_cost_fifo_jbfn_at_target_outbound_line(
+        movements,
+        Decimal("10"),
+        1,
+        101,
+        fifo_shortage_mode="perpetual_mixed",
+    )
+    assert unit == Decimal("100")
+
+
+def test_fifo_jbfn_two_sales_then_one_purchase() -> None:
+    movements = [
+        _mv_jbfn(1, 1, "2026-01-01", "out", "5"),
+        _mv_jbfn(2, 2, "2026-01-02", "out", "7"),
+        _mv_jbfn(3, 3, "2026-01-03", "in", "15", "40"),
+    ]
+    u1 = _unit_cost_fifo_jbfn_at_target_outbound_line(
+        movements, Decimal("5"), 1, 1, fifo_shortage_mode="perpetual_mixed"
+    )
+    u2 = _unit_cost_fifo_jbfn_at_target_outbound_line(
+        movements, Decimal("7"), 2, 2, fifo_shortage_mode="perpetual_mixed"
+    )
+    assert u1 == Decimal("40")
+    assert u2 == Decimal("40")
+
+
+def test_fifo_jbfn_end_chain_shortage_perpetual_zero_without_layer() -> None:
+    """بدون هیچ ورودی در دنباله؛ کسری مانند FIFO دائمی بدون لایه → صفر برای باقیمانده."""
+    movements = [
+        _mv_jbfn(1, 1, "2026-01-01", "out", "10"),
+    ]
+    unit = _unit_cost_fifo_jbfn_at_target_outbound_line(
+        movements,
+        Decimal("10"),
+        1,
+        1,
+        fifo_shortage_mode="perpetual_mixed",
+    )
+    assert unit == Decimal("0")
+
+
+def test_fifo_jbfn_end_chain_shortage_uses_average_when_configured() -> None:
+    movements = [
+        _mv_jbfn(1, 1, "2026-01-01", "out", "10"),
+    ]
+    unit = _unit_cost_fifo_jbfn_at_target_outbound_line(
+        movements,
+        Decimal("10"),
+        1,
+        1,
+        fifo_shortage_mode="average_purchase_on_shortage",
+        average_unit_for_shortage=Decimal("25"),
+    )
+    assert unit == Decimal("25")
+
+
 def test_profit_setting_normalizers() -> None:
     assert _normalize_invoice_profit_method("MANUAL") == "manual"
     assert _normalize_invoice_profit_method("weird") == "automatic"
 
     assert _normalize_invoice_profit_basis("FIFO") == "fifo"
+    assert _normalize_invoice_profit_basis("fifo_jbfn") == "fifo_jbfn"
     assert _normalize_invoice_profit_basis("wma") == "moving_weighted_average"
     assert _normalize_invoice_profit_basis("unknown") == "purchase_price"
 

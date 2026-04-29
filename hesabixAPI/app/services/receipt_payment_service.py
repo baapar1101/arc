@@ -270,7 +270,9 @@ def create_receipt_payment(
     db: Session,
     business_id: int,
     user_id: int,
-    data: Dict[str, Any]
+    data: Dict[str, Any],
+    *,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """
     ایجاد سند دریافت یا پرداخت
@@ -285,6 +287,7 @@ def create_receipt_payment(
             - person_lines: لیست تراکنش‌های اشخاص [{"person_id": int, "amount": float, "description": str?}, ...]
             - account_lines: لیست تراکنش‌های حساب‌ها [{"account_id": int, "amount": float, "description": str?}, ...]
             - extra_info: اطلاعات اضافی (اختیاری)
+        commit: اگر False باشد، فقط flush می‌شود (مثلاً داخل تراکنش بزرگ‌تر مانند ویرایش فاکتور)
     
     Returns:
         Dict: اطلاعات سند ایجاد شده
@@ -1185,7 +1188,10 @@ def create_receipt_payment(
             logger.error(f"خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
             # خطا را لاگ می‌کنیم اما به فرآیند ادامه می‌دهیم
     
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(document)
     # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند
     for invoice_id in updated_invoice_ids:
@@ -1209,34 +1215,35 @@ def create_receipt_payment(
     
     result = document_to_dict(db, document)
     
-    # Invalidate cache بعد از ایجاد موفق سند دریافت/پرداخت
-    from app.services.document_service import invalidate_documents_cache
-    invalidate_documents_cache(
-        business_id=business_id,
-        fiscal_year_id=document.fiscal_year_id,
-        document_id=document.id,
-        document_type=document_type
-    )
-    
-    # فراخوانی workflow triggers
-    try:
-        from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_created
-        # محاسبه مجموع مبلغ
-        total_amount = sum(
-            float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
-            for line in result.get("lines", [])
-        )
-        trigger_receipt_payment_created(
-            db=db,
+    if commit:
+        # Invalidate cache بعد از ایجاد موفق سند دریافت/پرداخت
+        from app.services.document_service import invalidate_documents_cache
+        invalidate_documents_cache(
             business_id=business_id,
-            receipt_payment_id=document.id,
-            type="receipt" if is_receipt else "payment",
-            amount=total_amount,
-            user_id=user_id
+            fiscal_year_id=document.fiscal_year_id,
+            document_id=document.id,
+            document_type=document_type
         )
-    except Exception as e:
-        # عدم موفقیت در trigger نباید مانع بازگشت سند شود
-        logger.warning(f"Failed to trigger workflows for receipt/payment {document.id}: {e}")
+        
+        # فراخوانی workflow triggers
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_created
+            # محاسبه مجموع مبلغ
+            total_amount = sum(
+                float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
+                for line in result.get("lines", [])
+            )
+            trigger_receipt_payment_created(
+                db=db,
+                business_id=business_id,
+                receipt_payment_id=document.id,
+                type="receipt" if is_receipt else "payment",
+                amount=total_amount,
+                user_id=user_id
+            )
+        except Exception as e:
+            # عدم موفقیت در trigger نباید مانع بازگشت سند شود
+            logger.warning(f"Failed to trigger workflows for receipt/payment {document.id}: {e}")
     
     return result
 

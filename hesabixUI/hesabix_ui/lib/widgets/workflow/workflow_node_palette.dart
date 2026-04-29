@@ -445,6 +445,18 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
         return 'بر اساس زمان‌بندی (cron) فعال می‌شود';
       case 'webhook':
         return 'از طریق webhook خارجی فعال می‌شود';
+      case 'crm.chat.conversation.started':
+        return 'بعد از ثبت مکالمه جدید در ویجت چت وب';
+      case 'crm.chat.message.received':
+        return 'وقتی بازدیدکننده در چت وب پیام بفرستد';
+      case 'crm.chat.message.sent':
+        return 'وقتی عامل یا سیستم در چت وب پیام بفرستد';
+      case 'crm.chat.conversation.assigned':
+        return 'وقتی مسئول مکالمه چت وب عوض شود';
+      case 'crm.chat.conversation.resolved':
+        return 'وقتی مکالمه چت وب به حل‌شده برود';
+      case 'crm.chat.conversation.reopened':
+        return 'وقتی مکالمه حل‌شده دوباره باز شود';
       default:
         return 'رویداد سیستم';
     }

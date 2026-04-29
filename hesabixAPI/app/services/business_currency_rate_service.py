@@ -229,3 +229,18 @@ def resolve_rate_to_base(
 		"effective_at": row.effective_at,
 		"rate_row_id": row.id,
 	}
+
+
+def resolve_rate_to_base_or_one(
+	db: Session, business_id: int, currency_id: int, as_of: datetime
+) -> Decimal:
+	"""
+	مثل resolve_rate_to_base اما در صورت نبود نرخ، خطای ارز غیرمجاز، یا نبود ارز اصلی → ۱ (تسعیر یک‌به‌یک).
+	برای داشبورد و تجمیع‌های غیرحساس که نباید خطا دهند.
+	"""
+	try:
+		res = resolve_rate_to_base(db, business_id, int(currency_id), as_of)
+		r = res.get("rate")
+		return r if isinstance(r, Decimal) else Decimal(str(r))
+	except Exception:
+		return Decimal(1)

@@ -167,6 +167,7 @@ ALLOWED_INVOICE_PROFIT_BASIS = {
     "cost_price",
     "average_cost",
     "fifo",
+    "fifo_jbfn",
     "lifo",
     "weighted_average",
     "moving_weighted_average",
@@ -2103,6 +2104,7 @@ def _iter_profit_movements_from_invoice_lines(
                 "document_id": int(doc.id),
                 "document_date": doc.document_date,
                 "registered_at": doc.registered_at,
+                "document_type": str(doc.document_type or ""),
                 "product_id": int(product_id),
                 "warehouse_id": wh_id,
                 "movement": movement,
@@ -2112,6 +2114,260 @@ def _iter_profit_movements_from_invoice_lines(
             }
         )
     return movements
+
+
+def _find_profit_movement_index_for_line(
+    movements: List[Dict[str, Any]], invoice_item_line_id: int
+) -> Optional[int]:
+    for idx, mv in enumerate(movements):
+        if int(mv.get("invoice_item_line_id") or 0) == int(invoice_item_line_id):
+            return idx
+    return None
+
+
+def _historical_sale_line_unit_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    warehouse_id_wh: Optional[int],
+    *,
+    normalized_basis: str,
+    fifo_sm: str,
+    invoice_item_line_id: int,
+    sale_document_date: date,
+) -> Decimal:
+    """
+    بهای تمام‌شدهٔ واحدی که برای همان ردیف خروجی فاکتور فروش، در تاریخ فروش تشخیص داده شده (COGS تاریخی).
+    """
+    ln = db.query(InvoiceItemLine).filter(InvoiceItemLine.id == int(invoice_item_line_id)).first()
+    product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not ln or not product:
+        return Decimal(0)
+
+    nb = _normalize_invoice_profit_basis(normalized_basis)
+
+    extra_info = ln.extra_info or {}
+    qty = Decimal(str(ln.quantity or 0))
+
+    if nb == "purchase_price":
+        base_cost = product.base_purchase_price or 0
+        if base_cost == 0 and extra_info.get("cost_price") is not None:
+            base_cost = extra_info.get("cost_price")
+        return Decimal(str(base_cost))
+
+    if nb == "cost_price":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        return Decimal(str(product.base_purchase_price or 0))
+
+    if nb == "actual_cost":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        if extra_info.get("cogs_amount") is not None and qty > 0:
+            return Decimal(str(extra_info.get("cogs_amount"))) / qty
+        return Decimal(str(product.base_purchase_price or 0))
+
+    if nb == "average_cost":
+        return _calculate_average_purchase_cost(db, business_id, product.id, sale_document_date)
+
+    if nb == "fifo":
+        return _calculate_fifo_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            sale_document_date,
+            warehouse_id_wh,
+            document_id=getattr(ln, "document_id", None),
+            invoice_item_line_id=int(ln.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if nb == "fifo_jbfn":
+        return _calculate_fifo_jbfn_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            sale_document_date,
+            warehouse_id_wh,
+            document_id=getattr(ln, "document_id", None),
+            invoice_item_line_id=int(ln.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if nb == "lifo":
+        return _calculate_lifo_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            sale_document_date,
+            warehouse_id_wh,
+            document_id=getattr(ln, "document_id", None),
+            invoice_item_line_id=int(ln.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if nb == "moving_weighted_average":
+        return _calculate_moving_weighted_average_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            sale_document_date,
+            warehouse_id_wh,
+            document_id=getattr(ln, "document_id", None),
+            invoice_item_line_id=int(ln.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if nb == "weighted_average":
+        return _calculate_weighted_average_cost(db, business_id, product.id, sale_document_date)
+
+    if nb == "standard_cost":
+        if extra_info.get("standard_cost") is not None:
+            return Decimal(str(extra_info.get("standard_cost")))
+        return Decimal(str(product.base_purchase_price or 0))
+
+    return Decimal(str(product.base_purchase_price or 0))
+
+
+def _movement_warehouse_matches(a: Any, b: Any) -> bool:
+    try:
+        ai = int(a) if a is not None else None
+    except Exception:
+        ai = None
+    try:
+        bi = int(b) if b is not None else None
+    except Exception:
+        bi = None
+    return ai == bi
+
+
+def _subtract_return_qty_from_sale_out_avail(
+    movements: List[Dict[str, Any]],
+    avail: Dict[int, Decimal],
+    *,
+    qty_to_return_from_stock: Decimal,
+    start_backward_from_idx: Optional[int],
+) -> None:
+    """کاهش سهم قابل قبول ماندهٔ خروج‌های فروش به‌محض برگشت وارده پیش از بازگشت فعلی (فقط موجودی مجازی، نه سود)."""
+    need = Decimal(str(qty_to_return_from_stock or 0))
+    if need <= 0:
+        return
+    j = int(start_backward_from_idx) - 1
+    while need > 0 and j >= 0:
+        mv = movements[j]
+        dt = mv.get("document_type") or ""
+        if mv.get("movement") != "out" or dt != INVOICE_SALES:
+            j -= 1
+            continue
+        rem = Decimal(str(avail.get(j, Decimal(0)) or 0))
+        if rem <= 0:
+            j -= 1
+            continue
+        take = min(need, rem)
+        avail[j] = rem - take
+        need -= take
+        if avail[j] <= 0:
+            j -= 1
+
+
+def _restoration_unit_cost_sales_return_match_prior_sales(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    warehouse_wh: Optional[int],
+    *,
+    normalized_basis: str,
+    fifo_sm: str,
+    restoration_qty: Decimal,
+    movements: List[Dict[str, Any]],
+    return_mv_idx: int,
+    return_document_as_of_date: date,
+    prior_adjust_end_idx_exclusive: Optional[int],
+) -> Decimal:
+    """
+    واحد بازگشت جریمهٔ COGS برای برگشت از فروش: تخصیص LIFO نسبت به مقادیر باقی‌ماندهٔ
+    از خروجی‌های فروش قبلی قبل از تاریخ/ردیف برگشت (با بازپخش برگشت‌های پیشین روی موجودی مجازی)،
+    سپس میانگین وزنی تاریخی بهای هر «خروجی فروش» که از همان سناریوی COGS زمانِ فروش بازسازی می‌شود.
+    در شکافی که خروجی فروش کافی نباشد: میانگین خرید تا تاریخ بازگشت.
+    """
+    qty_need = Decimal(str(restoration_qty or 0))
+    if qty_need <= 0:
+        return Decimal(0)
+
+    avail: Dict[int, Decimal] = {}
+    for j, mv in enumerate(movements):
+        dt = mv.get("document_type") or ""
+        if mv.get("movement") != "out" or dt != INVOICE_SALES:
+            continue
+        mq = Decimal(str(mv.get("quantity") or 0))
+        if mq > 0:
+            avail[int(j)] = mq
+
+    if prior_adjust_end_idx_exclusive is None:
+        prior_adjust_end_idx_exclusive = int(return_mv_idx)
+
+    # بازپخش بازگشت‌های فروشِ پیش از این خط با همان کالا/انبار؛ روی سهم ماندهٔ خروج‌های فروش تأثیر می‌گذارد
+    for k in range(0, prior_adjust_end_idx_exclusive):
+        k_mv = movements[k]
+        k_dt = k_mv.get("document_type") or ""
+        if (
+            int(k_mv.get("product_id") or 0) != int(product_id)
+            or not _movement_warehouse_matches(k_mv.get("warehouse_id"), warehouse_wh)
+        ):
+            continue
+        if k_mv.get("movement") != "in" or k_dt != INVOICE_SALES_RETURN:
+            continue
+        qk = Decimal(str(k_mv.get("quantity") or 0))
+        if qk > 0:
+            _subtract_return_qty_from_sale_out_avail(movements, avail, qty_to_return_from_stock=qk, start_backward_from_idx=k)
+
+    sum_cost = Decimal(0)
+    qty_left = qty_need
+
+    j = int(return_mv_idx) - 1
+    while qty_left > 0 and j >= 0:
+        mv = movements[j]
+        dt = mv.get("document_type") or ""
+        if mv.get("movement") != "out" or dt != INVOICE_SALES:
+            j -= 1
+            continue
+        rem_sale = Decimal(str(avail.get(int(j), Decimal(0)) or 0))
+        if rem_sale <= 0:
+            j -= 1
+            continue
+        take = min(qty_left, rem_sale)
+        line_id_sale = int(mv["invoice_item_line_id"])
+        sale_date = mv["document_date"]
+        mw = mv.get("warehouse_id")
+        wh_line: Optional[int] = None
+        try:
+            wh_line = int(mw) if mw is not None else None
+        except Exception:
+            wh_line = None
+        u = _historical_sale_line_unit_cost(
+            db,
+            business_id,
+            product_id,
+            wh_line,
+            normalized_basis=normalized_basis,
+            fifo_sm=fifo_sm,
+            invoice_item_line_id=line_id_sale,
+            sale_document_date=sale_date,
+        )
+        sum_cost += take * u
+        qty_left -= take
+        j -= 1
+
+    if qty_left > 0:
+        avg_fallback = _calculate_average_purchase_cost(db, business_id, product_id, return_document_as_of_date)
+        sum_cost += qty_left * avg_fallback
+        qty_left = Decimal(0)
+
+    return sum_cost / qty_need if qty_need > 0 else Decimal(0)
 
 
 def _calculate_fifo_cost(
@@ -2156,6 +2412,173 @@ def _calculate_fifo_cost(
         if unit is not None:
             return unit
     # ردیف در زنجیره انبار نیست یا شناسه ناقص است → تحلیلی امن
+    return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
+
+
+def _jbfn_resolve_shortage_tail(
+    need: Decimal,
+    *,
+    fifo_shortage_mode: str,
+    average_unit_for_shortage: Optional[Decimal],
+    last_cost_used: Decimal,
+    used_any_layer_or_borrow: bool,
+) -> Decimal:
+    """هزینهٔ باقی‌مانده در کسِ جی‌بی‌اف‌ان پس از پایان لایه‌ها و ورودهای آیندهٔ قابل‌دسترس."""
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    need = Decimal(str(need or 0))
+    if need <= 0:
+        return Decimal(0)
+    use_avg = sm == "average_purchase_on_shortage" and average_unit_for_shortage is not None
+    if use_avg:
+        av = Decimal(str(average_unit_for_shortage))
+        return need * av
+    if used_any_layer_or_borrow:
+        return need * Decimal(str(last_cost_used))
+    # همان منطق _consume_cost_layers برای «بدون لایه»: باقی‌مانده صفر می‌ماند
+    return Decimal(0)
+
+
+def _unit_cost_fifo_jbfn_at_target_outbound_line(
+    movements: List[Dict[str, Any]],
+    quantity: Decimal,
+    document_id: int,
+    invoice_item_line_id: int,
+    *,
+    fifo_shortage_mode: str = "perpetual_mixed",
+    average_unit_for_shortage: Optional[Decimal] = None,
+) -> Optional[Decimal]:
+    """
+    FIFO با تأمین کسری از ورودهای زمان‌بلاتر تا تاریخ سند (JBFN):
+    هر خروج ابتدا از لایه‌های انباشتهٔ گذشته، سپس از ورودهای بعدی به‌ترتیب زمان
+    (با پیش‌تخصیص به همان اندازه) مصرف می‌کند؛ اگر هنوز کسری مانَد، مانند کمبود FIFO
+    عمل می‌شود.
+
+    پیش‌تخصیص روی هر ردیف ورود تضمین می‌کند چند خروج پشت سر هم بتوانند از یک خرید
+    یا چند خریدِ بعدتر سهم ببرند؛ هنگام رسید به آن ورود، فقط ماندهٔ فیزیکی به لایه اضافه می‌شود.
+    """
+    qty_param = Decimal(str(quantity or 0))
+    if qty_param <= 0:
+        return Decimal(0)
+
+    sorted_movements = sorted(movements, key=_movement_sort_key)
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    avg_for_short: Optional[Decimal] = None
+    if sm == "average_purchase_on_shortage" and average_unit_for_shortage is not None:
+        avg_for_short = Decimal(str(average_unit_for_shortage))
+
+    layers: deque = deque()
+    prealloc: Dict[int, Decimal] = defaultdict(lambda: Decimal(0))
+
+    for idx, mv in enumerate(sorted_movements):
+        mv_type = mv.get("movement")
+        mq = Decimal(str(mv.get("quantity") or 0))
+        if mq <= 0:
+            continue
+
+        if mv_type == "in":
+            cp = Decimal(str(mv.get("cost_price") or 0))
+            rem_in = mq - prealloc[idx]
+            if rem_in > 0:
+                layers.append({"qty": rem_in, "cost": cp})
+            continue
+
+        if mv_type != "out":
+            continue
+
+        need = mq
+        total_cost = Decimal(0)
+        last_c = Decimal(0)
+        used_any = False
+
+        while need > 0 and layers:
+            top = layers[0]
+            lq = Decimal(str(top.get("qty") or 0))
+            lc = Decimal(str(top.get("cost") or 0))
+            if lq <= 0:
+                layers.popleft()
+                continue
+            take = min(need, lq)
+            total_cost += take * lc
+            last_c = lc
+            used_any = True
+            top["qty"] = lq - take
+            need -= take
+            if top["qty"] <= 0:
+                layers.popleft()
+
+        j = idx + 1
+        while need > 0 and j < len(sorted_movements):
+            fut = sorted_movements[j]
+            if fut.get("movement") == "in":
+                fut_qty = Decimal(str(fut.get("quantity") or 0))
+                avail = fut_qty - prealloc[j]
+                if avail > 0:
+                    take = min(need, avail)
+                    c = Decimal(str(fut.get("cost_price") or 0))
+                    total_cost += take * c
+                    last_c = c
+                    used_any = True
+                    prealloc[j] += take
+                    need -= take
+            j += 1
+
+        if need > 0:
+            total_cost += _jbfn_resolve_shortage_tail(
+                need,
+                fifo_shortage_mode=sm,
+                average_unit_for_shortage=avg_for_short,
+                last_cost_used=last_c,
+                used_any_layer_or_borrow=used_any,
+            )
+
+        if int(mv["document_id"]) == int(document_id) and int(mv.get("invoice_item_line_id") or 0) == int(
+            invoice_item_line_id
+        ):
+            return total_cost / mq if mq > 0 else Decimal(0)
+
+    return None
+
+
+def _calculate_fifo_jbfn_cost(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    quantity: Decimal,
+    as_of_date: date,
+    warehouse_id: Optional[int] = None,
+    *,
+    document_id: Optional[int] = None,
+    invoice_item_line_id: Optional[int] = None,
+    fifo_shortage_mode: str = "perpetual_mixed",
+) -> Decimal:
+    """
+    مانند FIFO دائمی، با این تفاوت که برای کسری، ورودهای ثبت‌شده بعد از همان تاریخ/زنجیره
+    (تا تاریخ سند) به ترتیب زمان مانند پیش‌خور به لایه اضافه می‌شوند، سپس در نهایت
+    مانده با همان fifo_shortage_mode جبران می‌گردد.
+    """
+    sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    movements = _iter_profit_movements_from_invoice_lines(
+        db=db,
+        business_id=business_id,
+        product_id=product_id,
+        as_of_date=as_of_date,
+        warehouse_id=warehouse_id,
+    )
+    qty = Decimal(str(quantity or 0))
+    if document_id is not None and invoice_item_line_id is not None:
+        avg_for_short: Optional[Decimal] = None
+        if sm == "average_purchase_on_shortage":
+            avg_for_short = _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
+        unit = _unit_cost_fifo_jbfn_at_target_outbound_line(
+            movements,
+            qty,
+            int(document_id),
+            int(invoice_item_line_id),
+            fifo_shortage_mode=sm,
+            average_unit_for_shortage=avg_for_short,
+        )
+        if unit is not None:
+            return unit
     return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
 
 
@@ -2308,6 +2731,21 @@ def _get_cost_per_unit_by_basis(
             fifo_shortage_mode=sm,
         )
 
+    elif normalized_basis == "fifo_jbfn":
+        _doc_id = getattr(line, "document_id", None)
+        _line_id = getattr(line, "id", None)
+        return _calculate_fifo_jbfn_cost(
+            db,
+            business_id,
+            product.id,
+            Decimal(str(line.quantity)),
+            document_date,
+            warehouse_id,
+            document_id=int(_doc_id) if _doc_id is not None else None,
+            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+            fifo_shortage_mode=sm,
+        )
+
     elif normalized_basis == "lifo":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
@@ -2382,6 +2820,105 @@ def _calculate_overhead_cost(
         return Decimal(0)
     
     return Decimal(0)
+
+
+def _invoice_profit_line_sale_cost_per_unit(
+    db: Session,
+    business_id: int,
+    product: Product,
+    item_line: Any,
+    qty: Decimal,
+    normalized_basis: str,
+    document_date: date,
+    warehouse_id: Any,
+    document_id_hdr: int,
+    fifo_sm: str,
+) -> Decimal:
+    """بهای هر واحد در ردیف فاکتور فروش یا خدمت (مسیر عمومی)، بدون منطق خاص بازگشت کالای ورودی."""
+    extra_info = item_line.extra_info or {}
+
+    if normalized_basis == "purchase_price":
+        base_cost = product.base_purchase_price or 0
+        if base_cost == 0 and extra_info.get("cost_price") is not None:
+            base_cost = extra_info.get("cost_price")
+        return Decimal(str(base_cost))
+
+    if normalized_basis == "cost_price":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        return Decimal(str(product.base_purchase_price or 0))
+
+    if normalized_basis == "actual_cost":
+        if extra_info.get("cost_price") is not None:
+            return Decimal(str(extra_info.get("cost_price")))
+        if extra_info.get("cogs_amount") is not None and qty > 0:
+            return Decimal(str(extra_info.get("cogs_amount"))) / qty
+        return Decimal(str(product.base_purchase_price or 0))
+
+    if normalized_basis == "average_cost":
+        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+
+    if normalized_basis == "fifo":
+        return _calculate_fifo_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            document_date,
+            warehouse_id,
+            document_id=document_id_hdr,
+            invoice_item_line_id=int(item_line.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if normalized_basis == "fifo_jbfn":
+        return _calculate_fifo_jbfn_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            document_date,
+            warehouse_id,
+            document_id=document_id_hdr,
+            invoice_item_line_id=int(item_line.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if normalized_basis == "lifo":
+        return _calculate_lifo_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            document_date,
+            warehouse_id,
+            document_id=document_id_hdr,
+            invoice_item_line_id=int(item_line.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if normalized_basis == "moving_weighted_average":
+        return _calculate_moving_weighted_average_cost(
+            db,
+            business_id,
+            product.id,
+            qty,
+            document_date,
+            warehouse_id,
+            document_id=document_id_hdr,
+            invoice_item_line_id=int(item_line.id),
+            fifo_shortage_mode=fifo_sm,
+        )
+
+    if normalized_basis == "weighted_average":
+        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+
+    if normalized_basis == "standard_cost":
+        if extra_info.get("standard_cost") is not None:
+            return Decimal(str(extra_info.get("standard_cost")))
+        return Decimal(str(product.base_purchase_price or 0))
+
+    return Decimal(str(product.base_purchase_price or 0))
 
 
 def _calculate_invoice_profit(
@@ -2511,120 +3048,138 @@ def _calculate_invoice_profit(
     
     # برای فاکتورهای فروش
     elif document.document_type in ["invoice_sales", "invoice_sales_return"]:
-        # دریافت ردیف‌های فاکتور از InvoiceItemLine (برای فاکتورهای فروش)
-        item_lines = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).all()
-        
+        is_sales_return = document.document_type == INVOICE_SALES_RETURN
+        item_lines = (
+            db.query(InvoiceItemLine)
+            .filter(InvoiceItemLine.document_id == document_id)
+            .order_by(InvoiceItemLine.id.asc())
+            .all()
+        )
+
+        mv_cache: Dict[str, List[Dict[str, Any]]] = {}
+
+        def _mv_list_pid_wh(pid_v: int, wh_key: Optional[int]) -> List[Dict[str, Any]]:
+            cache_k = f"{int(pid_v)}:{'' if wh_key is None else int(wh_key)}"
+            if cache_k not in mv_cache:
+                mv_cache[cache_k] = _iter_profit_movements_from_invoice_lines(
+                    db,
+                    business_id,
+                    int(pid_v),
+                    document.document_date,
+                    warehouse_id=wh_key,
+                )
+            return mv_cache[cache_k]
+
         for item_line in item_lines:
             if not item_line.product_id:
                 continue
-            
+
             product = db.query(Product).filter(Product.id == item_line.product_id).first()
             if not product:
                 continue
-            
-            # خواندن اطلاعات از extra_info
+
             extra_info = item_line.extra_info or {}
             qty = Decimal(str(item_line.quantity or 0))
             unit_price = Decimal(str(extra_info.get("unit_price", 0) or 0))
             line_discount = Decimal(str(extra_info.get("line_discount", 0) or 0))
             warehouse_id = extra_info.get("warehouse_id")
-            
-            # محاسبه مبلغ فروش (بعد از تخفیف، بدون مالیات)
-            # توجه: برای محاسبه سود، از مبلغ بدون مالیات استفاده می‌کنیم
-            # چون مالیات جزء درآمد نیست و باید جداگانه محاسبه شود
-            sales_amount = (qty * unit_price) - line_discount
-            
-            # محاسبه هزینه هر واحد - استفاده مستقیم از extra_info
-            cost_per_unit = Decimal(0)
-            if normalized_basis == "purchase_price":
-                # اگر قیمت خرید صفر یا None باشد، باید از cost_price در extra_info استفاده کنیم
-                base_cost = product.base_purchase_price or 0
-                if base_cost == 0 and extra_info.get("cost_price") is not None:
-                    base_cost = extra_info.get("cost_price")
-                cost_per_unit = Decimal(str(base_cost))
-            elif normalized_basis == "cost_price":
-                if extra_info.get("cost_price") is not None:
-                    cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+            inv_tracked_ok = extra_info.get("inventory_tracked", True)
+
+            try:
+                wh_iter = int(warehouse_id) if warehouse_id is not None else None
+            except Exception:
+                wh_iter = None
+
+            raw_net_sales = (qty * unit_price) - line_discount
+            if is_sales_return:
+                if raw_net_sales > 0:
+                    sales_amount = -raw_net_sales
                 else:
-                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
-            elif normalized_basis == "actual_cost":
-                if extra_info.get("cost_price") is not None:
-                    cost_per_unit = Decimal(str(extra_info.get("cost_price")))
-                elif extra_info.get("cogs_amount") is not None and qty > 0:
-                    cost_per_unit = Decimal(str(extra_info.get("cogs_amount"))) / qty
-                else:
-                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
-            elif normalized_basis == "average_cost":
-                cost_per_unit = _calculate_average_purchase_cost(db, business_id, product.id, document.document_date)
-            elif normalized_basis == "fifo":
-                cost_per_unit = _calculate_fifo_cost(
-                    db,
-                    business_id,
-                    product.id,
-                    qty,
-                    document.document_date,
-                    warehouse_id,
-                    document_id=int(document.id),
-                    invoice_item_line_id=int(item_line.id),
-                    fifo_shortage_mode=fifo_sm,
-                )
-            elif normalized_basis == "lifo":
-                cost_per_unit = _calculate_lifo_cost(
-                    db,
-                    business_id,
-                    product.id,
-                    qty,
-                    document.document_date,
-                    warehouse_id,
-                    document_id=int(document.id),
-                    invoice_item_line_id=int(item_line.id),
-                    fifo_shortage_mode=fifo_sm,
-                )
-            elif normalized_basis == "moving_weighted_average":
-                cost_per_unit = _calculate_moving_weighted_average_cost(
-                    db,
-                    business_id,
-                    product.id,
-                    qty,
-                    document.document_date,
-                    warehouse_id,
-                    document_id=int(document.id),
-                    invoice_item_line_id=int(item_line.id),
-                    fifo_shortage_mode=fifo_sm,
-                )
-            elif normalized_basis == "weighted_average":
-                cost_per_unit = _calculate_weighted_average_cost(db, business_id, product.id, document.document_date)
-            elif normalized_basis == "standard_cost":
-                if extra_info.get("standard_cost") is not None:
-                    cost_per_unit = Decimal(str(extra_info.get("standard_cost")))
-                else:
-                    cost_per_unit = Decimal(str(product.base_purchase_price or 0))
+                    sales_amount = raw_net_sales
             else:
-                cost_per_unit = Decimal(str(product.base_purchase_price or 0))
-            
-            total_line_cost = qty * cost_per_unit
-            
-            # محاسبه سود ناخالص ردیف
-            line_gross_profit = sales_amount - total_line_cost
-            line_gross_profit_percent = (line_gross_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
-            
-            # محاسبه هزینه سربار برای این ردیف
+                sales_amount = raw_net_sales
+
+            mv_hint, _inv_pair = _movement_from_type(document.document_type)
+            ex_mv = extra_info.get("movement")
+            ex_mv_norm: Optional[str] = None
+            if isinstance(ex_mv, str):
+                el = ex_mv.strip().lower()
+                if el in ("in", "out"):
+                    ex_mv_norm = el
+            effective_move = ex_mv_norm if ex_mv_norm in ("in", "out") else mv_hint
+
+            cost_per_unit = Decimal(0)
+            inbound_return_goods = bool(is_sales_return) and (effective_move == "in") and inv_tracked_ok is not False
+
+            if inbound_return_goods:
+                cp_raw = extra_info.get("cost_price")
+                if cp_raw is not None:
+                    cost_per_unit = Decimal(str(cp_raw))
+                else:
+                    mvl = _mv_list_pid_wh(product.id, wh_iter)
+                    idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
+                    if idx_ln is not None:
+                        cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
+                            db,
+                            business_id,
+                            int(product.id),
+                            wh_iter,
+                            normalized_basis=normalized_basis,
+                            fifo_sm=fifo_sm,
+                            restoration_qty=qty,
+                            movements=mvl,
+                            return_mv_idx=int(idx_ln),
+                            return_document_as_of_date=document.document_date,
+                            prior_adjust_end_idx_exclusive=int(idx_ln),
+                        )
+                    else:
+                        cost_per_unit = _calculate_average_purchase_cost(
+                            db, business_id, product.id, document.document_date
+                        )
+                total_line_cost = qty * cost_per_unit
+                line_gross_profit = sales_amount + total_line_cost
+            else:
+                cost_per_unit = _invoice_profit_line_sale_cost_per_unit(
+                    db,
+                    business_id,
+                    product,
+                    item_line,
+                    qty,
+                    normalized_basis,
+                    document.document_date,
+                    warehouse_id,
+                    int(document.id),
+                    fifo_sm,
+                )
+                total_line_cost = qty * cost_per_unit
+                line_gross_profit = sales_amount - total_line_cost
+
+            denom_row = (
+                abs(sales_amount)
+                if sales_amount != Decimal(0)
+                else (abs(total_line_cost) if total_line_cost != Decimal(0) else Decimal(0))
+            )
+            line_gross_profit_percent = (
+                (line_gross_profit / denom_row * Decimal(100)) if denom_row != Decimal(0) else Decimal(0)
+            )
+
             line_overhead = Decimal(0)
             if include_overhead:
                 line_overhead = _calculate_overhead_cost(
                     db, business_id, document_id, total_line_cost,
                     normalized_overhead_type, overhead_percent
                 ) / len(item_lines) if len(item_lines) > 0 else Decimal(0)
-            
-            # محاسبه سود خالص ردیف
+
             line_net_profit = line_gross_profit - line_overhead
-            line_net_profit_percent = (line_net_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
-            
+            line_net_profit_percent = (
+                (line_net_profit / denom_row * Decimal(100)) if denom_row != Decimal(0) else Decimal(0)
+            )
+
             total_gross_profit += line_gross_profit
             total_net_profit += line_net_profit
             total_sales += sales_amount
             total_cost += total_line_cost
-            
+
             line_profits.append({
                 "line_id": item_line.id,
                 "product_id": product.id,
@@ -2639,10 +3194,9 @@ def _calculate_invoice_profit(
                 "net_profit": float(line_net_profit),
                 "gross_profit_percent": float(line_gross_profit_percent),
                 "net_profit_percent": float(line_net_profit_percent),
-                "overhead": float(line_overhead)
+                "overhead": float(line_overhead),
             })
-        
-        # محاسبه هزینه سربار کل
+
         total_overhead = Decimal(0)
         if include_overhead:
             total_overhead = _calculate_overhead_cost(
@@ -2650,10 +3204,15 @@ def _calculate_invoice_profit(
                 normalized_overhead_type, overhead_percent
             )
             total_net_profit = total_gross_profit - total_overhead
-    
+
     # محاسبه درصد سود
-    gross_profit_percent = (total_gross_profit / total_sales * 100) if total_sales > 0 else Decimal(0)
-    net_profit_percent = (total_net_profit / total_sales * 100) if total_sales > 0 else Decimal(0)
+    denom_total = abs(total_sales) if total_sales != Decimal(0) else Decimal(0)
+    gross_profit_percent = (
+        (total_gross_profit / denom_total * Decimal(100)) if denom_total != Decimal(0) else Decimal(0)
+    )
+    net_profit_percent = (
+        (total_net_profit / denom_total * Decimal(100)) if denom_total != Decimal(0) else Decimal(0)
+    )
     
     # ساخت response
     result = {
@@ -4590,146 +5149,162 @@ def update_invoice(
     payments_provided = "payments" in data and isinstance(data.get("payments"), list)
     payments = list(data["payments"]) if payments_provided else []
     if payments_provided and not document.is_proforma:
-        try:
-            # دریافت person_id از extra_info
-            header_extra = data.get("extra_info") or document.extra_info or {}
-            person_id = _person_id_from_header({"extra_info": header_extra})
+        from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
 
-            # اگر لیست تراکنش‌ها خالی است یا قرار است با تراکنش‌های جدید جایگزین شود، ابتدا اسناد قبلی حذف شوند.
-            # اگر payments ارسال نشود (کلید نباشد)، تراکنش‌های قبلی دست‌نخورده می‌مانند (سازگاری API قدیمی).
-            if (not payments) or person_id:
-                from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
+        # person_id از extra_info مرج‌شده روی خود سند (نه فقط payload خام) تا با API ناقص هم‌خوان باشد
+        header_extra_pm = document.extra_info or {}
+        person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
 
-                old_links = (document.extra_info or {}).get("links", {})
-                old_receipt_payment_ids = old_links.get("receipt_payment_document_ids") or []
-                for old_rp_id in old_receipt_payment_ids:
-                    try:
-                        delete_receipt_payment(db, old_rp_id)
-                        logger.info(f"Deleted old receipt/payment document {old_rp_id} for invoice {document.id}")
-                    except Exception as ex:
-                        logger.warning(f"Could not delete old receipt/payment document {old_rp_id}: {ex}")
+        old_links = dict(header_extra_pm.get("links") or {})
+        old_receipt_payment_ids = list(old_links.get("receipt_payment_document_ids") or [])
 
-            if not payments:
+        has_positive_payment = any(
+            Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
+        )
+        if payments and has_positive_payment:
+            person_id_pm = _resolve_and_validate_person_id(db, document.business_id, person_id_pm)
+            if not person_id_pm:
+                raise ApiError(
+                    "PERSON_REQUIRED",
+                    "برای ثبت تراکنش‌های پرداخت، انتخاب طرف حساب الزامی است.",
+                    http_status=400,
+                )
+
+        # هرگاه payments در payload باشد، اسناد دریافت/پرداخت قبلی حذف می‌شوند؛ خطای حذف باید به کاربر برگردد
+        for old_rp_id in old_receipt_payment_ids:
+            delete_receipt_payment(db, int(old_rp_id), commit=False)
+
+        if not payments:
+            extra = dict(document.extra_info) if document.extra_info else {}
+            links = dict(extra.get("links", {}))
+            links.pop("receipt_payment_document_ids", None)
+            extra["links"] = links
+            document.extra_info = _normalize_document_extra_info_for_storage(extra)
+            flag_modified(document, "extra_info")
+        else:
+            # ایجاد سند جدید (person_id_pm در شاخه non-empty payments تضمین شده است)
+            account_lines: List[Dict[str, Any]] = []
+            total_amount = Decimal(0)
+            invoice_currency_id = int(document.currency_id)
+
+            for p in payments:
+                amount = Decimal(str(p.get("amount", 0) or 0))
+                if amount <= 0:
+                    continue
+                total_amount += amount
+                ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
+
+                # Currency match checks
+                if ttype in ("bank", "cash_register", "petty_cash", "check"):
+                    if ttype == "bank":
+                        ref_id = p.get("bank_id")
+                        if ref_id:
+                            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
+                    elif ttype == "cash_register":
+                        ref_id = p.get("cash_register_id")
+                        if ref_id:
+                            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
+                    elif ttype == "petty_cash":
+                        ref_id = p.get("petty_cash_id")
+                        if ref_id:
+                            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
+                    elif ttype == "check":
+                        ref_id = p.get("check_id")
+                        if ref_id:
+                            chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+                            if not chk:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+                            if int(chk.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
+
+                            # بررسی تطابق نوع چک با نوع فاکتور (در update)
+                            # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
+                            # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
+                            is_receipt_invoice = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                            expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+
+                            if chk.type != expected_check_type:
+                                check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                                expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                                invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                                raise ApiError(
+                                    "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                                    f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                                    http_status=400
+                                )
+
+                transaction_type_value = p.get("transaction_type") or p.get("type")
+                account_line: Dict[str, Any] = {
+                    "transaction_type": transaction_type_value,
+                    "amount": float(amount),
+                    "description": p.get("description"),
+                    "transaction_date": p.get("transaction_date"),
+                    "commission": p.get("commission"),
+                }
+                for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
+                    if p.get(key) is not None:
+                        account_line[key] = p.get(key)
+                account_lines.append(account_line)
+
+            if total_amount > 0 and account_lines:
+                is_receipt = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                person_is_receivable = inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                rp_data = {
+                    "document_type": "receipt" if is_receipt else "payment",
+                    "document_date": document.document_date.isoformat(),
+                    "currency_id": document.currency_id,
+                    "description": f"تسویه مرتبط با فاکتور {document.code}",
+                    "person_lines": [{
+                        "person_id": person_id_pm,
+                        "amount": float(total_amount),
+                        "description": f"طرف حساب فاکتور {document.code}",
+                    }],
+                    "account_lines": account_lines,
+                    "extra_info": {
+                        "source": "invoice",
+                        "invoice_id": document.id,
+                        "person_is_receivable": person_is_receivable,
+                    },
+                }
+                rp_doc = create_receipt_payment(
+                    db=db,
+                    business_id=document.business_id,
+                    user_id=user_id,
+                    data=rp_data,
+                    commit=False,
+                )
+                if isinstance(rp_doc, dict) and rp_doc.get("id"):
+                    rp_id = int(rp_doc["id"])
+                    payment_docs.append(rp_id)
+                    logger.info(f"Created receipt/payment document {rp_id} for invoice {document.id}")
+
+            # به‌روزرسانی لینک‌ها در extra_info
+            if payment_docs:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links["receipt_payment_document_ids"] = payment_docs
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            else:
                 extra = dict(document.extra_info) if document.extra_info else {}
                 links = dict(extra.get("links", {}))
                 links.pop("receipt_payment_document_ids", None)
                 extra["links"] = links
                 document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")
-            elif person_id:
-                # ایجاد سندهای جدید (مشابه create_invoice)
-                account_lines: List[Dict[str, Any]] = []
-                total_amount = Decimal(0)
-                invoice_currency_id = int(document.currency_id)
-                
-                for p in payments:
-                    amount = Decimal(str(p.get("amount", 0) or 0))
-                    if amount <= 0:
-                        continue
-                    total_amount += amount
-                    ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
-                    
-                    # Currency match checks
-                    if ttype in ("bank", "cash_register", "petty_cash", "check"):
-                        if ttype == "bank":
-                            ref_id = p.get("bank_id")
-                            if ref_id:
-                                acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
-                        elif ttype == "cash_register":
-                            ref_id = p.get("cash_register_id")
-                            if ref_id:
-                                acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
-                        elif ttype == "petty_cash":
-                            ref_id = p.get("petty_cash_id")
-                            if ref_id:
-                                acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
-                        elif ttype == "check":
-                            ref_id = p.get("check_id")
-                            if ref_id:
-                                chk = db.query(Check).filter(Check.id == int(ref_id)).first()
-                                if not chk:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
-                                if int(chk.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
-                                
-                                # بررسی تطابق نوع چک با نوع فاکتور (در update)
-                                # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
-                                # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
-                                is_receipt_invoice = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                                expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
-                                
-                                if chk.type != expected_check_type:
-                                    check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
-                                    expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
-                                    invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
-                                    raise ApiError(
-                                        "CHECK_TYPE_MISMATCH_WITH_INVOICE",
-                                        f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
-                                        http_status=400
-                                    )
-                    
-                    transaction_type_value = p.get("transaction_type") or p.get("type")
-                    account_line: Dict[str, Any] = {
-                        "transaction_type": transaction_type_value,
-                        "amount": float(amount),
-                        "description": p.get("description"),
-                        "transaction_date": p.get("transaction_date"),
-                        "commission": p.get("commission"),
-                    }
-                    for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
-                        if p.get(key) is not None:
-                            account_line[key] = p.get(key)
-                    account_lines.append(account_line)
-                
-                if total_amount > 0 and account_lines:
-                    is_receipt = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                    person_is_receivable = inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
-                    rp_data = {
-                        "document_type": "receipt" if is_receipt else "payment",
-                        "document_date": document.document_date.isoformat(),
-                        "currency_id": document.currency_id,
-                        "description": f"تسویه مرتبط با فاکتور {document.code}",
-                        "person_lines": [{
-                            "person_id": person_id,
-                            "amount": float(total_amount),
-                            "description": f"طرف حساب فاکتور {document.code}",
-                        }],
-                        "account_lines": account_lines,
-                        "extra_info": {
-                            "source": "invoice",
-                            "invoice_id": document.id,
-                            "person_is_receivable": person_is_receivable,
-                        },
-                    }
-                    rp_doc = create_receipt_payment(db=db, business_id=document.business_id, user_id=user_id, data=rp_data)
-                    if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                        rp_id = int(rp_doc["id"])
-                        payment_docs.append(rp_id)
-                        logger.info(f"Created receipt/payment document {rp_id} for invoice {document.id}")
-                
-                # به‌روزرسانی لینک‌ها در extra_info
-                if payment_docs:
-                    extra = dict(document.extra_info) if document.extra_info else {}
-                    links = dict(extra.get("links", {}))
-                    links["receipt_payment_document_ids"] = payment_docs
-                    extra["links"] = links
-                    document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                    flag_modified(document, "extra_info")
-        except Exception as ex:
-            logger.exception("could not update receipt/payment for invoice: %s", ex)
-            # حتی در صورت خطا، ادامه بده
 
     try:
         _remove_old_invoice_warehouse_documents(
@@ -6758,7 +7333,9 @@ def get_top_customers_report(
         }
     """
     from collections import defaultdict
-    
+
+    from app.services.person_service import amount_in_document_currency_to_base
+
     # تبدیل تاریخ‌ها
     date_from_obj = None
     date_to_obj = None
@@ -6826,7 +7403,10 @@ def get_top_customers_report(
         sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
-    
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+
     # Debug: لاگ تعداد فاکتورهای پیدا شده و بازه زمانی
     logger.debug(f"Top customers report: Found {len(sales_documents)} sales invoices for business {business_id}, date_range: {date_from_obj} to {date_to_obj}")
     
@@ -6884,13 +7464,20 @@ def get_top_customers_report(
         
         person_ids_set.add(person_id_int)
         
-        # محاسبه مبلغ فروش از extra_info.totals.net
+        # محاسبه مبلغ فروش از extra_info.totals.net (به ارز پایه برای مقایسهٔ بین ارزها)
         totals = extra_info.get('totals') or {}
         net_amount = Decimal(str(totals.get('net', 0) or 0))
-        
+        net_base = amount_in_document_currency_to_base(
+            db,
+            doc,
+            net_amount,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+
         customer_stats[person_id_int]['person_id'] = person_id_int
         customer_stats[person_id_int]['invoice_count'] += 1
-        customer_stats[person_id_int]['total_sales'] += net_amount
+        customer_stats[person_id_int]['total_sales'] += net_base
         
         # به‌روزرسانی آخرین تاریخ فروش
         doc_date = doc.document_date
@@ -7088,7 +7675,10 @@ def get_top_suppliers_report(
         purchases_query = purchases_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     purchases_documents = purchases_query.order_by(Document.document_date.asc()).all()
-    
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+
     # Debug: لاگ تعداد فاکتورهای پیدا شده
     logger.debug(f"Top suppliers report: Found {len(purchases_documents)} purchase invoices for business {business_id}")
     
@@ -7146,13 +7736,20 @@ def get_top_suppliers_report(
         
         person_ids_set.add(person_id_int)
         
-        # محاسبه مبلغ خرید از extra_info.totals.net
+        # محاسبه مبلغ خرید از extra_info.totals.net (به ارز پایه)
         totals = extra_info.get('totals') or {}
         net_amount = Decimal(str(totals.get('net', 0) or 0))
-        
+        net_base = amount_in_document_currency_to_base(
+            db,
+            doc,
+            net_amount,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+
         supplier_stats[person_id_int]['person_id'] = person_id_int
         supplier_stats[person_id_int]['invoice_count'] += 1
-        supplier_stats[person_id_int]['total_purchases'] += net_amount
+        supplier_stats[person_id_int]['total_purchases'] += net_base
         
         # به‌روزرسانی آخرین تاریخ خرید
         doc_date = doc.document_date

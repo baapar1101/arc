@@ -39,6 +39,7 @@ def create_link(
 	)
 	bot_username = settings.get("telegram_bot_username") or ""
 	deep_link = f"https://t.me/{bot_username}?start={link.token}" if bot_username else None
+	deep_link_crm = f"https://t.me/{bot_username}?start=crm" if bot_username else None
 	# اطمینان از اینکه expires_at با Z (UTC) برگردانده می‌شود
 	# پشتیبانی از date و datetime (برخی دیتابیس‌ها date برمی‌گردانند)
 	exp = link.expires_at
@@ -52,6 +53,7 @@ def create_link(
 	return success_response(
 		{
 			"deep_link": deep_link,
+			"deep_link_crm": deep_link_crm,
 			"link_token": link.token,
 			"expires_at": expires_at_iso,
 		},
@@ -120,34 +122,61 @@ def telegram_webhook(
 	chat = message.get("chat") or {}
 	chat_id = chat.get("id")
 
-	if text.startswith("/start "):
-		token = text.split(" ", 1)[1].strip()
-		t_repo = TelegramRepository(db)
-		t_obj = t_repo.get_by_token(token)
-		if not t_obj or t_obj.used_at is not None or t_obj.expires_at < datetime.utcnow():
+	if text.startswith("/start"):
+		_start_parts = text.split(maxsplit=1)
+		if len(_start_parts) == 2 and _start_parts[1].strip().lower() == "crm":
+			from sqlalchemy import select
+			from adapters.db.models.user import User
+			from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
+
 			if chat_id:
-				provider.send_text(chat_id=int(chat_id), text="⛔️ لینک اتصال نامعتبر یا منقضی است. لطفاً از داخل برنامه، لینک جدید بسازید.")
-			return {"ok": False}
-		# Link user to chat
-		u_repo = UserRepository(db)
-		user = u_repo.db.get(u_repo.model_class, t_obj.user_id)
-		if user is None:
-			return {"ok": False}
-		user.telegram_chat_id = int(chat_id) if chat_id else None  # type: ignore[attr-defined]
-		user.telegram_connected_at = datetime.utcnow()  # type: ignore[attr-defined]
-		u_repo.db.add(user)
-		u_repo.db.commit()
-		t_repo.mark_used(t_obj)
-		if chat_id:
-			provider.send_text(chat_id=int(chat_id), text="✅ اتصال تلگرام شما با موفقیت برقرار شد.\n\n👋 خوش آمدید! من دستیار هوش مصنوعی شما هستم.\n\nبرای شروع از منوی اصلی استفاده کنید:")
-			# ارسال منوی اصلی
-			from app.services.telegram_ai_chat_service import TelegramAIChatService
-			from app.core.auth_dependency import AuthContext
-			service = TelegramAIChatService(db, user.id, int(chat_id), provider)
-			# برای تلگرام، api_key_id را 0 می‌گذاریم (نشان می‌دهد از طریق تلگرام است)
-			user_context = AuthContext(db=db, user=user, api_key_id=0)
-			service.send_main_menu(user_context)
-		return {"ok": True}
+				u_crm = db.execute(select(User).where(User.telegram_chat_id == int(chat_id))).scalars().first()
+				if u_crm:
+
+					def _crm_send(msg: str, inline_keyboard: Any = None) -> Any:
+						rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+						return provider.send_text(int(chat_id), msg, parse_mode=None, reply_markup=rm)
+
+					dispatch_operator_messenger_message(
+						db,
+						platform="telegram",
+						message={"chat": {"id": chat_id}, "text": "/crmchat"},
+						send=_crm_send,
+					)
+				else:
+					provider.send_text(
+						chat_id=int(chat_id),
+						text="❌ ابتدا تلگرام را از داخل برنامه متصل کنید.",
+					)
+			return {"ok": True}
+		if len(_start_parts) == 2:
+			token = _start_parts[1].strip()
+			t_repo = TelegramRepository(db)
+			t_obj = t_repo.get_by_token(token)
+			if not t_obj or t_obj.used_at is not None or t_obj.expires_at < datetime.utcnow():
+				if chat_id:
+					provider.send_text(chat_id=int(chat_id), text="⛔️ لینک اتصال نامعتبر یا منقضی است. لطفاً از داخل برنامه، لینک جدید بسازید.")
+				return {"ok": False}
+			# Link user to chat
+			u_repo = UserRepository(db)
+			user = u_repo.db.get(u_repo.model_class, t_obj.user_id)
+			if user is None:
+				return {"ok": False}
+			user.telegram_chat_id = int(chat_id) if chat_id else None  # type: ignore[attr-defined]
+			user.telegram_connected_at = datetime.utcnow()  # type: ignore[attr-defined]
+			u_repo.db.add(user)
+			u_repo.db.commit()
+			t_repo.mark_used(t_obj)
+			if chat_id:
+				provider.send_text(chat_id=int(chat_id), text="✅ اتصال تلگرام شما با موفقیت برقرار شد.\n\n👋 خوش آمدید! من دستیار هوش مصنوعی شما هستم.\n\nبرای شروع از منوی اصلی استفاده کنید:")
+				# ارسال منوی اصلی
+				from app.services.telegram_ai_chat_service import TelegramAIChatService
+				from app.core.auth_dependency import AuthContext
+				service = TelegramAIChatService(db, user.id, int(chat_id), provider)
+				# برای تلگرام، api_key_id را 0 می‌گذاریم (نشان می‌دهد از طریق تلگرام است)
+				user_context = AuthContext(db=db, user=user, api_key_id=0)
+				service.send_main_menu(user_context)
+			return {"ok": True}
 
 	# Optional: unlink command
 	if text.strip().startswith("/unlink"):
@@ -177,11 +206,15 @@ def telegram_webhook(
 		if chat_id_inner:
 			from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
 
+			def _operator_send(msg: str, inline_keyboard: Any = None) -> Any:
+				rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+				return provider.send_text(int(chat_id_inner), msg, parse_mode=None, reply_markup=rm)
+
 			if dispatch_operator_messenger_message(
 				db,
 				platform="telegram",
 				message=message,
-				send_text=lambda t, _cid=int(chat_id_inner): provider.send_text(chat_id=_cid, text=t),
+				send=_operator_send,
 			):
 				pass
 			else:

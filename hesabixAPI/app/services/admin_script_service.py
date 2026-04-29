@@ -18,6 +18,8 @@ from adapters.db.models.person import Person
 from adapters.db.models.account import Account
 from adapters.db.session import get_db_session
 from app.core.responses import ApiError
+from app.services.invoice_service import SUPPORTED_INVOICE_TYPES, _cleanup_dead_receipt_payment_links
+from app.services.receipt_payment_service import delete_receipt_payment
 
 
 SCRIPT_DEFINITIONS: List[Dict[str, Any]] = [
@@ -30,7 +32,21 @@ SCRIPT_DEFINITIONS: List[Dict[str, Any]] = [
 			"business_id": None,
 			"limit": None,
 		},
-	}
+	},
+	{
+		"key": "remove_orphan_invoice_receipt_payment_documents",
+		"title": "اصلاح اسناد دریافت/پرداخت رها شدهٔ فاکتور",
+		"description": (
+			"حذف اسناد دریافت/پرداختی که از فاکتور منبع دیگر در لینک فاکتور نیستند (پس از باگ قدیمی ویرایش)، "
+			"و پاک‌سازی لینک‌های مردهٔ receipt_payment روی فاکتورها. business_id خالی = همهٔ کسب‌وکارها."
+		),
+		"supports_dry_run": True,
+		"default_params": {
+			"business_id": None,
+			"limit": None,
+			"require_invoice_source": True,
+		},
+	},
 ]
 
 
@@ -68,11 +84,14 @@ def create_script_run(db: Session, user_id: int, script_key: str, params: Dict[s
 	if not defn:
 		raise ApiError("SCRIPT_NOT_FOUND", "Script not found", http_status=404)
 
+	merged_params: Dict[str, Any] = dict(defn.get("default_params") or {})
+	merged_params.update(params or {})
+
 	run = AdminScriptRun(
 		script_key=script_key,
 		status="queued",
 		dry_run=bool(dry_run),
-		params_json=params or {},
+		params_json=merged_params,
 		created_by_user_id=user_id,
 	)
 	db.add(run)
@@ -163,6 +182,8 @@ def _execute_script_run(run_id: int) -> None:
 				return
 			if run.script_key == "fix_expense_income_document_lines_refs":
 				stats = _run_fix_expense_income_refs(db, run)
+			elif run.script_key == "remove_orphan_invoice_receipt_payment_documents":
+				stats = _run_remove_orphan_invoice_receipt_payments(db, run)
 			else:
 				raise ApiError("SCRIPT_NOT_IMPLEMENTED", "Script implementation not found", http_status=500)
 
@@ -336,6 +357,212 @@ def _run_fix_expense_income_refs(db: Session, run: AdminScriptRun) -> Dict[str, 
 		run.id,
 		"info",
 		f"Finished. candidates={stats['candidates']} updated_lines={stats['updated_lines']} dry_run={dry_run}",
+	)
+	db.commit()
+	return stats
+
+
+def _to_bool_param(value: Any, default: bool = True) -> bool:
+	if value is None:
+		return default
+	if isinstance(value, bool):
+		return value
+	s = str(value).strip().lower()
+	if s in ("0", "false", "no", "off", ""):
+		return False
+	if s in ("1", "true", "yes", "on"):
+		return True
+	return default
+
+
+def _extract_rp_invoice_id_for_cleanup(
+	extra: Any, *, require_invoice_source: bool
+) -> Optional[int]:
+	"""شناسه فاکتور مرجع روی سند دریافت/پرداخت؛ در حالت سخت‌گیرانه فقط source=invoice."""
+	if not isinstance(extra, dict):
+		return None
+	src = str(extra.get("source") or "").strip().lower()
+	if require_invoice_source and src != "invoice":
+		return None
+	raw = extra.get("invoice_id")
+	if raw is None:
+		return None
+	try:
+		iid = int(raw)
+		return iid if iid > 0 else None
+	except (TypeError, ValueError):
+		return None
+
+
+def _invoice_receipt_payment_link_ids(invoice: Document) -> List[int]:
+	extra = invoice.extra_info or {}
+	links = extra.get("links") or {}
+	raw = links.get("receipt_payment_document_ids") or []
+	out: List[int] = []
+	for x in raw:
+		try:
+			out.append(int(x))
+		except (TypeError, ValueError):
+			continue
+	return out
+
+
+def _run_remove_orphan_invoice_receipt_payments(db: Session, run: AdminScriptRun) -> Dict[str, Any]:
+	params = run.params_json or {}
+	business_id = _to_int(params.get("business_id"))
+	limit = _to_int(params.get("limit"))
+	dry_run = bool(run.dry_run)
+	require_invoice_source = _to_bool_param(params.get("require_invoice_source"), default=True)
+
+	stats: Dict[str, Any] = {
+		"scanned": 0,
+		"updated_lines": 0,
+		"skipped_invalid_ref": 0,
+		"errors": 0,
+		"phase_rp": {
+			"scanned_documents": 0,
+			"orphan_candidates": 0,
+			"deleted": 0,
+			"delete_failed": 0,
+			"skipped_no_invoice_id": 0,
+			"skipped_invoice_missing_or_not_invoice": 0,
+			"skipped_still_linked": 0,
+		},
+		"phase_invoices": {
+			"scanned_invoices": 0,
+			"links_cleaned": 0,
+		},
+	}
+
+	# --- فاز ۱: اسناد دریافت/پرداخت یتیم (invoice_id در سند هست ولی در لینک فاکتور نیست)
+	rp_q = db.query(Document).filter(Document.document_type.in_(["receipt", "payment"]))
+	if business_id is not None:
+		rp_q = rp_q.filter(Document.business_id == business_id)
+	rp_q = rp_q.order_by(Document.id.asc())
+	if limit is not None:
+		rp_q = rp_q.limit(limit)
+	rp_rows = rp_q.all()
+	stats["phase_rp"]["scanned_documents"] = len(rp_rows)
+	_append_log(db, run.id, "info", f"اسکن اسناد دریافت/پرداخت: {len(rp_rows)}")
+	db.commit()
+
+	for rp in rp_rows:
+		current = db.query(AdminScriptRun).filter(AdminScriptRun.id == run.id).first()
+		if current and current.status == "cancelled":
+			_append_log(db, run.id, "warning", "اجرای متوقف شد (لغو توسط کاربر)")
+			db.commit()
+			break
+
+		inv_id = _extract_rp_invoice_id_for_cleanup(rp.extra_info, require_invoice_source=require_invoice_source)
+		if inv_id is None:
+			stats["phase_rp"]["skipped_no_invoice_id"] += 1
+			continue
+
+		inv = db.query(Document).filter(Document.id == inv_id).first()
+		if not inv or inv.document_type not in SUPPORTED_INVOICE_TYPES:
+			stats["phase_rp"]["skipped_invoice_missing_or_not_invoice"] += 1
+			stats["skipped_invalid_ref"] += 1
+			continue
+
+		linked = _invoice_receipt_payment_link_ids(inv)
+		if int(rp.id) in linked:
+			stats["phase_rp"]["skipped_still_linked"] += 1
+			continue
+
+		stats["phase_rp"]["orphan_candidates"] += 1
+		if dry_run:
+			stats["phase_rp"]["deleted"] += 1
+			stats["updated_lines"] += 1
+			continue
+
+		try:
+			delete_receipt_payment(db, int(rp.id), commit=True)
+			stats["phase_rp"]["deleted"] += 1
+			stats["updated_lines"] += 1
+		except ApiError as exc:
+			stats["phase_rp"]["delete_failed"] += 1
+			stats["errors"] += 1
+			detail = getattr(exc, "detail", None)
+			msg = str(detail) if detail is not None else str(exc)
+			_append_log(db, run.id, "error", f"حذف سند دریافت/پرداخت {rp.id}: {msg}")
+			db.commit()
+		except Exception as exc:
+			stats["phase_rp"]["delete_failed"] += 1
+			stats["errors"] += 1
+			_append_log(db, run.id, "error", f"حذف سند دریافت/پرداخت {rp.id}: {exc}")
+			db.commit()
+
+		if stats["phase_rp"]["orphan_candidates"] > 0 and stats["phase_rp"]["orphan_candidates"] % 100 == 0:
+			_append_log(
+				db,
+				run.id,
+				"info",
+				f"پیشرفت فاز دریافت/پرداخت: orphan={stats['phase_rp']['orphan_candidates']} حذف‌شده={stats['phase_rp']['deleted']}",
+			)
+			db.commit()
+
+	# --- فاز ۲: لینک‌های مرده روی فاکتورها (ارجاع به سند حذف‌شده)
+	inv_q = db.query(Document).filter(Document.document_type.in_(tuple(SUPPORTED_INVOICE_TYPES)))
+	if business_id is not None:
+		inv_q = inv_q.filter(Document.business_id == business_id)
+	inv_q = inv_q.order_by(Document.id.asc())
+	if limit is not None:
+		inv_q = inv_q.limit(limit)
+	inv_rows = inv_q.all()
+	stats["phase_invoices"]["scanned_invoices"] = len(inv_rows)
+	stats["scanned"] = int(stats["phase_rp"]["scanned_documents"]) + len(inv_rows)
+	_append_log(db, run.id, "info", f"اسکن فاکتورها برای لینک مرده: {len(inv_rows)}")
+	db.commit()
+
+	for inv in inv_rows:
+		current = db.query(AdminScriptRun).filter(AdminScriptRun.id == run.id).first()
+		if current and current.status == "cancelled":
+			_append_log(db, run.id, "warning", "اجرای متوقف شد (لغو توسط کاربر)")
+			db.commit()
+			break
+
+		try:
+			if dry_run:
+				extra_info = inv.extra_info or {}
+				links = extra_info.get("links", {})
+				receipt_payment_ids = links.get("receipt_payment_document_ids", []) or []
+				if not receipt_payment_ids:
+					continue
+				valid_ids: List[int] = []
+				for doc_id in receipt_payment_ids:
+					try:
+						doc_id_int = int(doc_id)
+						doc = db.query(Document).filter(
+							Document.id == doc_id_int,
+							Document.document_type.in_(["receipt", "payment"]),
+						).first()
+						if doc:
+							valid_ids.append(doc_id_int)
+					except (ValueError, TypeError):
+						continue
+				if len(valid_ids) != len(receipt_payment_ids):
+					stats["phase_invoices"]["links_cleaned"] += 1
+					stats["updated_lines"] += 1
+				continue
+
+			if _cleanup_dead_receipt_payment_links(db, inv):
+				stats["phase_invoices"]["links_cleaned"] += 1
+				stats["updated_lines"] += 1
+				db.commit()
+		except Exception as exc:
+			stats["errors"] += 1
+			_append_log(db, run.id, "error", f"فاکتور {inv.id}: {exc}")
+			db.commit()
+
+	_append_log(
+		db,
+		run.id,
+		"info",
+		(
+			f"پایان. یتیم={stats['phase_rp']['orphan_candidates']} "
+			f"حذف/شبیه‌سازی={stats['phase_rp']['deleted']} "
+			f"پاک‌سازی لینک فاکتور={stats['phase_invoices']['links_cleaned']} dry_run={dry_run}"
+		),
 	)
 	db.commit()
 	return stats

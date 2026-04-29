@@ -16,7 +16,7 @@ import calendar
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_, inspect, text
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from adapters.db.repositories.document_repository import DocumentRepository
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
@@ -104,6 +104,18 @@ def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
     return {"metadata": metadata, "tables": data_out}
 
 
+def _user_facing_http_detail(exc: HTTPException) -> str:
+    """متن خطای قابل‌فهم برای کاربر از HTTPException (بدون repr دیکشنری/JSON)."""
+    d = exc.detail
+    if isinstance(d, dict):
+        msg = d.get("message")
+        if isinstance(msg, str) and msg.strip():
+            return msg.strip()
+    if isinstance(d, str) and d.strip():
+        return d.strip()
+    return str(d)
+
+
 async def _create_backup_before_closing(
     db: Session,
     business_id: int,
@@ -158,6 +170,11 @@ async def _create_backup_before_closing(
             "backup_id": str(saved.get("id", "")),
             "filename": filename,
             "file_info": saved,
+        }
+    except HTTPException as e:
+        return {
+            "success": False,
+            "error": _user_facing_http_detail(e),
         }
     except Exception as e:
         return {

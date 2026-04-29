@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Callable, Optional
 from datetime import datetime, date, timedelta
+from decimal import Decimal
+from datetime import timezone as dt_timezone
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -19,6 +21,8 @@ from adapters.db.models.product import Product
 from app.services.invoice_service import INVOICE_SALES, INVOICE_PURCHASE
 from sqlalchemy import or_
 from app.core.calendar import CalendarConverter, CalendarType
+from app.services.business_currency_rate_service import resolve_rate_to_base_or_one
+from app.services.person_service import amount_in_document_currency_to_base
 import jdatetime
 
 # ----------------------------
@@ -593,6 +597,23 @@ def _fiscal_year_dates_or_none(db: Session, business_id: int, fiscal_year_id: in
     return None, None
 
 
+def _check_amount_to_base(
+    db: Session,
+    business_id: int,
+    amount: float,
+    currency_id: int,
+    due_dt: datetime,
+) -> float:
+    """مبلغ چک را با نرخ روز سررسید به ارز پایه؛ بدون نرخ ۱:۱."""
+    if due_dt is None:
+        return float(amount)
+    as_of = due_dt
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=dt_timezone.utc)
+    rate = resolve_rate_to_base_or_one(db, business_id, int(currency_id), as_of)
+    return float(Decimal(str(amount)) * rate)
+
+
 def _resolve_latest_sales_invoices(
     db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -613,24 +634,17 @@ def _resolve_latest_sales_invoices(
     if fy_id is not None:
         doc_filters.append(Document.fiscal_year_id == fy_id)
 
-    # Fetch last N documents with currency info
     q = (
-        db.query(
-            Document.id,
-            Document.code,
-            Document.document_date,
-            Document.created_at,
-            Document.currency_id,
-            Currency.code.label("currency_code"),
-            Document.extra_info,
-        )
+        db.query(Document, Currency.code.label("currency_code"))
         .outerjoin(Currency, Currency.id == Document.currency_id)
         .filter(and_(*doc_filters))
         .order_by(Document.created_at.desc())
         .limit(limit)
     )
     rows = q.all()
-    doc_ids = [int(r.id) for r in rows]
+    doc_ids = [int(d.id) for d, _cc in rows]
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
     # Count items per document in batch
     items_count_by_doc: Dict[int, int] = {}
     if doc_ids:
@@ -643,17 +657,26 @@ def _resolve_latest_sales_invoices(
         for did, cnt in counts:
             items_count_by_doc[int(did)] = int(cnt or 0)
     items: List[Dict[str, Any]] = []
-    for d in rows:
+    for d, currency_code in rows:
         extra = d.extra_info or {}
         totals = (extra.get("totals") or {})
+        net_doc = Decimal(str(totals.get("net", 0) or 0))
+        net_base = amount_in_document_currency_to_base(
+            db,
+            d,
+            net_doc,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
         items.append({
             "id": int(d.id),
             "code": d.code,
             "document_date": d.document_date.isoformat() if d.document_date else None,
             "created_at": d.created_at.isoformat() if d.created_at else None,
-            "net_amount": float(totals.get("net", 0) or 0),
+            "net_amount": float(net_base),
+            "net_amount_document": float(net_doc),
             "currency_id": int(d.currency_id) if d.currency_id is not None else None,
-            "currency_code": d.currency_code,
+            "currency_code": currency_code,
             "items_count": items_count_by_doc.get(int(d.id), 0),
         })
     return {"items": items}
@@ -736,8 +759,9 @@ def _resolve_top_selling_products(
             amount_filters = list(doc_base_filters) + [Product.id.in_(product_ids)]
             amount_query = (
                 db.query(
-                    Product.id.label("product_id"),
-                    InvoiceItemLine.extra_info
+                    Product.id,
+                    InvoiceItemLine.extra_info,
+                    Document,
                 )
                 .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
                 .join(Document, Document.id == InvoiceItemLine.document_id)
@@ -749,15 +773,24 @@ def _resolve_top_selling_products(
                     amount_query = amount_query.filter(Document.currency_id == currency_id_int)
                 except Exception:
                     pass
-            
+
             amount_rows = amount_query.all()
-            # Aggregate amount در Python (فقط برای product های انتخاب شده)
+            # Aggregate amount در Python (به ارز پایه)
+            rate_cache: Dict[int, Decimal] = {}
+            base_currency_by_business: Dict[int, Optional[int]] = {}
             amount_by_product: Dict[int, float] = {}
-            for row in amount_rows:
-                product_id = int(row.product_id)
-                extra_info = row.extra_info or {}
-                line_total = float(extra_info.get("line_total", 0) or 0)
-                amount_by_product[product_id] = amount_by_product.get(product_id, 0) + line_total
+            for pid, extra_info_raw, doc in amount_rows:
+                product_id = int(pid)
+                extra_info = extra_info_raw or {}
+                line_total = Decimal(str(extra_info.get("line_total", 0) or 0))
+                line_base = amount_in_document_currency_to_base(
+                    db,
+                    doc,
+                    line_total,
+                    rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                amount_by_product[product_id] = amount_by_product.get(product_id, 0.0) + float(line_base)
         else:
             amount_by_product = {}
     else:
@@ -832,13 +865,23 @@ def _resolve_checks_overdue(db: Session, business_id: int, filters: Dict[str, An
     rows = q.all()
     items = []
     totals_by_currency = {}
+    total_base = 0.0
     for row in rows:
         currency_code = row.currency_code or "UNKNOWN"
         amount = float(row.amount)
+        cid = int(row.currency_id) if row.currency_id else None
+        due_dt = row.due_date
+        amt_base = (
+            _check_amount_to_base(db, business_id, amount, cid, due_dt)
+            if cid is not None and due_dt is not None
+            else amount
+        )
+        total_base += amt_base
         items.append({
             "id": int(row.id),
             "check_number": row.check_number,
             "amount": amount,
+            "amount_base": amt_base,
             "currency_code": currency_code,
             "type": row.type.name.lower() if row.type else None,
             "status": row.status.name if row.status else None,
@@ -846,7 +889,7 @@ def _resolve_checks_overdue(db: Session, business_id: int, filters: Dict[str, An
             "person_name": row.person_name,
         })
         totals_by_currency[currency_code] = totals_by_currency.get(currency_code, 0.0) + amount
-    return {"items": items, "totals_by_currency": totals_by_currency, "count": len(items)}
+    return {"items": items, "totals_by_currency": totals_by_currency, "total_base": total_base, "count": len(items)}
 
 
 def _resolve_latest_receipts_payments(
@@ -918,22 +961,16 @@ def _resolve_latest_purchase_invoices(
         doc_filters.append(Document.fiscal_year_id == fy_id)
 
     q = (
-        db.query(
-            Document.id,
-            Document.code,
-            Document.document_date,
-            Document.created_at,
-            Document.currency_id,
-            Currency.code.label("currency_code"),
-            Document.extra_info,
-        )
+        db.query(Document, Currency.code.label("currency_code"))
         .outerjoin(Currency, Currency.id == Document.currency_id)
         .filter(and_(*doc_filters))
         .order_by(Document.created_at.desc())
         .limit(limit)
     )
     rows = q.all()
-    doc_ids = [int(r.id) for r in rows]
+    doc_ids = [int(d.id) for d, _cc in rows]
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
     items_count_by_doc = {}
     if doc_ids:
         counts = (
@@ -945,17 +982,26 @@ def _resolve_latest_purchase_invoices(
         for did, cnt in counts:
             items_count_by_doc[int(did)] = int(cnt or 0)
     items = []
-    for d in rows:
+    for d, currency_code in rows:
         extra = d.extra_info or {}
         totals = extra.get("totals") or {}
+        net_doc = Decimal(str(totals.get("net", 0) or 0))
+        net_base = amount_in_document_currency_to_base(
+            db,
+            d,
+            net_doc,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
         items.append({
             "id": int(d.id),
             "code": d.code,
             "document_date": d.document_date.isoformat() if d.document_date else None,
             "created_at": d.created_at.isoformat() if d.created_at else None,
-            "net_amount": float(totals.get("net", 0) or 0),
+            "net_amount": float(net_base),
+            "net_amount_document": float(net_doc),
             "currency_id": int(d.currency_id) if d.currency_id is not None else None,
-            "currency_code": d.currency_code,
+            "currency_code": currency_code,
             "items_count": items_count_by_doc.get(int(d.id), 0),
         })
     return {"items": items}
@@ -1167,21 +1213,31 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
         doc_chart_filters.append(Document.fiscal_year_id == fy_id)
 
     q = (
-        db.query(
-            Document.document_date,
-            Document.extra_info,
-        )
+        db.query(Document)
         .filter(and_(*doc_chart_filters))
         .order_by(Document.document_date.asc())
     )
     rows = q.all()
     from collections import defaultdict
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
     agg: Dict[str, float] = defaultdict(float)
-    for doc_date, extra in rows:
+    for doc in rows:
+        doc_date = doc.document_date
         if not doc_date:
             continue
-        totals = (extra or {}).get("totals") or {}
-        net = float(totals.get("net", 0) or 0)
+        extra = doc.extra_info or {}
+        totals = extra.get("totals") or {}
+        net_doc = Decimal(str(totals.get("net", 0) or 0))
+        net_base = amount_in_document_currency_to_base(
+            db,
+            doc,
+            net_doc,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        net = float(net_base)
         if group == "month":
             key = f"{doc_date.year:04d}-{doc_date.month:02d}"
         elif group == "week":
@@ -1256,17 +1312,27 @@ def _resolve_checks_by_due_date(
     rows = q.all()
     items: List[Dict[str, Any]] = []
     totals_by_currency: Dict[str, float] = {}
-    
+    total_base: float = 0.0
+
     for row in rows:
         currency_code = row.currency_code or "UNKNOWN"
         currency_title = row.currency_title or currency_code
         amount = float(row.amount)
-        
+        cid = int(row.currency_id) if row.currency_id else None
+        due_dt = row.due_date
+        amt_base = (
+            _check_amount_to_base(db, business_id, amount, cid, due_dt)
+            if cid is not None and due_dt is not None
+            else amount
+        )
+        total_base += amt_base
+
         items.append({
             "id": int(row.id),
             "check_number": row.check_number,
             "amount": amount,
-            "currency_id": int(row.currency_id) if row.currency_id else None,
+            "amount_base": amt_base,
+            "currency_id": cid,
             "currency_code": currency_code,
             "currency_title": currency_title,
             "type": row.type.name.lower() if row.type else None,
@@ -1275,15 +1341,16 @@ def _resolve_checks_by_due_date(
             "person_id": int(row.person_id) if row.person_id else None,
             "person_name": row.person_name,
         })
-        
+
         # Aggregate totals by currency
         if currency_code not in totals_by_currency:
             totals_by_currency[currency_code] = 0.0
         totals_by_currency[currency_code] += amount
-    
+
     return {
         "items": items,
         "totals_by_currency": totals_by_currency,
+        "total_base": total_base,
         "count": len(items),
     }
 
@@ -1548,17 +1615,27 @@ def _resolve_checks_this_month(db: Session, business_id: int, filters: Dict[str,
     rows = q.all()
     items: List[Dict[str, Any]] = []
     totals_by_currency: Dict[str, float] = {}
-    
+    total_base = 0.0
+
     for row in rows:
         currency_code = row.currency_code or "UNKNOWN"
         currency_title = row.currency_title or currency_code
         amount = float(row.amount)
-        
+        cid = int(row.currency_id) if row.currency_id else None
+        due_dt = row.due_date
+        amt_base = (
+            _check_amount_to_base(db, business_id, amount, cid, due_dt)
+            if cid is not None and due_dt is not None
+            else amount
+        )
+        total_base += amt_base
+
         items.append({
             "id": int(row.id),
             "check_number": row.check_number,
             "amount": amount,
-            "currency_id": int(row.currency_id) if row.currency_id else None,
+            "amount_base": amt_base,
+            "currency_id": cid,
             "currency_code": currency_code,
             "currency_title": currency_title,
             "type": row.type.name.lower() if row.type else None,
@@ -1567,15 +1644,16 @@ def _resolve_checks_this_month(db: Session, business_id: int, filters: Dict[str,
             "person_id": int(row.person_id) if row.person_id else None,
             "person_name": row.person_name,
         })
-        
+
         # Aggregate totals by currency
         if currency_code not in totals_by_currency:
             totals_by_currency[currency_code] = 0.0
         totals_by_currency[currency_code] += amount
-    
+
     return {
         "items": items,
         "totals_by_currency": totals_by_currency,
+        "total_base": total_base,
         "count": len(items),
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),

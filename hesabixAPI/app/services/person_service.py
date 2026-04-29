@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timezone, date
 import json
 from sqlalchemy.exc import IntegrityError
 from app.core.responses import ApiError
@@ -1107,6 +1107,92 @@ def _person_line_amount_to_base(
     return amt * rate
 
 
+def amount_in_document_currency_to_base(
+    db: Session,
+    document: Document,
+    amount: Any,
+    *,
+    rate_cache: Dict[int, Decimal],
+    base_currency_by_business: Dict[int, Optional[int]],
+) -> Decimal:
+    """تبدیل مبلغ به ارز پایه با همان منطق خط سند (fx ذخیره‌شده یا resolve_rate؛ در نبود نرخ ۱:۱)."""
+    return _person_line_amount_to_base(
+        db,
+        document,
+        amount,
+        rate_cache=rate_cache,
+        base_currency_by_business=base_currency_by_business,
+    )
+
+
+def _filtered_person_balances_in_base(
+    db: Session,
+    person_ids: List[int],
+    *,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from_obj: Optional[date] = None,
+    date_to_obj: Optional[date] = None,
+) -> Dict[int, Dict[str, Any]]:
+    """تراز اشخاص با فیلتر سال مالی/ارز/بازه تاریخ؛ همه مقادیر به ارز پایه."""
+    if not person_ids:
+        return {}
+    q = (
+        db.query(DocumentLine, Document)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id.in_(person_ids),
+            Document.is_proforma == False,  # noqa: E712
+        )
+    )
+    if fiscal_year_id:
+        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
+    if currency_id:
+        q = q.filter(Document.currency_id == currency_id)
+    if date_from_obj is not None:
+        q = q.filter(Document.document_date >= date_from_obj)
+    if date_to_obj is not None:
+        q = q.filter(Document.document_date <= date_to_obj)
+
+    rows = q.all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    credit_by_person: Dict[int, Decimal] = {int(pid): Decimal(0) for pid in person_ids}
+    debit_by_person: Dict[int, Decimal] = {int(pid): Decimal(0) for pid in person_ids}
+    last_date: Dict[int, Optional[date]] = {int(pid): None for pid in person_ids}
+
+    for line, doc in rows:
+        pid = int(line.person_id)
+        if pid not in debit_by_person:
+            continue
+        debit_by_person[pid] += _person_line_amount_to_base(
+            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+        credit_by_person[pid] += _person_line_amount_to_base(
+            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+        dd = doc.document_date
+        if dd is not None:
+            cur = last_date.get(pid)
+            if cur is None or dd > cur:
+                last_date[pid] = dd
+
+    out: Dict[int, Dict[str, Any]] = {}
+    for pid in person_ids:
+        pid = int(pid)
+        tc = credit_by_person[pid]
+        td = debit_by_person[pid]
+        bal = tc - td
+        ld = last_date.get(pid)
+        out[pid] = {
+            "balance": float(bal),
+            "total_credit": float(tc),
+            "total_debit": float(td),
+            "last_transaction_date": ld.isoformat() if ld else None,
+        }
+    return out
+
+
 def calculate_person_balance(
     db: Session, 
     person_id: int, 
@@ -1309,71 +1395,41 @@ def get_debtors_report(
         }
     
     person_ids_list = [p.id for p in all_persons]
-    
-    # Query برای محاسبه تراز هر شخص با فیلتر تاریخ و ارز
-    balance_query = db.query(
-        DocumentLine.person_id,
-        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-        func.max(Document.document_date).label('last_transaction_date'),
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        DocumentLine.person_id.in_(person_ids_list),
-        Document.is_proforma == False  # فقط اسناد قطعی
-    )
-    
-    # اعمال فیلتر ارز
-    if currency_id:
-        balance_query = balance_query.filter(Document.currency_id == currency_id)
-    
-    # اعمال فیلتر سال مالی
-    if fiscal_year_id:
-        balance_query = balance_query.filter(Document.fiscal_year_id == fiscal_year_id)
-    
-    # اعمال فیلتر تاریخ
+
+    date_from_d: Optional[date] = None
+    date_to_d: Optional[date] = None
     if date_from:
         try:
-            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
-            balance_query = balance_query.filter(Document.document_date >= date_from_obj)
+            date_from_d = datetime.strptime(date_from, "%Y-%m-%d").date()
         except ValueError:
             pass
-    
     if date_to:
         try:
-            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
-            balance_query = balance_query.filter(Document.document_date <= date_to_obj)
+            date_to_d = datetime.strptime(date_to, "%Y-%m-%d").date()
         except ValueError:
             pass
-    
-    # Group by person_id
-    balance_query = balance_query.group_by(DocumentLine.person_id)
-    
-    balance_results = balance_query.all()
-    
-    # ساخت دیکشنری ترازها
-    balances_dict: Dict[int, Dict[str, Any]] = {}
-    for person_id in person_ids_list:
-        balances_dict[person_id] = {
-            'balance': 0.0,
-            'total_credit': 0.0,
-            'total_debit': 0.0,
-            'last_transaction_date': None,
-        }
-    
-    for result in balance_results:
-        person_id = result.person_id
-        total_credit = float(result.total_credit or 0)
-        total_debit = float(result.total_debit or 0)
-        balance = total_credit - total_debit
-        
-        balances_dict[person_id] = {
-            'balance': balance,
-            'total_credit': total_credit,
-            'total_debit': total_debit,
-            'last_transaction_date': result.last_transaction_date.isoformat() if result.last_transaction_date else None,
-        }
-    
+
+    balances_raw = _filtered_person_balances_in_base(
+        db,
+        person_ids_list,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from_obj=date_from_d,
+        date_to_obj=date_to_d,
+    )
+    balances_dict: Dict[int, Dict[str, Any]] = {
+        pid: balances_raw.get(
+            int(pid),
+            {
+                "balance": 0.0,
+                "total_credit": 0.0,
+                "total_debit": 0.0,
+                "last_transaction_date": None,
+            },
+        )
+        for pid in person_ids_list
+    }
+
     # فیلتر فقط بدهکاران (balance < 0)
     debtors = []
     for person in all_persons:
@@ -1510,71 +1566,41 @@ def get_creditors_report(
         }
     
     person_ids_list = [p.id for p in all_persons]
-    
-    # Query برای محاسبه تراز هر شخص با فیلتر تاریخ و ارز
-    balance_query = db.query(
-        DocumentLine.person_id,
-        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-        func.max(Document.document_date).label('last_transaction_date'),
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        DocumentLine.person_id.in_(person_ids_list),
-        Document.is_proforma == False  # فقط اسناد قطعی
-    )
-    
-    # اعمال فیلتر ارز
-    if currency_id:
-        balance_query = balance_query.filter(Document.currency_id == currency_id)
-    
-    # اعمال فیلتر سال مالی
-    if fiscal_year_id:
-        balance_query = balance_query.filter(Document.fiscal_year_id == fiscal_year_id)
-    
-    # اعمال فیلتر تاریخ
+
+    date_from_d: Optional[date] = None
+    date_to_d: Optional[date] = None
     if date_from:
         try:
-            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
-            balance_query = balance_query.filter(Document.document_date >= date_from_obj)
+            date_from_d = datetime.strptime(date_from, "%Y-%m-%d").date()
         except ValueError:
             pass
-    
     if date_to:
         try:
-            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
-            balance_query = balance_query.filter(Document.document_date <= date_to_obj)
+            date_to_d = datetime.strptime(date_to, "%Y-%m-%d").date()
         except ValueError:
             pass
-    
-    # Group by person_id
-    balance_query = balance_query.group_by(DocumentLine.person_id)
-    
-    balance_results = balance_query.all()
-    
-    # ساخت دیکشنری ترازها
-    balances_dict: Dict[int, Dict[str, Any]] = {}
-    for person_id in person_ids_list:
-        balances_dict[person_id] = {
-            'balance': 0.0,
-            'total_credit': 0.0,
-            'total_debit': 0.0,
-            'last_transaction_date': None,
-        }
-    
-    for result in balance_results:
-        person_id = result.person_id
-        total_credit = float(result.total_credit or 0)
-        total_debit = float(result.total_debit or 0)
-        balance = total_credit - total_debit
-        
-        balances_dict[person_id] = {
-            'balance': balance,
-            'total_credit': total_credit,
-            'total_debit': total_debit,
-            'last_transaction_date': result.last_transaction_date.isoformat() if result.last_transaction_date else None,
-        }
-    
+
+    balances_raw = _filtered_person_balances_in_base(
+        db,
+        person_ids_list,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from_obj=date_from_d,
+        date_to_obj=date_to_d,
+    )
+    balances_dict: Dict[int, Dict[str, Any]] = {
+        pid: balances_raw.get(
+            int(pid),
+            {
+                "balance": 0.0,
+                "total_credit": 0.0,
+                "total_debit": 0.0,
+                "last_transaction_date": None,
+            },
+        )
+        for pid in person_ids_list
+    }
+
     # فیلتر فقط بستانکاران (balance > 0)
     creditors = []
     for person in all_persons:

@@ -7961,6 +7961,123 @@ class AppLocalizationsEn extends AppLocalizations {
       'Whether the Bale action sent a document from file storage';
 
   @override
+  String get workflowFieldCrmChatConversationId => 'Chat conversation ID';
+
+  @override
+  String get workflowFieldDescCrmChatConversationId =>
+      'CRM web chat conversation record ID in trigger_data';
+
+  @override
+  String get workflowFieldCrmChatWidgetId => 'Chat widget ID';
+
+  @override
+  String get workflowFieldDescCrmChatWidgetId =>
+      'Web chat widget linked to this conversation';
+
+  @override
+  String get workflowFieldCrmChatMessageId => 'Chat message ID';
+
+  @override
+  String get workflowFieldDescCrmChatMessageId =>
+      'Recorded web chat message ID';
+
+  @override
+  String get workflowFieldCrmChatBody => 'Message body';
+
+  @override
+  String get workflowFieldDescCrmChatBody =>
+      'Visitor or agent message text in web chat';
+
+  @override
+  String get workflowFieldCrmChatSenderRole => 'Sender role';
+
+  @override
+  String get workflowFieldDescCrmChatSenderRole =>
+      'visitor or agent depending on the message';
+
+  @override
+  String get workflowFieldCrmChatVisitorFirstName => 'Visitor first name';
+
+  @override
+  String get workflowFieldDescCrmChatVisitorFirstName =>
+      'First name from the chat widget form';
+
+  @override
+  String get workflowFieldCrmChatVisitorLastName => 'Visitor last name';
+
+  @override
+  String get workflowFieldDescCrmChatVisitorLastName =>
+      'Last name from the chat widget form';
+
+  @override
+  String get workflowFieldCrmChatPageUrl => 'Page URL';
+
+  @override
+  String get workflowFieldDescCrmChatPageUrl =>
+      'Site page URL when the event occurred (if present)';
+
+  @override
+  String get workflowFieldCrmChatConversationStatus => 'Conversation status';
+
+  @override
+  String get workflowFieldDescCrmChatConversationStatus =>
+      'e.g. open or resolved';
+
+  @override
+  String get workflowFieldCrmChatAssignedToUserId => 'Assigned user ID';
+
+  @override
+  String get workflowFieldDescCrmChatAssignedToUserId =>
+      'Responsible agent user when assigned';
+
+  @override
+  String get workflowFieldCrmChatAgentUserId => 'Agent user ID';
+
+  @override
+  String get workflowFieldDescCrmChatAgentUserId =>
+      'Sending user for agent-role messages (agent reply trigger)';
+
+  @override
+  String get workflowFieldAutomationSource => 'Automation source';
+
+  @override
+  String get workflowFieldDescAutomationSource =>
+      'e.g. workflow when the message was sent by automation';
+
+  @override
+  String get workflowFieldOperatorRelay => 'Operator relay';
+
+  @override
+  String get workflowFieldDescOperatorRelay =>
+      'When sent via operator bridge (Telegram/Bale)';
+
+  @override
+  String get workflowFieldCrmChatOldAssignedUserId => 'Previous assignee ID';
+
+  @override
+  String get workflowFieldDescCrmChatOldAssignedUserId =>
+      'Before assignment changed';
+
+  @override
+  String get workflowFieldCrmChatNewAssignedUserId => 'New assignee ID';
+
+  @override
+  String get workflowFieldDescCrmChatNewAssignedUserId =>
+      'After assignment changed';
+
+  @override
+  String get workflowFieldCrmChatOldStatus => 'Previous conversation status';
+
+  @override
+  String get workflowFieldDescCrmChatOldStatus => 'Before status update';
+
+  @override
+  String get workflowFieldCrmChatNewStatus => 'New conversation status';
+
+  @override
+  String get workflowFieldDescCrmChatNewStatus => 'After status update';
+
+  @override
   String get workflowFieldEmailTo => 'To';
 
   @override

@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -20,6 +20,57 @@ def _parse_iso_date(dt: str | date) -> date:
     if isinstance(dt, str):
         return date.fromisoformat(dt.split('T')[0])
     raise ValueError(f"Invalid date format: {dt}")
+
+
+def _turnover_by_account_in_base_currency(
+    db: Session,
+    business_id: int,
+    account_ids: List[int],
+    date_from_obj: date,
+    date_to_obj: date,
+    currency_id: Optional[int],
+    project_id: Optional[int],
+) -> Dict[int, Dict[str, Decimal]]:
+    """گردش هر حساب در بازه، با تبدیل مبالغ خط به ارز پایهٔ کسب‌وکار."""
+    from app.services.person_service import _person_line_amount_to_base
+
+    q = (
+        db.query(DocumentLine, Document)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.is_proforma == False,  # noqa: E712
+                DocumentLine.account_id.isnot(None),
+                DocumentLine.account_id.in_(account_ids),
+                Document.document_date >= date_from_obj,
+                Document.document_date <= date_to_obj,
+            )
+        )
+    )
+    if project_id:
+        q = q.filter(Document.project_id == project_id)
+    if currency_id:
+        q = q.filter(Document.currency_id == currency_id)
+
+    rows = q.all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    turnover_by_account: Dict[int, Dict[str, Decimal]] = {}
+
+    for line, doc in rows:
+        aid = line.account_id
+        if aid is None:
+            continue
+        if aid not in turnover_by_account:
+            turnover_by_account[aid] = {"debit": Decimal(0), "credit": Decimal(0)}
+        turnover_by_account[aid]["debit"] += _person_line_amount_to_base(
+            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+        turnover_by_account[aid]["credit"] += _person_line_amount_to_base(
+            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+        )
+    return turnover_by_account
 
 
 def _is_revenue_account(code: str) -> bool:
@@ -135,43 +186,17 @@ def get_pnl_period_report(
             }
         }
     
-    # محاسبه گردش بدهکار و بستانکار برای هر حساب در بازه تاریخ
-    turnover_query = db.query(
-        DocumentLine.account_id,
-        func.sum(DocumentLine.debit).label('total_debit'),
-        func.sum(DocumentLine.credit).label('total_credit')
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.is_proforma == False,
-            DocumentLine.account_id.isnot(None),
-            DocumentLine.account_id.in_(account_ids),
-            Document.document_date >= date_from_obj,
-            Document.document_date <= date_to_obj,
-        )
+    # محاسبه گردش هر حساب در بازه به ارز پایه (تسعیر از روی سند)
+    turnover_by_account = _turnover_by_account_in_base_currency(
+        db,
+        business_id,
+        account_ids,
+        date_from_obj,
+        date_to_obj,
+        currency_id,
+        project_id,
     )
-    
-    # 🆕 فیلتر پروژه
-    if project_id:
-        turnover_query = turnover_query.filter(Document.project_id == project_id)
-    
-    turnover_query = turnover_query.group_by(DocumentLine.account_id)
-    
-    if currency_id:
-        turnover_query = turnover_query.filter(Document.currency_id == currency_id)
-    
-    turnover_results = turnover_query.all()
-    
-    # ساخت دیکشنری برای دسترسی سریع به گردش هر حساب
-    turnover_by_account = {}
-    for result in turnover_results:
-        turnover_by_account[result.account_id] = {
-            'debit': Decimal(str(result.total_debit or 0)),
-            'credit': Decimal(str(result.total_credit or 0)),
-        }
-    
+
     # ساخت آیتم‌های درآمد
     revenue_items = []
     total_revenue = Decimal(0)
@@ -325,43 +350,17 @@ def get_pnl_cumulative_report(
             }
         }
     
-    # محاسبه گردش بدهکار و بستانکار برای هر حساب از ابتدای سال مالی تا date_to
-    turnover_query = db.query(
-        DocumentLine.account_id,
-        func.sum(DocumentLine.debit).label('total_debit'),
-        func.sum(DocumentLine.credit).label('total_credit')
-    ).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.is_proforma == False,
-            DocumentLine.account_id.isnot(None),
-            DocumentLine.account_id.in_(account_ids),
-            Document.document_date >= date_from_obj,
-            Document.document_date <= date_to_obj,
-        )
+    # محاسبه گردش هر حساب از ابتدای سال تا date_to به ارز پایه (تسعیر از روی سند)
+    turnover_by_account = _turnover_by_account_in_base_currency(
+        db,
+        business_id,
+        account_ids,
+        date_from_obj,
+        date_to_obj,
+        currency_id,
+        project_id,
     )
-    
-    # 🆕 فیلتر پروژه
-    if project_id:
-        turnover_query = turnover_query.filter(Document.project_id == project_id)
-    
-    turnover_query = turnover_query.group_by(DocumentLine.account_id)
-    
-    if currency_id:
-        turnover_query = turnover_query.filter(Document.currency_id == currency_id)
-    
-    turnover_results = turnover_query.all()
-    
-    # ساخت دیکشنری برای دسترسی سریع به گردش هر حساب
-    turnover_by_account = {}
-    for result in turnover_results:
-        turnover_by_account[result.account_id] = {
-            'debit': Decimal(str(result.total_debit or 0)),
-            'credit': Decimal(str(result.total_credit or 0)),
-        }
-    
+
     # ساخت آیتم‌های درآمد
     revenue_items = []
     total_revenue = Decimal(0)

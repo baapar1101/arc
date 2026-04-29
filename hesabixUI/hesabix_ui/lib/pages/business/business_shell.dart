@@ -918,7 +918,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
-            label: 'فرایندها و زون ارجاعات',
+            label: 'فرایندها و مراحل قیف',
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
             path: '/business/${widget.businessId}/crm/process-definitions',

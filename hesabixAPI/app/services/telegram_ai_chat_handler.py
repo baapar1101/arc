@@ -11,6 +11,8 @@ from adapters.db.repositories.user_repo import UserRepository
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from app.core.auth_dependency import AuthContext
+from app.services.messenger_operator.crm_callback_map import crm_callback_data_to_command
+from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +99,22 @@ async def handle_telegram_callback_query(
 	telegram_provider: TelegramProvider
 ) -> bool:
 	"""پردازش Callback Query از دکمه‌ها"""
-	chat = callback_query.get("message", {}).get("chat", {})
+	msg = callback_query.get("message") or {}
+	chat = msg.get("chat") or {}
 	chat_id = chat.get("id")
-	callback_data = callback_query.get("data", "")
+	# اگر پیام حذف شده باشد، در چت خصوصی معمولاً chat_id == from.id است
+	if chat_id is None:
+		from_cb = callback_query.get("from") or {}
+		chat_id = from_cb.get("id")
+	callback_data = (callback_query.get("data") or "").strip()
 	query_id = callback_query.get("id", "")
 	
-	if not chat_id or not callback_data:
+	if chat_id is None or not callback_data:
+		return False
+
+	try:
+		chat_id = int(chat_id)
+	except (TypeError, ValueError):
 		return False
 	
 	# پاسخ به callback query (برای حذف loading)
@@ -122,6 +134,27 @@ async def handle_telegram_callback_query(
 	parts = callback_data.split(":")
 	
 	try:
+		if parts[0] == "crm":
+			cmd = crm_callback_data_to_command(parts[1:])
+			if not cmd:
+				return bool(
+					service.telegram_provider.send_text(
+						chat_id=chat_id, text="دکمه نامعتبر یا منقضی است.", parse_mode=None
+					)
+				)
+
+			def _crm_send(msg: str, inline_keyboard: Any = None) -> Any:
+				rm = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
+				return telegram_provider.send_text(chat_id, msg, parse_mode=None, reply_markup=rm)
+
+			return bool(
+				dispatch_operator_messenger_message(
+					db,
+					platform="telegram",
+					message={"chat": {"id": chat_id}, "text": cmd},
+					send=_crm_send,
+				)
+			)
 		if parts[0] == "menu":
 			return await handle_menu_callback(service, user_context, parts[1:])
 		elif parts[0] == "chat":
@@ -288,13 +321,20 @@ async def handle_back_callback(
 	return False
 
 
-def get_user_by_telegram_chat_id(db: Session, chat_id: int):
+def get_user_by_telegram_chat_id(db: Session, chat_id: int | None):
 	"""پیدا کردن کاربر از chat_id تلگرام"""
 	from sqlalchemy import select
 	from adapters.db.models.user import User
-	
+
+	if chat_id is None:
+		return None
+	try:
+		cid = int(chat_id)
+	except (TypeError, ValueError):
+		return None
+
 	user = db.execute(
-		select(User).where(User.telegram_chat_id == chat_id)
+		select(User).where(User.telegram_chat_id == cid)
 	).scalars().first()
 	
 	return user
@@ -628,14 +668,14 @@ async def handle_auto_reply(
 					"operator_name": operator_name,
 					"message_preview": message_preview
 				}
-				
-			notification_service.send(
-				user_id=ticket.user_id,
-				event_key="support.operator_reply",
-				context=context,
-				preferred_channels=["inapp", "email", "telegram", "sms"],
-				broadcast_mode=False
-			)
+
+				notification_service.send(
+					user_id=ticket.user_id,
+					event_key="support.operator_reply",
+					context=context,
+					preferred_channels=["inapp", "email", "telegram", "sms"],
+					broadcast_mode=False
+				)
 			except Exception as e:
 				logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ AI به تیکت {ticket_id}: {e}")
 		

@@ -7928,6 +7928,122 @@ class AppLocalizationsFa extends AppLocalizations {
       'آیا اکشن بله سند را از فایل‌سرور ارسال کرده است';
 
   @override
+  String get workflowFieldCrmChatConversationId => 'شناسه مکالمه چت';
+
+  @override
+  String get workflowFieldDescCrmChatConversationId =>
+      'شناسه رکورد مکالمه چت وب CRM در trigger_data';
+
+  @override
+  String get workflowFieldCrmChatWidgetId => 'شناسه ویجت چت';
+
+  @override
+  String get workflowFieldDescCrmChatWidgetId =>
+      'شناسه ویجت چت وب متصل به این مکالمه';
+
+  @override
+  String get workflowFieldCrmChatMessageId => 'شناسه پیام چت';
+
+  @override
+  String get workflowFieldDescCrmChatMessageId => 'شناسه پیام ثبت‌شده در چت وب';
+
+  @override
+  String get workflowFieldCrmChatBody => 'متن پیام';
+
+  @override
+  String get workflowFieldDescCrmChatBody =>
+      'متن پیام بازدیدکننده یا عامل در چت وب';
+
+  @override
+  String get workflowFieldCrmChatSenderRole => 'نقش فرستنده';
+
+  @override
+  String get workflowFieldDescCrmChatSenderRole =>
+      'visitor یا agent مطابق پیام';
+
+  @override
+  String get workflowFieldCrmChatVisitorFirstName => 'نام بازدیدکننده';
+
+  @override
+  String get workflowFieldDescCrmChatVisitorFirstName =>
+      'نام ثبت‌شده در فرم چت';
+
+  @override
+  String get workflowFieldCrmChatVisitorLastName => 'نام خانوادگی بازدیدکننده';
+
+  @override
+  String get workflowFieldDescCrmChatVisitorLastName =>
+      'نام خانوادگی ثبت‌شده در فرم چت';
+
+  @override
+  String get workflowFieldCrmChatPageUrl => 'آدرس صفحه';
+
+  @override
+  String get workflowFieldDescCrmChatPageUrl =>
+      'نشانی صفحهٔ سایت هنگام رویداد (در صورت وجود)';
+
+  @override
+  String get workflowFieldCrmChatConversationStatus => 'وضعیت مکالمه';
+
+  @override
+  String get workflowFieldDescCrmChatConversationStatus =>
+      'مثلاً open یا resolved';
+
+  @override
+  String get workflowFieldCrmChatAssignedToUserId => 'شناسه مسئول مکالمه';
+
+  @override
+  String get workflowFieldDescCrmChatAssignedToUserId =>
+      'کاربر عامل موثر بر مکالمه در صورت تخصیص';
+
+  @override
+  String get workflowFieldCrmChatAgentUserId => 'شناسه کاربر عامل پیام';
+
+  @override
+  String get workflowFieldDescCrmChatAgentUserId =>
+      'فرستندهٔ پیام نقش agent در تریگر پاسخ عامل';
+
+  @override
+  String get workflowFieldAutomationSource => 'منبع اتوماسیون';
+
+  @override
+  String get workflowFieldDescAutomationSource =>
+      'مثلاً workflow وقتی پیام از ورک‌فلو است';
+
+  @override
+  String get workflowFieldOperatorRelay => 'پل اپراتور';
+
+  @override
+  String get workflowFieldDescOperatorRelay =>
+      'در صورت ارسال از کانال اپراتور (تلگرام/بله)';
+
+  @override
+  String get workflowFieldCrmChatOldAssignedUserId => 'شناسه مسئول قبلی';
+
+  @override
+  String get workflowFieldDescCrmChatOldAssignedUserId =>
+      'قبل از تغییر تخصیص مکالمه';
+
+  @override
+  String get workflowFieldCrmChatNewAssignedUserId => 'شناسه مسئول جدید';
+
+  @override
+  String get workflowFieldDescCrmChatNewAssignedUserId =>
+      'پس از تغییر تخصیص مکالمه';
+
+  @override
+  String get workflowFieldCrmChatOldStatus => 'وضعیت قبلی مکالمه';
+
+  @override
+  String get workflowFieldDescCrmChatOldStatus => 'قبل از به‌روزرسانی وضعیت';
+
+  @override
+  String get workflowFieldCrmChatNewStatus => 'وضعیت جدید مکالمه';
+
+  @override
+  String get workflowFieldDescCrmChatNewStatus => 'پس از به‌روزرسانی وضعیت';
+
+  @override
   String get workflowFieldEmailTo => 'گیرنده';
 
   @override

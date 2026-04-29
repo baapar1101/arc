@@ -1177,6 +1177,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                     child: Text('FIFO (اول ورود، اول خروج)'),
                   ),
                   DropdownMenuItem(
+                    value: 'fifo_jbfn',
+                    child: Text('FIFO JBFN (کسری از خریدهای بعدی تا تاریخ سند)'),
+                  ),
+                  DropdownMenuItem(
                     value: 'lifo',
                     child: Text('LIFO (آخر ورود، اول خروج)'),
                   ),
@@ -1200,15 +1204,16 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                 },
               ),
               if (_invoiceProfitCalculationBasis == 'fifo' ||
+                  _invoiceProfitCalculationBasis == 'fifo_jbfn' ||
                   _invoiceProfitCalculationBasis == 'lifo' ||
                   _invoiceProfitCalculationBasis == 'moving_weighted_average') ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _invoiceProfitFifoShortageMode,
                   decoration: const InputDecoration(
-                    labelText: 'سیاست کسری (FIFO / LIFO / WMA)',
+                    labelText: 'سیاست کسری (FIFO / LIFO / WMA / FIFO JBFN)',
                     helperText:
-                        'در کمبود موجودی: آخرین بهای موزون / لایه، یا میانگین خرید تا تاریخ سند',
+                        'در کمبود موجودی: آخرین بهای موزون / لایه، یا میانگین خرید تا تاریخ سند (برای FIFO، LIFO، WMA، FIFO JBFN)',
                     border: OutlineInputBorder(),
                   ),
                   items: const [

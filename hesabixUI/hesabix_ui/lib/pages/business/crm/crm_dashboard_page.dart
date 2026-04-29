@@ -5,7 +5,6 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
-import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
@@ -65,11 +64,6 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
         _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
-      SnackBarHelper.show(
-        context,
-        message: 'خطا در بارگذاری: ${ErrorExtractor.forContext(e, context)}',
-        isError: true,
-      );
     }
   }
 
@@ -126,64 +120,88 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                   onRefresh: _load,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      MediaQuery.paddingOf(context).bottom + 16,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final padW = MediaQuery.paddingOf(context).horizontal;
+                        final maxW = constraints.maxWidth + padW;
+                        final useTwoCol = maxW >= 620;
+                        final gap = maxW < 400 ? 10.0 : 12.0;
+                        final tileW = useTwoCol ? (constraints.maxWidth - gap) / 2 : constraints.maxWidth;
+                        Widget rowPair(Widget a, Widget b) {
+                          if (!useTwoCol) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                a,
+                                SizedBox(height: gap),
+                                b,
+                              ],
+                            );
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(width: tileW, child: a),
+                              SizedBox(width: gap),
+                              SizedBox(width: tileW, child: b),
+                            ],
+                          );
+                        }
+
+                        final p1 = rowPair(
+                          _SummaryCard(
+                            icon: Icons.contact_phone,
+                            title: 'سرنخ‌ها',
+                            value: '${_summary?['total_leads'] ?? 0}',
+                            subtitle: '${_summary?['converted_leads'] ?? 0} تبدیل شده',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/leads'),
+                          ),
+                          _SummaryCard(
+                            icon: Icons.trending_up,
+                            title: 'فرصت فروش',
+                            value: '${_summary?['total_deals'] ?? 0}',
+                            subtitle: '${_summary?['closed_deals'] ?? 0} بسته شده',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/deals'),
+                          ),
+                        );
+                        final p2 = rowPair(
+                          _SummaryCard(
+                            icon: Icons.percent,
+                            title: 'نرخ تبدیل',
+                            value: '${_summary?['conversion_rate'] ?? 0}%',
+                            subtitle: 'سرنخ به مشتری',
+                          ),
+                          _SummaryCard(
+                            icon: Icons.account_balance_wallet,
+                            title: 'مبلغ کل فرصت‌ها',
+                            value: NumberFormat('#,##0').format(((_summary?['total_deals_amount'] as num?) ?? 0).toDouble()),
+                            subtitle: 'ریال',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/deals'),
+                          ),
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(
-                              child: _SummaryCard(
-                                icon: Icons.contact_phone,
-                                title: 'سرنخ‌ها',
-                                value: '${_summary?['total_leads'] ?? 0}',
-                                subtitle: '${_summary?['converted_leads'] ?? 0} تبدیل شده',
-                                onTap: () => context.go('/business/${widget.businessId}/crm/leads'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _SummaryCard(
-                                icon: Icons.trending_up,
-                                title: 'فرصت فروش',
-                                value: '${_summary?['total_deals'] ?? 0}',
-                                subtitle: '${_summary?['closed_deals'] ?? 0} بسته شده',
-                                onTap: () => context.go('/business/${widget.businessId}/crm/deals'),
-                              ),
+                            p1,
+                            SizedBox(height: gap),
+                            p2,
+                            SizedBox(height: maxW < 400 ? 14 : 20),
+                            _FollowUpsCard(
+                              businessId: widget.businessId,
+                              leads: _followUpLeads,
+                              deals: _followUpDeals,
+                              onRefresh: _load,
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SummaryCard(
-                                icon: Icons.percent,
-                                title: 'نرخ تبدیل',
-                                value: '${_summary?['conversion_rate'] ?? 0}%',
-                                subtitle: 'سرنخ به مشتری',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _SummaryCard(
-                                icon: Icons.account_balance_wallet,
-                                title: 'مبلغ کل فرصت‌ها',
-                                value: NumberFormat('#,##0').format(((_summary?['total_deals_amount'] as num?) ?? 0).toDouble()),
-                                subtitle: 'ریال',
-                                onTap: () => context.go('/business/${widget.businessId}/crm/deals'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        _FollowUpsCard(
-                          businessId: widget.businessId,
-                          leads: _followUpLeads,
-                          deals: _followUpDeals,
-                          onRefresh: _load,
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ),

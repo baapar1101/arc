@@ -110,9 +110,17 @@ async def get_follow_ups_today(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    from datetime import datetime, timedelta
-    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    end = start + timedelta(days=days_ahead)
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+
+    # بازهٔ «امروز» بر اساس تقویم محلی ایران (نه نیمه‌شب UTC)، سپس تبدیل به UTC نَیْو برای مقایسه با DB
+    tz = ZoneInfo("Asia/Tehran")
+    utc = timezone.utc
+    now_local = datetime.now(tz)
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_local = start_local + timedelta(days=days_ahead)
+    start = start_local.astimezone(utc).replace(tzinfo=None)
+    end = end_local.astimezone(utc).replace(tzinfo=None)
     current_user_id = ctx.get_user_id()
     restrict_assignee = bool(
         current_user_id and not (ctx.is_superadmin() or ctx.is_business_owner(business_id))

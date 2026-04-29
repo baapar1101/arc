@@ -11,7 +11,7 @@ class ChatConversationStartedTrigger(BaseTrigger):
 	def get_metadata(self) -> Dict[str, Any]:
 		return {
 			"name": "شروع مکالمه چت وب",
-			"description": "اولین ثبت مکالمه پس از تکمیل فرم بازدیدکننده (نام، ایمیل، تلفن)",
+			"description": "اولین ثبت مکالمه پس از تکمیل فرم بازدیدکننده (نام، نام خانوادگی، ایمیل، تلفن)",
 			"config_schema": {
 				"enabled": {"type": "boolean", "description": "فعال/غیرفعال", "default": True, "required": False},
 				"widget_id_filter": {

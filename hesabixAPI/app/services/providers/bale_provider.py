@@ -27,8 +27,9 @@ class BaleProvider:
 		chat_id: int,
 		text: str,
 		parse_mode: str | None = None,
+		reply_markup: Dict[str, Any] | None = None,
 	) -> bool:
-		"""ارسال پیام متنی به چت بله. API: https://tapi.bale.ai"""
+		"""ارسال پیام متنی به چت بله. API مشابه تلگرام؛ reply_markup اختیاری است."""
 		if not self.is_configured():
 			return False
 		token = self.bot_token
@@ -40,6 +41,8 @@ class BaleProvider:
 		}
 		if parse_mode:
 			data["parse_mode"] = parse_mode
+		if reply_markup:
+			data["reply_markup"] = reply_markup
 		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 		req = request.Request(url, data=body, method="POST")
 		req.add_header("Content-Type", "application/json")
@@ -57,6 +60,41 @@ class BaleProvider:
 			logger.error(
 				"bale_send_exception",
 				chat_id=chat_id,
+				exception_type=type(exc).__name__,
+				exception_message=str(exc),
+			)
+			return False
+
+	def answer_callback_query(
+		self,
+		callback_query_id: str,
+		text: str | None = None,
+		show_alert: bool = False,
+	) -> bool:
+		"""پاسخ به callback دکمهٔ اینلاین (الزامی پس از کلیک طبق مستندات بله)."""
+		if not self.is_configured() or not callback_query_id:
+			return False
+		token = self.bot_token
+		assert token
+		url = f"{BALE_API_BASE}/bot{token}/answerCallbackQuery"
+		payload: Dict[str, Any] = {"callback_query_id": str(callback_query_id)}
+		if text:
+			payload["text"] = str(text)[:200]
+		if show_alert:
+			payload["show_alert"] = True
+		body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=10) as resp:
+				if resp.status != 200:
+					return False
+				raw = resp.read().decode("utf-8")
+				j = json.loads(raw)
+				return j.get("ok") is True
+		except Exception as exc:
+			logger.error(
+				"bale_answer_callback_exception",
 				exception_type=type(exc).__name__,
 				exception_message=str(exc),
 			)

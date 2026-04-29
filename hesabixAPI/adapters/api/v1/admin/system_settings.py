@@ -263,6 +263,16 @@ def register_telegram_webhook_endpoint(
 	
 	if ok:
 		logger.info("telegram_webhook_register_success", webhook_url=webhook_url)
+		cmd_ok = provider.set_my_commands(
+			[
+				{"command": "menu", "description": "منوی اصلی"},
+				{"command": "crmchat", "description": "چت وب CRM (اپراتور ویجت)"},
+				{"command": "bizpick", "description": "فهرست انتخاب کسب‌وکار"},
+				{"command": "crmhelp", "description": "راهنما و دکمه\u200cهای چت وب"},
+				{"command": "help", "description": "راهنمای ربات"},
+			]
+		)
+		logger.info("telegram_bot_commands_registered", ok=cmd_ok)
 	else:
 		logger.error("telegram_webhook_register_failed", 
 			webhook_url=webhook_url,

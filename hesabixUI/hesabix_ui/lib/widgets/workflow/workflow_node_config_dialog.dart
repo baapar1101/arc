@@ -4480,6 +4480,109 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
       ];
     }
 
+    if (key == 'crm.chat.conversation.started') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+        _workflowSuggestedField('visitor_first_name', t.workflowFieldCrmChatVisitorFirstName,
+            t.workflowFieldDescCrmChatVisitorFirstName, 'string'),
+        _workflowSuggestedField(
+            'visitor_last_name', t.workflowFieldCrmChatVisitorLastName, t.workflowFieldDescCrmChatVisitorLastName, 'string'),
+        _workflowSuggestedField('visitor_email', t.workflowFieldEmail, t.workflowFieldDescEmail, 'string'),
+        _workflowSuggestedField('visitor_phone', t.workflowFieldPhone, t.workflowFieldDescPhone, 'string'),
+        _workflowSuggestedField(
+            'page_url', t.workflowFieldCrmChatPageUrl, t.workflowFieldDescCrmChatPageUrl, 'string'),
+        _workflowSuggestedField('conversation_status', t.workflowFieldCrmChatConversationStatus,
+            t.workflowFieldDescCrmChatConversationStatus, 'string'),
+        _workflowSuggestedField('assigned_to_user_id', t.workflowFieldCrmChatAssignedToUserId,
+            t.workflowFieldDescCrmChatAssignedToUserId, 'number'),
+        _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+      ];
+    }
+    if (key == 'crm.chat.message.received') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+        _workflowSuggestedField(
+            'message_id', t.workflowFieldCrmChatMessageId, t.workflowFieldDescCrmChatMessageId, 'number'),
+        _workflowSuggestedField('body', t.workflowFieldCrmChatBody, t.workflowFieldDescCrmChatBody, 'string'),
+        _workflowSuggestedField(
+            'sender_role', t.workflowFieldCrmChatSenderRole, t.workflowFieldDescCrmChatSenderRole, 'string'),
+        _workflowSuggestedField(
+            'file_storage_id', t.workflowFieldFileStorageId, t.workflowFieldDescFileStorageId, 'string'),
+        _workflowSuggestedField('visitor_first_name', t.workflowFieldCrmChatVisitorFirstName,
+            t.workflowFieldDescCrmChatVisitorFirstName, 'string'),
+        _workflowSuggestedField(
+            'visitor_last_name', t.workflowFieldCrmChatVisitorLastName, t.workflowFieldDescCrmChatVisitorLastName, 'string'),
+        _workflowSuggestedField('visitor_email', t.workflowFieldEmail, t.workflowFieldDescEmail, 'string'),
+        _workflowSuggestedField('visitor_phone', t.workflowFieldPhone, t.workflowFieldDescPhone, 'string'),
+        _workflowSuggestedField('conversation_status', t.workflowFieldCrmChatConversationStatus,
+            t.workflowFieldDescCrmChatConversationStatus, 'string'),
+        _workflowSuggestedField('assigned_to_user_id', t.workflowFieldCrmChatAssignedToUserId,
+            t.workflowFieldDescCrmChatAssignedToUserId, 'number'),
+        _workflowSuggestedField('lead_id', t.workflowFieldLeadId, t.workflowFieldDescLeadId, 'number'),
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        _workflowSuggestedField(
+            'page_url', t.workflowFieldCrmChatPageUrl, t.workflowFieldDescCrmChatPageUrl, 'string'),
+      ];
+    }
+    if (key == 'crm.chat.message.sent') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+        _workflowSuggestedField(
+            'message_id', t.workflowFieldCrmChatMessageId, t.workflowFieldDescCrmChatMessageId, 'number'),
+        _workflowSuggestedField('body', t.workflowFieldCrmChatBody, t.workflowFieldDescCrmChatBody, 'string'),
+        _workflowSuggestedField(
+            'sender_role', t.workflowFieldCrmChatSenderRole, t.workflowFieldDescCrmChatSenderRole, 'string'),
+        _workflowSuggestedField(
+            'agent_user_id', t.workflowFieldCrmChatAgentUserId, t.workflowFieldDescCrmChatAgentUserId, 'number'),
+        _workflowSuggestedField(
+            'automation_source', t.workflowFieldAutomationSource, t.workflowFieldDescAutomationSource, 'string'),
+        _workflowSuggestedField(
+            'operator_relay', t.workflowFieldOperatorRelay, t.workflowFieldDescOperatorRelay, 'boolean'),
+      ];
+    }
+    if (key == 'crm.chat.conversation.assigned') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+        _workflowSuggestedField('old_assigned_to_user_id', t.workflowFieldCrmChatOldAssignedUserId,
+            t.workflowFieldDescCrmChatOldAssignedUserId, 'number'),
+        _workflowSuggestedField('new_assigned_to_user_id', t.workflowFieldCrmChatNewAssignedUserId,
+            t.workflowFieldDescCrmChatNewAssignedUserId, 'number'),
+      ];
+    }
+    if (key == 'crm.chat.conversation.resolved') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+      ];
+    }
+    if (key == 'crm.chat.conversation.reopened') {
+      return [
+        _workflowSuggestedField(
+            'conversation_id', t.workflowFieldCrmChatConversationId, t.workflowFieldDescCrmChatConversationId, 'number'),
+        _workflowSuggestedField(
+            'widget_id', t.workflowFieldCrmChatWidgetId, t.workflowFieldDescCrmChatWidgetId, 'number'),
+        _workflowSuggestedField(
+            'old_status', t.workflowFieldCrmChatOldStatus, t.workflowFieldDescCrmChatOldStatus, 'string'),
+        _workflowSuggestedField(
+            'new_status', t.workflowFieldCrmChatNewStatus, t.workflowFieldDescCrmChatNewStatus, 'string'),
+      ];
+    }
+
     if (key.contains('payment')) {
       return [
         _workflowSuggestedField('payment_id', t.workflowFieldPaymentId, t.workflowFieldDescPaymentId, 'number'),

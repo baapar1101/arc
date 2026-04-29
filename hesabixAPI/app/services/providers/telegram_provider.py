@@ -92,6 +92,37 @@ class TelegramProvider:
 			)
 			return False, str(exc)
 
+	def set_my_commands(
+		self,
+		commands: list[dict[str, str]],
+		language_code: str | None = None,
+		scope: dict[str, Any] | None = None,
+	) -> bool:
+		"""ثبت دستورات منوی / در تلگرام (BotFather جایگزین نمی‌شود؛ همان Bot را آپدیت می‌کند)."""
+		if not self.is_configured():
+			return False
+		payload: Dict[str, Any] = {"commands": commands}
+		if language_code:
+			payload["language_code"] = language_code
+		if scope:
+			payload["scope"] = scope
+		if self._proxy_enabled():
+			ok, _ = self._proxy_request("setMyCommands", payload)
+			return ok
+		token = self.bot_token
+		assert token
+		url = f"https://api.telegram.org/bot{token}/setMyCommands"
+		body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=10) as resp:
+				raw = resp.read().decode("utf-8")
+				j = json.loads(raw)
+				return bool(j.get("ok"))
+		except Exception:
+			return False
+
 	def send_text(
 		self,
 		chat_id: int,
@@ -123,8 +154,9 @@ class TelegramProvider:
 		if parse_mode:
 			data["parse_mode"] = parse_mode
 		if reply_markup:
-			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
-		
+			# شیء تودرتو؛ json.dumps(data) یک بار کل بدنه را می‌سازد (نه رشتهٔ JSON دوبل)
+			data["reply_markup"] = reply_markup
+
 		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 		req = request.Request(url, data=body, method="POST")
 		req.add_header("Content-Type", "application/json")
@@ -172,8 +204,8 @@ class TelegramProvider:
 		if parse_mode:
 			data["parse_mode"] = parse_mode
 		if reply_markup:
-			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
-		
+			data["reply_markup"] = reply_markup
+
 		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 		req = request.Request(url, data=body, method="POST")
 		req.add_header("Content-Type", "application/json")
@@ -213,8 +245,8 @@ class TelegramProvider:
 			"message_id": message_id,
 		}
 		if reply_markup:
-			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
-		
+			data["reply_markup"] = reply_markup
+
 		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 		req = request.Request(url, data=body, method="POST")
 		req.add_header("Content-Type", "application/json")

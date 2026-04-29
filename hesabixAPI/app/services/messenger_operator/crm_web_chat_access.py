@@ -22,11 +22,10 @@ def is_superadmin_user(user: User) -> bool:
 
 
 def user_can_reply_crm_web_chat(db: Session, user: User, business_id: int) -> bool:
+	"""فقط مالک کسب‌وکار یا عضو با مجوز پاسخ‌گویی چت وب CRM (سوپرادمین از این قاعده مستثنی نیست)."""
 	b = db.get(Business, int(business_id))
 	if not b or b.deleted_at is not None:
 		return False
-	if is_superadmin_user(user):
-		return True
 	if int(b.owner_id) == int(user.id):
 		return True
 	repo = BusinessPermissionRepository(db)
@@ -39,13 +38,15 @@ def user_can_reply_crm_web_chat(db: Session, user: User, business_id: int) -> bo
 	return check_crm_web_chat_capability(perms, "reply")
 
 
+def user_has_crm_web_chat_messenger_access(db: Session, user: User) -> bool:
+	"""آیا کاربر حداقل یک کسب‌وکار دارد که بتواند از پیام‌رسان چت وب CRM را به‌عنوان عامل استفاده کند؟"""
+	return bool(iter_reply_allowed_businesses(db, user))
+
+
 def iter_reply_allowed_businesses(db: Session, user: User) -> List[Tuple[int, str]]:
-	"""کسب‌وکارهایی که کاربر می‌تواند در چت وب به‌عنوان عامل پاسخ دهد."""
+	"""کسب‌وکارهایی که کاربر می‌تواند در چت وب به‌عنوان عامل پاسخ دهد (مالک یا عضو با مجوز reply)."""
 	out: List[Tuple[int, str]] = []
 	seen: set[int] = set()
-
-	if is_superadmin_user(user):
-		return []
 
 	owned = db.scalars(
 		select(Business).where(Business.owner_id == int(user.id), Business.deleted_at.is_(None))
@@ -71,3 +72,22 @@ def iter_reply_allowed_businesses(db: Session, user: User) -> List[Tuple[int, st
 		out.append((bid, (b.name or "").strip() or f"کسب‌وکار {bid}"))
 
 	return out
+
+
+def iter_messenger_crm_business_page(
+	db: Session,
+	user: User,
+	*,
+	offset: int = 0,
+	limit: int = 10,
+) -> Tuple[List[Tuple[int, str]], bool]:
+	"""
+	صفحه‌ای از کسب‌وکارهای قابل انتخاب برای چت وب در پیام‌رسان.
+	فقط همان فهرست مجاز (مالک یا عضو با دسترسی CRM chat reply)؛ بدون لیست سراسری.
+	"""
+	off = max(0, int(offset))
+	lim = max(1, min(int(limit), 25))
+	all_allowed = iter_reply_allowed_businesses(db, user)
+	slice_ = all_allowed[off : off + lim + 1]
+	has_more = len(slice_) > lim
+	return slice_[:lim], has_more
