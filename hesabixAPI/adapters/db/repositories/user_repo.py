@@ -23,6 +23,16 @@ class UserRepository(BaseRepository[User]):
 		stmt = select(User).where(User.mobile == mobile)
 		return self.db.execute(stmt).scalars().first()
 
+	def count_recently_active_users(self, within_minutes: int = 5) -> int:
+		"""تعداد کاربران فعالی که ضربان فعالیت در بازهٔ اخیر داشته‌اند (برآورد «کاربر آنلاین»)."""
+		cutoff = datetime.utcnow() - timedelta(minutes=max(1, min(within_minutes, 120)))
+		stmt = select(func.count()).select_from(User).where(
+			User.is_active == True,
+			User.last_activity_at.is_not(None),
+			User.last_activity_at >= cutoff,
+		)
+		return int(self.db.execute(stmt).scalar() or 0)
+
 	def touch_last_activity(self, user_id: int, throttle_seconds: int = 45) -> Optional[datetime]:
 		"""
 		به‌روزرسانی زمان آخرین فعالیت کاربر؛ اگر قبلاً در بازهٔ throttle به‌روز شده باشد، UPDATE زده نمی‌شود.

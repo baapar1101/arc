@@ -13,7 +13,7 @@ from adapters.api.v1.schemas import (
 	UserDetailResponse, BulkOperationResponse, BulkResetPasswordResponse,
 	AdminSetUserPasswordRequest,
 )
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_user_management
 from app.core.cache import get_cache
@@ -32,6 +32,13 @@ from starlette.responses import StreamingResponse
 
 
 router = APIRouter(prefix="/users", tags=["کاربران", "مدیریت سیستم"])
+
+
+def verify_user_management_page_access(ctx: AuthContext = Depends(get_current_user)) -> AuthContext:
+	"""همان بازهٔ دسترسی UI: سوپرادمین یا system_settings یا user_management."""
+	if ctx.is_superadmin() or ctx.has_app_permission("system_settings") or ctx.has_app_permission("user_management"):
+		return ctx
+	raise ApiError("FORBIDDEN", "مجوز دسترسی به مدیریت کاربران یا تنظیمات سیستم لازم است", http_status=403)
 
 
 @router.post("/search", 
@@ -1087,6 +1094,36 @@ def get_users_summary(
 	}
 	
 	return success_response(response_data, request)
+
+
+@router.get(
+	"/stats/online",
+	summary="تعداد کاربران با فعالیت اخیر (آنلاین تقریبی)",
+	description="""
+بر اساس فیلد `last_activity_at` (ضربان اپ کلاینت) تعداد کاربران **فعال** را می‌دهد که
+در بازهٔ اخیر (پیش‌فرض ۵ دقیقه، قابل تنظیم) فعالیت ثبت کرده باشند.
+
+تعریف «آنلاین»: کاربری که اخیراً ضربان HTTP زده؛ نه همان واقع‌زمان WebSocket مطلق.
+مجوز مانند باز کردن همین صفحه در UI: سوپرادمین، `system_settings` یا `user_management`.
+""",
+	response_model=SuccessResponse,
+)
+def get_users_online_stats(
+	request: Request,
+	window_minutes: int = Query(5, ge=1, le=120, description="بازه زمانی برای شمار کاربر «اخیراً فعال»"),
+	_: AuthContext = Depends(verify_user_management_page_access),
+	db: Session = Depends(get_db),
+):
+	repo = UserRepository(db)
+	online_approx = repo.count_recently_active_users(within_minutes=window_minutes)
+	return success_response(
+		{
+			"recently_active_count": online_approx,
+			"window_minutes": window_minutes,
+			"note": "تعداد کاربران فعال با فعالیت ثبت‌شده در بازهٔ اخیر (ضربان اپ؛ تقریبی).",
+		},
+		request,
+	)
 
 
 @router.post("/bulk-activate",

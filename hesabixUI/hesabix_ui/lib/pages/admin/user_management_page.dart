@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -20,6 +22,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
   CalendarController? _calendarController;
   Set<int> _selectedRowIndexes = const {};
   List<Map<String, dynamic>> _tableRawItems = [];
+  Timer? _onlinePolling;
+
+  /// تعداد کاربران فعال با ضربان اخیر (همان بازهٔ `window_minutes` API)
+  int? _recentApproxCount;
 
   int get _selectedCount => _selectedRowIndexes.length;
 
@@ -27,6 +33,39 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     _initCalendarController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fetchRecentApproxCount();
+      _onlinePolling?.cancel();
+      _onlinePolling =
+          Timer.periodic(const Duration(seconds: 55), (_) => _fetchRecentApproxCount());
+    });
+  }
+
+  @override
+  void dispose() {
+    _onlinePolling?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchRecentApproxCount() async {
+    try {
+      final res = await ApiClient().get<Map<String, dynamic>>(
+        '/api/v1/users/stats/online',
+        query: {'window_minutes': 5},
+      );
+      final body = res.data;
+      if (!mounted || body == null) return;
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final n = data['recently_active_count'];
+        final parsed = (n is int) ? n : int.tryParse('$n');
+        if (!mounted || parsed == null) return;
+        setState(() => _recentApproxCount = parsed);
+      }
+    } catch (_) {
+      /* نادیده — شمارنده اختیاری است */
+    }
   }
 
   Future<void> _initCalendarController() async {
@@ -54,6 +93,29 @@ class _UserManagementPageState extends State<UserManagementPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/user/profile/system-settings'),
         ),
+        actions: [
+          Tooltip(
+            message:
+                'تعداد کاربران «فعّال» سیستمی که ضربان اپ را در ۵ دقیقهٔ اخیر ثبت کرده‌اند (برآورد تقریبی آنلاین بودن؛ نه تعداد قطعی سوکت‌ها).',
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(start: 4, end: 8),
+              child: Chip(
+                avatar: Icon(Icons.sensors_rounded, size: 18, color: theme.colorScheme.primary),
+                label: Text(
+                  _recentApproxCount == null
+                      ? 'فعالیت اخیر: …'
+                      : 'فعالیت اخیر (~۵ دق): ${_recentApproxCount!} نفر',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'به‌روزرسانی شمارندهٔ فعالیت اخیر',
+            icon: const Icon(Icons.sync),
+            onPressed: _fetchRecentApproxCount,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: DataTableWidget<Map<String, dynamic>>(
