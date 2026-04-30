@@ -31,7 +31,6 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   
   // فیلترها
   String? _selectedStatus;
-  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   
   // وضعیت‌های مختلف
@@ -85,7 +84,9 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
       final response = await _service.listOrders(
         businessId: widget.businessId,
         status: _selectedStatus,
-        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        search: _searchController.text.trim().isNotEmpty
+            ? _searchController.text.trim()
+            : null,
       );
       
       setState(() {
@@ -271,38 +272,53 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'جستجو (کد، مشتری، شماره تماس، کالا)...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText:
+                          'جستجو (کد، مشتری، شماره تماس، کالا)...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      _debounceTimer?.cancel();
+                      _debounceTimer = Timer(
+                        const Duration(milliseconds: 500),
+                        () {
+                          _loadOrders();
+                        },
+                      );
+                    },
+                  ),
                 ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
+                SizedBox(
+                  width: 48,
+                  child: ListenableBuilder(
+                    listenable: _searchController,
+                    builder: (context, _) {
+                      if (_searchController.text.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _searchQuery = '');
+                          _debounceTimer?.cancel();
                           _loadOrders();
                         },
-                      )
-                    : null,
-              ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-                
-                // لغو تایمر قبلی
-                _debounceTimer?.cancel();
-                
-                // ایجاد تایمر جدید برای debounce
-                _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-                  _loadOrders();
-                });
-              },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),

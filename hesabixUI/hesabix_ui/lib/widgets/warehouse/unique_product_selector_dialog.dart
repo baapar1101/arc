@@ -240,46 +240,61 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
             // Search
             Padding(
               padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'جستجو (سریال/بارکد)',
-                  prefixIcon: const Icon(Icons.search),
-                  border: const OutlineInputBorder(),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        labelText: 'جستجو (سریال/بارکد)',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: ListenableBuilder(
+                      listenable: _searchController,
+                      builder: (context, _) {
+                        if (_searchController.text.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (_) => setState(() {}),
+                          onPressed: () => _searchController.clear(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             // List
             Flexible(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('خطا: $_error'),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadData,
-                                child: const Text('تلاش مجدد'),
+              child: ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  return _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('خطا: $_error'),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _loadData,
+                                    child: const Text('تلاش مجدد'),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
-                      : _filteredInstances.isEmpty
-                          ? const Center(child: Text('کالای یونیکی یافت نشد'))
-                          : ListView.builder(
+                            )
+                          : _filteredInstances.isEmpty
+                              ? const Center(child: Text('کالای یونیکی یافت نشد'))
+                              : ListView.builder(
                               itemCount: _filteredInstances.length,
                               itemBuilder: (context, index) {
                                 final inst = _filteredInstances[index];
@@ -325,7 +340,9 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                                       : const Icon(Icons.radio_button_unchecked),
                                 );
                               },
-                            ),
+                            );
+                },
+              ),
             ),
             // Footer
             Container(

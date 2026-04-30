@@ -50,7 +50,6 @@ class WorkflowNodePaletteContent extends StatefulWidget {
 
 class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent> {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   WorkflowNodeType? _filterType;
 
   @override
@@ -59,18 +58,21 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
     super.dispose();
   }
 
-  List<WorkflowNodeMetadata> _filterItems(List<WorkflowNodeMetadata> items) {
-    if (_searchQuery.isEmpty) return items;
-    
+  List<WorkflowNodeMetadata> _filterItems(
+    List<WorkflowNodeMetadata> items,
+    String query,
+  ) {
+    if (query.isEmpty) return items;
+
     return items.where((item) {
       final nameLower = item.name.toLowerCase();
       final descLower = item.description?.toLowerCase() ?? '';
       final keyLower = item.key.toLowerCase();
-      final searchLower = _searchQuery.toLowerCase();
-      
+      final searchLower = query.toLowerCase();
+
       return nameLower.contains(searchLower) ||
-             descLower.contains(searchLower) ||
-             keyLower.contains(searchLower);
+          descLower.contains(searchLower) ||
+          keyLower.contains(searchLower);
     }).toList();
   }
 
@@ -123,12 +125,6 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-
-    final filteredTriggers = _filterItems(widget.triggers);
-    final filteredActions = _filterItems(widget.actions);
-    final filteredLoops = _filterItems(_getStaticLoopNodes());
-    final filteredConditions = _filterItems(_getStaticConditionNodes());
 
     return Column(
       children: [
@@ -159,35 +155,41 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
           padding: const EdgeInsets.all(12),
           child: Column(
             children: [
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: AppLocalizations.of(context).workflowPaletteSearch,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: AppLocalizations.of(context).workflowPaletteSearch,
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: ListenableBuilder(
+                      listenable: _searchController,
+                      builder: (context, _) {
+                        if (_searchController.text.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                          onPressed: () => _searchController.clear(),
+                        );
+                      },
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
+                ],
               ),
               const SizedBox(height: 8),
               // Filter Chips
@@ -256,50 +258,57 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
         ),
         // Content
         Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              // Triggers Section
-              if (_filterType == null || _filterType == WorkflowNodeType.trigger)
-                _buildSection(
-                  context,
-                  title: 'Trigger ها',
-                  icon: Icons.bolt,
-                  color: Colors.green,
-                  items: filteredTriggers,
-                  type: WorkflowNodeType.trigger,
-                ),
-              // Actions Section
-              if (_filterType == null || _filterType == WorkflowNodeType.action)
-                _buildSection(
-                  context,
-                  title: 'Action ها',
-                  icon: Icons.play_arrow,
-                  color: theme.colorScheme.primary,
-                  items: filteredActions,
-                  type: WorkflowNodeType.action,
-                ),
-              // Loop Section
-              if (_filterType == null || _filterType == WorkflowNodeType.loop)
-                _buildSection(
-                  context,
-                  title: 'Loop ها',
-                  icon: Icons.loop,
-                  color: Colors.purple,
-                  items: filteredLoops,
-                  type: WorkflowNodeType.loop,
-                ),
-              // Condition Section
-              if (_filterType == null || _filterType == WorkflowNodeType.condition)
-                _buildSection(
-                  context,
-                  title: 'Condition ها',
-                  icon: Icons.code,
-                  color: Colors.orange,
-                  items: filteredConditions,
-                  type: WorkflowNodeType.condition,
-                ),
-            ],
+          child: ListenableBuilder(
+            listenable: _searchController,
+            builder: (context, _) {
+              final q = _searchController.text;
+              final filteredTriggers = _filterItems(widget.triggers, q);
+              final filteredActions = _filterItems(widget.actions, q);
+              final filteredLoops = _filterItems(_getStaticLoopNodes(), q);
+              final filteredConditions = _filterItems(_getStaticConditionNodes(), q);
+
+              return ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  if (_filterType == null || _filterType == WorkflowNodeType.trigger)
+                    _buildSection(
+                      context,
+                      title: 'Trigger ها',
+                      icon: Icons.bolt,
+                      color: Colors.green,
+                      items: filteredTriggers,
+                      type: WorkflowNodeType.trigger,
+                    ),
+                  if (_filterType == null || _filterType == WorkflowNodeType.action)
+                    _buildSection(
+                      context,
+                      title: 'Action ها',
+                      icon: Icons.play_arrow,
+                      color: theme.colorScheme.primary,
+                      items: filteredActions,
+                      type: WorkflowNodeType.action,
+                    ),
+                  if (_filterType == null || _filterType == WorkflowNodeType.loop)
+                    _buildSection(
+                      context,
+                      title: 'Loop ها',
+                      icon: Icons.loop,
+                      color: Colors.purple,
+                      items: filteredLoops,
+                      type: WorkflowNodeType.loop,
+                    ),
+                  if (_filterType == null || _filterType == WorkflowNodeType.condition)
+                    _buildSection(
+                      context,
+                      title: 'Condition ها',
+                      icon: Icons.code,
+                      color: Colors.orange,
+                      items: filteredConditions,
+                      type: WorkflowNodeType.condition,
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ],

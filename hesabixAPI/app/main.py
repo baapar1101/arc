@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from fastapi.openapi.docs import get_swagger_ui_html
+from app.openapi_local_docs import get_local_swagger_ui_html
 import logging
 import os
 from typing import Optional, IO
@@ -672,12 +672,10 @@ def create_app() -> FastAPI:
     @application.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html():
         """صفحه سفارشی Swagger UI با پشتیبانی کامل از فارسی و RTL"""
-        return get_swagger_ui_html(
+        return get_local_swagger_ui_html(
             openapi_url=application.openapi_url,
             title=f"{app_name} - مستندات API",
             oauth2_redirect_url=application.swagger_ui_oauth2_redirect_url,
-            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
-            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
             swagger_favicon_url="/assets/logo-blue.png",
         )
 
@@ -693,7 +691,7 @@ def create_app() -> FastAPI:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{app_name} - مستندات API</title>
             <link rel="icon" type="image/png" href="/assets/logo-blue.png">
-            <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+            <link rel="stylesheet" type="text/css" href="/assets/swagger/vendor/swagger-ui.css">
             <link rel="stylesheet" type="text/css" href="/assets/swagger/custom.css">
             <link rel="stylesheet" type="text/css" href="/assets/swagger/swagger-rtl.css">
             <link rel="stylesheet" type="text/css" href="/assets/swagger/dark-mode.css">
@@ -720,8 +718,8 @@ def create_app() -> FastAPI:
             <button id="dark-mode-toggle" class="dark-mode-toggle" title="تغییر حالت تیره/روشن" aria-label="تغییر حالت تیره/روشن">
                 <span id="dark-mode-icon">🌙</span>
             </button>
-            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+            <script src="/assets/swagger/vendor/swagger-ui-bundle.js"></script>
+            <script src="/assets/swagger/vendor/swagger-ui-standalone-preset.js"></script>
             <script>
                 window.onload = function() {{
                     const ui = SwaggerUIBundle({{

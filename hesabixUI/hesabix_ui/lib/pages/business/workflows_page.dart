@@ -239,20 +239,33 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: t.workflowSearch,
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isEmpty
-                          ? null
-                          : IconButton(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            labelText: t.workflowSearch,
+                            prefixIcon: const Icon(Icons.search),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 48,
+                        child: ListenableBuilder(
+                          listenable: _searchController,
+                          builder: (context, _) {
+                            if (_searchController.text.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return IconButton(
                               icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                              },
-                            ),
-                    ),
+                              onPressed: () => _searchController.clear(),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),

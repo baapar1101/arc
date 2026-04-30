@@ -1143,15 +1143,38 @@ class _SupportPageState extends State<SupportPage> {
   Widget _buildMobileSearch(AppLocalizations t) {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          labelText: t.search,
-          hintText: 'جست‌وجو در عنوان و توضیحات تیکت‌ها...',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isEmpty
-              ? null
-              : IconButton(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: t.search,
+                hintText: 'جست‌وجو در عنوان و توضیحات تیکت‌ها...',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              textInputAction: TextInputAction.search,
+              onChanged: _onSearchChanged,
+              onSubmitted: (_) {
+                _searchDebounce?.cancel();
+                setState(() {
+                  _ticketPage = 1;
+                  _hasMoreTickets = true;
+                });
+                _loadTickets();
+              },
+            ),
+          ),
+          SizedBox(
+            width: 48,
+            child: ListenableBuilder(
+              listenable: _searchController,
+              builder: (context, _) {
+                if (_searchController.text.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return IconButton(
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     setState(() {
@@ -1162,18 +1185,11 @@ class _SupportPageState extends State<SupportPage> {
                     });
                     _loadTickets(showSpinner: false);
                   },
-                ),
-        ),
-        textInputAction: TextInputAction.search,
-        onChanged: _onSearchChanged,
-        onSubmitted: (_) {
-          _searchDebounce?.cancel();
-          setState(() {
-            _ticketPage = 1;
-            _hasMoreTickets = true;
-          });
-          _loadTickets();
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

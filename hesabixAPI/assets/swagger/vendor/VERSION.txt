@@ -1,0 +1,6 @@
+Swagger UI 4.15.5 (swagger-ui-dist)
+Apache License 2.0 — https://github.com/swagger-api/swagger-ui
+
+فایل‌ها با بستهٔ PyPI «swagger-ui-bundle» 1.1.0 (vendor داخلی همان نسخه) استخراج و در ریپو نگه داشته شده‌اند تا بدون CDN در دسترس باشند.
+
+برای ارتقا به نسخهٔ جدیدتر (مثلاً swagger-ui-dist@5): پس از دسترسی به اینترنت، از npm یا آرشیو رسمی dist همان نسخه را در این پوشه کپی کنید و این فایل را به‌روز کنید.

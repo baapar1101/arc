@@ -22,7 +22,6 @@ class _PriceListsPageState extends State<PriceListsPage> {
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _priceLists = [];
   bool _loading = false;
-  String _searchQuery = '';
 
   @override
   void initState() {
@@ -41,7 +40,9 @@ class _PriceListsPageState extends State<PriceListsPage> {
     try {
       final result = await _svc.listPriceLists(
         businessId: widget.businessId,
-        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        search: _searchController.text.trim().isNotEmpty
+            ? _searchController.text.trim()
+            : null,
       );
       final items = result['items'] as List<dynamic>? ?? [];
       setState(() {
@@ -60,8 +61,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
     }
   }
 
-  void _onSearchChanged(String value) {
-    setState(() => _searchQuery = value);
+  void _onSearchChanged(String _) {
     _loadPriceLists();
   }
 
@@ -75,23 +75,39 @@ class _PriceListsPageState extends State<PriceListsPage> {
         // Search bar
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              labelText: 'جستجو در لیست‌های قیمت',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    labelText: 'جستجو در لیست‌های قیمت',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
+              ),
+              SizedBox(
+                width: 48,
+                child: ListenableBuilder(
+                  listenable: _searchController,
+                  builder: (context, _) {
+                    if (_searchController.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         _onSearchChanged('');
                       },
-                    )
-                  : null,
-              border: const OutlineInputBorder(),
-            ),
-            onChanged: _onSearchChanged,
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         // Header with create button
@@ -143,14 +159,14 @@ class _PriceListsPageState extends State<PriceListsPage> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            _searchQuery.isNotEmpty
+                            _searchController.text.trim().isNotEmpty
                                 ? 'هیچ لیست قیمتی یافت نشد'
                                 : 'هیچ لیست قیمتی وجود ندارد',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   color: Colors.grey[600],
                                 ),
                           ),
-                          if (_searchQuery.isEmpty) ...[
+                          if (_searchController.text.trim().isEmpty) ...[
                             const SizedBox(height: 8),
                             Text(
                               'برای شروع، یک لیست قیمت جدید ایجاد کنید',

@@ -146,42 +146,59 @@ class _InvoiceNumberFieldState extends State<InvoiceNumberField> {
 
           // فیلد ورودی شماره فاکتور
           if (_isManualEntry) ...[
-            TextFormField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: widget.hintText ?? 'شماره فاکتور را وارد کنید',
-                prefixIcon: const Icon(Icons.numbers),
-                suffixIcon: _controller.text.isNotEmpty
-                    ? IconButton(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText:
+                          widget.hintText ?? 'شماره فاکتور را وارد کنید',
+                      prefixIcon: const Icon(Icons.numbers),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest,
+                    ),
+                    onChanged: (value) {
+                      widget.onChanged(value.isEmpty ? null : value);
+                    },
+                    inputFormatters: [
+                      const EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'[a-zA-Z0-9\-_]')),
+                    ],
+                    validator: widget.isRequired && _isManualEntry
+                        ? (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'شماره فاکتور الزامی است';
+                            }
+                            return null;
+                          }
+                        : null,
+                  ),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: ListenableBuilder(
+                    listenable: _controller,
+                    builder: (context, _) {
+                      if (_controller.text.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _controller.clear();
                           widget.onChanged('');
                         },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                      );
+                    },
+                  ),
                 ),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
-              ),
-              onChanged: (value) {
-                widget.onChanged(value.isEmpty ? null : value);
-              },
-              inputFormatters: [
-                const EnglishDigitsFormatter(),
-                // فقط اعداد و حروف انگلیسی و خط تیره و زیرخط
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_]')),
               ],
-              validator: widget.isRequired && _isManualEntry
-                  ? (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'شماره فاکتور الزامی است';
-                      }
-                      return null;
-                    }
-                  : null,
             ),
           ] else ...[
             // نمایش حالت اتوماتیک

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -50,6 +51,8 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   int _totalCount = 0;
   bool _hasMore = true;
   
+  Timer? _searchDebounce;
+
   List<Map<String, dynamic>> _activeSubscriptions = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _availablePlans = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _invoices = const <Map<String, dynamic>>[];
@@ -94,7 +97,9 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _calendarController?.removeListener(_onCalendarChanged);
+    _searchController.removeListener(_onSearchChanged);
     _tabController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -116,11 +121,15 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   }
   
   void _onSearchChanged() {
-    final query = _searchController.text.trim();
-    if (query != _searchQuery) {
-      _searchQuery = query.isEmpty ? null : query;
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final query = _searchController.text.trim();
+      final next = query.isEmpty ? null : query;
+      if (next == _searchQuery) return;
+      _searchQuery = next;
       _load();
-    }
+    });
   }
 
   Future<void> _load({bool reset = true}) async {
@@ -1102,25 +1111,39 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                   ),
                 ),
               // Search bar
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'جستجو در فایل‌ها...',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _searchQuery != null
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'جستجو در فایل‌ها...',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      ),
+                    ),
                   ),
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                ),
+                  SizedBox(
+                    width: 48,
+                    child: ListenableBuilder(
+                      listenable: _searchController,
+                      builder: (context, _) {
+                        if (_searchController.text.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => _searchController.clear(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               // Filters and actions

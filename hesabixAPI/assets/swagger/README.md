@@ -8,6 +8,12 @@
 swagger/
 ├── custom.css          # استایل‌های سفارشی اصلی
 ├── swagger-rtl.css     # پشتیبانی از راست‌به‌چپ (RTL)
+├── dark-mode.css       # حالت تیره (برای /docs-custom)
+├── vendor/             # Swagger UI بدون CDN (bundle + CSS + preset)
+│   ├── swagger-ui-bundle.js
+│   ├── swagger-ui.css
+│   ├── swagger-ui-standalone-preset.js
+│   └── VERSION.txt
 └── README.md           # این فایل
 ```
 

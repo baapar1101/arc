@@ -468,8 +468,6 @@ class _StockCountPageState extends State<StockCountPage> {
                       _calculatedByKey = <String, Map<String, dynamic>>{};
                       _summary = null;
                     });
-                  } else {
-                    setState(() {});
                   }
                 },
               ),
@@ -690,7 +688,6 @@ class _StockCountPageState extends State<StockCountPage> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < _mobileBreakpoint;
-    final visibleRows = _visibleRows();
     return Scaffold(
       appBar: AppBar(
         title: const Text('انبار گردانی'),
@@ -770,9 +767,14 @@ class _StockCountPageState extends State<StockCountPage> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                'لیست محصولات (${visibleRows.length}/${_rows.length})',
-                                style: Theme.of(context).textTheme.titleMedium,
+                              child: ListenableBuilder(
+                                listenable: _searchController,
+                                builder: (context, _) {
+                                  return Text(
+                                    'لیست محصولات (${_visibleRows().length}/${_rows.length})',
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  );
+                                },
                               ),
                             ),
                             IconButton(
@@ -802,25 +804,36 @@ class _StockCountPageState extends State<StockCountPage> {
                         ),
                         if (isMobile) ...[
                           const SizedBox(height: 12),
-                          TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              labelText: 'جستجو (کد/نام/انبار)',
-                              prefixIcon: const Icon(Icons.search),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: _searchController.text.isEmpty
-                                  ? null
-                                  : IconButton(
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'جستجو (کد/نام/انبار)',
+                                    prefixIcon: Icon(Icons.search),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 48,
+                                child: ListenableBuilder(
+                                  listenable: _searchController,
+                                  builder: (context, _) {
+                                    if (_searchController.text.isEmpty) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return IconButton(
                                       tooltip: 'پاک کردن جستجو',
                                       icon: const Icon(Icons.close),
-                                      onPressed: () {
-                                        setState(() => _searchController.clear());
-                                      },
-                                    ),
-                            ),
-                            onChanged: (_) {
-                              setState(() {});
-                            },
+                                      onPressed: () => _searchController.clear(),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -873,39 +886,49 @@ class _StockCountPageState extends State<StockCountPage> {
               ),
             ),
           if (_rows.isNotEmpty && isMobile)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList.separated(
-                itemCount: visibleRows.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final row = visibleRows[index];
-                  final calc = _calculatedByKey[row.key];
-                  return _StockCountRowCard(
-                    row: row,
-                    calculated: calc,
-                    onCopySystemToPhysical: () {
-                      final systemQty = (row.raw['system_quantity'] as num?)?.toDouble();
-                      if (systemQty == null) return;
-                      row.physicalCtrl.text = systemQty.toString();
-                      if (_calculatedByKey.isNotEmpty) {
-                        setState(() {
-                          _calculatedByKey = <String, Map<String, dynamic>>{};
-                          _summary = null;
-                        });
-                      }
+            ListenableBuilder(
+              listenable: _searchController,
+              builder: (context, _) {
+                final visibleRows = _visibleRows();
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverList.separated(
+                    itemCount: visibleRows.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final row = visibleRows[index];
+                      final calc = _calculatedByKey[row.key];
+                      return _StockCountRowCard(
+                        row: row,
+                        calculated: calc,
+                        onCopySystemToPhysical: () {
+                          final systemQty =
+                              (row.raw['system_quantity'] as num?)?.toDouble();
+                          if (systemQty == null) return;
+                          row.physicalCtrl.text = systemQty.toString();
+                          if (_calculatedByKey.isNotEmpty) {
+                            setState(() {
+                              _calculatedByKey =
+                                  <String, Map<String, dynamic>>{};
+                              _summary = null;
+                            });
+                          }
+                        },
+                        onEditingChanged: () {
+                          if (_calculatedByKey.isNotEmpty) {
+                            setState(() {
+                              _calculatedByKey =
+                                  <String, Map<String, dynamic>>{};
+                              _summary = null;
+                            });
+                          }
+                        },
+                      );
                     },
-                    onEditingChanged: () {
-                      if (_calculatedByKey.isNotEmpty) {
-                        setState(() {
-                          _calculatedByKey = <String, Map<String, dynamic>>{};
-                          _summary = null;
-                        });
-                      }
-                    },
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           if (_rows.isNotEmpty && !isMobile)
             SliverFillRemaining(

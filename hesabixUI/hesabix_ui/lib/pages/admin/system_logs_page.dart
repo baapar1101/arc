@@ -125,9 +125,14 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
           children: [
             _buildFilters(theme, t),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _buildLogsList(theme, t),
+              child: ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  return _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _buildLogsList(theme, t);
+                },
+              ),
             ),
           ],
         ),
@@ -140,23 +145,35 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search logs...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search logs...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 48,
+                child: ListenableBuilder(
+                  listenable: _searchController,
+                  builder: (context, _) {
+                    if (_searchController.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
                       icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-              border: const OutlineInputBorder(),
-            ),
-            onChanged: (value) => setState(() {}),
+                      onPressed: () => _searchController.clear(),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Row(

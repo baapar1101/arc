@@ -160,39 +160,58 @@ class _CustomerPickerWidgetState extends State<CustomerPickerWidget> {
           // فیلد جست‌وجو
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _clearSelection();
-                        },
-                      )
-                    : _isLoading
-                        ? const SizedBox(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest,
+                    ),
+                    onChanged: (value) {
+                      if (value.length >= 2) {
+                        _searchCustomers(value);
+                      } else if (value.isEmpty) {
+                        _clearSelection();
+                      }
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: _isLoading
+                      ? const Center(
+                          child: SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                          ),
+                        )
+                      : ListenableBuilder(
+                          listenable: _searchController,
+                          builder: (context, _) {
+                            if (_searchController.text.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _clearSelection();
+                              },
+                            );
+                          },
+                        ),
                 ),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
-              ),
-              onChanged: (value) {
-                if (value.length >= 2) {
-                  _searchCustomers(value);
-                } else if (value.isEmpty) {
-                  _clearSelection();
-                }
-              },
+              ],
             ),
           ),
 

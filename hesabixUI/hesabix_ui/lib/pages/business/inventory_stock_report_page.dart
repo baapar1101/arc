@@ -146,16 +146,11 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
     }
   }
   
-  void _onSearchChanged(String value) {
-    setState(() {
-      _searchQuery = value;
-    });
-    
-    // Cancel previous timer
+  void _onSearchChanged(String _) {
     _searchDebounce?.cancel();
-    
-    // Create new timer
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      _searchQuery = _searchController.text;
       _refreshData();
     });
   }
@@ -895,31 +890,45 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
         const SizedBox(height: 16),
         
         // جستجو
-        TextField(
-          controller: _searchController,
-                            decoration: InputDecoration(
-                              labelText: 'جستجو',
-                              hintText: 'کد/نام محصول',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? IconButton(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'جستجو',
+                  hintText: 'کد/نام محصول',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: _onSearchChanged,
+                onSubmitted: (_) {
+                  _refreshData();
+                },
+              ),
+            ),
+            SizedBox(
+              width: 48,
+              child: ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  if (_searchController.text.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return IconButton(
                     icon: const Icon(Icons.clear),
-                                      onPressed: () {
-                                        setState(() {
-                                          _searchQuery = '';
-                        _searchController.clear();
-                                        });
-                                        _refreshData();
-                                      },
-                                    )
-                                  : null,
-                            ),
-          onChanged: _onSearchChanged,
-          onSubmitted: (_) {
-            _refreshData();
-          },
+                    onPressed: () {
+                      _searchController.clear();
+                      _searchQuery = '';
+                      _refreshData();
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         
@@ -1158,8 +1167,12 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
                               _refreshData();
                             },
                     ),
-                    TextField(
-                      controller: _searchController,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
                             decoration: InputDecoration(
                               labelText: 'جستجو',
                               hintText: 'کد/نام محصول',
@@ -1167,26 +1180,36 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear, size: 18),
-                                      onPressed: () {
-                                        setState(() {
-                                          _searchQuery = '';
-                                    _searchController.clear();
-                                        });
-                                        _refreshData();
-                                      },
-                                    )
-                                  : null,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                             ),
                             style: const TextStyle(fontSize: 13),
-                      onChanged: _onSearchChanged,
+                            onChanged: _onSearchChanged,
                             onSubmitted: (_) {
                               _refreshData();
                             },
                           ),
+                        ),
+                        SizedBox(
+                          width: 44,
+                          child: ListenableBuilder(
+                            listenable: _searchController,
+                            builder: (context, _) {
+                              if (_searchController.text.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                  _refreshData();
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                     DropdownButtonFormField<bool?>(
                             value: _trackInventory,
                             decoration: InputDecoration(
