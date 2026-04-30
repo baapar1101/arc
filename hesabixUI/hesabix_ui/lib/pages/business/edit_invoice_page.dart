@@ -33,6 +33,7 @@ import '../../utils/invoice_global_discount_calculator.dart';
 import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
 import '../../services/business_currency_rate_service.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
 import '../../widgets/invoice/keep_alive_tab_child.dart';
@@ -76,6 +77,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   List<Map<String, dynamic>>? _businessCurrenciesCache;
   int _invoiceCurrencyDecimalPlaces = 2;
   bool _invoiceCurrencyRoundMonetary = true;
+  String _invoiceCurrencyUnitLabel = 'ریال';
   int? _selectedProjectId;
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
@@ -661,6 +663,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     var dp = 2;
     var rm = true;
     final cache = _businessCurrenciesCache;
+    final unitLabel = currencyUnitLabelForBusinessCurrencyIdOrNull(id, cache);
     if (id != null && cache != null) {
       for (final raw in cache) {
         final c = Map<String, dynamic>.from(raw as Map);
@@ -673,6 +676,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     }
     _invoiceCurrencyDecimalPlaces = dp;
     _invoiceCurrencyRoundMonetary = rm;
+    _invoiceCurrencyUnitLabel = unitLabel ?? 'ریال';
   }
 
   Future<void> _reloadFxRates() async {
@@ -1088,6 +1092,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
                 currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                currencyUnitLabel: _invoiceCurrencyUnitLabel,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _invoiceWarehouseReleaseMode != 'none',
                 initialRows: _lineItems,

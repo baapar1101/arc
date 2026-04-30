@@ -30,6 +30,7 @@ import '../../services/bom_service.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/responsive_helper.dart';
@@ -105,6 +106,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<Map<String, dynamic>>? _businessCurrenciesCache;
   int _invoiceCurrencyDecimalPlaces = 2;
   bool _invoiceCurrencyRoundMonetary = true;
+  String _invoiceCurrencyUnitLabel = 'ریال';
   int? _selectedProjectId;
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
@@ -1629,6 +1631,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     var dp = 2;
     var rm = true;
     final cache = _businessCurrenciesCache;
+    var unitLabel = currencyUnitLabelForBusinessCurrencyIdOrNull(id, cache);
     if (id != null && cache != null) {
       for (final raw in cache) {
         final c = Map<String, dynamic>.from(raw as Map);
@@ -1641,6 +1644,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     _invoiceCurrencyDecimalPlaces = dp;
     _invoiceCurrencyRoundMonetary = rm;
+    _invoiceCurrencyUnitLabel = unitLabel ?? 'ریال';
   }
 
   Future<void> _loadBusinessCurrenciesAndMeta() async {
@@ -2224,6 +2228,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       isRequired: false,
                                       label: 'مبلغ کارمزد',
                                       hintText: 'مثال: 100000',
+                                      currencyUnit: _invoiceCurrencyUnitLabel,
                                     ),
                                   ),
                               ],
@@ -2583,6 +2588,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       isRequired: false,
                                       label: 'مبلغ کارمزد',
                                       hintText: 'مثال: 100000',
+                                      currencyUnit: _invoiceCurrencyUnitLabel,
                                     ),
                                   )
                                 else
@@ -3378,6 +3384,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
                 currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                currencyUnitLabel: _invoiceCurrencyUnitLabel,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
                 initialRows: _lineItems,

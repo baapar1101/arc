@@ -21,6 +21,8 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/currency_display_utils.dart';
+import '../../services/currency_service.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
@@ -232,6 +234,8 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
+  List<Map<String, dynamic>>? _businessCurrenciesCache;
+  String _documentCurrencyUnitLabel = 'ریال';
 
   @override
   void initState() {
@@ -247,6 +251,32 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       _personLines.addAll(widget.initial!.personLines);
       _centerTransactions.addAll(widget.initial!.centerTransactions);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBusinessCurrenciesForDialog());
+  }
+
+  Future<void> _loadBusinessCurrenciesForDialog() async {
+    try {
+      final list = await CurrencyService(widget.apiClient).listBusinessCurrencies(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _businessCurrenciesCache = list;
+        _syncDocumentCurrencyUnitLabel();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _businessCurrenciesCache = null;
+        _syncDocumentCurrencyUnitLabel();
+      });
+    }
+  }
+
+  void _syncDocumentCurrencyUnitLabel() {
+    final label = currencyUnitLabelForBusinessCurrencyIdOrNull(
+      _selectedCurrencyId,
+      _businessCurrenciesCache,
+    );
+    _documentCurrencyUnitLabel = label ?? 'ریال';
   }
 
   @override
@@ -370,6 +400,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       isReceipt: _isReceipt,
       lines: _personLines,
       selectedCurrencyId: _selectedCurrencyId,
+      currencyUnitLabel: _documentCurrencyUnitLabel,
       onChanged: (ls) => setState(() {
         _personLines
           ..clear()
@@ -411,6 +442,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                   businessId: widget.businessId,
                   calendarController: widget.calendarController,
                   invoiceType: InvoiceType.sales,
+                  selectedCurrencyId: _selectedCurrencyId,
                   checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
                   authStore: widget.authStore,
                   shrinkWrapBody: true,
@@ -450,12 +482,13 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                     transactions: _centerTransactions,
                     onChanged: (txs) => setState(() {
                       _centerTransactions
-                        ..clear()
-                        ..addAll(txs);
+                          ..clear()
+                          ..addAll(txs);
                     }),
                     businessId: widget.businessId,
                     calendarController: widget.calendarController,
                     invoiceType: InvoiceType.sales,
+                    selectedCurrencyId: _selectedCurrencyId,
                     checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
                     authStore: widget.authStore,
                   ),
@@ -524,7 +557,10 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                           child: CurrencyPickerWidget(
                             businessId: widget.businessId,
                             selectedCurrencyId: _selectedCurrencyId,
-                            onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                            onChanged: (currencyId) => setState(() {
+                              _selectedCurrencyId = currencyId;
+                              _syncDocumentCurrencyUnitLabel();
+                            }),
                             label: 'ارز',
                             hintText: 'انتخاب ارز',
                           ),
@@ -579,7 +615,10 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                     CurrencyPickerWidget(
                       businessId: widget.businessId,
                       selectedCurrencyId: _selectedCurrencyId,
-                      onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                      onChanged: (currencyId) => setState(() {
+                        _selectedCurrencyId = currencyId;
+                        _syncDocumentCurrencyUnitLabel();
+                      }),
                       label: 'ارز',
                       hintText: 'انتخاب ارز',
                     ),
@@ -919,12 +958,14 @@ class _PersonsPanel extends StatefulWidget {
   final List<_PersonLine> lines;
   final ValueChanged<List<_PersonLine>> onChanged;
   final int? selectedCurrencyId;
+  final String currencyUnitLabel;
   const _PersonsPanel({
     required this.businessId,
     required this.isReceipt,
     required this.lines,
     required this.onChanged,
     this.selectedCurrencyId,
+    this.currencyUnitLabel = 'ریال',
   });
 
   @override
@@ -955,6 +996,7 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                       isReceipt: widget.isReceipt,
                       line: line,
                       selectedCurrencyId: widget.selectedCurrencyId,
+                      currencyUnit: widget.currencyUnitLabel,
                       onChanged: (l) {
                         final newLines = List<_PersonLine>.from(widget.lines);
                         newLines[i] = l;
@@ -1020,6 +1062,7 @@ class _PersonLineTile extends StatefulWidget {
   final ValueChanged<_PersonLine> onChanged;
   final VoidCallback onDelete;
   final int? selectedCurrencyId;
+  final String currencyUnit;
   const _PersonLineTile({
     required this.businessId,
     required this.isReceipt,
@@ -1027,6 +1070,7 @@ class _PersonLineTile extends StatefulWidget {
     required this.onChanged,
     required this.onDelete,
     this.selectedCurrencyId,
+    this.currencyUnit = 'ریال',
   });
 
   @override
@@ -1346,7 +1390,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   width: 180,
                   child: AmountFieldWordsTooltip(
                     controller: _amountController,
-                    currencyUnit: 'ریال',
+                    currencyUnit: widget.currencyUnit,
                     child: TextFormField(
                       controller: _amountController,
                       decoration: InputDecoration(

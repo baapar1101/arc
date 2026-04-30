@@ -22,6 +22,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/pages/business/crm/crm_operator_voice.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 
 /// صندوق ورودی چت وب (ویجت جاسازی‌شده در سایت مشتری).
 class CrmWebChatPage extends StatefulWidget {
