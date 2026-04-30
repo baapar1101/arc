@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'business_nav.dart';
+import 'business_route_paths.dart';
 
 /// الگوی مسیر نسبی (بدون business id و بدون tab) برای نام مسیرهای go_router قبلی.
 abstract final class BusinessNamedRoutes {

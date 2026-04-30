@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/permission/access_denied_page.dart';
-// import '../../core/api_client.dart'; // duplicate removed
+import '../../core/api_client.dart';
 import '../../services/wallet_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;

@@ -69,7 +69,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
         final pathsList = m['paths'];
         final active = m['active_path']?.toString();
         if (pathsList is! List || pathsList.isEmpty) continue;
-        final paths = <String>[];
+        var paths = <String>[];
         for (final p in pathsList) {
           final s = p?.toString().trim() ?? '';
           if (s.isEmpty) continue;
