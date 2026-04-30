@@ -105,7 +105,13 @@ fi
 # همان کانفیگ deploy.sh
 if [[ -d /etc/nginx/conf.d ]]; then
   cat > /etc/nginx/conf.d/rate-limit-api.conf <<RATELIMIT
-limit_req_zone \$binary_remote_addr zone=api_limit:10m rate=10r/s;
+# OPTIONS (CORS preflight) را در سهمیه نمی‌گذارد؛ هر XHR معمولاً OPTIONS + METHOD است.
+map \$request_method \$api_limit_key {
+	default  \$binary_remote_addr;
+	OPTIONS  "";
+}
+
+limit_req_zone \$api_limit_key zone=api_limit:10m rate=40r/s;
 RATELIMIT
 fi
 
@@ -208,7 +214,7 @@ ${API_SSL_BLOCK}
   }
 
   location /api/ {
-    limit_req zone=api_limit burst=20 nodelay;
+    limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
