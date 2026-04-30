@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -1558,8 +1559,10 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               TextButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
-                  context.pushNamed(
-                    'business_edit_invoice',
+                  BusinessNamedRoutes.pushNamed(
+                    context,
+                    businessId: widget.businessId,
+                    routeName: 'business_edit_invoice',
                     pathParameters: {
                       'business_id': widget.businessId.toString(),
                       'invoice_id': invoiceId.toString(),
@@ -1655,8 +1658,10 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     onTap: () {
                       Navigator.pop(context);
                       // Navigate to persons page - user can search and edit from there
-                      context.pushNamed(
-                        'business_persons',
+                      BusinessNamedRoutes.pushNamed(
+                        context,
+                        businessId: widget.businessId,
+                        routeName: 'business_persons',
                         pathParameters: {
                           'business_id': widget.businessId.toString(),
                         },
@@ -1672,8 +1677,10 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     onTap: () {
                       Navigator.pop(context);
                       // Navigate to products page - user can search and edit from there
-                      context.pushNamed(
-                        'business_products',
+                      BusinessNamedRoutes.pushNamed(
+                        context,
+                        businessId: widget.businessId,
+                        routeName: 'business_products',
                         pathParameters: {
                           'business_id': widget.businessId.toString(),
                         },
@@ -1689,8 +1696,10 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     onTap: invoiceId != null
                         ? () {
                             Navigator.pop(context);
-                            context.pushNamed(
-                              'business_edit_invoice',
+                            BusinessNamedRoutes.pushNamed(
+                              context,
+                              businessId: widget.businessId,
+                              routeName: 'business_edit_invoice',
                               pathParameters: {
                                 'business_id': widget.businessId.toString(),
                                 'invoice_id': invoiceId.toString(),

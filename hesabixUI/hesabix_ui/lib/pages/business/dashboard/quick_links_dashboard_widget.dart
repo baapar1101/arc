@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../models/quick_link_tile_models.dart';
 import '../../../services/business_dashboard_service.dart';
+import '../../../core/business_named_route_locations.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
@@ -721,8 +721,10 @@ class QuickLinksDashboardBody extends StatelessWidget {
     if (name == null || name.isEmpty) return;
     try {
       if (!context.mounted) return;
-      context.goNamed(
-        name,
+      BusinessNamedRoutes.goNamed(
+        context,
+        businessId: businessId,
+        routeName: name,
         pathParameters: {'business_id': businessId.toString()},
       );
     } catch (_) {

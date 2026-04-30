@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/business_named_route_locations.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
@@ -566,8 +566,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   void _goBackToWorkflowsList() {
-    context.goNamed(
-      'business_workflows',
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_workflows',
       pathParameters: {
         'business_id': widget.businessId.toString(),
       },
@@ -814,8 +816,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       final t = AppLocalizations.of(context);
       SnackBarHelper.showSuccess(context, message: t.workflowSaved);
       // بازگشت به صفحه لیست ورکفلوها
-      context.goNamed(
-        'business_workflows',
+      BusinessNamedRoutes.goNamed(
+        context,
+        businessId: widget.businessId,
+        routeName: 'business_workflows',
         pathParameters: {
           'business_id': widget.businessId.toString(),
         },

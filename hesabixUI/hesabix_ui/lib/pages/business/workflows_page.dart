@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/business_named_route_locations.dart';
+import '../../core/business_nav.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -186,7 +188,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             tooltip: t.workflowMarketplaceOpen,
             icon: const Icon(Icons.store_mall_directory_outlined),
             onPressed: () {
-              context.go('/business/${widget.businessId}/workflows/marketplace');
+              context.go(context.businessPanelUrl(widget.businessId, 'workflows/marketplace'));
             },
           ),
           IconButton(
@@ -567,8 +569,10 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
   }) async {
     if (workflow == null) {
       // افزودن workflow جدید
-      context.goNamed(
-        'business_new_workflow',
+      BusinessNamedRoutes.goNamed(
+        context,
+        businessId: widget.businessId,
+        routeName: 'business_new_workflow',
         pathParameters: {
           'business_id': widget.businessId.toString(),
         },
@@ -580,8 +584,10 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       if (workflowId == null) {
         return;
       }
-      context.goNamed(
-        'business_edit_workflow',
+      BusinessNamedRoutes.goNamed(
+        context,
+        businessId: widget.businessId,
+        routeName: 'business_edit_workflow',
         pathParameters: {
           'business_id': widget.businessId.toString(),
           'workflow_id': workflowId.toString(),

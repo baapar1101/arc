@@ -9790,46 +9790,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'View all sent notifications (OTP, password reset, tickets, etc.)';
 
   @override
-  String get accountSettingsAppearanceDescription =>
-      'Business panel layout on desktop (single page vs tabs)';
-
-  @override
-  String get accountSettingsAppearanceTitle => 'Appearance';
-
-  @override
-  String get appearanceBusinessPanelSection => 'Business panel (desktop)';
-
-  @override
-  String get appearanceDesktopOnlyNote =>
-      'Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.';
-
-  @override
-  String get appearanceNavigationSingleLabel => 'Single page';
-
-  @override
-  String get appearanceNavigationSingleSubtitle =>
-      'Only one page open at a time (classic navigation)';
-
-  @override
-  String get appearanceNavigationTabsLabel => 'Tabs in top bar';
-
-  @override
-  String get appearanceNavigationTabsSubtitle =>
-      'Keep multiple pages open and switch via tabs on the dark strip (desktop only). Background tabs stay mounted; stable page keys improve reuse when you return.';
-
-  @override
-  String get appearanceSaveButton => 'Save';
-
-  @override
-  String get appearanceSaveError => 'Could not save settings';
-
-  @override
-  String get appearanceSaved => 'Saved';
-
-  @override
-  String get appearanceSettingsPageTitle => 'Appearance settings';
-
-  @override
   String get notificationCenterLevelInfo => 'Info';
 
   @override
@@ -11656,4 +11616,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmWebChatVisitorVoiceOffWidget => 'Guest voice disabled';
+
+  @override
+  String get accountSettingsAppearanceTitle => 'Appearance';
+
+  @override
+  String get accountSettingsAppearanceDescription =>
+      'Business panel layout on desktop (single page vs tabs)';
+
+  @override
+  String get appearanceSettingsPageTitle => 'Appearance settings';
+
+  @override
+  String get appearanceBusinessPanelSection => 'Business panel (desktop)';
+
+  @override
+  String get appearanceNavigationSingleLabel => 'Single page';
+
+  @override
+  String get appearanceNavigationSingleSubtitle =>
+      'Only one page open at a time (classic navigation)';
+
+  @override
+  String get appearanceNavigationTabsLabel => 'Tabs in top bar';
+
+  @override
+  String get appearanceNavigationTabsSubtitle =>
+      'Keep multiple pages open and switch via tabs on the dark strip (desktop only). Background tabs stay mounted; stable page keys improve reuse when you return.';
+
+  @override
+  String get appearanceDesktopOnlyNote =>
+      'Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.';
+
+  @override
+  String get appearanceSaved => 'Saved';
+
+  @override
+  String get appearanceSaveError => 'Could not save settings';
+
+  @override
+  String get appearanceSaveButton => 'Save';
+
+  @override
+  String get businessPanelTabCloseThisTab => 'Close this tab';
+
+  @override
+  String get businessPanelTabCloseTabsToTheRight => 'Close tabs to the right';
+
+  @override
+  String get businessPanelTabCloseTabsToTheLeft => 'Close tabs to the left';
+
+  @override
+  String get businessPanelTabAllTabsTitle => 'All tabs';
+
+  @override
+  String get businessPanelTabCloseAllTabs => 'Close all tabs';
+
+  @override
+  String get businessPanelTabListTooltip => 'List all tabs';
 }

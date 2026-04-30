@@ -18,6 +18,7 @@ import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import '../../main.dart' show navigatorKey;
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
@@ -4473,10 +4474,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     Widget editButton() => OutlinedButton.icon(
           onPressed: () {
             final doc = _document!;
-            final router = GoRouter.of(context);
             Navigator.of(context).pop();
-            router.pushNamed(
-              'business_edit_invoice',
+            BusinessNamedRoutes.pushNamed(
+              context,
+              businessId: doc.businessId,
+              routeName: 'business_edit_invoice',
               pathParameters: {
                 'business_id': doc.businessId.toString(),
                 'invoice_id': doc.id.toString(),

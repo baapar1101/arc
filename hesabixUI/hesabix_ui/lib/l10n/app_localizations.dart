@@ -18377,30 +18377,6 @@ abstract class AppLocalizations {
   /// **'View all sent notifications (OTP, password reset, tickets, etc.)'**
   String get accountSettingsNotificationHistoryDescription;
 
-  String get accountSettingsAppearanceDescription;
-
-  String get accountSettingsAppearanceTitle;
-
-  String get appearanceBusinessPanelSection;
-
-  String get appearanceDesktopOnlyNote;
-
-  String get appearanceNavigationSingleLabel;
-
-  String get appearanceNavigationSingleSubtitle;
-
-  String get appearanceNavigationTabsLabel;
-
-  String get appearanceNavigationTabsSubtitle;
-
-  String get appearanceSaveButton;
-
-  String get appearanceSaveError;
-
-  String get appearanceSaved;
-
-  String get appearanceSettingsPageTitle;
-
   /// No description provided for @notificationCenterLevelInfo.
   ///
   /// In en, this message translates to:
@@ -21640,6 +21616,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Guest voice disabled'**
   String get crmWebChatVisitorVoiceOffWidget;
+
+  /// No description provided for @accountSettingsAppearanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get accountSettingsAppearanceTitle;
+
+  /// No description provided for @accountSettingsAppearanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Business panel layout on desktop (single page vs tabs)'**
+  String get accountSettingsAppearanceDescription;
+
+  /// No description provided for @appearanceSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance settings'**
+  String get appearanceSettingsPageTitle;
+
+  /// No description provided for @appearanceBusinessPanelSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Business panel (desktop)'**
+  String get appearanceBusinessPanelSection;
+
+  /// No description provided for @appearanceNavigationSingleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get appearanceNavigationSingleLabel;
+
+  /// No description provided for @appearanceNavigationSingleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one page open at a time (classic navigation)'**
+  String get appearanceNavigationSingleSubtitle;
+
+  /// No description provided for @appearanceNavigationTabsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabs in top bar'**
+  String get appearanceNavigationTabsLabel;
+
+  /// No description provided for @appearanceNavigationTabsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep multiple pages open and switch via tabs on the dark strip (desktop only). Background tabs stay mounted; stable page keys improve reuse when you return.'**
+  String get appearanceNavigationTabsSubtitle;
+
+  /// No description provided for @appearanceDesktopOnlyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.'**
+  String get appearanceDesktopOnlyNote;
+
+  /// No description provided for @appearanceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get appearanceSaved;
+
+  /// No description provided for @appearanceSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save settings'**
+  String get appearanceSaveError;
+
+  /// No description provided for @appearanceSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get appearanceSaveButton;
+
+  /// No description provided for @businessPanelTabCloseThisTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close this tab'**
+  String get businessPanelTabCloseThisTab;
+
+  /// No description provided for @businessPanelTabCloseTabsToTheRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tabs to the right'**
+  String get businessPanelTabCloseTabsToTheRight;
+
+  /// No description provided for @businessPanelTabCloseTabsToTheLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tabs to the left'**
+  String get businessPanelTabCloseTabsToTheLeft;
+
+  /// No description provided for @businessPanelTabAllTabsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All tabs'**
+  String get businessPanelTabAllTabsTitle;
+
+  /// No description provided for @businessPanelTabCloseAllTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Close all tabs'**
+  String get businessPanelTabCloseAllTabs;
+
+  /// No description provided for @businessPanelTabListTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'List all tabs'**
+  String get businessPanelTabListTooltip;
 }
 
 class _AppLocalizationsDelegate

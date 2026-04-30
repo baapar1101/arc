@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/models/invoice_list_item.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -63,8 +64,10 @@ class InvoicesListPage extends StatefulWidget {
       context.pop(true);
       return;
     }
-    context.goNamed(
-      'business_invoice',
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: businessId,
+      routeName: 'business_invoice',
       pathParameters: {'business_id': businessId.toString()},
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1030,8 +1033,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                 onTap: (item) async {
                   final invoice = item as InvoiceListItem;
                   if (!mounted) return;
-                  await context.pushNamed(
-                    'business_edit_invoice',
+                  await BusinessNamedRoutes.pushNamed(
+                    context,
+                    businessId: widget.businessId,
+                    routeName: 'business_edit_invoice',
                     pathParameters: {
                       'business_id': widget.businessId.toString(),
                       'invoice_id': invoice.id.toString(),
@@ -1048,8 +1053,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                 onTap: (item) async {
                   final invoice = item as InvoiceListItem;
                   if (!mounted) return;
-                  await context.pushNamed(
-                    'business_new_invoice',
+                  await BusinessNamedRoutes.pushNamed(
+                    context,
+                    businessId: widget.businessId,
+                    routeName: 'business_new_invoice',
                     pathParameters: {
                       'business_id': widget.businessId.toString(),
                     },
@@ -1421,8 +1428,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             label: t.invoiceCopyOpenNew,
             onTap: () async {
               if (!mounted) return;
-              await context.pushNamed(
-                'business_new_invoice',
+              await BusinessNamedRoutes.pushNamed(
+                context,
+                businessId: widget.businessId,
+                routeName: 'business_new_invoice',
                 pathParameters: {
                   'business_id': widget.businessId.toString(),
                 },
@@ -1623,8 +1632,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Future<void> _onAddNew() async {
     if (!mounted) return;
-    await context.pushNamed(
-      'business_new_invoice',
+    await BusinessNamedRoutes.pushNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_new_invoice',
       pathParameters: {
         'business_id': widget.businessId.toString(),
       },
@@ -1645,8 +1656,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Future<void> _onEdit(InvoiceListItem item) async {
     if (!mounted) return;
-    await context.pushNamed(
-      'business_edit_invoice',
+    await BusinessNamedRoutes.pushNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_edit_invoice',
       pathParameters: {
         'business_id': widget.businessId.toString(),
         'invoice_id': item.id.toString(),

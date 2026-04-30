@@ -4452,5 +4452,11 @@
   "appearanceDesktopOnlyNote": "Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.",
   "appearanceSaved": "Saved",
   "appearanceSaveError": "Could not save settings",
-  "appearanceSaveButton": "Save"
+  "appearanceSaveButton": "Save",
+  "businessPanelTabCloseThisTab": "Close this tab",
+  "businessPanelTabCloseTabsToTheRight": "Close tabs to the right",
+  "businessPanelTabCloseTabsToTheLeft": "Close tabs to the left",
+  "businessPanelTabAllTabsTitle": "All tabs",
+  "businessPanelTabCloseAllTabs": "Close all tabs",
+  "businessPanelTabListTooltip": "List all tabs"
 }

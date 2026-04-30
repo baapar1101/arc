@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
+import 'business_route_paths.dart';
 import '../services/user_ui_preferences_service.dart';
 
 enum BusinessPanelNavigationMode { single, tabs }
@@ -79,6 +80,13 @@ class BusinessPanelUiStore extends ChangeNotifier {
             ? (active.startsWith('/') ? active : '/$active')
             : paths.last;
         if (!paths.contains(ap)) ap = paths.last;
+        final apIdx = paths.indexWhere((p) => p.split('?').first == ap.split('?').first);
+        paths = BusinessRoutePaths.migratePathsToTabSlots(bid, paths);
+        if (apIdx >= 0 && apIdx < paths.length) {
+          ap = paths[apIdx];
+        } else {
+          ap = paths.last;
+        }
         _tabsByBusiness[bid] = BusinessPanelTabSession(paths: paths, activePath: ap);
       }
     }
@@ -175,15 +183,23 @@ class BusinessPanelUiStore extends ChangeNotifier {
       return;
     }
 
+    final slot = BusinessRoutePaths.parseTabSlotFromPath(norm);
+    if (slot == null) return;
+
     final existing = _tabsByBusiness[businessId];
     var paths = existing != null ? List<String>.from(existing.paths) : <String>[];
 
-    if (!paths.contains(norm)) {
+    if (slot < paths.length) {
+      paths[slot] = norm;
+    } else if (slot == paths.length) {
       paths.add(norm);
-      const maxTabs = 24;
-      if (paths.length > maxTabs) {
-        paths = paths.sublist(paths.length - maxTabs);
-      }
+    } else {
+      return;
+    }
+
+    const maxTabs = BusinessRoutePaths.tabBranchCount;
+    if (paths.length > maxTabs) {
+      paths = paths.sublist(paths.length - maxTabs);
     }
 
     final updated = BusinessPanelTabSession(paths: paths, activePath: norm);
@@ -223,7 +239,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
 
     var paths = List<String>.from(s.paths);
     paths.remove(path);
-    final dash = '/business/$businessId/dashboard';
+    paths = BusinessRoutePaths.repackTabPathsAfterRemoval(businessId, paths);
+    final dash = BusinessRoutePaths.uri(businessId, 0, 'dashboard');
 
     if (paths.isEmpty) {
       _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: [dash], activePath: dash);
@@ -234,12 +251,73 @@ class BusinessPanelUiStore extends ChangeNotifier {
     }
 
     final wasActive = s.activePath == path;
-    final nextActive = wasActive ? paths.last : s.activePath;
+    final String nextActive;
+    if (wasActive) {
+      nextActive = paths.last;
+    } else {
+      final tail = BusinessRoutePaths.stripBusinessPrefixAndTab(s.activePath, businessId);
+      nextActive = paths.firstWhere(
+        (p) => BusinessRoutePaths.stripBusinessPrefixAndTab(p, businessId) == tail,
+        orElse: () => paths.last,
+      );
+    }
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: nextActive);
     notifyListeners();
     if (wasActive) {
       go(nextActive);
     }
+    _schedulePersist();
+  }
+
+  /// ترتیب مسیرها با ایندکس ۰ نزدیک‌تر به «شروع» نوار در RTL (سمت راست صفحه) است.
+  void closeTabsToTheRightOf(int businessId, String anchorPath, void Function(String location) go) {
+    final s = _tabsByBusiness[businessId];
+    if (s == null) return;
+    final paths = List<String>.from(s.paths);
+    final i = paths.indexOf(anchorPath);
+    if (i <= 0) return;
+    paths.removeRange(0, i);
+    _applyBulkTabPathsAfterRemoval(businessId, paths, anchorPath, go);
+  }
+
+  /// ایندکس بالاتر = در RTL به‌سمت چپ نوار.
+  void closeTabsToTheLeftOf(int businessId, String anchorPath, void Function(String location) go) {
+    final s = _tabsByBusiness[businessId];
+    if (s == null) return;
+    final paths = List<String>.from(s.paths);
+    final i = paths.indexOf(anchorPath);
+    if (i < 0 || i >= paths.length - 1) return;
+    paths.removeRange(i + 1, paths.length);
+    _applyBulkTabPathsAfterRemoval(businessId, paths, anchorPath, go);
+  }
+
+  void closeAllTabs(int businessId, void Function(String location) go) {
+    final dash = BusinessRoutePaths.uri(businessId, 0, 'dashboard');
+    _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: [dash], activePath: dash);
+    notifyListeners();
+    go(dash);
+    _schedulePersist();
+  }
+
+  void _applyBulkTabPathsAfterRemoval(
+    int businessId,
+    List<String> paths,
+    String anchorPath,
+    void Function(String location) go,
+  ) {
+    if (paths.isEmpty) {
+      closeAllTabs(businessId, go);
+      return;
+    }
+    final repacked = BusinessRoutePaths.repackTabPathsAfterRemoval(businessId, paths);
+    final anchorTail = BusinessRoutePaths.stripBusinessPrefixAndTab(anchorPath, businessId);
+    final nextActive = repacked.firstWhere(
+      (p) => BusinessRoutePaths.stripBusinessPrefixAndTab(p, businessId) == anchorTail,
+      orElse: () => repacked.last,
+    );
+    _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: repacked, activePath: nextActive);
+    notifyListeners();
+    go(nextActive);
     _schedulePersist();
   }
 }

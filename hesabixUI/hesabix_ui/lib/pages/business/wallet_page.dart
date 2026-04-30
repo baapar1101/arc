@@ -7,7 +7,7 @@ import '../../services/wallet_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:go_router/go_router.dart';
-import '../../core/api_client.dart';
+import '../../core/business_named_route_locations.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -456,8 +456,10 @@ class _WalletPageState extends State<WalletPage> {
                                   final docId = row['document_id'];
                                   if (docId == null) return;
                                   if (!mounted) return;
-                                  await context.pushNamed(
-                                    'business_documents',
+                                  await BusinessNamedRoutes.pushNamed(
+                                    context,
+                                    businessId: widget.businessId,
+                                    routeName: 'business_documents',
                                     pathParameters: {'business_id': widget.businessId.toString()},
                                     extra: {'focus_document_id': docId},
                                   );

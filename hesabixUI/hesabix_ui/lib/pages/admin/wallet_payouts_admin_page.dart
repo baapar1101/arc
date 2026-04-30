@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
+import '../../core/business_named_route_locations.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/admin_wallet_payouts_service.dart';
 import '../../utils/number_formatters.dart';
@@ -986,8 +987,10 @@ class _PayoutDetailSheet extends StatelessWidget {
                             onTap: () {
                               final businessId = payout['business_id'];
                               if (businessId != null) {
-                                context.pushNamed(
-                                  'business_dashboard',
+                                BusinessNamedRoutes.pushNamed(
+                                  context,
+                                  businessId: businessId,
+                                  routeName: 'business_dashboard',
                                   pathParameters: {'business_id': businessId.toString()},
                                 );
                               }
@@ -1037,8 +1040,10 @@ class _PayoutDetailSheet extends StatelessWidget {
                                 final businessId = payout['business_id'];
                                 final docId = payout['document_id'];
                                 if (businessId != null && docId != null) {
-                                  context.pushNamed(
-                                    'business_documents',
+                                  BusinessNamedRoutes.pushNamed(
+                                    context,
+                                    businessId: businessId,
+                                    routeName: 'business_documents',
                                     pathParameters: {'business_id': businessId.toString()},
                                     extra: {'focus_document_id': docId},
                                   );

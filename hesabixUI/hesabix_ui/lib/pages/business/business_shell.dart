@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
+import '../../core/business_nav.dart';
+import '../../core/business_route_paths.dart';
 import '../../core/business_panel_ui_store.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
@@ -46,7 +48,6 @@ import 'expense_income_list_page.dart';
 import 'transfers_page.dart';
 import 'documents_page.dart';
 import 'business_shell_side_nav_scope.dart';
-import 'business_shell_tabbed_body.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -71,6 +72,10 @@ class BusinessShell extends StatefulWidget {
 }
 
 class _BusinessShellState extends State<BusinessShell> {
+  static const double _kUnifiedBizTabBarHeight = 36;
+  static const double _kBizTabMinWidth = 72;
+  static const double _kBizTabMaxWidth = 152;
+
   int _hoverIndex = -1;
   bool _isProductsAndServicesExpanded = false;
   bool _isBankingExpanded = false;
@@ -93,7 +98,9 @@ class _BusinessShellState extends State<BusinessShell> {
     if (mounted) setState(() {});
   }
 
-  String _tabTitleForBusinessPath(String path, List<_MenuItem> menuRoot) {
+  String _bu(String rel) => context.businessPanelUrl(widget.businessId, rel);
+
+  String _tabTitleForBusinessPath(String path, int businessId, List<_MenuItem> menuRoot) {
     var best = '';
     var bestLen = 0;
     void walk(List<_MenuItem> items) {
@@ -111,18 +118,185 @@ class _BusinessShellState extends State<BusinessShell> {
     walk(menuRoot);
     if (best.isNotEmpty) return best;
     try {
-      final segs = Uri.parse(path).pathSegments;
-      if (segs.length > 2) {
-        return segs.sublist(2).join(' / ');
-      }
+      final tail = BusinessRoutePaths.stripBusinessPrefixAndTab(path, businessId);
+      if (tail.isNotEmpty) return tail.replaceAll('/', ' / ');
     } catch (_) {}
     return path;
   }
 
-  Widget _buildBusinessTabStrip({
+  Future<void> _showDesktopTabActionDialog(
+    BuildContext context,
+    List<_MenuItem> menuRoot,
+    BusinessPanelTabSession session,
+    String path,
+  ) async {
+    final store = BusinessPanelUiStore.instance;
+    final bid = widget.businessId;
+    void go(String loc) => context.go(loc);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final t = AppLocalizations.of(ctx)!;
+        return AlertDialog(
+          title: Text(
+            _tabTitleForBusinessPath(path, bid, menuRoot),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: Text(t.businessPanelTabCloseThisTab),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  store.closeTab(bid, path, go);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.arrow_forward),
+                title: Text(t.businessPanelTabCloseTabsToTheRight),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  store.closeTabsToTheRightOf(bid, path, go);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.arrow_back),
+                title: Text(t.businessPanelTabCloseTabsToTheLeft),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  store.closeTabsToTheLeftOf(bid, path, go);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showAllTabsManagementDialog(BuildContext context, List<_MenuItem> menuRoot) async {
+    final store = BusinessPanelUiStore.instance;
+    final bid = widget.businessId;
+    void go(String loc) => context.go(loc);
+    final session = store.tabsForBusiness(bid);
+    if (session == null || session.paths.isEmpty) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final t = AppLocalizations.of(ctx)!;
+        return AlertDialog(
+          title: Text(t.businessPanelTabAllTabsTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: session.paths.length,
+              itemBuilder: (_, i) {
+                final p = session.paths[i];
+                final title = _tabTitleForBusinessPath(p, bid, menuRoot);
+                final sel = p == session.activePath;
+                return ListTile(
+                  dense: true,
+                  selected: sel,
+                  title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    store.selectTab(bid, p, go);
+                  },
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      store.closeTab(bid, p, go);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                store.closeAllTabs(bid, go);
+              },
+              child: Text(t.businessPanelTabCloseAllTabs),
+            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktopTabChip(
+    BuildContext context,
+    List<_MenuItem> menuRoot,
+    BusinessPanelTabSession session,
+    String path,
+    double maxTabWidth,
+  ) {
+    final store = BusinessPanelUiStore.instance;
+    final bid = widget.businessId;
+    final active = path == session.activePath;
+    final label = _tabTitleForBusinessPath(path, bid, menuRoot);
+    void goLoc(String loc) => context.go(loc);
+
+    return Material(
+      color: active ? Colors.white24 : Colors.white12,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => store.selectTab(bid, path, goLoc),
+        onLongPress: () => _showDesktopTabActionDialog(context, menuRoot, session, path),
+        child: SizedBox(
+          width: maxTabWidth,
+          height: _kUnifiedBizTabBarHeight - 8,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(start: 6, end: 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.05),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => store.closeTab(bid, path, goLoc),
+                  customBorder: const CircleBorder(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close, size: 14, color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// یک خط: نام کسب‌وکار • تب‌ها (کروم‌وار) • ساعت • دکمهٔ دیالوگ همهٔ تب‌ها
+  Widget _buildUnifiedDesktopTabStrip({
     required BuildContext context,
     required List<_MenuItem> menuRoot,
     required Color barBg,
+    required String businessName,
+    required String dateTimeStr,
+    required bool isMobile,
   }) {
     final store = BusinessPanelUiStore.instance;
     final bid = widget.businessId;
@@ -131,56 +305,95 @@ class _BusinessShellState extends State<BusinessShell> {
       return const SizedBox.shrink();
     }
 
-    return Material(
-      color: barBg,
-      child: SizedBox(
-        height: 36,
-        child: Align(
-          alignment: Alignment.centerRight,
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    final Widget businessTitle = Padding(
+      padding: const EdgeInsetsDirectional.only(start: 6, end: 4),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 200),
+        child: Text(
+          businessName,
+          style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+        ),
+      ),
+    );
+
+    final Widget dateWidget = Padding(
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 6),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 240),
+        child: Text(
+          dateTimeStr,
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: isRtl ? TextAlign.left : TextAlign.right,
+        ),
+      ),
+    );
+
+    final t = AppLocalizations.of(context)!;
+    final Widget overflowBtn = IconButton(
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+      padding: EdgeInsets.zero,
+      tooltip: t.businessPanelTabListTooltip,
+      icon: const Icon(Icons.more_horiz, color: Colors.white70, size: 22),
+      onPressed: () => _showAllTabsManagementDialog(context, menuRoot),
+    );
+
+    final Widget tabRegion = LayoutBuilder(
+      builder: (context, constraints) {
+        final n = session.paths.length;
+        if (n <= 0 || !constraints.hasBoundedWidth) {
+          return const SizedBox.expand();
+        }
+        final perTab = (constraints.maxWidth / n).clamp(_kBizTabMinWidth, _kBizTabMaxWidth).toDouble();
+        return ClipRect(
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            reverse: isRtl,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Row(
+              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
               children: [
                 for (final p in session.paths)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 6),
-                    child: Material(
-                      color: p == session.activePath ? Colors.white24 : Colors.white12,
-                      borderRadius: BorderRadius.circular(6),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(6),
-                        onTap: () => store.selectTab(bid, p, (loc) => context.go(loc)),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 8, end: 2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 200),
-                                child: Text(
-                                  _tabTitleForBusinessPath(p, menuRoot),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => store.closeTab(bid, p, (loc) => context.go(loc)),
-                                customBorder: const CircleBorder(),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4),
-                                  child: Icon(Icons.close, size: 16, color: Colors.white70),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    padding: const EdgeInsetsDirectional.only(end: 3),
+                    child: _buildDesktopTabChip(context, menuRoot, session, p, perTab),
                   ),
               ],
             ),
           ),
+        );
+      },
+    );
+
+    final List<Widget> rowChildren = isRtl
+        ? <Widget>[
+            businessTitle,
+            Expanded(child: tabRegion),
+            if (!isMobile) dateWidget,
+            overflowBtn,
+          ]
+        : <Widget>[
+            if (!isMobile) dateWidget,
+            Expanded(child: tabRegion),
+            businessTitle,
+            overflowBtn,
+          ];
+
+    return Material(
+      color: barBg,
+      child: SizedBox(
+        height: _kUnifiedBizTabBarHeight,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: rowChildren,
         ),
       ),
     );
@@ -310,7 +523,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshBankAccountsPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final accountsPath = '/business/${widget.businessId}/accounts';
+        final accountsPath = _bu('accounts');
         if (currentPath == accountsPath) {
           // Try to get the page state and refresh the page
           final pageState = BankAccountsPage.getPageState(widget.businessId);
@@ -329,7 +542,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshPersonsPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final personsPath = '/business/${widget.businessId}/persons';
+        final personsPath = _bu('persons');
         if (currentPath == personsPath) {
           final pageState = PersonsPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -346,7 +559,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshCashRegistersPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final cashBoxPath = '/business/${widget.businessId}/cash-box';
+        final cashBoxPath = _bu('cash-box');
         if (currentPath == cashBoxPath) {
           final pageState = CashRegistersPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -363,7 +576,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshPettyCashPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final pettyCashPath = '/business/${widget.businessId}/petty-cash';
+        final pettyCashPath = _bu('petty-cash');
         if (currentPath == pettyCashPath) {
           final pageState = PettyCashPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -380,7 +593,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshChecksPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final checksPath = '/business/${widget.businessId}/checks';
+        final checksPath = _bu('checks');
         if (currentPath == checksPath) {
           final pageState = ChecksPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -397,7 +610,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshInvoicesPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final invoicesPath = '/business/${widget.businessId}/invoice';
+        final invoicesPath = _bu('invoice');
         if (currentPath == invoicesPath) {
           final pageState = InvoicesListPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -414,7 +627,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshReceiptsPaymentsPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final receiptsPaymentsPath = '/business/${widget.businessId}/receipts-payments';
+        final receiptsPaymentsPath = _bu('receipts-payments');
         if (currentPath == receiptsPaymentsPath) {
           final pageState = ReceiptsPaymentsListPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -431,7 +644,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshExpenseIncomePageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final expenseIncomePath = '/business/${widget.businessId}/expense-income';
+        final expenseIncomePath = _bu('expense-income');
         if (currentPath == expenseIncomePath) {
           final pageState = ExpenseIncomeListPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -448,7 +661,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshTransfersPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final transfersPath = '/business/${widget.businessId}/transfers';
+        final transfersPath = _bu('transfers');
         if (currentPath == transfersPath) {
           final pageState = TransfersPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -465,7 +678,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshDocumentsPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final documentsPath = '/business/${widget.businessId}/documents';
+        final documentsPath = _bu('documents');
         if (currentPath == documentsPath) {
           final pageState = DocumentsPage.getPageState(widget.businessId);
           if (pageState != null && pageState.mounted) {
@@ -679,7 +892,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool useRail = width >= 700;
     final bool railExtended = width >= 1100;
     final ColorScheme scheme = Theme.of(context).colorScheme;
-    String location = '/business/${widget.businessId}/dashboard'; // default location
+    String location = _bu('dashboard'); // default location
     try {
       location = GoRouterState.of(context).uri.toString();
     } catch (e) {
@@ -698,7 +911,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.businessDashboard,
         icon: Icons.dashboard_outlined,
         selectedIcon: Icons.dashboard,
-        path: '/business/${widget.businessId}/dashboard',
+        path: _bu('dashboard'),
         type: _MenuItemType.simple,
       ),
       _MenuItem(
@@ -712,7 +925,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.people,
         icon: Icons.people,
         selectedIcon: Icons.people,
-        path: '/business/${widget.businessId}/persons',
+        path: _bu('persons'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -727,7 +940,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.products,
             icon: Icons.shopping_cart,
             selectedIcon: Icons.shopping_cart,
-            path: '/business/${widget.businessId}/products',
+            path: _bu('products'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -735,7 +948,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.categories,
             icon: Icons.category,
             selectedIcon: Icons.category,
-            path: '/business/${widget.businessId}/categories',
+            path: _bu('categories'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -743,7 +956,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.productAttributes,
             icon: Icons.tune,
             selectedIcon: Icons.tune,
-            path: '/business/${widget.businessId}/product-attributes',
+            path: _bu('product-attributes'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -760,7 +973,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.accounts,
             icon: Icons.account_balance_wallet,
             selectedIcon: Icons.account_balance_wallet,
-            path: '/business/${widget.businessId}/accounts',
+            path: _bu('accounts'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -768,7 +981,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.pettyCash,
             icon: Icons.money,
             selectedIcon: Icons.money,
-            path: '/business/${widget.businessId}/petty-cash',
+            path: _bu('petty-cash'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -776,7 +989,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.cashBox,
             icon: Icons.savings,
             selectedIcon: Icons.savings,
-            path: '/business/${widget.businessId}/cash-box',
+            path: _bu('cash-box'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -784,7 +997,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.wallet,
             icon: Icons.wallet,
             selectedIcon: Icons.wallet,
-            path: '/business/${widget.businessId}/wallet',
+            path: _bu('wallet'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -801,7 +1014,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: 'فروش سریع',
         icon: Icons.point_of_sale,
         selectedIcon: Icons.point_of_sale,
-        path: '/business/${widget.businessId}/quick-sales',
+        path: _bu('quick-sales'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -809,7 +1022,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.invoice,
         icon: Icons.receipt,
         selectedIcon: Icons.receipt,
-        path: '/business/${widget.businessId}/invoice',
+        path: _bu('invoice'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -817,7 +1030,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.receiptsAndPayments,
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
-        path: '/business/${widget.businessId}/receipts-payments',
+        path: _bu('receipts-payments'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ), 
@@ -825,7 +1038,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.expenseAndIncome,
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
-        path: '/business/${widget.businessId}/expense-income',
+        path: _bu('expense-income'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -833,7 +1046,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.transfers,
         icon: Icons.swap_horiz,
         selectedIcon: Icons.swap_horiz,
-        path: '/business/${widget.businessId}/transfers',
+        path: _bu('transfers'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -841,7 +1054,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.checks,
         icon: Icons.receipt_long,
         selectedIcon: Icons.receipt_long,
-        path: '/business/${widget.businessId}/checks',
+        path: _bu('checks'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -849,7 +1062,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.documents,
         icon: Icons.description,
         selectedIcon: Icons.description,
-        path: '/business/${widget.businessId}/documents',
+        path: _bu('documents'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -864,7 +1077,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.chartOfAccounts,
             icon: Icons.table_chart,
             selectedIcon: Icons.table_chart,
-            path: '/business/${widget.businessId}/chart-of-accounts',
+            path: _bu('chart-of-accounts'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -872,7 +1085,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.openingBalance,
             icon: Icons.play_arrow,
             selectedIcon: Icons.play_arrow,
-            path: '/business/${widget.businessId}/opening-balance',
+            path: _bu('opening-balance'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -880,7 +1093,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.yearEndClosing,
             icon: Icons.stop,
             selectedIcon: Icons.stop,
-            path: '/business/${widget.businessId}/year-end-closing',
+            path: _bu('year-end-closing'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -888,7 +1101,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.currencyRevaluation,
             icon: Icons.payments,
             selectedIcon: Icons.payments,
-            path: '/business/${widget.businessId}/currency-revaluation',
+            path: _bu('currency-revaluation'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -898,7 +1111,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.reports,
         icon: Icons.assessment,
         selectedIcon: Icons.assessment,
-        path: '/business/${widget.businessId}/reports',
+        path: _bu('reports'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -920,7 +1133,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.warehouses,
             icon: Icons.store,
             selectedIcon: Icons.store,
-            path: '/business/${widget.businessId}/warehouses',
+            path: _bu('warehouses'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -928,7 +1141,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'حواله‌های انبار',
             icon: Icons.description,
             selectedIcon: Icons.description,
-            path: '/business/${widget.businessId}/warehouse-docs',
+            path: _bu('warehouse-docs'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -936,7 +1149,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'انبار گردانی',
             icon: Icons.inventory,
             selectedIcon: Icons.inventory,
-            path: '/business/${widget.businessId}/stock-count',
+            path: _bu('stock-count'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -946,7 +1159,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.storageSpace,
         icon: Icons.storage,
         selectedIcon: Icons.storage,
-        path: '/business/${widget.businessId}/storage-files',
+        path: _bu('storage-files'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -954,7 +1167,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.taxpayers,
         icon: Icons.account_balance,
         selectedIcon: Icons.account_balance,
-        path: '/business/${widget.businessId}/tax-workspace',
+        path: _bu('tax-workspace'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -969,7 +1182,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'اشتراک AI',
             icon: Icons.subscriptions_outlined,
             selectedIcon: Icons.subscriptions,
-            path: '/business/${widget.businessId}/ai/subscription',
+            path: _bu('ai/subscription'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -977,7 +1190,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'آمار استفاده',
             icon: Icons.bar_chart_outlined,
             selectedIcon: Icons.bar_chart,
-            path: '/business/${widget.businessId}/ai/usage',
+            path: _bu('ai/usage'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -987,7 +1200,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: workflowLabel,
         icon: Icons.hub_outlined,
         selectedIcon: Icons.hub,
-        path: '/business/${widget.businessId}/workflows',
+        path: _bu('workflows'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -995,14 +1208,14 @@ class _BusinessShellState extends State<BusinessShell> {
         label: 'CRM',
         icon: Icons.handshake_outlined,
         selectedIcon: Icons.handshake,
-        path: '/business/${widget.businessId}/crm/dashboard',
+        path: _bu('crm/dashboard'),
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
             label: 'داشبورد',
             icon: Icons.dashboard_outlined,
             selectedIcon: Icons.dashboard,
-            path: '/business/${widget.businessId}/crm/dashboard',
+            path: _bu('crm/dashboard'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -1010,7 +1223,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: t.crmMenuNotesCalendar,
             icon: Icons.calendar_month_outlined,
             selectedIcon: Icons.calendar_month,
-            path: '/business/${widget.businessId}/crm/notes-calendar',
+            path: _bu('crm/notes-calendar'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -1018,7 +1231,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'چت وب',
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
-            path: '/business/${widget.businessId}/crm/web-chat',
+            path: _bu('crm/web-chat'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -1026,7 +1239,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'فرایندها و مراحل قیف',
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
-            path: '/business/${widget.businessId}/crm/process-definitions',
+            path: _bu('crm/process-definitions'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -1034,7 +1247,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'سرنخ‌ها',
             icon: Icons.contact_phone_outlined,
             selectedIcon: Icons.contact_phone,
-            path: '/business/${widget.businessId}/crm/leads',
+            path: _bu('crm/leads'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -1042,7 +1255,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'فرصت‌های فروش',
             icon: Icons.trending_up_outlined,
             selectedIcon: Icons.trending_up,
-            path: '/business/${widget.businessId}/crm/deals',
+            path: _bu('crm/deals'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -1050,7 +1263,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'فعالیت‌ها',
             icon: Icons.history,
             selectedIcon: Icons.history,
-            path: '/business/${widget.businessId}/crm/activities',
+            path: _bu('crm/activities'),
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
@@ -1058,7 +1271,7 @@ class _BusinessShellState extends State<BusinessShell> {
             label: 'گزارشات',
             icon: Icons.assessment_outlined,
             selectedIcon: Icons.assessment,
-            path: '/business/${widget.businessId}/crm/reports',
+            path: _bu('crm/reports'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -1068,7 +1281,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.warranty ?? 'گارانتی',
         icon: Icons.verified_user,
         selectedIcon: Icons.verified_user,
-        path: '/business/${widget.businessId}/warranty',
+        path: _bu('warranty'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1076,7 +1289,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: 'تعمیرگاه',
         icon: Icons.build_circle_outlined,
         selectedIcon: Icons.build_circle,
-        path: '/business/${widget.businessId}/repair-shop',
+        path: _bu('repair-shop'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -1084,7 +1297,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.customerClubMenu,
         icon: Icons.card_giftcard_outlined,
         selectedIcon: Icons.card_giftcard,
-        path: '/business/${widget.businessId}/customer-club',
+        path: _bu('customer-club'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1092,7 +1305,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.distributionMenu,
         icon: Icons.local_shipping_outlined,
         selectedIcon: Icons.local_shipping,
-        path: '/business/${widget.businessId}/distribution',
+        path: _bu('distribution'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1100,7 +1313,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: 'استعلامات',
         icon: Icons.search_outlined,
         selectedIcon: Icons.search,
-        path: '/business/${widget.businessId}/zohal/inquiries',
+        path: _bu('zohal/inquiries'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1115,21 +1328,21 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.settings,
         icon: Icons.settings,
         selectedIcon: Icons.settings,
-        path: '/business/${widget.businessId}/settings',
+        path: _bu('settings'),
         type: _MenuItemType.simple,
       ),
       _MenuItem(
         label: t.templates,
         icon: Icons.picture_as_pdf,
         selectedIcon: Icons.picture_as_pdf,
-        path: '/business/${widget.businessId}/report-templates',
+        path: _bu('report-templates'),
         type: _MenuItemType.simple,
       ),
       _MenuItem(
         label: t.pluginMarketplace,
         icon: Icons.store,
         selectedIcon: Icons.store,
-        path: '/business/${widget.businessId}/plugin-marketplace',
+        path: _bu('plugin-marketplace'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1165,7 +1378,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     final pathOnly = Uri.tryParse(location)?.path ??
-        '/business/${widget.businessId}/dashboard';
+        _bu('dashboard');
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await BusinessPanelUiStore.instance.hydrateIfNeeded();
@@ -1293,7 +1506,7 @@ class _BusinessShellState extends State<BusinessShell> {
     void _refreshProductsPageIfOpen() {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
-        final productsPath = '/business/${widget.businessId}/products';
+        final productsPath = _bu('products');
         if (currentPath == productsPath) {
           // If we're on the products page, refresh it
           _refreshCurrentPage();
@@ -1584,35 +1797,26 @@ class _BusinessShellState extends State<BusinessShell> {
     final uiStore = BusinessPanelUiStore.instance;
     final bool showBizTabs =
         useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
-    final BusinessPanelTabSession? tabSession = uiStore.tabsForBusiness(widget.businessId);
-    final bool useIndexedTabBody = useRail &&
-        uiStore.mode == BusinessPanelNavigationMode.tabs &&
-        tabSession != null &&
-        tabSession.paths.isNotEmpty;
-
-    final Widget shellMainChild = useIndexedTabBody && tabSession != null
-        ? BusinessShellTabbedBody(
-            paths: List<String>.from(tabSession.paths),
-            activePath: tabSession.activePath,
-            routerChild: widget.child,
-          )
-        : widget.child;
-    const double tabStripHeight = 36;
+    final Widget shellMainChild = widget.child;
     final double topStripHeight =
-        _businessTopBarHeight + (showBizTabs ? tabStripHeight : 0);
+        showBizTabs ? _kUnifiedBizTabBarHeight : _businessTopBarHeight;
 
     final PreferredSizeWidget preferredAppBar = PreferredSize(
       preferredSize: Size.fromHeight(topStripHeight + kToolbarHeight),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          businessTopBar,
           if (showBizTabs)
-            _buildBusinessTabStrip(
+            _buildUnifiedDesktopTabStrip(
               context: context,
               menuRoot: menuItems,
               barBg: topBarBg,
-            ),
+              businessName: businessName,
+              dateTimeStr: dateTimeStr,
+              isMobile: isMobile,
+            )
+          else
+            businessTopBar,
           appBar,
         ],
       ),
@@ -1770,7 +1974,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (child.label == t.checks) {
                                             showAddCheckDialog();
                                           } else if (child.label == t.invoice) {
-                                            context.go('/business/${widget.businessId}/invoice/new');
+                                            context.go(_bu('invoice/new'));
                                           } else if (child.label == t.receiptsAndPayments) {
                                             showAddReceiptPaymentDialog();
                                           } else if (child.label == t.expenseAndIncome) {
@@ -1780,13 +1984,13 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (child.label == 'حواله‌های انبار') {
                                             showAddWarehouseDocumentDialog();
                                           } else if (child.label == 'فرایندها و زون ارجاعات') {
-                                            context.go('/business/${widget.businessId}/crm/process-definitions?openAdd=1');
+                                            context.go('${_bu('crm/process-definitions')}?openAdd=1');
                                           } else if (child.label == 'سرنخ‌ها') {
-                                            context.go('/business/${widget.businessId}/crm/leads?openAdd=1');
+                                            context.go('${_bu('crm/leads')}?openAdd=1');
                                           } else if (child.label == 'فرصت‌های فروش') {
-                                            context.go('/business/${widget.businessId}/crm/deals?openAdd=1');
+                                            context.go('${_bu('crm/deals')}?openAdd=1');
                                           } else if (child.label == 'فعالیت‌ها') {
-                                            context.go('/business/${widget.businessId}/crm/activities?openAdd=1');
+                                            context.go('${_bu('crm/activities')}?openAdd=1');
                                           }
                                         },
                                         child: Container(
@@ -1969,7 +2173,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.cashBox) {
                                             showAddCashBoxDialog();
                                           } else if (item.label == t.invoice) {
-                                            context.go('/business/${widget.businessId}/invoice/new');
+                                            context.go(_bu('invoice/new'));
                                           } else if (item.label == t.receiptsAndPayments) {
                                             showAddReceiptPaymentDialog();
                                           } else if (item.label == t.expenseAndIncome) {
@@ -2094,7 +2298,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                   showAddPersonDialog();
                                 } else if (item.label == t.invoice) {
                                   // Navigate to add invoice
-                                  context.go('/business/${widget.businessId}/invoice/new');
+                                  context.go(_bu('invoice/new'));
                                 } else if (item.label == t.expenseAndIncome) {
                                   // Show add expense/income dialog
                                   showAddExpenseIncomeDialog();
@@ -2175,7 +2379,7 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Navigate to add check
                             } else if (child.label == t.invoice) {
                               // Navigate to add invoice
-                              context.go('/business/${widget.businessId}/invoice/new');
+                              context.go(_bu('invoice/new'));
                             } else if (child.label == t.receiptsAndPayments) {
                               // Show add receipt payment dialog
                               showAddReceiptPaymentDialog();
@@ -2189,13 +2393,13 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Show add warehouse document dialog
                               showAddWarehouseDocumentDialog();
                             } else if (child.label == 'فرایندها و زون ارجاعات') {
-                              context.go('/business/${widget.businessId}/crm/process-definitions?openAdd=1');
+                              context.go('${_bu('crm/process-definitions')}?openAdd=1');
                             } else if (child.label == 'سرنخ‌ها') {
-                              context.go('/business/${widget.businessId}/crm/leads?openAdd=1');
+                              context.go('${_bu('crm/leads')}?openAdd=1');
                             } else if (child.label == 'فرصت‌های فروش') {
-                              context.go('/business/${widget.businessId}/crm/deals?openAdd=1');
+                              context.go('${_bu('crm/deals')}?openAdd=1');
                             } else if (child.label == 'فعالیت‌ها') {
-                              context.go('/business/${widget.businessId}/crm/activities?openAdd=1');
+                              context.go('${_bu('crm/activities')}?openAdd=1');
                             }
                           },
                           child: Container(

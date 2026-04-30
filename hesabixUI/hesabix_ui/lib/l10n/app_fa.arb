@@ -4494,7 +4494,13 @@
   "appearanceDesktopOnlyNote": "حالت تب فقط در عرض زیاد اعمال می‌شود؛ در موبایل همیشه حالت تک‌صفحه است.",
   "appearanceSaved": "ذخیره شد",
   "appearanceSaveError": "ذخیرهٔ تنظیمات ناموفق بود",
-  "appearanceSaveButton": "ذخیره"
+  "appearanceSaveButton": "ذخیره",
+  "businessPanelTabCloseThisTab": "بستن این تب",
+  "businessPanelTabCloseTabsToTheRight": "بستن تب‌های راست‌تر",
+  "businessPanelTabCloseTabsToTheLeft": "بستن تب‌های چپ‌تر",
+  "businessPanelTabAllTabsTitle": "همهٔ تب‌ها",
+  "businessPanelTabCloseAllTabs": "بستن همهٔ تب‌ها",
+  "businessPanelTabListTooltip": "لیست همهٔ تب‌ها"
 }
 
 

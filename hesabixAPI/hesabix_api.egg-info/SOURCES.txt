@@ -233,6 +233,7 @@ adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
 adapters/db/models/telegram.py
 adapters/db/models/user.py
+adapters/db/models/user_ui_preferences.py
 adapters/db/models/wallet.py
 adapters/db/models/warehouse.py
 adapters/db/models/warehouse_document.py
@@ -470,6 +471,7 @@ app/services/telegram_ai_chat_service.py
 app/services/template_builder_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
+app/services/user_ui_preferences_service.py
 app/services/wallet_service.py
 app/services/warehouse_location_service.py
 app/services/warehouse_placement_sync.py
@@ -625,6 +627,7 @@ migrations/versions/20260604_000001_seed_notification_event_types.py
 migrations/versions/20260605_000001_seed_notification_event_types_workflow_extensions.py
 migrations/versions/20260606_000001_business_crm_allow_web_chat_voice.py
 migrations/versions/20260607_000001_users_last_activity_signature.py
+migrations/versions/20260608_000001_user_ui_preferences.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

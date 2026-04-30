@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/business_named_route_locations.dart';
+import '../../core/business_nav.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -233,8 +235,10 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
       SnackBarHelper.show(context, message: t.workflowMarketplaceInstalled);
       final wfId = wfMap['id'];
       if (wfId is int) {
-        context.goNamed(
-          'business_edit_workflow',
+        BusinessNamedRoutes.goNamed(
+          context,
+          businessId: widget.businessId,
+          routeName: 'business_edit_workflow',
           pathParameters: {
             'business_id': widget.businessId.toString(),
             'workflow_id': wfId.toString(),
@@ -242,7 +246,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
           extra: wfMap,
         );
       } else {
-        context.go('/business/${widget.businessId}/workflows');
+        context.go(context.businessPanelUrl(widget.businessId, 'workflows'));
       }
     } catch (e) {
       if (!mounted) return;
