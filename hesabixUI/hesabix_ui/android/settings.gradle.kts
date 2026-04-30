@@ -1,3 +1,12 @@
+val hesabixGradleMirror: String = run {
+    val p = java.util.Properties()
+    val gradleProps = file("gradle.properties")
+    if (gradleProps.isFile) {
+        gradleProps.inputStream().use { p.load(it) }
+    }
+    p.getProperty("hesabix.gradle.mirror", "https://gradle.mirror.hesabix.ir").trimEnd('/')
+}
+
 pluginManagement {
     val flutterSdkPath =
         run {
@@ -11,12 +20,9 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
-        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
-        google()
-        mavenCentral()
-        gradlePluginPortal()
+        maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
+        maven { url = uri("${hesabixGradleMirror}/maven2/") }
+        maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
     }
 }
 
