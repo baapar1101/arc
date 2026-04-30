@@ -11,7 +11,7 @@ if (!defined('WPINC')) {
 }
 ?>
 
-<div class="wrap hesabix-v2-setup-wizard">
+<div class="wrap hesabix-v2-wrap hesabix-v2-setup-wizard">
 	<h1><?php _e('راه‌اندازی حسابیکس V2', 'hesabix-v2'); ?></h1>
 	
 	<div class="wizard-container">
@@ -73,39 +73,6 @@ if (!defined('WPINC')) {
 		</div>
 	</div>
 </div>
-
-<style>
-.hesabix-v2-setup-wizard {
-	max-width: 800px;
-	margin: 50px auto;
-}
-.wizard-container {
-	background: white;
-	padding: 30px;
-	border: 1px solid #ccc;
-	border-radius: 8px;
-}
-.wizard-step {
-	min-height: 300px;
-}
-#businesses-list {
-	margin: 20px 0;
-}
-.business-item {
-	padding: 15px;
-	border: 1px solid #ddd;
-	margin: 10px 0;
-	border-radius: 4px;
-	cursor: pointer;
-}
-.business-item:hover {
-	background: #f5f5f5;
-}
-.business-item.selected {
-	background: #e3f2fd;
-	border-color: #2271b1;
-}
-</style>
 
 <script>
 jQuery(document).ready(function($) {
@@ -171,13 +138,15 @@ jQuery(document).ready(function($) {
 			api_key: apiKey
 		}).done(function(res) {
 			if (res && res.success && res.businesses && res.businesses.length) {
-				var html = '';
+				$list.empty();
 				res.businesses.forEach(function(b) {
-					var id = b.id || b.business_id;
+					var id = parseInt(b.id || b.business_id, 10);
+					if (!id) return;
 					var name = b.name_fa || b.name || b.title || ('کسب‌وکار ' + id);
-					html += '<div class="business-item" data-id="' + id + '">' + name + '</div>';
+					var $div = $('<div/>', { 'class': 'business-item', 'data-id': id });
+					$div.text(name);
+					$list.append($div);
 				});
-				$list.html(html);
 				$('#complete-setup').hide();
 			} else if (res && res.success && (!res.businesses || !res.businesses.length)) {
 				$list.html('<p><?php echo esc_js(__('کسب‌وکاری یافت نشد.', 'hesabix-v2')); ?></p>');

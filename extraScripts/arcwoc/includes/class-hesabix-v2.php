@@ -108,6 +108,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
 
 		$this->loader = new Hesabix_V2_Loader();
 	}
@@ -150,9 +151,10 @@ class Hesabix_V2
 			$this->loader->add_action('woocommerce_payment_complete', $plugin_admin, 'maybe_sync_order_on_payment_complete', 10, 1);
 			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_sync_order_on_status_change', 10, 4);
 			
-			// Customer sync hooks
+			// Customer sync hooks (پروفایل وردپرس + ذخیرهٔ مشتری از «حساب کاربری من» ووکامرس)
 			$this->loader->add_action('user_register', $plugin_admin, 'on_customer_register');
 			$this->loader->add_action('profile_update', $plugin_admin, 'on_customer_update');
+			$this->loader->add_action('woocommerce_update_customer', $plugin_admin, 'on_customer_update', 10, 1);
 		}
 
 		// AJAX actions
@@ -160,14 +162,17 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_product', $plugin_admin, 'ajax_sync_product');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_products', $plugin_admin, 'ajax_sync_products');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_customers', $plugin_admin, 'ajax_sync_customers');
+		$this->loader->add_action('wp_ajax_hesabix_v2_import_customers_from_hesabix', $plugin_admin, 'ajax_import_customers_from_hesabix');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_warehouses_and_banks', $plugin_admin, 'ajax_get_warehouses_and_banks');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_invoice_tags', $plugin_admin, 'ajax_get_invoice_tags');
 
 		// Setup wizard AJAX
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_verify_api_key', $plugin_admin, 'ajax_setup_verify_api_key');
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_businesses', $plugin_admin, 'ajax_setup_businesses');
-		$this->loader->add_action('wp_ajax_hesabix_v2_setup_fiscal_years', $plugin_admin, 'ajax_setup_fiscal_years');
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_complete', $plugin_admin, 'ajax_setup_complete');
+
+		$this->loader->add_action('hesabix_v2_process_queue', 'Hesabix_V2_Queue_Service', 'process_due');
+		$this->loader->add_action('hesabix_v2_clean_old_logs', 'Hesabix_V2_Log_Service', 'cron_clean_old_logs');
 	}
 
 	/**

@@ -297,6 +297,7 @@ adapters/db/seed_data/__init__.py
 adapters/db/seed_data/notification_event_types_seed.py
 app/__init__.py
 app/main.py
+app/openapi_local_docs.py
 app/core/__init__.py
 app/core/auth_dependency.py
 app/core/batch_operations.py
@@ -622,6 +623,7 @@ migrations/versions/20260603_000001_crm_chat_message_edited_at.py
 migrations/versions/20260604_000001_seed_notification_event_types.py
 migrations/versions/20260605_000001_seed_notification_event_types_workflow_extensions.py
 migrations/versions/20260606_000001_business_crm_allow_web_chat_voice.py
+migrations/versions/20260607_000001_users_last_activity_signature.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

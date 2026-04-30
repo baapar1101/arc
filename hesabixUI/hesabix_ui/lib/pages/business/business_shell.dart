@@ -44,6 +44,7 @@ import 'receipts_payments_list_page.dart';
 import 'expense_income_list_page.dart';
 import 'transfers_page.dart';
 import 'documents_page.dart';
+import 'business_shell_side_nav_scope.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -82,6 +83,9 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
+
+  /// فقط زمانی که `NavigationRail`/ریل کناری برای دسکتاپ نشان داده می‌شود؛ موبایل از drawer استفاده می‌کند.
+  bool _desktopRailVisible = true;
 
   @override
   void initState() {
@@ -1363,7 +1367,17 @@ class _BusinessShellState extends State<BusinessShell> {
       titleSpacing: 0,
       title: Row(
         children: [
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          if (useRail)
+            IconButton(
+              tooltip: _desktopRailVisible ? 'پنهان کردن منوی کناری' : 'نمایش منوی کناری',
+              onPressed: () => setState(() => _desktopRailVisible = !_desktopRailVisible),
+              icon: Icon(
+                _desktopRailVisible ? Icons.menu_open : Icons.menu,
+                color: appBarFg,
+              ),
+            ),
+          if (!useRail) const SizedBox(width: 4),
           Image.asset(logoAsset, height: 28),
           const SizedBox(width: 12),
           Text(t.appTitle, style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700)),
@@ -1480,10 +1494,15 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color activeFg = scheme.onPrimaryContainer;
 
     if (useRail) {
-      return Scaffold(
+      return BusinessShellSideNavScope(
+        desktopRailSupported: true,
+        desktopRailVisible: _desktopRailVisible,
+        setDesktopRailVisible: (visible) => setState(() => _desktopRailVisible = visible),
+        child: Scaffold(
         appBar: preferredAppBar,
         body: Row(
           children: [
+            if (_desktopRailVisible) ...[
             Container(
               width: railExtended ? 260 : 88,
               height: double.infinity,
@@ -1861,13 +1880,19 @@ class _BusinessShellState extends State<BusinessShell> {
               ),
             ),
             const VerticalDivider(thickness: 1, width: 1),
+            ],
             Expanded(child: content),
           ],
         ),
+      ),
       );
     }
 
-      return Scaffold(
+      return BusinessShellSideNavScope(
+        desktopRailSupported: false,
+        desktopRailVisible: false,
+        setDesktopRailVisible: (_) {},
+        child: Scaffold(
         appBar: preferredAppBar,
       drawer: Drawer(
         backgroundColor: sideBg,
@@ -2070,7 +2095,8 @@ class _BusinessShellState extends State<BusinessShell> {
         ),
       ),
       body: content,
-    );
+    ),
+      );
   }
 
   Future<void> _handleInvoiceWizardResult(WarehouseDocWizardResult wizardResult) async {

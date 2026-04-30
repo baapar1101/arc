@@ -111,6 +111,34 @@ add_filter('hesabix_v2_invoice_data', function($data, $order) {
 }, 10, 2);
 ```
 
+#### حداکثر اختلاف گرد کردن (جمع خطوط در مقابل مبلغ نهایی سفارش)
+
+اگر اختلاف رُند شده بین جمع `line_total` خطوط و `order_total` ووکامرس از این حد بیشتر باشد، افزونه خودکار اصلاح نمی‌کند و فقط هشدار می‌نویسد (پیش‌فرض: `2` واحد پول).
+
+```php
+add_filter('hesabix_v2_invoice_rounding_tolerance', function($tolerance) {
+    return 5;
+});
+```
+
+#### حداکثر اصلاح سربرگ (gross − discount + tax = مبلغ نهایی سفارش)
+
+برای هم‌خوانی بدهکار مشتری در فاکتور با مبلغ سند دریافت، اگر اختلاف گرد کردن بین این فرمول و `order_total` کم باشد، به **`gross`** سربرگ در حد چند واحد پول اضافه/کم می‌شود (پیش‌فرض تحمل `5`).
+
+```php
+add_filter('hesabix_v2_invoice_header_totals_tolerance', function($t) {
+    return 10;
+});
+```
+
+#### آرایهٔ پرداخت‌های همراه فاکتور (قبل از ارسال به API)
+
+```php
+add_filter('hesabix_v2_invoice_payments', function($payments, $order) {
+    return $payments;
+}, 10, 2);
+```
+
 #### تغییر URL پایه API
 
 ```php

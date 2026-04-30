@@ -5,9 +5,19 @@
  * @package    Hesabix_V2
  */
 
-/* RTL Support + IRANYekanWeb font (same as legacy Hesabix) */
-.hesabix-v2-wrap,
-.hesabix-v2-wrap * {
+/* RTL Support + IRANYekanWeb font (بدون اعمال به همهٔ زیرمجموعه‌ها تا با Dashicons تداخل نگیرد) */
+.hesabix-v2-wrap {
+	box-sizing: border-box;
+	font-family: 'IRANYekanWeb', sans-serif;
+}
+
+.hesabix-v2-wrap table,
+.hesabix-v2-wrap input,
+.hesabix-v2-wrap select,
+.hesabix-v2-wrap textarea,
+.hesabix-v2-wrap button,
+.hesabix-v2-wrap label,
+.hesabix-v2-wrap .button {
 	box-sizing: border-box;
 	font-family: 'IRANYekanWeb', sans-serif;
 }
@@ -56,7 +66,8 @@
 	margin: 0 0 10px 0;
 	font-size: 14px;
 	color: #666;
-	text-transform: uppercase;
+	text-transform: none;
+	letter-spacing: normal;
 }
 
 .stat-number {
@@ -137,6 +148,10 @@
 .wizard-step h2 {
 	color: #2271b1;
 	margin-top: 0;
+}
+
+.hesabix-v2-setup-wizard #businesses-list {
+	margin: 20px 0;
 }
 
 /* Business Selection */

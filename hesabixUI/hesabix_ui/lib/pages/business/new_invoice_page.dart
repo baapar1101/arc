@@ -38,6 +38,7 @@ import '../../services/business_api_service.dart';
 import '../../services/person_service.dart';
 import '../../services/report_template_service.dart';
 import '../../models/invoice_transaction.dart';
+import '../../models/account_model.dart';
 import '../../models/invoice_line_item.dart';
 import '../../utils/invoice_line_preferences.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
@@ -49,6 +50,8 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'invoices_list_page.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
+import '../../widgets/invoice/invoice_adjustments_form.dart';
+import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
 
 
@@ -138,6 +141,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   
   // تراکنش‌های فاکتور
   List<InvoiceTransaction> _transactions = [];
+  // اضافات و کسورات (فقط فروش/خرید)
+  List<InvoiceAdjustmentFormRow> _adjustmentRows = <InvoiceAdjustmentFormRow>[];
+
   // ردیف‌های فاکتور برای ساخت payload
   List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
   // لیست شناسه فرمول‌های تولید استفاده شده در این فاکتور
@@ -198,6 +204,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     return sum;
   }
 
+  bool get _invoiceTypeSupportsAdjustments =>
+      _selectedInvoiceType == InvoiceType.sales ||
+      _selectedInvoiceType == InvoiceType.purchase;
+
+  bool _adjustmentsTabVisibleForType(InvoiceType? type) =>
+      type == InvoiceType.sales || type == InvoiceType.purchase;
+
+  num get _adjustmentsNetSum => sumSignedAdjustmentsNet(_adjustmentRows);
+
+  num get _adjustmentsTaxSum => sumSignedAdjustmentsTax(_adjustmentRows);
+
+  num get _invoiceGrandTotal =>
+      invoiceAdjustmentsRound2(_sumTotal + _adjustmentsNetSum + _adjustmentsTaxSum);
+
   bool get _isSalesOrReturn =>
       _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
 
@@ -212,11 +232,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (bal < 0) {
       currentDebt = -bal;
     }
-    // مبلغ فاکتور (با مالیات)
-    final gross = _sumSubtotal.toDouble();
-    final discount = _sumDiscount.toDouble();
-    final tax = _sumTax.toDouble();
-    final totalWithTax = gross - discount + tax;
+    // مبلغ فاکتور با اضافات/کسورات و مالیات آن‌ها
+    final totalWithTax = _invoiceGrandTotal.toDouble();
     // پرداخت‌های برنامه‌ریزی‌شده
     double plannedPaid = 0;
     for (final p in _transactions) {
@@ -243,7 +260,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   void initState() {
     super.initState();
     _copyFromLoading = widget.copyFromInvoiceId != null;
-    _tabController = TabController(length: 4, vsync: this); // شروع با 4 تب
+    _tabController = TabController(
+      length: _getTabCountForType(InvoiceType.sales),
+      vsync: this,
+    );
     _attachTabListener();
     // تنظیم نوع فاکتور پیش‌فرض
     _selectedInvoiceType = InvoiceType.sales;
@@ -294,6 +314,42 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     final s = v.toString();
     if (s.length < 10) return null;
     return DateTime.tryParse(s.substring(0, 10));
+  }
+
+  void _disposeAdjustmentRows() {
+    disposeInvoiceAdjustmentRows(_adjustmentRows);
+    _adjustmentRows = [];
+  }
+
+  Future<void> _hydrateAdjustmentRowsFromExtra(Map<String, dynamic> ei) async {
+    _disposeAdjustmentRows();
+    final invType = _selectedInvoiceType;
+    if (invType != InvoiceType.sales && invType != InvoiceType.purchase) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final raw = ei['invoice_adjustments'];
+    if (raw is! List || raw.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final svc = AccountService();
+    final newRows = <InvoiceAdjustmentFormRow>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      final aid = (m['account_id'] as num?)?.toInt();
+      Account? acc;
+      if (aid != null) {
+        try {
+          final j = await svc.getAccount(businessId: widget.businessId, accountId: aid);
+          acc = Account.fromJson(j);
+        } catch (_) {}
+      }
+      newRows.add(InvoiceAdjustmentFormRow.fromSavedMap(m, account: acc));
+    }
+    if (!mounted) return;
+    setState(() => _adjustmentRows = newRows);
   }
 
   void _disposeInstallmentRowControllersFully() {
@@ -692,6 +748,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       });
 
       _adjustTabBarLengthAfterPrefill();
+      await _hydrateAdjustmentRowsFromExtra(ei);
       await _reloadFxRates();
       if (_selectedCustomer != null) {
         await _loadCustomerBalance();
@@ -1021,8 +1078,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (n <= 0) return;
       final start = _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now();
       final periodDays = (_installmentPeriod == 'monthly') ? 30 : (_installmentPeriodDays ?? 30);
-      // محاسبه اصل با لحاظ پیش‌پرداخت
-      final totalNet = _sumTotal.toDouble();
+      // محاسبه اصل با لحاظ پیش‌پرداخت (مبلغ نهایی فاکتور شامل اضافات/کسورات)
+      final totalNet = _invoiceGrandTotal.toDouble();
       final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
       final principalTotal = principalTarget;
 
@@ -1144,7 +1201,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         _installmentPeriodDays = plan.periodDays;
                         _interestRate = plan.interestRate ?? 0.0;
                         final dpPercent = plan.downPaymentPercent ?? 0.0;
-                        _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
+                        _downPayment = (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
                         // به‌روزرسانی Controller ها
                         _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
                         _downPaymentController.text = formatNumberForInput(_downPayment);
@@ -1170,7 +1227,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     _interestRate = plan.interestRate ?? 0.0;
                     // محاسبه پیش‌پرداخت از درصد پلن بر اساس جمع کنونی
                     final dpPercent = plan.downPaymentPercent ?? 0.0;
-                    _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
+                    _downPayment = (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
                     _firstInstallmentDueDate = _invoiceDate ?? DateTime.now();
                     // به‌روزرسانی Controller ها
                     _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
@@ -1404,7 +1461,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   // تراز اختلاف
                   final n = _installmentRows.length;
                   if (n == 0) return;
-                  final totalNet = _sumTotal.toDouble();
+                  final totalNet = _invoiceGrandTotal.toDouble();
                   final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
                   double sumPrincipal = 0;
                   for (final r in _installmentRows) {
@@ -1596,7 +1653,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       final sumPrincipal = _installmentsPrincipalTotal;
                       final sumInterest = _installmentsInterestTotal;
                       final sumTotal = _installmentsTotal;
-                      final targetPrincipal = (_sumTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
+                      final targetPrincipal = (_invoiceGrandTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
                       final diff = sumPrincipal - targetPrincipal;
                       final diffColor = diff.abs() <= 1 ? Colors.green : Colors.orange;
                       return Align(
@@ -1753,6 +1810,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     var n = 3; // اطلاعات، کالاها، تنظیمات
     if (_transactionsTabVisibleForType(type)) n += 1; // تراکنش‌ها بین کالاها و اقساط/تنظیمات
+    if (_adjustmentsTabVisibleForType(type)) n += 1; // اضافات/کسورات قبل از اقساط/تنظیمات
     if (_installmentsTabVisibleForType(type)) n += 1; // اقساط قبل از تنظیمات
     return n;
   }
@@ -1780,7 +1838,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   int _installmentsSlotForType(InvoiceType? type) {
-    return 2 + (_transactionsTabVisibleForType(type) ? 1 : 0);
+    return 2 +
+        (_transactionsTabVisibleForType(type) ? 1 : 0) +
+        (_adjustmentsTabVisibleForType(type) ? 1 : 0);
   }
 
 
@@ -1826,6 +1886,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   @override
   void dispose() {
+    disposeInvoiceAdjustmentRows(_adjustmentRows);
+    _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
     // Dispose کردن Controller های اقساطی
@@ -1922,6 +1984,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             Tab(icon: const Icon(Icons.inventory_2_outlined), text: t.productsServicesTab),
             if (_shouldShowTransactionsTab)
               Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.transactionsTab),
+            if (_adjustmentsTabVisibleForType(_selectedInvoiceType))
+              const Tab(icon: Icon(Icons.tune), text: 'اضافات و کسورات'),
             if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn))
               const Tab(icon: Icon(Icons.payments_outlined), text: 'اقساط'),
             Tab(icon: const Icon(Icons.settings_outlined), text: t.settingsTab),
@@ -1940,6 +2004,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _buildProductsTab(),
           // تب تراکنش‌ها (فقط اگر باید نمایش داده شود)
           if (_shouldShowTransactionsTab) _buildTransactionsTab(),
+          if (_adjustmentsTabVisibleForType(_selectedInvoiceType)) _buildAdjustmentsTab(),
           // تب اقساط (در صورت فعال بودن)
           if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)) _buildInstallmentsTab(),
           // تب تنظیمات
@@ -2713,7 +2778,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       final payload = validation as Map<String, dynamic>;
 
       // بررسی مبلغ صفر فاکتور
-      if (_sumTotal == 0) {
+      if (_invoiceGrandTotal == 0) {
         final confirmed = await _showZeroAmountWarning();
         if (!confirmed) {
           return; // کاربر انصراف داد
@@ -2959,18 +3024,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
     final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn;
-    
-    // اعتبارسنجی طرف حساب برای فروش
+
+    final adjValidationMsg = validateAdjustmentRows(
+      _adjustmentRows,
+      invoiceTypeSupportsAdjustments: _invoiceTypeSupportsAdjustments,
+    );
+    if (adjValidationMsg != null) return adjValidationMsg;
+
     if (isSalesOrReturn && _selectedCustomer == null) {
       return 'انتخاب طرف حساب الزامی است';
     }
-    
-    // اعتبارسنجی تامین‌کننده برای خرید
+
     if (isPurchaseOrReturn && _selectedSupplier == null) {
       return 'انتخاب تامین‌کننده الزامی است';
     }
 
-    // اعتبارسنجی کارمزد در حالت فروش
     if (isSalesOrReturn && _selectedSeller != null && _commissionType != null) {
       if (_commissionType == CommissionType.percentage) {
         final p = _commissionPercentage ?? 0;
@@ -2988,6 +3056,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'discount': _sumDiscount,
         'tax': _sumTax,
         'net': _sumTotal,
+        'adjustments_net': _adjustmentsNetSum,
+        'adjustments_tax': _adjustmentsTaxSum,
       },
     };
     extraInfo['post_inventory'] = _invoiceWarehouseReleaseMode != 'none';
@@ -3022,6 +3092,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } else if (isPurchaseOrReturn && _selectedSupplier != null) {
       extraInfo['person_id'] = _selectedSupplier!.id;
     }
+
+    if (_invoiceTypeSupportsAdjustments) {
+      final adjPayload = buildAdjustmentsPayloadList(_adjustmentRows);
+      if (adjPayload.isNotEmpty) {
+        extraInfo['invoice_adjustments'] = adjPayload;
+      } else {
+        extraInfo.remove('invoice_adjustments');
+      }
+    } else {
+      extraInfo.remove('invoice_adjustments');
+    }
     
     // افزودن اطلاعات فروشنده و کارمزد (اختیاری)
     if (isSalesOrReturn && _selectedSeller != null) {
@@ -3043,7 +3124,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
       // اگر برنامه اقساط دستی است، مجموع اصل اقساط باید با (جمع فاکتور - پیش‌پرداخت) برابر باشد
       if (_installmentRows.isNotEmpty) {
-        final totalNet = _sumTotal.toDouble();
+        final totalNet = _invoiceGrandTotal.toDouble();
         final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
         double sumPrincipal = 0;
         for (final r in _installmentRows) {
@@ -3287,6 +3368,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         _selectedSupplier = null;
         _selectedSeller = null;
       }
+
+      if (newType != InvoiceType.sales && newType != InvoiceType.purchase) {
+        disposeInvoiceAdjustmentRows(_adjustmentRows);
+        _adjustmentRows = [];
+      }
       
       // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
       final newTabCount = _getTabCountForType(newType);
@@ -3485,7 +3571,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     Text('${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('جمع پس از ردیف‌ها: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700])),
+                    if (_adjustmentsNetSum != 0 || _adjustmentsTaxSum != 0) ...[
+                      Text('جمع خالص اضافات/کسورات: ${formatWithThousands(_adjustmentsNetSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
+                      Text('مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -3493,6 +3584,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAdjustmentsTab() {
+    return InvoiceAdjustmentsTabContent(
+      businessId: widget.businessId,
+      rows: _adjustmentRows,
+      decimalPlaces: _invoiceCurrencyDecimalPlaces,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -3509,7 +3611,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
-            invoiceTotal: _sumTotal, // ارسال مبلغ کل فاکتور
+            invoiceTotal: _invoiceGrandTotal,
             onChanged: (transactions) {
               setState(() {
                 _transactions = transactions;

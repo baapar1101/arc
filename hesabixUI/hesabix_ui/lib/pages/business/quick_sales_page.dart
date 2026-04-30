@@ -32,6 +32,7 @@ import '../../widgets/product/category_tree_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
+import 'business_shell_side_nav_scope.dart';
 
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
@@ -116,6 +117,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   bool _loadingCategories = false;
   int? _selectedCategoryId;
 
+  VoidCallback? _restoreDesktopRailAfterQuit;
+
   @override
   void initState() {
     super.initState();
@@ -127,7 +130,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     _loadRecentProducts();
     _loadCategories();
     // فوکوس خودکار روی فیلد بارکد
+    // فوکوس خودکار روی فیلد بارکد؛ در حالت ریل دسکتاپ فضای بیشتر با جمع شدن نوار کناری
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
+      if (shellScope?.canControlDesktopRail ?? false) {
+        shellScope!.setRailVisible(false);
+        final scope = shellScope;
+        _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
+      }
       _barcodeFocus.requestFocus();
       _keyboardListenerFocus.requestFocus();
     });
@@ -227,6 +238,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
 
   @override
   void dispose() {
+    _restoreDesktopRailAfterQuit?.call();
     _searchDebounce?.cancel();
     _barcodeController.dispose();
     _documentDescriptionController.dispose();

@@ -96,6 +96,9 @@ class Hesabix_V2_Activator
 			update_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 		}
 
+		add_option('hesabix_v2_invoice_payment_destination', 'bank');
+		add_option('hesabix_v2_default_cash_register_id', '');
+
 		if (!get_option('hesabix_v2_enabled')) {
 			update_option('hesabix_v2_enabled', false);
 		}

@@ -64,7 +64,7 @@ class Hesabix_V2_Updater
 	{
 		$url = isset($info->download_url) ? trim($info->download_url) : '';
 		if (empty($url)) {
-			$url = defined('HESABIX_V2_UPDATE_ARCHIVE_URL') ? HESABIX_V2_UPDATE_ARCHIVE_URL : 'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/master.zip';
+			$url = defined('HESABIX_V2_UPDATE_ARCHIVE_URL') ? HESABIX_V2_UPDATE_ARCHIVE_URL : 'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/main.zip';
 		}
 		if (empty($url) || empty($info->version)) {
 			return '';

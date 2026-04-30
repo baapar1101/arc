@@ -212,6 +212,20 @@ class Hesabix_V2_Log_Service
 	}
 
 	/**
+	 * Cron: پاکسازی لاگ‌های قدیمی (فیلتر روزها: hesabix_v2_log_retention_days، حداقل ۷).
+	 *
+	 * @return void
+	 */
+	public static function cron_clean_old_logs()
+	{
+		$days = (int) apply_filters('hesabix_v2_log_retention_days', 30);
+		if ($days < 7) {
+			$days = 7;
+		}
+		self::clean_old_logs($days);
+	}
+
+	/**
 	 * Get log file path for download
 	 *
 	 * @since    2.0.0

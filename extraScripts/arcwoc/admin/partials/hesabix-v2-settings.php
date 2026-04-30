@@ -17,6 +17,11 @@ $add_checkout_fields = get_option('hesabix_v2_add_checkout_fields', false);
 $api_key = get_option('hesabix_v2_api_key');
 $business_id = get_option('hesabix_v2_business_id');
 $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
+$invoice_payment_destination = get_option('hesabix_v2_invoice_payment_destination', 'bank');
+if ($invoice_payment_destination !== 'cash_register') {
+	$invoice_payment_destination = 'bank';
+}
+$saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 ?>
 
 <div class="wrap hesabix-v2-wrap">
@@ -84,6 +89,17 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_categories" value="1" <?php checked(!isset($sync_settings['sync_product_categories']) || !empty($sync_settings['sync_product_categories'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php _e('در صورت غیرفعال بودن، محصول بدون دستهٔ حسابیکس ارسال می‌شود.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('همگام‌سازی قیمت محصول', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -110,6 +126,7 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 						<input type="checkbox" name="auto_sync_customers" value="1" <?php checked($sync_settings['auto_sync_customers'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php _e('ثبت‌نام کاربر با نقش مشتری، ویرایش پروفایل وردپرس، و ذخیرهٔ مشتری از حساب کاربری من ووکامرس (هوک woocommerce_update_customer).', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
@@ -237,12 +254,33 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php _e('بانک پیش‌فرض (پرداخت)', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('ثبت پرداخت فاکتور در', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:block;margin-bottom:6px;">
+						<input type="radio" name="hesabix_v2_invoice_payment_destination" value="bank" <?php checked($invoice_payment_destination, 'bank'); ?>>
+						<?php _e('حساب بانکی', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:block;">
+						<input type="radio" name="hesabix_v2_invoice_payment_destination" value="cash_register" <?php checked($invoice_payment_destination, 'cash_register'); ?>>
+						<?php _e('صندوق', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php _e('برای سفارش‌های پرداخت‌شده، سند دریافت در حسابیکس به این مقصد ثبت می‌شود (فاکتور غیر پیش‌فاکتور). حساب انتخاب‌شده باید با ارز فاکتور هم‌خوان باشد.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-pay-row hesabix-v2-pay-bank">
+				<th scope="row"><?php _e('حساب بانکی پیش‌فرض', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="hesabix_v2_default_bank_id" id="hesabix_v2_default_bank_id" class="regular-text">
 						<option value=""><?php _e('— انتخاب حساب بانکی —', 'hesabix-v2'); ?></option>
 					</select>
-					<p class="description"><?php _e('برای ثبت پرداخت هنگام سفارش پرداخت‌شده.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-pay-row hesabix-v2-pay-cash">
+				<th scope="row"><?php _e('صندوق پیش‌فرض', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="hesabix_v2_default_cash_register_id" id="hesabix_v2_default_cash_register_id" class="regular-text">
+						<option value=""><?php _e('— انتخاب صندوق —', 'hesabix-v2'); ?></option>
+					</select>
 				</td>
 			</tr>
 		</table>
@@ -250,6 +288,16 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 		(function($){
 			var savedWarehouse = '<?php echo esc_js(get_option('hesabix_v2_default_warehouse_id', '')); ?>';
 			var savedBank = '<?php echo esc_js(get_option('hesabix_v2_default_bank_id', '')); ?>';
+			var savedCashRegister = '<?php echo esc_js((string) $saved_cash_register_id); ?>';
+
+			function hesabixV2TogglePaymentRows() {
+				var v = $('input[name="hesabix_v2_invoice_payment_destination"]:checked').val();
+				$('.hesabix-v2-pay-bank').toggle(v === 'bank');
+				$('.hesabix-v2-pay-cash').toggle(v === 'cash_register');
+			}
+			$('input[name="hesabix_v2_invoice_payment_destination"]').on('change', hesabixV2TogglePaymentRows);
+			hesabixV2TogglePaymentRows();
+
 			$('#hesabix_v2_load_warehouses_banks').on('click', function(){
 				var $btn = $(this);
 				var $status = $('#hesabix_v2_wh_bank_status');
@@ -272,6 +320,12 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 							$bank.append($('<option></option>').val(b.id).text((b.code ? b.code + ' - ' : '') + b.name));
 						});
 						if (savedBank) $bank.val(savedBank);
+						var $cash = $('#hesabix_v2_default_cash_register_id');
+						$cash.find('option:not(:first)').remove();
+						(res.cash_registers || []).forEach(function(c){
+							$cash.append($('<option></option>').val(c.id).text((c.code ? c.code + ' - ' : '') + c.name));
+						});
+						if (savedCashRegister) $cash.val(savedCashRegister);
 						$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
 					} else {
 						$status.text(res.message || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
@@ -282,7 +336,6 @@ $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 					$btn.prop('disabled', false);
 				});
 			});
-			$(document).ready(function(){ $('#hesabix_v2_load_warehouses_banks').trigger('click'); });
 
 			$('#hesabix_v2_load_invoice_tags').on('click', function(){
 				var $btn = $(this);

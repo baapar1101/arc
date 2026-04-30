@@ -41,6 +41,23 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * AJAX فقط برای کاربرانی که WooCommerce را مدیریت می‌کنند.
+	 *
+	 * @return void
+	 */
+	private function ajax_require_manage_wc()
+	{
+		if (!current_user_can('manage_woocommerce')) {
+			wp_send_json(
+				array(
+					'success' => false,
+					'message' => __('شما اجازهٔ انجام این عمل را ندارید.', 'hesabix-v2'),
+				)
+			);
+		}
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    2.0.0
@@ -187,6 +204,10 @@ class Hesabix_V2_Admin
 	 */
 	public function add_admin_menu()
 	{
+		if (!function_exists('is_plugin_active')) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
 		add_menu_page(
 			__('حسابیکس V2', 'hesabix-v2'),
 			__('حسابیکس V2', 'hesabix-v2'),
@@ -350,6 +371,7 @@ class Hesabix_V2_Admin
 			'auto_sync_customers' => isset($_POST['auto_sync_customers']),
 			'auto_sync_orders' => isset($_POST['auto_sync_orders']),
 			'sync_on_product_update' => isset($_POST['sync_on_product_update']),
+			'sync_product_categories' => isset($_POST['sync_product_categories']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
 			'sync_product_stock' => isset($_POST['sync_product_stock']),
 			'create_customer_on_order' => isset($_POST['create_customer_on_order']),
@@ -391,6 +413,14 @@ class Hesabix_V2_Admin
 		}
 		if (isset($_POST['hesabix_v2_default_bank_id'])) {
 			update_option('hesabix_v2_default_bank_id', sanitize_text_field(wp_unslash($_POST['hesabix_v2_default_bank_id'])));
+		}
+		if (isset($_POST['hesabix_v2_invoice_payment_destination'])) {
+			$pd = sanitize_text_field(wp_unslash($_POST['hesabix_v2_invoice_payment_destination']));
+			update_option('hesabix_v2_invoice_payment_destination', $pd === 'cash_register' ? 'cash_register' : 'bank');
+		}
+		if (isset($_POST['hesabix_v2_default_cash_register_id'])) {
+			$v = sanitize_text_field(wp_unslash($_POST['hesabix_v2_default_cash_register_id']));
+			update_option('hesabix_v2_default_cash_register_id', $v === '' ? '' : absint($v));
 		}
 
 		add_settings_error(
@@ -464,6 +494,25 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * فقط کاربران با نقش customer (مشتری فروشگاه) همگام شوند، نه هر کاربر وردپرس.
+	 *
+	 * @param int $user_id
+	 * @return bool
+	 */
+	private function should_sync_wp_user_as_customer($user_id)
+	{
+		if ($user_id < 1) {
+			return false;
+		}
+		$user = get_userdata($user_id);
+		if (!$user || empty($user->roles)) {
+			return false;
+		}
+
+		return in_array('customer', (array) $user->roles, true);
+	}
+
+	/**
 	 * بعد از تکمیل چک‌اوت — در صورت فعال بودن در تنظیمات
 	 *
 	 * @param int         $order_id
@@ -531,6 +580,7 @@ class Hesabix_V2_Admin
 	public function ajax_get_invoice_tags()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api = new Hesabix_V2_Api();
 		$res = $api->list_invoice_tags(false);
@@ -561,6 +611,10 @@ class Hesabix_V2_Admin
 	 */
 	public function on_customer_register($customer_id)
 	{
+		if (!$this->should_sync_wp_user_as_customer((int) $customer_id)) {
+			return;
+		}
+
 		$sync_settings = get_option('hesabix_v2_sync_settings', array());
 		
 		if (isset($sync_settings['auto_sync_customers']) && $sync_settings['auto_sync_customers']) {
@@ -570,13 +624,19 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * On customer update
+	 * بعد از به‌روزرسانی مشتری ووکامرس یا پروفایل وردپرس (همگام با حسابیکس در صورت فعال بودن تنظیمات).
+	 *
+	 * هوک‌ها: {@see profile_update}، {@see woocommerce_update_customer} (آدرس/جزئیات از حساب کاربری من).
 	 *
 	 * @since    2.0.0
-	 * @param    int    $customer_id
+	 * @param    int    $customer_id شناسهٔ کاربر = همان customer id در ووکامرس
 	 */
 	public function on_customer_update($customer_id)
 	{
+		if (!$this->should_sync_wp_user_as_customer((int) $customer_id)) {
+			return;
+		}
+
 		$sync_settings = get_option('hesabix_v2_sync_settings', array());
 		
 		if (isset($sync_settings['auto_sync_customers']) && $sync_settings['auto_sync_customers']) {
@@ -648,6 +708,7 @@ class Hesabix_V2_Admin
 	public function ajax_test_connection()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api = new Hesabix_V2_Api();
 		$result = $api->test_connection();
@@ -663,6 +724,7 @@ class Hesabix_V2_Admin
 	public function ajax_sync_product()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$product_id = intval($_POST['product_id']);
 		$variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : null;
@@ -681,6 +743,7 @@ class Hesabix_V2_Admin
 	public function ajax_sync_products()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$product_ids = Hesabix_V2_Product_Service::get_all_products();
 		
@@ -698,11 +761,36 @@ class Hesabix_V2_Admin
 	public function ajax_sync_customers()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$customer_ids = Hesabix_V2_Customer_Service::get_all_customers();
 		
 		$sync_service = new Hesabix_V2_Sync_Service();
 		$result = $sync_service->bulk_sync_customers($customer_ids);
+
+		wp_send_json($result);
+	}
+
+	/**
+	 * AJAX: واردات اشخاص (مشتری‌سان) از حسابیکس به ووکامرس.
+	 *
+	 * @since 2.0.1
+	 */
+	public function ajax_import_customers_from_hesabix()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('ابتدا اتصال را از تنظیمات یا ویزارد کامل کنید.', 'hesabix-v2'),
+			));
+		}
+
+		$create_missing = !empty($_POST['create_missing']);
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$result = $sync_service->import_customers_from_hesabix($create_missing);
 
 		wp_send_json($result);
 	}
@@ -715,6 +803,7 @@ class Hesabix_V2_Admin
 	public function ajax_get_warehouses_and_banks()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api = new Hesabix_V2_Api();
 		$warehouses = array();
@@ -746,10 +835,25 @@ class Hesabix_V2_Admin
 			}
 		}
 
+		$cash_registers = array();
+		$cash_res = $api->get_cash_registers();
+		if (!empty($cash_res['success']) && !empty($cash_res['data'])) {
+			$items = isset($cash_res['data']['items']) ? $cash_res['data']['items'] : (is_array($cash_res['data']) ? $cash_res['data'] : array());
+			foreach ($items as $row) {
+				$id = isset($row['id']) ? $row['id'] : null;
+				$name = isset($row['name']) ? $row['name'] : (isset($row['title']) ? $row['title'] : (isset($row['code']) ? $row['code'] : (string) $id));
+				$code = isset($row['code']) ? $row['code'] : '';
+				if ($id !== null) {
+					$cash_registers[] = array('id' => (string) $id, 'name' => $name, 'code' => $code);
+				}
+			}
+		}
+
 		wp_send_json(array(
 			'success' => true,
 			'warehouses' => $warehouses,
 			'banks' => $banks,
+			'cash_registers' => $cash_registers,
 		));
 	}
 
@@ -763,6 +867,7 @@ class Hesabix_V2_Admin
 	public function ajax_setup_verify_api_key()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api_key = isset($_POST['api_key']) ? sanitize_text_field(wp_unslash($_POST['api_key'])) : '';
 		if (empty($api_key)) {
@@ -811,6 +916,7 @@ class Hesabix_V2_Admin
 	public function ajax_setup_businesses()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api_key = isset($_POST['api_key']) ? sanitize_text_field(wp_unslash($_POST['api_key'])) : '';
 		if (empty($api_key)) {
@@ -838,41 +944,6 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: Setup wizard - get fiscal years for a business
-	 *
-	 * @since    2.0.0
-	 */
-	public function ajax_setup_fiscal_years()
-	{
-		check_ajax_referer('hesabix_v2_nonce', 'nonce');
-
-		$api_key = isset($_POST['api_key']) ? sanitize_text_field(wp_unslash($_POST['api_key'])) : '';
-		$business_id = isset($_POST['business_id']) ? absint($_POST['business_id']) : 0;
-		if (empty($api_key)) {
-			wp_send_json(array('success' => false, 'message' => __('کلید API را وارد کنید.', 'hesabix-v2')));
-		}
-		if (!$business_id) {
-			wp_send_json(array('success' => false, 'message' => __('کسب‌وکار انتخاب نشده.', 'hesabix-v2')));
-		}
-
-		$api = new Hesabix_V2_Api();
-		$result = $api->get_fiscal_years($business_id, $api_key);
-
-		if (isset($result['success']) && $result['success']) {
-			$data = $result['data'] ?? $result;
-			$list = is_array($data) ? $data : ($data['items'] ?? $data['list'] ?? $data['data'] ?? array());
-			if (!is_array($list)) {
-				$list = array();
-			}
-
-			wp_send_json(array('success' => true, 'fiscal_years' => $list));
-		}
-
-		$message = $result['message'] ?? __('بارگذاری سال‌های مالی ناموفق بود.', 'hesabix-v2');
-		wp_send_json(array('success' => false, 'message' => $message));
-	}
-
-	/**
 	 * AJAX: Setup wizard - save API key, business and complete
 	 * سال مالی ارسال نمی‌شود - حسابیکس به‌صورت خودکار اسناد را به سال مالی جاری ارجاع می‌دهد.
 	 *
@@ -881,6 +952,7 @@ class Hesabix_V2_Admin
 	public function ajax_setup_complete()
 	{
 		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
 
 		$api_key = isset($_POST['api_key']) ? sanitize_text_field(wp_unslash($_POST['api_key'])) : '';
 		$business_id = isset($_POST['business_id']) ? absint($_POST['business_id']) : 0;

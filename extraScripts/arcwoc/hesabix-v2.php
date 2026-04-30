@@ -44,7 +44,7 @@ if (!defined('HESABIX_V2_UPDATE_INFO_URL')) {
  * Example: archive of default branch (branch name may be main or master):
  */
 if (!defined('HESABIX_V2_UPDATE_ARCHIVE_URL')) {
-	define('HESABIX_V2_UPDATE_ARCHIVE_URL', 'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/master.zip');
+	define('HESABIX_V2_UPDATE_ARCHIVE_URL', 'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/main.zip');
 }
 
 /**
@@ -102,8 +102,12 @@ function hesabix_v2_bootstrap()
 		return;
 	}
 
+	if (!function_exists('is_plugin_active')) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+
 	// Check if old version is active (is_plugin_active only exists in admin)
-	if (function_exists('is_plugin_active') && is_plugin_active('hesabixwcplugin/hesabix.php')) {
+	if (is_plugin_active('hesabixwcplugin/hesabix.php')) {
 		add_action('admin_notices', function() {
 			echo '<div class="notice notice-info is-dismissible">';
 			echo '<p><strong>' . __('توجه:', 'hesabix-v2') . '</strong> ';

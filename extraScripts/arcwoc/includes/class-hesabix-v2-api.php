@@ -523,7 +523,9 @@ class Hesabix_V2_Api
 	}
 
 	/**
-	 * Search persons
+	 * لیست و جستجوی اشخاص کسب‌وکار (بدنه همان QueryInfo سرور: take، skip، search، …).
+	 *
+	 * مسیر رسمی API: POST /persons/businesses/{business_id}/persons — نه .../persons/search.
 	 *
 	 * @since    2.0.0
 	 * @param    array    $query
@@ -540,9 +542,82 @@ class Hesabix_V2_Api
 
 		return $this->request(
 			'POST',
-			"/persons/businesses/{$this->business_id}/persons/search",
+			"/persons/businesses/{$this->business_id}/persons",
 			$query
 		);
+	}
+
+	/**
+	 * جستجوی شخص با تطبیق دقیق ایمیل یا موبایل (برای جلوگیری از تکرار مهمان).
+	 *
+	 * @param string $email
+	 * @param string $mobile
+	 * @return int|null
+	 */
+	public function find_person_id_by_contact($email, $mobile)
+	{
+		$email = mb_strtolower(trim((string) $email));
+		$mobile = trim((string) $mobile);
+
+		if ($email !== '') {
+			$res = $this->search_persons(
+				array(
+					'take' => 15,
+					'skip' => 0,
+					'search' => $email,
+					'search_fields' => array('email'),
+				)
+			);
+			$pid = self::pick_person_id_exact_match($res, 'email', $email);
+			if ($pid) {
+				return $pid;
+			}
+		}
+
+		if ($mobile !== '') {
+			$res = $this->search_persons(
+				array(
+					'take' => 15,
+					'skip' => 0,
+					'search' => $mobile,
+					'search_fields' => array('mobile'),
+				)
+			);
+			$pid = self::pick_person_id_exact_match($res, 'mobile', $mobile);
+			if ($pid) {
+				return $pid;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array $api_result
+	 * @param string $field email|mobile
+	 * @param string $needle_normalized
+	 * @return int|null
+	 */
+	private static function pick_person_id_exact_match($api_result, $field, $needle_normalized)
+	{
+		if (empty($api_result['success']) || empty($api_result['data']['items']) || !is_array($api_result['data']['items'])) {
+			return null;
+		}
+
+		foreach ($api_result['data']['items'] as $item) {
+			if (!isset($item['id'])) {
+				continue;
+			}
+			if (!isset($item[$field])) {
+				continue;
+			}
+			$val = mb_strtolower(trim((string) $item[$field]));
+			if ($val !== '' && $val === $needle_normalized) {
+				return (int) $item['id'];
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -745,6 +820,22 @@ class Hesabix_V2_Api
 		return $this->request(
 			'POST',
 			"/bank-accounts/businesses/{$this->business_id}/bank-accounts",
+			array('take' => 500, 'skip' => 0)
+		);
+	}
+
+	/**
+	 * لیست صندوق‌های کسب‌وکار
+	 * POST /cash-registers/businesses/{business_id}/cash-registers (بدنه QueryInfo)
+	 *
+	 * @since    2.0.0
+	 * @return   array
+	 */
+	public function get_cash_registers()
+	{
+		return $this->request(
+			'POST',
+			"/cash-registers/businesses/{$this->business_id}/cash-registers",
 			array('take' => 500, 'skip' => 0)
 		);
 	}

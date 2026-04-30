@@ -37,6 +37,9 @@ import '../../utils/currency_display_utils.dart';
 import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
 import '../../widgets/invoice/keep_alive_tab_child.dart';
+import '../../widgets/invoice/invoice_adjustments_form.dart';
+import '../../models/account_model.dart';
+import '../../services/account_service.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -102,6 +105,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   // تراکنش‌های پرداخت
   List<InvoiceTransaction> _transactions = [];
 
+  List<InvoiceAdjustmentFormRow> _adjustmentRows = <InvoiceAdjustmentFormRow>[];
+
   // For preserving and merging extra_info
   Map<String, dynamic> _originalExtraInfo = <String, dynamic>{};
 
@@ -123,6 +128,52 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final c = _selectedCurrencyId;
     if (b == null || c == null) return false;
     return c != b;
+  }
+
+  bool get _invoiceTypeSupportsAdjustments =>
+      _selectedInvoiceType == InvoiceType.sales ||
+      _selectedInvoiceType == InvoiceType.purchase;
+
+  bool _adjustmentsTabVisibleForType(InvoiceType? type) =>
+      type == InvoiceType.sales || type == InvoiceType.purchase;
+
+  num get _adjustmentsNetSum => sumSignedAdjustmentsNet(_adjustmentRows);
+
+  num get _adjustmentsTaxSum => sumSignedAdjustmentsTax(_adjustmentRows);
+
+  num get _invoiceGrandTotal =>
+      invoiceAdjustmentsRound2(_sumTotal + _adjustmentsNetSum + _adjustmentsTaxSum);
+
+  Future<void> _hydrateAdjustmentRowsFromExtra(Map<String, dynamic> ei) async {
+    disposeInvoiceAdjustmentRows(_adjustmentRows);
+    _adjustmentRows = [];
+    final invType = _selectedInvoiceType;
+    if (invType != InvoiceType.sales && invType != InvoiceType.purchase) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final raw = ei['invoice_adjustments'];
+    if (raw is! List || raw.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final svc = AccountService();
+    final newRows = <InvoiceAdjustmentFormRow>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      final aid = (m['account_id'] as num?)?.toInt();
+      Account? acc;
+      if (aid != null) {
+        try {
+          final j = await svc.getAccount(businessId: widget.businessId, accountId: aid);
+          acc = Account.fromJson(j);
+        } catch (_) {}
+      }
+      newRows.add(InvoiceAdjustmentFormRow.fromSavedMap(m, account: acc));
+    }
+    if (!mounted) return;
+    setState(() => _adjustmentRows = newRows);
   }
 
   @override
@@ -159,7 +210,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   Map<String, dynamic>? get _installmentPlanForEditor =>
       _documentHadInstallmentPlanAtLoad ? _initialInstallmentPlanCopy : null;
 
-  int _installmentsSlotIndex() => 2 + (_shouldShowTransactionsTab ? 1 : 0);
+  int _installmentsSlotIndex() =>
+      2 +
+      (_shouldShowTransactionsTab ? 1 : 0) +
+      (_adjustmentsTabVisibleForType(_selectedInvoiceType) ? 1 : 0);
 
   int _mapTabIndexAfterInstallmentsToggle({
     required int oldIndex,
@@ -234,6 +288,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       if (type != null && !invoiceTypeSupportsGlobalDiscount(type.value)) {
         _globalDiscountValueController.clear();
       }
+      if (type != InvoiceType.sales && type != InvoiceType.purchase) {
+        disposeInvoiceAdjustmentRows(_adjustmentRows);
+        _adjustmentRows = [];
+      }
       if (_isProforma ||
           (type != InvoiceType.sales && type != InvoiceType.salesReturn)) {
         _useInstallments = false;
@@ -258,14 +316,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
   // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
   int _getTabCount() {
-    if (_isProforma) return 3; // اطلاعات، کالاها، تنظیمات
     if (_selectedInvoiceType == InvoiceType.waste ||
         _selectedInvoiceType == InvoiceType.directConsumption ||
         _selectedInvoiceType == InvoiceType.production) {
-      return 3; // اطلاعات، کالاها، تنظیمات (بدون تراکنش)
+      return 3; // اطلاعات، کالاها، تنظیمات
     }
-    var n = 4; // اطلاعات، کالاها، تراکنش‌ها، تنظیمات
-    if (_shouldShowInstallmentsTab) n += 1; // اقساط بین تراکنش‌ها و تنظیمات
+    var n = 3; // اطلاعات، کالاها، تنظیمات
+    if (_shouldShowTransactionsTab) n += 1;
+    if (_adjustmentsTabVisibleForType(_selectedInvoiceType)) n += 1;
+    if (_shouldShowInstallmentsTab) n += 1;
     return n;
   }
 
@@ -279,6 +338,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
   @override
   void dispose() {
+    disposeInvoiceAdjustmentRows(_adjustmentRows);
+    _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
     super.dispose();
@@ -494,6 +555,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           initialIndex: prevIdx.clamp(0, newTabCount - 1),
         );
       }
+
+      await _hydrateAdjustmentRowsFromExtra(_originalExtraInfo);
 
       await _reloadFxRates();
       if (mounted) {
@@ -786,6 +849,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             Tab(icon: const Icon(Icons.inventory_2_outlined), text: t.invoiceProductsTab),
             if (_shouldShowTransactionsTab)
               Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.invoiceTransactionsTab),
+            if (_adjustmentsTabVisibleForType(_selectedInvoiceType))
+              const Tab(icon: Icon(Icons.tune), text: 'اضافات و کسورات'),
             if (_shouldShowInstallmentsTab)
               Tab(icon: const Icon(Icons.payments_outlined), text: t.invoiceInstallmentsTab),
             Tab(icon: const Icon(Icons.settings_outlined), text: t.invoiceSettingsTab),
@@ -802,13 +867,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     _buildInvoiceInfoTab(),
                     _buildProductsTab(),
                     if (_shouldShowTransactionsTab) _buildTransactionsTab(),
+                    if (_adjustmentsTabVisibleForType(_selectedInvoiceType)) _buildAdjustmentsTab(),
                     if (_shouldShowInstallmentsTab)
                       KeepAliveTabChild(
                         child: InvoiceInstallmentsEditor(
                           key: _installmentsEditorKey,
                           businessId: widget.businessId,
                           calendarController: widget.calendarController,
-                          sumTotal: _sumTotal,
+                          sumTotal: _invoiceGrandTotal,
                           invoiceDate: _invoiceDate,
                           initialInstallmentPlan: _installmentPlanForEditor,
                         ),
@@ -1174,7 +1240,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     Text('${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('جمع پس از ردیف‌ها: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700])),
+                    if (_adjustmentsNetSum != 0 || _adjustmentsTaxSum != 0) ...[
+                      Text('جمع خالص اضافات/کسورات: ${formatWithThousands(_adjustmentsNetSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
+                      Text('مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -1182,6 +1253,17 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAdjustmentsTab() {
+    return InvoiceAdjustmentsTabContent(
+      businessId: widget.businessId,
+      rows: _adjustmentRows,
+      decimalPlaces: _invoiceCurrencyDecimalPlaces,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -1207,7 +1289,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
-            invoiceTotal: _sumTotal, // ارسال مبلغ کل فاکتور
+            invoiceTotal: _invoiceGrandTotal,
           ),
         ),
       ),
@@ -1300,7 +1382,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   Future<void> _ensureInstallmentsEditorBuilt() async {
     if (!_shouldShowInstallmentsTab) return;
     if (_installmentsEditorKey.currentState != null) return;
-    final instIdx = 2 + (_shouldShowTransactionsTab ? 1 : 0);
+    final instIdx = _installmentsSlotIndex();
     if (instIdx < 0 || instIdx >= _tabController.length) return;
     // TabController.animateTo در این نسخه void است (نه Future).
     _tabController.animateTo(instIdx);
@@ -1323,7 +1405,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       final payload = payloadOrError as Map<String, dynamic>;
 
       // بررسی مبلغ صفر فاکتور
-      if (_sumTotal == 0) {
+      if (_invoiceGrandTotal == 0) {
         final confirmed = await _showZeroAmountWarning();
         if (!confirmed) {
           return; // کاربر انصراف داد
@@ -1442,6 +1524,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'discount': _sumDiscount,
       'tax': _sumTax,
       'net': _sumTotal,
+      'adjustments_net': _adjustmentsNetSum,
+      'adjustments_tax': _adjustmentsTaxSum,
     };
     if (invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value)) {
       final graw = _globalDiscountValueController.text.replaceAll(',', '').trim();
@@ -1489,6 +1573,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase ||
         _selectedInvoiceType == InvoiceType.purchaseReturn;
 
+    final adjValidationMsg = validateAdjustmentRows(
+      _adjustmentRows,
+      invoiceTypeSupportsAdjustments: _invoiceTypeSupportsAdjustments,
+    );
+    if (adjValidationMsg != null) return adjValidationMsg;
+
     if (isSalesOrReturn && _selectedCustomer == null) {
       return 'انتخاب طرف حساب الزامی است';
     }
@@ -1501,6 +1591,17 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       mergedExtra['person_id'] = _selectedCustomer!.id;
     } else if (isPurchaseOrReturn && _selectedSupplier != null) {
       mergedExtra['person_id'] = _selectedSupplier!.id;
+    }
+
+    if (_invoiceTypeSupportsAdjustments) {
+      final adjPayload = buildAdjustmentsPayloadList(_adjustmentRows);
+      if (adjPayload.isNotEmpty) {
+        mergedExtra['invoice_adjustments'] = adjPayload;
+      } else {
+        mergedExtra.remove('invoice_adjustments');
+      }
+    } else {
+      mergedExtra.remove('invoice_adjustments');
     }
 
     String _convertInvoiceTypeToApi(InvoiceType type) => 'invoice_${type.value}';

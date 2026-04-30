@@ -139,8 +139,8 @@ hesabix_v2_setup_completed      // وضعیت راه‌اندازی
 
 ### Persons (Customers)
 - `POST /v1/persons/businesses/{id}/persons/create` - ایجاد شخص
-- `PUT /v1/persons/businesses/{id}/persons/{person_id}/update` - ویرایش
-- `POST /v1/persons/businesses/{id}/persons/search` - جستجو
+- `PUT /v1/persons/persons/{person_id}` - ویرایش شخص
+- `POST /v1/persons/businesses/{id}/persons` - لیست اشخاص (بدنهٔ QueryInfo: take، skip، search، …)
 
 ### Invoices
 - `POST /v1/invoices/business/{id}` - ایجاد فاکتور
@@ -264,11 +264,11 @@ add_filter('hesabix_v2_product_data', function($data, $product) {
     return $data;
 }, 10, 2);
 
-// Modify customer data
-add_filter('hesabix_v2_customer_data', function($data, $customer) {
+// Modify customer data ($order ممکن است null باشد اگر از پروفایل کاربر بدون سفارش ساخته شود)
+add_filter('hesabix_v2_customer_data', function($data, $customer, $order) {
     // Modify $data
     return $data;
-}, 10, 2);
+}, 10, 3);
 ```
 
 ## 📝 Changelog

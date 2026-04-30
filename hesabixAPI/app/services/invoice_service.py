@@ -3472,6 +3472,17 @@ def create_invoice(
     except ApiError:
         raise
 
+    try:
+        from app.services.invoice_adjustments_service import merge_invoice_adjustments_into_header_extra
+
+        merge_invoice_adjustments_into_header_extra(db, business_id, invoice_type, header_extra)
+        data["extra_info"] = header_extra
+    except ApiError:
+        raise
+
+    header_extra = dict(data.get("extra_info") or {})
+    totals = dict(header_extra.get("totals") or {})
+
     # Inventory posting is decoupled; no stock validation here
     post_inventory: bool = _is_inventory_posting_enabled(data)
     movement_hint, _ = _movement_from_type(invoice_type)
@@ -3508,10 +3519,10 @@ def create_invoice(
                     current_debt = (-bdec) if bdec < 0 else Decimal(0)
             except Exception:
                 current_debt = Decimal(0)
-            # مبلغ کل فاکتور (با مالیات) که AR را افزایش می‌دهد
-            net_wo_tax = Decimal(str(totals.get("gross", 0))) - Decimal(str(totals.get("discount", 0)))
-            tax_amt = Decimal(str(totals.get("tax", 0)))
-            total_with_tax = net_wo_tax + tax_amt
+            # مبلغ کل فاکتور (با مالیات و اضافات/کسورات) که AR را افزایش می‌دهد
+            from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
+            total_with_tax = total_with_tax_from_totals_dict(totals)
             # پرداخت‌های همزمان ارسالی با فاکتور
             planned_paid = Decimal(0)
             try:
@@ -3622,7 +3633,9 @@ def create_invoice(
     discount = Decimal(str(totals["discount"]))
     net = gross - discount
     tax = Decimal(str(totals["tax"]))
-    total_with_tax = net + tax
+    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
+    total_with_tax = total_with_tax_from_totals_dict(totals)
 
     ensure_document_policy_allows_creation(
         db,
@@ -3639,6 +3652,8 @@ def create_invoice(
         "discount": float(Decimal(str(totals["discount"]))),
         "tax": float(Decimal(str(totals["tax"]))),
         "net": float(Decimal(str(totals["net"]))),
+        "adjustments_net": float(Decimal(str(totals.get("adjustments_net", 0)))),
+        "adjustments_tax": float(Decimal(str(totals.get("adjustments_tax", 0)))),
     }
 
     from app.services.invoice_fx_revaluation import apply_fx_revaluation_to_invoice_extra
@@ -3745,7 +3760,10 @@ def create_invoice(
 
     # Accounting lines for finalized invoices (بدون خطوط COGS/Inventory؛ به حواله موکول شد)
     if not document.is_proforma:
+        from app.services.invoice_adjustments_service import add_adjustment_document_lines
+
         accounts = _resolve_accounts_for_invoice(db, data)
+        _adj_extra = dict(document.extra_info or {})
 
         # COGS به پست حواله منتقل شد
 
@@ -3788,6 +3806,14 @@ def create_invoice(
                     credit=tax,
                     description="مالیات بر ارزش افزوده خروجی",
                 ))
+            add_adjustment_document_lines(
+                db,
+                business_id=business_id,
+                document_id=int(document.id),
+                invoice_type=invoice_type,
+                accounts=accounts,
+                header_extra=_adj_extra,
+            )
             # COGS/Inventory در پست حواله ثبت خواهد شد
             # --- فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR) ---
             plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document_date)
@@ -3901,6 +3927,14 @@ def create_invoice(
                     description=data.get("description"),
                     extra_info={"side": "person", "person_id": person_id},
                 ))
+            add_adjustment_document_lines(
+                db,
+                business_id=business_id,
+                document_id=int(document.id),
+                invoice_type=invoice_type,
+                accounts=accounts,
+                header_extra=_adj_extra,
+            )
 
         # Purchase Return
         elif invoice_type == INVOICE_PURCHASE_RETURN:
@@ -4734,6 +4768,15 @@ def update_invoice(
             )
         except ApiError:
             raise
+        from app.services.invoice_adjustments_service import (
+            merge_invoice_adjustments_into_header_extra,
+            add_adjustment_document_lines,
+            total_with_tax_from_totals_dict,
+        )
+
+        merge_invoice_adjustments_into_header_extra(db, int(document.business_id), inv_type, header_extra)
+        totals = dict(header_extra.get("totals") or {})
+        _adj_extra_hdr = dict(header_extra)
         ex_merge = dict(document.extra_info or {})
         if isinstance(header_extra, dict):
             if header_extra.get("global_discount"):
@@ -4741,6 +4784,10 @@ def update_invoice(
             else:
                 ex_merge.pop("global_discount", None)
         ex_merge["totals"] = totals
+        if "invoice_adjustments" in header_extra:
+            ex_merge["invoice_adjustments"] = header_extra["invoice_adjustments"]
+        else:
+            ex_merge.pop("invoice_adjustments", None)
         if "customer_club" in header_extra:
             ex_merge["customer_club"] = header_extra["customer_club"]
         elif "customer_club" in ex_merge and data.get("loyalty_redemption_points") is None:
@@ -4758,7 +4805,7 @@ def update_invoice(
         discount = Decimal(str(totals.get("discount", 0)))
         net = gross - discount
         tax = Decimal(str(totals.get("tax", 0)))
-        total_with_tax = net + tax
+        total_with_tax = total_with_tax_from_totals_dict(totals)
         person_id = _person_id_from_header({"extra_info": header_extra})
         person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
         # inventory/COGS handled in warehouse posting
@@ -4793,6 +4840,14 @@ def update_invoice(
                 ))
             if tax > 0:
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=Decimal(0), credit=tax, description="مالیات خروجی"))
+            add_adjustment_document_lines(
+                db,
+                business_id=int(document.business_id),
+                document_id=int(document.id),
+                invoice_type=inv_type,
+                accounts=accounts,
+                header_extra=_adj_extra_hdr,
+            )
             # COGS/Inventory by warehouse posting
             # فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR)
             plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document.document_date)
@@ -4891,6 +4946,14 @@ def update_invoice(
                     credit=total_with_tax,
                     description=document.description,
                 ))
+            add_adjustment_document_lines(
+                db,
+                business_id=int(document.business_id),
+                document_id=int(document.id),
+                invoice_type=inv_type,
+                accounts=accounts,
+                header_extra=_adj_extra_hdr,
+            )
         elif inv_type == INVOICE_PURCHASE_RETURN:
             # برگشت GRNI به مبلغ ناخالص
             if gross > 0:

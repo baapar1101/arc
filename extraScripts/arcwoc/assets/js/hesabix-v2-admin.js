@@ -27,15 +27,12 @@
 		bindEvents: function() {
 			// Test connection
 			$(document).on('click', '#test-connection', this.testConnection);
-			
+
 			// Sync products
 			$(document).on('click', '#sync-products', this.syncProducts);
-			
+
 			// Sync customers
 			$(document).on('click', '#sync-customers', this.syncCustomers);
-			
-			// Setup wizard
-			$(document).on('submit', '#login-form', this.setupLogin);
 		},
 
 		/**
@@ -104,7 +101,7 @@
 								  'موفق: ' + response.success + '<br>' +
 								  'ناموفق: ' + response.failed + '<br>' +
 								  'کل: ' + response.total;
-					
+
 					if (response.errors && response.errors.length > 0) {
 						message += '<br><br><strong>خطاها:</strong><ul>';
 						response.errors.forEach(function(error) {
@@ -112,8 +109,11 @@
 						});
 						message += '</ul>';
 					}
-					
-					$result.html('<div class="notice notice-success"><p>' + message + '</p></div>');
+
+					var noticeClass = (response.failed > 0)
+						? 'notice-warning'
+						: 'notice-success';
+					$result.html('<div class="notice ' + noticeClass + '"><p>' + message + '</p></div>');
 				},
 				error: function(xhr, status, error) {
 					$result.html('<div class="notice notice-error"><p>خطا: ' + error + '</p></div>');
@@ -154,8 +154,11 @@
 								  'موفق: ' + response.success + '<br>' +
 								  'ناموفق: ' + response.failed + '<br>' +
 								  'کل: ' + response.total;
-					
-					$result.html('<div class="notice notice-success"><p>' + message + '</p></div>');
+
+					var noticeClass = (response.failed > 0)
+						? 'notice-warning'
+						: 'notice-success';
+					$result.html('<div class="notice ' + noticeClass + '"><p>' + message + '</p></div>');
 				},
 				error: function(xhr, status, error) {
 					$result.html('<div class="notice notice-error"><p>خطا: ' + error + '</p></div>');
@@ -167,23 +170,9 @@
 		},
 
 		/**
-		 * Setup wizard login
-		 */
-		setupLogin: function(e) {
-			e.preventDefault();
-			
-			var $form = $(this);
-			var $message = $('#login-message');
-			
-			// This needs backend implementation
-			$message.html('<div class="notice notice-info"><p>در حال پردازش...</p></div>');
-		},
-
-		/**
 		 * Initialize tooltips
 		 */
 		initTooltips: function() {
-			// Add tooltip functionality if needed
 			$('.hesabix-tooltip').hover(
 				function() {
 					$(this).attr('title', '');

@@ -33,6 +33,24 @@ if (!defined('WPINC')) {
 	</div>
 
 	<div class="hesabix-v2-card">
+		<h2><?php _e('واردات مشتریان از حسابیکس', 'hesabix-v2'); ?></h2>
+		<p><?php _e('اشخاص ثبت‌شده در حسابیکس با نقش مشتری (یا بدون نوع مشخص) با کاربران ووکامرس از طریق ایمیل یا موبایل صورت‌حساب تطبیق داده می‌شوند. صورت‌حساب پروفایل به‌روز و لینک در جدول مپینگ ذخیره می‌شود.', 'hesabix-v2'); ?></p>
+		<p>
+			<label>
+				<input type="checkbox" id="hesabix-import-create-missing" value="1">
+				<?php _e('ایجاد حساب مشتری در ووکامرس برای اشخاصی که ایمیل معتبر دارند ولی در سایت کاربر نیستند', 'hesabix-v2'); ?>
+			</label>
+		</p>
+		<p class="description"><?php _e('در این حالت رمز عبور تصادفی ساخته می‌شود؛ ممکن است طبق تنظیمات ووکامرس ایمیل ارسال شود.', 'hesabix-v2'); ?></p>
+		<p>
+			<button type="button" id="import-customers-from-hesabix" class="button button-primary">
+				<?php _e('واردات از حسابیکس', 'hesabix-v2'); ?>
+			</button>
+		</p>
+		<div id="import-customers-result"></div>
+	</div>
+
+	<div class="hesabix-v2-card">
 		<h2><?php _e('وضعیت همگام‌سازی', 'hesabix-v2'); ?></h2>
 		<?php
 		$db = new Hesabix_V2_DB_Service();
@@ -153,6 +171,51 @@ jQuery(document).ready(function($) {
 			},
 			complete: function() {
 				$btn.prop('disabled', false).text('<?php _e('همگام‌سازی همه مشتریان', 'hesabix-v2'); ?>');
+			}
+		});
+	});
+
+	// Import customers from Hesabix → WooCommerce
+	$('#import-customers-from-hesabix').on('click', function() {
+		var $btn = $(this);
+		var $result = $('#import-customers-result');
+
+		if (!confirm('<?php echo esc_js(__('این عمل ممکن است زمان‌بر باشد. ادامه می‌دهید؟', 'hesabix-v2')); ?>')) {
+			return;
+		}
+
+		$btn.prop('disabled', true).text('<?php echo esc_js(__('در حال واردات...', 'hesabix-v2')); ?>');
+		$result.html('<p><?php echo esc_js(__('لطفاً صبر کنید...', 'hesabix-v2')); ?></p>');
+
+		$.ajax({
+			url: typeof hesabix_v2_ajax !== 'undefined' ? hesabix_v2_ajax.ajax_url : ajaxurl,
+			type: 'POST',
+			data: {
+				action: 'hesabix_v2_import_customers_from_hesabix',
+				nonce: typeof hesabix_v2_ajax !== 'undefined' ? hesabix_v2_ajax.nonce : '',
+				create_missing: $('#hesabix-import-create-missing').is(':checked') ? '1' : ''
+			},
+			success: function(res) {
+				if (!res || !res.success) {
+					var errMsg = res && res.message ? res.message : '<?php echo esc_js(__('خطا در واردات', 'hesabix-v2')); ?>';
+					$result.html('<div class="notice notice-error"><p>' + errMsg + '</p></div>');
+					return;
+				}
+				var st = res.stats || {};
+				var msg = '<strong><?php echo esc_js(__('نتیجه:', 'hesabix-v2')); ?></strong><br>' +
+					'<?php echo esc_js(__('کل بررسی‌شده:', 'hesabix-v2')); ?> ' + (st.total_processed || 0) + '<br>' +
+					'<?php echo esc_js(__('به‌روزشده (تطبیق یافت):', 'hesabix-v2')); ?> ' + (st.matched_updated || 0) + '<br>' +
+					'<?php echo esc_js(__('ایجاد شده:', 'hesabix-v2')); ?> ' + (st.created || 0) + '<br>' +
+					'<?php echo esc_js(__('رد شده:', 'hesabix-v2')); ?> ' + (st.skipped || 0) + '<br>' +
+					'<?php echo esc_js(__('ناموفق:', 'hesabix-v2')); ?> ' + (st.failed || 0);
+				var noticeClass = (st.failed > 0) ? 'notice-warning' : 'notice-success';
+				$result.html('<div class="notice ' + noticeClass + '"><p>' + msg + '</p></div>');
+			},
+			error: function() {
+				$result.html('<div class="notice notice-error"><p><?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?></p></div>');
+			},
+			complete: function() {
+				$btn.prop('disabled', false).text('<?php echo esc_js(__('واردات از حسابیکس', 'hesabix-v2')); ?>');
 			}
 		});
 	});
