@@ -113,13 +113,24 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   String _tabTitleForBusinessPath(String path, int businessId, List<_MenuItem> menuRoot) {
+    final pathNorm = path.split('?').first;
+    final pathTail = BusinessRoutePaths.stripBusinessPrefixAndTab(pathNorm, businessId);
+    final pathTailBase = pathTail.split('?').first;
+
     var best = '';
     var bestLen = 0;
     void walk(List<_MenuItem> items) {
       for (final item in items) {
         final p = item.path;
-        if (p != null && path.startsWith(p) && p.length >= bestLen) {
-          bestLen = p.length;
+        if (p == null) continue;
+        final menuNorm = p.split('?').first;
+        final menuTail = BusinessRoutePaths.stripBusinessPrefixAndTab(menuNorm, businessId);
+        final menuTailBase = menuTail.split('?').first;
+        if (menuTailBase.isEmpty) continue;
+        final nested = pathTailBase.startsWith('$menuTailBase/');
+        if (pathTailBase != menuTailBase && !nested) continue;
+        if (menuTailBase.length >= bestLen) {
+          bestLen = menuTailBase.length;
           best = item.label;
         }
         final ch = item.children;
@@ -130,10 +141,19 @@ class _BusinessShellState extends State<BusinessShell> {
     walk(menuRoot);
     if (best.isNotEmpty) return best;
     try {
-      final tail = BusinessRoutePaths.stripBusinessPrefixAndTab(path, businessId);
-      if (tail.isNotEmpty) return tail.replaceAll('/', ' / ');
+      if (pathTailBase.isNotEmpty) return pathTailBase.replaceAll('/', ' / ');
     } catch (_) {}
     return path;
+  }
+
+  /// تطبیق مسیر منو با [location] بر اساس بخش منطقی مسیر (بدون توجه به شمارهٔ تب).
+  bool _businessMenuPathMatchesLocation(String location, String menuPath, int businessId) {
+    final locTail =
+        BusinessRoutePaths.stripBusinessPrefixAndTab(location.split('?').first, businessId).split('?').first;
+    final menuTail =
+        BusinessRoutePaths.stripBusinessPrefixAndTab(menuPath.split('?').first, businessId).split('?').first;
+    if (menuTail.isEmpty) return false;
+    return locTail == menuTail || locTail.startsWith('$menuTail/');
   }
 
   Future<void> _showDesktopTabActionDialog(
@@ -1368,13 +1388,15 @@ class _BusinessShellState extends State<BusinessShell> {
       final item = menuItems[i];
       if (item.type == _MenuItemType.separator) continue; // نادیده گرفتن آیتم جداکننده
       
-      if (item.type == _MenuItemType.simple && item.path != null && location.startsWith(item.path!)) {
+      if (item.type == _MenuItemType.simple && item.path != null &&
+          _businessMenuPathMatchesLocation(location, item.path!, widget.businessId)) {
         selectedIndex = i;
         break;
       } else if (item.type == _MenuItemType.expandable && item.children != null) {
         for (int j = 0; j < item.children!.length; j++) {
           final child = item.children![j];
-          if (child.path != null && location.startsWith(child.path!)) {
+          if (child.path != null &&
+              _businessMenuPathMatchesLocation(location, child.path!, widget.businessId)) {
             selectedIndex = i;
             // تنظیم وضعیت باز بودن منو بر اساس برچسب آیتم
             if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = true;
@@ -1909,7 +1931,8 @@ class _BusinessShellState extends State<BusinessShell> {
                   if (isChildItem && item.children != null && childIndex >= 0 && childIndex < item.children!.length) {
                     // زیرآیتم با انیمیشن و بهبود بصری
                     final child = item.children![childIndex];
-                    final bool isChildSelected = child.path != null && location.startsWith(child.path!);
+                    final bool isChildSelected = child.path != null &&
+                        _businessMenuPathMatchesLocation(location, child.path!, widget.businessId);
                     final bool isChildHovered = index == _hoverIndex;
                     final bool isChildActive = isChildSelected || isChildHovered;
                     final BorderRadius childBr = isChildSelected
