@@ -18377,6 +18377,30 @@ abstract class AppLocalizations {
   /// **'View all sent notifications (OTP, password reset, tickets, etc.)'**
   String get accountSettingsNotificationHistoryDescription;
 
+  String get accountSettingsAppearanceDescription;
+
+  String get accountSettingsAppearanceTitle;
+
+  String get appearanceBusinessPanelSection;
+
+  String get appearanceDesktopOnlyNote;
+
+  String get appearanceNavigationSingleLabel;
+
+  String get appearanceNavigationSingleSubtitle;
+
+  String get appearanceNavigationTabsLabel;
+
+  String get appearanceNavigationTabsSubtitle;
+
+  String get appearanceSaveButton;
+
+  String get appearanceSaveError;
+
+  String get appearanceSaved;
+
+  String get appearanceSettingsPageTitle;
+
   /// No description provided for @notificationCenterLevelInfo.
   ///
   /// In en, this message translates to:

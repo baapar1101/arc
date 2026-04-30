@@ -4440,5 +4440,17 @@
   "crmWebChatMicRecording": "Recording…",
   "crmWebChatMicStopSend": "Stop & send",
   "crmWebChatMicUnavailableWeb": "Voice capture is unavailable in this browser build; attach a file instead",
-  "crmWebChatVisitorVoiceOffWidget": "Guest voice disabled"
+  "crmWebChatVisitorVoiceOffWidget": "Guest voice disabled",
+  "accountSettingsAppearanceTitle": "Appearance",
+  "accountSettingsAppearanceDescription": "Business panel layout on desktop (single page vs tabs)",
+  "appearanceSettingsPageTitle": "Appearance settings",
+  "appearanceBusinessPanelSection": "Business panel (desktop)",
+  "appearanceNavigationSingleLabel": "Single page",
+  "appearanceNavigationSingleSubtitle": "Only one page open at a time (classic navigation)",
+  "appearanceNavigationTabsLabel": "Tabs in top bar",
+  "appearanceNavigationTabsSubtitle": "Keep multiple pages open and switch via tabs on the dark strip (desktop only). Background tabs stay mounted; stable page keys improve reuse when you return.",
+  "appearanceDesktopOnlyNote": "Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.",
+  "appearanceSaved": "Saved",
+  "appearanceSaveError": "Could not save settings",
+  "appearanceSaveButton": "Save"
 }

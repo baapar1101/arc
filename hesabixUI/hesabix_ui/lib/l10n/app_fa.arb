@@ -4482,7 +4482,19 @@
   "crmWebChatMicRecording": "ضبط…",
   "crmWebChatMicStopSend": "توقف و ارسال",
   "crmWebChatMicUnavailableWeb": "ضبط صدا در مرورگر این نسخه در دست نیست؛ از اپ یا دکمهٔ پیوست استفاده کنید",
-  "crmWebChatVisitorVoiceOffWidget": "ویس مهمان خاموش"
+  "crmWebChatVisitorVoiceOffWidget": "ویس مهمان خاموش",
+  "accountSettingsAppearanceTitle": "ظاهر برنامه",
+  "accountSettingsAppearanceDescription": "نحوهٔ نمایش پنل کسب‌وکار در دسکتاپ (صفحهٔ واحد یا چند تب)",
+  "appearanceSettingsPageTitle": "تنظیمات ظاهری",
+  "appearanceBusinessPanelSection": "پنل کسب‌وکار (دسکتاپ)",
+  "appearanceNavigationSingleLabel": "صفحهٔ واحد",
+  "appearanceNavigationSingleSubtitle": "در هر زمان فقط یک صفحه باز است (ناوبری کلاسیک)",
+  "appearanceNavigationTabsLabel": "تب در نوار بالا",
+  "appearanceNavigationTabsSubtitle": "چند صفحه باز بماند و با تب‌های نوار تیره بالای پنل جابه‌جا شوید (فقط دسکتاپ). تب‌های پس‌زمینه در حافظه می‌مانند؛ کلید پایدار مسیر برای بازگشت بهتر به همان تب هم‌سو با روتر است.",
+  "appearanceDesktopOnlyNote": "حالت تب فقط در عرض زیاد اعمال می‌شود؛ در موبایل همیشه حالت تک‌صفحه است.",
+  "appearanceSaved": "ذخیره شد",
+  "appearanceSaveError": "ذخیرهٔ تنظیمات ناموفق بود",
+  "appearanceSaveButton": "ذخیره"
 }
 
 

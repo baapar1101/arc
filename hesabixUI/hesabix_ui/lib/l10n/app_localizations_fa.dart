@@ -9745,6 +9745,46 @@ class AppLocalizationsFa extends AppLocalizations {
       'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
 
   @override
+  String get accountSettingsAppearanceDescription =>
+      'نحوهٔ نمایش پنل کسب‌وکار در دسکتاپ (صفحهٔ واحد یا چند تب)';
+
+  @override
+  String get accountSettingsAppearanceTitle => 'ظاهر برنامه';
+
+  @override
+  String get appearanceBusinessPanelSection => 'پنل کسب‌وکار (دسکتاپ)';
+
+  @override
+  String get appearanceDesktopOnlyNote =>
+      'حالت تب فقط در عرض زیاد اعمال می‌شود؛ در موبایل همیشه حالت تک‌صفحه است.';
+
+  @override
+  String get appearanceNavigationSingleLabel => 'صفحهٔ واحد';
+
+  @override
+  String get appearanceNavigationSingleSubtitle =>
+      'در هر زمان فقط یک صفحه باز است (ناوبری کلاسیک)';
+
+  @override
+  String get appearanceNavigationTabsLabel => 'تب در نوار بالا';
+
+  @override
+  String get appearanceNavigationTabsSubtitle =>
+      'چند صفحه باز بماند و با تب‌های نوار تیره بالای پنل جابه‌جا شوید (فقط دسکتاپ). تب‌های پس‌زمینه در حافظه می‌مانند؛ کلید پایدار مسیر برای بازگشت بهتر به همان تب هم‌سو با روتر است.';
+
+  @override
+  String get appearanceSaveButton => 'ذخیره';
+
+  @override
+  String get appearanceSaveError => 'ذخیرهٔ تنظیمات ناموفق بود';
+
+  @override
+  String get appearanceSaved => 'ذخیره شد';
+
+  @override
+  String get appearanceSettingsPageTitle => 'تنظیمات ظاهری';
+
+  @override
   String get notificationCenterLevelInfo => 'اطلاعات';
 
   @override

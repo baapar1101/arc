@@ -398,6 +398,7 @@ app/services/file_storage_share_service.py
 app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
 app/services/general_ledger_service.py
+app/services/invoice_adjustments_service.py
 app/services/invoice_fx_revaluation.py
 app/services/invoice_global_discount_service.py
 app/services/invoice_product_price_sync_service.py

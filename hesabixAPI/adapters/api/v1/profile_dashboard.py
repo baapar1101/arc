@@ -13,6 +13,7 @@ from app.services.profile_dashboard_widgets_service import (
     save_profile_dashboard_layout_profile,
     get_profile_widgets_batch_data,
 )
+from app.services.user_ui_preferences_service import get_user_ui_preferences, save_user_ui_preferences
 from app.core.cache import get_cache
 
 router = APIRouter(prefix="/profile", tags=["profile-dashboard"])
@@ -145,4 +146,34 @@ def post_profile_dashboard_widgets_data(
         cache.set(cache_key, formatted, ttl=30)
 
     return success_response(formatted, request)
+
+
+@router.get("/ui-preferences",
+    summary="ترجیحات ظاهری / UI کاربر",
+    description="شامل حالت نمایش پنل کسب‌وکار (تکی یا تب در دسکتاپ) و وضعیت تب‌ها به‌ازای هر کسب‌وکار.",
+    response_model=SuccessResponse,
+)
+def get_ui_preferences(
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = get_user_ui_preferences(db=db, user_id=ctx.get_user_id())
+    return success_response(data, request)
+
+
+@router.put("/ui-preferences",
+    summary="ذخیرهٔ ترجیحات ظاهری کاربر",
+    response_model=SuccessResponse,
+)
+def put_ui_preferences(
+    request: Request,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    if not isinstance(payload, dict):
+        payload = {}
+    result = save_user_ui_preferences(db=db, user_id=ctx.get_user_id(), payload=payload)
+    return success_response(result, request)
 

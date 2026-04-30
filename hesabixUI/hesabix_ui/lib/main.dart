@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'core/hesabix_router_pages.dart';
 import 'pages/profile/notifications_settings_page.dart';
 import 'pages/profile/user_notifications_page.dart';
 import 'pages/profile/notification_history_page.dart';
@@ -20,6 +21,7 @@ import 'pages/profile/api_keys_page.dart';
 import 'pages/profile/sessions_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/account_settings_page.dart';
+import 'pages/profile/appearance_settings_page.dart';
 import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/profile/announcements_page.dart';
@@ -1009,6 +1011,11 @@ class _MyAppState extends State<MyApp> {
               ),
             ),
             GoRoute(
+              path: '/user/profile/appearance-settings',
+              name: 'profile_appearance_settings',
+              builder: (context, state) => const AppearanceSettingsPage(),
+            ),
+            GoRoute(
               path: '/user/profile/marketing',
               name: 'profile_marketing',
               builder: (context, state) => MarketingPage(calendarController: _calendarController!),
@@ -1081,15 +1088,15 @@ class _MyAppState extends State<MyApp> {
                 GoRoute(
                   path: 'wallet',
                   name: 'system_settings_wallet',
-                  builder: (context, state) {
+                  pageBuilder: (context, state) {
                     if (_authStore == null) {
-                      return PermissionGuard.buildAccessDeniedPage();
+                      return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                     }
                     final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
                     if (!allowed) {
-                      return PermissionGuard.buildAccessDeniedPage();
+                      return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                     }
-                    return const WalletSettingsPage();
+                    return hesabixNoTransitionPage(state, const WalletSettingsPage());
                   },
                 ),
                 GoRoute(
@@ -1564,8 +1571,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/business/:business_id/dashboard',
               name: 'business_dashboard',
-              pageBuilder: (context, state) => NoTransitionPage(
-                child: BusinessDashboardPage(
+              pageBuilder: (context, state) => hesabixNoTransitionPage(state, BusinessDashboardPage(
                   businessId: int.parse(state.pathParameters['business_id']!),
                   authStore: _authStore!,
                   calendarController: _calendarController!,
@@ -1577,8 +1583,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_users_permissions',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: UsersPermissionsPage(
+                return hesabixNoTransitionPage(state, UsersPermissionsPage(
                     businessId: businessId.toString(),
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1591,8 +1596,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_opening_balance',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: OpeningBalancePage(
+                return hesabixNoTransitionPage(state, OpeningBalancePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1604,8 +1608,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_year_end_closing',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: YearEndClosingPage(
+                return hesabixNoTransitionPage(state, YearEndClosingPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1617,8 +1620,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_currency_revaluation',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CurrencyRevaluationPage(
+                return hesabixNoTransitionPage(state, CurrencyRevaluationPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1629,8 +1631,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/business/:business_id/chart-of-accounts',
               name: 'business_chart_of_accounts',
-              pageBuilder: (context, state) => NoTransitionPage(
-                child: AccountsPage(
+              pageBuilder: (context, state) => hesabixNoTransitionPage(state, AccountsPage(
                   businessId: int.parse(state.pathParameters['business_id']!),
                   authStore: _authStore!,
                 ),
@@ -1641,8 +1642,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_accounts',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: BankAccountsPage(
+                return hesabixNoTransitionPage(state, BankAccountsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1654,8 +1654,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_petty_cash',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PettyCashPage(
+                return hesabixNoTransitionPage(state, PettyCashPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1667,8 +1666,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_cash_box',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CashRegistersPage(
+                return hesabixNoTransitionPage(state, CashRegistersPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1680,8 +1678,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_wallet',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WalletPage(
+                return hesabixNoTransitionPage(state, WalletPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1693,8 +1690,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_ai_subscription',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: AISubscriptionPage(
+                return hesabixNoTransitionPage(state, AISubscriptionPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1706,8 +1702,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_ai_usage',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: AIUsagePage(
+                return hesabixNoTransitionPage(state, AIUsagePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1719,8 +1714,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_zohal_inquiries',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ZohalInquiriesPage(
+                return hesabixNoTransitionPage(state, ZohalInquiriesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1766,8 +1760,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_warranty',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarrantyManagementPage(
+                return hesabixNoTransitionPage(state, WarrantyManagementPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1780,8 +1773,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_warranty_settings',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarrantySettingsPage(
+                return hesabixNoTransitionPage(state, WarrantySettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1794,8 +1786,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_repair_shop',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: RepairOrdersListPage(
+                return hesabixNoTransitionPage(state, RepairOrdersListPage(
                     businessId: businessId,
                   ),
                 );
@@ -1806,8 +1797,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_repair_shop_new',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: RepairOrderFormPage(
+                return hesabixNoTransitionPage(state, RepairOrderFormPage(
                     businessId: businessId,
                   ),
                 );
@@ -1819,8 +1809,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final orderId = int.parse(state.pathParameters['order_id']!);
-                return NoTransitionPage(
-                  child: RepairOrderDetailPage(
+                return hesabixNoTransitionPage(state, RepairOrderDetailPage(
                     businessId: businessId,
                     orderId: orderId,
                   ),
@@ -1832,8 +1821,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_repair_shop_technicians',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: RepairTechniciansPage(
+                return hesabixNoTransitionPage(state, RepairTechniciansPage(
                     businessId: businessId,
                   ),
                 );
@@ -1844,8 +1832,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_repair_shop_settings',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: RepairSettingsPage(
+                return hesabixNoTransitionPage(state, RepairSettingsPage(
                     businessId: businessId,
                   ),
                 );
@@ -1856,8 +1843,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_customer_club',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CustomerClubMainPage(
+                return hesabixNoTransitionPage(state, CustomerClubMainPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1870,8 +1856,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_distribution',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DistributionMainPage(
+                return hesabixNoTransitionPage(state, DistributionMainPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -1884,8 +1869,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_notification_templates',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: NotificationTemplatesPage(
+                return hesabixNoTransitionPage(state, NotificationTemplatesPage(
                     businessId: businessId,
                   ),
                 );
@@ -1896,8 +1880,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_notification_template_new',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: NotificationTemplateFormPage(
+                return hesabixNoTransitionPage(state, NotificationTemplateFormPage(
                     businessId: businessId,
                   ),
                 );
@@ -1909,8 +1892,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final templateId = int.parse(state.pathParameters['template_id']!);
-                return NoTransitionPage(
-                  child: NotificationTemplateFormPage(
+                return hesabixNoTransitionPage(state, NotificationTemplateFormPage(
                     businessId: businessId,
                     templateId: templateId,
                   ),
@@ -2070,19 +2052,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: '/user/profile/system-settings/wallet',
-              name: 'system_wallet_settings',
-              pageBuilder: (context, state) => const NoTransitionPage(
-                child: WalletSettingsPage(),
-              ),
-            ),
-            GoRoute(
               path: '/business/:business_id/invoice',
               name: 'business_invoice',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InvoicesListPage(
+                return hesabixNoTransitionPage(state, InvoicesListPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -2096,8 +2070,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_tax_workspace',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: TaxWorkspacePage(
+                return hesabixNoTransitionPage(state, TaxWorkspacePage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -2116,8 +2089,7 @@ class _MyAppState extends State<MyApp> {
                     copyFromRaw != null && copyFromRaw.trim().isNotEmpty
                         ? int.tryParse(copyFromRaw.trim())
                         : null;
-                return NoTransitionPage(
-                  child: NewInvoicePage(
+                return hesabixNoTransitionPage(state, NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -2132,8 +2104,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final invoiceId = int.parse(state.pathParameters['invoice_id']!);
-                return NoTransitionPage(
-                  child: EditInvoicePage(
+                return hesabixNoTransitionPage(state, EditInvoicePage(
                     businessId: businessId,
                     invoiceId: invoiceId,
                     authStore: _authStore!,
@@ -2147,8 +2118,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ReportsPage(
+                return hesabixNoTransitionPage(state, ReportsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -2189,8 +2159,7 @@ class _MyAppState extends State<MyApp> {
                     }
                   }
                 } catch (_) {}
-                return NoTransitionPage(
-                  child: KardexPage(
+                return hesabixNoTransitionPage(state, KardexPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     initialPersonIds: initialPersonIds.toList(),
@@ -2203,8 +2172,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_debtors',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DebtorsReportPage(
+                return hesabixNoTransitionPage(state, DebtorsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2216,8 +2184,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_creditors',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CreditorsReportPage(
+                return hesabixNoTransitionPage(state, CreditorsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2229,8 +2196,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_people_transactions',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PeopleTransactionsReportPage(
+                return hesabixNoTransitionPage(state, PeopleTransactionsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2242,8 +2208,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_item_movements',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ItemMovementsReportPage(
+                return hesabixNoTransitionPage(state, ItemMovementsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2255,8 +2220,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_sales_by_product',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: SalesByProductReportPage(
+                return hesabixNoTransitionPage(state, SalesByProductReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2268,8 +2232,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_inventory_kardex',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InventoryKardexReportPage(
+                return hesabixNoTransitionPage(state, InventoryKardexReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2281,8 +2244,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_inventory_stock',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InventoryStockReportPage(
+                return hesabixNoTransitionPage(state, InventoryStockReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2294,8 +2256,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_stock_count',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: StockCountReportPage(
+                return hesabixNoTransitionPage(state, StockCountReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2307,8 +2268,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_warehouse_documents_summary',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarehouseDocumentsSummaryReportPage(
+                return hesabixNoTransitionPage(state, WarehouseDocumentsSummaryReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2320,8 +2280,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_slow_moving_items',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: SlowMovingItemsReportPage(
+                return hesabixNoTransitionPage(state, SlowMovingItemsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2333,8 +2292,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_critical_stock',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CriticalStockReportPage(
+                return hesabixNoTransitionPage(state, CriticalStockReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2346,8 +2304,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_inter_warehouse_transfers',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InterWarehouseTransfersReportPage(
+                return hesabixNoTransitionPage(state, InterWarehouseTransfersReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2359,8 +2316,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_adjustment_documents',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: AdjustmentDocumentsReportPage(
+                return hesabixNoTransitionPage(state, AdjustmentDocumentsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2372,8 +2328,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_warehouse_performance',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarehousePerformanceReportPage(
+                return hesabixNoTransitionPage(state, WarehousePerformanceReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2385,8 +2340,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_product_movement_history',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ProductMovementHistoryReportPage(
+                return hesabixNoTransitionPage(state, ProductMovementHistoryReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2398,8 +2352,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_inventory_valuation',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InventoryValuationReportPage(
+                return hesabixNoTransitionPage(state, InventoryValuationReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2411,8 +2364,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_pending_documents',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PendingDocumentsReportPage(
+                return hesabixNoTransitionPage(state, PendingDocumentsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2424,8 +2376,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_inventory_turnover',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InventoryTurnoverReportPage(
+                return hesabixNoTransitionPage(state, InventoryTurnoverReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2437,8 +2388,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_bank_accounts_turnover',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: BankAccountsTurnoverReportPage(
+                return hesabixNoTransitionPage(state, BankAccountsTurnoverReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2450,8 +2400,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_cash_petty_turnover',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CashPettyTurnoverReportPage(
+                return hesabixNoTransitionPage(state, CashPettyTurnoverReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2463,8 +2412,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_distribution_dashboard',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DistributionReportsDashboardPage(
+                return hesabixNoTransitionPage(state, DistributionReportsDashboardPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2476,8 +2424,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_daily_sales',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DailySalesReportPage(
+                return hesabixNoTransitionPage(state, DailySalesReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2489,8 +2436,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_daily_purchases',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DailyPurchasesReportPage(
+                return hesabixNoTransitionPage(state, DailyPurchasesReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2502,8 +2448,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_monthly_sales',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: MonthlySalesReportPage(
+                return hesabixNoTransitionPage(state, MonthlySalesReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2515,8 +2460,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_top_customers',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: TopCustomersReportPage(
+                return hesabixNoTransitionPage(state, TopCustomersReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2528,8 +2472,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_top_suppliers',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: TopSuppliersReportPage(
+                return hesabixNoTransitionPage(state, TopSuppliersReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2541,8 +2484,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_materials_consumption',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: MaterialsConsumptionReportPage(
+                return hesabixNoTransitionPage(state, MaterialsConsumptionReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2554,8 +2496,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_production',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ProductionReportPage(
+                return hesabixNoTransitionPage(state, ProductionReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2567,8 +2508,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_trial_balance',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: TrialBalanceReportPage(
+                return hesabixNoTransitionPage(state, TrialBalanceReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2580,8 +2520,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_general_ledger',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: GeneralLedgerReportPage(
+                return hesabixNoTransitionPage(state, GeneralLedgerReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2593,8 +2532,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_journal_ledger',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: JournalLedgerReportPage(
+                return hesabixNoTransitionPage(state, JournalLedgerReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2606,8 +2544,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_pnl_period',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PnlPeriodReportPage(
+                return hesabixNoTransitionPage(state, PnlPeriodReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2619,8 +2556,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_pnl_cumulative',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PnlCumulativeReportPage(
+                return hesabixNoTransitionPage(state, PnlCumulativeReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2632,8 +2568,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_accounts_review',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: AccountReviewReportPage(
+                return hesabixNoTransitionPage(state, AccountReviewReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2645,8 +2580,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_activity_logs',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ActivityLogsPage(
+                return hesabixNoTransitionPage(state, ActivityLogsPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2660,12 +2594,10 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // گارد دسترسی: فقط کاربرانی که دسترسی join دارند
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: SettingsPage(
+                return hesabixNoTransitionPage(state, SettingsPage(
                     businessId: businessId,
                     localeController: controller,
                     calendarController: _calendarController!,
@@ -2680,9 +2612,9 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
-                return NoTransitionPage(child: BusinessBackupPage(businessId: businessId));
+                return hesabixNoTransitionPage(state, BusinessBackupPage(businessId: businessId));
               },
             ),
             GoRoute(
@@ -2691,15 +2623,15 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
                 final isOwner = _authStore!.currentBusiness?.id == businessId &&
                     _authStore!.currentBusiness?.isOwner == true;
                 final hasFtp = _authStore!.hasBusinessPermission('settings', 'manage_ftp');
                 if (!isOwner && !hasFtp) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
-                return NoTransitionPage(child: BusinessFtpBackupSettingsPage(businessId: businessId));
+                return hesabixNoTransitionPage(state, BusinessFtpBackupSettingsPage(businessId: businessId));
               },
             ),
             GoRoute(
@@ -2708,9 +2640,9 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
-                return NoTransitionPage(child: BusinessRestorePage(businessId: businessId));
+                return hesabixNoTransitionPage(state, BusinessRestorePage(businessId: businessId));
               },
             ),
             GoRoute(
@@ -2720,9 +2652,9 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // فقط مالک می‌تواند حذف کند
                 if (_authStore!.currentBusiness?.isOwner != true) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
-                return NoTransitionPage(child: DeleteBusinessPage(businessId: businessId));
+                return hesabixNoTransitionPage(state, DeleteBusinessPage(businessId: businessId));
               },
             ),
             GoRoute(
@@ -2734,9 +2666,9 @@ class _MyAppState extends State<MyApp> {
                     _authStore!.currentBusiness?.isOwner == true;
                 final canRollback = isOwner || _authStore!.hasBusinessPermission('fiscal_years', 'rollback');
                 if (!canRollback) {
-                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
-                return NoTransitionPage(child: FiscalYearRollbackPage(businessId: businessId));
+                return hesabixNoTransitionPage(state, FiscalYearRollbackPage(businessId: businessId));
               },
             ),
             GoRoute(
@@ -2745,12 +2677,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: BusinessInfoSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, BusinessInfoSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2760,12 +2690,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'business')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: BusinessCurrenciesSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, BusinessCurrenciesSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2775,12 +2703,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'business')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: FxRevaluationSettingsPage(
+                return hesabixNoTransitionPage(state, FxRevaluationSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -2793,12 +2719,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'business')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: QuickSalesSettingsPage(
+                return hesabixNoTransitionPage(state, QuickSalesSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -2811,12 +2735,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('invoices', 'add')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: QuickSalesPage(
+                return hesabixNoTransitionPage(state, QuickSalesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -2830,12 +2752,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: CreditSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, CreditSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2845,12 +2765,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.canReadSection('crm')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: BusinessCrmSettingsPage(
+                return hesabixNoTransitionPage(state, BusinessCrmSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
@@ -2864,8 +2782,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
                 final isOwner = _authStore!.currentBusiness?.id == businessId &&
@@ -2874,12 +2791,10 @@ class _MyAppState extends State<MyApp> {
                     _authStore!.hasBusinessPermission('customer_club', 'view') ||
                     _authStore!.hasBusinessPermission('customer_club', 'manage');
                 if (!canAccess) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: CustomerClubSettingsPage(
+                return hesabixNoTransitionPage(state, CustomerClubSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -2892,12 +2807,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: DocumentNumberingSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, DocumentNumberingSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2907,12 +2820,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: TaxSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, TaxSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2922,12 +2833,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('fiscal_years', 'edit')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: FiscalYearSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, FiscalYearSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2937,12 +2846,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: BusinessPrintSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, BusinessPrintSettingsPage(businessId: businessId),
                 );
               },
             ),
@@ -2952,12 +2859,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: InstallmentPlansPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, InstallmentPlansPage(businessId: businessId),
                 );
               },
             ),
@@ -2967,12 +2872,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: DocumentMonetizationBusinessPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, DocumentMonetizationBusinessPage(businessId: businessId),
                 );
               },
             ),
@@ -2981,8 +2884,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_product_attributes',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ProductAttributesPage(
+                return hesabixNoTransitionPage(state, ProductAttributesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -2995,12 +2897,10 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 if (!_authStore!.hasBusinessPermission('products', 'view')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: ProductBulkPricesSheetPage(
+                return hesabixNoTransitionPage(state, ProductBulkPricesSheetPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3012,8 +2912,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_products',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ProductsPage(
+                return hesabixNoTransitionPage(state, ProductsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3025,8 +2924,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_price_lists',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PriceListsPage(
+                return hesabixNoTransitionPage(state, PriceListsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3039,8 +2937,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final priceListId = int.parse(state.pathParameters['price_list_id']!);
-                return NoTransitionPage(
-                  child: PriceListItemsPage(
+                return hesabixNoTransitionPage(state, PriceListItemsPage(
                     businessId: businessId,
                     priceListId: priceListId,
                     authStore: _authStore!,
@@ -3053,8 +2950,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_persons',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: PersonsPage(
+                return hesabixNoTransitionPage(state, PersonsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3066,8 +2962,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_projects',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ProjectsPage(
+                return hesabixNoTransitionPage(state, ProjectsPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -3082,8 +2977,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_receipts_payments',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ReceiptsPaymentsListPage(
+                return hesabixNoTransitionPage(state, ReceiptsPaymentsListPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -3098,8 +2992,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_installments_report',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: InstallmentsReportPage(
+                return hesabixNoTransitionPage(state, InstallmentsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     apiClient: ApiClient(),
@@ -3112,8 +3005,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_expense_income',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ExpenseIncomeListPage(
+                return hesabixNoTransitionPage(state, ExpenseIncomeListPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -3127,8 +3019,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_transfers',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: TransfersPage(
+                return hesabixNoTransitionPage(state, TransfersPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -3143,8 +3034,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final warehouseId = int.parse(state.pathParameters['warehouse_id']!);
-                return NoTransitionPage(
-                  child: WarehouseLocationsPage(
+                return hesabixNoTransitionPage(state, WarehouseLocationsPage(
                     businessId: businessId,
                     warehouseId: warehouseId,
                   ),
@@ -3156,8 +3046,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_warehouses',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarehousesPage(
+                return hesabixNoTransitionPage(state, WarehousesPage(
                     businessId: businessId,
                   ),
                 );
@@ -3168,8 +3057,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_warehouse_docs',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: WarehouseDocsPage(
+                return hesabixNoTransitionPage(state, WarehouseDocsPage(
                     businessId: businessId,
                   ),
                 );
@@ -3181,8 +3069,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final docId = int.parse(state.pathParameters['doc_id']!);
-                return NoTransitionPage(
-                  child: WarehouseDocumentDetailsPage(
+                return hesabixNoTransitionPage(state, WarehouseDocumentDetailsPage(
                     businessId: businessId,
                     documentId: docId,
                   ),
@@ -3195,8 +3082,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final calendarController = ApiClient.getCalendarController();
-                return NoTransitionPage(
-                  child: StockCountPage(
+                return hesabixNoTransitionPage(state, StockCountPage(
                     businessId: businessId,
                     calendarController: calendarController,
                   ),
@@ -3208,8 +3094,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_documents',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: DocumentsPage(
+                return hesabixNoTransitionPage(state, DocumentsPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
@@ -3223,8 +3108,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_storage_files',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: StorageFilesPage(
+                return hesabixNoTransitionPage(state, StorageFilesPage(
                     businessId: businessId,
                   ),
                 );
@@ -3235,8 +3119,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_storage_file_manager',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: StorageFileManagerPage(
+                return hesabixNoTransitionPage(state, StorageFileManagerPage(
                     businessId: businessId,
                   ),
                 );
@@ -3247,8 +3130,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_report_templates',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ReportTemplatesPage(
+                return hesabixNoTransitionPage(state, ReportTemplatesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3262,12 +3144,10 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // گارد دسترسی مشاهده بازار
                 if (!_authStore!.hasBusinessPermission('marketplace', 'view')) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: PluginMarketplacePage(
+                return hesabixNoTransitionPage(state, PluginMarketplacePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3282,12 +3162,10 @@ class _MyAppState extends State<MyApp> {
                 final allowed = _authStore!.hasBusinessPermission('marketplace', 'invoices') ||
                     _authStore!.hasBusinessPermission('marketplace', 'view');
                 if (!allowed) {
-                  return NoTransitionPage(
-                    child: PermissionGuard.buildAccessDeniedPage(),
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return NoTransitionPage(
-                  child: MarketplaceInvoicesPage(
+                return hesabixNoTransitionPage(state, MarketplaceInvoicesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -3299,8 +3177,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_checks',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: ChecksPage(
+                return hesabixNoTransitionPage(state, ChecksPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -3313,8 +3190,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_new_check',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CheckFormPage(
+                return hesabixNoTransitionPage(state, CheckFormPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
@@ -3328,8 +3204,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final checkId = int.tryParse(state.pathParameters['check_id'] ?? '0');
-                return NoTransitionPage(
-                  child: CheckFormPage(
+                return hesabixNoTransitionPage(state, CheckFormPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     checkId: checkId,
@@ -3343,8 +3218,7 @@ class _MyAppState extends State<MyApp> {
               name: 'business_checks_reconciliation',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: CheckReconciliationPage(
+                return hesabixNoTransitionPage(state, CheckReconciliationPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,

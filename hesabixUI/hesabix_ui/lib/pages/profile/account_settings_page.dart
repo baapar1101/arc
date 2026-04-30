@@ -55,6 +55,13 @@ class AccountSettingsPage extends StatelessWidget {
                   childAspectRatio: aspectRatio,
                   children: [
                     _SettingsCard(
+                      title: t.accountSettingsAppearanceTitle,
+                      description: t.accountSettingsAppearanceDescription,
+                      icon: Icons.palette_outlined,
+                      color: Colors.deepPurple,
+                      onTap: () => context.go('/user/profile/appearance-settings'),
+                    ),
+                    _SettingsCard(
                       title: t.marketing,
                       description: t.accountSettingsMarketingDescription,
                       icon: Icons.campaign,

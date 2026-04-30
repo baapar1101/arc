@@ -9790,6 +9790,46 @@ class AppLocalizationsEn extends AppLocalizations {
       'View all sent notifications (OTP, password reset, tickets, etc.)';
 
   @override
+  String get accountSettingsAppearanceDescription =>
+      'Business panel layout on desktop (single page vs tabs)';
+
+  @override
+  String get accountSettingsAppearanceTitle => 'Appearance';
+
+  @override
+  String get appearanceBusinessPanelSection => 'Business panel (desktop)';
+
+  @override
+  String get appearanceDesktopOnlyNote =>
+      'Tabbed layout applies only on wide screens; on mobile, navigation stays single-page.';
+
+  @override
+  String get appearanceNavigationSingleLabel => 'Single page';
+
+  @override
+  String get appearanceNavigationSingleSubtitle =>
+      'Only one page open at a time (classic navigation)';
+
+  @override
+  String get appearanceNavigationTabsLabel => 'Tabs in top bar';
+
+  @override
+  String get appearanceNavigationTabsSubtitle =>
+      'Keep multiple pages open and switch via tabs on the dark strip (desktop only). Background tabs stay mounted; stable page keys improve reuse when you return.';
+
+  @override
+  String get appearanceSaveButton => 'Save';
+
+  @override
+  String get appearanceSaveError => 'Could not save settings';
+
+  @override
+  String get appearanceSaved => 'Saved';
+
+  @override
+  String get appearanceSettingsPageTitle => 'Appearance settings';
+
+  @override
   String get notificationCenterLevelInfo => 'Info';
 
   @override

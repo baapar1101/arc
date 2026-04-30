@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
+import '../../core/business_panel_ui_store.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
@@ -45,6 +46,7 @@ import 'expense_income_list_page.dart';
 import 'transfers_page.dart';
 import 'documents_page.dart';
 import 'business_shell_side_nav_scope.dart';
+import 'business_shell_tabbed_body.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -87,9 +89,107 @@ class _BusinessShellState extends State<BusinessShell> {
   /// فقط زمانی که `NavigationRail`/ریل کناری برای دسکتاپ نشان داده می‌شود؛ موبایل از drawer استفاده می‌کند.
   bool _desktopRailVisible = true;
 
+  void _onBusinessPanelUiChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String _tabTitleForBusinessPath(String path, List<_MenuItem> menuRoot) {
+    var best = '';
+    var bestLen = 0;
+    void walk(List<_MenuItem> items) {
+      for (final item in items) {
+        final p = item.path;
+        if (p != null && path.startsWith(p) && p.length >= bestLen) {
+          bestLen = p.length;
+          best = item.label;
+        }
+        final ch = item.children;
+        if (ch != null) walk(ch);
+      }
+    }
+
+    walk(menuRoot);
+    if (best.isNotEmpty) return best;
+    try {
+      final segs = Uri.parse(path).pathSegments;
+      if (segs.length > 2) {
+        return segs.sublist(2).join(' / ');
+      }
+    } catch (_) {}
+    return path;
+  }
+
+  Widget _buildBusinessTabStrip({
+    required BuildContext context,
+    required List<_MenuItem> menuRoot,
+    required Color barBg,
+  }) {
+    final store = BusinessPanelUiStore.instance;
+    final bid = widget.businessId;
+    final session = store.tabsForBusiness(bid);
+    if (session == null || session.paths.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Material(
+      color: barBg,
+      child: SizedBox(
+        height: 36,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                for (final p in session.paths)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Material(
+                      color: p == session.activePath ? Colors.white24 : Colors.white12,
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => store.selectTab(bid, p, (loc) => context.go(loc)),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 8, end: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 200),
+                                child: Text(
+                                  _tabTitleForBusinessPath(p, menuRoot),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => store.closeTab(bid, p, (loc) => context.go(loc)),
+                                customBorder: const CircleBorder(),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(Icons.close, size: 16, color: Colors.white70),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    BusinessPanelUiStore.instance.addListener(_onBusinessPanelUiChanged);
     // اطمینان از bind بودن AuthStore برای ApiClient (جهت هدرها و تنظیمات)
     try {
       ApiClient.bindAuthStore(widget.authStore);
@@ -112,6 +212,7 @@ class _BusinessShellState extends State<BusinessShell> {
 
   @override
   void dispose() {
+    BusinessPanelUiStore.instance.removeListener(_onBusinessPanelUiChanged);
     _dateTimeUpdateTimer?.cancel();
     super.dispose();
   }
@@ -1063,6 +1164,19 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    final pathOnly = Uri.tryParse(location)?.path ??
+        '/business/${widget.businessId}/dashboard';
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await BusinessPanelUiStore.instance.hydrateIfNeeded();
+      if (!mounted) return;
+      BusinessPanelUiStore.instance.onBusinessRouteChanged(
+        widget.businessId,
+        pathOnly,
+        isDesktop: useRail,
+      );
+    });
+
     Future<void> onSelect(int index) async {
       final item = menuItems[index];
       if (item.type == _MenuItemType.separator) return; // آیتم جداکننده قابل کلیک نیست
@@ -1467,12 +1581,38 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
     );
 
+    final uiStore = BusinessPanelUiStore.instance;
+    final bool showBizTabs =
+        useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
+    final BusinessPanelTabSession? tabSession = uiStore.tabsForBusiness(widget.businessId);
+    final bool useIndexedTabBody = useRail &&
+        uiStore.mode == BusinessPanelNavigationMode.tabs &&
+        tabSession != null &&
+        tabSession.paths.isNotEmpty;
+
+    final Widget shellMainChild = useIndexedTabBody && tabSession != null
+        ? BusinessShellTabbedBody(
+            paths: List<String>.from(tabSession.paths),
+            activePath: tabSession.activePath,
+            routerChild: widget.child,
+          )
+        : widget.child;
+    const double tabStripHeight = 36;
+    final double topStripHeight =
+        _businessTopBarHeight + (showBizTabs ? tabStripHeight : 0);
+
     final PreferredSizeWidget preferredAppBar = PreferredSize(
-      preferredSize: const Size.fromHeight(_businessTopBarHeight + kToolbarHeight),
+      preferredSize: Size.fromHeight(topStripHeight + kToolbarHeight),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           businessTopBar,
+          if (showBizTabs)
+            _buildBusinessTabStrip(
+              context: context,
+              menuRoot: menuItems,
+              barBg: topBarBg,
+            ),
           appBar,
         ],
       ),
@@ -1480,8 +1620,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
     final content = Container(
       color: scheme.surface,
-      child: SafeArea(
-        child: widget.child,
+        child: SafeArea(
+        child: shellMainChild,
       ),
     );
 

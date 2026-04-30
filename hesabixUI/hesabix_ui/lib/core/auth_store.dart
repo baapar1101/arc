@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'api_client.dart';
+import 'business_panel_ui_store.dart';
 import '../models/business_dashboard_models.dart';
 
 class AuthStore with ChangeNotifier {
@@ -128,6 +129,7 @@ class AuthStore with ChangeNotifier {
       // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();
       await clearLastUrl();
+      BusinessPanelUiStore.instance.reset();
     } else {
       if (kIsWeb) {
         await prefs.setString(_kApiKey, key);
