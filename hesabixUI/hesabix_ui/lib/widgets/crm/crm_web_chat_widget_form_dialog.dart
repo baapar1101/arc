@@ -11,16 +11,20 @@ class CrmWebChatWidgetFormDialog extends StatefulWidget {
     required this.nameController,
     required this.originsController,
     required this.initialAllowVisitorFile,
+    required this.initialAllowVisitorVoice,
     required this.initialIsActive,
     required this.businessFileUploadEnabled,
+    required this.businessVoiceUploadEnabled,
   });
 
   final bool isEdit;
   final TextEditingController nameController;
   final TextEditingController originsController;
   final bool initialAllowVisitorFile;
+  final bool initialAllowVisitorVoice;
   final bool initialIsActive;
   final bool businessFileUploadEnabled;
+  final bool businessVoiceUploadEnabled;
 
   @override
   State<CrmWebChatWidgetFormDialog> createState() => _CrmWebChatWidgetFormDialogState();
@@ -28,12 +32,14 @@ class CrmWebChatWidgetFormDialog extends StatefulWidget {
 
 class _CrmWebChatWidgetFormDialogState extends State<CrmWebChatWidgetFormDialog> {
   late bool _allowVisitorFile;
+  late bool _allowVisitorVoice;
   late bool _isActive;
 
   @override
   void initState() {
     super.initState();
     _allowVisitorFile = widget.initialAllowVisitorFile;
+    _allowVisitorVoice = widget.initialAllowVisitorVoice;
     _isActive = widget.initialIsActive;
   }
 
@@ -144,6 +150,33 @@ class _CrmWebChatWidgetFormDialogState extends State<CrmWebChatWidgetFormDialog>
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Material(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.crmWebChatVisitorVoiceSwitchTitle),
+                      subtitle: Text(
+                        widget.businessVoiceUploadEnabled
+                            ? t.crmWebChatVisitorVoiceSwitchOn
+                            : t.crmWebChatVisitorVoiceSwitchOff,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      value: _allowVisitorVoice && widget.businessVoiceUploadEnabled,
+                      onChanged: widget.businessVoiceUploadEnabled
+                          ? (v) => setState(() {
+                                _allowVisitorVoice = v;
+                              })
+                          : null,
+                    ),
+                  ),
+                ),
                 if (widget.isEdit) ...[
                   const SizedBox(height: 4),
                   SwitchListTile(
@@ -182,6 +215,7 @@ class _CrmWebChatWidgetFormDialogState extends State<CrmWebChatWidgetFormDialog>
                         Navigator.pop(context, <String, dynamic>{
                           'save': true,
                           'allow_visitor_file': _allowVisitorFile,
+                          'allow_visitor_voice': _allowVisitorVoice,
                           'is_active': _isActive,
                         });
                       },

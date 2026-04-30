@@ -80,9 +80,10 @@ async def public_widget_options(
 		w = chat_svc.get_widget_by_public_key(db, public_key.strip())
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-	allow = chat_svc.visitor_file_upload_effective_for_widget(db, w)
+	allow_f = chat_svc.visitor_file_upload_effective_for_widget(db, w)
+	allow_v = chat_svc.visitor_voice_effective_for_widget(db, w)
 	return success_response(
-		data={"allow_file_upload": allow},
+		data={"allow_file_upload": allow_f, "allow_voice": allow_v},
 		request=request,
 		message="",
 	)

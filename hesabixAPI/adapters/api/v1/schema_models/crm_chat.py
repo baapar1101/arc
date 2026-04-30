@@ -78,7 +78,16 @@ class CrmChatConversationPatch(BaseModel):
 
 
 class BusinessCrmSettingsUpdate(BaseModel):
-	allow_web_chat_file_upload: bool = Field(..., description="ارسال فایل توسط بازدیدکننده در چت وب")
+	allow_web_chat_file_upload: Optional[bool] = Field(None, description="ارسال فایل توسط بازدیدکننده در چت وب")
+	allow_web_chat_voice: Optional[bool] = Field(None, description="ارسال پیام صوتی در چت وب (بازدیدکننده و اعمال محدودیت نوع صوت)")
+
+	@model_validator(mode="after")
+	def at_least_one_field(self) -> "BusinessCrmSettingsUpdate":
+		if self.allow_web_chat_file_upload is None and self.allow_web_chat_voice is None:
+			raise ValueError(
+				"حداقل یکی از فیلدهای allow_web_chat_file_upload یا allow_web_chat_voice الزامی است"
+			)
+		return self
 
 
 class CrmChatMarkReadBody(BaseModel):

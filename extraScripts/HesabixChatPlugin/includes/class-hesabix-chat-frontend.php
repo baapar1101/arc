@@ -222,6 +222,7 @@ class Hesabix_Chat_Frontend {
 				'borderRadius'    => (int) $o['border_radius'],
 				'dir'             => $dir,
 				'showFileUpload'  => (int) $o['show_file_upload'] === 1,
+				'showVoiceMessage' => (int) ( $o['show_voice_message'] ?? 0 ) === 1,
 				'loadMode'        => (string) $o['load_mode'],
 				'debug'           => (bool) apply_filters( 'hesabix_chat_debug', false ),
 				'emailField'      => $email_eff,
@@ -237,6 +238,7 @@ class Hesabix_Chat_Frontend {
 				'launcherAttentionDelaySec'  => (int) ( $o['launcher_attention_delay_sec'] ?? 0 ),
 				'openPanelOnLoad'            => (int) ( $o['open_panel_on_load'] ?? 0 ) === 1,
 				'openPanelDelaySec'          => (int) ( $o['open_panel_delay_sec'] ?? 0 ),
+				'rememberPanelBetweenPages'  => (int) ( $o['remember_panel_between_pages'] ?? 1 ) === 1,
 				'strings'         => array(
 					'formTitle'    => __( 'شروع گفتگو', 'hesabix-chat' ),
 					'formSubtitle' => __( 'برای شروع، مشخصات خود را وارد کنید.', 'hesabix-chat' ),
@@ -262,6 +264,7 @@ class Hesabix_Chat_Frontend {
 					'errorGeneric' => __( 'خطا در ارتباط با سرور.', 'hesabix-chat' ),
 					'you'          => __( 'شما', 'hesabix-chat' ),
 					'support'      => __( 'پشتیبانی', 'hesabix-chat' ),
+					'voicePick'    => __( 'پیام صوتی (انتخاب فایل ضبط‌شده یا ضبط موبایل)', 'hesabix-chat' ),
 					'newChatHint'  => __( 'مکالمه فعلی پاک می‌شود و می‌توانید دوباره شروع کنید.', 'hesabix-chat' ),
 					'wsConnecting'     => __( 'در حال اتصال…', 'hesabix-chat' ),
 					'wsLive'           => __( 'زنده', 'hesabix-chat' ),

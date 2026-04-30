@@ -183,10 +183,14 @@ class CrmChatService {
   Future<Map<String, dynamic>> updateCrmSettings({
     required int businessId,
     required bool allowWebChatFileUpload,
+    required bool allowWebChatVoice,
   }) async {
     final res = await _apiClient.patch<dynamic>(
       '/api/v1/crm/businesses/$businessId/chat/crm-settings',
-      data: {'allow_web_chat_file_upload': allowWebChatFileUpload},
+      data: {
+        'allow_web_chat_file_upload': allowWebChatFileUpload,
+        'allow_web_chat_voice': allowWebChatVoice,
+      },
     );
     final d = _extractData(res.data);
     return d is Map<String, dynamic> ? Map<String, dynamic>.from(d) : <String, dynamic>{};

@@ -1118,3 +1118,25 @@
 	background: linear-gradient( 180deg, #1e1b4b 0%, #0f172a 50%, #020617 100% );
 	color: #e2e8f0;
 }
+
+/* پیوست، درگ در کامپوزر، پیش‌نمایش تصویر */
+.hesabix-chat-dragover textarea {
+	outline: 2px dashed var( --hesabix-accent, #4f46e5 );
+	outline-offset: 2px;
+}
+
+.hesabix-chat-thumb {
+	display: inline-block;
+	max-width: min( 100%, 260px );
+	border-radius: 10px;
+	overflow: hidden;
+	margin-bottom: 6px;
+}
+.hesabix-chat-thumb-img {
+	max-width: 260px;
+	max-height: 220px;
+	width: auto;
+	height: auto;
+	display: block;
+	cursor: zoom-in;
+}

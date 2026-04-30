@@ -19,4 +19,5 @@ class BusinessCrmSettings(Base):
 	allow_web_chat_file_upload: Mapped[bool] = mapped_column(
 		Boolean, nullable=False, default=False, server_default="0"
 	)
+	allow_web_chat_voice: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
 	updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

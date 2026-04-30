@@ -11521,4 +11521,43 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmWebChatTooltipMessageRead => 'خوانده شد';
+
+  @override
+  String get crmSettingsWebChatVoiceTitle => 'پیام صوتی در چت وب';
+
+  @override
+  String get crmSettingsWebChatVoiceSubtitle =>
+      'پیام‌های صوتی کوتاه (بازدیدکننده یا اپراتور) مانند هر فایل در فضای ذخیره‌سازی کسب‌وکار حساب می‌شوند.';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchTitle =>
+      'پیام صوتی توسط بازدیدکنندهٔ سایت';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchOn =>
+      'طبق تنظیمات کسب‌وکار و پلن فضا. می‌توانید فقط روی همین ویجت غیرفعال کنید.';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchOff =>
+      'پیام صوتی در تنظیمات CRM کسب‌وکار خاموش است یا در این ویجت محدود شده است.';
+
+  @override
+  String get crmWebChatVoiceDisabledCrm =>
+      'پیام صوتی برای این کسب‌وکار در تنظیمات CRM غیرفعال است';
+
+  @override
+  String get crmWebChatComposerDropTarget => 'رها کنید تا ارسال شود';
+
+  @override
+  String get crmWebChatMicRecording => 'ضبط…';
+
+  @override
+  String get crmWebChatMicStopSend => 'توقف و ارسال';
+
+  @override
+  String get crmWebChatMicUnavailableWeb =>
+      'ضبط صدا در مرورگر این نسخه در دست نیست؛ از اپ یا دکمهٔ پیوست استفاده کنید';
+
+  @override
+  String get crmWebChatVisitorVoiceOffWidget => 'ویس مهمان خاموش';
 }

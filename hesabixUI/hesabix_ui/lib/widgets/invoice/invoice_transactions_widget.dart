@@ -26,6 +26,7 @@ import '../../core/api_client.dart';
 import '../../widgets/date_input_field.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/invoice_transaction_preferences.dart';
+import '../../widgets/money/amount_field_words_tooltip.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -678,6 +679,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         calendarController: widget.calendarController,
         invoiceType: widget.invoiceType,
         selectedCurrencyId: widget.selectedCurrencyId,
+        currencyUnit: _currencySymbol ?? 'ریال',
         checkPickerMode: widget.checkPickerMode,
         authStore: widget.authStore,
         onSave: (newTransaction) {
@@ -1025,6 +1027,8 @@ class TransactionDialog extends StatefulWidget {
   final ValueChanged<InvoiceTransaction> onSave;
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
+  /// واحد پول برای suffix فیلد مبلغ و متن tooltip (مثلاً ریال یا نماد ارز).
+  final String currencyUnit;
   final CheckPickerMode checkPickerMode;
   final AuthStore? authStore;
 
@@ -1036,6 +1040,7 @@ class TransactionDialog extends StatefulWidget {
     required this.calendarController,
     required this.invoiceType,
     this.selectedCurrencyId,
+    this.currencyUnit = 'ریال',
     required this.onSave,
     this.checkPickerMode = CheckPickerMode.any,
     this.authStore,
@@ -1330,46 +1335,54 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextFormField(
+                            child: AmountFieldWordsTooltip(
                               controller: _amountController,
-                              decoration: const InputDecoration(
-                                labelText: 'مبلغ *',
-                                border: OutlineInputBorder(),
-                                suffixText: 'ریال',
+                              currencyUnit: widget.currencyUnit,
+                              child: TextFormField(
+                                controller: _amountController,
+                                decoration: InputDecoration(
+                                  labelText: 'مبلغ *',
+                                  border: const OutlineInputBorder(),
+                                  suffixText: widget.currencyUnit,
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
+                                ],
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'مبلغ الزامی است';
+                                  }
+                                  final cleanValue = value.replaceAll(',', '');
+                                  if (double.tryParse(cleanValue) == null) {
+                                    return 'مبلغ باید عدد باشد';
+                                  }
+                                  return null;
+                                },
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                EnglishDigitsFormatter(),
-                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                                ThousandsSeparatorInputFormatter(allowDecimal: false),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'مبلغ الزامی است';
-                                }
-                                final cleanValue = value.replaceAll(',', '');
-                                if (double.tryParse(cleanValue) == null) {
-                                  return 'مبلغ باید عدد باشد';
-                                }
-                                return null;
-                              },
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: TextFormField(
+                            child: AmountFieldWordsTooltip(
                               controller: _commissionController,
-                              decoration: const InputDecoration(
-                                labelText: 'کارمزد',
-                                border: OutlineInputBorder(),
-                                suffixText: 'ریال',
+                              currencyUnit: widget.currencyUnit,
+                              child: TextFormField(
+                                controller: _commissionController,
+                                decoration: InputDecoration(
+                                  labelText: 'کارمزد',
+                                  border: const OutlineInputBorder(),
+                                  suffixText: widget.currencyUnit,
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
+                                ],
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                EnglishDigitsFormatter(),
-                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                                ThousandsSeparatorInputFormatter(allowDecimal: false),
-                              ],
                             ),
                           ),
                         ],

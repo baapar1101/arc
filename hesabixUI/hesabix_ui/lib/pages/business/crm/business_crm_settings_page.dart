@@ -35,6 +35,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   late final CrmChatService _svc;
   bool _loading = true;
   bool _allowFiles = false;
+  bool _allowVoice = false;
   bool _saving = false;
   List<dynamic> _widgets = [];
 
@@ -56,7 +57,13 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     return s['allow_visitor_file_upload'] != false;
   }
 
-  Map<String, dynamic> _mergeWidgetSettings(Map<String, dynamic> w, bool allowVisitorFile) {
+  static bool _visitorVoiceAllowedInWidgetSettings(Map<String, dynamic> w) {
+    final s = w['settings'];
+    if (s is! Map) return true;
+    return s['allow_visitor_voice'] != false;
+  }
+
+  Map<String, dynamic> _mergeWidgetSettings(Map<String, dynamic> w, bool allowVisitorFile, bool allowVisitorVoice) {
     final prev = w['settings'];
     final m = <String, dynamic>{};
     if (prev is Map) {
@@ -69,6 +76,11 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     } else {
       m['allow_visitor_file_upload'] = false;
     }
+    if (allowVisitorVoice) {
+      m.remove('allow_visitor_voice');
+    } else {
+      m['allow_visitor_voice'] = false;
+    }
     return m;
   }
 
@@ -77,43 +89,25 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     if (mounted) SnackBarHelper.show(context, message: successMsg);
   }
 
-  Future<void> _load() async {
-    if (!widget.authStore.canReadSection('crm')) return;
-    setState(() => _loading = true);
-    try {
-      final d = await _svc.getCrmSettings(businessId: widget.businessId);
-      List<dynamic> w = [];
-      if (widget.authStore.canViewCrmWebChat()) {
-        w = await _svc.listWidgets(businessId: widget.businessId);
-      }
-      if (!mounted) return;
-      setState(() {
-        _allowFiles = d['allow_web_chat_file_upload'] == true;
-        _widgets = w;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      SnackBarHelper.show(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-        isError: true,
-      );
-    }
-  }
-
-  Future<void> _save(bool v) async {
+  Future<void> _persistCrmFlags({
+    required bool files,
+    required bool voice,
+  }) async {
     if (!widget.authStore.canWriteSection('crm')) {
       SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
       return;
     }
     setState(() => _saving = true);
     try {
-      await _svc.updateCrmSettings(businessId: widget.businessId, allowWebChatFileUpload: v);
+      await _svc.updateCrmSettings(
+        businessId: widget.businessId,
+        allowWebChatFileUpload: files,
+        allowWebChatVoice: voice,
+      );
       if (!mounted) return;
       setState(() {
-        _allowFiles = v;
+        _allowFiles = files;
+        _allowVoice = voice;
         _saving = false;
       });
       SnackBarHelper.show(context, message: 'ذخیره شد');
@@ -128,6 +122,37 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
       }
     }
   }
+
+  Future<void> _load() async {
+    if (!widget.authStore.canReadSection('crm')) return;
+    setState(() => _loading = true);
+    try {
+      final d = await _svc.getCrmSettings(businessId: widget.businessId);
+      List<dynamic> w = [];
+      if (widget.authStore.canViewCrmWebChat()) {
+        w = await _svc.listWidgets(businessId: widget.businessId);
+      }
+      if (!mounted) return;
+      setState(() {
+        _allowFiles = d['allow_web_chat_file_upload'] == true;
+        _allowVoice = d['allow_web_chat_voice'] == true;
+        _widgets = w;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      SnackBarHelper.show(
+        context,
+        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _setAllowFiles(bool v) async => _persistCrmFlags(files: v, voice: _allowVoice);
+
+  Future<void> _setAllowVoice(bool v) async => _persistCrmFlags(files: _allowFiles, voice: v);
 
   Future<void> _createWidgetDialog() async {
     if (!widget.authStore.canManageCrmWebChatWidgets()) {
@@ -145,27 +170,43 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
         nameController: nameCtrl,
         originsController: originsCtrl,
         initialAllowVisitorFile: true,
+        initialAllowVisitorVoice: true,
         initialIsActive: true,
         businessFileUploadEnabled: _allowFiles,
+        businessVoiceUploadEnabled: _allowVoice,
       ),
     );
     try {
       if (res == null || res['save'] != true || !mounted) return;
       final allowFile = res['allow_visitor_file'] == true;
+      final allowVs = res['allow_visitor_voice'] == true;
+
+      Map<String, dynamic>? merged;
+      if (_allowFiles || _allowVoice) {
+        merged = {};
+        if (_allowFiles && !allowFile) {
+          merged['allow_visitor_file_upload'] = false;
+        }
+        if (_allowVoice && !allowVs) {
+          merged['allow_visitor_voice'] = false;
+        }
+        if (merged.isEmpty) {
+          merged = null;
+        }
+      }
+
       final raw = originsCtrl.text.trim();
       List<String>? origins;
       if (raw.isNotEmpty) {
         origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       }
-      final Map<String, dynamic>? st = _allowFiles
-          ? (allowFile ? null : <String, dynamic>{'allow_visitor_file_upload': false})
-          : null;
+
       final t0 = AppLocalizations.of(context);
       await _svc.createWidget(
         businessId: widget.businessId,
         name: nameCtrl.text.trim().isEmpty ? t0.crmWebChatDefaultWidgetName : nameCtrl.text.trim(),
         allowedOrigins: origins,
-        settings: st,
+        settings: merged,
       );
       await _load();
       if (mounted) {
@@ -206,13 +247,16 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
         nameController: nameCtrl,
         originsController: originsCtrl,
         initialAllowVisitorFile: _visitorFileAllowedInWidgetSettings(w),
+        initialAllowVisitorVoice: _visitorVoiceAllowedInWidgetSettings(w),
         initialIsActive: w['is_active'] == true,
         businessFileUploadEnabled: _allowFiles,
+        businessVoiceUploadEnabled: _allowVoice,
       ),
     );
     try {
       if (res == null || res['save'] != true || !mounted) return;
       final allowFile = res['allow_visitor_file'] == true;
+      final allowVs = res['allow_visitor_voice'] == true;
       final isActive = res['is_active'] == true;
       final raw = originsCtrl.text.trim();
       List<String>? origins;
@@ -226,7 +270,9 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
         widgetId: id,
         name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
         allowedOrigins: origins,
-        settings: _allowFiles ? _mergeWidgetSettings(w, allowFile) : null,
+        settings: (!_allowFiles && !_allowVoice)
+            ? null
+            : _mergeWidgetSettings(w, allowFile, allowVs),
         isActive: isActive,
       );
       await _load();
@@ -275,19 +321,29 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
               padding: const EdgeInsets.all(16),
               children: [
                 Card(
-                  child: SwitchListTile(
-                    title: const Text('ارسال فایل در چت وب'),
-                    subtitle: const Text(
-                      'اگر فعال باشد، بازدیدکنندگان ویجت چت روی سایت شما می‌توانند فایل بفرستند. '
-                      'نیاز به پلن فضای ذخیره‌سازی فعال و ظرفیت کافی دارد؛ در غیر این صورت برای بازدیدکننده خطا نمایش داده می‌شود و به مالک کسب‌وکار اطلاع داده می‌شود.',
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SwitchListTile(
+                          title: const Text('ارسال فایل در چت وب'),
+                          subtitle: const Text(
+                            'اگر فعال باشد، بازدیدکنندگان ویجت چت می‌توانند تصویر و فایل بفرستند. '
+                            'نیاز به پلن فضای ذخیره‌سازی فعال و ظرفیت کافی دارد.',
+                          ),
+                          value: _allowFiles,
+                          onChanged: (!canWrite || _saving) ? null : (v) => unawaited(_setAllowFiles(v)),
+                        ),
+                        const Divider(height: 1),
+                        SwitchListTile(
+                          title: Text(t.crmSettingsWebChatVoiceTitle),
+                          subtitle: Text(t.crmSettingsWebChatVoiceSubtitle),
+                          value: _allowVoice,
+                          onChanged: (!canWrite || _saving) ? null : (v) => unawaited(_setAllowVoice(v)),
+                        ),
+                      ],
                     ),
-                    value: _allowFiles,
-                    onChanged: (!canWrite || _saving)
-                        ? null
-                        : (v) {
-                            setState(() => _allowFiles = v);
-                            _save(v);
-                          },
                   ),
                 ),
                 if (widget.authStore.canViewCrmWebChat()) ...[
@@ -349,11 +405,17 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                               final name = w['name']?.toString() ?? t.crmWebChatDefaultWidgetName;
                               final active = w['is_active'] == true;
                               final guestFile = _visitorFileAllowedInWidgetSettings(w);
+                              final guestVoice = _visitorVoiceAllowedInWidgetSettings(w);
                               final fileHint = !_allowFiles
                                   ? t.crmWebChatVisitorAttachmentCrmOff
                                   : (guestFile
                                       ? t.crmWebChatVisitorAttachmentAllowed
                                       : t.crmWebChatVisitorAttachmentWidgetOff);
+                              final voiceHint = !_allowVoice
+                                  ? t.crmWebChatVisitorVoiceSwitchOff
+                                  : (guestVoice
+                                      ? t.crmWebChatVisitorVoiceSwitchOn
+                                      : t.crmWebChatVisitorVoiceOffWidget);
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 elevation: 0,
@@ -376,6 +438,14 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                                       const SizedBox(height: 4),
                                       Text(
                                         fileHint,
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        voiceHint,
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: cs.onSurfaceVariant,
                                           height: 1.3,

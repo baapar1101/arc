@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/number_normalizer.dart';
+import '../money/amount_field_words_tooltip.dart';
 
 class CommissionAmountField extends StatefulWidget {
   final double? initialValue;
@@ -8,6 +9,7 @@ class CommissionAmountField extends StatefulWidget {
   final bool isRequired;
   final String label;
   final String hintText;
+  final String currencyUnit;
 
   const CommissionAmountField({
     super.key,
@@ -16,6 +18,7 @@ class CommissionAmountField extends StatefulWidget {
     this.isRequired = false,
     this.label = 'مبلغ کارمزد',
     this.hintText = 'مثال: 100000',
+    this.currencyUnit = 'ریال',
   });
 
   @override
@@ -72,36 +75,40 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
+    return AmountFieldWordsTooltip(
       controller: _controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        const EnglishDigitsFormatter(),
-        const ThousandsSeparatorInputFormatter(allowDecimal: true),
-      ],
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hintText,
-        prefixIcon: Icon(
-          Icons.attach_money,
-          color: Theme.of(context).colorScheme.primary,
+      currencyUnit: widget.currencyUnit,
+      child: TextFormField(
+        controller: _controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          const EnglishDigitsFormatter(),
+          const ThousandsSeparatorInputFormatter(allowDecimal: true),
+        ],
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          prefixIcon: Icon(
+            Icons.attach_money,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          errorText: _errorText,
+          errorStyle: TextStyle(
+            color: Theme.of(context).colorScheme.error,
+            fontSize: 12,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        errorText: _errorText,
-        errorStyle: TextStyle(
-          color: Theme.of(context).colorScheme.error,
-          fontSize: 12,
-        ),
+        onChanged: _validateAndUpdate,
+        validator: (value) {
+          if (widget.isRequired && (value == null || value.isEmpty)) {
+            return 'این فیلد الزامی است';
+          }
+          return _errorText;
+        },
       ),
-      onChanged: _validateAndUpdate,
-      validator: (value) {
-        if (widget.isRequired && (value == null || value.isEmpty)) {
-          return 'این فیلد الزامی است';
-        }
-        return _errorText;
-      },
     );
   }
 }

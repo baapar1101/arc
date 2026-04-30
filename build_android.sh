@@ -4,9 +4,20 @@ set -euo pipefail
 
 # Build script for Flutter Android in this repo.
 # Creates Android App Bundle (AAB) and APK files for release.
+#
+# Mirrors & defaults align with deploy.sh:
+#   - Pub / engine artifacts: f.mirror.hesabix.ir (override with PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL)
+#   - Flutter Linux SDK tarball: shell.hesabix.ir (override with FLUTTER_SDK_TARBALL_URL)
+#   - Git fallbacks for SDK: FLUTTER_SDK_GIT_URL, then Tsinghua, then Gitee
+# Env FLUTTER_SDK_INSTALL_DIR: extract/clone SDK here when not root (default: REPO_ROOT/.flutter_sdk)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
+
+# Hesabix mirrors (defaults; overridden if corresponding env vars are already set)
+DEFAULT_PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
+DEFAULT_FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
+DEFAULT_FLUTTER_SDK_TARBALL_URL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
 
 DEFAULT_MODE="release" # debug|profile|release
 DEFAULT_BUILD_AAB=true
@@ -43,6 +54,13 @@ Options:
   --install-deps     Install dependencies before building.
   -h, --help         Show help.
 
+Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
+  PUB_HOSTED_URL              Dart pub mirror (default: $DEFAULT_PUB_HOSTED_URL)
+  FLUTTER_STORAGE_BASE_URL    Flutter engine/storage mirror (default: $DEFAULT_FLUTTER_STORAGE_BASE_URL)
+  FLUTTER_SDK_TARBALL_URL     Linux SDK tarball URL (default: $DEFAULT_FLUTTER_SDK_TARBALL_URL)
+  FLUTTER_SDK_INSTALL_DIR     Where to extract/clone SDK if missing (default: /opt/flutter as root, else REPO_ROOT/.flutter_sdk)
+  FLUTTER_SDK_GIT_URL         Preferred git mirror if GitHub clone fails
+
 Usage examples:
   ./build_android.sh
   ./build_android.sh --mode release --clean
@@ -58,21 +76,148 @@ die() { echo "[error] $*" >&2; exit 1; }
 
 cmd_exists() { command -v "$1" >/dev/null 2>&1; }
 
-ensure_flutter_in_path() {
-  if cmd_exists flutter; then
+set_flutter_mirror_env() {
+  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-$DEFAULT_PUB_HOSTED_URL}"
+  export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-$DEFAULT_FLUTTER_STORAGE_BASE_URL}"
+}
+
+uses_non_google_flutter_storage() {
+  case "${FLUTTER_STORAGE_BASE_URL:-}" in
+    *storage.googleapis.com*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+flutter_sdk_install_dir() {
+  if [ -n "${FLUTTER_SDK_INSTALL_DIR:-}" ]; then
+    printf '%s' "$FLUTTER_SDK_INSTALL_DIR"
     return 0
   fi
-  local SNAP_FLUTTER_BIN="$HOME/snap/flutter/common/flutter/bin"
-  if [ -d "$SNAP_FLUTTER_BIN" ]; then
-    export PATH="$PATH:$SNAP_FLUTTER_BIN"
+  if [ "$(id -u)" -eq 0 ]; then
+    printf '%s' "/opt/flutter"
+    return 0
   fi
-  local FLUTTER_SDK_PATH="${FLUTTER_SDK_PATH:-/root/flutter}"
-  if [ -d "$FLUTTER_SDK_PATH/bin" ]; then
-    export PATH="$PATH:$FLUTTER_SDK_PATH/bin"
+  printf '%s' "$REPO_ROOT/.flutter_sdk"
+}
+
+# Prefer Hesabix internal tarball then git mirrors (same order as deploy.sh); respects mirrors for pub/engine.
+ensure_flutter_sdk() {
+  local opt_flutter="/opt/flutter/bin"
+  local install_parent install_target tarball_url use_mirror=0
+
+  set_flutter_mirror_env
+
+  if uses_non_google_flutter_storage; then
+    use_mirror=1
   fi
-  if ! cmd_exists flutter; then
-    die "Flutter not found. Please install it or configure PATH. Suggested path: $FLUTTER_SDK_PATH/bin"
+
+  if [ "$use_mirror" -eq 1 ]; then
+    if cmd_exists flutter; then
+      return 0
+    fi
+    if [ -x "${opt_flutter}/flutter" ]; then
+      export PATH="${opt_flutter}:$PATH"
+      git config --global --add safe.directory /opt/flutter 2>/dev/null || true
+      return 0
+    fi
+  else
+    if cmd_exists flutter; then
+      return 0
+    fi
+    if [ -x "${opt_flutter}/flutter" ]; then
+      export PATH="${opt_flutter}:$PATH"
+      git config --global --add safe.directory /opt/flutter 2>/dev/null || true
+      return 0
+    fi
+    local SNAP_FLUTTER_BIN="$HOME/snap/flutter/common/flutter/bin"
+    if [ -d "$SNAP_FLUTTER_BIN" ]; then
+      export PATH="$PATH:$SNAP_FLUTTER_BIN"
+    fi
+    if [ -d "${HOME}/snap/flutter/current/flutter/bin" ] && [ -x "${HOME}/snap/flutter/current/flutter/bin/flutter" ]; then
+      export PATH="${HOME}/snap/flutter/current/flutter/bin:$PATH"
+    fi
+    if cmd_exists flutter; then
+      return 0
+    fi
+    local legacy="${FLUTTER_SDK_PATH:-/root/flutter}"
+    if [ -d "${legacy}/bin" ]; then
+      export PATH="$PATH:${legacy}/bin"
+    fi
+    if cmd_exists flutter; then
+      return 0
+    fi
   fi
+
+  tarball_url="${FLUTTER_SDK_TARBALL_URL:-$DEFAULT_FLUTTER_SDK_TARBALL_URL}"
+  install_target="$(flutter_sdk_install_dir)"
+  install_parent="$(dirname "$install_target")"
+
+  if [ ! -d "$install_target" ] || [ ! -x "$install_target/bin/flutter" ]; then
+    warn "Flutter not found; trying internal SDK tarball: $tarball_url"
+    mkdir -p "$install_parent" 2>/dev/null || true
+    cmd_exists curl || die "curl is required to download Flutter SDK"
+    local tmp_tar
+    tmp_tar="$(mktemp "${TMPDIR:-/tmp}/flutter_sdk.tar.XXXXXX.xz")"
+    if curl -sfL --connect-timeout 15 --max-time 600 -o "$tmp_tar" "$tarball_url"; then
+      if tar -xJf "$tmp_tar" -C "$install_parent" 2>/dev/null; then
+        rm -f "$tmp_tar"
+        if [ ! -x "$install_target/bin/flutter" ]; then
+          local single_dir
+          single_dir=$(ls -1 "$install_parent" 2>/dev/null | grep -E '^flutter' | head -1 || true)
+          if [ -n "$single_dir" ] && [ -d "$install_parent/$single_dir/bin" ] && [ -x "$install_parent/$single_dir/bin/flutter" ]; then
+            rm -rf "$install_target" 2>/dev/null || true
+            mv "$install_parent/$single_dir" "$install_target"
+          fi
+        fi
+      else
+        rm -f "$tmp_tar"
+        warn "Failed to extract Flutter tarball"
+      fi
+    else
+      rm -f "$tmp_tar"
+      warn "Internal tarball not available from $tarball_url"
+    fi
+  fi
+
+  if [ -x "$install_target/bin/flutter" ]; then
+    export PATH="$install_target/bin:$PATH"
+    git config --global --add safe.directory "$install_target" 2>/dev/null || true
+    return 0
+  fi
+
+  if [ "$use_mirror" -eq 0 ] && cmd_exists snap && ! snap list flutter 2>/dev/null | grep -q flutter; then
+    warn "Trying: snap install flutter --classic (may use Google storage)"
+    if snap install flutter --classic 2>/dev/null; then
+      export PATH="/snap/bin:$PATH"
+      cmd_exists flutter && return 0
+    fi
+  fi
+
+  warn "Installing Flutter SDK via git clone into $install_target ..."
+  mkdir -p "$install_parent"
+  cmd_exists git || die "git is required to clone Flutter SDK"
+  rm -rf "$install_target" 2>/dev/null || true
+  local cloned=0
+  if git clone --depth 1 --branch stable "https://github.com/flutter/flutter.git" "$install_target" 2>/dev/null; then
+    cloned=1
+  else
+    local repo_url
+    for repo_url in "${FLUTTER_SDK_GIT_URL:-}" \
+      "https://mirrors.tuna.tsinghua.edu.cn/git/flutter-sdk.git" \
+      "https://gitee.com/mirrors/Flutter.git"; do
+      [ -z "$repo_url" ] && continue
+      if git clone --depth 1 --branch stable "$repo_url" "$install_target" 2>/dev/null; then
+        cloned=1
+        break
+      fi
+      rm -rf "$install_target" 2>/dev/null || true
+    done
+  fi
+  [ "$cloned" -eq 1 ] || die "Flutter SDK install failed. Set FLUTTER_SDK_PATH or install Flutter manually."
+
+  export PATH="$install_target/bin:$PATH"
+  git config --global --add safe.directory "$install_target" 2>/dev/null || true
+  cmd_exists flutter || die "Flutter binary missing after clone: $install_target/bin/flutter"
 }
 
 is_flutter_project_dir() {
@@ -162,7 +307,8 @@ case "$MODE" in
   *) die "Invalid mode: $MODE (allowed: debug|profile|release)" ;;
 esac
 
-ensure_flutter_in_path
+set_flutter_mirror_env
+ensure_flutter_sdk
 
 APP_DIR="$(auto_detect_project_dir)"
 
@@ -176,9 +322,6 @@ echo "Universal APK: $BUILD_UNIVERSAL_APK"
 echo "Split APK: $BUILD_SPLIT_APK"
 
 cd "$APP_DIR"
-
-export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
-export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 
 echo "Using Pub Hosted URL: $PUB_HOSTED_URL"
 echo "Using Flutter Storage URL: $FLUTTER_STORAGE_BASE_URL"

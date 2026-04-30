@@ -21,6 +21,7 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/money/amount_field_words_tooltip.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
   final int businessId;
@@ -1343,26 +1344,30 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 180,
-                  child: TextFormField(
+                  child: AmountFieldWordsTooltip(
                     controller: _amountController,
-                    decoration: InputDecoration(
-                      labelText: t.amount,
-                      hintText: '1,000,000',
+                    currencyUnit: 'ریال',
+                    child: TextFormField(
+                      controller: _amountController,
+                      decoration: InputDecoration(
+                        labelText: t.amount,
+                        hintText: '1,000,000',
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: false),
+                      ],
+                      validator: (v) {
+                        final val = parseFormattedDouble(v);
+                        if (val == null || val <= 0) return t.mustBePositiveNumber;
+                        return null;
+                      },
+                      onChanged: (v) {
+                        final val = parseFormattedDouble(v) ?? 0;
+                        widget.onChanged(widget.line.copyWith(amount: val));
+                      },
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      EnglishDigitsFormatter(),
-                      ThousandsSeparatorInputFormatter(allowDecimal: false),
-                    ],
-                    validator: (v) {
-                      final val = parseFormattedDouble(v);
-                      if (val == null || val <= 0) return t.mustBePositiveNumber;
-                      return null;
-                    },
-                    onChanged: (v) {
-                      final val = parseFormattedDouble(v) ?? 0;
-                      widget.onChanged(widget.line.copyWith(amount: val));
-                    },
                   ),
                 ),
                 const SizedBox(width: 8),

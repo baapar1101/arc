@@ -21550,6 +21550,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read'**
   String get crmWebChatTooltipMessageRead;
+
+  /// No description provided for @crmSettingsWebChatVoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages in web chat'**
+  String get crmSettingsWebChatVoiceTitle;
+
+  /// No description provided for @crmSettingsWebChatVoiceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice clips count toward your storage plan like other uploads.'**
+  String get crmSettingsWebChatVoiceSubtitle;
+
+  /// No description provided for @crmWebChatVisitorVoiceSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let visitors send voice messages'**
+  String get crmWebChatVisitorVoiceSwitchTitle;
+
+  /// No description provided for @crmWebChatVisitorVoiceSwitchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow CRM and storage limits. Per-widget toggle off if needed.'**
+  String get crmWebChatVisitorVoiceSwitchOn;
+
+  /// No description provided for @crmWebChatVisitorVoiceSwitchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice upload is disabled in CRM settings or limited for this widget.'**
+  String get crmWebChatVisitorVoiceSwitchOff;
+
+  /// No description provided for @crmWebChatVoiceDisabledCrm.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages are disabled in CRM settings for this business'**
+  String get crmWebChatVoiceDisabledCrm;
+
+  /// No description provided for @crmWebChatComposerDropTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to send'**
+  String get crmWebChatComposerDropTarget;
+
+  /// No description provided for @crmWebChatMicRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording…'**
+  String get crmWebChatMicRecording;
+
+  /// No description provided for @crmWebChatMicStopSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop & send'**
+  String get crmWebChatMicStopSend;
+
+  /// No description provided for @crmWebChatMicUnavailableWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice capture is unavailable in this browser build; attach a file instead'**
+  String get crmWebChatMicUnavailableWeb;
+
+  /// No description provided for @crmWebChatVisitorVoiceOffWidget.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest voice disabled'**
+  String get crmWebChatVisitorVoiceOffWidget;
 }
 
 class _AppLocalizationsDelegate

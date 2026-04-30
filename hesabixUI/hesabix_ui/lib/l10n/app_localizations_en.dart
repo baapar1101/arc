@@ -11577,4 +11577,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmWebChatTooltipMessageRead => 'Read';
+
+  @override
+  String get crmSettingsWebChatVoiceTitle => 'Voice messages in web chat';
+
+  @override
+  String get crmSettingsWebChatVoiceSubtitle =>
+      'Voice clips count toward your storage plan like other uploads.';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchTitle =>
+      'Let visitors send voice messages';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchOn =>
+      'Follow CRM and storage limits. Per-widget toggle off if needed.';
+
+  @override
+  String get crmWebChatVisitorVoiceSwitchOff =>
+      'Voice upload is disabled in CRM settings or limited for this widget.';
+
+  @override
+  String get crmWebChatVoiceDisabledCrm =>
+      'Voice messages are disabled in CRM settings for this business';
+
+  @override
+  String get crmWebChatComposerDropTarget => 'Drop to send';
+
+  @override
+  String get crmWebChatMicRecording => 'Recording…';
+
+  @override
+  String get crmWebChatMicStopSend => 'Stop & send';
+
+  @override
+  String get crmWebChatMicUnavailableWeb =>
+      'Voice capture is unavailable in this browser build; attach a file instead';
+
+  @override
+  String get crmWebChatVisitorVoiceOffWidget => 'Guest voice disabled';
 }

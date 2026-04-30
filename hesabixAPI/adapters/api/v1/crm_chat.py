@@ -53,7 +53,10 @@ async def patch_crm_business_settings(
 	_: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
 	s = chat_svc.update_crm_business_settings(
-		db, business_id, allow_web_chat_file_upload=body.allow_web_chat_file_upload
+		db,
+		business_id,
+		allow_web_chat_file_upload=body.allow_web_chat_file_upload,
+		allow_web_chat_voice=body.allow_web_chat_voice,
 	)
 	return success_response(data=_fmt(request, chat_svc.business_crm_settings_to_dict(s)), request=request, message="CRM_CHAT_SETTINGS_SAVED")
 

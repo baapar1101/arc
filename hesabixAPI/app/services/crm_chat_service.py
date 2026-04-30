@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from sqlalchemy import and_, delete, desc, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException, UploadFile
@@ -19,6 +20,7 @@ from fastapi import HTTPException, UploadFile
 from adapters.db.models.business import Business
 from adapters.db.models.business_crm_settings import BusinessCrmSettings
 from adapters.db.models.crm_chat import CrmChatConversation, CrmChatMessage, CrmChatWidget
+from adapters.db.models.messenger_operator_session import MessengerOperatorSession
 from adapters.db.models.file_storage import FileStorage
 from adapters.db.models.user import User
 from app.core.responses import ApiError
@@ -140,6 +142,28 @@ def visitor_file_upload_effective_for_widget(db: Session, w: CrmChatWidget) -> b
 	return True
 
 
+def visitor_voice_effective_for_widget(db: Session, w: CrmChatWidget) -> bool:
+	"""پس از فعال بودن سطح کسب‌وکار، می‌توان با settings ویجت قطع کرد."""
+	s = get_or_create_crm_settings(db, w.business_id)
+	if not bool(getattr(s, "allow_web_chat_voice", False)):
+		return False
+	st = w.settings or {}
+	if st.get("allow_visitor_voice") is False:
+		return False
+	return True
+
+
+def _upload_likely_audio(*, content_type: Optional[str], filename: Optional[str]) -> bool:
+	ct = (content_type or "").strip().lower()
+	if ct.startswith("audio/"):
+		return True
+	fn = (filename or "").lower()
+	for ext in (".webm", ".weba", ".ogg", ".oga", ".opus", ".mp3", ".m4a", ".aac", ".wav", ".flac"):
+		if fn.endswith(ext):
+			return True
+	return False
+
+
 def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
 	return {
 		"id": c.id,
@@ -205,7 +229,11 @@ def _message_to_dict_enriched(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
 def get_or_create_crm_settings(db: Session, business_id: int) -> BusinessCrmSettings:
 	row = db.get(BusinessCrmSettings, business_id)
 	if not row:
-		row = BusinessCrmSettings(business_id=business_id, allow_web_chat_file_upload=False)
+		row = BusinessCrmSettings(
+			business_id=business_id,
+			allow_web_chat_file_upload=False,
+			allow_web_chat_voice=False,
+		)
 		db.add(row)
 		db.commit()
 		db.refresh(row)
@@ -216,15 +244,23 @@ def business_crm_settings_to_dict(s: BusinessCrmSettings) -> Dict[str, Any]:
 	return {
 		"business_id": s.business_id,
 		"allow_web_chat_file_upload": bool(s.allow_web_chat_file_upload),
+		"allow_web_chat_voice": bool(getattr(s, "allow_web_chat_voice", False)),
 		"updated_at": s.updated_at,
 	}
 
 
 def update_crm_business_settings(
-	db: Session, business_id: int, *, allow_web_chat_file_upload: bool
+	db: Session,
+	business_id: int,
+	*,
+	allow_web_chat_file_upload: Optional[bool] = None,
+	allow_web_chat_voice: Optional[bool] = None,
 ) -> BusinessCrmSettings:
 	row = get_or_create_crm_settings(db, business_id)
-	row.allow_web_chat_file_upload = allow_web_chat_file_upload
+	if allow_web_chat_file_upload is not None:
+		row.allow_web_chat_file_upload = allow_web_chat_file_upload
+	if allow_web_chat_voice is not None:
+		row.allow_web_chat_voice = allow_web_chat_voice
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
@@ -518,7 +554,22 @@ async def post_visitor_file(
 	wgt = db.get(CrmChatWidget, c.widget_id)
 	if not wgt:
 		raise ApiError("CRM_CHAT_WIDGET_NOT_FOUND", "Widget not found", http_status=404)
-	if not visitor_file_upload_effective_for_widget(db, wgt):
+	is_aud = _upload_likely_audio(content_type=getattr(upload, "content_type", None), filename=upload.filename)
+	if is_aud:
+		if not visitor_voice_effective_for_widget(db, wgt):
+			bsettings = get_or_create_crm_settings(db, c.business_id)
+			if not bool(getattr(bsettings, "allow_web_chat_voice", False)):
+				raise ApiError(
+					"CRM_VOICE_UPLOAD_DISABLED",
+					"Voice messages are not enabled for web chat for this business.",
+					http_status=403,
+				)
+			raise ApiError(
+				"WIDGET_VOICE_UPLOAD_DISABLED",
+				"Voice messages by visitors are disabled for this widget.",
+				http_status=403,
+			)
+	elif not visitor_file_upload_effective_for_widget(db, wgt):
 		bsettings = get_or_create_crm_settings(db, c.business_id)
 		if not bsettings.allow_web_chat_file_upload:
 			raise ApiError(
@@ -640,6 +691,15 @@ async def post_agent_message(
 		fs = _assert_crm_file_for_conversation(
 			db, business_id=business_id, conversation_id=conversation_id, file_id=str(file_storage_id).strip()
 		)
+		mime_ag = (fs.mime_type or "").strip().lower()
+		if mime_ag.startswith("audio/"):
+			sv = get_or_create_crm_settings(db, business_id)
+			if not bool(getattr(sv, "allow_web_chat_voice", False)):
+				raise ApiError(
+					"CRM_VOICE_UPLOAD_DISABLED",
+					"Voice messages are not enabled for web chat for this business.",
+					http_status=403,
+				)
 		fid = str(fs.id)
 		cap = (body or "").strip()
 		bname = cap if cap else f"📎 {fs.original_name or 'file'}"
@@ -857,6 +917,15 @@ async def patch_agent_message(
 	return _message_to_dict_enriched(db, m)
 
 
+def _clear_messenger_sessions_for_conversation(db: Session, conversation_id: int) -> None:
+	"""جلوگیری از خطای FK هنگام حذف مکالمه (دیتابیسهای بدون/ondelete ناسازگار)."""
+	db.execute(
+		update(MessengerOperatorSession)
+		.where(MessengerOperatorSession.active_conversation_id == conversation_id)
+		.values(active_conversation_id=None)
+	)
+
+
 async def delete_conversation_agent(
 	db: Session,
 	business_id: int,
@@ -865,6 +934,22 @@ async def delete_conversation_agent(
 	c = _get_conversation_business(db, business_id, conversation_id)
 	cid = c.id
 	bid = c.business_id
+	_clear_messenger_sessions_for_conversation(db, cid)
+	db.delete(c)
+	try:
+		db.commit()
+	except IntegrityError:
+		db.rollback()
+		logger.exception(
+			"crm chat delete conversation failed integrity business_id=%s conversation_id=%s",
+			business_id,
+			conversation_id,
+		)
+		raise ApiError(
+			"CRM_CHAT_CONVERSATION_DELETE_FAILED",
+			"Could not delete conversation due to database constraints.",
+			http_status=409,
+		) from None
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversation.deleted",
@@ -873,8 +958,6 @@ async def delete_conversation_agent(
 	}
 	await crm_chat_realtime_manager.broadcast_conversation(cid, ev)
 	await crm_chat_realtime_manager.broadcast_business(bid, ev)
-	db.delete(c)
-	db.commit()
 	return {"id": cid, "deleted": True}
 
 
@@ -899,8 +982,27 @@ async def delete_conversations_bulk_agent(
 	total = int(db.scalar(cnt_q) or 0)
 	if total == 0:
 		return {"deleted": 0}
-	db.execute(delete(CrmChatConversation).where(base))
-	db.commit()
+	conv_ids_subq = select(CrmChatConversation.id).where(base)
+	db.execute(
+		update(MessengerOperatorSession)
+		.where(MessengerOperatorSession.active_conversation_id.in_(conv_ids_subq))
+		.values(active_conversation_id=None)
+	)
+	try:
+		db.execute(delete(CrmChatConversation).where(base))
+		db.commit()
+	except IntegrityError:
+		db.rollback()
+		logger.exception(
+			"crm chat bulk delete conversations failed integrity business_id=%s status=%s",
+			business_id,
+			status,
+		)
+		raise ApiError(
+			"CRM_CHAT_CONVERSATIONS_BULK_DELETE_FAILED",
+			"Could not delete conversations due to database constraints.",
+			http_status=409,
+		) from None
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversations.bulk_deleted",

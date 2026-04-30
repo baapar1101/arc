@@ -11,6 +11,14 @@
 	var cfg = HESABIX_CHAT;
 	var STORAGE_VERSION = 1;
 
+	function remembersPanelAcrossPages() {
+		var r = cfg.rememberPanelBetweenPages;
+		if ( typeof r === 'undefined' ) {
+			return true;
+		}
+		return r === true || r === 1 || r === '1';
+	}
+
 	function chatIsVerbose() {
 		if ( cfg && cfg.debug ) {
 			return true;
@@ -60,6 +68,7 @@
 		loadMode: cfg.loadMode,
 		hasApiBase: Boolean( cfg.apiBase && String( cfg.apiBase ).length ),
 		hasPublicKey: Boolean( cfg.publicKey && String( cfg.publicKey ).length ),
+		rememberPanel: remembersPanelAcrossPages(),
 		hint: 'برای لاگ بیشتر: ?hesabix_chat_debug=1 در URL یا localStorage.hesabix_chat_debug=1'
 	} );
 
@@ -74,6 +83,52 @@
 
 	function storageKey() {
 		return 'hesabix_wp_crm_' + STORAGE_VERSION + '_' + simpleKey( cfg.apiBase + '|' + cfg.publicKey );
+	}
+
+	function panelUiStorageKey() {
+		return 'hesabix_wp_panel_' + STORAGE_VERSION + '_' + simpleKey( cfg.apiBase + '|' + cfg.publicKey );
+	}
+
+	function readRememberedPanelOpen() {
+		if ( ! remembersPanelAcrossPages() ) {
+			return null;
+		}
+		try {
+			if ( typeof sessionStorage === 'undefined' ) {
+				return null;
+			}
+			var raw = sessionStorage.getItem( panelUiStorageKey() );
+			if ( raw === null || raw === '' ) {
+				return null;
+			}
+			if ( raw === '1' ) {
+				return true;
+			}
+			if ( raw === '0' ) {
+				return false;
+			}
+		} catch ( ePan ) {}
+		return null;
+	}
+
+	function persistRememberedPanelOpen( opened ) {
+		if ( ! remembersPanelAcrossPages() ) {
+			return;
+		}
+		try {
+			if ( typeof sessionStorage === 'undefined' ) {
+				return;
+			}
+			sessionStorage.setItem( panelUiStorageKey(), opened ? '1' : '0' );
+		} catch ( ePan2 ) {}
+	}
+
+	function clearRememberedPanelOpen() {
+		try {
+			if ( typeof sessionStorage !== 'undefined' ) {
+				sessionStorage.removeItem( panelUiStorageKey() );
+			}
+		} catch ( ePan3 ) {}
 	}
 
 	function getWsUrl() {
@@ -127,6 +182,7 @@
 		try {
 			localStorage.removeItem( storageKey() );
 		} catch ( e ) {}
+		clearRememberedPanelOpen();
 	}
 
 	function parseJsonSafe( text ) {
@@ -311,9 +367,13 @@
 		}
 	}
 
+	function visitorFileDownloadUrl( conversationId, fileId ) {
+		return apiPath( '/api/v1/public/crm-chat/conversations/' + conversationId + '/files/' + encodeURIComponent( fileId ) + '/download' );
+	}
+
 	/** دانلود فایل ضمیمه بدون گذاشتن توکن در URL (هدر X-Visitor-Token). */
 	function downloadVisitorFile( convId, token, fileId, displayName ) {
-		var u = apiPath( '/api/v1/public/crm-chat/conversations/' + convId + '/files/' + encodeURIComponent( fileId ) + '/download' );
+		var u = visitorFileDownloadUrl( convId, fileId );
 		return fetch( u, { method: 'GET', headers: visitorTokenHeaders( token ) } ).then( function ( res ) {
 			if ( ! res.ok ) {
 				return res.text().then( function ( text ) {
@@ -403,7 +463,8 @@
 		agentJoinBannerText: '',
 		visitorTypingSendTimer: null,
 		visitorTypingStopTimer: null,
-		pageUrlReportTimer: null
+		pageUrlReportTimer: null,
+		visitorOpts: { allowFile: false, allowVoice: false }
 	};
 
 	/** همگام‌سازی نشانی صفحهٔ فعلی با سرور (SPA: pushState/popstate/hashchange + interval). */
@@ -750,7 +811,9 @@
 	host.appendChild( root );
 
 	function setupVisitorFileUpload() {
-		if ( ! cfg.showFileUpload ) {
+		var wantsFileUi = !!( cfg.showFileUpload );
+		var wantsVoiceUi = !!( cfg.showVoiceMessage );
+		if ( ! wantsFileUi && ! wantsVoiceUi ) {
 			return;
 		}
 		var base = ( cfg.apiBase || '' ).replace( /\/$/, '' );
@@ -771,32 +834,123 @@
 					return;
 				}
 				var wrapD = j.data !== undefined && j.data !== null ? j.data : j;
-				if ( ! wrapD || ! wrapD.allow_file_upload ) {
+				if ( ! wrapD ) {
 					return;
 				}
-				var fileRow = document.createElement( 'div' );
-				fileRow.className = 'hesabix-chat-file-row';
-				var finp = document.createElement( 'input' );
-				finp.type = 'file';
-				finp.className = 'hesabix-chat-attach';
-				finp.setAttribute( 'aria-label', ( cfg.strings && cfg.strings.attach ) || '' );
-				fileRow.appendChild( finp );
-				comp.appendChild( fileRow );
-				finp.addEventListener( 'change', function ( ev ) {
-					var f = ev.target && ev.target.files && ev.target.files[0];
-					if ( ! f || ! state.session ) {
-						return;
-					}
-					showFormError( errC, '' );
-					postFile( state.session.conversation_id, state.session.visitor_token, f, '' )
-						.then( function () {
-							ev.target.value = '';
-							return refreshMessages();
-						} )
-						.catch( function ( e ) {
-							showFormError( errC, e.message || cfg.strings.errorGeneric );
+				state.visitorOpts.allowFile = !! wrapD.allow_file_upload;
+				state.visitorOpts.allowVoice = !! wrapD.allow_voice;
+				var effFile = !!( wantsFileUi && state.visitorOpts.allowFile );
+				var effVoice = !!( wantsVoiceUi && state.visitorOpts.allowVoice );
+				if ( effFile ) {
+					var fileRow = document.createElement( 'div' );
+					fileRow.className = 'hesabix-chat-file-row';
+					var finp = document.createElement( 'input' );
+					finp.type = 'file';
+					finp.className = 'hesabix-chat-attach';
+					finp.setAttribute( 'aria-label', ( cfg.strings && cfg.strings.attach ) || '' );
+					fileRow.appendChild( finp );
+					comp.appendChild( fileRow );
+					finp.addEventListener( 'change', function ( ev ) {
+						var f = ev.target && ev.target.files && ev.target.files[0];
+						if ( ! f || ! state.session ) {
+							return;
+						}
+						showFormError( errC, '' );
+						postFile( state.session.conversation_id, state.session.visitor_token, f, '' )
+							.then( function () {
+								ev.target.value = '';
+								return refreshMessages();
+							} )
+							.catch( function ( e ) {
+								showFormError( errC, e.message || cfg.strings.errorGeneric );
+							} );
+					} );
+				}
+				if ( effVoice ) {
+					var micRow = document.createElement( 'div' );
+					micRow.className = 'hesabix-chat-voice-row';
+					var vin = document.createElement( 'input' );
+					vin.type = 'file';
+					vin.accept = 'audio/*';
+					try {
+						vin.capture = 'user';
+					} catch ( ig ) {}
+					vin.className = 'hesabix-chat-voice-file';
+					vin.setAttribute( 'aria-label', ( cfg.strings && cfg.strings.voicePick ) ? String( cfg.strings.voicePick ) : 'Voice' );
+					micRow.appendChild( vin );
+					comp.appendChild( micRow );
+					vin.addEventListener( 'change', function ( ev ) {
+						var f = ev.target && ev.target.files && ev.target.files[0];
+						if ( ! f || ! state.session ) {
+							return;
+						}
+						showFormError( errC, '' );
+						postFile( state.session.conversation_id, state.session.visitor_token, f, '' )
+							.then( function () {
+								ev.target.value = '';
+								return refreshMessages();
+							} )
+							.catch( function ( e ) {
+								showFormError( errC, e.message || cfg.strings.errorGeneric );
+							} );
+					} );
+				}
+				if ( effFile || effVoice ) {
+					comp.classList.add( 'hesabix-chat-composer--dropzone' );
+					if ( ta._hesabixPasteBound !== true ) {
+						ta._hesabixPasteBound = true;
+						ta.addEventListener( 'paste', function ( pe ) {
+							if ( ! effFile || ! state.session ) {
+								return;
+							}
+							var dt = pe.clipboardData || window.clipboardData;
+							if ( ! dt || ! dt.files || ! dt.files.length ) {
+								return;
+							}
+							var pf = dt.files[0];
+							if ( ! pf ) {
+								return;
+							}
+							pe.preventDefault();
+							showFormError( errC, '' );
+							postFile( state.session.conversation_id, state.session.visitor_token, pf, '' )
+								.then( function () {
+									return refreshMessages();
+								} )
+								.catch( function ( e ) {
+									showFormError( errC, e.message || cfg.strings.errorGeneric );
+								} );
 						} );
-				} );
+						ta.addEventListener( 'dragover', function ( de ) {
+							de.preventDefault();
+							comp.classList.add( 'hesabix-chat-dragover' );
+						} );
+						ta.addEventListener( 'dragleave', function () {
+							comp.classList.remove( 'hesabix-chat-dragover' );
+						} );
+						ta.addEventListener( 'drop', function ( de ) {
+							de.preventDefault();
+							comp.classList.remove( 'hesabix-chat-dragover' );
+							if ( ! state.session ) {
+								return;
+							}
+							var dt2 = de.dataTransfer;
+							if ( ! dt2 || ! dt2.files || ! dt2.files.length ) {
+								return;
+							}
+							var df = dt2.files[0];
+							if ( ! df ) {
+								return;
+							}
+							showFormError( errC, '' );
+							postFile( state.session.conversation_id, state.session.visitor_token, df, '' ).then( function () {
+								return refreshMessages();
+							} ).catch( function ( e ) {
+								showFormError( errC, e.message || cfg.strings.errorGeneric );
+							} );
+						} );
+					}
+				}
 			} )
 			.catch( function () {} );
 		};
@@ -1156,26 +1310,95 @@
 			var bodyP = document.createElement( 'div' );
 			bodyP.textContent = ( m.body || '' ).toString();
 			if ( m.file && m.file.original_name && m.file.id ) {
+				var fm = ( m.file.mime_type || '' ).toString().toLowerCase();
 				var fileDiv = document.createElement( 'div' );
 				fileDiv.className = 'hesabix-chat-file';
-				var dlBtn = document.createElement( 'button' );
-				dlBtn.type = 'button';
-				dlBtn.className = 'hesabix-chat-file-dl';
-				dlBtn.textContent = m.file.original_name;
-				dlBtn.addEventListener( 'click', function () {
-					if ( ! state.session ) {
-						return;
-					}
-					downloadVisitorFile(
-						state.session.conversation_id,
-						state.session.visitor_token,
-						m.file.id,
-						m.file.original_name
-					).catch( function ( e ) {
-						showFormError( errC, e.message || cfg.strings.errorGeneric );
+				var sid = state.session ? state.session.conversation_id : null;
+				var stok = state.session ? state.session.visitor_token : null;
+				if ( fm.indexOf( 'image/' ) === 0 && sid && stok ) {
+					var thumb = document.createElement( 'div' );
+					thumb.className = 'hesabix-chat-thumb';
+					var vu = visitorFileDownloadUrl( sid, m.file.id );
+					fetch( vu, {
+						method: 'GET',
+						headers: visitorTokenHeaders( stok ),
+					} )
+						.then( function ( r ) {
+							return r.blob();
+						} )
+						.then( function ( b ) {
+							var url = URL.createObjectURL( b );
+							var im = document.createElement( 'img' );
+							im.className = 'hesabix-chat-thumb-img';
+							im.alt = m.file.original_name;
+							im.src = url;
+							im.onload = function () {
+								try {
+									URL.revokeObjectURL( url );
+								} catch ( eR ) {}
+							};
+							im.addEventListener( 'click', function () {
+								downloadVisitorFile( sid, stok, m.file.id, m.file.original_name ).catch( function () {} );
+							} );
+							thumb.appendChild( im );
+						} )
+						.catch( function () {} );
+					fileDiv.appendChild( thumb );
+				} else if ( fm.indexOf( 'audio/' ) === 0 && sid && stok ) {
+					var ap = visitorFileDownloadUrl( sid, m.file.id );
+					fetch( ap, { method: 'GET', headers: visitorTokenHeaders( stok ) } )
+						.then( function ( r ) {
+							return r.blob();
+						} )
+						.then( function ( blob ) {
+							var urlA = URL.createObjectURL( blob );
+							var aud = document.createElement( 'audio' );
+							aud.controls = true;
+							aud.preload = 'metadata';
+							aud.src = urlA;
+							fileDiv.appendChild( aud );
+						} )
+						.catch( function () {} );
+				} else {
+					var dlBtn0 = document.createElement( 'button' );
+					dlBtn0.type = 'button';
+					dlBtn0.className = 'hesabix-chat-file-dl';
+					dlBtn0.textContent = m.file.original_name;
+					dlBtn0.addEventListener( 'click', function () {
+						if ( ! state.session ) {
+							return;
+						}
+						downloadVisitorFile(
+							state.session.conversation_id,
+							state.session.visitor_token,
+							m.file.id,
+							m.file.original_name
+						).catch( function ( e ) {
+							showFormError( errC, e.message || cfg.strings.errorGeneric );
+						} );
 					} );
-				} );
-				fileDiv.appendChild( dlBtn );
+					fileDiv.appendChild( dlBtn0 );
+				}
+				if ( fm.indexOf( 'image/' ) === 0 || fm.indexOf( 'audio/' ) === 0 ) {
+					var dlLink = document.createElement( 'button' );
+					dlLink.type = 'button';
+					dlLink.className = 'hesabix-chat-file-dl hesabix-chat-file-dl--sub';
+					dlLink.textContent = m.file.original_name;
+					dlLink.addEventListener( 'click', function () {
+						if ( ! state.session ) {
+							return;
+						}
+						downloadVisitorFile(
+							state.session.conversation_id,
+							state.session.visitor_token,
+							m.file.id,
+							m.file.original_name
+						).catch( function ( e ) {
+							showFormError( errC, e.message || cfg.strings.errorGeneric );
+						} );
+					} );
+					fileDiv.appendChild( dlLink );
+				}
 				bodyP.appendChild( fileDiv );
 			}
 			var small = document.createElement( 'small' );
@@ -1590,6 +1813,7 @@
 			unbindRealtime();
 			applyLauncherIdleIfNeeded();
 		}
+		persistRememberedPanelOpen( v );
 	}
 
 	btn.addEventListener( 'click', function ( ev ) {
@@ -1643,6 +1867,16 @@
 
 	function runLauncherBoot( skipRefreshOnOpen ) {
 		scheduleLauncherAttention();
+		var remembered = readRememberedPanelOpen();
+		if ( remembered === false ) {
+			return;
+		}
+		if ( remembered === true ) {
+			setTimeout( function () {
+				setOpen( true, skipRefreshOnOpen === true );
+			}, 0 );
+			return;
+		}
 		if ( ! wantsOpenOnLoad() ) {
 			return;
 		}

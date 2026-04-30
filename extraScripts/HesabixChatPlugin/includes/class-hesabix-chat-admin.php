@@ -50,6 +50,7 @@ class Hesabix_Chat_Admin {
 			'header_logo_url'      => '',
 			'rtl'                  => 'auto',
 			'show_file_upload'     => 0,
+			'show_voice_message'  => 0,
 			'email_field'         => 'required',
 			'show_page_context'   => 0,
 			'quick_replies_text'  => '',
@@ -58,6 +59,7 @@ class Hesabix_Chat_Admin {
 			'launcher_attention_delay_sec' => 3,
 			'open_panel_on_load'          => 0,
 			'open_panel_delay_sec'        => 0,
+			'remember_panel_between_pages' => 1,
 		);
 	}
 
@@ -338,6 +340,7 @@ class Hesabix_Chat_Admin {
 		$out['rtl'] = in_array( $rtl, array( 'auto', 'ltr', 'rtl' ), true ) ? $rtl : 'auto';
 
 		$out['show_file_upload'] = ! empty( $input['show_file_upload'] ) ? 1 : 0;
+		$out['show_voice_message'] = ! empty( $input['show_voice_message'] ) ? 1 : 0;
 
 		$ef = isset( $input['email_field'] ) ? (string) $input['email_field'] : (string) $defaults['email_field'];
 		$out['email_field'] = in_array( $ef, array( 'required', 'optional', 'hidden', 'auto' ), true ) ? $ef : 'required';
@@ -364,6 +367,7 @@ class Hesabix_Chat_Admin {
 		$out['launcher_attention_delay_sec'] = $this->int_range( $input['launcher_attention_delay_sec'] ?? null, 0, 600, (int) $defaults['launcher_attention_delay_sec'] );
 		$out['open_panel_on_load']   = ! empty( $input['open_panel_on_load'] ) ? 1 : 0;
 		$out['open_panel_delay_sec'] = $this->int_range( $input['open_panel_delay_sec'] ?? null, 0, 120, (int) $defaults['open_panel_delay_sec'] );
+		$out['remember_panel_between_pages'] = ! empty( $input['remember_panel_between_pages'] ) ? 1 : 0;
 
 		return $out;
 	}
@@ -695,6 +699,13 @@ class Hesabix_Chat_Admin {
 								<input name="<?php echo esc_attr( self::OPTION_NAME . '[open_panel_delay_sec]' ); ?>" type="number" id="hesabix_open_panel_delay" min="0" max="120" value="<?php echo (int) ( $o['open_panel_delay_sec'] ?? 0 ); ?>" />
 								<span class="description"><?php esc_html_e( '۰ یعنی بلافاصله پس از آماده‌شدن ویجت.', 'hesabix-chat' ); ?></span>
 							</p>
+							<p>
+								<label>
+									<input name="<?php echo esc_attr( self::OPTION_NAME . '[remember_panel_between_pages]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['remember_panel_between_pages'] ?? 1 ) ); ?> />
+									<?php esc_html_e( 'حفظ وضعیت باز یا بسته بودن پنل هنگام رفتن به صفحهٔ دیگر (در همین تب مرورگر).', 'hesabix-chat' ); ?>
+								</label>
+							</p>
+							<p class="description"><?php esc_html_e( 'اگر غیرفعال باشد، در هر بارگذاری صفحه فقط گزینهٔ «باز بودن خودکار پنل» بالا اعمال می‌شود و آخرین وضعیت پنل به خاطر سپرده نمی‌شود.', 'hesabix-chat' ); ?></p>
 						</td>
 					</tr>
 					</table>
@@ -708,6 +719,15 @@ class Hesabix_Chat_Admin {
 							<label>
 								<input name="<?php echo esc_attr( self::OPTION_NAME . '[show_file_upload]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) $o['show_file_upload'] ); ?> />
 								<?php esc_html_e( 'اجازه اتصال به ارسال فایل (ابتدا در CRM: تنظیمات چت > ارسال فایل باید فعال و فضای ذخیره‌سازی کافی باشد؛ سپس ویجت فقط اگر API تأیید کند input را نشان می‌دهد).', 'hesabix-chat' ); ?>
+							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'پیام صوتی', 'hesabix-chat' ); ?></th>
+						<td>
+							<label>
+								<input name="<?php echo esc_attr( self::OPTION_NAME . '[show_voice_message]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['show_voice_message'] ?? 0 ) ); ?> />
+								<?php esc_html_e( 'نمایش دکمهٔ ضبط؛ فقط در صورت تأیید API و فعال بودن در تنظیمات CRM و ویجت.', 'hesabix-chat' ); ?>
 							</label>
 						</td>
 					</tr>

@@ -18,6 +18,7 @@ import '../../services/product_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/invoice_line_preferences.dart';
+import '../money/amount_field_words_tooltip.dart';
 
 void _invoiceLineAttrsLog(String message) {
   if (kDebugMode) {
@@ -30,6 +31,8 @@ class InvoiceLineItemsTable extends StatefulWidget {
   final int? selectedCurrencyId; // از تب ارز فاکتور
   /// تعداد اعشار نمایش/ورود مبلغ (از تنظیمات ارز؛ ۰ = مثل ریال).
   final int currencyDecimalPlaces;
+  /// واحد پول برای tooltip «مبلغ به حروف» (قیمت واحد، تخفیف مبلغی، مبلغ مالیات).
+  final String currencyUnitLabel;
   final ValueChanged<List<InvoiceLineItem>>? onChanged;
   final String invoiceType; // sales | purchase | sales_return | purchase_return | ...
   final bool postInventory;
@@ -42,6 +45,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     required this.businessId,
     this.selectedCurrencyId,
     this.currencyDecimalPlaces = 2,
+    this.currencyUnitLabel = 'ریال',
     this.onChanged,
     this.invoiceType = 'sales',
     this.postInventory = true,
@@ -1122,6 +1126,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   invoiceType: widget.invoiceType,
                   currencyId: widget.selectedCurrencyId,
                   currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                  currencyUnitLabel: widget.currencyUnitLabel,
                   item: item,
                   onChanged: (src, price) {
                     final validatedPrice = price < 0 ? 0 : price;
@@ -1197,6 +1202,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   height: fieldHeight,
                   child: _DiscountCell(
                     currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                    currencyUnitLabel: widget.currencyUnitLabel,
                     value: item.discountValue,
                     type: item.discountType,
                     onChanged: (type, value) {
@@ -1209,6 +1215,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 const SizedBox(height: 12),
                 _TaxCell(
                   currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                  currencyUnitLabel: widget.currencyUnitLabel,
                   rate: item.taxRate,
                   taxAmount: item.taxAmount,
                   onRateChanged: (r) {
@@ -1388,6 +1395,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       invoiceType: widget.invoiceType,
                       currencyId: widget.selectedCurrencyId,
                       currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                      currencyUnitLabel: widget.currencyUnitLabel,
                       item: item,
                       onChanged: (src, price) {
                         final validatedPrice = price < 0 ? 0 : price;
@@ -1472,6 +1480,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   height: fieldHeight,
                   child: _DiscountCell(
                     currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                    currencyUnitLabel: widget.currencyUnitLabel,
                     value: item.discountValue,
                     type: item.discountType,
                     onChanged: (type, value) {
@@ -1490,6 +1499,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   height: fieldHeight,
                   child: _TaxCell(
                     currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                    currencyUnitLabel: widget.currencyUnitLabel,
                     rate: item.taxRate,
                     taxAmount: item.taxAmount,
                     onRateChanged: (r) {
@@ -1739,6 +1749,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
 class _DiscountCell extends StatefulWidget {
   final int currencyDecimalPlaces;
+  final String currencyUnitLabel;
   final String type; // percent | amount
   final num value;
   final void Function(String type, num value) onChanged;
@@ -1747,6 +1758,7 @@ class _DiscountCell extends StatefulWidget {
 
   const _DiscountCell({
     required this.currencyDecimalPlaces,
+    this.currencyUnitLabel = 'ریال',
     required this.type,
     required this.value,
     required this.onChanged,
@@ -1890,14 +1902,21 @@ class _DiscountCellState extends State<_DiscountCell> {
         ),
       ),
     );
+    final fieldOrTooltip = _type == 'amount'
+        ? AmountFieldWordsTooltip(
+            controller: _ctrl,
+            currencyUnit: widget.currencyUnitLabel,
+            child: field,
+          )
+        : field;
     return SizedBox(
       height: fieldHeight,
       child: isMobile
-          ? field
+          ? fieldOrTooltip
           : Tooltip(
               message: t.discountTypeAndValue,
               waitDuration: const Duration(milliseconds: 400),
-              child: field,
+              child: fieldOrTooltip,
             ),
     );
   }
@@ -1905,6 +1924,7 @@ class _DiscountCellState extends State<_DiscountCell> {
 
 class _TaxCell extends StatefulWidget {
   final int currencyDecimalPlaces;
+  final String currencyUnitLabel;
   final num rate; // editable percent
   final num taxAmount; // readonly
   final ValueChanged<num> onRateChanged;
@@ -1913,6 +1933,7 @@ class _TaxCell extends StatefulWidget {
 
   const _TaxCell({
     required this.currencyDecimalPlaces,
+    this.currencyUnitLabel = 'ریال',
     required this.rate,
     required this.taxAmount,
     required this.onRateChanged,
@@ -1999,14 +2020,19 @@ class _TaxCellState extends State<_TaxCell> {
       ),
     );
 
-    final amountField = TextFormField(
+    final amountField = AmountFieldWordsTooltip(
       controller: _amountCtrl,
-      readOnly: true,
-      enableInteractiveSelection: false,
-      textAlign: TextAlign.right,
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        contentPadding: fieldPadding,
+      currencyUnit: widget.currencyUnitLabel,
+      child: TextFormField(
+        controller: _amountCtrl,
+        readOnly: true,
+        enableInteractiveSelection: false,
+        textAlign: TextAlign.right,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          contentPadding: fieldPadding,
+          hintText: t.workflowFieldTaxAmount,
+        ),
       ),
     );
 
@@ -2032,7 +2058,6 @@ class _TaxCellState extends State<_TaxCell> {
     }
 
     final taxRateTooltip = '${t.tax} (${t.percent})';
-    final taxAmountTooltip = t.workflowFieldTaxAmount;
 
     return Row(
       children: [
@@ -2074,21 +2099,7 @@ class _TaxCellState extends State<_TaxCell> {
         Expanded(
           child: SizedBox(
             height: fieldHeight,
-            child: Tooltip(
-              message: taxAmountTooltip,
-              waitDuration: const Duration(milliseconds: 400),
-              child: TextFormField(
-                controller: _amountCtrl,
-                readOnly: true,
-                enableInteractiveSelection: false,
-                textAlign: TextAlign.right,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  contentPadding: fieldPadding,
-                  hintText: t.workflowFieldTaxAmount,
-                ),
-              ),
-            ),
+            child: amountField,
           ),
         ),
       ],
@@ -2101,6 +2112,7 @@ class _UnitPriceCell extends StatefulWidget {
   final String invoiceType;
   final int? currencyId;
   final int currencyDecimalPlaces;
+  final String currencyUnitLabel;
   final InvoiceLineItem item;
   final void Function(String source, num price) onChanged;
   final Future<InvoiceLineItem> Function() resolver;
@@ -2113,6 +2125,7 @@ class _UnitPriceCell extends StatefulWidget {
     required this.invoiceType,
     required this.currencyId,
     required this.currencyDecimalPlaces,
+    this.currencyUnitLabel = 'ریال',
     required this.item,
     required this.onChanged,
     required this.resolver,
@@ -2186,37 +2199,41 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     
     return SizedBox(
       height: fieldHeight,
-      child: TextFormField(
+      child: AmountFieldWordsTooltip(
         controller: _ctrl,
-        focusNode: effectiveFocusNode,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: const [
-          EnglishDigitsFormatter(),
-          ThousandsSeparatorInputFormatter(allowDecimal: true),
-        ],
-        onChanged: (v) {
-          _isUserTyping = true;
-          final price = parseFormattedDouble(v) ?? 0;
-          widget.onChanged('manual', price < 0 ? 0 : price);
-          // بعد از یک فریم، فلگ را ریست کن
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _isUserTyping = false;
-            }
-          });
-        },
-        onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-        textInputAction: TextInputAction.next,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          contentPadding: fieldPadding,
-          suffixIcon: _loading
-              ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-              : IconButton(
-                  tooltip: t.pricePickFromList,
-                  icon: const Icon(Icons.list_alt_outlined),
-                  onPressed: () => _openPricePicker(context),
-                ),
+        currencyUnit: widget.currencyUnitLabel,
+        child: TextFormField(
+          controller: _ctrl,
+          focusNode: effectiveFocusNode,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: const [
+            EnglishDigitsFormatter(),
+            ThousandsSeparatorInputFormatter(allowDecimal: true),
+          ],
+          onChanged: (v) {
+            _isUserTyping = true;
+            final price = parseFormattedDouble(v) ?? 0;
+            widget.onChanged('manual', price < 0 ? 0 : price);
+            // بعد از یک فریم، فلگ را ریست کن
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _isUserTyping = false;
+              }
+            });
+          },
+          onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            contentPadding: fieldPadding,
+            suffixIcon: _loading
+                ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
+                : IconButton(
+                    tooltip: t.pricePickFromList,
+                    icon: const Icon(Icons.list_alt_outlined),
+                    onPressed: () => _openPricePicker(context),
+                  ),
+          ),
         ),
       ),
     );

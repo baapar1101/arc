@@ -4429,5 +4429,16 @@
   "crmWebChatSocketNoKey": "No key",
   "crmWebChatPeerTyping": "Visitor is typing…",
   "crmWebChatTooltipMessageSent": "Sent",
-  "crmWebChatTooltipMessageRead": "Read"
+  "crmWebChatTooltipMessageRead": "Read",
+  "crmSettingsWebChatVoiceTitle": "Voice messages in web chat",
+  "crmSettingsWebChatVoiceSubtitle": "Voice clips count toward your storage plan like other uploads.",
+  "crmWebChatVisitorVoiceSwitchTitle": "Let visitors send voice messages",
+  "crmWebChatVisitorVoiceSwitchOn": "Follow CRM and storage limits. Per-widget toggle off if needed.",
+  "crmWebChatVisitorVoiceSwitchOff": "Voice upload is disabled in CRM settings or limited for this widget.",
+  "crmWebChatVoiceDisabledCrm": "Voice messages are disabled in CRM settings for this business",
+  "crmWebChatComposerDropTarget": "Drop to send",
+  "crmWebChatMicRecording": "Recording…",
+  "crmWebChatMicStopSend": "Stop & send",
+  "crmWebChatMicUnavailableWeb": "Voice capture is unavailable in this browser build; attach a file instead",
+  "crmWebChatVisitorVoiceOffWidget": "Guest voice disabled"
 }

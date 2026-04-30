@@ -38,6 +38,7 @@ import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, parseJsonDoubleOrNull;
+import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
@@ -4846,34 +4847,38 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       const SizedBox(height: 16),
                       
                       // مبلغ
-                      TextFormField(
+                      AmountFieldWordsTooltip(
                         controller: _amountController,
-                        decoration: const InputDecoration(
-                          labelText: 'مبلغ *',
-                          border: OutlineInputBorder(),
-                          suffixText: 'ریال',
+                        currencyUnit: 'ریال',
+                        child: TextFormField(
+                          controller: _amountController,
+                          decoration: const InputDecoration(
+                            labelText: 'مبلغ *',
+                            border: OutlineInputBorder(),
+                            suffixText: 'ریال',
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            EnglishDigitsFormatter(),
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'مبلغ الزامی است';
+                            }
+                            final cleanValue = value.replaceAll(',', '');
+                            final amount = double.tryParse(cleanValue);
+                            if (amount == null || amount <= 0) {
+                              return 'مبلغ باید عدد مثبت باشد';
+                            }
+                            // اعتبارسنجی محدودیت مبلغ
+                            if (!_validateAmount(amount)) {
+                              return 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است';
+                            }
+                            return null;
+                          },
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ThousandsSeparatorInputFormatter(allowDecimal: false),
-                        ],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'مبلغ الزامی است';
-                          }
-                          final cleanValue = value.replaceAll(',', '');
-                          final amount = double.tryParse(cleanValue);
-                          if (amount == null || amount <= 0) {
-                            return 'مبلغ باید عدد مثبت باشد';
-                          }
-                          // اعتبارسنجی محدودیت مبلغ
-                          if (!_validateAmount(amount)) {
-                            return 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است';
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 16),
                       
@@ -4997,19 +5002,23 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       if (_selectedTransactionMethod != null) const SizedBox(height: 16),
                       
                       // کارمزد
-                      TextFormField(
+                      AmountFieldWordsTooltip(
                         controller: _commissionController,
-                        decoration: const InputDecoration(
-                          labelText: 'کارمزد',
-                          border: OutlineInputBorder(),
-                          suffixText: 'ریال',
+                        currencyUnit: 'ریال',
+                        child: TextFormField(
+                          controller: _commissionController,
+                          decoration: const InputDecoration(
+                            labelText: 'کارمزد',
+                            border: OutlineInputBorder(),
+                            suffixText: 'ریال',
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            EnglishDigitsFormatter(),
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                          ],
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ThousandsSeparatorInputFormatter(allowDecimal: false),
-                        ],
                       ),
                       const SizedBox(height: 16),
                       

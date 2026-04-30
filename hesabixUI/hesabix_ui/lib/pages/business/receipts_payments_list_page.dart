@@ -31,6 +31,7 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import '../../services/business_dashboard_service.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
@@ -3294,31 +3295,35 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 180,
-                  child: TextFormField(
+                  child: AmountFieldWordsTooltip(
                     controller: _amountController,
-                    decoration: InputDecoration(
-                      labelText: t.amount,
-                      hintText: '1,000,000',
+                    currencyUnit: 'ریال',
+                    child: TextFormField(
+                      controller: _amountController,
+                      decoration: InputDecoration(
+                        labelText: t.amount,
+                        hintText: '1,000,000',
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: false),
+                      ],
+                      validator: (v) {
+                        final val = parseFormattedDouble(v);
+                        debugPrint('🟢 [PersonLineTile] validator - input: "$v", parsed: $val');
+                        if (val == null || val <= 0) return t.mustBePositiveNumber;
+                        return null;
+                      },
+                      onChanged: (v) {
+                        final controllerTextBefore = _amountController.text;
+                        final parsed = parseFormattedDouble(v);
+                        final val = parsed ?? 0;
+                        debugPrint('🟠 [PersonLineTile] onChanged - input: "$v", controller.text before: "$controllerTextBefore", parsed: $parsed, final val: $val, old line.amount: ${widget.line.amount}');
+                        widget.onChanged(widget.line.copyWith(amount: val));
+                        debugPrint('🟣 [PersonLineTile] onChanged - after widget.onChanged, controller.text: "${_amountController.text}"');
+                      },
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      EnglishDigitsFormatter(),
-                      ThousandsSeparatorInputFormatter(allowDecimal: false),
-                    ],
-                    validator: (v) {
-                      final val = parseFormattedDouble(v);
-                      debugPrint('🟢 [PersonLineTile] validator - input: "$v", parsed: $val');
-                      if (val == null || val <= 0) return t.mustBePositiveNumber;
-                      return null;
-                    },
-                    onChanged: (v) {
-                      final controllerTextBefore = _amountController.text;
-                      final parsed = parseFormattedDouble(v);
-                      final val = parsed ?? 0;
-                      debugPrint('🟠 [PersonLineTile] onChanged - input: "$v", controller.text before: "$controllerTextBefore", parsed: $parsed, final val: $val, old line.amount: ${widget.line.amount}');
-                      widget.onChanged(widget.line.copyWith(amount: val));
-                      debugPrint('🟣 [PersonLineTile] onChanged - after widget.onChanged, controller.text: "${_amountController.text}"');
-                    },
                   ),
                 ),
                 const SizedBox(width: 8),

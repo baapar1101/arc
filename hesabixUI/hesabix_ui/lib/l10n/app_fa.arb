@@ -4471,7 +4471,18 @@
   "crmWebChatSocketNoKey": "بدون کلید",
   "crmWebChatPeerTyping": "بازدیدکننده در حال تایپ است…",
   "crmWebChatTooltipMessageSent": "ارسال شد",
-  "crmWebChatTooltipMessageRead": "خوانده شد"
+  "crmWebChatTooltipMessageRead": "خوانده شد",
+  "crmSettingsWebChatVoiceTitle": "پیام صوتی در چت وب",
+  "crmSettingsWebChatVoiceSubtitle": "پیام‌های صوتی کوتاه (بازدیدکننده یا اپراتور) مانند هر فایل در فضای ذخیره‌سازی کسب‌وکار حساب می‌شوند.",
+  "crmWebChatVisitorVoiceSwitchTitle": "پیام صوتی توسط بازدیدکنندهٔ سایت",
+  "crmWebChatVisitorVoiceSwitchOn": "طبق تنظیمات کسب‌وکار و پلن فضا. می‌توانید فقط روی همین ویجت غیرفعال کنید.",
+  "crmWebChatVisitorVoiceSwitchOff": "پیام صوتی در تنظیمات CRM کسب‌وکار خاموش است یا در این ویجت محدود شده است.",
+  "crmWebChatVoiceDisabledCrm": "پیام صوتی برای این کسب‌وکار در تنظیمات CRM غیرفعال است",
+  "crmWebChatComposerDropTarget": "رها کنید تا ارسال شود",
+  "crmWebChatMicRecording": "ضبط…",
+  "crmWebChatMicStopSend": "توقف و ارسال",
+  "crmWebChatMicUnavailableWeb": "ضبط صدا در مرورگر این نسخه در دست نیست؛ از اپ یا دکمهٔ پیوست استفاده کنید",
+  "crmWebChatVisitorVoiceOffWidget": "ویس مهمان خاموش"
 }
 
 

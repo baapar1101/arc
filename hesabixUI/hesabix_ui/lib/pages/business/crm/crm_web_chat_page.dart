@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -17,7 +20,7 @@ import 'package:hesabix_ui/services/crm_chat_service.dart';
 import 'package:hesabix_ui/services/crm_chat_ws_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/pages/business/crm/crm_operator_voice.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// صندوق ورودی چت وب (ویجت جاسازی‌شده در سایت مشتری).
@@ -53,7 +56,12 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   bool _loadingMsgs = false;
   bool _wsLive = false;
   bool _allowWebChatFileUpload = false;
+  bool _allowWebChatVoice = false;
   bool _sendingFile = false;
+  bool _composerDragOver = false;
+  bool _recordingVoice = false;
+  final Map<String, Uint8List> _imagePreviewCache = {};
+  final OperatorVoiceController _voiceCtrl = createOperatorVoiceController();
   /// `null` = همه؛ پیش‌فرض پس از بارگذاری ترجیح ذخیره‌شده یا «باز».
   String? _statusFilter = 'open';
   Timer? _fallbackPoll;
@@ -478,6 +486,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     _msgScroll.dispose();
     _convSearchCtrl.dispose();
     _replyFocus.dispose();
+    unawaited(_voiceCtrl.dispose());
     super.dispose();
   }
 
@@ -509,13 +518,16 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       await _loadConversationsList(silent: true);
       await _loadWidgetsCache();
       bool allowFiles = false;
+      bool allowVoice = false;
       try {
         final st = await _svc.getCrmSettings(businessId: widget.businessId);
         allowFiles = st['allow_web_chat_file_upload'] == true;
+        allowVoice = st['allow_web_chat_voice'] == true;
       } catch (_) {}
       if (!mounted) return;
       setState(() {
         _allowWebChatFileUpload = allowFiles;
+        _allowWebChatVoice = allowVoice;
         if (!silent) _loading = false;
       });
       if (_selectedConvId != null) {
@@ -836,6 +848,139 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     }
   }
 
+  Future<Uint8List?> _cachedImageThumb(String fileId) async {
+    if (_imagePreviewCache.containsKey(fileId)) {
+      return _imagePreviewCache[fileId];
+    }
+    try {
+      final bytes = await _storage.downloadFile(
+        businessId: widget.businessId,
+        fileId: fileId,
+      );
+      final u = Uint8List.fromList(bytes);
+      if (!mounted) return u;
+      setState(() => _imagePreviewCache[fileId] = u);
+      return u;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildMessageAttachment(
+    ThemeData theme,
+    ColorScheme cs,
+    Map<dynamic, dynamic> file,
+    AppLocalizations t,
+  ) {
+    final id = file['id']?.toString() ?? '';
+    final name = file['original_name']?.toString() ?? t.crmWebChatFileLabel;
+    final mime = (file['mime_type'] ?? '').toString().toLowerCase();
+    if (mime.startsWith('image/') && id.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: GestureDetector(
+            onTap: () => unawaited(_downloadChatFile(id, name)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220, maxWidth: 320),
+              child: FutureBuilder<Uint8List?>(
+                future: _cachedImageThumb(id),
+                builder: (ctx, snap) {
+                  final b = snap.data;
+                  if (b != null && b.isNotEmpty) {
+                    return Image.memory(
+                      b,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => _attachmentFallback(theme, cs, t, id, name),
+                    );
+                  }
+                  return AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: ColoredBox(
+                      color: cs.surfaceContainerHighest,
+                      child: Center(
+                        child: snap.connectionState != ConnectionState.done
+                            ? const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (mime.startsWith('audio/')) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: InkWell(
+          onTap: () => unawaited(_downloadChatFile(id, name)),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.85),
+              border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.graphic_eq, color: cs.primary),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.download_rounded, size: 18, color: cs.primary),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return _attachmentFallback(theme, cs, t, id, name);
+  }
+
+  Widget _attachmentFallback(ThemeData theme, ColorScheme cs, AppLocalizations t, String id, String name) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        onTap: () => unawaited(_downloadChatFile(id, name)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.attach_file, size: 18, color: cs.onPrimaryContainer),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                name,
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.download, size: 16, color: cs.primary),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _downloadChatFile(String fileId, String originalName) async {
     try {
       final bytes = await _storage.downloadFile(
@@ -885,48 +1030,43 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     }
   }
 
-  Future<void> _pickAndSendAgentFile() async {
+  static bool _looksAudioFileName(String name) {
+    final n = name.toLowerCase();
+    for (final ext in <String>['.aac', '.webm', '.opus', '.ogg', '.oga', '.mp3', '.m4a', '.wav', '.flac']) {
+      if (n.endsWith(ext)) return true;
+    }
+    return false;
+  }
+
+  Future<void> _sendAgentAttachmentBytes(Uint8List bytes, String filename) async {
     final id = _selectedConvId;
-    if (id == null || !widget.authStore.canReplyCrmWebChat()) {
-      return;
-    }
-    if (!_allowWebChatFileUpload) {
-      final t = AppLocalizations.of(context);
-      SnackBarHelper.show(context, message: t.crmWebChatFileUploadDisabledCrm, isError: true);
-      return;
-    }
-    try {
-      final pick = await FilePicker.platform.pickFiles(
-        withData: true,
-        type: FileType.any,
-        allowMultiple: false,
-      );
-      if (pick == null || pick.files.isEmpty) return;
-      final f = pick.files.first;
-      final bytes = f.bytes;
-      if (bytes == null) {
-        if (mounted) {
-          final t = AppLocalizations.of(context);
-          SnackBarHelper.show(
-            context,
-            message: t.crmWebChatFileReadFailed,
-            isError: true,
-          );
-        }
+    if (id == null || !widget.authStore.canReplyCrmWebChat()) return;
+    final t = AppLocalizations.of(context);
+    final aud = _looksAudioFileName(filename);
+    if (aud) {
+      if (!_allowWebChatVoice) {
+        SnackBarHelper.show(context, message: t.crmWebChatVoiceDisabledCrm, isError: true);
         return;
       }
-      setState(() => _sendingFile = true);
+    } else {
+      if (!_allowWebChatFileUpload) {
+        SnackBarHelper.show(context, message: t.crmWebChatFileUploadDisabledCrm, isError: true);
+        return;
+      }
+    }
+    setState(() => _sendingFile = true);
+    try {
       final up = await _storage.uploadFile(
         businessId: widget.businessId,
         fileBytes: bytes,
-        filename: f.name.isNotEmpty ? f.name : 'file',
+        filename: filename.isNotEmpty ? filename : (aud ? 'voice.aac' : 'file'),
         moduleContext: 'crm_web_chat',
         contextId: id.toString(),
       );
       if (!mounted) return;
       final fid = up['file_id']?.toString();
       if (fid == null || fid.isEmpty) {
-        throw StateError(AppLocalizations.of(context).crmWebChatFileIdMissing);
+        throw StateError(t.crmWebChatFileIdMissing);
       }
       final cap = _replyCtrl.text.trim();
       await _svc.postAgentMessage(
@@ -939,14 +1079,11 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       await _loadMessages();
       await _loadConversationsList();
       if (mounted) {
-        final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: t.crmWebChatFileSent);
         if (_wsLive) _ws.sendTyping(id, active: false);
         unawaited(_markVisitorMessagesReadSilently());
       }
     } catch (e) {
       if (mounted) {
-        final t = AppLocalizations.of(context);
         SnackBarHelper.show(
           context,
           message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
@@ -955,6 +1092,147 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       }
     } finally {
       if (mounted) setState(() => _sendingFile = false);
+    }
+  }
+
+  Future<void> _onComposerDrop(DropDoneDetails detail) async {
+    if (detail.files.isEmpty) return;
+    final xf = detail.files.first;
+    final name = xf.name;
+    final bytes = await xf.readAsBytes();
+    if (!mounted || bytes.isEmpty) return;
+    await _sendAgentAttachmentBytes(Uint8List.fromList(bytes), name);
+  }
+
+  Future<void> _toggleOperatorVoice() async {
+    if (kIsWeb) {
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).crmWebChatMicUnavailableWeb,
+        isError: true,
+      );
+      return;
+    }
+    final id = _selectedConvId;
+    if (id == null || !widget.authStore.canReplyCrmWebChat() || !_allowWebChatVoice) return;
+    if (_sendingFile) return;
+    final t = AppLocalizations.of(context);
+    try {
+      if (!_recordingVoice) {
+        final ok = await _voiceCtrl.ensureReady();
+        if (!ok) {
+          SnackBarHelper.show(context, message: t.crmWebChatError('میکروفون'), isError: true);
+          return;
+        }
+        await _voiceCtrl.startRecording();
+        if (mounted) setState(() => _recordingVoice = true);
+        return;
+      }
+      setState(() => _recordingVoice = false);
+      final clip = await _voiceCtrl.stopAndRead();
+      if (clip == null) return;
+      final (blob, fname) = clip;
+      await _sendAgentAttachmentBytes(blob, fname);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _recordingVoice = false);
+        SnackBarHelper.show(
+          context,
+          message: t.crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Widget _buildComposerField(
+    ThemeData theme,
+    ColorScheme cs,
+    AppLocalizations t,
+  ) {
+    final canDrop =
+        (_allowWebChatFileUpload || _allowWebChatVoice) && !_sendingFile && _selectedConvId != null;
+    final field = AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _composerDragOver ? cs.primary : Colors.transparent, width: 2),
+      ),
+      child: TextField(
+        controller: _replyCtrl,
+        focusNode: _replyFocus,
+        decoration: InputDecoration(
+          hintText: t.crmWebChatReplyHint,
+          helperText: canDrop ? t.crmWebChatComposerDropTarget : null,
+          helperMaxLines: 2,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        minLines: 1,
+        maxLines: 6,
+        textInputAction: TextInputAction.newline,
+      ),
+    );
+
+    if (!canDrop) {
+      return field;
+    }
+
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!mounted) return;
+        setState(() => _composerDragOver = true);
+      },
+      onDragExited: (_) {
+        if (!mounted) return;
+        setState(() => _composerDragOver = false);
+      },
+      onDragDone: (DropDoneDetails d) {
+        if (!mounted) return;
+        setState(() => _composerDragOver = false);
+        unawaited(_onComposerDrop(d));
+      },
+      child: field,
+    );
+  }
+
+  Future<void> _pickAndSendAgentFile() async {
+    final id = _selectedConvId;
+    if (id == null || !widget.authStore.canReplyCrmWebChat()) {
+      return;
+    }
+    try {
+      final pick = await FilePicker.platform.pickFiles(withData: true, type: FileType.any, allowMultiple: false);
+      if (pick == null || pick.files.isEmpty) return;
+      final f = pick.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).crmWebChatFileReadFailed,
+            isError: true,
+          );
+        }
+        return;
+      }
+      final name = f.name.isNotEmpty ? f.name : 'file';
+      Uint8List u8;
+      if (bytes is Uint8List) {
+        u8 = bytes;
+      } else {
+        u8 = Uint8List.fromList(bytes);
+      }
+      await _sendAgentAttachmentBytes(u8, name);
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).crmWebChatError(ErrorExtractor.forContext(e, context)),
+          isError: true,
+        );
+      }
     }
   }
 
@@ -973,8 +1251,6 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       await _loadMessages();
       await _loadConversationsList();
       if (mounted) {
-        final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: t.crmWebChatMessageSent);
         final cid = _selectedConvId;
         if (cid != null && _wsLive) _ws.sendTyping(cid, active: false);
         unawaited(_markVisitorMessagesReadSilently());
@@ -1647,34 +1923,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (file is Map && file['id'] != null && !isDeleted)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: InkWell(
-                            onTap: () => _downloadChatFile(
-                              file['id']!.toString(),
-                              file['original_name']?.toString() ?? t.crmWebChatFileLabel,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.attach_file, size: 18, color: cs.onPrimaryContainer),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    file['original_name']?.toString() ?? t.crmWebChatFileLabel,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(Icons.download, size: 16, color: cs.primary),
-                              ],
-                            ),
-                          ),
-                        ),
+                        _buildMessageAttachment(theme, cs, file as Map<dynamic, dynamic>, t),
                       if (isDeleted)
                         Text(
                           t.crmWebChatMessageDeleted,
@@ -1792,23 +2041,37 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         ),
                       ),
                     if (_allowWebChatFileUpload) const SizedBox(width: 4),
-                    Expanded(
-                      child: TextField(
-                        controller: _replyCtrl,
-                        focusNode: _replyFocus,
-                        decoration: InputDecoration(
-                          hintText: t.crmWebChatReplyHint,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        minLines: 1,
-                        maxLines: 6,
-                        textInputAction: TextInputAction.newline,
+                    if (_allowWebChatVoice)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: kIsWeb
+                            ? Tooltip(
+                                message: t.crmWebChatMicUnavailableWeb,
+                                child: IconButton.filledTonal(
+                                  onPressed: null,
+                                  icon: Icon(Icons.mic_off_outlined, color: cs.onSurfaceVariant.withValues(alpha: 0.55)),
+                                ),
+                              )
+                            : IconButton.filledTonal(
+                                tooltip:
+                                    _recordingVoice ? t.crmWebChatMicStopSend : t.crmWebChatMicRecording,
+                                style: _recordingVoice
+                                    ? IconButton.styleFrom(backgroundColor: cs.errorContainer)
+                                    : null,
+                                onPressed: (_selectedConvId == null || _sendingFile)
+                                    ? null
+                                    : _toggleOperatorVoice,
+                                icon: Icon(
+                                  _recordingVoice ? Icons.stop_circle_outlined : Icons.mic_none_outlined,
+                                  color: _recordingVoice ? cs.onErrorContainer : null,
+                                ),
+                              ),
                       ),
-                    ),
+                    if (_allowWebChatVoice) const SizedBox(width: 4),
+                    Expanded(child: _buildComposerField(theme, cs, t)),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: _sendingFile ? null : _sendReply,
+                      onPressed: (_sendingFile || _recordingVoice) ? null : _sendReply,
                       child: Text(t.crmWebChatSend),
                     ),
                   ],
