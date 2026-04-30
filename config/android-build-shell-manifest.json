@@ -1,0 +1,83 @@
+{
+  "manifest_version": 1,
+  "description": "فهرست آرتیفکت‌های آپلودشده روی shell.hesabix.ir برای نصب/بیلد اندروید (Ubuntu 24.04). sha256 را بعد از آپلود با sha256sum پر کنید.",
+
+  "base_url": "https://shell.hesabix.ir/android-build",
+
+  "project_expectations": {
+    "pubspec_dart_sdk": "^3.9.2",
+    "gradle_wrapper": "8.12",
+    "android_compile_sdk": 36,
+    "android_build_tools": "34.0.0",
+    "android_ndk_version": "26.1.10909125",
+    "android_sdkmanager_packages": [
+      "platform-tools",
+      "platforms;android-36",
+      "build-tools;34.0.0",
+      "ndk;26.1.10909125"
+    ]
+  },
+
+  "artifacts": [
+    {
+      "id": "jdk_temurin_17",
+      "role": "java",
+      "relative_path": "jdk/OpenJDK17U-jdk_x64_linux_hotspot_17.0.14_7.tar.gz",
+      "version": "17.0.14+7",
+      "sha256": null,
+      "upstream": "https://github.com/adoptium/temurin17-binaries/releases"
+    },
+    {
+      "id": "flutter_sdk_stable",
+      "role": "flutter",
+      "relative_path": "flutter/flutter_linux_3.35.4-stable.tar.xz",
+      "version": "3.35.4-stable",
+      "sha256": null,
+      "upstream": "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.35.4-stable.tar.xz",
+      "note": "باید با constraint دارت pubspec سازگار باشد؛ در صورت ارتقای Flutter، نسخه و مسیر و upstream را عوض کنید."
+    },
+    {
+      "id": "android_cmdline_tools",
+      "role": "android_sdk_bootstrap",
+      "relative_path": "android/commandlinetools-linux-14742923_latest.zip",
+      "version": "14742923_latest",
+      "sha256": null,
+      "upstream": "https://developer.android.com/studio#command-line-tools-only",
+      "note": "نام فایل با rev گوگل عوض می‌شود؛ آخرین zip لینوکس را از همان صفحه بگیرید و این ورودی را به‌روز کنید."
+    },
+    {
+      "id": "android_sdk_bundle",
+      "role": "android_sdk_prebuilt",
+      "relative_path": "android/android-sdk-hesabix-noble-amd64.tar.zst",
+      "version": "pinned-to-project-2026-04",
+      "sha256": null,
+      "upstream": null,
+      "note": "کل ANDROID_SDK_ROOT بعد از sdkmanager و licenses؛ اختیاری اگر فقط cmdline-tools می‌گذارید این را null بدانید یا حذف کنید."
+    },
+    {
+      "id": "gradle_distribution_fallback",
+      "role": "gradle_zip_optional",
+      "relative_path": "gradle/gradle-8.12-all.zip",
+      "version": "8.12",
+      "sha256": null,
+      "upstream": "https://services.gradle.org/distributions/gradle-8.12-all.zip",
+      "note": "پشتیبان وقتی میرور داخلی در دسترس نباشد؛ معمولاً wrapper از gradle.mirror.hesabix.ir می‌گیرد."
+    }
+  ],
+
+  "ubuntu_noble_amd64_debs": {
+    "note": "اختیاری: debهای minimal برای نصب بدون اینترنت؛ مسیر نمونه روی shell",
+    "relative_index_path": "ubuntu-noble/debs/index.txt",
+    "package_names_suggested": [
+      "git",
+      "curl",
+      "wget",
+      "ca-certificates",
+      "unzip",
+      "zip",
+      "xz-utils",
+      "file",
+      "openjdk-17-jdk"
+    ]
+  }
+}

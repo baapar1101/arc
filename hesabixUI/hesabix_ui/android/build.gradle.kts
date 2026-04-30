@@ -1,9 +1,14 @@
+val hesabixGradleMirror: String =
+    providers.gradleProperty("hesabix.gradle.mirror")
+        .orElse("https://gradle.mirror.hesabix.ir")
+        .get()
+        .trimEnd('/')
+
 allprojects {
     repositories {
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
-        google()
-        mavenCentral()
+        maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
+        maven { url = uri("${hesabixGradleMirror}/maven2/") }
+        maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
     }
 }
 
@@ -16,29 +21,25 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
-    
+
     afterEvaluate {
         if (project.hasProperty("android")) {
             repositories {
-                maven { url = uri("https://maven.aliyun.com/repository/google") }
-                maven { url = uri("https://maven.aliyun.com/repository/central") }
-                google()
-                mavenCentral()
+                maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
+                maven { url = uri("${hesabixGradleMirror}/maven2/") }
+                maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
             }
         }
     }
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    
+
     buildscript {
         repositories {
-            maven { url = uri("https://maven.aliyun.com/repository/google") }
-            maven { url = uri("https://maven.aliyun.com/repository/central") }
-            maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
-            google()
-            mavenCentral()
-            gradlePluginPortal()
+            maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
+            maven { url = uri("${hesabixGradleMirror}/maven2/") }
+            maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
         }
     }
 }
