@@ -1981,6 +1981,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onDraftChanged: (isDraft) {
                             setState(() {
                               _isDraft = isDraft;
+                              if (isDraft && _transactions.isNotEmpty) {
+                                _transactions = [];
+                              }
                               if (isDraft && _useInstallments) {
                                 _useInstallments = false;
                                 _hasUserCustomizedSettings = true;
@@ -2289,6 +2292,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onDraftChanged: (isDraft) {
                                   setState(() {
                                     _isDraft = isDraft;
+                                    if (isDraft && _transactions.isNotEmpty) {
+                                      _transactions = [];
+                                    }
                                     if (isDraft && _useInstallments) {
                                       _useInstallments = false;
                                       _numInstallments = null;
@@ -3115,8 +3121,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
     
-    // افزودن payments اگر وجود دارد
-    if (_transactions.isNotEmpty) {
+    // تراکنش‌ها فقط برای فاکتور قطعی (هم‌راستا با بک‌اند و edit_invoice_page)
+    if (!_isDraft && _transactions.isNotEmpty) {
       payload['payments'] = _transactions.map((t) => t.toJson()).toList();
     }
     

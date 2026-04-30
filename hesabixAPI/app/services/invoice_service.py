@@ -177,6 +177,46 @@ ALLOWED_INVOICE_PROFIT_BASIS = {
 ALLOWED_INVOICE_PROFIT_TYPES = {"gross", "net", "both"}
 ALLOWED_INVOICE_PROFIT_OVERHEAD_TYPES = {"none", "production_overhead", "all_overhead", "custom_percent"}
 
+# کلیدهای لینک اسناد جانبی روی extra_info.links فاکتور
+INVOICE_LINK_RECEIPT_PAYMENT_IDS = "receipt_payment_document_ids"
+INVOICE_LINK_EXPENSE_INCOME_IDS = "expense_income_document_ids"
+
+
+def _strip_invoice_side_document_links_from_document(document: Document) -> None:
+    """حذف لینک‌های دریافت/پرداخت و هزینه/درآمد از extra فاکتور (پیش‌فاکتور نباید این لینک‌ها را نگه دارد)."""
+    extra = dict(document.extra_info or {})
+    links = dict(extra.get("links") or {})
+    links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+    links.pop(INVOICE_LINK_EXPENSE_INCOME_IDS, None)
+    extra["links"] = links
+    document.extra_info = _normalize_document_extra_info_for_storage(extra)
+    flag_modified(document, "extra_info")
+
+
+def _delete_invoice_linked_side_documents(
+    db: Session,
+    *,
+    receipt_payment_ids: List[Any],
+    expense_income_ids: List[Any],
+) -> None:
+    """
+    حذف اسناد دریافت/پرداخت و هزینه/درآمد پیوندخورده به فاکتور (بدون commit؛ در همان تراکنش caller).
+    """
+    if receipt_payment_ids:
+        from app.services.receipt_payment_service import delete_receipt_payment
+
+        for rid in receipt_payment_ids:
+            if rid is None:
+                continue
+            delete_receipt_payment(db, int(rid), commit=False)
+    if expense_income_ids:
+        from app.services.expense_income_service import delete_expense_income
+
+        for eid in expense_income_ids:
+            if eid is None:
+                continue
+            delete_expense_income(db, int(eid), commit=False)
+
 
 def _normalize_invoice_profit_method(value: Optional[str]) -> str:
     method = str(value or "automatic").strip().lower()
@@ -4175,247 +4215,208 @@ def create_invoice(
         db, business_id, document, invoice_type, lines_input, data
     )
 
-    # Persist invoice first
-    db.commit()
+    # یک تراکنش واحد تا پایان: فاکتور + تراکنش دریافت/پرداخت (فقط غیرپیش‌فاکتور) + حواله + ثبت‌های وابسته
+    db.flush()
     db.refresh(document)
 
-    # Optional: create receipt/payment document(s)
+    # Optional: create receipt/payment document(s) — فقط برای فاکتور قطعی
     payment_docs: List[int] = []
     payments = data.get("payments") or []
-    
+
     # بررسی تنظیمات auto_create_payment_document برای فروش سریع
     extra_info_all = data.get("extra_info") or {}
     auto_create_payment_doc = extra_info_all.get("auto_create_payment_document", True)
     is_quick_sale = extra_info_all.get("quick_sale", False)
-    
-    if payments and isinstance(payments, list):
-        try:
-            # Only when person is present
-            if person_id:
-                from app.services.receipt_payment_service import create_receipt_payment
 
-                # Aggregate amounts into one receipt/payment with multiple account_lines
-                account_lines: List[Dict[str, Any]] = []
-                total_amount = Decimal(0)
-                # Validate currency of payment accounts vs invoice currency
-                invoice_currency_id = int(currency_id)
-                for p in payments:
-                    amount = Decimal(str(p.get("amount", 0) or 0))
-                    if amount <= 0:
-                        continue
-                    total_amount += amount
-                    # پشتیبانی از هر دو فیلد 'type' و 'transaction_type'
-                    ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
-                    # Currency match checks for money accounts
-                    if ttype in ("bank", "cash_register", "petty_cash", "check"):
-                        if ttype == "bank":
-                            ref_id = p.get("bank_id")
-                            if ref_id:
-                                acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
-                        elif ttype == "cash_register":
-                            ref_id = p.get("cash_register_id")
-                            if ref_id:
-                                acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
-                        elif ttype == "petty_cash":
-                            ref_id = p.get("petty_cash_id")
-                            if ref_id:
-                                acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
-                                if not acct:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
-                                if int(acct.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
-                        elif ttype == "check":
-                            ref_id = p.get("check_id")
-                            if ref_id:
-                                chk = db.query(Check).filter(Check.id == int(ref_id)).first()
-                                if not chk:
-                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
-                                if int(chk.currency_id) != invoice_currency_id:
-                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
-                                
-                                # بررسی تطابق نوع چک با نوع فاکتور
-                                # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
-                                # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
-                                is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                                expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
-                                
-                                if chk.type != expected_check_type:
-                                    check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
-                                    expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
-                                    invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
-                                    raise ApiError(
-                                        "CHECK_TYPE_MISMATCH_WITH_INVOICE",
-                                        f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
-                                        http_status=400
-                                    )
+    if not document.is_proforma and payments and isinstance(payments, list):
+        if person_id:
+            from app.services.receipt_payment_service import create_receipt_payment
 
-                    # Build account line entry including ids/names for linking
-                    # استفاده از 'type' یا 'transaction_type' (فرانت‌اند 'type' می‌فرستد)
-                    transaction_type_value = p.get("transaction_type") or p.get("type")
-                    logger.info(f"Payment item: type={p.get('type')}, transaction_type={p.get('transaction_type')}, resolved={transaction_type_value}")
-                    account_line: Dict[str, Any] = {
-                        "transaction_type": transaction_type_value,
-                        "amount": float(amount),
-                        "description": p.get("description"),
-                        "transaction_date": p.get("transaction_date"),
-                        "commission": p.get("commission"),
+            # Aggregate amounts into one receipt/payment with multiple account_lines
+            account_lines: List[Dict[str, Any]] = []
+            total_amount = Decimal(0)
+            # Validate currency of payment accounts vs invoice currency
+            invoice_currency_id = int(currency_id)
+            for p in payments:
+                amount = Decimal(str(p.get("amount", 0) or 0))
+                if amount <= 0:
+                    continue
+                total_amount += amount
+                # پشتیبانی از هر دو فیلد 'type' و 'transaction_type'
+                ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
+                # Currency match checks for money accounts
+                if ttype in ("bank", "cash_register", "petty_cash", "check"):
+                    if ttype == "bank":
+                        ref_id = p.get("bank_id")
+                        if ref_id:
+                            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
+                    elif ttype == "cash_register":
+                        ref_id = p.get("cash_register_id")
+                        if ref_id:
+                            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
+                    elif ttype == "petty_cash":
+                        ref_id = p.get("petty_cash_id")
+                        if ref_id:
+                            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
+                            if not acct:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+                            if int(acct.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
+                    elif ttype == "check":
+                        ref_id = p.get("check_id")
+                        if ref_id:
+                            chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+                            if not chk:
+                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+                            if int(chk.currency_id) != invoice_currency_id:
+                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
+
+                            # بررسی تطابق نوع چک با نوع فاکتور
+                            # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
+                            # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
+                            is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                            expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+
+                            if chk.type != expected_check_type:
+                                check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                                expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                                invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                                raise ApiError(
+                                    "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                                    f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                                    http_status=400
+                                )
+
+                # Build account line entry including ids/names for linking
+                transaction_type_value = p.get("transaction_type") or p.get("type")
+                logger.info(f"Payment item: type={p.get('type')}, transaction_type={p.get('transaction_type')}, resolved={transaction_type_value}")
+                account_line: Dict[str, Any] = {
+                    "transaction_type": transaction_type_value,
+                    "amount": float(amount),
+                    "description": p.get("description"),
+                    "transaction_date": p.get("transaction_date"),
+                    "commission": p.get("commission"),
+                }
+                logger.info(f"Created account_line: {account_line}")
+                for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
+                    if p.get(key) is not None:
+                        account_line[key] = p.get(key)
+                account_lines.append(account_line)
+
+            if total_amount > 0 and account_lines:
+                if is_quick_sale and not auto_create_payment_doc:
+                    logger.info(f"Skipping auto-create payment document for quick sale invoice {document.id} (auto_create_payment_document is False)")
+                else:
+                    is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                    rp_data = {
+                        "document_type": "receipt" if is_receipt else "payment",
+                        "document_date": document.document_date.isoformat(),
+                        "currency_id": document.currency_id,
+                        "description": f"تسویه مرتبط با فاکتور {document.code}",
+                        "person_lines": [{
+                            "person_id": person_id,
+                            "amount": float(total_amount),
+                            "description": f"طرف حساب فاکتور {document.code}",
+                        }],
+                        "account_lines": account_lines,
+                        "extra_info": {
+                            "source": "invoice",
+                            "invoice_id": document.id,
+                            "person_is_receivable": person_is_receivable,
+                        },
                     }
-                    logger.info(f"Created account_line: {account_line}")
-                    # pass through reference ids/names if provided
-                    for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
-                        if p.get(key) is not None:
-                            account_line[key] = p.get(key)
-                    account_lines.append(account_line)
-
-                if total_amount > 0 and account_lines:
-                    # اگر auto_create_payment_document غیرفعال باشد و فروش سریع باشد، سند پرداخت جداگانه ایجاد نکن
-                    if is_quick_sale and not auto_create_payment_doc:
-                        logger.info(f"Skipping auto-create payment document for quick sale invoice {document.id} (auto_create_payment_document is False)")
+                    rp_doc = create_receipt_payment(
+                        db=db,
+                        business_id=business_id,
+                        user_id=user_id,
+                        data=rp_data,
+                        commit=False,
+                    )
+                    logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
+                    if isinstance(rp_doc, dict) and rp_doc.get("id"):
+                        payment_docs.append(int(rp_doc["id"]))
+                        logger.info(f"Added receipt/payment document ID {payment_docs[-1]} to payment_docs.")
                     else:
-                        is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                        # نوع حساب طرف‌شخص برای سند دریافت/پرداخت متناسب با نوع فاکتور:
-                        # فروش و برگشت از فروش → دریافتنی‌ها (10401)
-                        # خرید و برگشت از خرید → پرداختنی‌ها (20201)
-                        person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
-                        rp_data = {
-                            "document_type": "receipt" if is_receipt else "payment",
-                            "document_date": document.document_date.isoformat(),
-                            "currency_id": document.currency_id,
-                            "description": f"تسویه مرتبط با فاکتور {document.code}",
-                            "person_lines": [{
-                                "person_id": person_id,
-                                "amount": float(total_amount),
-                                "description": f"طرف حساب فاکتور {document.code}",
-                            }],
-                            "account_lines": account_lines,
-                            "extra_info": {
-                                "source": "invoice",
-                                "invoice_id": document.id,
-                                # هدایت نوع حساب طرف‌شخص در سند دریافت/پرداخت
-                                "person_is_receivable": person_is_receivable,
-                            },
-                        }
-                        rp_doc = create_receipt_payment(db=db, business_id=business_id, user_id=user_id, data=rp_data)
-                        logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
-                        if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                            rp_id = int(rp_doc["id"])
-                            payment_docs.append(rp_id)
-                            logger.info(f"Added receipt/payment document ID {rp_id} to payment_docs. Current list: {payment_docs}")
-                        else:
-                            logger.warning(f"create_receipt_payment did not return valid document with id. Returned: {rp_doc}")
-        except Exception as ex:
-            logger.exception("could not create receipt/payment for invoice: %s", ex)
-            # حتی در صورت خطا، اگر payment_docs پر شده باشد، لینک را ذخیره کن
-            if payment_docs:
-                logger.info(f"Exception occurred but payment_docs has {len(payment_docs)} items. Will still save links.")
+                        raise ApiError(
+                            "RECEIPT_PAYMENT_CREATE_FAILED",
+                            "ایجاد سند دریافت/پرداخت مرتبط با فاکتور ناموفق بود.",
+                            http_status=500,
+                        )
 
-    # Save links back to invoice
     if payment_docs:
-        logger.info(f"Saving links to invoice {document.id}. payment_docs: {payment_docs}")
-        # اطمینان از اینکه document در session است
+        logger.info(f"Linking payment_docs to invoice {document.id}: {payment_docs}")
         db.add(document)
-        # دریافت extra_info فعلی (ممکن است dict یا None باشد)
         extra = dict(document.extra_info) if document.extra_info else {}
-        # ایجاد یا به‌روزرسانی links
         links = dict(extra.get("links", {}))
-        links["receipt_payment_document_ids"] = payment_docs
+        links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
         extra["links"] = links
-        # به‌روزرسانی extra_info (نرمال‌سازی برای ذخیره یکسان)
         document.extra_info = _normalize_document_extra_info_for_storage(extra)
-        # علامت‌گذاری برای به‌روزرسانی (برای JSON fields در SQLAlchemy)
         flag_modified(document, "extra_info")
-        try:
-            db.commit()
-            db.refresh(document)
-            logger.info(f"Successfully saved links to invoice {document.id}. Updated extra_info: {document.extra_info}")
-        except Exception as ex:
-            logger.exception(f"Failed to save links to invoice {document.id}: {ex}")
-            db.rollback()
-            raise
-    else:
-        logger.warning(f"No payment_docs to save for invoice {document.id}. payments data: {payments}")
+        db.flush()
+    elif payments and isinstance(payments, list) and payments:
+        logger.debug(f"No payment_docs for invoice {document.id}; payments payload present: {payments}")
 
     # ایجاد حواله انبار در صورت نیاز (همان منطق در _create_warehouse_documents_for_invoice)
-    # post_inventory: آیا حواله ایجاد شود؛ auto_post_warehouse: قطعی فوری یا پیش‌نویس
     try:
         created_wh_ids = _create_warehouse_documents_for_invoice(
             db, business_id, document, user_id, lines_input, invoice_type
         )
         if created_wh_ids:
-            db.commit()
+            db.flush()
+    except ApiError:
+        raise
     except Exception as ex:
-        # عدم موفقیت در ساخت حواله نباید مانع بازگشت فاکتور شود
-        # فاکتور قبلاً commit شده است، پس فقط exception را log می‌کنیم
         logger.exception(f"Failed to create warehouse document for invoice {document.id}: {ex}")
-        try:
-            db.rollback()
-        except Exception:
-            pass
+        raise ApiError(
+            "WAREHOUSE_SYNC_FAILED",
+            "همگام‌سازی حواله انبار با فاکتور ناموفق بود.",
+            http_status=409,
+        ) from ex
 
     # شناسایی سود قطعی دفتر وقتی مبنا «فاکتور» است (حواله جداگانه مسیر خود را دارد)
     if not document.is_proforma:
+        from app.services.invoice_profit_ledger_service import on_sales_invoice_document_finalized
+
+        on_sales_invoice_document_finalized(db, int(document.id))
         try:
-            from app.services.invoice_profit_ledger_service import on_sales_invoice_document_finalized
+            from app.services.customer_club_service import sync_customer_club_for_invoice
 
-            on_sales_invoice_document_finalized(db, int(document.id))
-            try:
-                from app.services.customer_club_service import sync_customer_club_for_invoice
-
-                sync_customer_club_for_invoice(db, int(document.id))
-            except Exception as club_ex:
-                logger.warning(
-                    "customer_club sync on create failed doc_id=%s err=%s",
-                    document.id,
-                    club_ex,
-                    exc_info=True,
-                )
-            db.commit()
-        except Exception as ledger_ex:
+            sync_customer_club_for_invoice(db, int(document.id))
+        except Exception as club_ex:
             logger.warning(
-                "invoice profit ledger on create failed doc_id=%s err=%s",
+                "customer_club sync on create failed doc_id=%s err=%s",
                 document.id,
-                ledger_ex,
+                club_ex,
                 exc_info=True,
             )
-            try:
-                db.rollback()
-            except Exception:
-                pass
+        db.flush()
 
     # پس از خرید/برگشت از خرید: هم‌رسانی ledger فاکتورهای فروش/تولید همان کالاها (FIFO به‌روز)
     if not document.is_proforma and invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
-        try:
-            from app.services.invoice_profit_ledger_service import (
-                refresh_sales_ledgers_after_inventory_invoice_change,
-            )
+        from app.services.invoice_profit_ledger_service import (
+            refresh_sales_ledgers_after_inventory_invoice_change,
+        )
 
-            _pids = _distinct_product_ids_for_invoice(db, int(document.id))
-            refresh_sales_ledgers_after_inventory_invoice_change(
-                db,
-                business_id,
-                _pids,
-                fiscal_year_id=int(document.fiscal_year_id),
-            )
-            db.commit()
-        except Exception as inv_chain_ex:
-            logger.warning(
-                "inventory-chain ledger refresh failed doc_id=%s err=%s",
-                document.id,
-                inv_chain_ex,
-                exc_info=True,
-            )
-            try:
-                db.rollback()
-            except Exception:
-                pass
+        _pids = _distinct_product_ids_for_invoice(db, int(document.id))
+        refresh_sales_ledgers_after_inventory_invoice_change(
+            db,
+            business_id,
+            _pids,
+            fiscal_year_id=int(document.fiscal_year_id),
+        )
+        db.flush()
+
+    db.commit()
+    db.refresh(document)
 
     # فراخوانی workflow triggers برای فاکتور ایجاد شده
     try:
@@ -4456,7 +4457,17 @@ def create_invoice(
         document_id=document.id,
         document_type=document.document_type
     )
-    
+    if payment_docs:
+        for _pid in payment_docs:
+            _rp = db.query(Document).filter(Document.id == int(_pid)).first()
+            if _rp:
+                invalidate_documents_cache(
+                    business_id=business_id,
+                    fiscal_year_id=_rp.fiscal_year_id,
+                    document_id=_rp.id,
+                    document_type=_rp.document_type,
+                )
+
     # اگر expense/income باشد، cache آن را هم invalidate کن
     if document.document_type in ['expense', 'income']:
         from app.services.expense_income_service import invalidate_expense_income_cache
@@ -4482,6 +4493,9 @@ def update_invoice(
 
     _pre_links_wh = (document.extra_info or {}).get("links") or {}
     _old_warehouse_document_ids = list(_pre_links_wh.get("warehouse_document_ids") or [])
+    _old_is_proforma = bool(document.is_proforma)
+    _old_receipt_payment_ids = list(_pre_links_wh.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or [])
+    _old_expense_income_ids = list(_pre_links_wh.get(INVOICE_LINK_EXPENSE_INCOME_IDS) or [])
 
     # Only editable in current fiscal year
     try:
@@ -4534,6 +4548,15 @@ def update_invoice(
         # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
         merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
         document.extra_info = merged_extra
+    # پیش‌فاکتور: با برگشت از قطعی، اسناد دریافت/پرداخت و هزینه/درآمد پیوندی حذف می‌شوند؛ لینک‌ها از extra حذف می‌گردد
+    if not _old_is_proforma and document.is_proforma:
+        _delete_invoice_linked_side_documents(
+            db,
+            receipt_payment_ids=_old_receipt_payment_ids,
+            expense_income_ids=_old_expense_income_ids,
+        )
+    if document.is_proforma:
+        _strip_invoice_side_document_links_from_document(document)
     if isinstance(data.get("description"), str) or data.get("description") is None:
         if data.get("description") is not None:
             document.description = data.get("description")
@@ -5156,7 +5179,7 @@ def update_invoice(
         person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
 
         old_links = dict(header_extra_pm.get("links") or {})
-        old_receipt_payment_ids = list(old_links.get("receipt_payment_document_ids") or [])
+        old_receipt_payment_ids = list(old_links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or [])
 
         has_positive_payment = any(
             Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
@@ -5177,7 +5200,7 @@ def update_invoice(
         if not payments:
             extra = dict(document.extra_info) if document.extra_info else {}
             links = dict(extra.get("links", {}))
-            links.pop("receipt_payment_document_ids", None)
+            links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
             extra["links"] = links
             document.extra_info = _normalize_document_extra_info_for_storage(extra)
             flag_modified(document, "extra_info")
@@ -5294,14 +5317,14 @@ def update_invoice(
             if payment_docs:
                 extra = dict(document.extra_info) if document.extra_info else {}
                 links = dict(extra.get("links", {}))
-                links["receipt_payment_document_ids"] = payment_docs
+                links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
                 extra["links"] = links
                 document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")
             else:
                 extra = dict(document.extra_info) if document.extra_info else {}
                 links = dict(extra.get("links", {}))
-                links.pop("receipt_payment_document_ids", None)
+                links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
                 extra["links"] = links
                 document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")

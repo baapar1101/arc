@@ -5,23 +5,7 @@
  */
 
 /* ==================== فونت‌های فارسی ==================== */
-@font-face {
-  font-family: 'Vazirmatn';
-  src: local('Vazirmatn'), 
-       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Vazirmatn';
-  src: local('Vazirmatn Bold'),
-       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/* بدون بارگذاری از CDN؛ اگر وزیرمتن روی سیستم نصب باشد با local() استفاده می‌شود. */
 
 /* ==================== تنظیمات پایه ==================== */
 :root {

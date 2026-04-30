@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from app.openapi_local_docs import get_local_swagger_ui_html
 import logging
 import os
+from pathlib import Path
 from typing import Optional, IO
 
 from app.core.settings import get_settings
@@ -661,12 +662,20 @@ def create_app() -> FastAPI:
         ],
     )
 
-    # Mount کردن فایل‌های استاتیک برای Swagger UI سفارشی
+    # Swagger UI vendor 4.x فیلد openapi را فقط برای 3.0.x / 2.0 قبول می‌کند؛ پیش‌فرض FastAPI 3.1.0 است.
+    application.openapi_version = "3.0.3"
+
+    # Mount استاتیک؛ مسیر مطلق تا با هر WorkingDirectory سرویس systemd درست باشد.
+    _api_root = Path(__file__).resolve().parent.parent
+    _assets_dir = _api_root / "assets"
+    _log = logging.getLogger(__name__)
     try:
-        application.mount("/assets", StaticFiles(directory="assets"), name="assets")
-    except Exception:
-        # در صورت نبود دایرکتوری assets، خطا را نادیده بگیر
-        pass
+        if not _assets_dir.is_dir():
+            _log.warning("دایرکتوری assets برای مستندات یافت نشد: %s", _assets_dir)
+        else:
+            application.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+    except Exception as e:
+        _log.warning("mount کردن /assets ناموفق بود: %s", e)
 
     # Swagger UI سفارشی با استایل‌های فارسی و RTL
     @application.get("/docs", include_in_schema=False)
@@ -676,6 +685,8 @@ def create_app() -> FastAPI:
             openapi_url=application.openapi_url,
             title=f"{app_name} - مستندات API",
             oauth2_redirect_url=application.swagger_ui_oauth2_redirect_url,
+            init_oauth=application.swagger_ui_init_oauth,
+            swagger_ui_parameters=application.swagger_ui_parameters,
             swagger_favicon_url="/assets/logo-blue.png",
         )
 
@@ -1356,8 +1367,18 @@ def create_app() -> FastAPI:
         openapi_schema = get_openapi(
             title=application.title,
             version=application.version,
+            openapi_version=application.openapi_version,
+            summary=application.summary,
             description=application.description,
+            terms_of_service=application.terms_of_service,
+            contact=application.contact,
+            license_info=application.license_info,
             routes=application.routes,
+            webhooks=application.webhooks.routes,
+            tags=application.openapi_tags,
+            servers=application.servers,
+            separate_input_output_schemas=application.separate_input_output_schemas,
+            external_docs=application.openapi_external_docs,
         )
         
         # اضافه کردن security schemes با مستندات کامل
