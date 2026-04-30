@@ -7,7 +7,8 @@ import '../core/calendar_controller.dart';
 import '../theme/theme_controller.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
-import 'theme_mode_switcher.dart';import '../utils/snackbar_helper.dart';
+import 'theme_mode_switcher.dart';
+import '../utils/snackbar_helper.dart';
 
 
 class CombinedUserMenuButton extends StatelessWidget {
@@ -15,6 +16,8 @@ class CombinedUserMenuButton extends StatelessWidget {
   final LocaleController? localeController;
   final CalendarController? calendarController;
   final ThemeController? themeController;
+  /// نوار ابزار فشرده (مثلاً پنل کسب‌وکار): آواتار کوچک‌تر.
+  final bool denseToolbar;
 
   const CombinedUserMenuButton({
     super.key,
@@ -22,6 +25,7 @@ class CombinedUserMenuButton extends StatelessWidget {
     this.localeController,
     this.calendarController,
     this.themeController,
+    this.denseToolbar = false,
   });
 
   void _showUserMenu(BuildContext context) {
@@ -486,12 +490,22 @@ class CombinedUserMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     
+    final double avatarR = denseToolbar ? 12 : 16;
+    final double iconSz = denseToolbar ? 14 : 18;
     return IconButton(
+      visualDensity: denseToolbar ? VisualDensity.compact : VisualDensity.standard,
+      style: denseToolbar
+          ? IconButton.styleFrom(
+              minimumSize: const Size(34, 34),
+              padding: const EdgeInsets.all(4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            )
+          : null,
       icon: CircleAvatar(
-        radius: 16,
+        radius: avatarR,
         backgroundColor: cs.surfaceContainerHighest,
         foregroundColor: cs.onSurface,
-        child: const Icon(Icons.person, size: 18),
+        child: Icon(Icons.person, size: iconSz),
       ),
       onPressed: () => _showUserMenu(context),
       tooltip: AppLocalizations.of(context).profile,

@@ -72,9 +72,13 @@ class BusinessShell extends StatefulWidget {
 }
 
 class _BusinessShellState extends State<BusinessShell> {
-  static const double _kUnifiedBizTabBarHeight = 36;
-  static const double _kBizTabMinWidth = 72;
-  static const double _kBizTabMaxWidth = 152;
+  /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
+  static const double _kBizAppBarToolbarHeight = 44;
+  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان.
+  static const double _kUnifiedBizTabBarHeight = 40;
+  static const double _kBizTabChipHeight = 28;
+  static const double _kBizTabMinWidth = 76;
+  static const double _kBizTabMaxWidth = 168;
 
   int _hoverIndex = -1;
   bool _isProductsAndServicesExpanded = false;
@@ -284,41 +288,63 @@ class _BusinessShellState extends State<BusinessShell> {
     void goLoc(String loc) => context.go(loc);
 
     final cs = Theme.of(context).colorScheme;
-    final Color chipBg = active ? cs.primaryContainer : cs.surfaceContainerHighest;
+    final bool isDarkStrip = Theme.of(context).brightness == Brightness.dark;
+    final Color inactiveFill =
+        cs.surfaceContainerHighest.withValues(alpha: isDarkStrip ? 0.88 : 0.94);
     final Color chipFg = active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
-    final Color chipClose = active ? cs.onPrimaryContainer.withValues(alpha: 0.85) : cs.onSurfaceVariant.withValues(alpha: 0.85);
+    final Color chipFgStrong = active ? cs.onPrimaryContainer : cs.onSurface;
+    final Color chipClose = chipFg.withValues(alpha: 0.82);
+    final Color borderCol =
+        active ? cs.primary.withValues(alpha: 0.45) : cs.outline.withValues(alpha: isDarkStrip ? 0.44 : 0.36);
+    final BorderRadius chipRadius = BorderRadius.circular(8);
 
-    return Material(
-      color: chipBg,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: () => store.selectTab(bid, path, goLoc),
-        onLongPress: () => _showDesktopTabActionDialog(context, menuRoot, session, path),
-        child: SizedBox(
-          width: maxTabWidth,
-          height: _kUnifiedBizTabBarHeight - 8,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 6, end: 2),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: chipFg, fontSize: 11, height: 1.05, fontWeight: active ? FontWeight.w600 : FontWeight.w500),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 6),
+      child: Material(
+        color: active ? cs.primaryContainer : inactiveFill,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: chipRadius,
+          side: BorderSide(color: borderCol, width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => store.selectTab(bid, path, goLoc),
+          onLongPress: () => _showDesktopTabActionDialog(context, menuRoot, session, path),
+          child: SizedBox(
+            width: maxTabWidth,
+            height: _kBizTabChipHeight,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: active ? chipFgStrong : chipFg,
+                        fontSize: 11.5,
+                        height: 1.1,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: active ? 0.15 : 0,
+                      ),
+                    ),
                   ),
-                ),
-                InkWell(
-                  onTap: () => store.closeTab(bid, path, goLoc),
-                  customBorder: const CircleBorder(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(Icons.close, size: 14, color: chipClose),
+                  const SizedBox(width: 2),
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: InkWell(
+                      onTap: () => store.closeTab(bid, path, goLoc),
+                      customBorder: const CircleBorder(),
+                      child: Icon(Icons.close_rounded, size: 15, color: chipClose),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -326,11 +352,12 @@ class _BusinessShellState extends State<BusinessShell> {
     );
   }
 
-  /// یک خط: نام کسب‌وکار • تب‌ها (کروم‌وار) • ساعت • دکمهٔ دیالوگ همهٔ تب‌ها
+  /// یک خط: نام کسب‌وکار • تب‌ها • ساعت • دکمهٔ همهٔ تب‌ها
   Widget _buildUnifiedDesktopTabStrip({
     required BuildContext context,
     required List<_MenuItem> menuRoot,
     required Color barBg,
+    required Color stripBottomBorder,
     required String businessName,
     required String dateTimeStr,
     required bool isMobile,
@@ -343,47 +370,74 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     final cs = Theme.of(context).colorScheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color stripFg = cs.onSurfaceVariant;
     final Color stripFgTitle = cs.onSurface;
+    final Color pillBg = cs.surface.withValues(alpha: isDark ? 0.42 : 0.78);
+    final Color pillOutline = cs.outline.withValues(alpha: isDark ? 0.42 : 0.34);
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    final Widget businessTitle = Padding(
-      padding: const EdgeInsetsDirectional.only(start: 6, end: 4),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 200),
-        child: Text(
-          businessName,
-          style: TextStyle(color: stripFgTitle, fontSize: 12, fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+    Widget pill(Widget child, {double maxW = 260}) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxW),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: pillBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: pillOutline, width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+            child: child,
+          ),
         ),
+      );
+    }
+
+    final Widget businessTitle = pill(
+      Text(
+        businessName,
+        style: TextStyle(color: stripFgTitle, fontSize: 12.5, fontWeight: FontWeight.w700),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: isRtl ? TextAlign.right : TextAlign.left,
       ),
+      maxW: 220,
     );
 
-    final Widget dateWidget = Padding(
-      padding: const EdgeInsetsDirectional.only(start: 4, end: 6),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 240),
-        child: Text(
-          dateTimeStr,
-          style: TextStyle(color: stripFg, fontSize: 11),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: isRtl ? TextAlign.left : TextAlign.right,
-        ),
-      ),
-    );
+    final Widget dateWidget = !isMobile
+        ? pill(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule_rounded, size: 15, color: stripFg),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    dateTimeStr,
+                    style: TextStyle(color: stripFg, fontSize: 11.5, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            maxW: 260,
+          )
+        : const SizedBox.shrink();
 
     final t = AppLocalizations.of(context)!;
-    final Widget overflowBtn = IconButton(
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-      padding: EdgeInsets.zero,
-      tooltip: t.businessPanelTabListTooltip,
-      icon: Icon(Icons.more_horiz, color: stripFg, size: 22),
-      onPressed: () => _showAllTabsManagementDialog(context, menuRoot),
+    final Widget overflowBtn = Padding(
+      padding: const EdgeInsetsDirectional.only(start: 2),
+      child: IconButton(
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+        padding: EdgeInsets.zero,
+        tooltip: t.businessPanelTabListTooltip,
+        icon: Icon(Icons.more_horiz_rounded, color: stripFg, size: 20),
+        onPressed: () => _showAllTabsManagementDialog(context, menuRoot),
+      ),
     );
 
     final Widget tabRegion = LayoutBuilder(
@@ -393,48 +447,50 @@ class _BusinessShellState extends State<BusinessShell> {
           return const SizedBox.expand();
         }
         final perTab = (constraints.maxWidth / n).clamp(_kBizTabMinWidth, _kBizTabMaxWidth).toDouble();
-        return ClipRect(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            reverse: isRtl,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Row(
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                for (final p in session.paths)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 3),
-                    child: _buildDesktopTabChip(context, menuRoot, session, p, perTab),
-                  ),
-              ],
+        return Align(
+          alignment: Alignment.center,
+          child: ClipRect(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: isRtl,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                children: [
+                  for (final p in session.paths)
+                    _buildDesktopTabChip(context, menuRoot, session, p, perTab),
+                ],
+              ),
             ),
           ),
         );
       },
     );
 
-    final List<Widget> rowChildren = isRtl
-        ? <Widget>[
-            businessTitle,
-            Expanded(child: tabRegion),
-            if (!isMobile) dateWidget,
-            overflowBtn,
-          ]
-        : <Widget>[
-            if (!isMobile) dateWidget,
-            Expanded(child: tabRegion),
-            businessTitle,
-            overflowBtn,
-          ];
+    final List<Widget> rowChildren = <Widget>[
+      businessTitle,
+      const SizedBox(width: 12),
+      Expanded(child: tabRegion),
+      const SizedBox(width: 12),
+      if (!isMobile) dateWidget,
+      if (!isMobile) const SizedBox(width: 8),
+      overflowBtn,
+    ];
 
-    return Material(
-      color: barBg,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: barBg,
+        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
+      ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: rowChildren,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: rowChildren,
+          ),
         ),
       ),
     );
@@ -1730,33 +1786,53 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color appBarFg = scheme.onPrimary;
 
     final appBar = AppBar(
+      toolbarHeight: _kBizAppBarToolbarHeight,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
       backgroundColor: appBarBg,
       foregroundColor: appBarFg,
+      iconTheme: IconThemeData(color: appBarFg, size: 21),
+      actionsIconTheme: IconThemeData(color: appBarFg, size: 21),
       automaticallyImplyLeading: !useRail,
       titleSpacing: 0,
       title: Row(
         children: [
-          const SizedBox(width: 8),
+          SizedBox(width: useRail ? 2 : 8),
           if (useRail)
             IconButton(
               tooltip: _desktopRailVisible ? 'پنهان کردن منوی کناری' : 'نمایش منوی کناری',
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(36, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () => setState(() => _desktopRailVisible = !_desktopRailVisible),
               icon: Icon(
-                _desktopRailVisible ? Icons.menu_open : Icons.menu,
+                _desktopRailVisible ? Icons.menu_open_rounded : Icons.menu_rounded,
                 color: appBarFg,
+                size: 21,
               ),
             ),
-          if (!useRail) const SizedBox(width: 4),
-          Image.asset(logoAsset, height: 28),
-          const SizedBox(width: 12),
-          Text(t.appTitle, style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700)),
+          if (!useRail) const SizedBox(width: 2),
+          Image.asset(logoAsset, height: 22),
+          const SizedBox(width: 10),
+          Text(
+            t.appTitle,
+            style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700, fontSize: 15, height: 1.1),
+          ),
         ],
       ),
       leading: useRail
           ? null
           : Builder(
               builder: (ctx) => IconButton(
-                icon: Icon(Icons.menu, color: appBarFg),
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(40, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: Icon(Icons.menu_rounded, color: appBarFg, size: 21),
                 onPressed: () => Scaffold.of(ctx).openDrawer(),
                 tooltip: t.menu,
               ),
@@ -1765,6 +1841,11 @@ class _BusinessShellState extends State<BusinessShell> {
         NotificationBellButton(authStore: widget.authStore, iconColor: appBarFg),
         IconButton(
           tooltip: 'چت سریع با AI',
+          visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(
+            minimumSize: const Size(38, 38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           onPressed: () {
             AIChatDialog.show(
               context,
@@ -1773,27 +1854,32 @@ class _BusinessShellState extends State<BusinessShell> {
               calendarController: widget.calendarController,
             );
           },
-          icon: const Icon(Icons.smart_toy_outlined),
+          icon: Icon(Icons.smart_toy_outlined, color: appBarFg, size: 21),
         ),
         IconButton(
           tooltip: 'ماشین حساب',
+          visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(
+            minimumSize: const Size(38, 38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           onPressed: () {
             CalculatorDialog.show(context);
           },
-          icon: const Icon(Icons.calculate_outlined),
+          icon: Icon(Icons.calculate_outlined, color: appBarFg, size: 21),
         ),
         CombinedUserMenuButton(
           authStore: widget.authStore,
           localeController: widget.localeController,
           calendarController: widget.calendarController,
           themeController: widget.themeController,
+          denseToolbar: true,
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 2),
       ],
     );
 
-    // نوار باریک بالای AppBar: نام کسب‌وکار و (در نمای دسکتاپ/تبلت) تاریخ و زمان
-    const double _businessTopBarHeight = 32;
+    // نوار دوم: تب‌ها یا نام کسب‌وکار / تاریخ
     final bool isMobile = width < 700;
     final String businessName = currentBusiness?.name ?? '';
     final bool isJalali = widget.calendarController?.isJalali ?? true;
@@ -1802,40 +1888,49 @@ class _BusinessShellState extends State<BusinessShell> {
       isJalali,
       t.localeName,
     );
-    final Color secondaryStripBg =
-        isDark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow;
+    final Color secondaryStripBg = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isDark ? 0.175 : 0.10),
+      isDark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow,
+    );
+    final Color stripBottomBorder = scheme.outline.withValues(alpha: isDark ? 0.58 : 0.48);
     final Color stripMuted = scheme.onSurfaceVariant;
     final Color stripTitle = scheme.onSurface;
 
-    final Widget businessTopBar = Container(
-      height: _businessTopBarHeight,
-      width: double.infinity,
-      color: secondaryStripBg,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      alignment: Alignment.center,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              businessName,
-              style: TextStyle(
-                color: stripTitle,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+    final Widget businessTopBar = DecoratedBox(
+      decoration: BoxDecoration(
+        color: secondaryStripBg,
+        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
+      ),
+      child: SizedBox(
+        height: _kUnifiedBizTabBarHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  businessName,
+                  style: TextStyle(
+                    color: stripTitle,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              if (!isMobile)
+                Text(
+                  dateTimeStr,
+                  style: TextStyle(
+                    color: stripMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
           ),
-          if (!isMobile)
-            Text(
-              dateTimeStr,
-              style: TextStyle(
-                color: stripMuted,
-                fontSize: 12,
-              ),
-            ),
-        ],
+        ),
       ),
     );
 
@@ -1843,21 +1938,20 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool showBizTabs =
         useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
     final Widget shellMainChild = widget.child;
-    final double topStripHeight =
-        showBizTabs ? _kUnifiedBizTabBarHeight : _businessTopBarHeight;
+    final double topStripHeight = _kUnifiedBizTabBarHeight;
 
     final PreferredSizeWidget preferredAppBar = PreferredSize(
-      preferredSize: Size.fromHeight(topStripHeight + kToolbarHeight),
+      preferredSize: Size.fromHeight(topStripHeight + _kBizAppBarToolbarHeight),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           appBar,
-          Divider(height: 1, thickness: 1, color: scheme.outline.withValues(alpha: isDark ? 0.35 : 0.28)),
           if (showBizTabs)
             _buildUnifiedDesktopTabStrip(
               context: context,
               menuRoot: menuItems,
               barBg: secondaryStripBg,
+              stripBottomBorder: stripBottomBorder,
               businessName: businessName,
               dateTimeStr: dateTimeStr,
               isMobile: isMobile,
