@@ -149,28 +149,32 @@ class _AccountSelectionDialog extends StatefulWidget {
 }
 
 class _AccountSelectionDialogState extends State<_AccountSelectionDialog> {
-  String _searchQuery = '';
-  List<Account> _filteredAccounts = [];
+  late final TextEditingController _searchController;
 
   @override
   void initState() {
     super.initState();
-    _filteredAccounts = widget.accounts;
+    _searchController = TextEditingController();
   }
 
-  void _filterAccounts(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredAccounts = widget.accounts;
-      } else {
-        _filteredAccounts = widget.accounts
-            .where((account) =>
-                account.name.toLowerCase().contains(query.toLowerCase()) ||
-                account.code.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Account> _computedFiltered() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return widget.accounts;
+    }
+    return widget.accounts
+        .where(
+          (account) =>
+              account.name.toLowerCase().contains(query) ||
+              account.code.toLowerCase().contains(query),
+        )
+        .toList();
   }
 
   @override
@@ -215,49 +219,57 @@ class _AccountSelectionDialogState extends State<_AccountSelectionDialog> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
+                controller: _searchController,
                 decoration: const InputDecoration(
                   labelText: 'جستجو',
                   hintText: 'نام یا کد حساب...',
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
                 ),
-                onChanged: _filterAccounts,
               ),
             ),
-            
+
             // لیست حساب‌ها
             Expanded(
-              child: _filteredAccounts.isEmpty
-                  ? Center(
+              child: ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  final filtered = _computedFiltered();
+                  final queryEmpty = _searchController.text.trim().isEmpty;
+                  if (filtered.isEmpty) {
+                    return Center(
                       child: Text(
-                        _searchQuery.isEmpty ? 'هیچ حسابی یافت نشد' : 'نتیجه‌ای یافت نشد',
+                        queryEmpty ? 'هیچ حسابی یافت نشد' : 'نتیجه‌ای یافت نشد',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _filteredAccounts.length,
-                      itemBuilder: (context, index) {
-                        final account = _filteredAccounts[index];
-                        final isSelected = widget.selectedAccount?.id == account.id;
-                        
-                        return ListTile(
-                          title: Text(account.name),
-                          subtitle: Text('کد: ${account.code}'),
-                          selected: isSelected,
-                          onTap: () {
-                            widget.onAccountSelected(account);
-                          },
-                          trailing: isSelected
-                              ? Icon(
-                                  Icons.check,
-                                  color: theme.colorScheme.primary,
-                                )
-                              : null,
-                        );
-                      },
-                    ),
+                    );
+                  }
+                  return ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final account = filtered[index];
+                      final isSelected = widget.selectedAccount?.id == account.id;
+
+                      return ListTile(
+                        title: Text(account.name),
+                        subtitle: Text('کد: ${account.code}'),
+                        selected: isSelected,
+                        onTap: () {
+                          widget.onAccountSelected(account);
+                        },
+                        trailing: isSelected
+                            ? Icon(
+                                Icons.check,
+                                color: theme.colorScheme.primary,
+                              )
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
             
             // دکمه‌های پایین

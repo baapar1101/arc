@@ -56,38 +56,43 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
           width: 1,
         ),
       ),
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        decoration: InputDecoration(
-          hintText: AppLocalizations.of(context).searchSettingsPlaceholder,
-          prefixIcon: Icon(
-            Icons.search,
-            color: colorScheme.onSurfaceVariant,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context).searchSettingsPlaceholder,
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
           ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _controller,
-            builder: (context, value, child) {
-              return value.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      onPressed: _clearSearch,
-                    )
-                  : const SizedBox.shrink();
+          ListenableBuilder(
+            listenable: _controller,
+            builder: (context, _) {
+              final hasText = _controller.text.isNotEmpty;
+              return IconButton(
+                icon: Icon(
+                  Icons.clear,
+                  color: hasText ? colorScheme.onSurfaceVariant : Colors.transparent,
+                ),
+                onPressed: hasText ? _clearSearch : null,
+              );
             },
           ),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          filled: false,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-        ),
+        ],
       ),
     );
   }

@@ -28,11 +28,8 @@ class AmountFieldWordsTooltip extends StatelessWidget {
           usePersian: persian,
           currencyUnit: currencyUnit,
         );
-        if (msg == null) {
-          return child;
-        }
-
         final theme = Theme.of(context);
+        // همیشه همان عمق درخت را نگه می‌داریم؛ عوض کردن والد مستقیم TextField باعث پرت شدن فوکوس می‌شد.
         return TooltipTheme(
           data: TooltipThemeData(
             decoration: BoxDecoration(
@@ -55,8 +52,9 @@ class AmountFieldWordsTooltip extends StatelessWidget {
             showDuration: const Duration(seconds: 14),
           ),
           child: Tooltip(
-            message: msg,
+            message: msg ?? '',
             verticalOffset: 10,
+            excludeFromSemantics: msg == null || msg.isEmpty,
             child: child,
           ),
         );

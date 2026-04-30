@@ -827,6 +827,14 @@ class _ProductPickerBottomSheet extends StatefulWidget {
 }
 
 class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
+  final FocusNode _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
   String _getCategoryLabel(int categoryId) {
     final node = findCategoryNode(widget.categoryTree, categoryId);
     return node?.label ?? 'دسته‌بندی';
@@ -886,102 +894,112 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: ValueListenableBuilder<_ProductPickerState>(
-          valueListenable: widget.pickerStateNotifier,
-          builder: (context, state, _) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                Row(
+                Text(
+                  widget.label,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () async => widget.onSearchByBarcode(context),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  tooltip: 'جستجو با بارکد/سریال',
+                  color: colorScheme.primary,
+                ),
+                if (widget.canAddNewProduct && widget.onAddNewProduct != null)
+                  IconButton(
+                    onPressed: () => widget.onAddNewProduct!(context),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'افزودن کالا/خدمت جدید',
+                    color: colorScheme.primary,
+                  ),
+                IconButton(onPressed: widget.onClose, icon: const Icon(Icons.close)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (widget.isMobile && widget.selectedCategoryId != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
                   children: [
-                    Text(
-                      widget.label,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () async => widget.onSearchByBarcode(context),
-                      icon: const Icon(Icons.qr_code_scanner),
-                      tooltip: 'جستجو با بارکد/سریال',
-                      color: colorScheme.primary,
-                    ),
-                    if (widget.canAddNewProduct && widget.onAddNewProduct != null)
-                      IconButton(
-                        onPressed: () => widget.onAddNewProduct!(context),
-                        icon: const Icon(Icons.add),
-                        tooltip: 'افزودن کالا/خدمت جدید',
-                        color: colorScheme.primary,
+                    Expanded(
+                      child: Chip(
+                        label: Text(_getCategoryLabel(widget.selectedCategoryId!)),
+                        onDeleted: () => widget.onCategorySelected(null),
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        avatar: const Icon(Icons.category, size: 18),
                       ),
-                    IconButton(onPressed: widget.onClose, icon: const Icon(Icons.close)),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                // Breadcrumb دسته‌بندی انتخاب شده (فقط در موبایل)
-                if (widget.isMobile && widget.selectedCategoryId != null)
+              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.isMobile)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Chip(
-                            label: Text(_getCategoryLabel(widget.selectedCategoryId!)),
-                            onDeleted: () => widget.onCategorySelected(null),
-                            deleteIcon: const Icon(Icons.close, size: 18),
-                            avatar: const Icon(Icons.category, size: 18),
-                          ),
-                        ),
-                      ],
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: IconButton(
+                      onPressed: () => _showCategoryFilter(context),
+                      icon: Icon(
+                        widget.selectedCategoryId != null
+                            ? Icons.filter_alt
+                            : Icons.filter_alt_outlined,
+                      ),
+                      tooltip: 'فیلتر دسته‌بندی',
+                      color: widget.selectedCategoryId != null
+                          ? colorScheme.primary
+                          : colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
-                Row(
-                  children: [
-                    // دکمه فیلتر دسته‌بندی (فقط در موبایل)
-                    if (widget.isMobile)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: IconButton(
-                          onPressed: () => _showCategoryFilter(context),
-                          icon: Icon(
-                            widget.selectedCategoryId != null
-                                ? Icons.filter_alt
-                                : Icons.filter_alt_outlined,
-                          ),
-                          tooltip: 'فیلتر دسته‌بندی',
-                          color: widget.selectedCategoryId != null
-                              ? colorScheme.primary
-                              : colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
-                    Expanded(
-                      child: TextField(
-                        controller: widget.searchController,
-                        decoration: InputDecoration(
-                          hintText: widget.hintText,
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          suffixIcon: state.isLoading
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                )
-                              : null,
-                        ),
-                        onChanged: widget.onQueryChanged,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
                 Expanded(
-                  child: _buildList(theme, state),
+                  child: TextField(
+                    controller: widget.searchController,
+                    focusNode: _searchFocus,
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: widget.onQueryChanged,
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  height: kMinInteractiveDimension,
+                  child: ValueListenableBuilder<_ProductPickerState>(
+                    valueListenable: widget.pickerStateNotifier,
+                    builder: (context, state, _) {
+                      if (!state.isLoading) {
+                        return const SizedBox.shrink();
+                      }
+                      return const Padding(
+                        padding: EdgeInsetsDirectional.only(start: 8, top: 12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
-            );
-          },
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ValueListenableBuilder<_ProductPickerState>(
+                valueListenable: widget.pickerStateNotifier,
+                builder: (context, state, _) {
+                  return _buildList(theme, state);
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

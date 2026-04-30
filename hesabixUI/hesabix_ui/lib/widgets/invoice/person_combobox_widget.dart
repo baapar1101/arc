@@ -293,11 +293,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       isScrollControlled: true,
       builder: (context) {
         print('[PersonCombobox] BottomSheet builder called - _persons count: ${_persons.length}, _isLoading: $_isLoading, _isSearching: $_isSearching');
-        return ValueListenableBuilder<_PersonPickerState>(
-          valueListenable: _pickerStateNotifier,
-          builder: (context, pickerState, _) {
-            print('[PersonCombobox] ValueListenableBuilder rebuild - persons count: ${pickerState.persons.length}, isLoading: ${pickerState.isLoading}, isSearching: ${pickerState.isSearching}, hasSearched: ${pickerState.hasSearched}');
-            return _PersonPickerBottomSheet(
+        return _PersonPickerBottomSheet(
               pickerStateNotifier: _pickerStateNotifier,
               selectedPerson: widget.selectedPerson,
               onPersonSelected: _selectPerson,
@@ -311,8 +307,6 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
               personTypes: widget.personTypes,
               onAddNew: () => _addNewPerson(context),
             );
-          },
-        );
       },
     );
   }
@@ -438,83 +432,100 @@ class _PersonPickerBottomSheet extends StatefulWidget {
 }
 
 class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
+  final FocusNode _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     print('[PersonPickerBottomSheet] build called');
     final theme = Theme.of(context);
-    
-    return ValueListenableBuilder<_PersonPickerState>(
-      valueListenable: widget.pickerStateNotifier,
-      builder: (context, pickerState, _) {
-        print('[PersonPickerBottomSheet] ValueListenableBuilder rebuild - persons count: ${pickerState.persons.length}, isLoading: ${pickerState.isLoading}, isSearching: ${pickerState.isSearching}');
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(16),
-          child: Column(
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
             children: [
-              // هدر
-              Row(
-                children: [
-                  Text(
-                    widget.label,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (widget.onAddNew != null)
-                    IconButton(
-                      onPressed: widget.onAddNew,
-                      icon: const Icon(Icons.add),
-                      tooltip: 'افزودن شخص جدید',
-                      color: theme.colorScheme.primary,
-                    ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // فیلد جست‌وجو
-              TextField(
-                controller: widget.searchController,
-                decoration: InputDecoration(
-                  hintText: widget.searchHint,
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  suffixIcon: pickerState.isSearching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : null,
+              Text(
+                widget.label,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                onChanged: (value) {
-                  print('[PersonPickerBottomSheet] TextField onChanged called with: "$value"');
-                  print('[PersonPickerBottomSheet] Current persons count: ${pickerState.persons.length}');
-                  print('[PersonPickerBottomSheet] Calling onSearchChanged callback...');
-                  widget.onSearchChanged(value);
-                  print('[PersonPickerBottomSheet] onSearchChanged callback completed');
-                },
               ),
-              const SizedBox(height: 16),
-              
-              // لیست اشخاص
-              Expanded(
-                child: _buildPersonsList(context, pickerState),
+              const Spacer(),
+              if (widget.onAddNew != null)
+                IconButton(
+                  onPressed: widget.onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن شخص جدید',
+                  color: theme.colorScheme.primary,
+                ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.searchController,
+                  focusNode: _searchFocus,
+                  decoration: InputDecoration(
+                    hintText: widget.searchHint,
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onChanged: widget.onSearchChanged,
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                height: kMinInteractiveDimension,
+                child: ValueListenableBuilder<_PersonPickerState>(
+                  valueListenable: widget.pickerStateNotifier,
+                  builder: (context, pickerState, _) {
+                    if (!pickerState.isSearching) {
+                      return const SizedBox.shrink();
+                    }
+                    return const Padding(
+                      padding: EdgeInsetsDirectional.only(start: 8, top: 12),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ValueListenableBuilder<_PersonPickerState>(
+              valueListenable: widget.pickerStateNotifier,
+              builder: (context, pickerState, _) {
+                print(
+                  '[PersonPickerBottomSheet] list rebuild persons=${pickerState.persons.length} loading=${pickerState.isLoading}',
+                );
+                return _buildPersonsList(context, pickerState);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -500,6 +500,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
 
 class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> {
   late final ScrollController _scrollController;
+  final FocusNode _searchFocus = FocusNode();
 
   @override
   void initState() {
@@ -509,6 +510,7 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
 
   @override
   void dispose() {
+    _searchFocus.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -528,78 +530,87 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
     print('[CustomerPickerBottomSheet] build called');
     final theme = Theme.of(context);
 
-    return ValueListenableBuilder<_CustomerPickerState>(
-      valueListenable: widget.pickerStateNotifier,
-      builder: (context, pickerState, _) {
-        print('[CustomerPickerBottomSheet] ValueListenableBuilder rebuild - customers count: ${pickerState.customers.length}, isLoading: ${pickerState.isLoading}, hasSearched: ${pickerState.hasSearched}');
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
             children: [
-              // هدر
-              Row(
-                children: [
-                  Text(
-                    'انتخاب طرف حساب',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (widget.onAddNew != null)
-                    IconButton(
-                      onPressed: widget.onAddNew,
-                      icon: const Icon(Icons.add),
-                      tooltip: 'افزودن شخص جدید',
-                      color: theme.colorScheme.primary,
-                    ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // فیلد جست‌وجو
-              TextField(
-                controller: widget.searchController,
-                decoration: InputDecoration(
-                  hintText: 'جست‌وجو در طرف حساب‌ها...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  suffixIcon: pickerState.isLoading
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : null,
+              Text(
+                'انتخاب طرف حساب',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                onChanged: (value) {
-                  print('[CustomerPickerBottomSheet] TextField onChanged called with: "$value"');
-                  print('[CustomerPickerBottomSheet] Current customers count: ${pickerState.customers.length}');
-                  print('[CustomerPickerBottomSheet] Calling onSearchChanged callback...');
-                  widget.onSearchChanged(value);
-                  print('[CustomerPickerBottomSheet] onSearchChanged callback completed');
-                },
               ),
-              const SizedBox(height: 16),
-              
-              // لیست طرف حساب‌ها
-              Expanded(
-                child: _buildCustomersList(context, pickerState),
+              const Spacer(),
+              if (widget.onAddNew != null)
+                IconButton(
+                  onPressed: widget.onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن شخص جدید',
+                  color: theme.colorScheme.primary,
+                ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.searchController,
+                  focusNode: _searchFocus,
+                  decoration: InputDecoration(
+                    hintText: 'جست‌وجو در طرف حساب‌ها...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onChanged: widget.onSearchChanged,
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                height: kMinInteractiveDimension,
+                child: ValueListenableBuilder<_CustomerPickerState>(
+                  valueListenable: widget.pickerStateNotifier,
+                  builder: (context, pickerState, _) {
+                    if (!pickerState.isLoading) {
+                      return const SizedBox.shrink();
+                    }
+                    return const Padding(
+                      padding: EdgeInsetsDirectional.only(start: 8, top: 12),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ValueListenableBuilder<_CustomerPickerState>(
+              valueListenable: widget.pickerStateNotifier,
+              builder: (context, pickerState, _) {
+                print(
+                  '[CustomerPickerBottomSheet] list rebuild count=${pickerState.customers.length} loading=${pickerState.isLoading}',
+                );
+                return _buildCustomersList(context, pickerState);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 

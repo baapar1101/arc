@@ -342,20 +342,35 @@ class _CashRegisterPickerBottomSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: searchController,
-            decoration: InputDecoration(
-              hintText: hintText,
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              suffixIcon: isSearching
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                    )
-                  : null,
-            ),
-            onChanged: onSearchChanged,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onChanged: onSearchChanged,
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                height: kMinInteractiveDimension,
+                child: isSearching
+                    ? const Padding(
+                        padding: EdgeInsetsDirectional.only(start: 8, top: 12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Expanded(

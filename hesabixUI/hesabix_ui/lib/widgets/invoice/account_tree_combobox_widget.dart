@@ -144,7 +144,6 @@ class _AccountTreeDialog extends StatefulWidget {
 
 class _AccountTreeDialogState extends State<_AccountTreeDialog> {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   final Set<int> _expandedNodes = {};
 
   @override
@@ -184,12 +183,13 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
   List<AccountTreeNode> _filterTree(List<AccountTreeNode> nodes) {
     // ابتدا بر اساس نوع سند (expense/income) هرس می‌کنیم
     final prunedByType = _pruneByDocumentType(nodes, widget.documentTypeFilter);
-    if (_searchQuery.isEmpty) {
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) {
       return prunedByType;
     }
 
     final List<AccountTreeNode> filtered = [];
-    final query = _searchQuery.toLowerCase();
+    final query = q;
 
     for (final node in prunedByType) {
       final matchesSearch = node.name.toLowerCase().contains(query) ||
@@ -286,8 +286,7 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final filteredTree = _filterTree(widget.accountTree);
-    
+
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
@@ -340,18 +339,13 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
                       prefixIcon: Icon(Icons.search),
                       border: OutlineInputBorder(),
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton.icon(
-                        onPressed: () => _expandAll(filteredTree),
+                        onPressed: () => _expandAll(_filterTree(widget.accountTree)),
                         icon: const Icon(Icons.unfold_more, size: 18),
                         label: const Text('باز کردن همه'),
                       ),
@@ -369,21 +363,29 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
             
             const Divider(height: 1),
             
-            // درخت حساب‌ها
+            // درخت حساب‌ها — فقط این بخش با تایپ دوباره ساخته می‌شود؛ فوکوس روی جستجو حفظ می‌شود.
             Expanded(
-              child: filteredTree.isEmpty
-                  ? Center(
+              child: ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  final filteredTree = _filterTree(widget.accountTree);
+                  final queryEmpty = _searchController.text.trim().isEmpty;
+                  if (filteredTree.isEmpty) {
+                    return Center(
                       child: Text(
-                        _searchQuery.isEmpty ? 'هیچ حسابی یافت نشد' : 'نتیجه‌ای یافت نشد',
+                        queryEmpty ? 'هیچ حسابی یافت نشد' : 'نتیجه‌ای یافت نشد',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(8),
-                      children: _buildTreeNodes(filteredTree, 0),
-                    ),
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.all(8),
+                    children: _buildTreeNodes(filteredTree, 0),
+                  );
+                },
+              ),
             ),
             
             const Divider(height: 1),

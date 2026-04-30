@@ -630,35 +630,42 @@ class _AddCurrencyDialogState extends State<_AddCurrencyDialog> {
               ),
             ),
 
-            // Search bar
+            // Search bar — فیلد جست‌وجو خارج از ValueListenableBuilder تا با تغییر suffix فوکوس قطع نشود
             Padding(
               padding: const EdgeInsets.all(16),
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _searchController,
-                builder: (context, value, child) {
-                  return TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'جستجو بر اساس نام، کد یا نماد ارز...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: value.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                              },
-                              tooltip: 'پاک کردن',
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'جستجو بر اساس نام، کد یا نماد ارز...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
                       ),
-                      filled: true,
-                      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                      autofocus: true,
                     ),
-                    autofocus: true,
-                  );
-                },
+                  ),
+                  ListenableBuilder(
+                    listenable: _searchController,
+                    builder: (context, _) {
+                      final hasText = _searchController.text.isNotEmpty;
+                      return IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: hasText ? null : Colors.transparent,
+                        ),
+                        tooltip: 'پاک کردن',
+                        onPressed: hasText ? () => _searchController.clear() : null,
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
 
