@@ -223,6 +223,75 @@ class BusinessPanelUiStore extends ChangeNotifier {
     return true;
   }
 
+  static String _appendQueryFromMenuUri(String pathWithoutQuery, Uri menuUri) {
+    if (!menuUri.hasQuery) return pathWithoutQuery;
+    return '$pathWithoutQuery?${menuUri.query}';
+  }
+
+  /// در حالت «تب» (منوی کناری دسکتاپ): صفحهٔ جدید در تب بعدی باز می‌شود؛
+  /// اگر همین بخش از قبل در یک تب باز بود، به همان تب می‌رود.
+  /// در حالت تک‌صفحه یا وقتی [fallbackOnly]، همان [menuUrl] با [go] زده می‌شود.
+  void navigateSidebarFromMenuUrl({
+    required int businessId,
+    required String menuUrl,
+    required void Function(String location) go,
+    bool fallbackOnly = false,
+  }) {
+    if (fallbackOnly || _mode != BusinessPanelNavigationMode.tabs) {
+      go(menuUrl);
+      return;
+    }
+
+    final uri = Uri.tryParse(menuUrl);
+    if (uri == null) {
+      go(menuUrl);
+      return;
+    }
+    final pathOnly = uri.path;
+    if (!pathOnly.startsWith('/business/$businessId/')) {
+      go(menuUrl);
+      return;
+    }
+
+    final tailKey = BusinessRoutePaths.stripBusinessPrefixAndTab(pathOnly, businessId);
+    final tailCmp = tailKey.split('?').first;
+
+    var paths = List<String>.from(_tabsByBusiness[businessId]?.paths ?? const []);
+
+    for (var i = 0; i < paths.length; i++) {
+      final p = paths[i];
+      final existingTail = BusinessRoutePaths.stripBusinessPrefixAndTab(p.split('?').first, businessId);
+      if (existingTail.split('?').first != tailCmp) continue;
+      final slot = BusinessRoutePaths.parseTabSlotFromPath(p.split('?').first);
+      if (slot == null) continue;
+      final newBase = BusinessRoutePaths.uri(businessId, slot, tailKey);
+      final newFull = _appendQueryFromMenuUri(newBase, uri);
+      paths[i] = newFull;
+      _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+      notifyListeners();
+      go(newFull);
+      _schedulePersist();
+      return;
+    }
+
+    while (paths.length >= BusinessRoutePaths.tabBranchCount) {
+      paths.removeAt(0);
+    }
+    if (paths.isNotEmpty) {
+      paths = BusinessRoutePaths.repackTabPathsAfterRemoval(businessId, paths);
+    }
+
+    final slot = paths.length;
+    final newBase = BusinessRoutePaths.uri(businessId, slot, tailKey);
+    final newFull = _appendQueryFromMenuUri(newBase, uri);
+    paths.add(newFull);
+
+    _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+    notifyListeners();
+    go(newFull);
+    _schedulePersist();
+  }
+
   void selectTab(int businessId, String path, void Function(String location) go) {
     final s = _tabsByBusiness[businessId];
     if (s == null || !s.paths.contains(path)) return;

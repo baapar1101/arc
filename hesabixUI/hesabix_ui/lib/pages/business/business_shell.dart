@@ -100,6 +100,18 @@ class _BusinessShellState extends State<BusinessShell> {
 
   String _bu(String rel) => context.businessPanelUrl(widget.businessId, rel);
 
+  /// در دسکتاپ + حالت «تب»: منوی کناری تب جدید باز می‌کند؛ در موبایل/تک‌صفحه همان مسیر [_bu].
+  Future<void> _navigateMenuPath(BuildContext ctx, String menuUrl, {required bool desktopRail}) async {
+    await BusinessPanelUiStore.instance.hydrateIfNeeded();
+    if (!ctx.mounted) return;
+    BusinessPanelUiStore.instance.navigateSidebarFromMenuUrl(
+      businessId: widget.businessId,
+      menuUrl: menuUrl,
+      go: (loc) => ctx.go(loc),
+      fallbackOnly: !desktopRail,
+    );
+  }
+
   String _tabTitleForBusinessPath(String path, int businessId, List<_MenuItem> menuRoot) {
     var best = '';
     var bestLen = 0;
@@ -1412,7 +1424,7 @@ class _BusinessShellState extends State<BusinessShell> {
                 );
               }
             } else {
-              ctx.go(item.path!);
+              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail);
             }
           }
         } catch (e) {
@@ -1431,7 +1443,7 @@ class _BusinessShellState extends State<BusinessShell> {
                 );
               }
             } else {
-              ctx.go(item.path!);
+              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail);
             }
         }
       } else if (item.type == _MenuItemType.expandable) {
@@ -1466,11 +1478,11 @@ class _BusinessShellState extends State<BusinessShell> {
         if (child.path != null) {
           try {
             if (GoRouterState.of(context).uri.toString() != child.path!) {
-              context.go(child.path!);
+              await _navigateMenuPath(context, child.path!, desktopRail: useRail);
             }
           } catch (e) {
             // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
-            context.go(child.path!);
+            await _navigateMenuPath(context, child.path!, desktopRail: useRail);
           }
         }
       }
