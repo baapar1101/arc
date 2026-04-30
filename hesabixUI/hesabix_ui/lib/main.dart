@@ -825,7 +825,13 @@ class _MyAppState extends State<MyApp> {
         if (currentPath == '/login') {
           return '/user/profile/dashboard';
         }
-        
+
+        // مسیرهای قدیمی پنل بدون segment «tabN» با StatefulShellRoute هم‌خوان نیستند؛ اینجا نرمال می‌شوند.
+        if (currentPath.startsWith('/business/')) {
+          final normalized = redirectLegacyBusinessPath(context, state);
+          if (normalized != null) return normalized;
+        }
+
         // اگر در root است، آخرین URL را بررسی کن
         if (currentPath == '/') {
           // اگر آخرین URL موجود است و معتبر است، به آن برود

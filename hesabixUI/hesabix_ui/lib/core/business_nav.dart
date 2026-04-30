@@ -7,7 +7,10 @@ import 'business_route_paths.dart';
 String? redirectLegacyBusinessPath(BuildContext context, GoRouterState state) {
   final path = state.uri.path;
   if (BusinessRoutePaths.tabSegmentRegex.hasMatch(path)) return null;
-  final bidStr = state.pathParameters['business_id'];
+  var bidStr = state.pathParameters['business_id'];
+  if (bidStr == null || bidStr.isEmpty) {
+    bidStr = RegExp(r'^/business/(\d+)').firstMatch(path)?.group(1);
+  }
   if (bidStr == null) return null;
   final bid = int.tryParse(bidStr);
   if (bid == null) return null;
