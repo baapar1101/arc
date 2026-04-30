@@ -283,8 +283,13 @@ class _BusinessShellState extends State<BusinessShell> {
     final label = _tabTitleForBusinessPath(path, bid, menuRoot);
     void goLoc(String loc) => context.go(loc);
 
+    final cs = Theme.of(context).colorScheme;
+    final Color chipBg = active ? cs.primaryContainer : cs.surfaceContainerHighest;
+    final Color chipFg = active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+    final Color chipClose = active ? cs.onPrimaryContainer.withValues(alpha: 0.85) : cs.onSurfaceVariant.withValues(alpha: 0.85);
+
     return Material(
-      color: active ? Colors.white24 : Colors.white12,
+      color: chipBg,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
@@ -302,15 +307,15 @@ class _BusinessShellState extends State<BusinessShell> {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.05),
+                    style: TextStyle(color: chipFg, fontSize: 11, height: 1.05, fontWeight: active ? FontWeight.w600 : FontWeight.w500),
                   ),
                 ),
                 InkWell(
                   onTap: () => store.closeTab(bid, path, goLoc),
                   customBorder: const CircleBorder(),
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close, size: 14, color: Colors.white70),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(Icons.close, size: 14, color: chipClose),
                   ),
                 ),
               ],
@@ -337,6 +342,10 @@ class _BusinessShellState extends State<BusinessShell> {
       return const SizedBox.shrink();
     }
 
+    final cs = Theme.of(context).colorScheme;
+    final Color stripFg = cs.onSurfaceVariant;
+    final Color stripFgTitle = cs.onSurface;
+
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     final Widget businessTitle = Padding(
@@ -345,7 +354,7 @@ class _BusinessShellState extends State<BusinessShell> {
         constraints: const BoxConstraints(maxWidth: 200),
         child: Text(
           businessName,
-          style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(color: stripFgTitle, fontSize: 12, fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: isRtl ? TextAlign.right : TextAlign.left,
@@ -359,7 +368,7 @@ class _BusinessShellState extends State<BusinessShell> {
         constraints: const BoxConstraints(maxWidth: 240),
         child: Text(
           dateTimeStr,
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
+          style: TextStyle(color: stripFg, fontSize: 11),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: isRtl ? TextAlign.left : TextAlign.right,
@@ -373,7 +382,7 @@ class _BusinessShellState extends State<BusinessShell> {
       constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
       padding: EdgeInsets.zero,
       tooltip: t.businessPanelTabListTooltip,
-      icon: const Icon(Icons.more_horiz, color: Colors.white70, size: 22),
+      icon: Icon(Icons.more_horiz, color: stripFg, size: 22),
       onPressed: () => _showAllTabsManagementDialog(context, menuRoot),
     );
 
@@ -1717,9 +1726,8 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
 
-    // Brand top bar with contrast color
-    final Color appBarBg = const Color(0xFF0D47A1); // آبی تیره
-    final Color appBarFg = Colors.white;
+    final Color appBarBg = scheme.primary;
+    final Color appBarFg = scheme.onPrimary;
 
     final appBar = AppBar(
       backgroundColor: appBarBg,
@@ -1794,12 +1802,15 @@ class _BusinessShellState extends State<BusinessShell> {
       isJalali,
       t.localeName,
     );
-    const Color topBarBg = Color(0xFF020D1A);
+    final Color secondaryStripBg =
+        isDark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow;
+    final Color stripMuted = scheme.onSurfaceVariant;
+    final Color stripTitle = scheme.onSurface;
 
     final Widget businessTopBar = Container(
       height: _businessTopBarHeight,
       width: double.infinity,
-      color: topBarBg,
+      color: secondaryStripBg,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: Alignment.center,
       child: Row(
@@ -1808,8 +1819,8 @@ class _BusinessShellState extends State<BusinessShell> {
           Expanded(
             child: Text(
               businessName,
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: stripTitle,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -1819,8 +1830,8 @@ class _BusinessShellState extends State<BusinessShell> {
           if (!isMobile)
             Text(
               dateTimeStr,
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: stripMuted,
                 fontSize: 12,
               ),
             ),
@@ -1840,18 +1851,19 @@ class _BusinessShellState extends State<BusinessShell> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          appBar,
+          Divider(height: 1, thickness: 1, color: scheme.outline.withValues(alpha: isDark ? 0.35 : 0.28)),
           if (showBizTabs)
             _buildUnifiedDesktopTabStrip(
               context: context,
               menuRoot: menuItems,
-              barBg: topBarBg,
+              barBg: secondaryStripBg,
               businessName: businessName,
               dateTimeStr: dateTimeStr,
               isMobile: isMobile,
             )
           else
             businessTopBar,
-          appBar,
         ],
       ),
     );
