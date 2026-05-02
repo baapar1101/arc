@@ -15,6 +15,9 @@ _MAX_TABS_PER_BUSINESS = 24
 def _default_preferences() -> Dict[str, Any]:
 	return {
 		"business_panel_navigation": "single",
+		# reuse_across_tabs: همان منطق قبلی (اسکن تب‌ها برای همان مقصد یا تب جدید)
+		# long_press_new_tab: کلیک معمولی فقط تب فعال را عوض می‌کند؛ لانگ‌پرس منطق بالا را اعمال می‌کند
+		"business_panel_sidebar_tab_behavior": "reuse_across_tabs",
 		"business_panel_tabs": {},
 	}
 
@@ -84,6 +87,11 @@ def get_user_ui_preferences(db: Session, user_id: int) -> Dict[str, Any]:
 	mode = stored.get("business_panel_navigation")
 	if mode in ("single", "tabs"):
 		data["business_panel_navigation"] = mode
+	sb = stored.get("business_panel_sidebar_tab_behavior")
+	if sb in ("reuse_across_tabs", "long_press_new_tab"):
+		data["business_panel_sidebar_tab_behavior"] = sb
+	else:
+		data["business_panel_sidebar_tab_behavior"] = base["business_panel_sidebar_tab_behavior"]
 	tabs = _normalize_tabs_payload(stored.get("business_panel_tabs"))
 	data["business_panel_tabs"] = tabs
 	return data
@@ -102,6 +110,12 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 	if mode not in ("single", "tabs"):
 		mode = "single"
 
+	sidebar_behavior = payload.get("business_panel_sidebar_tab_behavior")
+	if sidebar_behavior is None:
+		sidebar_behavior = current.get("business_panel_sidebar_tab_behavior", "reuse_across_tabs")
+	if sidebar_behavior not in ("reuse_across_tabs", "long_press_new_tab"):
+		sidebar_behavior = "reuse_across_tabs"
+
 	if "business_panel_tabs" in payload and isinstance(payload["business_panel_tabs"], dict):
 		tabs = _normalize_tabs_payload(payload["business_panel_tabs"])
 	else:
@@ -109,6 +123,7 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 
 	next_prefs = {
 		"business_panel_navigation": mode,
+		"business_panel_sidebar_tab_behavior": sidebar_behavior,
 		"business_panel_tabs": tabs,
 	}
 

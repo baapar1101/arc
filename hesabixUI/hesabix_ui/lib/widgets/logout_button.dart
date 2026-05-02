@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth_store.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';import '../utils/snackbar_helper.dart';
-
-
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../utils/snackbar_helper.dart';
 class LogoutButton extends StatelessWidget {
   final AuthStore authStore;
-  const LogoutButton({super.key, required this.authStore});
+  final bool toolbarCompact;
+  const LogoutButton({super.key, required this.authStore, this.toolbarCompact = false});
 
   Future<void> _confirmAndLogout(BuildContext context) async {
     final t = AppLocalizations.of(context);
@@ -37,16 +37,18 @@ class LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final iconSz = toolbarCompact ? 14.0 : 16.0;
+    final avatarR = toolbarCompact ? 12.0 : 14.0;
     return Tooltip(
       message: t.logout,
       child: InkWell(
         onTap: () => _confirmAndLogout(context),
         customBorder: const CircleBorder(),
         child: CircleAvatar(
-          radius: 14,
+          radius: avatarR,
           backgroundColor: cs.surfaceContainerHighest,
           foregroundColor: cs.onSurface,
-          child: const Icon(Icons.logout, size: 16),
+          child: Icon(Icons.logout, size: iconSz),
         ),
       ),
     );

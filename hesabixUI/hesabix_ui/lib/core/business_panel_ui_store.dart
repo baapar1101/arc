@@ -8,6 +8,14 @@ import '../services/user_ui_preferences_service.dart';
 
 enum BusinessPanelNavigationMode { single, tabs }
 
+/// رفتار باز شدن مسیر از منوی کناری در حالت تب (فقط دسکتاپ با ریل).
+enum BusinessPanelSidebarTabBehavior {
+  /// همان منطق پیش‌فرض: اگر همان مقصد در تب‌ها بود به آن برو، وگرنه تب جدید.
+  reuseAcrossTabsOnTap,
+  /// کلیک معمولی فقط تب فعال را عوض می‌کند؛ لانگ‌پرس همان منطق [reuseAcrossTabsOnTap] را اعمال می‌کند.
+  newTabViaLongPress,
+}
+
 class BusinessPanelTabSession {
   final List<String> paths;
   final String activePath;
@@ -24,12 +32,16 @@ class BusinessPanelUiStore extends ChangeNotifier {
   static final BusinessPanelUiStore instance = BusinessPanelUiStore._();
 
   BusinessPanelNavigationMode _mode = BusinessPanelNavigationMode.single;
+  BusinessPanelSidebarTabBehavior _sidebarTabBehavior =
+      BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
   final Map<int, BusinessPanelTabSession> _tabsByBusiness = {};
   bool _hydrated = false;
   Future<void>? _hydrateFuture;
   Timer? _persistDebounce;
 
   BusinessPanelNavigationMode get mode => _mode;
+
+  BusinessPanelSidebarTabBehavior get sidebarTabBehavior => _sidebarTabBehavior;
 
   bool get isHydrated => _hydrated;
 
@@ -47,6 +59,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
     _hydrated = false;
     _hydrateFuture = null;
     _mode = BusinessPanelNavigationMode.single;
+    _sidebarTabBehavior = BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
     _tabsByBusiness.clear();
     notifyListeners();
   }
@@ -57,6 +70,12 @@ class BusinessPanelUiStore extends ChangeNotifier {
       _mode = BusinessPanelNavigationMode.tabs;
     } else {
       _mode = BusinessPanelNavigationMode.single;
+    }
+    final sb = raw['business_panel_sidebar_tab_behavior'];
+    if (sb == 'long_press_new_tab') {
+      _sidebarTabBehavior = BusinessPanelSidebarTabBehavior.newTabViaLongPress;
+    } else {
+      _sidebarTabBehavior = BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
     }
     _tabsByBusiness.clear();
     final tabsRaw = raw['business_panel_tabs'];
@@ -131,6 +150,10 @@ class BusinessPanelUiStore extends ChangeNotifier {
     return {
       'business_panel_navigation':
           _mode == BusinessPanelNavigationMode.tabs ? 'tabs' : 'single',
+      'business_panel_sidebar_tab_behavior':
+          _sidebarTabBehavior == BusinessPanelSidebarTabBehavior.newTabViaLongPress
+              ? 'long_press_new_tab'
+              : 'reuse_across_tabs',
       'business_panel_tabs': tabs,
     };
   }
@@ -163,8 +186,12 @@ class BusinessPanelUiStore extends ChangeNotifier {
     applyServerPayload(data);
   }
 
-  Future<void> setNavigationMode(BusinessPanelNavigationMode next) async {
-    _mode = next;
+  Future<void> updateAppearancePreferences({
+    required BusinessPanelNavigationMode navigationMode,
+    required BusinessPanelSidebarTabBehavior sidebarTabBehavior,
+  }) async {
+    _mode = navigationMode;
+    _sidebarTabBehavior = sidebarTabBehavior;
     notifyListeners();
     await persistImmediate();
   }
@@ -228,14 +255,15 @@ class BusinessPanelUiStore extends ChangeNotifier {
     return '$pathWithoutQuery?${menuUri.query}';
   }
 
-  /// در حالت «تب» (منوی کناری دسکتاپ): صفحهٔ جدید در تب بعدی باز می‌شود؛
-  /// اگر همین بخش از قبل در یک تب باز بود، به همان تب می‌رود.
+  /// در حالت «تب» (منوی کناری دسکتاپ): با [reuseAcrossTabs]==true همان منطق قبلی؛
+  /// با false فقط اسلات تب فعال جایگزین می‌شود (در صورت نبود جلسهٔ تب، به منطق قبلی می‌افتد).
   /// در حالت تک‌صفحه یا وقتی [fallbackOnly]، همان [menuUrl] با [go] زده می‌شود.
   void navigateSidebarFromMenuUrl({
     required int businessId,
     required String menuUrl,
     required void Function(String location) go,
     bool fallbackOnly = false,
+    bool reuseAcrossTabs = true,
   }) {
     if (fallbackOnly || _mode != BusinessPanelNavigationMode.tabs) {
       go(menuUrl);
@@ -254,6 +282,57 @@ class BusinessPanelUiStore extends ChangeNotifier {
     }
 
     final tailKey = BusinessRoutePaths.stripBusinessPrefixAndTab(pathOnly, businessId);
+
+    if (!reuseAcrossTabs) {
+      final replaced = _tryReplaceActiveTabSlot(
+        businessId: businessId,
+        menuUri: uri,
+        tailKey: tailKey,
+        go: go,
+      );
+      if (replaced) return;
+    }
+
+    _navigateSidebarReuseAcrossTabs(
+      businessId: businessId,
+      menuUri: uri,
+      tailKey: tailKey,
+      go: go,
+    );
+  }
+
+  bool _tryReplaceActiveTabSlot({
+    required int businessId,
+    required Uri menuUri,
+    required String tailKey,
+    required void Function(String location) go,
+  }) {
+    final session = _tabsByBusiness[businessId];
+    if (session == null || session.paths.isEmpty) return false;
+
+    final slot = BusinessRoutePaths.parseTabSlotFromPath(session.activePath.split('?').first);
+    if (slot == null) return false;
+
+    final paths = List<String>.from(session.paths);
+    if (slot < 0 || slot >= paths.length) return false;
+
+    final newBase = BusinessRoutePaths.uri(businessId, slot, tailKey);
+    final newFull = _appendQueryFromMenuUri(newBase, menuUri);
+
+    paths[slot] = newFull;
+    _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+    notifyListeners();
+    go(newFull);
+    _schedulePersist();
+    return true;
+  }
+
+  void _navigateSidebarReuseAcrossTabs({
+    required int businessId,
+    required Uri menuUri,
+    required String tailKey,
+    required void Function(String location) go,
+  }) {
     final tailCmp = tailKey.split('?').first;
 
     var paths = List<String>.from(_tabsByBusiness[businessId]?.paths ?? const []);
@@ -265,7 +344,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
       final slot = BusinessRoutePaths.parseTabSlotFromPath(p.split('?').first);
       if (slot == null) continue;
       final newBase = BusinessRoutePaths.uri(businessId, slot, tailKey);
-      final newFull = _appendQueryFromMenuUri(newBase, uri);
+      final newFull = _appendQueryFromMenuUri(newBase, menuUri);
       paths[i] = newFull;
       _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
       notifyListeners();
@@ -283,7 +362,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
 
     final slot = paths.length;
     final newBase = BusinessRoutePaths.uri(businessId, slot, tailKey);
-    final newFull = _appendQueryFromMenuUri(newBase, uri);
+    final newFull = _appendQueryFromMenuUri(newBase, menuUri);
     paths.add(newFull);
 
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);

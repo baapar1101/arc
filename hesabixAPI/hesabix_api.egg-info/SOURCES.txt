@@ -218,6 +218,7 @@ adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
 adapters/db/models/product_bom.py
+adapters/db/models/product_general_barcode_alias.py
 adapters/db/models/product_instance.py
 adapters/db/models/product_tax_code.py
 adapters/db/models/project.py
@@ -429,6 +430,7 @@ app/services/petty_cash_service.py
 app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/product_attribute_service.py
+app/services/product_general_barcode_service.py
 app/services/product_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
@@ -628,6 +630,7 @@ migrations/versions/20260605_000001_seed_notification_event_types_workflow_exten
 migrations/versions/20260606_000001_business_crm_allow_web_chat_voice.py
 migrations/versions/20260607_000001_users_last_activity_signature.py
 migrations/versions/20260608_000001_user_ui_preferences.py
+migrations/versions/20260609_000001_product_general_barcodes.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

@@ -250,7 +250,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       }
       return;
     }
-    await _ws.connect(
+    final authedOk = await _ws.connect(
       apiKey: key,
       businessId: widget.businessId,
       onMessage: _onWsMessage,
@@ -262,11 +262,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       },
     );
     if (!mounted) return;
-    setState(() => _wsLive = true);
-    _stopFallback();
-    _startBackupPoll();
-    if (_selectedConvId != null) {
-      _ws.subscribeConversation(_selectedConvId!);
+    if (authedOk) {
+      setState(() => _wsLive = true);
+      _stopFallback();
+      _startBackupPoll();
+      if (_selectedConvId != null) {
+        _ws.subscribeConversation(_selectedConvId!);
+      }
+    } else {
+      setState(() => _wsLive = false);
+      _stopBackupPoll();
+      _startFallback();
     }
   }
 
@@ -799,11 +805,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       _messages = [];
       _peerTyping = false;
       _mobileShowList = false;
-    });
+    }    );
     _loadMessages();
-    if (_wsLive) {
-      _ws.subscribeConversation(id);
-    }
+    _ws.subscribeConversation(id);
   }
 
   String? _nameForUserId(int? userId) {

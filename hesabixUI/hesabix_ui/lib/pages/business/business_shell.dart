@@ -74,11 +74,14 @@ class BusinessShell extends StatefulWidget {
 class _BusinessShellState extends State<BusinessShell> {
   /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
   static const double _kBizAppBarToolbarHeight = 44;
-  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان.
-  static const double _kUnifiedBizTabBarHeight = 40;
-  static const double _kBizTabChipHeight = 28;
-  static const double _kBizTabMinWidth = 76;
-  static const double _kBizTabMaxWidth = 168;
+  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی بلندتر برای تب‌های ثابت و ظاهر حرفه‌ای.
+  static const double _kUnifiedBizTabBarHeight = 48;
+  static const double _kBizTabStripVerticalPadding = 7;
+  /// ارتفاع ثابت بدنهٔ هر تب داخل نوار (نوار − پدینگ عمودی).
+  static const double _kBizTabChipInnerHeight =
+      _kUnifiedBizTabBarHeight - (_kBizTabStripVerticalPadding * 2);
+  static const double _kBizTabMinWidth = 100;
+  static const double _kBizTabMaxWidth = 188;
 
   int _hoverIndex = -1;
   bool _isProductsAndServicesExpanded = false;
@@ -104,8 +107,13 @@ class _BusinessShellState extends State<BusinessShell> {
 
   String _bu(String rel) => context.businessPanelUrl(widget.businessId, rel);
 
-  /// در دسکتاپ + حالت «تب»: منوی کناری تب جدید باز می‌کند؛ در موبایل/تک‌صفحه همان مسیر [_bu].
-  Future<void> _navigateMenuPath(BuildContext ctx, String menuUrl, {required bool desktopRail}) async {
+  /// در دسکتاپ + حالت «تب»: بر اساس [reuseAcrossTabs]؛ در موبایل/تک‌صفحه همان مسیر [_bu].
+  Future<void> _navigateMenuPath(
+    BuildContext ctx,
+    String menuUrl, {
+    required bool desktopRail,
+    required bool reuseAcrossTabs,
+  }) async {
     await BusinessPanelUiStore.instance.hydrateIfNeeded();
     if (!ctx.mounted) return;
     BusinessPanelUiStore.instance.navigateSidebarFromMenuUrl(
@@ -113,10 +121,26 @@ class _BusinessShellState extends State<BusinessShell> {
       menuUrl: menuUrl,
       go: (loc) => ctx.go(loc),
       fallbackOnly: !desktopRail,
+      reuseAcrossTabs: reuseAcrossTabs,
     );
   }
 
-  String _tabTitleForBusinessPath(String path, int businessId, List<_MenuItem> menuRoot) {
+  bool _reuseAcrossTabsForSidebarGesture({required bool longPress}) {
+    final store = BusinessPanelUiStore.instance;
+    if (store.mode != BusinessPanelNavigationMode.tabs) return true;
+    if (store.sidebarTabBehavior != BusinessPanelSidebarTabBehavior.newTabViaLongPress) {
+      return true;
+    }
+    return longPress;
+  }
+
+  /// عنوان نمایشی تب؛ برای مسیرهای خارج از درخت منو از [t] و [_fallbackTabTitleForRouteTail] استفاده می‌شود.
+  String _tabTitleForBusinessPath(
+    String path,
+    int businessId,
+    List<_MenuItem> menuRoot,
+    AppLocalizations t,
+  ) {
     final pathNorm = path.split('?').first;
     final pathTail = BusinessRoutePaths.stripBusinessPrefixAndTab(pathNorm, businessId);
     final pathTailBase = pathTail.split('?').first;
@@ -144,10 +168,38 @@ class _BusinessShellState extends State<BusinessShell> {
 
     walk(menuRoot);
     if (best.isNotEmpty) return best;
+    final localizedTail = _fallbackTabTitleForRouteTail(pathTailBase, t);
+    if (localizedTail != null) return localizedTail;
     try {
       if (pathTailBase.isNotEmpty) return pathTailBase.replaceAll('/', ' / ');
     } catch (_) {}
     return path;
+  }
+
+  /// مسیرهایی که در [allMenuItems] نیستند یا پیشوند «repair-shop» ندارند (تیره به‌جای /).
+  String? _fallbackTabTitleForRouteTail(String pathTailBase, AppLocalizations t) {
+    switch (pathTailBase) {
+      case 'users-permissions':
+        return t.usersAndPermissions;
+      case 'price-lists':
+        return t.priceLists;
+      case 'projects':
+        return t.businessPanelTabRouteProjects;
+      case 'installments-report':
+        return t.installmentsReportTitle;
+      case 'document-monetization':
+        return t.documentMonetizationTitle;
+      case 'repair-shop-technicians':
+        return t.businessPanelTabRouteRepairTechnicians;
+      case 'repair-shop-settings':
+        return t.businessPanelTabRouteRepairShopSettings;
+      default:
+        break;
+    }
+    if (RegExp(r'^price-lists/\d+/items$').hasMatch(pathTailBase)) {
+      return t.businessPanelTabRoutePriceListItems;
+    }
+    return null;
   }
 
   /// تطبیق مسیر منو با [location] بر اساس بخش منطقی مسیر (بدون توجه به شمارهٔ تب).
@@ -176,7 +228,7 @@ class _BusinessShellState extends State<BusinessShell> {
         final t = AppLocalizations.of(ctx)!;
         return AlertDialog(
           title: Text(
-            _tabTitleForBusinessPath(path, bid, menuRoot),
+            _tabTitleForBusinessPath(path, bid, menuRoot, t),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -238,7 +290,7 @@ class _BusinessShellState extends State<BusinessShell> {
               itemCount: session.paths.length,
               itemBuilder: (_, i) {
                 final p = session.paths[i];
-                final title = _tabTitleForBusinessPath(p, bid, menuRoot);
+                final title = _tabTitleForBusinessPath(p, bid, menuRoot, t);
                 final sel = p == session.activePath;
                 return ListTile(
                   dense: true,
@@ -279,71 +331,94 @@ class _BusinessShellState extends State<BusinessShell> {
     List<_MenuItem> menuRoot,
     BusinessPanelTabSession session,
     String path,
-    double maxTabWidth,
   ) {
     final store = BusinessPanelUiStore.instance;
     final bid = widget.businessId;
     final active = path == session.activePath;
-    final label = _tabTitleForBusinessPath(path, bid, menuRoot);
+    final t = AppLocalizations.of(context)!;
+    final label = _tabTitleForBusinessPath(path, bid, menuRoot, t);
     void goLoc(String loc) => context.go(loc);
 
     final cs = Theme.of(context).colorScheme;
     final bool isDarkStrip = Theme.of(context).brightness == Brightness.dark;
-    final Color inactiveFill =
-        cs.surfaceContainerHighest.withValues(alpha: isDarkStrip ? 0.88 : 0.94);
-    final Color chipFg = active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
-    final Color chipFgStrong = active ? cs.onPrimaryContainer : cs.onSurface;
-    final Color chipClose = chipFg.withValues(alpha: 0.82);
-    final Color borderCol =
-        active ? cs.primary.withValues(alpha: 0.45) : cs.outline.withValues(alpha: isDarkStrip ? 0.44 : 0.36);
-    final BorderRadius chipRadius = BorderRadius.circular(8);
+    final chipFg = active ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.92);
+    final chipFgStrong = active ? cs.onSurface : cs.onSurfaceVariant;
+    final chipClose = chipFg.withValues(alpha: active ? 0.72 : 0.62);
+
+    final BorderRadius chipRadius = BorderRadius.circular(11);
+
+    final Color chipBg = active
+        ? Color.alphaBlend(
+            cs.primary.withValues(alpha: isDarkStrip ? 0.26 : 0.13),
+            cs.surface,
+          )
+        : cs.surfaceContainerHighest.withValues(alpha: isDarkStrip ? 0.52 : 0.72);
+
+    final Color chipBorder = active
+        ? cs.primary.withValues(alpha: isDarkStrip ? 0.72 : 0.52)
+        : cs.outline.withValues(alpha: isDarkStrip ? 0.38 : 0.22);
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 6),
-      child: Material(
-        color: active ? cs.primaryContainer : inactiveFill,
-        shadowColor: Colors.transparent,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: chipRadius,
-          side: BorderSide(color: borderCol, width: 1),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => store.selectTab(bid, path, goLoc),
-          onLongPress: () => _showDesktopTabActionDialog(context, menuRoot, session, path),
-          child: SizedBox(
-            width: maxTabWidth,
-            height: _kBizTabChipHeight,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: active ? chipFgStrong : chipFg,
-                        fontSize: 11.5,
-                        height: 1.1,
-                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        letterSpacing: active ? 0.15 : 0,
+      padding: const EdgeInsetsDirectional.only(end: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: _kBizTabMinWidth, maxWidth: _kBizTabMaxWidth),
+        child: Material(
+          elevation: active ? (isDarkStrip ? 5 : 4) : 0,
+          shadowColor: cs.shadow.withValues(alpha: active ? (isDarkStrip ? 0.45 : 0.28) : 0),
+          color: chipBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: chipRadius,
+            side: BorderSide(color: chipBorder, width: active ? 1.5 : 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: chipRadius,
+            hoverColor: cs.primary.withValues(alpha: isDarkStrip ? 0.09 : 0.06),
+            splashColor: cs.primary.withValues(alpha: 0.10),
+            onTap: () => store.selectTab(bid, path, goLoc),
+            onLongPress: () => _showDesktopTabActionDialog(context, menuRoot, session, path),
+            child: SizedBox(
+              height: _kBizTabChipInnerHeight,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: active ? cs.primary : cs.outline.withValues(alpha: 0.55),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                  SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: InkWell(
-                      onTap: () => store.closeTab(bid, path, goLoc),
-                      customBorder: const CircleBorder(),
-                      child: Icon(Icons.close_rounded, size: 15, color: chipClose),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontSize: 12.5,
+                              height: 1.15,
+                              letterSpacing: active ? 0.15 : 0.02,
+                              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                              color: active ? chipFgStrong : chipFg,
+                            ),
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                        icon: Icon(Icons.close_rounded, size: 16.5, color: chipClose),
+                        onPressed: () => store.closeTab(bid, path, goLoc),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -352,7 +427,10 @@ class _BusinessShellState extends State<BusinessShell> {
     );
   }
 
-  /// یک خط: نام کسب‌وکار • تب‌ها • ساعت • دکمهٔ همهٔ تب‌ها
+  /// یک خط: نام کسب‌وکار + آیکون • تب‌ها (کنار نام، با اسکرول) • زمان • منوی تب‌ها
+  ///
+  /// [menuRoot] باید **منوی کامل** ([allMenuItems]) باشد نه [menuItems] فیلترشده،
+  /// تا عنوان تب‌ها از همان برچسب‌های محلی منو به‌دست آید (و به `products` خام نیفتد).
   Widget _buildUnifiedDesktopTabStrip({
     required BuildContext context,
     required List<_MenuItem> menuRoot,
@@ -369,127 +447,176 @@ class _BusinessShellState extends State<BusinessShell> {
       return const SizedBox.shrink();
     }
 
-    final cs = Theme.of(context).colorScheme;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
     final Color stripFg = cs.onSurfaceVariant;
     final Color stripFgTitle = cs.onSurface;
-    final Color pillBg = cs.surface.withValues(alpha: isDark ? 0.42 : 0.78);
-    final Color pillOutline = cs.outline.withValues(alpha: isDark ? 0.42 : 0.34);
-
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    Widget pill(Widget child, {double maxW = 260}) {
+    final BorderRadius pillRadius = BorderRadius.circular(12);
+
+    Widget metaCapsule({
+      required Widget child,
+      double maxW = 260,
+      EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    }) {
       return ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxW),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: pillBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: pillOutline, width: 1),
+            borderRadius: pillRadius,
+            color: cs.surface.withValues(alpha: isDark ? 0.52 : 0.94),
+            border: Border.all(color: cs.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
+            boxShadow: [
+              BoxShadow(
+                color: cs.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
+                blurRadius: isDark ? 14 : 10,
+                spreadRadius: -2,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-            child: child,
-          ),
+          child: Padding(padding: padding, child: child),
         ),
       );
     }
 
-    final Widget businessTitle = pill(
-      Text(
-        businessName,
-        style: TextStyle(color: stripFgTitle, fontSize: 12.5, fontWeight: FontWeight.w700),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: isRtl ? TextAlign.right : TextAlign.left,
+    final Widget businessTitle = metaCapsule(
+      maxW: 248,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: isDark ? 0.35 : 0.18),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(7),
+              child: Icon(Icons.storefront_rounded, size: 18, color: cs.primary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              businessName,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.12,
+                color: stripFgTitle,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: isRtl ? TextAlign.right : TextAlign.left,
+            ),
+          ),
+        ],
       ),
-      maxW: 220,
     );
 
     final Widget dateWidget = !isMobile
-        ? pill(
-            Row(
+        ? metaCapsule(
+            maxW: 268,
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.schedule_rounded, size: 15, color: stripFg),
-                const SizedBox(width: 8),
+                Icon(Icons.schedule_rounded, size: 17, color: stripFg.withValues(alpha: 0.95)),
+                const SizedBox(width: 9),
                 Flexible(
                   child: Text(
                     dateTimeStr,
-                    style: TextStyle(color: stripFg, fontSize: 11.5, fontWeight: FontWeight.w500),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: stripFg,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      letterSpacing: 0.02,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            maxW: 260,
           )
         : const SizedBox.shrink();
 
     final t = AppLocalizations.of(context)!;
-    final Widget overflowBtn = Padding(
-      padding: const EdgeInsetsDirectional.only(start: 2),
-      child: IconButton(
-        visualDensity: VisualDensity.compact,
-        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-        padding: EdgeInsets.zero,
-        tooltip: t.businessPanelTabListTooltip,
-        icon: Icon(Icons.more_horiz_rounded, color: stripFg, size: 20),
-        onPressed: () => _showAllTabsManagementDialog(context, menuRoot),
+    final Widget overflowBtn = Tooltip(
+      message: t.businessPanelTabListTooltip,
+      child: Material(
+        color: cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.55 : 0.82),
+        shape: const CircleBorder(),
+        elevation: isDark ? 2 : 1,
+        shadowColor: cs.shadow.withValues(alpha: 0.18),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => _showAllTabsManagementDialog(context, menuRoot),
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: Icon(Icons.more_horiz_rounded, color: stripFgTitle.withValues(alpha: 0.85), size: 22),
+          ),
+        ),
       ),
     );
 
-    final Widget tabRegion = LayoutBuilder(
-      builder: (context, constraints) {
-        final n = session.paths.length;
-        if (n <= 0 || !constraints.hasBoundedWidth) {
-          return const SizedBox.expand();
-        }
-        final perTab = (constraints.maxWidth / n).clamp(_kBizTabMinWidth, _kBizTabMaxWidth).toDouble();
-        return Align(
-          alignment: Alignment.center,
-          child: ClipRect(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: isRtl,
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                children: [
-                  for (final p in session.paths)
-                    _buildDesktopTabChip(context, menuRoot, session, p, perTab),
-                ],
-              ),
+    final Widget tabRegion = Expanded(
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: ClipRect(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: isRtl,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
+            child: Row(
+              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final p in session.paths)
+                  _buildDesktopTabChip(context, menuRoot, session, p),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
-
-    final List<Widget> rowChildren = <Widget>[
-      businessTitle,
-      const SizedBox(width: 12),
-      Expanded(child: tabRegion),
-      const SizedBox(width: 12),
-      if (!isMobile) dateWidget,
-      if (!isMobile) const SizedBox(width: 8),
-      overflowBtn,
-    ];
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: barBg,
         border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
+            blurRadius: isDark ? 8 : 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsetsDirectional.only(
+            start: 14,
+            end: 14,
+            top: _kBizTabStripVerticalPadding,
+            bottom: _kBizTabStripVerticalPadding,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
-            children: rowChildren,
+            children: [
+              businessTitle,
+              const SizedBox(width: 12),
+              tabRegion,
+              if (!isMobile) ...[
+                const SizedBox(width: 10),
+                dateWidget,
+              ],
+              const SizedBox(width: 8),
+              overflowBtn,
+            ],
           ),
         ),
       ),
@@ -1489,11 +1616,12 @@ class _BusinessShellState extends State<BusinessShell> {
       );
     });
 
-    Future<void> onSelect(int index) async {
+    Future<void> onSelect(int index, {bool longPress = false}) async {
       final item = menuItems[index];
       if (item.type == _MenuItemType.separator) return; // آیتم جداکننده قابل کلیک نیست
       
           if (item.type == _MenuItemType.simple && item.path != null) {
+        final reuseAcrossTabs = _reuseAcrossTabsForSidebarGesture(longPress: longPress);
         try {
           if (!context.mounted) return;
           final ctx = context;
@@ -1511,7 +1639,7 @@ class _BusinessShellState extends State<BusinessShell> {
                 );
               }
             } else {
-              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail);
+              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail, reuseAcrossTabs: reuseAcrossTabs);
             }
           }
         } catch (e) {
@@ -1530,7 +1658,7 @@ class _BusinessShellState extends State<BusinessShell> {
                 );
               }
             } else {
-              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail);
+              await _navigateMenuPath(ctx, item.path!, desktopRail: useRail, reuseAcrossTabs: reuseAcrossTabs);
             }
         }
       } else if (item.type == _MenuItemType.expandable) {
@@ -1546,7 +1674,7 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
-    Future<void> onSelectChild(int parentIndex, int childIndex) async {
+    Future<void> onSelectChild(int parentIndex, int childIndex, {bool longPress = false}) async {
       final parent = menuItems[parentIndex];
       if (parent.type == _MenuItemType.expandable && parent.children != null) {
         final child = parent.children![childIndex];
@@ -1563,13 +1691,14 @@ class _BusinessShellState extends State<BusinessShell> {
           return;
         }
         if (child.path != null) {
+          final reuseAcrossTabs = _reuseAcrossTabsForSidebarGesture(longPress: longPress);
           try {
             if (GoRouterState.of(context).uri.toString() != child.path!) {
-              await _navigateMenuPath(context, child.path!, desktopRail: useRail);
+              await _navigateMenuPath(context, child.path!, desktopRail: useRail, reuseAcrossTabs: reuseAcrossTabs);
             }
           } catch (e) {
             // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
-            await _navigateMenuPath(context, child.path!, desktopRail: useRail);
+            await _navigateMenuPath(context, child.path!, desktopRail: useRail, reuseAcrossTabs: reuseAcrossTabs);
           }
         }
       }
@@ -1896,36 +2025,98 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color stripMuted = scheme.onSurfaceVariant;
     final Color stripTitle = scheme.onSurface;
 
+    final ThemeData shellStripTheme = Theme.of(context);
+
     final Widget businessTopBar = DecoratedBox(
       decoration: BoxDecoration(
         color: secondaryStripBg,
         border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
+            blurRadius: isDark ? 8 : 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsetsDirectional.only(
+            start: 14,
+            end: 14,
+            top: _kBizTabStripVerticalPadding,
+            bottom: _kBizTabStripVerticalPadding,
+          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  businessName,
-                  style: TextStyle(
-                    color: stripTitle,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: isDark ? 0.35 : 0.18),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(7),
+                        child: Icon(Icons.storefront_rounded, size: 18, color: scheme.primary),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        businessName,
+                        style: shellStripTheme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.12,
+                          color: stripTitle,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.start,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (!isMobile)
-                Text(
-                  dateTimeStr,
-                  style: TextStyle(
-                    color: stripMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: scheme.surface.withValues(alpha: isDark ? 0.52 : 0.94),
+                    border: Border.all(color: scheme.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
+                        blurRadius: isDark ? 14 : 10,
+                        spreadRadius: -2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 17, color: stripMuted.withValues(alpha: 0.95)),
+                        const SizedBox(width: 9),
+                        Flexible(
+                          child: Text(
+                            dateTimeStr,
+                            style: shellStripTheme.textTheme.bodySmall?.copyWith(
+                              color: stripMuted,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -1949,7 +2140,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (showBizTabs)
             _buildUnifiedDesktopTabStrip(
               context: context,
-              menuRoot: menuItems,
+              menuRoot: allMenuItems,
               barBg: secondaryStripBg,
               stripBottomBorder: stripBottomBorder,
               businessName: businessName,
@@ -2058,7 +2249,14 @@ class _BusinessShellState extends State<BusinessShell> {
                         onExit: (_) => setState(() => _hoverIndex = -1),
                         child: InkWell(
                           borderRadius: childBr,
-                          onTap: () => onSelectChild(menuIndex, childIndex),
+                          onTap: () => onSelectChild(menuIndex, childIndex, longPress: false),
+                          onLongPress: (useRail &&
+                                  BusinessPanelUiStore.instance.mode ==
+                                      BusinessPanelNavigationMode.tabs &&
+                                  BusinessPanelUiStore.instance.sidebarTabBehavior ==
+                                      BusinessPanelSidebarTabBehavior.newTabViaLongPress)
+                              ? () => onSelectChild(menuIndex, childIndex, longPress: true)
+                              : null,
                           child: Container(
                             margin: EdgeInsets.zero,
                             padding: EdgeInsets.symmetric(
@@ -2223,9 +2421,18 @@ class _BusinessShellState extends State<BusinessShell> {
                                 if (item.label == 'CRM') _isCrmExpanded = !_isCrmExpanded;
                               });
                             } else {
-                              onSelect(menuIndex);
+                              onSelect(menuIndex, longPress: false);
                             }
                           },
+                          onLongPress: (!useRail ||
+                                  item.type != _MenuItemType.simple ||
+                                  item.path == null ||
+                                  BusinessPanelUiStore.instance.mode !=
+                                      BusinessPanelNavigationMode.tabs ||
+                                  BusinessPanelUiStore.instance.sidebarTabBehavior !=
+                                      BusinessPanelSidebarTabBehavior.newTabViaLongPress)
+                              ? null
+                              : () => onSelect(menuIndex, longPress: true),
                           child: Container(
                             margin: EdgeInsets.zero,
                             padding: EdgeInsets.symmetric(

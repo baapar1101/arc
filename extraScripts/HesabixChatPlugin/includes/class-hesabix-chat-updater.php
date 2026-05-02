@@ -8,10 +8,33 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/** اکشن Ajax بررسی نسخه */
+const HESABIX_CHAT_UPDATE_AJAX_CHECK = 'hesabix_chat_update_check';
+
+/** اکشن Ajax نصب/به‌روزرسانی از بسته */
+const HESABIX_CHAT_UPDATE_AJAX_INSTALL = 'hesabix_chat_update_install';
+
+/** برای check_ajax_referer و هر دو درخواست */
+const HESABIX_CHAT_UPDATE_NONCE_ACTION = 'hesabix_chat_update_v1';
+
 class Hesabix_Chat_Updater {
 
 	/** ۱۲ ساعت */
 	const CACHE_TTL = 43200;
+
+	/** @var self|null */
+	private static $instance = null;
+
+	public static function init() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	public static function instance() {
+		return self::$instance ?: self::init();
+	}
 
 	/**
 	 * کلید کش وابسته به آدرس‌های به‌روزرسانی تا بعد از تغییر wp-config یا فیلتر، نتیجهٔ تازه گرفته شود.
@@ -60,10 +83,12 @@ class Hesabix_Chat_Updater {
 	/**
 	 * @return void
 	 */
-	public function __construct() {
+	private function __construct() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'filter_update_transient' ) );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( $this, 'align_extracted_plugin_folder' ), 10, 4 );
+		add_action( 'wp_ajax_' . HESABIX_CHAT_UPDATE_AJAX_CHECK, array( $this, 'ajax_update_check' ) );
+		add_action( 'wp_ajax_' . HESABIX_CHAT_UPDATE_AJAX_INSTALL, array( $this, 'ajax_update_install' ) );
 	}
 
 	/**
@@ -219,15 +244,20 @@ class Hesabix_Chat_Updater {
 	}
 
 	/**
+	 * خواندن متادادهٔ آخرین بستهٔ راه دور (نسخه + آدرس zip)؛ کش می‌شود حتی اگر محیط وردپرس/PHP نامناسب باشد تا تب تنظیمات بتواند نسخه را نشان دهد.
+	 *
+	 * @param bool $force_refresh .
 	 * @return array<string, mixed>|null
 	 */
-	private function get_remote_info() {
-		if ( (bool) apply_filters( 'hesabix_chat_update_force_check', false ) ) {
-			delete_site_transient( $this->get_update_cache_key() );
+	private function resolve_remote_package_cached( $force_refresh = false ) {
+		$key = $this->get_update_cache_key();
+
+		if ( $force_refresh || (bool) apply_filters( 'hesabix_chat_update_force_check', false ) ) {
+			delete_site_transient( $key );
 			delete_site_transient( 'hesabix_chat_update_manifest' );
 		}
 
-		$cached = get_site_transient( $this->get_update_cache_key() );
+		$cached = get_site_transient( $key );
 		if ( is_array( $cached ) && ! empty( $cached['version'] ) && ! empty( $cached['download_url'] ) ) {
 			return $cached;
 		}
@@ -246,15 +276,96 @@ class Hesabix_Chat_Updater {
 			return null;
 		}
 
+		set_site_transient(
+			$key,
+			$info,
+			(int) apply_filters( 'hesabix_chat_update_cache_ttl', self::CACHE_TTL )
+		);
+		return $info;
+	}
+
+	/**
+	 * منطق پیشین: فقط اگر الزامات وردپرس و PHP برآورده شود برای هستهٔ به‌روزرسانی افزونه‌ها برمی‌گردد.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function get_remote_info() {
+		$info = $this->resolve_remote_package_cached( false );
+		if ( $info === null ) {
+			return null;
+		}
 		if ( $info['requires'] !== '' && version_compare( get_bloginfo( 'version' ), $info['requires'], '<' ) ) {
 			return null;
 		}
 		if ( $info['requires_php'] !== '' && version_compare( (string) PHP_VERSION, $info['requires_php'], '<' ) ) {
 			return null;
 		}
-
-		set_site_transient( $this->get_update_cache_key(), $info, (int) apply_filters( 'hesabix_chat_update_cache_ttl', self::CACHE_TTL ) );
 		return $info;
+	}
+
+	/**
+	 * وضعیت برای تب «به‌روزرسانی» و Ajax.
+	 *
+	 * @param bool $force_refresh .
+	 * @return array<string, scalar|bool|string>
+	 */
+	public function get_update_dashboard_state( $force_refresh = false ) {
+		$current         = defined( 'HESABIX_CHAT_VERSION' ) ? (string) HESABIX_CHAT_VERSION : '';
+		$uses_raw_zip    = $this->use_source_urls();
+		$uses_manifest_o = $this->get_manifest_url() !== '';
+		$configured      = $uses_raw_zip || $uses_manifest_o;
+
+		$pkg             = $this->resolve_remote_package_cached( $force_refresh );
+		$remote_str      = is_array( $pkg ) ? (string) ( $pkg['version'] ?? '' ) : '';
+		$remote_loaded   = ( $remote_str !== '' );
+
+		$download_url = is_array( $pkg ) ? (string) ( $pkg['download_url'] ?? '' ) : '';
+		$req_wp       = is_array( $pkg ) ? (string) ( $pkg['requires'] ?? '' ) : '';
+		$req_php      = is_array( $pkg ) ? (string) ( $pkg['requires_php'] ?? '' ) : '';
+		$source       = is_array( $pkg ) ? (string) ( $pkg['source'] ?? '' ) : '';
+
+		$wp_ok  = true;
+		$php_ok = true;
+		if ( $remote_loaded ) {
+			if ( $req_wp !== '' && version_compare( get_bloginfo( 'version' ), $req_wp, '<' ) ) {
+				$wp_ok = false;
+			}
+			if ( $req_php !== '' && version_compare( (string) PHP_VERSION, $req_php, '<' ) ) {
+				$php_ok = false;
+			}
+		}
+
+		$env_ok           = $wp_ok && $php_ok;
+		$newer            = $remote_loaded && version_compare( $remote_str, $current, '>' );
+		$update_available = $newer && $env_ok && $configured && $download_url !== '';
+
+		return array(
+			'current_version'            => $current,
+			'remote_version'             => $remote_str,
+			'remote_loaded'              => $remote_loaded,
+			'configured'                 => $configured,
+			'configured_raw_zip'         => $uses_raw_zip && $configured,
+			'configured_manifest_only'   => $uses_manifest_o && ! $uses_raw_zip,
+			'source_kind'                => $source,
+			'download_available'         => ( $download_url !== '' ),
+			'wp_compatible'              => $wp_ok,
+			'php_compatible'             => $php_ok,
+			'env_compatible'             => $env_ok,
+			'requires_wp'                => $req_wp,
+			'requires_php'               => $req_php,
+			'update_available'           => $update_available,
+			'newer_than_local'           => $newer,
+			'can_install'                => self::current_user_can_update_via_ui(),
+		);
+	}
+
+	/**
+	 * حق انجام به‌روزرسانی از این صفحه.
+	 *
+	 * @return bool
+	 */
+	public static function current_user_can_update_via_ui() {
+		return current_user_can( 'manage_options' ) && current_user_can( 'update_plugins' );
 	}
 
 	/**
@@ -327,14 +438,25 @@ class Hesabix_Chat_Updater {
 
 		$info = $this->get_remote_info();
 		if ( $info === null ) {
-			$info = array(
-				'version'         => HESABIX_CHAT_VERSION,
-				'download_url'    => '',
-				'name'            => 'Hesabix Web Chat',
-				'homepage'        => 'https://hesabix.ir',
-				'last_updated'    => '',
-				'sections'        => array(),
-			);
+			$pkg = $this->resolve_remote_package_cached( false );
+			if ( is_array( $pkg ) && isset( $pkg['version'] ) && (string) $pkg['version'] !== '' ) {
+				$info = $pkg;
+				if ( empty( $info['name'] ) ) {
+					$info['name'] = 'Hesabix Web Chat';
+				}
+				if ( empty( $info['homepage'] ) ) {
+					$info['homepage'] = 'https://hesabix.ir';
+				}
+			} else {
+				$info = array(
+					'version'      => HESABIX_CHAT_VERSION,
+					'download_url' => '',
+					'name'         => 'Hesabix Web Chat',
+					'homepage'     => 'https://hesabix.ir',
+					'last_updated' => '',
+					'sections'     => array(),
+				);
+			}
 		}
 
 		$sections = array( 'description' => '' );
@@ -366,6 +488,158 @@ class Hesabix_Chat_Updater {
 			$out->icons = $info['icons'];
 		}
 		return $out;
+	}
+
+	/**
+	 * Ajax: مقایسهٔ نسخهٔ نصب‌شده با نسخهٔ منتشرشده (بدون نشان‌دادن URL بسته به مرورگر).
+	 */
+	public function ajax_update_check() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'مجوز کافی نیست.', 'hesabix-chat' ) ), 403 );
+		}
+
+		check_ajax_referer( HESABIX_CHAT_UPDATE_NONCE_ACTION, 'nonce' );
+
+		$refresh = isset( $_POST['refresh'] )
+			&& ( '1' === (string) wp_unslash( $_POST['refresh'] ) || 'true' === (string) wp_unslash( $_POST['refresh'] ) );
+
+		wp_send_json_success( $this->get_update_dashboard_state( $refresh ) );
+	}
+
+	/**
+	 * Ajax: نصب/به‌روزرسانی از بستهٔ راه دور؛ پس از موفقیت کاربر با ریفرش صفحه نسخهٔ جدید را می‌بیند.
+	 */
+	public function ajax_update_install() {
+		if ( ! self::current_user_can_update_via_ui() ) {
+			wp_send_json_error( array( 'message' => __( 'مجوز به‌روزرسانی افزونه را ندارید.', 'hesabix-chat' ) ), 403 );
+		}
+
+		check_ajax_referer( HESABIX_CHAT_UPDATE_NONCE_ACTION, 'nonce' );
+
+		$this->purge_update_caches_before_install();
+
+		$pkg = $this->resolve_remote_package_cached( true );
+		if ( ! is_array( $pkg ) || empty( $pkg['download_url'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'دریافت اطلاعات بستهٔ به‌روزرسانی ناموفق بود یا منبعی تنظیم نشده.', 'hesabix-chat' ) ) );
+		}
+
+		$download = esc_url_raw( (string) $pkg['download_url'] );
+		if ( strpos( $download, 'http://' ) !== 0 && strpos( $download, 'https://' ) !== 0 ) {
+			wp_send_json_error( array( 'message' => __( 'آدرس بستهٔ نامعتبر است.', 'hesabix-chat' ) ) );
+		}
+
+		$plugin_file = plugin_basename( HESABIX_CHAT_FILE );
+		$current     = defined( 'HESABIX_CHAT_VERSION' ) ? (string) HESABIX_CHAT_VERSION : '';
+		$new_version = isset( $pkg['version'] ) ? (string) $pkg['version'] : '';
+
+		if ( '' === $new_version || '' === $current ) {
+			wp_send_json_error( array( 'message' => __( 'تشخیص نسخه ممکن نیست.', 'hesabix-chat' ) ) );
+		}
+
+		if ( ! version_compare( $new_version, $current, '>' ) ) {
+			wp_send_json_error( array( 'message' => __( 'به‌روزرسانی جدیدی نسبت به نسخهٔ فعلی در دسترس نیست.', 'hesabix-chat' ) ) );
+		}
+
+		$requires = isset( $pkg['requires'] ) ? (string) $pkg['requires'] : '';
+		if ( $requires !== '' && version_compare( get_bloginfo( 'version' ), $requires, '<' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => sprintf(
+					/* translators: %s: minimum WP version required */
+						__( 'وردپرس باید حداقل نسخهٔ %s باشد.', 'hesabix-chat' ),
+						$requires
+					),
+				)
+			);
+		}
+		$requires_php = isset( $pkg['requires_php'] ) ? (string) $pkg['requires_php'] : '';
+		if ( $requires_php !== '' && version_compare( (string) PHP_VERSION, $requires_php, '<' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => sprintf(
+					/* translators: %s: minimum PHP version required */
+						__( 'PHP باید حداقل نسخهٔ %s باشد.', 'hesabix-chat' ),
+						$requires_php
+					),
+				)
+			);
+		}
+
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'admin' );
+		}
+		if ( function_exists( 'wc_set_time_limit' ) ) {
+			wc_set_time_limit( 0 );
+		} elseif ( function_exists( 'set_time_limit' ) ) {
+			// phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- طول کشیدن دریافت بستهٔ zip
+			@set_time_limit( 600 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+		if ( ! class_exists( 'Automatic_Upgrader_Skin' ) ) {
+			wp_send_json_error( array( 'message' => __( 'کلاس‌های به‌روزرسانی وردپرس در دسترس نیستند.', 'hesabix-chat' ) ) );
+		}
+
+		if ( false === WP_Filesystem() ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'اتصال به فایل سیستم نشد. روش دسترسی به فایل‌ها (مانند FTP) را از طریق wp-config یا پشتیبان هاست تنظیم کنید.', 'hesabix-chat' ),
+				)
+			);
+		}
+
+		$skin     = new Automatic_Upgrader_Skin();
+		$upgrader = new Plugin_Upgrader( $skin );
+
+		$result = $upgrader->run(
+			array(
+				'package'             => $download,
+				'destination'         => WP_PLUGIN_DIR,
+				'clear_destination'   => true,
+				'clear_working'       => true,
+				'clear_update_cache'  => false,
+				'is_multi'            => false,
+				'hook_extra'          => array(
+					'plugin' => $plugin_file,
+				),
+			)
+		);
+
+		delete_site_transient( $this->get_update_cache_key() );
+		delete_site_transient( 'hesabix_chat_update_manifest' );
+
+		if ( false === $result || is_wp_error( $result ) ) {
+			$msg = is_wp_error( $result )
+				? $result->get_error_message()
+				: __( 'به‌روزرسانی افزونه با خطا متوقف شد.', 'hesabix-chat' );
+			if ( isset( $skin ) && isset( $skin->result ) && is_wp_error( $skin->result ) ) {
+				$skin_msg = $skin->result->get_error_message();
+				if ( '' !== $skin_msg && $skin_msg !== $msg ) {
+					$msg = $skin_msg . ' — ' . $msg;
+				}
+			}
+			wp_send_json_error( array( 'message' => $msg ), 500 );
+		}
+
+		wp_clean_plugins_cache();
+
+		wp_send_json_success(
+			array(
+				'message'     => __( 'به‌روزرسانی با موفقیت انجام شد؛ صفحه به‌روز می‌شود…', 'hesabix-chat' ),
+				'new_version' => $new_version,
+			)
+		);
+	}
+
+	/**
+	 * پیش از یک نصب کامل کش‌های وابسته را خالی کن تا خطای کش قدیمی نباشیم.
+	 */
+	private function purge_update_caches_before_install() {
+		delete_site_transient( $this->get_update_cache_key() );
+		delete_site_transient( 'hesabix_chat_update_manifest' );
 	}
 
 	/**

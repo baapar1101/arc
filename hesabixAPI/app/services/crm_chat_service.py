@@ -917,13 +917,37 @@ async def patch_agent_message(
 	return _message_to_dict_enriched(db, m)
 
 
-def _clear_messenger_sessions_for_conversation(db: Session, conversation_id: int) -> None:
-	"""جلوگیری از خطای FK هنگام حذف مکالمه (دیتابیسهای بدون/ondelete ناسازگار)."""
+
+
+
+def _purge_conversation_rows(db: Session, *, filters) -> tuple[int, int]:
+	"""
+	مرتب‌سازی قطعی حذف برای جلوگیری از IntegrityError:
+	اول نشست پیامرسان برای این گفتگوها؛ سپس پیام‌ها؛ سپس خود مکالمه (بدون اعتماد تنها به CASCADE/ترتیب flush).
+	filterها روی همان مجموعهٔ سطرهای `crm_chat_conversations` اعمال می‌شود.
+	return: (پیش‌شمار قبل از حذف، حذف‌شدهٔ واقعی مکالمه طبق rowcount؛ اگر نامشخص → کل پیش‌شمار).
+	"""
+	conv_ids_sq = select(CrmChatConversation.id).where(filters)
+	cnt_q = select(func.count()).select_from(CrmChatConversation).where(filters)
+	prev_total = int(db.scalar(cnt_q) or 0)
+	if prev_total == 0:
+		return prev_total, 0
 	db.execute(
 		update(MessengerOperatorSession)
-		.where(MessengerOperatorSession.active_conversation_id == conversation_id)
-		.values(active_conversation_id=None)
+		.where(MessengerOperatorSession.active_conversation_id.in_(conv_ids_sq))
+		.values(active_conversation_id=None),
 	)
+	db.flush()
+	db.execute(delete(CrmChatMessage).where(CrmChatMessage.conversation_id.in_(conv_ids_sq)))
+	db.flush()
+	res = db.execute(delete(CrmChatConversation).where(filters))
+	try:
+		deleted = int(res.rowcount or 0)
+	except (TypeError, ValueError):
+		deleted = prev_total
+	if deleted < 0:
+		deleted = prev_total
+	return prev_total, deleted
 
 
 async def delete_conversation_agent(
@@ -934,9 +958,12 @@ async def delete_conversation_agent(
 	c = _get_conversation_business(db, business_id, conversation_id)
 	cid = c.id
 	bid = c.business_id
-	_clear_messenger_sessions_for_conversation(db, cid)
-	db.delete(c)
+	filters_one = and_(
+		CrmChatConversation.id == cid,
+		CrmChatConversation.business_id == business_id,
+	)
 	try:
+		_prev_total, _deleted_conv = _purge_conversation_rows(db, filters=filters_one)
 		db.commit()
 	except IntegrityError:
 		db.rollback()
@@ -967,7 +994,7 @@ async def delete_conversations_bulk_agent(
 	*,
 	status: Optional[str] = None,
 ) -> Dict[str, Any]:
-	"""حذف دسته‌جمعی مکالمه‌ها؛ در صورت ارسال status فقط همان وضعیت. پیام‌ها با CASCADE حذف می‌شوند."""
+	"""حذف دسته‌جمعی مکالمه‌ها؛ در صورت ارسال status فقط همان وضعیت. پیام‌ها و نشست‌ها قبل از مکالمه به‌ترتیب امن پاک می‌شوند."""
 	if status is not None and status not in ("open", "pending", "resolved"):
 		raise ApiError(
 			"CRM_CHAT_CONVERSATION_STATUS_INVALID",
@@ -978,18 +1005,8 @@ async def delete_conversations_bulk_agent(
 	if status:
 		filters.append(CrmChatConversation.status == status)
 	base = and_(*filters)
-	cnt_q = select(func.count()).select_from(CrmChatConversation).where(base)
-	total = int(db.scalar(cnt_q) or 0)
-	if total == 0:
-		return {"deleted": 0}
-	conv_ids_subq = select(CrmChatConversation.id).where(base)
-	db.execute(
-		update(MessengerOperatorSession)
-		.where(MessengerOperatorSession.active_conversation_id.in_(conv_ids_subq))
-		.values(active_conversation_id=None)
-	)
 	try:
-		db.execute(delete(CrmChatConversation).where(base))
+		prev_total, deleted_n = _purge_conversation_rows(db, filters=base)
 		db.commit()
 	except IntegrityError:
 		db.rollback()
@@ -1003,15 +1020,18 @@ async def delete_conversations_bulk_agent(
 			"Could not delete conversations due to database constraints.",
 			http_status=409,
 		) from None
+	if deleted_n <= 0 and prev_total <= 0:
+		return {"deleted": 0}
+	report_n = deleted_n if deleted_n > 0 else prev_total
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversations.bulk_deleted",
 		"business_id": business_id,
-		"count": total,
+		"count": report_n,
 		"status_filter": status,
 	}
 	await crm_chat_realtime_manager.broadcast_business(business_id, ev)
-	return {"deleted": total}
+	return {"deleted": report_n}
 
 
 async def patch_conversation_agent(
@@ -1135,6 +1155,7 @@ async def _broadcast_messages_read(
 	message_ids: List[int],
 	read_at: datetime,
 	reader_role: str,
+	reader_display_name: Optional[str] = None,
 ) -> None:
 	if not message_ids:
 		return
@@ -1146,6 +1167,8 @@ async def _broadcast_messages_read(
 		"read_at": read_at,
 		"reader_role": reader_role,
 	}
+	if reader_display_name and str(reader_display_name).strip():
+		payload["reader_display_name"] = str(reader_display_name).strip()
 	await crm_chat_realtime_manager.broadcast_conversation(conversation_id, payload)
 	await crm_chat_realtime_manager.broadcast_business(
 		business_id, {**payload, "conversation_id": conversation_id}
@@ -1194,6 +1217,7 @@ async def mark_messages_read_by_agent(
 	business_id: int,
 	conversation_id: int,
 	up_to_message_id: int,
+	reading_user: Optional[User] = None,
 ) -> Dict[str, Any]:
 	"""عامل CRM پیام‌های بازدیدکننده را تا شناسه داده‌شده «خوانده» علامت می‌زند."""
 	c = _get_conversation_business(db, business_id, conversation_id)
@@ -1216,7 +1240,8 @@ async def mark_messages_read_by_agent(
 	now = datetime.utcnow()
 	db.execute(update(CrmChatMessage).where(CrmChatMessage.id.in_(msg_ids)).values(read_at=now))
 	db.commit()
+	rdn = agent_display_name(reading_user) if reading_user is not None else None
 	await _broadcast_messages_read(
-		c.id, c.business_id, message_ids=msg_ids, read_at=now, reader_role="agent"
+		c.id, c.business_id, message_ids=msg_ids, read_at=now, reader_role="agent", reader_display_name=rdn
 	)
 	return {"updated": len(msg_ids), "message_ids": msg_ids, "read_at": now}

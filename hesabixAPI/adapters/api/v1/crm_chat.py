@@ -219,6 +219,7 @@ async def post_chat_conversation_read(
 			business_id=business_id,
 			conversation_id=conversation_id,
 			up_to_message_id=body.up_to_message_id,
+			reading_user=ctx.user,
 		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

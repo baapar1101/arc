@@ -2,33 +2,65 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, and_, or_, func, text
+from sqlalchemy import select, and_, or_, func, exists, text
 from app.core.query_timeout import query_timeout
 
 from adapters.api.v1.schemas import QueryInfo
 from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product import Product
+from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
 from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
+
+from app.services.product_general_barcode_service import split_raw_general_barcodes
 
 
 class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Product)
 
-    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, sort: list[Any] | None = None, search: str | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
+    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, sort: list[Any] | None = None, search: str | None = None, search_fields: List[str] | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
         stmt = select(Product).where(Product.business_id == business_id)
 
         if search:
-            like = f"%{search}%"
-            stmt = stmt.where(
-                or_(
-                    Product.name.ilike(like),
-                    Product.code.ilike(like),
-                    Product.description.ilike(like),
+            s = search.strip()
+            like = f"%{s}%"
+            ors: List[Any] = []
+            raw_fields = search_fields or []
+            field_set = {str(x).strip().lower() for x in raw_fields if str(x).strip()}
+            if not field_set:
+                field_set = {"name", "code", "description", "general_barcodes", "barcode"}
+
+            # فیلد legacy «barcode» همان بارکدهای عمومی است
+            if "barcode" in field_set:
+                field_set.add("general_barcodes")
+
+            if "name" in field_set:
+                ors.append(Product.name.ilike(like))
+            if "code" in field_set:
+                ors.append(Product.code.ilike(like))
+            if "description" in field_set:
+                ors.append(Product.description.ilike(like))
+
+            if "general_barcodes" in field_set:
+                term_lower = s.lower()
+                alias_match = exists(
+                    select(1).select_from(ProductGeneralBarcodeAlias).where(
+                        ProductGeneralBarcodeAlias.product_id == Product.id,
+                        ProductGeneralBarcodeAlias.business_id == business_id,
+                        ProductGeneralBarcodeAlias.token_normalized == term_lower,
+                    )
                 )
-            )
+                partial_col = and_(
+                    Product.general_barcodes.isnot(None),
+                    Product.general_barcodes != "",
+                    Product.general_barcodes.ilike(like),
+                )
+                ors.append(or_(alias_match, partial_col))
+
+            if ors:
+                stmt = stmt.where(or_(*ors))
 
         # Apply filters (supports minimal set used by clients)
         if filters:
@@ -228,6 +260,10 @@ class ProductRepository(BaseRepository[Product]):
             # دریافت attribute_ids از ProductAttributeLink
             links = self.db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == p.id).all()
             attribute_ids = [link.attribute_id for link in links]
+
+            gb_raw = getattr(p, "general_barcodes", None)
+            gb_tokens = split_raw_general_barcodes(gb_raw) if gb_raw else []
+            legacy_barcode = gb_tokens[0] if gb_tokens else None
             
             result = {
                 "id": p.id,
@@ -256,6 +292,8 @@ class ProductRepository(BaseRepository[Product]):
                 "inventory_mode": getattr(p, 'inventory_mode', None) or "bulk",
                 "track_serial": p.track_serial,
                 "track_barcode": p.track_barcode,
+                "general_barcodes": getattr(p, "general_barcodes", None),
+                "barcode": legacy_barcode,
                 "is_sales_taxable": p.is_sales_taxable,
                 "is_purchase_taxable": p.is_purchase_taxable,
                 "sales_tax_rate": p.sales_tax_rate,
@@ -316,20 +354,31 @@ class ProductRepository(BaseRepository[Product]):
         self.db.refresh(obj)
         return obj
 
-    def update(self, product_id: int, **data: Any) -> Optional[Product]:
+    def update(self, product_id: int, *, commit: bool = True, **data: Any) -> Optional[Product]:
         obj = self.db.get(Product, product_id)
         if not obj:
             return None
         # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
-        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor", "default_warehouse_id", "base_sales_price", "base_purchase_price"}
+        nullable_overrides = {
+            "main_unit_id",
+            "secondary_unit_id",
+            "unit_conversion_factor",
+            "default_warehouse_id",
+            "base_sales_price",
+            "base_purchase_price",
+            "general_barcodes",
+        }
         for k, v in data.items():
             if hasattr(obj, k):
                 if k in nullable_overrides:
                     setattr(obj, k, v)
                 elif v is not None:
                     setattr(obj, k, v)
-        self.db.commit()
-        self.db.refresh(obj)
+        if commit:
+            self.db.commit()
+            self.db.refresh(obj)
+        else:
+            self.db.flush()
         return obj
 
     def delete(self, product_id: int) -> bool:

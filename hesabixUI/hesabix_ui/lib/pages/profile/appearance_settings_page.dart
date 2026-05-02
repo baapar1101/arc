@@ -14,6 +14,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   bool _loading = true;
   String? _error;
   BusinessPanelNavigationMode _draft = BusinessPanelNavigationMode.single;
+  BusinessPanelSidebarTabBehavior _draftSidebarTabBehavior =
+      BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
   bool _saving = false;
 
   @override
@@ -30,8 +32,10 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     try {
       await BusinessPanelUiStore.instance.hydrateIfNeeded();
       if (!mounted) return;
+      final store = BusinessPanelUiStore.instance;
       setState(() {
-        _draft = BusinessPanelUiStore.instance.mode;
+        _draft = store.mode;
+        _draftSidebarTabBehavior = store.sidebarTabBehavior;
         _loading = false;
       });
     } catch (e) {
@@ -46,7 +50,10 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await BusinessPanelUiStore.instance.setNavigationMode(_draft);
+      await BusinessPanelUiStore.instance.updateAppearancePreferences(
+        navigationMode: _draft,
+        sidebarTabBehavior: _draftSidebarTabBehavior,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).appearanceSaved)),
@@ -113,6 +120,46 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                               if (v != null) setState(() => _draft = v);
                             },
                     ),
+                    if (_draft == BusinessPanelNavigationMode.tabs) ...[
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.appearanceSidebarTabBehaviorSection,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            RadioListTile<BusinessPanelSidebarTabBehavior>(
+                              title: Text(t.appearanceSidebarTabBehaviorReuseTitle),
+                              subtitle: Text(t.appearanceSidebarTabBehaviorReuseSubtitle),
+                              value: BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap,
+                              groupValue: _draftSidebarTabBehavior,
+                              onChanged: _saving
+                                  ? null
+                                  : (v) {
+                                      if (v != null) setState(() => _draftSidebarTabBehavior = v);
+                                    },
+                            ),
+                            RadioListTile<BusinessPanelSidebarTabBehavior>(
+                              title: Text(t.appearanceSidebarTabBehaviorLongPressTitle),
+                              subtitle: Text(t.appearanceSidebarTabBehaviorLongPressSubtitle),
+                              value: BusinessPanelSidebarTabBehavior.newTabViaLongPress,
+                              groupValue: _draftSidebarTabBehavior,
+                              onChanged: _saving
+                                  ? null
+                                  : (v) {
+                                      if (v != null) setState(() => _draftSidebarTabBehavior = v);
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(t.appearanceDesktopOnlyNote, style: theme.textTheme.bodySmall),
                   ],

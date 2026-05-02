@@ -148,6 +148,7 @@ class ProductFormController extends ChangeNotifier {
           autoGenerateCode: true,
           code: null,
           name: cloneSuggestedDisplayName(parsed.name),
+          generalBarcodes: null,
         );
         _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
         await _loadExistingPriceItems(productId: cloneSourceProductId);

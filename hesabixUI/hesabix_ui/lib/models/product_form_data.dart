@@ -14,6 +14,8 @@ class ProductFormData {
   bool autoGenerateCode;
   String name;
   String? description;
+  /// بارکدهای عمومی؛ با ویرگول از هم جدا می‌شوند (هم‌عرض با APIی `general_barcodes`).
+  String? generalBarcodes;
   int? categoryId;
   
   // Inventory
@@ -63,6 +65,7 @@ class ProductFormData {
     this.autoGenerateCode = true,
     this.name = '',
     this.description,
+    this.generalBarcodes,
     this.categoryId,
     this.trackInventory = false,
     this.reorderPoint,
@@ -97,6 +100,7 @@ class ProductFormData {
     bool? autoGenerateCode,
     String? name,
     Object? description = _kProductFormFieldUnset,
+    Object? generalBarcodes = _kProductFormFieldUnset,
     Object? categoryId = _kProductFormFieldUnset,
     bool? trackInventory,
     Object? reorderPoint = _kProductFormFieldUnset,
@@ -130,6 +134,7 @@ class ProductFormData {
       autoGenerateCode: autoGenerateCode ?? this.autoGenerateCode,
       name: name ?? this.name,
       description: _nullableCopyField<String>(description, this.description),
+      generalBarcodes: _nullableCopyField<String>(generalBarcodes, this.generalBarcodes),
       categoryId: _nullableCopyField<int>(categoryId, this.categoryId),
       trackInventory: trackInventory ?? this.trackInventory,
       reorderPoint: _nullableCopyField<int>(reorderPoint, this.reorderPoint),
@@ -177,6 +182,7 @@ class ProductFormData {
       'code': codeValue,
       'name': name,
       'description': description,
+      'general_barcodes': generalBarcodes?.trim().isEmpty == true ? null : generalBarcodes?.trim(),
       'category_id': categoryId,
       'track_inventory': trackInventory,
       'inventory_mode': inventoryMode ?? 'bulk',
@@ -207,7 +213,11 @@ class ProductFormData {
     };
     // Remove only nulls we intentionally kept nullable
     // اما default_warehouse_id و attribute_ids را همیشه نگه می‌داریم (حتی اگر null/خالی باشند) تا بک‌اند بتواند آن‌ها را به‌روزرسانی کند
-    payload.removeWhere((k, v) => v == null && k != 'default_warehouse_id' && k != 'attribute_ids');
+    payload.removeWhere((k, v) =>
+        v == null &&
+        k != 'default_warehouse_id' &&
+        k != 'attribute_ids' &&
+        k != 'general_barcodes');
     return payload;
   }
 
@@ -218,6 +228,7 @@ class ProductFormData {
       autoGenerateCode: false,
       name: product['name'] ?? '',
       description: product['description']?.toString(),
+      generalBarcodes: product['general_barcodes']?.toString(),
       categoryId: product['category_id'] as int?,
       trackInventory: (product['track_inventory'] == true),
       inventoryMode: product['inventory_mode']?.toString(),

@@ -198,6 +198,21 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                       maxLines: 4,
                     ),
                     SizedBox(height: spacing),
+                    TextFormField(
+                      initialValue: widget.formData.generalBarcodes ?? '',
+                      decoration: InputDecoration(
+                        labelText: t.productGeneralBarcodes,
+                        helperText: t.productGeneralBarcodesHint,
+                      ),
+                      minLines: 1,
+                      maxLines: 3,
+                      onChanged: (value) => _updateFormData(
+                        widget.formData.copyWith(
+                          generalBarcodes: value.trim().isEmpty ? null : value,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: spacing),
                     
                     CategoryPickerField(
                       businessId: widget.businessId,
@@ -238,6 +253,22 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             decoration: InputDecoration(labelText: t.description),
             onChanged: (value) => _updateFormData(widget.formData.copyWith(description: value.trim().isEmpty ? null : value)),
             maxLines: 3,
+          ),
+          SizedBox(height: spacing),
+
+          TextFormField(
+            initialValue: widget.formData.generalBarcodes ?? '',
+            decoration: InputDecoration(
+              labelText: t.productGeneralBarcodes,
+              helperText: t.productGeneralBarcodesHint,
+            ),
+            minLines: 1,
+            maxLines: 3,
+            onChanged: (value) => _updateFormData(
+              widget.formData.copyWith(
+                generalBarcodes: value.trim().isEmpty ? null : value,
+              ),
+            ),
           ),
           SizedBox(height: spacing),
           

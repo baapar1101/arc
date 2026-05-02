@@ -2842,11 +2842,11 @@ def _calculate_overhead_cost(
     if overhead_type == "none":
         return Decimal(0)
     
-    elif overhead_type == "custom_percent":
+    elif overhead_type in ("custom_percent", "all_overhead"):
         if overhead_percent is None or overhead_percent <= 0:
             return Decimal(0)
-        return total_cost * (overhead_percent / 100)
-    
+        return total_cost * (overhead_percent / Decimal(100))
+
     elif overhead_type == "production_overhead":
         document = db.query(Document).filter(Document.id == document_id).first()
         if document and document.document_type == "invoice_production":
@@ -2854,11 +2854,7 @@ def _calculate_overhead_cost(
             operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
             return operations_total
         return Decimal(0)
-    
-    elif overhead_type == "all_overhead":
-        # TODO: پیاده‌سازی کامل بر اساس نیاز کسب و کار
-        return Decimal(0)
-    
+
     return Decimal(0)
 
 
@@ -2961,6 +2957,98 @@ def _invoice_profit_line_sale_cost_per_unit(
     return Decimal(str(product.base_purchase_price or 0))
 
 
+def _invoice_line_net_before_global_discount(item_line: Any) -> Decimal:
+    extra_info = item_line.extra_info or {}
+    qty = Decimal(str(item_line.quantity or 0))
+    unit_price = Decimal(str(extra_info.get("unit_price", 0) or 0))
+    line_discount = Decimal(str(extra_info.get("line_discount", 0) or 0))
+    return qty * unit_price - line_discount
+
+
+def _document_global_discount_amount_for_profit(document: Document, item_lines: List[Any]) -> Decimal:
+    """مبلغ تخفیف کلی؛ اولویت با global_discount.amount، وگرنه totals.discount − جمع تخفیف ردیفی."""
+    extra = document.extra_info or {}
+    gd = extra.get("global_discount")
+    if isinstance(gd, dict) and gd.get("amount") is not None:
+        try:
+            v = Decimal(str(gd.get("amount")))
+            if v > 0:
+                return v
+        except Exception:
+            pass
+    totals = dict(extra.get("totals") or {})
+    try:
+        tot_disc = Decimal(str(totals.get("discount", 0) or 0))
+    except Exception:
+        tot_disc = Decimal(0)
+    sum_line_disc = Decimal(0)
+    for ln in item_lines:
+        try:
+            sum_line_disc += Decimal(str((ln.extra_info or {}).get("line_discount", 0) or 0))
+        except Exception:
+            pass
+    cand = tot_disc - sum_line_disc
+    return cand if cand > 0 else Decimal(0)
+
+
+def _document_adjustments_net_for_profit(document: Document) -> Decimal:
+    extras = document.extra_info or {}
+    totals = dict(extras.get("totals") or {})
+    try:
+        return Decimal(str(totals.get("adjustments_net", 0) or 0))
+    except Exception:
+        return Decimal(0)
+
+
+def _allocate_global_discount_to_lines(
+    item_lines: List[Any],
+    global_discount_amount: Decimal,
+    *,
+    is_sales_return: bool,
+) -> Dict[int, Decimal]:
+    """شناسهٔ خط فاکتور → سهم تخفیف کلی از آن خط (متناسب با زیرجمع قبل از تخفیف کلی)."""
+    out: Dict[int, Decimal] = {}
+    if global_discount_amount <= 0 or not item_lines:
+        return out
+
+    nets = [_invoice_line_net_before_global_discount(ln) for ln in item_lines]
+    if is_sales_return:
+        weights = [max(Decimal(0), abs(n)) for n in nets]
+    else:
+        weights = [max(Decimal(0), n) for n in nets]
+    wsum = sum(weights)
+    n_lines = len(item_lines)
+
+    def _emit_equal() -> Dict[int, Decimal]:
+        if n_lines <= 0:
+            return {}
+        per_mid = (global_discount_amount / Decimal(n_lines)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        acc = Decimal(0)
+        eqmap: Dict[int, Decimal] = {}
+        for i, ln in enumerate(item_lines):
+            lid = int(ln.id)
+            if i == n_lines - 1:
+                eqmap[lid] = global_discount_amount - acc
+            else:
+                eqmap[lid] = per_mid
+                acc += per_mid
+        return eqmap
+
+    if wsum <= 0:
+        return _emit_equal()
+
+    allocated = Decimal(0)
+    for i, ln in enumerate(item_lines):
+        lid = int(ln.id)
+        if i == n_lines - 1:
+            out[lid] = global_discount_amount - allocated
+        else:
+            share = (global_discount_amount * (weights[i] / wsum)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            out[lid] = share
+            allocated += share
+    return out
+
+
 def _calculate_invoice_profit(
     db: Session,
     business_id: int,
@@ -3000,16 +3088,15 @@ def _calculate_invoice_profit(
     total_sales = Decimal(0)
     total_cost = Decimal(0)
     line_profits = []
-    
+    adjustments_net_total = Decimal(0)
+    total_overhead = Decimal(0)
+
     # برای فاکتور تولید
     if document.document_type == "invoice_production":
-        # دریافت ردیف‌های فاکتور از InvoiceItemLine (برای فاکتور تولید)
         lines = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).all()
-        # جداسازی خطوط ورودی و خروجی
         out_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "out"]
         in_lines = [ln for ln in lines if (ln.extra_info or {}).get("movement") == "in"]
-        
-        # محاسبه هزینه مواد اولیه
+
         total_materials_cost = Decimal(0)
         for line in out_lines:
             if not line.product_id:
@@ -3017,7 +3104,7 @@ def _calculate_invoice_profit(
             product = db.query(Product).filter(Product.id == line.product_id).first()
             if not product:
                 continue
-            
+
             qty = Decimal(str(line.quantity or 0))
             line_extra = line.extra_info or {}
             line_warehouse_id = line_extra.get("warehouse_id")
@@ -3027,44 +3114,64 @@ def _calculate_invoice_profit(
                 fifo_shortage_mode=fifo_sm,
             )
             total_materials_cost += qty * cost_per_unit
-        
-        # دریافت هزینه عملیات
+
         extra_info = document.extra_info or {}
         operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
-        
-        # هزینه کل تولید
+
         total_production_cost = total_materials_cost + operations_total
-        
-        # محاسبه سود برای محصولات نهایی
+
+        out_specs: List[Dict[str, Any]] = []
         for line in in_lines:
-            if not line.product_id:
-                continue
-            
-            product = db.query(Product).filter(Product.id == line.product_id).first()
-            if not product:
-                continue
-            
             qty = Decimal(str(line.quantity or 0))
-            unit_price = Decimal(str(product.base_sales_price or 0))
-            sales_amount = qty * unit_price
-            
-            # توزیع هزینه تولید
-            if len(in_lines) > 0:
-                line_cost = total_production_cost / len(in_lines)
+            line_extra = line.extra_info or {}
+            unit_price = Decimal(str(line_extra.get("unit_price", 0) or 0))
+            product = None
+            if line.product_id:
+                product = db.query(Product).filter(Product.id == line.product_id).first()
+            if unit_price <= 0 and product is not None:
+                unit_price = Decimal(str(product.base_sales_price or 0))
+            sales_amt = qty * unit_price
+            pname = (product.name if product else None) or (line.description or "").strip() or "—"
+            pcode = product.code if product else None
+            pid_i = int(product.id) if product else (int(line.product_id) if line.product_id else None)
+            out_specs.append({
+                "line": line,
+                "qty": qty,
+                "unit_price": unit_price,
+                "sales_amount": sales_amt,
+                "product_code": pcode,
+                "product_name": pname,
+                "product_id": pid_i,
+            })
+
+        weight_sum = sum(s["sales_amount"] for s in out_specs)
+        n_out = len(out_specs)
+
+        for spec in out_specs:
+            line = spec["line"]
+            qty = spec["qty"]
+            unit_price = spec["unit_price"]
+            sales_amount = spec["sales_amount"]
+            if weight_sum > 0:
+                line_cost = total_production_cost * (sales_amount / weight_sum)
+            elif n_out > 0:
+                line_cost = total_production_cost / Decimal(n_out)
             else:
                 line_cost = Decimal(0)
-            
+
             line_gross_profit = sales_amount - line_cost
-            line_gross_profit_percent = (line_gross_profit / sales_amount * 100) if sales_amount > 0 else Decimal(0)
-            
+            line_gross_profit_percent = (
+                (line_gross_profit / sales_amount * Decimal(100)) if sales_amount > 0 else Decimal(0)
+            )
+
             total_gross_profit += line_gross_profit
             total_sales += sales_amount
-            
+
             line_profits.append({
                 "line_id": line.id,
-                "product_id": product.id,
-                "product_code": product.code,
-                "product_name": product.name,
+                "product_id": spec["product_id"],
+                "product_code": spec["product_code"],
+                "product_name": spec["product_name"],
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
                 "cost_per_unit": float(line_cost / qty) if qty > 0 else 0,
@@ -3074,18 +3181,17 @@ def _calculate_invoice_profit(
                 "gross_profit_percent": float(line_gross_profit_percent),
                 "net_profit": float(line_gross_profit),
                 "net_profit_percent": float(line_gross_profit_percent),
-                "overhead": 0.0
+                "overhead": 0.0,
             })
-        
-        total_overhead = Decimal(0)
+
         if include_overhead and normalized_overhead_type != "production_overhead":
             total_overhead = _calculate_overhead_cost(
                 db, business_id, document.id, total_production_cost,
                 normalized_overhead_type, overhead_percent
             )
-        
+
         total_net_profit = total_gross_profit - total_overhead
-    
+
     # برای فاکتورهای فروش
     elif document.document_type in ["invoice_sales", "invoice_sales_return"]:
         is_sales_return = document.document_type == INVOICE_SALES_RETURN
@@ -3110,14 +3216,13 @@ def _calculate_invoice_profit(
                 )
             return mv_cache[cache_k]
 
+        gd_amt = _document_global_discount_amount_for_profit(document, item_lines)
+        gd_alloc = _allocate_global_discount_to_lines(item_lines, gd_amt, is_sales_return=is_sales_return)
+        adjustments_net_total = _document_adjustments_net_for_profit(document)
+
+        profit_rows: List[Dict[str, Any]] = []
+
         for item_line in item_lines:
-            if not item_line.product_id:
-                continue
-
-            product = db.query(Product).filter(Product.id == item_line.product_id).first()
-            if not product:
-                continue
-
             extra_info = item_line.extra_info or {}
             qty = Decimal(str(item_line.quantity or 0))
             unit_price = Decimal(str(extra_info.get("unit_price", 0) or 0))
@@ -3131,13 +3236,20 @@ def _calculate_invoice_profit(
                 wh_iter = None
 
             raw_net_sales = (qty * unit_price) - line_discount
+            alloc_g = gd_alloc.get(int(item_line.id), Decimal(0))
+            raw_after_global = raw_net_sales - alloc_g
+
             if is_sales_return:
-                if raw_net_sales > 0:
-                    sales_amount = -raw_net_sales
+                if raw_after_global > 0:
+                    sales_amount = -raw_after_global
                 else:
-                    sales_amount = raw_net_sales
+                    sales_amount = raw_after_global
             else:
-                sales_amount = raw_net_sales
+                sales_amount = raw_after_global
+
+            product = None
+            if item_line.product_id:
+                product = db.query(Product).filter(Product.id == item_line.product_id).first()
 
             mv_hint, _inv_pair = _movement_from_type(document.document_type)
             ex_mv = extra_info.get("movement")
@@ -3149,50 +3261,58 @@ def _calculate_invoice_profit(
             effective_move = ex_mv_norm if ex_mv_norm in ("in", "out") else mv_hint
 
             cost_per_unit = Decimal(0)
-            inbound_return_goods = bool(is_sales_return) and (effective_move == "in") and inv_tracked_ok is not False
+            total_line_cost = Decimal(0)
+            line_gross_profit = Decimal(0)
 
-            if inbound_return_goods:
-                cp_raw = extra_info.get("cost_price")
-                if cp_raw is not None:
-                    cost_per_unit = Decimal(str(cp_raw))
-                else:
-                    mvl = _mv_list_pid_wh(product.id, wh_iter)
-                    idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
-                    if idx_ln is not None:
-                        cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
-                            db,
-                            business_id,
-                            int(product.id),
-                            wh_iter,
-                            normalized_basis=normalized_basis,
-                            fifo_sm=fifo_sm,
-                            restoration_qty=qty,
-                            movements=mvl,
-                            return_mv_idx=int(idx_ln),
-                            return_document_as_of_date=document.document_date,
-                            prior_adjust_end_idx_exclusive=int(idx_ln),
-                        )
-                    else:
-                        cost_per_unit = _calculate_average_purchase_cost(
-                            db, business_id, product.id, document.document_date
-                        )
-                total_line_cost = qty * cost_per_unit
-                line_gross_profit = sales_amount + total_line_cost
-            else:
-                cost_per_unit = _invoice_profit_line_sale_cost_per_unit(
-                    db,
-                    business_id,
-                    product,
-                    item_line,
-                    qty,
-                    normalized_basis,
-                    document.document_date,
-                    warehouse_id,
-                    int(document.id),
-                    fifo_sm,
+            if product:
+                inbound_return_goods = (
+                    bool(is_sales_return) and (effective_move == "in") and inv_tracked_ok is not False
                 )
-                total_line_cost = qty * cost_per_unit
-                line_gross_profit = sales_amount - total_line_cost
+
+                if inbound_return_goods:
+                    cp_raw = extra_info.get("cost_price")
+                    if cp_raw is not None:
+                        cost_per_unit = Decimal(str(cp_raw))
+                    else:
+                        mvl = _mv_list_pid_wh(product.id, wh_iter)
+                        idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
+                        if idx_ln is not None:
+                            cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
+                                db,
+                                business_id,
+                                int(product.id),
+                                wh_iter,
+                                normalized_basis=normalized_basis,
+                                fifo_sm=fifo_sm,
+                                restoration_qty=qty,
+                                movements=mvl,
+                                return_mv_idx=int(idx_ln),
+                                return_document_as_of_date=document.document_date,
+                                prior_adjust_end_idx_exclusive=int(idx_ln),
+                            )
+                        else:
+                            cost_per_unit = _calculate_average_purchase_cost(
+                                db, business_id, product.id, document.document_date
+                            )
+                    total_line_cost = qty * cost_per_unit
+                    line_gross_profit = sales_amount + total_line_cost
+                else:
+                    cost_per_unit = _invoice_profit_line_sale_cost_per_unit(
+                        db,
+                        business_id,
+                        product,
+                        item_line,
+                        qty,
+                        normalized_basis,
+                        document.document_date,
+                        warehouse_id,
+                        int(document.id),
+                        fifo_sm,
+                    )
+                    total_line_cost = qty * cost_per_unit
+                    line_gross_profit = sales_amount - total_line_cost
+            else:
+                line_gross_profit = sales_amount
 
             denom_row = (
                 abs(sales_amount)
@@ -3203,39 +3323,29 @@ def _calculate_invoice_profit(
                 (line_gross_profit / denom_row * Decimal(100)) if denom_row != Decimal(0) else Decimal(0)
             )
 
-            line_overhead = Decimal(0)
-            if include_overhead:
-                line_overhead = _calculate_overhead_cost(
-                    db, business_id, document_id, total_line_cost,
-                    normalized_overhead_type, overhead_percent
-                ) / len(item_lines) if len(item_lines) > 0 else Decimal(0)
+            pname = (product.name if product else None) or (item_line.description or "").strip() or "—"
+            pcode = product.code if product else None
+            pid_disp = int(product.id) if product else (int(item_line.product_id) if item_line.product_id else None)
 
-            line_net_profit = line_gross_profit - line_overhead
-            line_net_profit_percent = (
-                (line_net_profit / denom_row * Decimal(100)) if denom_row != Decimal(0) else Decimal(0)
-            )
-
-            total_gross_profit += line_gross_profit
-            total_net_profit += line_net_profit
-            total_sales += sales_amount
-            total_cost += total_line_cost
-
-            line_profits.append({
+            profit_rows.append({
                 "line_id": item_line.id,
-                "product_id": product.id,
-                "product_code": product.code,
-                "product_name": product.name,
+                "product_id": pid_disp,
+                "product_code": pcode,
+                "product_name": pname,
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
                 "cost_per_unit": float(cost_per_unit),
-                "sales_amount": float(sales_amount),
-                "total_cost": float(total_line_cost),
-                "gross_profit": float(line_gross_profit),
-                "net_profit": float(line_net_profit),
-                "gross_profit_percent": float(line_gross_profit_percent),
-                "net_profit_percent": float(line_net_profit_percent),
-                "overhead": float(line_overhead),
+                "sales_amount": sales_amount,
+                "total_line_cost": total_line_cost,
+                "line_gross_profit": line_gross_profit,
+                "line_gross_profit_percent": line_gross_profit_percent,
+                "denom_row": denom_row,
             })
+
+        total_gross_from_lines = sum(pr["line_gross_profit"] for pr in profit_rows)
+        total_gross_profit = total_gross_from_lines + adjustments_net_total
+        total_sales = sum(pr["sales_amount"] for pr in profit_rows)
+        total_cost = sum(pr["total_line_cost"] for pr in profit_rows)
 
         total_overhead = Decimal(0)
         if include_overhead:
@@ -3243,10 +3353,49 @@ def _calculate_invoice_profit(
                 db, business_id, document_id, total_cost,
                 normalized_overhead_type, overhead_percent
             )
-            total_net_profit = total_gross_profit - total_overhead
+
+        n_rows = len(profit_rows)
+        for pr in profit_rows:
+            tlc = pr["total_line_cost"]
+            if include_overhead and total_overhead > 0:
+                if total_cost > 0:
+                    line_overhead = total_overhead * (tlc / total_cost)
+                elif n_rows > 0:
+                    line_overhead = total_overhead / Decimal(n_rows)
+                else:
+                    line_overhead = Decimal(0)
+            else:
+                line_overhead = Decimal(0)
+
+            lg = pr["line_gross_profit"]
+            line_net_profit = lg - line_overhead
+            denom_row = pr["denom_row"]
+            line_net_profit_percent = (
+                (line_net_profit / denom_row * Decimal(100)) if denom_row != Decimal(0) else Decimal(0)
+            )
+
+            line_profits.append({
+                "line_id": pr["line_id"],
+                "product_id": pr["product_id"],
+                "product_code": pr["product_code"],
+                "product_name": pr["product_name"],
+                "quantity": pr["quantity"],
+                "unit_price": pr["unit_price"],
+                "cost_per_unit": pr["cost_per_unit"],
+                "sales_amount": float(pr["sales_amount"]),
+                "total_cost": float(tlc),
+                "gross_profit": float(lg),
+                "net_profit": float(line_net_profit),
+                "gross_profit_percent": float(pr["line_gross_profit_percent"]),
+                "net_profit_percent": float(line_net_profit_percent),
+                "overhead": float(line_overhead),
+            })
+
+        total_net_profit = total_gross_profit - total_overhead
 
     # محاسبه درصد سود
-    denom_total = abs(total_sales) if total_sales != Decimal(0) else Decimal(0)
+    revenue_basis = total_sales + adjustments_net_total
+    denom_total = abs(revenue_basis) if revenue_basis != Decimal(0) else Decimal(0)
     gross_profit_percent = (
         (total_gross_profit / denom_total * Decimal(100)) if denom_total != Decimal(0) else Decimal(0)
     )

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 
@@ -7,12 +8,16 @@ import '../config/app_config.dart';
 import 'crm_chat_ws_client_stub.dart';
 export 'crm_chat_ws_client_stub.dart';
 
+const Duration _kCrmWsAuthTimeout = Duration(seconds: 17);
+
 class WebCrmChatWs implements CrmChatWsClient {
   web.WebSocket? _ws;
   void Function(Map<String, dynamic>)? _onMessage;
   void Function()? _onDisconnected;
   final Set<int> _subscribed = {};
   bool _authed = false;
+
+  StreamSubscription<web.CloseEvent>? _closeListen;
 
   void _resetSession() {
     _authed = false;
@@ -35,7 +40,7 @@ class WebCrmChatWs implements CrmChatWsClient {
   }
 
   @override
-  Future<void> connect({
+  Future<bool> connect({
     required String apiKey,
     required int businessId,
     required void Function(Map<String, dynamic> message) onMessage,
@@ -52,44 +57,108 @@ class WebCrmChatWs implements CrmChatWsClient {
         : apiBase.replaceFirst('http://', 'ws://');
     final url = '$wsBase/ws/crm-chat';
 
+    final handshake = Completer<bool>();
+    Timer? handshakeTimer;
+
+    void completeHandshake(bool ok) {
+      handshakeTimer?.cancel();
+      handshakeTimer = null;
+      if (!handshake.isCompleted) {
+        handshake.complete(ok);
+      }
+    }
+
+    handshakeTimer = Timer(_kCrmWsAuthTimeout, () {
+      try {
+        _ws?.close();
+      } catch (_) {}
+      completeHandshake(false);
+    });
+
+    web.WebSocket sock;
     try {
-      _ws = web.WebSocket(url);
-      _ws!.onOpen.listen((web.Event _) {
+      sock = web.WebSocket(url);
+      _ws = sock;
+    } catch (_) {
+      completeHandshake(false);
+      await handshake.future;
+      _ws = null;
+      _resetSession();
+      return false;
+    }
+
+    sock.onOpen.listen((web.Event _) {
+      try {
         _sendJson(<String, Object?>{
           'type': 'auth',
           'role': 'agent',
           'api_key': apiKey,
           'business_id': businessId,
         });
-      });
-      _ws!.onMessage.listen((web.MessageEvent e) {
+      } catch (_) {
         try {
-          final data = e.data;
-          if (data is JSString) { // ignore: invalid_runtime_check_with_js_interop_types
-            final msg = jsonDecode(data.toDart) as Map<String, dynamic>;
-            if (msg['type'] == 'auth_ok') {
-              _authed = true;
-              _flushSubscribeQueue();
-            }
-            _onMessage?.call(msg);
-          }
+          sock.close();
         } catch (_) {}
-      });
-      _ws!.onError.listen((web.Event _) {
-        _ws = null;
-        _resetSession();
-        _onDisconnected?.call();
-      });
-      _ws!.onClose.listen((web.CloseEvent _) {
-        _ws = null;
-        _resetSession();
-        _onDisconnected?.call();
-      });
-    } catch (_) {
+      }
+    });
+
+    sock.onMessage.listen((web.MessageEvent e) {
+      try {
+        final data = e.data;
+        if (data is JSString) {
+          // ignore: invalid_runtime_check_with_js_interop_types
+          final msg = jsonDecode(data.toDart) as Map<String, dynamic>;
+          if (msg['type'] == 'auth_ok') {
+            _authed = true;
+            _flushSubscribeQueue();
+            completeHandshake(true);
+          }
+          _onMessage?.call(msg);
+        }
+      } catch (_) {}
+    });
+
+    sock.onError.listen((web.Event _) {
+      final okSession = _authed;
+      try {
+        sock.close();
+      } catch (_) {}
       _ws = null;
+      completeHandshake(false);
       _resetSession();
-      _onDisconnected?.call();
+      if (okSession) {
+        _onDisconnected?.call();
+      }
+    });
+
+    _closeListen = sock.onClose.listen((web.CloseEvent _) {
+      final okSession = _authed;
+      _closeListen?.cancel();
+      _closeListen = null;
+      _ws = null;
+      completeHandshake(false);
+      _resetSession();
+      if (okSession) {
+        _onDisconnected?.call();
+      }
+    });
+
+    final authedOk = await handshake.future;
+    handshakeTimer?.cancel();
+    handshakeTimer = null;
+
+    if (!authedOk) {
+      try {
+        sock.close();
+      } catch (_) {}
+      _ws = null;
+      await _closeListen?.cancel();
+      _closeListen = null;
+      _resetSession();
+      return false;
     }
+
+    return true;
   }
 
   @override
@@ -113,6 +182,8 @@ class WebCrmChatWs implements CrmChatWsClient {
   @override
   void disconnect() {
     try {
+      _closeListen?.cancel();
+      _closeListen = null;
       _ws?.close();
     } catch (_) {}
     _ws = null;

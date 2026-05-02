@@ -5,7 +5,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class ThemeModeSwitcher extends StatelessWidget {
   final ThemeController controller;
-  const ThemeModeSwitcher({super.key, required this.controller});
+  final bool toolbarCompact;
+  const ThemeModeSwitcher({super.key, required this.controller, this.toolbarCompact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +26,10 @@ class ThemeModeSwitcher extends StatelessWidget {
       ],
       onSelected: (mode) => controller.setMode(mode),
       child: CircleAvatar(
-        radius: 14,
+        radius: toolbarCompact ? 12 : 14,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
-        child: Icon(icon, size: 16),
+        child: Icon(icon, size: toolbarCompact ? 14 : 16),
       ),
     );
   }

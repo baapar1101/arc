@@ -52,6 +52,13 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # بارکدهای عمومی (چند مقدار با ویرگول؛ برای اسکن و چاپ برچسب)
+    general_barcodes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="بارکدهای عمومی جدا شده با ویرگول",
+    )
+
     # دسته‌بندی (اختیاری)
     category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True)
 

@@ -29,6 +29,7 @@ import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/general_barcode_utils.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
 
@@ -237,6 +238,53 @@ class _ProductsPageState extends State<ProductsPage> {
         return;
       }
       await ProductLabelPrintDialog.show(context, items: labels);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    }
+  }
+
+  Future<void> _bulkPrintGeneralBarcodeLabels() async {
+    final t = AppLocalizations.of(context);
+    try {
+      final state = _tableKey.currentState as dynamic;
+      final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+      if (items.isEmpty) {
+        SnackBarHelper.showError(context, message: t.noRowsSelectedError);
+        return;
+      }
+      final labels = <ProductLabelPrintItem>[];
+      for (final row in items) {
+        if (row is! Map<String, dynamic>) continue;
+        final name = row['name']?.toString() ?? '';
+        final code = row['code']?.toString() ?? '';
+        final raw = row['general_barcodes']?.toString();
+        final tokens = parseGeneralBarcodeTokens(raw);
+        for (final tok in tokens) {
+          labels.add(
+            ProductLabelPrintItem(
+              productName: name,
+              productCode: code,
+              serialNumber: '',
+              instanceBarcode: tok,
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      if (labels.isEmpty) {
+        SnackBarHelper.showError(context, message: t.generalBarcodeLabelsNoneSelected);
+        return;
+      }
+      await ProductLabelPrintDialog.show(
+        context,
+        items: labels,
+        initialShowSerialLine: false,
+        dialogTitle: t.generalBarcodeLabelsTitle,
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -1563,7 +1611,7 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ]),
           ],
-          searchFields: const ['code', 'name', 'description'],
+          searchFields: const ['code', 'name', 'description', 'general_barcodes'],
           filterFields: const ['item_type', 'category_id'],
           defaultPageSize: 20,
           customHeaderActions: [
@@ -1631,6 +1679,14 @@ class _ProductsPageState extends State<ProductsPage> {
                 child: IconButton(
                   onPressed: _bulkPrintUniqueProductLabels,
                   icon: const Icon(Icons.qr_code_2_outlined),
+                ),
+              ),
+            if (widget.authStore.hasBusinessPermission('products', 'view'))
+              Tooltip(
+                message: AppLocalizations.of(context).printGeneralBarcodeLabels,
+                child: IconButton(
+                  onPressed: _bulkPrintGeneralBarcodeLabels,
+                  icon: const Icon(Icons.label_outline),
                 ),
               ),
             if (widget.authStore.hasBusinessPermission('products', 'edit'))

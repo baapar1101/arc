@@ -24,6 +24,9 @@ class ProfileShell extends StatefulWidget {
 }
 
 class _ProfileShellState extends State<ProfileShell> {
+  /// هم‌تراز با [BusinessShell] — نوار بالای پنل کاربر.
+  static const double _kProfileAppBarToolbarHeight = 44;
+
   int _hoverIndex = -1;
 
   @override
@@ -108,27 +111,41 @@ class _ProfileShellState extends State<ProfileShell> {
       context.go('/login');
     }
 
-    // Brand top bar with contrast color
-    final Color appBarBg = const Color(0xFF0D47A1); // آبی تیره
-    final Color appBarFg = Colors.white;
+    final Color appBarBg = scheme.primary;
+    final Color appBarFg = scheme.onPrimary;
 
     final appBar = AppBar(
+      toolbarHeight: _kProfileAppBarToolbarHeight,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
       backgroundColor: appBarBg,
       foregroundColor: appBarFg,
+      iconTheme: IconThemeData(color: appBarFg, size: 21),
+      actionsIconTheme: IconThemeData(color: appBarFg, size: 21),
+      automaticallyImplyLeading: !useRail,
       titleSpacing: 0,
       title: Row(
         children: [
-          const SizedBox(width: 12),
-          Image.asset(logoAsset, height: 28),
-          const SizedBox(width: 12),
-          Text(t.appTitle, style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700)),
+          SizedBox(width: useRail ? 12 : 8),
+          Image.asset(logoAsset, height: 22),
+          const SizedBox(width: 10),
+          Text(
+            t.appTitle,
+            style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700, fontSize: 15, height: 1.1),
+          ),
         ],
       ),
       leading: useRail
           ? null
           : Builder(
               builder: (ctx) => IconButton(
-                icon: Icon(Icons.menu, color: appBarFg),
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(40, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: Icon(Icons.menu_rounded, color: appBarFg, size: 21),
                 onPressed: () => Scaffold.of(ctx).openDrawer(),
                 tooltip: t.menu,
               ),
@@ -136,22 +153,23 @@ class _ProfileShellState extends State<ProfileShell> {
       actions: [
         if (widget.calendarController != null) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: CalendarSwitcher(controller: widget.calendarController!),
+            padding: const EdgeInsets.symmetric(horizontal: 2.0),
+            child: CalendarSwitcher(controller: widget.calendarController!, toolbarCompact: true),
           ),
         ],
         if (widget.localeController != null) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: LanguageSwitcher(controller: widget.localeController!),
+            padding: const EdgeInsets.symmetric(horizontal: 2.0),
+            child: LanguageSwitcher(controller: widget.localeController!, toolbarCompact: true),
           ),
         ],
         if (widget.themeController != null) ...[
-          ThemeModeSwitcher(controller: widget.themeController!),
-          const SizedBox(width: 8),
+          ThemeModeSwitcher(controller: widget.themeController!, toolbarCompact: true),
+          const SizedBox(width: 6),
         ],
-        NotificationBellButton(authStore: widget.authStore, iconColor: appBarFg),
-        LogoutButton(authStore: widget.authStore),
+        NotificationBellButton(authStore: widget.authStore, iconColor: appBarFg, denseToolbar: true),
+        LogoutButton(authStore: widget.authStore, toolbarCompact: true),
+        const SizedBox(width: 2),
       ],
     );
 

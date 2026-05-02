@@ -30,11 +30,14 @@ String _localizedAnnouncementLevel(BuildContext context, String raw) {
 class NotificationBellButton extends StatefulWidget {
   final AuthStore authStore;
   final Color? iconColor;
+  /// هم‌خط با آیکن‌های نوار ابزار در [BusinessShell] (ارتفاع ۴۴).
+  final bool denseToolbar;
 
   const NotificationBellButton({
     super.key,
     required this.authStore,
     this.iconColor,
+    this.denseToolbar = false,
   });
 
   @override
@@ -360,15 +363,23 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   @override
   Widget build(BuildContext context) {
     final color = widget.iconColor ?? Theme.of(context).colorScheme.onSurface;
+    final icon = Icon(Icons.notifications_none, size: widget.denseToolbar ? 21 : null);
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 4),
+      padding: EdgeInsetsDirectional.only(end: widget.denseToolbar ? 2 : 4),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           IconButton(
             tooltip: 'اعلان‌ها',
+            visualDensity: widget.denseToolbar ? VisualDensity.compact : VisualDensity.standard,
+            style: widget.denseToolbar
+                ? IconButton.styleFrom(
+                    minimumSize: const Size(38, 38),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )
+                : null,
             onPressed: _openNotificationCenter,
-            icon: const Icon(Icons.notifications_none),
+            icon: icon,
             color: color,
           ),
           if (_unreadCount > 0)

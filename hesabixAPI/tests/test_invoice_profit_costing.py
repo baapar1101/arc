@@ -1,9 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from app.services.invoice_service import (
+    _allocate_global_discount_to_lines,
     _build_cost_layers_from_movements,
     _consume_cost_layers_for_quantity,
+    _document_adjustments_net_for_profit,
+    _document_global_discount_amount_for_profit,
+    _invoice_line_net_before_global_discount,
     _movement_sort_key,
     _normalize_invoice_profit_basis,
     _normalize_invoice_profit_fifo_shortage_mode,
@@ -281,3 +286,47 @@ def test_profit_setting_normalizers() -> None:
 
     assert _normalize_invoice_profit_type("BOTH") == "both"
     assert _normalize_invoice_profit_type("none") == "gross"
+
+
+def test_invoice_line_net_before_global_discount_mock() -> None:
+    ln = MagicMock()
+    ln.quantity = 2
+    ln.extra_info = {"unit_price": 50, "line_discount": 10}
+    assert _invoice_line_net_before_global_discount(ln) == Decimal("90")
+
+
+def test_allocate_global_discount_proportional_sales() -> None:
+    ln1 = MagicMock(id=1, quantity=2, extra_info={"unit_price": 100, "line_discount": 0})
+    ln2 = MagicMock(id=2, quantity=2, extra_info={"unit_price": 50, "line_discount": 0})
+    m = _allocate_global_discount_to_lines([ln1, ln2], Decimal("30"), is_sales_return=False)
+    assert sum(m.values()) == Decimal("30")
+    assert m[1] == Decimal("20")
+    assert m[2] == Decimal("10")
+
+
+def test_allocate_global_discount_equal_when_no_positive_weight() -> None:
+    ln1 = MagicMock(id=1, quantity=1, extra_info={"unit_price": 0, "line_discount": 0})
+    ln2 = MagicMock(id=2, quantity=1, extra_info={"unit_price": 0, "line_discount": 0})
+    m = _allocate_global_discount_to_lines([ln1, ln2], Decimal("10"), is_sales_return=False)
+    assert sum(m.values()) == Decimal("10")
+
+
+def test_document_adjustments_net_for_profit() -> None:
+    doc = MagicMock()
+    doc.extra_info = {"totals": {"adjustments_net": -15}}
+    assert _document_adjustments_net_for_profit(doc) == Decimal("-15")
+
+
+def test_document_global_discount_amount_prefers_extra_amount() -> None:
+    doc = MagicMock()
+    doc.extra_info = {"global_discount": {"amount": 42}, "totals": {"discount": 99}}
+    ln = MagicMock(extra_info={"line_discount": 0})
+    assert _document_global_discount_amount_for_profit(doc, [ln]) == Decimal("42")
+
+
+def test_document_global_discount_amount_from_totals_minus_lines() -> None:
+    doc = MagicMock()
+    doc.extra_info = {"totals": {"discount": 130}}
+    ln1 = MagicMock(extra_info={"line_discount": 30})
+    ln2 = MagicMock(extra_info={"line_discount": 0})
+    assert _document_global_discount_amount_for_profit(doc, [ln1, ln2]) == Decimal("100")

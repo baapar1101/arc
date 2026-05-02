@@ -296,7 +296,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         searchQuery: null,
         limit: _pageSize,
         skip: 0,
-        searchFields: const ['code', 'name'],
+        searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       if (!mounted) return;
@@ -360,7 +360,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         searchQuery: q,
         limit: _pageSize,
         skip: 0,
-        searchFields: const ['code', 'name'],
+        searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       if (!mounted) return;
@@ -398,7 +398,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         searchQuery: _currentSearchQuery,
         limit: _pageSize,
         skip: _currentSkip,
-        searchFields: const ['code', 'name'],
+        searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       if (!mounted) return;

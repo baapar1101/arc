@@ -3357,6 +3357,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String get barcode => 'Barcode';
 
   @override
+  String get productGeneralBarcodes => 'General barcodes';
+
+  @override
+  String get productGeneralBarcodesHint =>
+      'Enter multiple codes separated by commas (English or Persian comma). Used for quick product lookup on invoices and optional PDF labels.';
+
+  @override
+  String get printGeneralBarcodeLabels => 'Print general barcode labels (PDF)';
+
+  @override
+  String get generalBarcodeLabelsTitle => 'General barcode labels';
+
+  @override
+  String get generalBarcodeLabelsNoneSelected =>
+      'No general barcodes found on selected products.';
+
+  @override
+  String get labelPdfDialogTitle => 'Print labels';
+
+  @override
+  String get labelPdfContentSection => 'Label content';
+
+  @override
+  String get labelPdfLinearBarcode => 'Linear barcode';
+
+  @override
+  String get labelPdfQrCode => 'QR code';
+
+  @override
+  String get labelPdfBarcodeAsText => 'Barcode value as text';
+
+  @override
+  String get labelPdfProductName => 'Product name';
+
+  @override
+  String get labelPdfSerialLine => 'Serial line';
+
+  @override
+  String get labelPdfPaperLayoutSection => 'Paper & layout';
+
+  @override
+  String get labelPdfPaperSize => 'Paper size';
+
+  @override
+  String get labelPdfLandscape => 'Landscape';
+
+  @override
+  String get labelPdfColumns => 'Columns';
+
+  @override
+  String get labelPdfPageMarginPts => 'Page margin (pt)';
+
+  @override
+  String get labelPdfPreview => 'Preview';
+
+  @override
+  String get labelPdfSave => 'Save PDF';
+
+  @override
+  String get labelPdfShare => 'Share';
+
+  @override
+  String get labelPdfClose => 'Close';
+
+  @override
+  String get labelPdfSaved => 'PDF file saved';
+
+  @override
+  String get labelPdfSaveFailed => 'Could not save PDF';
+
+  @override
+  String get labelPdfShareFailed => 'Share failed';
+
+  @override
+  String get labelPdfBuildError => 'Could not build PDF';
+
+  @override
+  String get labelPdfPreviewHintDesktop =>
+      'Zoom and scroll using the preview toolbar';
+
+  @override
+  String get labelPdfPreviewHintWeb =>
+      'On web: preview uses your browser PDF viewer (zoom via menu or Ctrl±)';
+
+  @override
+  String get labelPdfOrientationLandscape => 'Landscape';
+
+  @override
+  String get labelPdfOrientationPortrait => 'Portrait';
+
+  @override
   String get generalInformation => 'General information';
 
   @override
@@ -3546,6 +3637,41 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bulkProductPricesSheetSelectListsHint =>
       'Select one or more price lists to show and edit list prices, then load the page.';
+
+  @override
+  String get bulkProductPricesSheetExportExcel => 'Download Excel';
+
+  @override
+  String get bulkProductPricesSheetImportExcel => 'Upload Excel';
+
+  @override
+  String get bulkProductPricesSheetExcelHint =>
+      'All products matching this search are exported. After editing prices, upload the file. Keep the worksheet name «BulkPrices»; pi_* columns are price-item IDs.';
+
+  @override
+  String get bulkProductPricesSheetGuideTitle => 'Guide & Excel';
+
+  @override
+  String get bulkProductPricesSheetSearchSection => 'Search & price lists';
+
+  @override
+  String get bulkProductPricesSheetTableSection => 'Price grid';
+
+  @override
+  String get bulkProductPricesSheetMoreActions => 'More actions';
+
+  @override
+  String get bulkProductPricesSheetNoRows => 'No products on this page';
+
+  @override
+  String get bulkProductPricesSheetNoRowsHint =>
+      'Try another search or switch page.';
+
+  @override
+  String get bulkProductPricesSheetPageLabel => 'Page';
+
+  @override
+  String get bulkProductPricesSheetPriceListPrices => 'List prices';
 
   @override
   String get preview => 'Preview';
@@ -11674,4 +11800,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessPanelTabListTooltip => 'List all tabs';
+
+  @override
+  String get businessPanelTabRouteProjects => 'Projects';
+
+  @override
+  String get businessPanelTabRoutePriceListItems => 'Price list items';
+
+  @override
+  String get businessPanelTabRouteRepairTechnicians => 'Repair technicians';
+
+  @override
+  String get businessPanelTabRouteRepairShopSettings => 'Repair shop settings';
+
+  @override
+  String get appearanceSidebarTabBehaviorSection =>
+      'Sidebar navigation (when tabs are on)';
+
+  @override
+  String get appearanceSidebarTabBehaviorReuseTitle =>
+      'Reuse open tab or open a new one';
+
+  @override
+  String get appearanceSidebarTabBehaviorReuseSubtitle =>
+      'If that page is already open in a tab, switch to it; otherwise add a new tab. This matches the previous default behavior.';
+
+  @override
+  String get appearanceSidebarTabBehaviorLongPressTitle =>
+      'Replace the active tab; long press for the default behavior';
+
+  @override
+  String get appearanceSidebarTabBehaviorLongPressSubtitle =>
+      'A normal click loads the destination in the current tab only. Long press on a sidebar item reuses an open tab or opens a new tab, like the option above.';
 }

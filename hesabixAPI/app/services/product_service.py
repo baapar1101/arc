@@ -19,7 +19,29 @@ from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductU
 from adapters.db.models.category import BusinessCategory
 from sqlalchemy.exc import IntegrityError
 
+from app.services.product_general_barcode_service import (
+    normalize_general_barcodes_storage,
+    assert_tokens_unique_among_products,
+    assert_tokens_not_used_by_unique_instances,
+    replace_general_barcode_aliases,
+    split_raw_general_barcodes,
+)
+
 logger = logging.getLogger(__name__)
+
+
+def _resolve_create_general_barcodes_raw(payload: ProductCreateRequest) -> Optional[str]:
+    gb = payload.general_barcodes
+    if isinstance(gb, str) and gb.strip():
+        return gb
+    if payload.barcode and str(payload.barcode).strip():
+        return str(payload.barcode).strip()
+    return None
+
+
+def _legacy_barcode_field_from_general_csv(csv_val: Optional[str]) -> Optional[str]:
+    tokens = split_raw_general_barcodes(csv_val)
+    return tokens[0] if tokens else None
 
 
 def invalidate_products_cache(business_id: int, product_id: Optional[int] = None, category_id: Optional[int] = None):
@@ -321,6 +343,9 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
     _validate_units(main_unit, secondary_unit, payload.unit_conversion_factor)
     logger.debug(f"[CREATE_PRODUCT] Validation passed - main_unit='{main_unit}', secondary_unit='{secondary_unit}'")
 
+    raw_gb_create = _resolve_create_general_barcodes_raw(payload)
+    stored_gb_create, gb_tokens_create = normalize_general_barcodes_storage(raw_gb_create)
+
     # Retry Logic برای مدیریت Race Condition در تولید کد خودکار
     max_retries = 10
     retry_count = 0
@@ -385,12 +410,17 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
                 image_file_id=payload.image_file_id,
                 default_warehouse_id=payload.default_warehouse_id,
                 is_active=payload.is_active if payload.is_active is not None else True,  # پیش‌فرض True
+                general_barcodes=stored_gb_create,
             )
             logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
             logger.debug(f"[CREATE_PRODUCT] Flushing to get ID...")
             db.flush()  # Flush برای دریافت id، اما commit نمی‌کند
             logger.info(f"[CREATE_PRODUCT] Product flushed - ID={obj.id}")
+
+            assert_tokens_unique_among_products(db, business_id, gb_tokens_create, exclude_product_id=None)
+            assert_tokens_not_used_by_unique_instances(db, business_id, gb_tokens_create, exclude_product_id=None)
+            replace_general_barcode_aliases(db, business_id, obj.id, gb_tokens_create)
 
             # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
             logger.debug(f"[CREATE_PRODUCT] Upserting attributes - attribute_ids={payload.attribute_ids}")
@@ -425,6 +455,13 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             logger.warning(f"[CREATE_PRODUCT] IntegrityError caught (attempt {retry_count + 1}): {e}")
             logger.debug(f"[CREATE_PRODUCT] Rolling back transaction...")
             db.rollback()
+            err_txt = str(getattr(e, "orig", e)).lower()
+            if "uq_product_general_barcode_business_token" in err_txt or "product_general_barcode_aliases" in err_txt:
+                raise ApiError(
+                    "DUPLICATE_GENERAL_BARCODE",
+                    "بارکد عمومی تکراری است یا قبلاً برای کالای دیگری ثبت شده است",
+                    http_status=409,
+                )
             retry_count += 1
             logger.info(f"[CREATE_PRODUCT] Will retry (retry_count={retry_count}/{max_retries})")
             
@@ -475,6 +512,8 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
     include_inventory = bool(query.get("include_inventory", False))
     inventory_as_of_date = query.get("inventory_as_of_date")
     raw_category_ids = query.get("category_ids")
+    raw_sf = query.get("search_fields") or query.get("searchFields")
+    search_fields: Optional[List[str]] = raw_sf if isinstance(raw_sf, list) else None
     category_ids: Optional[List[int]] = None
     if isinstance(raw_category_ids, list) and raw_category_ids:
         category_ids = []
@@ -494,6 +533,7 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
         sort_desc=sort_desc,
         sort=sort_multi,
         search=search,
+        search_fields=search_fields,
         filters=filters,
         category_ids=category_ids,
         include_inventory=include_inventory,
@@ -542,6 +582,24 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     factor_val = payload.unit_conversion_factor if 'unit_conversion_factor' in fields_set else obj.unit_conversion_factor
     _validate_units(main_unit_val, secondary_unit_val, factor_val)
 
+    gb_handled = False
+    general_barcodes_val: Optional[str] = None
+    general_tokens: List[str] = []
+    if 'general_barcodes' in fields_set:
+        gb_handled = True
+        general_barcodes_val, general_tokens = normalize_general_barcodes_storage(payload.general_barcodes)
+    elif 'barcode' in fields_set:
+        gb_handled = True
+        bc = payload.barcode
+        if bc is None or (isinstance(bc, str) and not str(bc).strip()):
+            general_barcodes_val, general_tokens = normalize_general_barcodes_storage(None)
+        else:
+            general_barcodes_val, general_tokens = normalize_general_barcodes_storage(str(bc).strip())
+
+    if gb_handled:
+        assert_tokens_unique_among_products(db, business_id, general_tokens, exclude_product_id=product_id)
+        assert_tokens_not_used_by_unique_instances(db, business_id, general_tokens, exclude_product_id=product_id)
+
     # فقط اگر code در fields_set است و مقدار دارد، آن را به‌روزرسانی کن
     # اگر code در fields_set نیست یا None است، مقدار قبلی را نگه می‌داریم
     code_to_update = code_value if 'code' in fields_set else None
@@ -580,8 +638,13 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
                 http_status=400
             )
 
+    gb_kw = {}
+    if gb_handled:
+        gb_kw["general_barcodes"] = general_barcodes_val
+
     updated = repo.update(
         product_id,
+        commit=False,
         item_type=payload.item_type if payload.item_type is not None else None,
         code=code_to_update,
         name=payload.name.strip() if isinstance(payload.name, str) else None,
@@ -611,18 +674,31 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
         is_active=payload.is_active if 'is_active' in fields_set else None,
         default_warehouse_id=(
-            None if item_type == ProductItemType.SERVICE.value 
+            None if item_type == ProductItemType.SERVICE.value
             else (
-                # اگر default_warehouse_id در fields_set است، مقدار آن را استفاده می‌کنیم (حتی اگر null باشد)
-                payload.default_warehouse_id if default_warehouse_id_updated 
+                payload.default_warehouse_id if default_warehouse_id_updated
                 else obj.default_warehouse_id
             )
         ),
+        **gb_kw,
     )
     if not updated:
         return None
 
-    _upsert_attributes(db, product_id, business_id, payload.attribute_ids)
+    if gb_handled:
+        replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
+
+    _upsert_attributes(db, product_id, business_id, payload.attribute_ids, auto_commit=False)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ApiError(
+            "GENERAL_BARCODE_CONFLICT",
+            "بارکد عمومی تکراری است یا با دادهٔ دیگر در تداخل است",
+            http_status=409,
+        )
+    db.refresh(updated)
     
     # Invalidate cache بعد از به‌روزرسانی موفق محصول
     # دریافت category_id قبلی و جدید
@@ -1046,6 +1122,8 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "default_warehouse_id": obj.default_warehouse_id,
         "default_warehouse_name": obj.default_warehouse.name if obj.default_warehouse else None,
         "default_warehouse_code": obj.default_warehouse.code if obj.default_warehouse else None,
+        "general_barcodes": getattr(obj, "general_barcodes", None),
+        "barcode": _legacy_barcode_field_from_general_csv(getattr(obj, "general_barcodes", None)),
         "is_active": obj.is_active if hasattr(obj, 'is_active') else True,  # مقدار پیش‌فرض True در صورت عدم وجود فیلد
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,

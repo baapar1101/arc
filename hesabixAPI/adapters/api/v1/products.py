@@ -19,6 +19,7 @@ from adapters.api.v1.schema_models.product import (
     BulkPriceUpdateRequest,
     BulkPriceUpdatePreviewResponse,
     BulkProductPriceSheetApplyRequest,
+    BulkProductPriceSheetExcelExportRequest,
     BulkProductPriceSheetItemsRequest,
     BulkDefaultWarehouseRequest,
     BulkDefaultWarehousePreviewResponse,
@@ -44,6 +45,8 @@ from app.services.bulk_price_update_service import (
 )
 from app.services.bulk_product_prices_sheet_service import (
     apply_bulk_product_price_sheet,
+    export_bulk_product_price_sheet_excel,
+    import_bulk_product_price_sheet_from_excel,
     list_bulk_price_sheet_items,
 )
 from adapters.db.models.business import Business
@@ -404,6 +407,7 @@ def search_products_endpoint(
 			"sort_desc": query_info.sort_desc,
 			"sort": to_serializable(query_info.sort) if getattr(query_info, "sort", None) else None,
 			"search": query_info.search,
+			"search_fields": to_serializable(query_info.search_fields) if getattr(query_info, "search_fields", None) else None,
 			"filters": serializable_filters,
 			"category_ids": to_serializable(query_info.category_ids) if query_info.category_ids else None,
 			"include_inventory": query_info.include_inventory,
@@ -426,6 +430,7 @@ def search_products_endpoint(
 			"sort_desc": query_info.sort_desc,
 			"sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
 			"search": query_info.search,
+			"search_fields": query_info.search_fields,
 			"filters": query_info.filters,
 			"category_ids": query_info.category_ids,
 			"include_inventory": query_info.include_inventory,
@@ -2808,6 +2813,74 @@ def apply_bulk_product_prices_sheet_endpoint(
 ) -> Dict[str, Any]:
     result = apply_bulk_product_price_sheet(db, business_id, payload)
     return success_response(data=result, request=request)
+
+
+@router.post(
+    "/business/{business_id}/bulk-prices-sheet/export/excel",
+    summary="خروجی اکسل ورق ویرایش گسترده قیمت",
+    response_class=None,
+)
+@require_business_access("business_id")
+async def export_bulk_product_prices_sheet_excel_endpoint(
+    request: Request,
+    business_id: int,
+    payload: BulkProductPriceSheetExcelExportRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "view")),
+):
+    from fastapi.responses import Response
+
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    rtl = locale == "fa"
+    data, filename = export_bulk_product_price_sheet_excel(
+        db,
+        business_id,
+        search=payload.search,
+        search_fields=payload.search_fields,
+        price_list_ids=list(payload.price_list_ids),
+        rtl_sheet=rtl,
+    )
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post(
+    "/business/{business_id}/bulk-prices-sheet/import/excel",
+    summary="ایمپورت اکسل ورق ویرایش گسترده قیمت",
+    response_model=SuccessResponse[Dict[str, Any]],
+)
+@require_business_access("business_id")
+async def import_bulk_product_prices_sheet_excel_endpoint(
+    request: Request,
+    business_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
+) -> Dict[str, Any]:
+    if not file.filename or not str(file.filename).lower().endswith(".xlsx"):
+        raise ApiError(
+            "INVALID_FILE",
+            "فقط فایل‌های .xlsx پشتیبانی می‌شوند",
+            http_status=400,
+        )
+    content = await file.read()
+    result = import_bulk_product_price_sheet_from_excel(db, business_id, content)
+    if not result.get("ok"):
+        raise ApiError(
+            "BULK_PRICE_SHEET_IMPORT_FAILED",
+            result.get("message") or "ایمپورت ناموفق بود",
+            http_status=400,
+            details={"errors": result.get("errors") or []},
+        )
+    return success_response(data=result, request=request, message=result.get("message"))
 
 
 @router.post(

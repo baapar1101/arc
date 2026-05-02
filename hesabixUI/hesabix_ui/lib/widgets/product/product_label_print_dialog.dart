@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../data_table/helpers/file_saver.dart';
@@ -68,15 +69,36 @@ extension on _PaperKind {
 /// دیالوگ پیش‌نمایش و ذخیره/اشتراک PDF برچسب‌ها.
 class ProductLabelPrintDialog extends StatefulWidget {
   final List<ProductLabelPrintItem> items;
+  /// برای بارکدهای عمومی معمولاً `false` تا خط «سریال» خالی نمایش داده نشود.
+  final bool initialShowSerialLine;
+  final String? dialogTitle;
+  final String? dialogSubtitle;
 
-  const ProductLabelPrintDialog({super.key, required this.items});
+  const ProductLabelPrintDialog({
+    super.key,
+    required this.items,
+    this.initialShowSerialLine = true,
+    this.dialogTitle,
+    this.dialogSubtitle,
+  });
 
-  static Future<void> show(BuildContext context, {required List<ProductLabelPrintItem> items}) {
+  static Future<void> show(
+    BuildContext context, {
+    required List<ProductLabelPrintItem> items,
+    bool initialShowSerialLine = true,
+    String? dialogTitle,
+    String? dialogSubtitle,
+  }) {
     if (items.isEmpty) return Future.value();
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => ProductLabelPrintDialog(items: items),
+      builder: (ctx) => ProductLabelPrintDialog(
+        items: items,
+        initialShowSerialLine: initialShowSerialLine,
+        dialogTitle: dialogTitle,
+        dialogSubtitle: dialogSubtitle,
+      ),
     );
   }
 
@@ -87,12 +109,19 @@ class ProductLabelPrintDialog extends StatefulWidget {
 class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
   bool _showLinear = true;
   bool _showQr = true;
+  bool _showBarcodeAsText = false;
   bool _showProductName = true;
-  bool _showSerialLine = true;
+  late bool _showSerialLine;
   int _columns = 2;
   double _marginPt = 28;
   _PaperKind _paper = _PaperKind.a4;
   bool _landscape = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showSerialLine = widget.initialShowSerialLine;
+  }
 
   PdfPageFormat get _pageFormat {
     final b = _paper.baseFormat();
@@ -201,7 +230,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
           textAlign: pw.TextAlign.center,
           textDirection: pw.TextDirection.ltr,
         ),
-        if (_showSerialLine) ...[
+        if (_showSerialLine && item.serialNumber.trim().isNotEmpty) ...[
           pw.SizedBox(height: 2),
           pw.Text(
             shapePdfPersianText('سریال: ${item.serialNumber}'),
@@ -263,6 +292,24 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
               data: scan,
               width: 72,
               height: 72,
+            ),
+          ),
+        );
+      }
+
+      if (_showBarcodeAsText && hasScan && scan.isNotEmpty) {
+        children.add(pw.SizedBox(height: 4));
+        children.add(
+          pw.Center(
+            child: pw.Text(
+              scan,
+              style: pw.TextStyle(
+                fontSize: 11,
+                letterSpacing: 0.9,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              textAlign: pw.TextAlign.center,
+              textDirection: pw.TextDirection.ltr,
             ),
           ),
         );
@@ -335,22 +382,24 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
   }
 
   Future<void> _onSavePdf(BuildContext context) async {
+    final t = AppLocalizations.of(context);
     try {
       final bytes = await _buildPdf(_pageFormat);
       final name = 'product-labels-${DateTime.now().millisecondsSinceEpoch}.pdf';
       await FileSaver.saveBytes(bytes, name);
       if (!context.mounted) return;
-      SnackBarHelper.show(context, message: 'فایل PDF ذخیره شد');
+      SnackBarHelper.show(context, message: t.labelPdfSaved);
     } catch (e) {
       if (!context.mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'ذخیره PDF ناموفق: ${ErrorExtractor.forContext(e, context)}',
+        message: '${t.labelPdfSaveFailed}: ${ErrorExtractor.forContext(e, context)}',
       );
     }
   }
 
   Future<void> _onSharePdf(BuildContext context) async {
+    final t = AppLocalizations.of(context);
     try {
       final bytes = await _buildPdf(_pageFormat);
       await Printing.sharePdf(bytes: bytes, filename: 'product-labels.pdf');
@@ -358,13 +407,14 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
       if (!context.mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'اشتراک‌گذاری ناموفق: ${ErrorExtractor.forContext(e, context)}',
+        message: '${t.labelPdfShareFailed}: ${ErrorExtractor.forContext(e, context)}',
       );
     }
   }
 
   Widget _settingsPanel(BuildContext context, {required bool narrow}) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final chipsCard = Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -372,43 +422,48 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('محتوای برچسب', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(t.labelPdfContentSection, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 FilterChip(
-                  label: const Text('بارکد خطی'),
+                  label: Text(t.labelPdfLinearBarcode),
                   selected: _showLinear,
                   onSelected: (v) => setState(() => _showLinear = v),
                 ),
                 FilterChip(
-                  label: const Text('QR'),
+                  label: Text(t.labelPdfQrCode),
                   selected: _showQr,
                   onSelected: (v) => setState(() => _showQr = v),
                 ),
                 FilterChip(
-                  label: const Text('نام کالا'),
+                  label: Text(t.labelPdfBarcodeAsText),
+                  selected: _showBarcodeAsText,
+                  onSelected: (v) => setState(() => _showBarcodeAsText = v),
+                ),
+                FilterChip(
+                  label: Text(t.labelPdfProductName),
                   selected: _showProductName,
                   onSelected: (v) => setState(() => _showProductName = v),
                 ),
                 FilterChip(
-                  label: const Text('سریال (متن)'),
+                  label: Text(t.labelPdfSerialLine),
                   selected: _showSerialLine,
                   onSelected: (v) => setState(() => _showSerialLine = v),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Text('صفحه و چیدمان', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(t.labelPdfPaperLayoutSection, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<_PaperKind>(
               key: ValueKey(_paper),
               initialValue: _paper,
-              decoration: const InputDecoration(
-                labelText: 'سایز کاغذ',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: t.labelPdfPaperSize,
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               items: _PaperKind.values
@@ -424,7 +479,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('افقی (Landscape)'),
+              title: Text(t.labelPdfLandscape),
               value: _landscape,
               onChanged: (v) => setState(() => _landscape = v),
             ),
@@ -434,9 +489,9 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
                   child: DropdownButtonFormField<int>(
                     key: ValueKey(_columns),
                     initialValue: _columns,
-                    decoration: const InputDecoration(
-                      labelText: 'تعداد ستون',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.labelPdfColumns,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     items: const [1, 2, 3, 4]
@@ -451,7 +506,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
               ],
             ),
             const SizedBox(height: 8),
-            Text('حاشیه صفحه: ${_marginPt.toStringAsFixed(0)} pt'),
+            Text('${t.labelPdfPageMarginPts}: ${_marginPt.toStringAsFixed(0)}'),
             Slider(
               value: _marginPt,
               min: 12,
@@ -480,10 +535,14 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final previewKey = ValueKey(
-      '${_showLinear}_${_showQr}_${_columns}_${_marginPt.toStringAsFixed(0)}'
+      '${_showLinear}_${_showQr}_${_showBarcodeAsText}_${_columns}_${_marginPt.toStringAsFixed(0)}'
       '_${_showProductName}_${_showSerialLine}_${_paper}_${_landscape}_${widget.items.length}',
     );
+    final orientationLabel = _landscape ? t.labelPdfOrientationLandscape : t.labelPdfOrientationPortrait;
+    final headerSubtitle =
+        widget.dialogSubtitle ?? '${widget.items.length} · ${_paper.label} · $orientationLabel';
 
     return Dialog(
       clipBehavior: Clip.antiAlias,
@@ -509,11 +568,11 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'چاپ برچسب',
+                            widget.dialogTitle ?? t.labelPdfDialogTitle,
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            '${widget.items.length} برچسب · سایز: ${_paper.label} · ${_landscape ? 'افقی' : 'عمودی'}',
+                            headerSubtitle,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -523,7 +582,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('بستن'),
+                      child: Text(t.labelPdfClose),
                     ),
                   ],
                 ),
@@ -578,12 +637,12 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
                       OutlinedButton.icon(
                         onPressed: () => _onSavePdf(context),
                         icon: const Icon(Icons.save_alt_outlined),
-                        label: const Text('ذخیره PDF'),
+                        label: Text(t.labelPdfSave),
                       ),
                       OutlinedButton.icon(
                         onPressed: () => _onSharePdf(context),
                         icon: const Icon(Icons.share_outlined),
-                        label: const Text('اشتراک'),
+                        label: Text(t.labelPdfShare),
                       ),
                     ],
                   ),
@@ -598,6 +657,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
 
   Widget _previewArea(BuildContext context, Key previewKey) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(8),
       child: DecoratedBox(
@@ -616,16 +676,14 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
                   Icon(Icons.visibility_outlined, size: 20, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
                   Text(
-                    'پیش‌نمایش',
+                    t.labelPdfPreview,
                     style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   Expanded(
                     child: Align(
                       alignment: AlignmentDirectional.centerEnd,
                       child: Text(
-                        kIsWeb
-                            ? 'در وب: پیش‌نمایش با نمایشگر PDF مرورگر (زوم از منوی راست‌کلیک یا Ctrl±)'
-                            : 'زوم و پیمایش از نوار پیش‌نمایش',
+                        kIsWeb ? t.labelPdfPreviewHintWeb : t.labelPdfPreviewHintDesktop,
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         textAlign: TextAlign.end,
                         overflow: TextOverflow.ellipsis,

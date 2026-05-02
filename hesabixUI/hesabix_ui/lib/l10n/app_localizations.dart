@@ -6533,6 +6533,180 @@ abstract class AppLocalizations {
   /// **'Barcode'**
   String get barcode;
 
+  /// No description provided for @productGeneralBarcodes.
+  ///
+  /// In en, this message translates to:
+  /// **'General barcodes'**
+  String get productGeneralBarcodes;
+
+  /// No description provided for @productGeneralBarcodesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter multiple codes separated by commas (English or Persian comma). Used for quick product lookup on invoices and optional PDF labels.'**
+  String get productGeneralBarcodesHint;
+
+  /// No description provided for @printGeneralBarcodeLabels.
+  ///
+  /// In en, this message translates to:
+  /// **'Print general barcode labels (PDF)'**
+  String get printGeneralBarcodeLabels;
+
+  /// No description provided for @generalBarcodeLabelsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'General barcode labels'**
+  String get generalBarcodeLabelsTitle;
+
+  /// No description provided for @generalBarcodeLabelsNoneSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No general barcodes found on selected products.'**
+  String get generalBarcodeLabelsNoneSelected;
+
+  /// No description provided for @labelPdfDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print labels'**
+  String get labelPdfDialogTitle;
+
+  /// No description provided for @labelPdfContentSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Label content'**
+  String get labelPdfContentSection;
+
+  /// No description provided for @labelPdfLinearBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Linear barcode'**
+  String get labelPdfLinearBarcode;
+
+  /// No description provided for @labelPdfQrCode.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code'**
+  String get labelPdfQrCode;
+
+  /// No description provided for @labelPdfBarcodeAsText.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode value as text'**
+  String get labelPdfBarcodeAsText;
+
+  /// No description provided for @labelPdfProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name'**
+  String get labelPdfProductName;
+
+  /// No description provided for @labelPdfSerialLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial line'**
+  String get labelPdfSerialLine;
+
+  /// No description provided for @labelPdfPaperLayoutSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper & layout'**
+  String get labelPdfPaperLayoutSection;
+
+  /// No description provided for @labelPdfPaperSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper size'**
+  String get labelPdfPaperSize;
+
+  /// No description provided for @labelPdfLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get labelPdfLandscape;
+
+  /// No description provided for @labelPdfColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get labelPdfColumns;
+
+  /// No description provided for @labelPdfPageMarginPts.
+  ///
+  /// In en, this message translates to:
+  /// **'Page margin (pt)'**
+  String get labelPdfPageMarginPts;
+
+  /// No description provided for @labelPdfPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get labelPdfPreview;
+
+  /// No description provided for @labelPdfSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save PDF'**
+  String get labelPdfSave;
+
+  /// No description provided for @labelPdfShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get labelPdfShare;
+
+  /// No description provided for @labelPdfClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get labelPdfClose;
+
+  /// No description provided for @labelPdfSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF file saved'**
+  String get labelPdfSaved;
+
+  /// No description provided for @labelPdfSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save PDF'**
+  String get labelPdfSaveFailed;
+
+  /// No description provided for @labelPdfShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Share failed'**
+  String get labelPdfShareFailed;
+
+  /// No description provided for @labelPdfBuildError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not build PDF'**
+  String get labelPdfBuildError;
+
+  /// No description provided for @labelPdfPreviewHintDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom and scroll using the preview toolbar'**
+  String get labelPdfPreviewHintDesktop;
+
+  /// No description provided for @labelPdfPreviewHintWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'On web: preview uses your browser PDF viewer (zoom via menu or Ctrl±)'**
+  String get labelPdfPreviewHintWeb;
+
+  /// No description provided for @labelPdfOrientationLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get labelPdfOrientationLandscape;
+
+  /// No description provided for @labelPdfOrientationPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get labelPdfOrientationPortrait;
+
   /// No description provided for @generalInformation.
   ///
   /// In en, this message translates to:
@@ -6892,6 +7066,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select one or more price lists to show and edit list prices, then load the page.'**
   String get bulkProductPricesSheetSelectListsHint;
+
+  /// No description provided for @bulkProductPricesSheetExportExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Excel'**
+  String get bulkProductPricesSheetExportExcel;
+
+  /// No description provided for @bulkProductPricesSheetImportExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Excel'**
+  String get bulkProductPricesSheetImportExcel;
+
+  /// No description provided for @bulkProductPricesSheetExcelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'All products matching this search are exported. After editing prices, upload the file. Keep the worksheet name «BulkPrices»; pi_* columns are price-item IDs.'**
+  String get bulkProductPricesSheetExcelHint;
+
+  /// No description provided for @bulkProductPricesSheetGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide & Excel'**
+  String get bulkProductPricesSheetGuideTitle;
+
+  /// No description provided for @bulkProductPricesSheetSearchSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Search & price lists'**
+  String get bulkProductPricesSheetSearchSection;
+
+  /// No description provided for @bulkProductPricesSheetTableSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Price grid'**
+  String get bulkProductPricesSheetTableSection;
+
+  /// No description provided for @bulkProductPricesSheetMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get bulkProductPricesSheetMoreActions;
+
+  /// No description provided for @bulkProductPricesSheetNoRows.
+  ///
+  /// In en, this message translates to:
+  /// **'No products on this page'**
+  String get bulkProductPricesSheetNoRows;
+
+  /// No description provided for @bulkProductPricesSheetNoRowsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another search or switch page.'**
+  String get bulkProductPricesSheetNoRowsHint;
+
+  /// No description provided for @bulkProductPricesSheetPageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Page'**
+  String get bulkProductPricesSheetPageLabel;
+
+  /// No description provided for @bulkProductPricesSheetPriceListPrices.
+  ///
+  /// In en, this message translates to:
+  /// **'List prices'**
+  String get bulkProductPricesSheetPriceListPrices;
 
   /// No description provided for @preview.
   ///
@@ -21724,6 +21964,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'List all tabs'**
   String get businessPanelTabListTooltip;
+
+  /// No description provided for @businessPanelTabRouteProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get businessPanelTabRouteProjects;
+
+  /// No description provided for @businessPanelTabRoutePriceListItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list items'**
+  String get businessPanelTabRoutePriceListItems;
+
+  /// No description provided for @businessPanelTabRouteRepairTechnicians.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair technicians'**
+  String get businessPanelTabRouteRepairTechnicians;
+
+  /// No description provided for @businessPanelTabRouteRepairShopSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair shop settings'**
+  String get businessPanelTabRouteRepairShopSettings;
+
+  /// No description provided for @appearanceSidebarTabBehaviorSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Sidebar navigation (when tabs are on)'**
+  String get appearanceSidebarTabBehaviorSection;
+
+  /// No description provided for @appearanceSidebarTabBehaviorReuseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse open tab or open a new one'**
+  String get appearanceSidebarTabBehaviorReuseTitle;
+
+  /// No description provided for @appearanceSidebarTabBehaviorReuseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If that page is already open in a tab, switch to it; otherwise add a new tab. This matches the previous default behavior.'**
+  String get appearanceSidebarTabBehaviorReuseSubtitle;
+
+  /// No description provided for @appearanceSidebarTabBehaviorLongPressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the active tab; long press for the default behavior'**
+  String get appearanceSidebarTabBehaviorLongPressTitle;
+
+  /// No description provided for @appearanceSidebarTabBehaviorLongPressSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A normal click loads the destination in the current tab only. Long press on a sidebar item reuses an open tab or opens a new tab, like the option above.'**
+  String get appearanceSidebarTabBehaviorLongPressSubtitle;
 }
 
 class _AppLocalizationsDelegate

@@ -64,6 +64,169 @@
 		}
 	}
 
+	var widgetDebugPending = [];
+	var widgetDebugFlushTimer = null;
+
+	function remoteDebugSecretKey( lk ) {
+		if ( lk === 'visitor_token' || lk === 'authorization' ) {
+			return true;
+		}
+		if ( lk.indexOf( 'password' ) >= 0 ) {
+			return true;
+		}
+		var i = lk.length - 6;
+		if ( i >= 0 && lk.slice( i ) === '_token' ) {
+			return true;
+		}
+		return false;
+	}
+
+	function sanitizeForRemoteDebugValue( data, depth ) {
+		if ( typeof depth !== 'number' ) {
+			depth = 0;
+		}
+		if ( depth > 5 ) {
+			return '[max-depth]';
+		}
+		if ( data === null || data === undefined ) {
+			return data;
+		}
+		if ( typeof data === 'string' ) {
+			if ( data.length > 800 ) {
+				return data.slice( 0, 800 ) + '…';
+			}
+			return data;
+		}
+		if ( typeof data !== 'object' ) {
+			return data;
+		}
+		if ( Array.isArray( data ) ) {
+			var outa = [];
+			var mx = Math.min( data.length, 40 );
+			for ( var ia = 0; ia < mx; ia++ ) {
+				outa.push( sanitizeForRemoteDebugValue( data[ ia ], depth + 1 ) );
+			}
+			return outa;
+		}
+		var outo = {};
+		for ( var dk in data ) {
+			if ( ! Object.prototype.hasOwnProperty.call( data, dk ) ) {
+				continue;
+			}
+			var lk2 = String( dk ).toLowerCase();
+			var vv = data[ dk ];
+			if ( remoteDebugSecretKey( lk2 ) ) {
+				outo[ dk ] =
+					typeof vv === 'string' && vv.length
+						? vv.slice( 0, Math.min( 4, vv.length ) ) + '…'
+						: '[redacted]';
+				continue;
+			}
+			outo[ dk ] = sanitizeForRemoteDebugValue( vv, depth + 1 );
+		}
+		return outo;
+	}
+
+	function widgetDebugConfigured() {
+		return !! (
+			cfg.widgetDebugLogging &&
+			cfg.widgetDebugAjaxUrl &&
+			cfg.widgetDebugNonce
+		);
+	}
+
+	function pushWidgetRemoteDebug( topic, payload ) {
+		if ( ! widgetDebugConfigured() ) {
+			return;
+		}
+		try {
+			var tpk = typeof topic === 'string' ? topic.slice( 0, 80 ) : 'event';
+			widgetDebugPending.push( {
+				topic: tpk || 'event',
+				client_ts: Date.now(),
+				payload: sanitizeForRemoteDebugValue( payload, 0 )
+			} );
+			if ( widgetDebugPending.length > 120 ) {
+				widgetDebugPending.splice(
+					0,
+					widgetDebugPending.length - 120
+				);
+			}
+			scheduleWidgetRemoteDebugFlush();
+		} catch ( eWd0 ) {}
+	}
+
+	function scheduleWidgetRemoteDebugFlush() {
+		if ( widgetDebugFlushTimer !== null ) {
+			return;
+		}
+		widgetDebugFlushTimer = window.setTimeout( function () {
+			widgetDebugFlushTimer = null;
+			flushWidgetRemoteDebugNow();
+		}, 2000 );
+	}
+
+	function flushWidgetRemoteDebugNow() {
+		if ( ! widgetDebugConfigured() || ! widgetDebugPending.length ) {
+			return;
+		}
+		var slice = widgetDebugPending.splice( 0, widgetDebugPending.length );
+		var packs;
+		try {
+			packs = JSON.stringify( {
+				referer:
+					typeof location !== 'undefined'
+						? String( location.href || '' ).split( '#' )[ 0 ]
+						: '',
+				items: slice
+			} );
+		} catch ( eWdJson ) {
+			return;
+		}
+		var ajaxU = cfg.widgetDebugAjaxUrl;
+		var ajaxN = cfg.widgetDebugNonce;
+		try {
+			if ( typeof fetch !== 'undefined' ) {
+				var fd = new FormData();
+				fd.append( 'action', 'hesabix_chat_debug_push' );
+				fd.append( 'nonce', ajaxN );
+				fd.append( 'batch', packs );
+				fetch( ajaxU, {
+					method: 'POST',
+					body: fd,
+					credentials: 'same-origin',
+					cache: 'no-store'
+				} ).catch( function () {} );
+				return;
+			}
+		} catch ( eWdF ) {}
+		try {
+			if ( typeof navigator !== 'undefined' && navigator.sendBeacon ) {
+				var fdBeacon = new FormData();
+				fdBeacon.append( 'action', 'hesabix_chat_debug_push' );
+				fdBeacon.append( 'nonce', ajaxN );
+				fdBeacon.append( 'batch', packs );
+				navigator.sendBeacon( ajaxU, fdBeacon );
+			}
+		} catch ( eWdB ) {}
+	}
+
+	if (
+		typeof document !== 'undefined' &&
+		document.addEventListener &&
+		document.visibilityState !== undefined
+	) {
+		document.addEventListener(
+			'visibilitychange',
+			function () {
+				if ( document.visibilityState === 'hidden' ) {
+					flushWidgetRemoteDebugNow();
+				}
+			},
+			false
+		);
+	}
+
 	chatLogV( 'راه\u200cاندازی', {
 		loadMode: cfg.loadMode,
 		hasApiBase: Boolean( cfg.apiBase && String( cfg.apiBase ).length ),
@@ -190,6 +353,32 @@
 			return JSON.parse( text );
 		} catch ( e ) {
 			return null;
+		}
+	}
+
+	function sameConversationId( a, b ) {
+		return a != null && b != null && String( a ) === String( b );
+	}
+
+	function wsFromRoleLooksAgent( role ) {
+		var r = String( role == null ? '' : role )
+			.toLowerCase()
+			.replace( /^\s+|\s+$/g, '' );
+		if ( ! r ) {
+			return false;
+		}
+		switch ( r ) {
+		case 'agent':
+		case 'staff':
+		case 'operator':
+		case 'support':
+		case 'supporter':
+		case 'consultant':
+		case 'advisor':
+		case 'employee':
+			return true;
+		default:
+			return false;
 		}
 	}
 
@@ -464,8 +653,180 @@
 		visitorTypingSendTimer: null,
 		visitorTypingStopTimer: null,
 		pageUrlReportTimer: null,
-		visitorOpts: { allowFile: false, allowVoice: false }
+		visitorOpts: { allowFile: false, allowVoice: false },
+		slowReplyTimer: null,
+		slowReplyBaselineAgentId: 0,
+		slowReplyVisible: false,
+		agentAttendanceNoticeShown: false,
+		businessHoursSticky: '',
+		businessHoursSendAck: ''
 	};
+
+	if ( cfg.businessHours && ( cfg.businessHours.enabled === true || cfg.businessHours.enabled === 1 || cfg.businessHours.enabled === '1' ) ) {
+		if ( cfg.businessHours.snapshotOutside && cfg.businessHours.snapshotMessage ) {
+			var snapM = String( cfg.businessHours.snapshotMessage || '' ).replace( /^\s+|\s+$/g, '' );
+			if ( snapM ) {
+				state.businessHoursSticky = snapM;
+			}
+		}
+	}
+
+	function resolveOperatorPresenceName( apiNameRaw ) {
+		var mode = ( cfg.operatorLabelMode || 'real' ) + '';
+		if ( mode === 'unified' ) {
+			var u = ( cfg.operatorUnifiedDisplayName || '' ).toString().trim();
+			if ( u ) {
+				return u;
+			}
+		}
+		return ( apiNameRaw || '' ).toString().trim();
+	}
+
+	function agentPresenceBubbleLabel( snFromMsg ) {
+		var r = resolveOperatorPresenceName( snFromMsg || '' );
+		if ( r ) {
+			return r;
+		}
+		var sup = cfg.strings && cfg.strings.support ? String( cfg.strings.support ) : '';
+		return sup.replace ? sup.replace( /^\s+|\s+$/g, '' ) : sup;
+	}
+
+	function noticeTplOrFallback( tpl, fallback ) {
+		var t = ( tpl != null ? String( tpl ) : '' ).replace( /^\s+|\s+$/g, '' );
+		return t ? t : ( fallback ? String( fallback ) : '' );
+	}
+
+	function maybeClearAgentTypingLive() {
+		if ( state.agentTypingTimer ) {
+			clearTimeout( state.agentTypingTimer );
+			state.agentTypingTimer = null;
+		}
+		state.agentTyping = false;
+		state.agentTypingName = '';
+		updatePeerTypingUI();
+	}
+
+	function scheduleSlowReplyChecks() {
+		var sec = +( cfg.slowReplyTimeoutSec || 0 );
+		var txtRaw = cfg.slowReplyMessage != null ? String( cfg.slowReplyMessage ) : '';
+		var txt = txtRaw.replace( /^\s+|\s+$/g, '' );
+		if ( state.slowReplyTimer ) {
+			clearTimeout( state.slowReplyTimer );
+			state.slowReplyTimer = null;
+		}
+		if ( sec <= 0 || ! txt ) {
+			return;
+		}
+		state.slowReplyTimer = setTimeout( function () {
+			state.slowReplyTimer = null;
+			if ( ! state.session ) {
+				return;
+			}
+			listMessages( state.session.conversation_id, state.session.visitor_token, 100 )
+				.then( function ( items ) {
+					var ax = maxAgentMessageId( items );
+					var base = +( state.slowReplyBaselineAgentId || 0 );
+					if ( ax > base ) {
+						return;
+					}
+					state.slowReplyVisible = true;
+					state.messages = items;
+					renderMessages();
+				} )
+				.catch( function () {} );
+		}, sec * 1000 );
+	}
+
+	function baselineSlowReplyAfterVisitorSend() {
+		state.slowReplyBaselineAgentId = maxAgentMessageId( state.messages );
+		state.slowReplyVisible = false;
+		scheduleSlowReplyChecks();
+	}
+
+	function businessHoursAjaxEnabled() {
+		var bh = cfg.businessHours;
+		return !!( bh && ( bh.enabled === true || bh.enabled === 1 || bh.enabled === '1' ) );
+	}
+
+	function fetchBusinessHoursStatusParsed() {
+		if ( ! businessHoursAjaxEnabled() ) {
+			return Promise.resolve( { outside_hours: false, message: '' } );
+		}
+		var bhc = cfg.businessHours;
+		var fd = new FormData();
+		fd.append( 'action', bhc.action );
+		fd.append( 'nonce', bhc.nonce );
+		return fetch( bhc.ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' } )
+			.then( function ( res ) {
+				return res.json();
+			} )
+			.then( function ( j ) {
+				if ( j && j.success && j.data ) {
+					return {
+						outside_hours: !! j.data.outside_hours,
+						message: j.data.message != null ? String( j.data.message ) : ''
+					};
+				}
+				return { outside_hours: false, message: '' };
+			} )
+			.catch( function () {
+				return { outside_hours: false, message: '' };
+			} );
+	}
+
+	function afterVisitorOutboundSuccess() {
+		baselineSlowReplyAfterVisitorSend();
+		if ( ! businessHoursAjaxEnabled() ) {
+			return;
+		}
+		fetchBusinessHoursStatusParsed().then( function ( r ) {
+			if ( r.outside_hours && r.message ) {
+				state.businessHoursSendAck = String( r.message ).replace( /^\s+|\s+$/g, '' );
+			} else {
+				state.businessHoursSendAck = '';
+			}
+			renderMessages();
+		} );
+	}
+
+	function refreshBusinessHoursStickyForPanel() {
+		if ( ! businessHoursAjaxEnabled() ) {
+			return;
+		}
+		fetchBusinessHoursStatusParsed().then( function ( r ) {
+			if ( r.outside_hours && r.message ) {
+				state.businessHoursSticky = String( r.message ).replace( /^\s+|\s+$/g, '' );
+			} else {
+				state.businessHoursSticky = '';
+			}
+			renderMessages();
+		} );
+	}
+
+	function bumpSlowReplyIfAgentAnswered() {
+		var ax = maxAgentMessageId( state.messages );
+		if ( ax > +( state.slowReplyBaselineAgentId || 0 ) ) {
+			state.slowReplyVisible = false;
+			if ( state.slowReplyTimer ) {
+				clearTimeout( state.slowReplyTimer );
+				state.slowReplyTimer = null;
+			}
+		}
+	}
+
+	function maybeShowAgentAttendanceNotice( tpl, actorNameRaw ) {
+		var nm = resolveOperatorPresenceName( actorNameRaw );
+		var t = tpl != null ? String( tpl ) : '';
+		if ( ! nm || ! t ) {
+			return;
+		}
+		if ( state.agentAttendanceNoticeShown ) {
+			return;
+		}
+		state.agentAttendanceNoticeShown = true;
+		state.agentJoinBannerText = t.replace( /\%s/g, nm );
+		renderMessages();
+	}
 
 	/** همگام‌سازی نشانی صفحهٔ فعلی با سرور (SPA: pushState/popstate/hashchange + interval). */
 	var visitorPageUrlHook = {
@@ -578,6 +939,7 @@
 				var changed = items.length !== state.messages.length || nextMax !== prevMax;
 				if ( changed ) {
 					state.messages = items;
+					bumpSlowReplyIfAgentAnswered();
 					renderMessages();
 					syncMarkAgentRead( items );
 				}
@@ -591,7 +953,43 @@
 		return;
 	}
 
+	var surface;
+	var poweredByEl;
+
+	function syncPoweredByVisibility() {
+		if ( ! poweredByEl || ! surface ) {
+			return;
+		}
+		if ( surface.classList.contains( 'hesabix-chat--step-form' ) ) {
+			poweredByEl.classList.remove( 'hesabix-chat--hidden' );
+		} else {
+			poweredByEl.classList.add( 'hesabix-chat--hidden' );
+		}
+	}
+
+	/* نوع تعریف function داخل بلاک try در حالت strict فقط محدود به همان بلاک است؛
+	   تابع‌های ارسال کامپوزر بیرون از try به setComposerSending نیاز دارند → تخصیص به var بیرونی */
+	var setComposerSending;
+	var setComposerFileInputsDisabled;
+
 	try {
+	function applyTplClassCsvToElement( el, csv ) {
+		if ( ! el || csv == null ) {
+			return;
+		}
+		var pts = String( csv ).split( /[\s,]+/ );
+		for ( var pi = 0; pi < pts.length; pi++ ) {
+			var tk = pts[ pi ].replace( /^\s+|\s+$/g, '' );
+			if ( ! tk ) {
+				continue;
+			}
+			try {
+				el.classList.add( tk );
+			} catch ( tcx ) {}
+		}
+	}
+
+	var tplCx = cfg.tplExtraClasses || {};
 	var root = document.createElement( 'div' );
 	var uiPreset = ( cfg.uiPreset && cfg.uiPreset.toString() ) || 'default';
 	if ( [ 'default', 'minimal', 'colorful' ].indexOf( uiPreset ) < 0 ) {
@@ -629,10 +1027,13 @@
 	root.style.setProperty( '--hesabix-radius', ( cfg.borderRadius || 12 ) + 'px' );
 	root.style.setProperty( '--hesabix-accent', cfg.buttonColor );
 
+	applyTplClassCsvToElement( root, tplCx.root );
+
 	var pos = posClass( cfg.buttonPosition );
 
 	var wrap = document.createElement( 'div' );
 	wrap.className = 'hesabix-chat-floating ' + pos;
+	applyTplClassCsvToElement( wrap, tplCx.launcherWrap );
 
 	var btn = document.createElement( 'button' );
 	btn.type = 'button';
@@ -649,15 +1050,18 @@
 	launcherLab.className = 'hesabix-chat-launcher-txt';
 	launcherLab.textContent = cfg.buttonText;
 	btn.appendChild( launcherLab );
+	applyTplClassCsvToElement( btn, tplCx.launcher );
 
 	var panel = document.createElement( 'div' );
 	panel.className = 'hesabix-chat-panel hesabix-chat--hidden ' + pos;
 	panel.setAttribute( 'role', 'dialog' );
 	panel.setAttribute( 'aria-modal', 'true' );
 	panel.setAttribute( 'aria-label', cfg.chatTitle );
+	applyTplClassCsvToElement( panel, tplCx.panel );
 
-	var surface = document.createElement( 'div' );
+	surface = document.createElement( 'div' );
 	surface.className = 'hesabix-chat-surface hesabix-chat-surface--' + uiPreset;
+	applyTplClassCsvToElement( surface, tplCx.surface );
 
 	var header = document.createElement( 'div' );
 	header.className = 'hesabix-chat-header';
@@ -750,6 +1154,42 @@
 		'<label class="hesabix-chat-fld"><span class="hesabix-chat-fld-l">' + esc( cfg.strings.phone ) + '</span><input type="tel" name="phone" required autocomplete="tel" /></label></div>' +
 		'<button type="submit" class="hesabix-chat-form-submit">' + esc( cfg.strings.start ) + '</button>';
 
+	poweredByEl = null;
+	( function buildPoweredFooter() {
+		if ( ! ( cfg.showPoweredByHesabix === true || cfg.showPoweredByHesabix === 1 || cfg.showPoweredByHesabix === '1' ) ) {
+			return;
+		}
+		var pUrlRaw = cfg.poweredByHesabixUrl != null ? String( cfg.poweredByHesabixUrl ) : '';
+		var pLblRaw = cfg.poweredByHesabixText != null ? String( cfg.poweredByHesabixText ) : '';
+		var pUrl = pUrlRaw.replace( /^\s+|\s+$/g, '' );
+		var pLbl = pLblRaw.replace( /^\s+|\s+$/g, '' );
+		if ( ! pUrl || ! /^https?:\/\//i.test( pUrl ) ) {
+			return;
+		}
+		if ( ! pLbl ) {
+			return;
+		}
+		try {
+			var u_chk = document.createElement( 'a' );
+			u_chk.href = pUrl;
+			if ( ! u_chk.host ) {
+				return;
+			}
+		} catch ( ePw0 ) {
+			return;
+		}
+		var wrap = document.createElement( 'p' );
+		wrap.className = 'hesabix-chat-powered-by';
+		var lk = document.createElement( 'a' );
+		lk.href = pUrl;
+		lk.rel = 'noopener noreferrer sponsored';
+		lk.target = '_blank';
+		lk.textContent = pLbl;
+		wrap.appendChild( lk );
+		poweredByEl = wrap;
+		formEl.appendChild( poweredByEl );
+	} )();
+
 	var comp = document.createElement( 'div' );
 	comp.className = 'hesabix-chat-composer hesabix-chat--hidden';
 	var errC = document.createElement( 'div' );
@@ -757,6 +1197,7 @@
 	var row = document.createElement( 'div' );
 	row.className = 'hesabix-chat-composer-row';
 	var ta = document.createElement( 'textarea' );
+	ta.className = 'hesabix-chat-composer-input';
 	ta.rows = 2;
 	ta.placeholder = cfg.strings.placeholder;
 	var sendBtn = document.createElement( 'button' );
@@ -764,11 +1205,52 @@
 	sendBtn.className = 'hesabix-chat-send';
 	var sendLabel = ( cfg.strings && cfg.strings.send ) ? String( cfg.strings.send ) : '';
 	var sendTip = ( cfg.strings && cfg.strings.sendTooltip ) ? String( cfg.strings.sendTooltip ) : sendLabel;
+	var sendingAria = cfg.strings && cfg.strings.sending ? String( cfg.strings.sending ) : sendLabel;
 	sendBtn.setAttribute( 'aria-label', sendLabel );
 	sendBtn.setAttribute( 'title', sendTip );
-	sendBtn.innerHTML =
+	var sendBtnIconSvg =
 		'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
 		'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+	var sendBtnSpinnerSvg =
+		'<svg class="hesabix-chat-send-spinner" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false">' +
+		'<path d="M12 3a9 9 0 1 1 0 18" /></svg>';
+	sendBtn.innerHTML = sendBtnIconSvg;
+
+	var composerSendInFlight = false;
+
+	setComposerFileInputsDisabled = function ( dis ) {
+		try {
+			var q = comp.querySelectorAll(
+				'input[type="file"].hesabix-chat-attach, input[type="file"].hesabix-chat-voice-file'
+			);
+			for ( var qi = 0; qi < q.length; qi++ ) {
+				q[ qi ].disabled = !! dis;
+			}
+		} catch ( fi0 ) {}
+	};
+
+	setComposerSending = function ( busy ) {
+		busy = !! busy;
+		composerSendInFlight = busy;
+		comp.classList.toggle( 'hesabix-chat-composer--sending', busy );
+		try {
+			ta.disabled = busy;
+		} catch ( eTa ) {}
+		sendBtn.disabled = busy;
+		sendBtn.setAttribute( 'aria-busy', busy ? 'true' : 'false' );
+		sendBtn.classList.toggle( 'hesabix-chat-send--busy', busy );
+		if ( busy ) {
+			sendBtn.innerHTML = sendBtnSpinnerSvg;
+			sendBtn.setAttribute( 'aria-label', sendingAria );
+			sendBtn.setAttribute( 'title', sendingAria );
+		} else {
+			sendBtn.innerHTML = sendBtnIconSvg;
+			sendBtn.setAttribute( 'aria-label', sendLabel );
+			sendBtn.setAttribute( 'title', sendTip );
+		}
+		setComposerFileInputsDisabled( busy );
+	};
+
 	row.appendChild( ta );
 	row.appendChild( sendBtn );
 	comp.appendChild( errC );
@@ -786,6 +1268,7 @@
 	surface.appendChild( comp );
 	panel.appendChild( surface );
 	surface.classList.add( 'hesabix-chat--step-form' );
+	syncPoweredByVisibility();
 	wrap.appendChild( btn );
 	wrap.appendChild( panel );
 	/* پرتال پنل: در حالت global دکمه fixed است و پنل absolute نسبت به host با ارتفاع صفر اشتباه جا می‌گرفت؛ پنل در body. */
@@ -855,14 +1338,24 @@
 						if ( ! f || ! state.session ) {
 							return;
 						}
+						if ( composerSendInFlight ) {
+							ev.target.value = '';
+							return;
+						}
 						showFormError( errC, '' );
+						setComposerSending( true );
 						postFile( state.session.conversation_id, state.session.visitor_token, f, '' )
 							.then( function () {
 								ev.target.value = '';
-								return refreshMessages();
+									return refreshMessages().then( function () {
+										afterVisitorOutboundSuccess();
+									} );
 							} )
 							.catch( function ( e ) {
 								showFormError( errC, e.message || cfg.strings.errorGeneric );
+							} )
+							.finally( function () {
+								setComposerSending( false );
 							} );
 					} );
 				}
@@ -884,14 +1377,24 @@
 						if ( ! f || ! state.session ) {
 							return;
 						}
+						if ( composerSendInFlight ) {
+							ev.target.value = '';
+							return;
+						}
 						showFormError( errC, '' );
+						setComposerSending( true );
 						postFile( state.session.conversation_id, state.session.visitor_token, f, '' )
 							.then( function () {
 								ev.target.value = '';
-								return refreshMessages();
+									return refreshMessages().then( function () {
+										afterVisitorOutboundSuccess();
+									} );
 							} )
 							.catch( function ( e ) {
 								showFormError( errC, e.message || cfg.strings.errorGeneric );
+							} )
+							.finally( function () {
+								setComposerSending( false );
 							} );
 					} );
 				}
@@ -901,6 +1404,9 @@
 						ta._hesabixPasteBound = true;
 						ta.addEventListener( 'paste', function ( pe ) {
 							if ( ! effFile || ! state.session ) {
+								return;
+							}
+							if ( composerSendInFlight ) {
 								return;
 							}
 							var dt = pe.clipboardData || window.clipboardData;
@@ -913,12 +1419,18 @@
 							}
 							pe.preventDefault();
 							showFormError( errC, '' );
+							setComposerSending( true );
 							postFile( state.session.conversation_id, state.session.visitor_token, pf, '' )
 								.then( function () {
-									return refreshMessages();
+									return refreshMessages().then( function () {
+										afterVisitorOutboundSuccess();
+									} );
 								} )
 								.catch( function ( e ) {
 									showFormError( errC, e.message || cfg.strings.errorGeneric );
+								} )
+								.finally( function () {
+									setComposerSending( false );
 								} );
 						} );
 						ta.addEventListener( 'dragover', function ( de ) {
@@ -934,6 +1446,9 @@
 							if ( ! state.session ) {
 								return;
 							}
+							if ( composerSendInFlight ) {
+								return;
+							}
 							var dt2 = de.dataTransfer;
 							if ( ! dt2 || ! dt2.files || ! dt2.files.length ) {
 								return;
@@ -943,11 +1458,19 @@
 								return;
 							}
 							showFormError( errC, '' );
-							postFile( state.session.conversation_id, state.session.visitor_token, df, '' ).then( function () {
-								return refreshMessages();
-							} ).catch( function ( e ) {
-								showFormError( errC, e.message || cfg.strings.errorGeneric );
-							} );
+							setComposerSending( true );
+							postFile( state.session.conversation_id, state.session.visitor_token, df, '' )
+								.then( function () {
+									return refreshMessages().then( function () {
+										afterVisitorOutboundSuccess();
+									} );
+								} )
+								.catch( function ( e ) {
+									showFormError( errC, e.message || cfg.strings.errorGeneric );
+								} )
+								.finally( function () {
+									setComposerSending( false );
+								} );
 						} );
 					}
 				}
@@ -1049,7 +1572,7 @@
 	}
 
 	function applyMessagesReadFromEvent( msg ) {
-		if ( ! state.session || ! msg || +msg.conversation_id !== +state.session.conversation_id ) {
+		if ( ! state.session || ! msg || ! sameConversationId( msg.conversation_id, state.session.conversation_id ) ) {
 			return;
 		}
 		var ids = msg.message_ids;
@@ -1138,14 +1661,27 @@
 		};
 		ws.onmessage = function ( ev ) {
 			var msg = parseJsonSafe( ev.data );
+			pushWidgetRemoteDebug( 'ws.in', msg != null ? msg : { raw: typeof ev.data === 'string' ? ev.data.slice( 0, 500 ) : '' } );
 			if ( ! msg ) {
 				return;
 			}
 			if ( msg.type === 'auth_ok' ) {
 				updateWsConn( 'live' );
+				pushWidgetRemoteDebug( 'ws.auth_ok', { conversation_hint: convId } );
 				return;
 			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'message.created' ) {
+				var created = msg.message;
+				try {
+					if (
+						state.session &&
+						created &&
+						sameConversationId( created.conversation_id, convId ) &&
+						String( created.sender_role || '' ).toLowerCase().replace( /^\s+|\s+$/g, '' ) === 'agent'
+					) {
+						maybeClearAgentTypingLive();
+					}
+				} catch ( eCre ) {}
 				refreshMessages().catch( function () {} );
 				return;
 			}
@@ -1158,7 +1694,7 @@
 				return;
 			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'conversation.deleted' ) {
-				if ( state.session && +msg.conversation_id === +convId ) {
+				if ( state.session && sameConversationId( msg.conversation_id, convId ) ) {
 					clearSession();
 					state.session = null;
 					enterFormMode();
@@ -1167,17 +1703,42 @@
 			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'messages.read' ) {
 				applyMessagesReadFromEvent( msg );
+				if ( cfg.showAgentAttendanceOnRead ) {
+					if ( sameConversationId( msg.conversation_id, convId ) ) {
+						var rr = String( msg.reader_role || '' ).toLowerCase().replace( /^\s+|\s+$/g, '' );
+						var midr = msg.message_ids;
+						var readerDispCore = agentPresenceBubbleLabel(
+							msg.reader_display_name != null ? String( msg.reader_display_name ) : ''
+						);
+						var tplBaseR = cfg.strings && cfg.strings.agentJoinedNotice ? String( cfg.strings.agentJoinedNotice ) : '';
+						var tplR = noticeTplOrFallback( cfg.agentReadNoticeTemplate, tplBaseR || '%s به گفتگو پیوست' );
+						if ( rr === 'agent' && midr && midr.length && tplR && readerDispCore ) {
+							maybeShowAgentAttendanceNotice( tplR, msg.reader_display_name );
+						}
+					}
+				}
 				return;
 			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'typing' ) {
-				if ( +msg.conversation_id === +convId && ( ( msg.from_role || '' ) + '' ) === 'agent' ) {
+				pushWidgetRemoteDebug( 'evt.typing.recv', {
+					active: !! msg.active,
+					from_role: msg.from_role,
+					cid_live: convId,
+					cid_msg: msg.conversation_id,
+					ok: Boolean(
+						sameConversationId( msg.conversation_id, convId ) && wsFromRoleLooksAgent( msg.from_role )
+					)
+				} );
+				if ( sameConversationId( msg.conversation_id, convId ) && wsFromRoleLooksAgent( msg.from_role ) ) {
 					if ( state.agentTypingTimer ) {
 						clearTimeout( state.agentTypingTimer );
 						state.agentTypingTimer = null;
 					}
 					state.agentTyping = Boolean( msg.active );
 					state.agentTypingName = msg.active
-						? ( ( msg.actor_name && String( msg.actor_name ) ) || '' ).trim()
+						? agentPresenceBubbleLabel(
+							( msg.actor_name && String( msg.actor_name ) ) || ''
+						  )
 						: '';
 					updatePeerTypingUI();
 					if ( state.agentTyping ) {
@@ -1192,24 +1753,42 @@
 				return;
 			}
 			if ( msg.type === 'crm_chat.event' && msg.event === 'agent.joined' ) {
-				if ( +msg.conversation_id === +convId && msg.agent ) {
+				pushWidgetRemoteDebug( 'evt.agent_joined.recv', {
+					ok: !!( cfg.showAgentJoinWs &&
+						sameConversationId( msg.conversation_id, convId ) &&
+						msg.agent ),
+					agent: msg.agent,
+					conversation_id: msg.conversation_id,
+					panel_open: state.open,
+					active_conv: convId
+				} );
+				if (
+					cfg.showAgentJoinWs &&
+					sameConversationId( msg.conversation_id, convId ) &&
+					msg.agent
+				) {
 					var ag = msg.agent;
 					var aid = ag.id != null ? String( ag.id ) : '';
-					var aname = ( ag.name && String( ag.name ).trim() ) || '';
-					var tplJ = ( cfg.strings && cfg.strings.agentJoinedNotice ) || '';
-					if ( aname && aid && ! state.seenAgentJoinIds[ aid ] ) {
+					var tplJb = cfg.strings && cfg.strings.agentJoinedNotice ? String( cfg.strings.agentJoinedNotice ) : '';
+					var tplJ = noticeTplOrFallback( cfg.agentJoinNoticeTemplate, tplJb || '%s به گفتگو پیوست' );
+					var nmJoin = agentPresenceBubbleLabel( ag.name != null ? String( ag.name ) : '' );
+					if ( aid && tplJ && nmJoin && ! state.seenAgentJoinIds[ aid ] ) {
 						state.seenAgentJoinIds[ aid ] = 1;
-						state.agentJoinBannerText = tplJ ? tplJ.replace( /\%s/g, aname ) : aname + ' وارد گفتگو شد';
-						renderMessages();
+						maybeShowAgentAttendanceNotice(
+							tplJ,
+							ag.name != null ? String( ag.name ) : ''
+						);
 					}
 				}
 				return;
 			}
 		};
 		ws.onerror = function () {
+			pushWidgetRemoteDebug( 'ws.error', { url: u } );
 			updateWsConn( 'offline' );
 		};
 		ws.onclose = function () {
+			pushWidgetRemoteDebug( 'ws.close', { hadSocket: Boolean( ws ) } );
 			if ( state.ws === ws ) {
 				state.ws = null;
 			}
@@ -1282,7 +1861,7 @@
 			var divS = document.createElement( 'div' );
 			divS.className = 'hesabix-chat-bubble hesabix-chat-bubble--agent hesabix-chat-bubble--canned';
 			var strongS = document.createElement( 'strong' );
-			strongS.textContent = cfg.strings.support;
+			strongS.textContent = agentPresenceBubbleLabel( '' );
 			var bodyS = document.createElement( 'div' );
 			bodyS.className = 'hesabix-chat-bubble-body';
 			bodyS.textContent = ( cannedBody || '' ).toString();
@@ -1303,8 +1882,8 @@
 			var role = ( m.sender_role || '' ).toString();
 			var div = document.createElement( 'div' );
 			div.className = 'hesabix-chat-bubble hesabix-chat-bubble--' + ( role === 'visitor' ? 'visitor' : 'agent' );
-			var sn = ( m.sender_name && String( m.sender_name ).trim() ) || '';
-			var label = role === 'visitor' ? cfg.strings.you : ( sn || cfg.strings.support );
+			var snRaw = ( m.sender_name && String( m.sender_name ).trim() ) || '';
+			var label = role === 'visitor' ? cfg.strings.you : agentPresenceBubbleLabel( snRaw );
 			var strong = document.createElement( 'strong' );
 			strong.textContent = label;
 			var bodyP = document.createElement( 'div' );
@@ -1474,14 +2053,42 @@
 				msgBox.appendChild( qrWrap );
 			}
 		}
+		var bhLine = '';
+		var sendAckTrim = state.businessHoursSendAck ? String( state.businessHoursSendAck ).replace( /^\s+|\s+$/g, '' ) : '';
+		var stickyTrim = state.businessHoursSticky ? String( state.businessHoursSticky ).replace( /^\s+|\s+$/g, '' ) : '';
+		if ( sendAckTrim ) {
+			bhLine = sendAckTrim;
+		} else if ( stickyTrim ) {
+			bhLine = stickyTrim;
+		}
+		if ( bhLine ) {
+			var bhEl = document.createElement( 'div' );
+			bhEl.className = 'hesabix-chat-chat-notice hesabix-chat-offline-hours-notice';
+			bhEl.setAttribute( 'role', 'status' );
+			bhEl.textContent = bhLine;
+			msgBox.appendChild( bhEl );
+		}
+		if ( state.slowReplyVisible && cfg.slowReplyMessage ) {
+			var sm = ( cfg.slowReplyMessage + '' ).replace( /^\s+|\s+$/g, '' );
+			if ( sm ) {
+				var slo = document.createElement( 'div' );
+				slo.className = 'hesabix-chat-chat-notice hesabix-chat-slow-reply-notice';
+				slo.setAttribute( 'role', 'status' );
+				slo.textContent = sm;
+				msgBox.appendChild( slo );
+			}
+		}
 		msgBox.scrollTop = msgBox.scrollHeight;
 	}
-
 	function pickQuickReply( questionText, answerText ) {
 		if ( ! state.session ) {
 			return;
 		}
+		if ( composerSendInFlight ) {
+			return;
+		}
 		showFormError( errC, '' );
+		setComposerSending( true );
 		postMessage( state.session.conversation_id, state.session.visitor_token, questionText )
 			.then( function ( msgData ) {
 				var vid = msgData && msgData.id != null ? +msgData.id : null;
@@ -1491,11 +2098,15 @@
 						state.localCannedAfterVisitor.push( { afterVisitorMessageId: vid, body: ans } );
 					}
 					renderMessages();
+					afterVisitorOutboundSuccess();
 				} );
 			} )
-			.catch( function ( e ) {
-				showFormError( errC, e.message || cfg.strings.errorGeneric );
-			} );
+				.catch( function ( e ) {
+					showFormError( errC, e.message || cfg.strings.errorGeneric );
+				} )
+				.finally( function () {
+					setComposerSending( false );
+				} );
 	}
 
 	function refreshMessages() {
@@ -1505,6 +2116,7 @@
 		return listMessages( state.session.conversation_id, state.session.visitor_token, 100 ).then( function ( items ) {
 			maybePlayAgentReplySound( items );
 			state.messages = items;
+			bumpSlowReplyIfAgentAnswered();
 			var have = {};
 			( items || [] ).forEach( function ( x ) {
 				if ( x && x.id != null ) {
@@ -1524,6 +2136,7 @@
 		comp.classList.remove( 'hesabix-chat--hidden' );
 		surface.classList.remove( 'hesabix-chat--step-form' );
 		surface.classList.add( 'hesabix-chat--step-chat' );
+		syncPoweredByVisibility();
 		if ( wsConnLabel ) {
 			updateWsConn( 'offline' );
 		}
@@ -1531,18 +2144,29 @@
 
 	function enterFormMode() {
 		teardownVisitorPageUrlTracking();
+		setComposerSending( false );
 		state.messages = [];
 		state.localCannedAfterVisitor = [];
 		state.agentSoundPrimed = false;
 		state.lastAgentMsgNotifiedId = 0;
 		state.seenAgentJoinIds = {};
 		state.agentJoinBannerText = '';
+		state.agentAttendanceNoticeShown = false;
+		state.slowReplyVisible = false;
+		state.slowReplyBaselineAgentId = 0;
+		if ( state.slowReplyTimer ) {
+			clearTimeout( state.slowReplyTimer );
+			state.slowReplyTimer = null;
+		}
 		state.agentTypingName = '';
+		state.businessHoursSticky = '';
+		state.businessHoursSendAck = '';
 		msgBox.innerHTML = '';
 		formEl.classList.remove( 'hesabix-chat--hidden' );
 		comp.classList.add( 'hesabix-chat--hidden' );
 		surface.classList.remove( 'hesabix-chat--step-chat' );
 		surface.classList.add( 'hesabix-chat--step-form' );
+		syncPoweredByVisibility();
 		if ( wsConnLabel ) {
 			wsConnLabel.innerHTML = '';
 			wsConnLabel.className = 'hesabix-chat-ws-conn';
@@ -1656,6 +2280,12 @@
 				state.agentTypingName = '';
 				saveSession( cid, tok );
 				state.session = { conversation_id: cid, visitor_token: tok };
+				state.agentAttendanceNoticeShown = false;
+				state.slowReplyVisible = false;
+				if ( state.slowReplyTimer ) {
+					clearTimeout( state.slowReplyTimer );
+					state.slowReplyTimer = null;
+				}
 				return afterSessionReady( false );
 			} )
 			.catch( function ( e ) {
@@ -1665,7 +2295,7 @@
 	} );
 
 	function submitComposerMessage() {
-		if ( ! state.session ) {
+		if ( ! state.session || composerSendInFlight ) {
 			return;
 		}
 		var t = ( ta.value || '' ).trim();
@@ -1673,6 +2303,7 @@
 		if ( ! t ) {
 			return;
 		}
+		setComposerSending( true );
 		postMessage( state.session.conversation_id, state.session.visitor_token, t )
 			.then( function () {
 				ta.value = '';
@@ -1683,16 +2314,27 @@
 				sendVisitorTyping( false );
 				return refreshMessages();
 			} )
+			.then( function () {
+				afterVisitorOutboundSuccess();
+			} )
 			.catch( function ( e ) {
 				showFormError( errC, e.message || cfg.strings.errorGeneric );
+			} )
+			.finally( function () {
+				setComposerSending( false );
 			} );
 	}
+
 	sendBtn.addEventListener( 'click', submitComposerMessage );
 	ta.addEventListener( 'keydown', function ( e ) {
 		if ( e.key !== 'Enter' ) {
 			return;
 		}
 		if ( ! ( e.ctrlKey || e.metaKey ) ) {
+			return;
+		}
+		if ( composerSendInFlight ) {
+			e.preventDefault();
 			return;
 		}
 		e.preventDefault();
@@ -1807,8 +2449,10 @@
 						.catch( function () {} );
 				}
 			}
+			refreshBusinessHoursStickyForPanel();
 		} else {
 			panel.classList.add( 'hesabix-chat--hidden' );
+			state.businessHoursSticky = '';
 			chatLogV( 'پنل بسته' );
 			unbindRealtime();
 			applyLauncherIdleIfNeeded();

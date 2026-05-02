@@ -191,11 +191,17 @@ class ProductCreateRequest(BaseModel):
         description="لیست شناسه‌های ویژگی‌های محصول"
     )
     
-    # بارکد
+    # بارکد (legacy؛ در صورت نبود general_barcodes به‌عنوان یک بارکد عمومی اولیه اعمال می‌شود)
     barcode: Optional[str] = Field(
         None,
-        description="بارکد محصول",
+        description="بارکد محصول (legacy)",
         max_length=50
+    )
+
+    general_barcodes: Optional[str] = Field(
+        None,
+        description="بارکدهای عمومی جدا شده با ویرگول برای اسکن و چاپ برچسب",
+        max_length=8192,
     )
     
     # وضعیت
@@ -264,6 +270,7 @@ class ProductUpdateRequest(BaseModel):
     image_file_id: Optional[str] = None
     attribute_ids: Optional[List[int]] = None
     barcode: Optional[str] = Field(None, max_length=50)
+    general_barcodes: Optional[str] = Field(None, max_length=8192)
     is_active: Optional[bool] = None
 
 
@@ -374,6 +381,7 @@ class ProductResponse(BaseModel):
     thumbnail_url: Optional[str] = None
     
     barcode: Optional[str] = None
+    general_barcodes: Optional[str] = None
     is_active: bool
     
     # اطلاعات موجودی (اختیاری - بسته به درخواست)
@@ -697,3 +705,27 @@ class BulkProductPriceSheetApplyRequest(BaseModel):
         max_length=500,
         description="حداکثر ۵۰۰ ردیف در هر درخواست",
     )
+
+
+class BulkProductPriceSheetExcelExportRequest(BaseModel):
+    """خروجی اکسل ورق ویرایش گسترده قیمت (همان فیلتر جستجو و لیست‌های قیمت انتخاب‌شده در UI)"""
+
+    search: Optional[str] = Field(None, max_length=500)
+    search_fields: Optional[List[str]] = Field(None, alias="searchFields")
+    price_list_ids: List[int] = Field(
+        default_factory=list,
+        max_length=12,
+        description="لیست‌های قیمت برای ستون‌های pi_*؛ خالی یعنی فقط قیمت‌های پایه",
+    )
+
+    class Config:
+        populate_by_name = True
+
+    @field_validator("price_list_ids")
+    @classmethod
+    def _positive_price_list_ids(cls, v: List[int]) -> List[int]:
+        out: List[int] = []
+        for x in v:
+            if x > 0:
+                out.append(int(x))
+        return out

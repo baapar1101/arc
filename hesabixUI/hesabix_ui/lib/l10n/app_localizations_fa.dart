@@ -3342,6 +3342,96 @@ class AppLocalizationsFa extends AppLocalizations {
   String get barcode => 'بارکد';
 
   @override
+  String get productGeneralBarcodes => 'بارکدهای عمومی';
+
+  @override
+  String get productGeneralBarcodesHint =>
+      'چند بارکد را با ویرگول (انگلیسی یا فارسی) جدا کنید. برای جستجوی سریع در فاکتور و چاپ برچسب PDF استفاده می‌شود.';
+
+  @override
+  String get printGeneralBarcodeLabels => 'چاپ برچسب بارکدهای عمومی (PDF)';
+
+  @override
+  String get generalBarcodeLabelsTitle => 'چاپ بارکدهای عمومی';
+
+  @override
+  String get generalBarcodeLabelsNoneSelected =>
+      'در کالاهای انتخاب‌شده بارکد عمومی ثبت نشده است.';
+
+  @override
+  String get labelPdfDialogTitle => 'چاپ برچسب';
+
+  @override
+  String get labelPdfContentSection => 'محتوای برچسب';
+
+  @override
+  String get labelPdfLinearBarcode => 'بارکد خطی';
+
+  @override
+  String get labelPdfQrCode => 'QR';
+
+  @override
+  String get labelPdfBarcodeAsText => 'مقدار بارکد به‌صورت متن';
+
+  @override
+  String get labelPdfProductName => 'نام کالا';
+
+  @override
+  String get labelPdfSerialLine => 'سریال (متن)';
+
+  @override
+  String get labelPdfPaperLayoutSection => 'صفحه و چیدمان';
+
+  @override
+  String get labelPdfPaperSize => 'سایز کاغذ';
+
+  @override
+  String get labelPdfLandscape => 'افقی (Landscape)';
+
+  @override
+  String get labelPdfColumns => 'تعداد ستون';
+
+  @override
+  String get labelPdfPageMarginPts => 'حاشیه صفحه (pt)';
+
+  @override
+  String get labelPdfPreview => 'پیش‌نمایش';
+
+  @override
+  String get labelPdfSave => 'ذخیره PDF';
+
+  @override
+  String get labelPdfShare => 'اشتراک';
+
+  @override
+  String get labelPdfClose => 'بستن';
+
+  @override
+  String get labelPdfSaved => 'فایل PDF ذخیره شد';
+
+  @override
+  String get labelPdfSaveFailed => 'ذخیره PDF ناموفق بود';
+
+  @override
+  String get labelPdfShareFailed => 'اشتراک‌گذاری ناموفق بود';
+
+  @override
+  String get labelPdfBuildError => 'خطا در ساخت PDF';
+
+  @override
+  String get labelPdfPreviewHintDesktop => 'زوم و پیمایش از نوار پیش‌نمایش';
+
+  @override
+  String get labelPdfPreviewHintWeb =>
+      'در وب: پیش‌نمایش با نمایشگر PDF مرورگر (زوم از منوی راست‌کلیک یا Ctrl±)';
+
+  @override
+  String get labelPdfOrientationLandscape => 'افقی';
+
+  @override
+  String get labelPdfOrientationPortrait => 'عمودی';
+
+  @override
   String get generalInformation => 'اطلاعات عمومی';
 
   @override
@@ -3531,6 +3621,41 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get bulkProductPricesSheetSelectListsHint =>
       'برای نمایش و ویرایش قیمت داخل لیست‌ها، یک یا چند لیست را انتخاب کنید و صفحه را بارگذاری کنید.';
+
+  @override
+  String get bulkProductPricesSheetExportExcel => 'دانلود اکسل';
+
+  @override
+  String get bulkProductPricesSheetImportExcel => 'بارگذاری اکسل';
+
+  @override
+  String get bulkProductPricesSheetExcelHint =>
+      'تمام کالاهای همین جستجو در اکسل ذخیره می‌شود. پس از ویرایش قیمت‌ها، فایل را بارگذاری کنید. نام برگه «BulkPrices» را حذف نکنید؛ ستون‌های pi_ شناسهٔ ردیف لیست قیمت در پایگاه است.';
+
+  @override
+  String get bulkProductPricesSheetGuideTitle => 'راهنما و خروجی اکسل';
+
+  @override
+  String get bulkProductPricesSheetSearchSection => 'جستجو و فهرست قیمت‌ها';
+
+  @override
+  String get bulkProductPricesSheetTableSection => 'جدول قیمت‌ها';
+
+  @override
+  String get bulkProductPricesSheetMoreActions => 'سایر عملیات';
+
+  @override
+  String get bulkProductPricesSheetNoRows => 'کالایی برای این صفحه نیست';
+
+  @override
+  String get bulkProductPricesSheetNoRowsHint =>
+      'فیلتر جستجو را عوض کنید یا صفحهٔ دیگری را انتخاب کنید.';
+
+  @override
+  String get bulkProductPricesSheetPageLabel => 'صفحه';
+
+  @override
+  String get bulkProductPricesSheetPriceListPrices => 'قیمت‌های لیست';
 
   @override
   String get preview => 'پیش‌نمایش';
@@ -11618,4 +11743,36 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessPanelTabListTooltip => 'لیست همهٔ تب‌ها';
+
+  @override
+  String get businessPanelTabRouteProjects => 'مدیریت پروژه‌ها';
+
+  @override
+  String get businessPanelTabRoutePriceListItems => 'آیتم‌های لیست قیمت';
+
+  @override
+  String get businessPanelTabRouteRepairTechnicians => 'مدیریت تعمیرکاران';
+
+  @override
+  String get businessPanelTabRouteRepairShopSettings => 'تنظیمات تعمیرگاه';
+
+  @override
+  String get appearanceSidebarTabBehaviorSection =>
+      'باز کردن از منوی کناری (وقتی تب فعال است)';
+
+  @override
+  String get appearanceSidebarTabBehaviorReuseTitle =>
+      'رفتن به تب موجود یا باز کردن تب جدید';
+
+  @override
+  String get appearanceSidebarTabBehaviorReuseSubtitle =>
+      'اگر همان صفحه در یکی از تب‌ها باز است به همان می‌رود؛ وگرنه تب جدید اضافه می‌شود (همان پیش‌فرض قبلی).';
+
+  @override
+  String get appearanceSidebarTabBehaviorLongPressTitle =>
+      'جایگزینی تب فعال؛ لانگ‌پرس مثل پیش‌فرض';
+
+  @override
+  String get appearanceSidebarTabBehaviorLongPressSubtitle =>
+      'کلیک معمولی فقط محتوای تب فعلی را عوض می‌کند. لانگ‌پرس روی آیتم منو همان رفتار گزینهٔ بالا را دارد (تب موجود یا تب جدید).';
 }

@@ -81,6 +81,27 @@ int _scheduleSeq(dynamic v, [int fallback = 0]) {
   return _parseInstallmentSeq(v) ?? fallback;
 }
 
+/// پارس امن شناسهٔ عددی از پاسخ API (int، double، رشته).
+int? _documentDetailsParseApiInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.round();
+  final s = value.toString().trim();
+  if (s.isEmpty) return null;
+  return int.tryParse(s);
+}
+
+/// لیست شناسه‌های اسناد دریافت/پرداخت پیوندخورده به فاکتور.
+List<int> _documentDetailsParseReceiptPaymentIdList(dynamic raw) {
+  if (raw is! List) return [];
+  final out = <int>[];
+  for (final x in raw) {
+    final id = _documentDetailsParseApiInt(x);
+    if (id != null) out.add(id);
+  }
+  return out;
+}
+
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
   final int documentId;
@@ -653,8 +674,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       } catch (_) {}
       
       // بارگذاری تراکنش‌های پرداخت برای فاکتورها
+      // extra_info از endpoint فاکتور مرجع قطعی است (شامل links.receipt_payment_document_ids)
       if (doc.documentType.startsWith('invoice')) {
-        await _loadPaymentDocuments(doc);
+        await _loadPaymentDocuments(
+          doc,
+          extraInfoOverride: mergedExtra,
+        );
         await _loadCounterpartyPersonDetails(doc);
       }
     } catch (e) {
@@ -721,26 +746,39 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
   }
 
-  Future<void> _loadPaymentDocuments(DocumentModel doc) async {
-    if (doc.extraInfo == null) return;
-    
-    final links = doc.extraInfo!['links'] as Map<String, dynamic>?;
-    if (links == null) return;
-    
-    final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
-    if (receiptPaymentIds == null || receiptPaymentIds.isEmpty) return;
-    
+  Future<void> _loadPaymentDocuments(
+    DocumentModel doc, {
+    Map<String, dynamic>? extraInfoOverride,
+  }) async {
+    final effectiveExtra = extraInfoOverride ?? doc.extraInfo;
+    if (effectiveExtra == null) return;
+
+    final links = effectiveExtra['links'];
+    if (links is! Map<String, dynamic>) return;
+
+    final receiptPaymentIds =
+        _documentDetailsParseReceiptPaymentIdList(links['receipt_payment_document_ids']);
+    if (receiptPaymentIds.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _paymentDocuments = [];
+          _loadingPayments = false;
+        });
+      }
+      return;
+    }
+
     setState(() {
       _loadingPayments = true;
     });
-    
+
     try {
       final List<ReceiptPaymentDocument> documents = [];
       for (final id in receiptPaymentIds) {
         try {
-          final doc = await _receiptPaymentService.getById(id as int);
-          if (doc != null) {
-            documents.add(doc);
+          final paymentDoc = await _receiptPaymentService.getById(id);
+          if (paymentDoc != null) {
+            documents.add(paymentDoc);
           }
         } catch (e) {
           // اگر خطا رخ داد، ادامه بده
@@ -4136,10 +4174,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       extraInfo: data['extra_info'] as Map<String, dynamic>?,
     );
 
-    final currentLinks = _document!.extraInfo?['links'] as Map<String, dynamic>? ?? {};
-    final currentIds = List<int>.from(currentLinks['receipt_payment_document_ids'] as List<dynamic>? ?? []);
-    currentIds.add(created['id'] as int);
-    await _updateInvoiceLinks(currentIds);
+    final newDocId = _documentDetailsParseApiInt(created['id']);
+    if (newDocId == null) {
+      throw Exception('شناسه سند دریافت/پرداخت از سرور نامعتبر است');
+    }
+    await _updateInvoiceLinks(
+      [newDocId],
+      unionWithServerReceiptPaymentIds: true,
+    );
 
     if (mounted) {
       SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت اضافه شد');
@@ -4322,14 +4364,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     try {
       // حذف سند دریافت/پرداخت
       await _receiptPaymentService.deleteReceiptPayment(doc.id);
-      
-      // به‌روزرسانی لینک‌های فاکتور
-      final currentLinks = _document!.extraInfo?['links'] as Map<String, dynamic>? ?? {};
-      final currentIds = List<int>.from(currentLinks['receipt_payment_document_ids'] as List<dynamic>? ?? []);
-      currentIds.remove(doc.id);
-      currentLinks['receipt_payment_document_ids'] = currentIds;
-      
-      await _updateInvoiceLinks(currentIds);
+
+      await _updateInvoiceLinks(
+        const [],
+        removeReceiptPaymentId: doc.id,
+      );
       // توجه: _updateInvoiceLinks خودش _loadDocument را فراخوانی می‌کند که _loadPaymentDocuments را هم فراخوانی می‌کند
       
       if (mounted) {
@@ -4345,10 +4384,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
   }
 
-  /// به‌روزرسانی لینک‌های فاکتور
-  Future<void> _updateInvoiceLinks(List<int> receiptPaymentIds) async {
+  /// به‌روزرسانی لینک‌های فاکتور با اسناد دریافت/پرداخت.
+  ///
+  /// [unionWithServerReceiptPaymentIds]: اگر true باشد، شناسه‌های ارسالی با لیست فعلی روی سرور اجماع می‌شوند (افزودن تراکنش).
+  /// [removeReceiptPaymentId]: در صورت ارسال، پس از خواندن لیست از سرور این شناسه حذف می‌شود (حذف تراکنش).
+  Future<void> _updateInvoiceLinks(
+    List<int> receiptPaymentIds, {
+    bool unionWithServerReceiptPaymentIds = false,
+    int? removeReceiptPaymentId,
+  }) async {
     if (_document == null) return;
-    
+
     try {
       final api = ApiClient();
       
@@ -4367,12 +4413,34 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       } catch (e) {
         // اگر خطا رخ داد، از _rawDocumentData استفاده کن
         invoiceItem = _rawDocumentData;
+        final fallbackExtra = invoiceItem?['extra_info'];
+        if (fallbackExtra is Map<String, dynamic>) {
+          latestExtraInfo = Map<String, dynamic>.from(fallbackExtra);
+        }
       }
       
       // استفاده از extra_info به‌روزرسانی شده یا فعلی document
       final currentExtraInfo = Map<String, dynamic>.from(latestExtraInfo ?? _document!.extraInfo ?? {});
-      final currentLinks = Map<String, dynamic>.from(currentExtraInfo['links'] ?? {});
-      currentLinks['receipt_payment_document_ids'] = receiptPaymentIds;
+      final serverLinksRaw = currentExtraInfo['links'];
+      final serverLinks = serverLinksRaw is Map<String, dynamic>
+          ? Map<String, dynamic>.from(serverLinksRaw)
+          : <String, dynamic>{};
+      final serverRpIds = _documentDetailsParseReceiptPaymentIdList(
+        serverLinks['receipt_payment_document_ids'],
+      );
+
+      final List<int> finalRpIds;
+      if (removeReceiptPaymentId != null) {
+        finalRpIds =
+            serverRpIds.where((id) => id != removeReceiptPaymentId).toList();
+      } else if (unionWithServerReceiptPaymentIds) {
+        finalRpIds = {...serverRpIds, ...receiptPaymentIds}.toList()..sort();
+      } else {
+        finalRpIds = List<int>.from(receiptPaymentIds);
+      }
+
+      final currentLinks = Map<String, dynamic>.from(serverLinks);
+      currentLinks['receipt_payment_document_ids'] = finalRpIds;
       currentExtraInfo['links'] = currentLinks;
       
       // دریافت product_lines از invoiceItem (که از API یا _rawDocumentData دریافت کردیم)
@@ -4381,11 +4449,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         final productLines = invoiceItem['product_lines'] as List<dynamic>?;
         if (productLines != null && productLines.isNotEmpty) {
           lines = productLines.map((line) {
+            final ln = line as Map<String, dynamic>;
             return {
-              'product_id': line['product_id'],
-              'quantity': line['quantity'],
-              'description': line['description'],
-              'extra_info': line['extra_info'] ?? {},
+              'product_id': ln['product_id'],
+              'quantity': ln['quantity'],
+              'description': ln['description'],
+              'extra_info': ln['extra_info'] ?? {},
             };
           }).toList();
         }
@@ -4401,11 +4470,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               final productLines = item['product_lines'] as List<dynamic>?;
               if (productLines != null && productLines.isNotEmpty) {
                 lines = productLines.map((line) {
+                  final ln = line as Map<String, dynamic>;
                   return {
-                    'product_id': line['product_id'],
-                    'quantity': line['quantity'],
-                    'description': line['description'],
-                    'extra_info': line['extra_info'] ?? {},
+                    'product_id': ln['product_id'],
+                    'quantity': ln['quantity'],
+                    'description': ln['description'],
+                    'extra_info': ln['extra_info'] ?? {},
                   };
                 }).toList();
               }

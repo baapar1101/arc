@@ -122,6 +122,33 @@ class Hesabix_Chat_Frontend {
 
 	/**
 	 * @param array<string, mixed> $o .
+	 * @return array<string, scalar|bool|string>
+	 */
+	public static function business_hours_client_config( array $o ) {
+		$bh = array(
+			'enabled'             => false,
+			'ajaxUrl'               => '',
+			'action'                => '',
+			'nonce'                 => '',
+			'snapshotOutside'       => false,
+			'snapshotMessage'       => '',
+		);
+		if ( empty( $o['business_hours_enabled'] ) || ! class_exists( 'Hesabix_Chat_Business_Hours' ) ) {
+			return $bh;
+		}
+		$snap                    = Hesabix_Chat_Business_Hours::localize_snapshot( $o );
+		$bh['enabled']           = true;
+		$bh['ajaxUrl']           = esc_url_raw( admin_url( 'admin-ajax.php' ) );
+		$bh['action']            = Hesabix_Chat_Business_Hours::AJAX_ACTION;
+		$bh['nonce']             = wp_create_nonce( Hesabix_Chat_Business_Hours::NONCE_ACTION );
+		$bh['snapshotOutside']   = ! empty( $snap['outside'] );
+		$bh['snapshotMessage']   = isset( $snap['message'] ) ? (string) $snap['message'] : '';
+
+		return $bh;
+	}
+
+	/**
+	 * @param array<string, mixed> $o .
 	 */
 	private function enqueue( $o ) {
 		if ( '' === (string) $o['public_key'] ) {
@@ -144,6 +171,13 @@ class Hesabix_Chat_Frontend {
 
 		wp_enqueue_style( 'hesabix-chat' );
 		wp_enqueue_script( 'hesabix-chat' );
+
+		$custom_css_saved = isset( $o['widget_custom_css'] ) ? (string) $o['widget_custom_css'] : '';
+		$custom_css_live  = (string) apply_filters( 'hesabix_chat_widget_custom_css', $custom_css_saved, $o );
+		$custom_css_live  = Hesabix_Chat_Admin::sanitize_widget_custom_css( $custom_css_live );
+		if ( $custom_css_live !== '' ) {
+			wp_add_inline_style( 'hesabix-chat', $custom_css_live );
+		}
 
 		$rtl = is_rtl() ? 'rtl' : 'ltr';
 		$opt = (string) $o['rtl'];
@@ -225,6 +259,9 @@ class Hesabix_Chat_Frontend {
 				'showVoiceMessage' => (int) ( $o['show_voice_message'] ?? 0 ) === 1,
 				'loadMode'        => (string) $o['load_mode'],
 				'debug'           => (bool) apply_filters( 'hesabix_chat_debug', false ),
+				'widgetDebugLogging'  => ! empty( $o['widget_debug_logging'] ),
+				'widgetDebugAjaxUrl'   => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
+				'widgetDebugNonce'    => wp_create_nonce( Hesabix_Chat_Debug::NONCE_ACTION ),
 				'emailField'      => $email_eff,
 				'showPageContext' => (int) ( $o['show_page_context'] ?? 0 ) === 1,
 				'prefill'         => $prefill,
@@ -239,6 +276,29 @@ class Hesabix_Chat_Frontend {
 				'openPanelOnLoad'            => (int) ( $o['open_panel_on_load'] ?? 0 ) === 1,
 				'openPanelDelaySec'          => (int) ( $o['open_panel_delay_sec'] ?? 0 ),
 				'rememberPanelBetweenPages'  => (int) ( $o['remember_panel_between_pages'] ?? 1 ) === 1,
+				'showAgentJoinWs'            => (int) ( $o['show_agent_join_ws'] ?? 1 ) === 1,
+				'showAgentAttendanceOnRead' => (int) ( $o['show_agent_attendance_on_read'] ?? 0 ) === 1,
+				'slowReplyTimeoutSec'        => (int) ( $o['slow_reply_timeout_sec'] ?? 0 ),
+				'slowReplyMessage'           => (string) ( $o['slow_reply_message'] ?? '' ),
+				'agentJoinNoticeTemplate'   => (string) ( $o['agent_join_notice_template'] ?? '' ),
+				'agentReadNoticeTemplate'   => (string) ( $o['agent_read_notice_template'] ?? '' ),
+				'operatorLabelMode'          => (string) ( $o['operator_label_mode'] ?? 'real' ),
+				'operatorUnifiedDisplayName' => (string) ( $o['operator_unified_display_name'] ?? '' ),
+				'showPoweredByHesabix'      => (int) ( $o['show_powered_by_hesabix'] ?? 1 ) === 1,
+				'poweredByHesabixUrl'       => esc_url_raw(
+					(string) apply_filters(
+						'hesabix_chat_powered_by_url',
+						(string) ( $o['powered_by_hesabix_url'] ?? 'https://hesabix.ir' ),
+						$o
+					)
+				),
+				'poweredByHesabixText'      => (string) apply_filters(
+					'hesabix_chat_powered_by_text',
+					(string) ( $o['powered_by_hesabix_text'] ?? '' ),
+					$o
+				),
+				'tplExtraClasses'           => Hesabix_Chat_Admin::template_extra_classes_bundle( $o ),
+				'businessHours'             => Hesabix_Chat_Frontend::business_hours_client_config( $o ),
 				'strings'         => array(
 					'formTitle'    => __( 'شروع گفتگو', 'hesabix-chat' ),
 					'formSubtitle' => __( 'برای شروع، مشخصات خود را وارد کنید.', 'hesabix-chat' ),
@@ -251,6 +311,8 @@ class Hesabix_Chat_Frontend {
 					'start'        => __( 'شروع', 'hesabix-chat' ),
 					'placeholder'  => __( 'پیام خود را بنویسید…', 'hesabix-chat' ),
 					'send'         => __( 'ارسال', 'hesabix-chat' ),
+					'sending'      => __( 'در حال ارسال…', 'hesabix-chat' ),
+					'sendBusyHint' => __( 'پیام قبلی در حال ارسال است؛ لطفاً صبر کنید.', 'hesabix-chat' ),
 					'sendTooltip'  => sprintf(
 						/* translators: 1: Send action, 2: keyboard shortcut hint */
 						__( '%1$s — %2$s', 'hesabix-chat' ),
@@ -273,7 +335,7 @@ class Hesabix_Chat_Frontend {
 					'wsOfflineHint'    => __( 'به‌روزرسانی ممکن است با تأخیر باشد.', 'hesabix-chat' ),
 					'agentTyping'      => __( 'پشتیبان در حال تایپ…', 'hesabix-chat' ),
 					'agentTypingNamed' => __( '%s در حال تایپ است…', 'hesabix-chat' ),
-					'agentJoinedNotice' => __( '%s وارد گفتگو شد', 'hesabix-chat' ),
+					'agentJoinedNotice' => __( '%s به گفتگو پیوست', 'hesabix-chat' ),
 					'msgDelivered'     => __( 'ارسال شد', 'hesabix-chat' ),
 					'msgReadBySupport' => __( 'پشتیبان خواند', 'hesabix-chat' ),
 					'quickRepliesTitle' => __( 'پرسش‌های پرتکرار', 'hesabix-chat' ),
@@ -294,7 +356,9 @@ class Hesabix_Chat_Frontend {
 			return '<!-- hesabix_chat: ' . esc_html__( 'public key تنظیم نشده', 'hesabix-chat' ) . ' -->';
 		}
 		$this->enqueue( $o );
-		return '<div id="hesabix-chat-host" class="hesabix-chat-host hesabix-chat-host--shortcode"></div>';
+		$class = Hesabix_Chat_Admin::widget_host_class_attribute_value( $o, true );
+
+		return '<div id="hesabix-chat-host" class="' . esc_attr( $class ) . '"></div>';
 	}
 
 	public function maybe_print_root() {
@@ -308,7 +372,8 @@ class Hesabix_Chat_Frontend {
 		if ( ! $this->should_show_floating_launcher( $o ) ) {
 			return;
 		}
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<div id="hesabix-chat-host" class="hesabix-chat-host" aria-hidden="true"></div>';
+		$class = Hesabix_Chat_Admin::widget_host_class_attribute_value( $o, false );
+
+		echo '<div id="hesabix-chat-host" class="' . esc_attr( $class ) . '" aria-hidden="true"></div>';
 	}
 }

@@ -445,7 +445,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         businessId: widget.businessId,
         searchQuery: code.trim(),
         limit: 10, // افزایش limit برای بررسی چند نتیجه
-        searchFields: const ['code', 'barcode', 'name'],
+        searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       
