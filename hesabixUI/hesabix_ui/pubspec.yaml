@@ -121,6 +121,13 @@ flutter:
           weight: 800
         - asset: assets/fonts/YekanBakhFaNum-Black.ttf
           weight: 900
+    # پوشش ایموجی و کاراکترهایی که یکان/عربی ندارند؛ بدون آن وب موتور Noto دانلودی را امتحان می‌کند و ممکن است به هشدار console برسد.
+    - family: Noto Sans
+      fonts:
+        - asset: assets/fonts/NotoSans-Regular.woff2
+    - family: Noto Color Emoji
+      fonts:
+        - asset: assets/fonts/NotoColorEmoji-Regular.ttf
   assets:
     - assets/images/
     - assets/fonts/Vazirmatn-Regular.ttf

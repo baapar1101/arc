@@ -20,7 +20,10 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       fontFamily: isFa ? 'YekanBakhFaNum' : null,
-      fontFamilyFallback: isFa ? const ['NotoSansArabic', 'Vazirmatn'] : const ['Roboto'],
+      // ایموجی و محدودهٔ وسیع یونیکد قبل از fallback دانلودی موتور وب (Noto از gstatic)
+      fontFamilyFallback: isFa
+          ? const ['Noto Color Emoji', 'Noto Sans', 'NotoSansArabic', 'Vazirmatn']
+          : const ['Noto Color Emoji', 'Noto Sans', 'Roboto'],
       textTheme: textTheme,
       // در حالت تیره، کنتراست متن‌ها را کمی تقویت می‌کنیم
       scaffoldBackgroundColor: isDark ? scheme.surface : null,

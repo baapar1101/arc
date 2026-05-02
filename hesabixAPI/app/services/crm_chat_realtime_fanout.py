@@ -2,16 +2,21 @@
 """
 Pub/Sub روی Redis برای پخش پیام وب‌سوکت چت CRM بین چند worker (uvicorn -w).
 
-بدون این لایه، اتاق مکالمه فقط در حافظهٔ همان فرایند است؛ عامل در worker A پیام می‌فرستد
-ولی بازدیدکننده روی worker B اتصال دارد → تایپ/ورود عامل هرگز به ویجیت نمی‌رسد،
-در حالی که «اکو»ٔ تایپ بازدیدکننده ممکن است روی همان worker به خودش برگردد.
+اگر Redis خاموش باشد، فهرست اتصال وب‌سوکت فقط در RAM همان **یک فرایند** است:
+عامل در worker B و بازدیدکننده در worker A اند → تایپ و agent.joined به ویجیت نمی‌رسد.
+بدون Redis باید **یک worker** داشته باشید (یا sticky session برای وب‌سوکت)، یا Redis را برای چت زنده روشن کنید.
+
+بعد از هر broadcast، اول روی همین فرایند `deliver_*` می‌زنیم؛ سپس (فقط وقتی Redis در تنظیمات فعال است) برای بقیهٔ workerها publish می‌شود؛
+شناسهٔ `s` جلوی رساندن دوبارهٔ همان پیام را روی کارگر فرستنده می‌گیرد.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
 import threading
+import uuid
 from typing import Any, Dict, Optional
 
 import redis
@@ -25,6 +30,19 @@ CHANNEL = "hesabix:crm_chat:ws_fanout"
 
 _fanout_listen_thread: Optional[threading.Thread] = None
 _main_loop_holder: Dict[str, Any] = {"loop": None}
+# شناسهٔ یکتا هر فرایند API برای حذف دوباره‌فرست؛ publish همان worker را هم subscriber می‌بیند
+_fanout_worker_sid_lock = threading.Lock()
+_fanout_worker_sid: Optional[str] = None
+
+
+def _fanout_process_sid() -> str:
+	"""شناسهٔ پایدار این worker تا پایان عمر فرایند (برای جلوگیری از دوبار رساندن پیام با deliver محلی + pub/sub)."""
+	global _fanout_worker_sid
+	if _fanout_worker_sid is None:
+		with _fanout_worker_sid_lock:
+			if _fanout_worker_sid is None:
+				_fanout_worker_sid = f"w{os.getpid()}:{uuid.uuid4().hex[:12]}"
+	return _fanout_worker_sid
 
 
 def _set_main_loop(loop: asyncio.AbstractEventLoop) -> None:
@@ -42,11 +60,11 @@ def _publish_raw(envelope: Dict[str, Any]) -> None:
 
 
 async def _fanout_publish(conversation_id: Optional[int], business_id: Optional[int], payload: Dict[str, Any]) -> bool:
-	"""در صورت موفقیت پیام را فقط از طریق Redis می‌فرستیم (subscriberها به سوکت‌ها می‌رسانند)."""
+	"""انتشار برای سایر workerها؛ شامل s=شناسهٔ فرستانده تا مشترک همان 프로سس دوبار به سوکت‌ها ندهد."""
 	if conversation_id is not None:
-		env = {"v": 1, "t": "c", "id": int(conversation_id), "p": payload}
+		env = {"v": 1, "t": "c", "id": int(conversation_id), "p": payload, "s": _fanout_process_sid()}
 	elif business_id is not None:
-		env = {"v": 1, "t": "b", "id": int(business_id), "p": payload}
+		env = {"v": 1, "t": "b", "id": int(business_id), "p": payload, "s": _fanout_process_sid()}
 	else:
 		return False
 	try:
@@ -58,19 +76,31 @@ async def _fanout_publish(conversation_id: Optional[int], business_id: Optional[
 
 
 async def broadcast_conversation_cross_worker(conversation_id: int, payload: Dict[str, Any]) -> None:
+	from app.services.crm_chat_realtime import crm_chat_realtime_manager
+
+	await crm_chat_realtime_manager.deliver_conversation(conversation_id, payload)
+	if not load_redis_settings_from_configuration()[0]:
+		return
 	ok = await _fanout_publish(conversation_id, None, payload)
 	if not ok:
-		from app.services.crm_chat_realtime import crm_chat_realtime_manager
-
-		await crm_chat_realtime_manager.deliver_conversation(conversation_id, payload)
+		logger.warning(
+			"crm chat fanout: Redis publish نشد؛ workerهای دیگر ممکن است رویداد نگیرند (conversation_id=%s)",
+			conversation_id,
+		)
 
 
 async def broadcast_business_cross_worker(business_id: int, payload: Dict[str, Any]) -> None:
+	from app.services.crm_chat_realtime import crm_chat_realtime_manager
+
+	await crm_chat_realtime_manager.deliver_business(business_id, payload)
+	if not load_redis_settings_from_configuration()[0]:
+		return
 	ok = await _fanout_publish(None, business_id, payload)
 	if not ok:
-		from app.services.crm_chat_realtime import crm_chat_realtime_manager
-
-		await crm_chat_realtime_manager.deliver_business(business_id, payload)
+		logger.warning(
+			"crm chat fanout: Redis publish نشد؛ workerهای دیگر ممکن است رویداد نگیرند (business_id=%s)",
+			business_id,
+		)
 
 
 def _schedule_deliver(envelope: Dict[str, Any]) -> None:
@@ -82,6 +112,10 @@ def _schedule_deliver(envelope: Dict[str, Any]) -> None:
 		from app.services.crm_chat_realtime import crm_chat_realtime_manager
 
 		if envelope.get("v") != 1:
+			return
+		sender_sid = envelope.get("s")
+		if isinstance(sender_sid, str) and sender_sid and sender_sid == _fanout_process_sid():
+			# قبلاً روی همین فرایند deliver شده
 			return
 		t = envelope.get("t")
 		eid = envelope.get("id")
@@ -183,7 +217,8 @@ def start_crm_chat_fanout_subscriber(loop: asyncio.AbstractEventLoop) -> None:
 
 	if not load_redis_settings_from_configuration()[0]:
 		logger.info(
-			"CRM chat WS fan-out: Redis غیرفعال؛ با چند worker ممکن است رویدادهای زنده بین فرایندها نرسند."
+			"CRM chat WS: Redis غیرفعال — تایپ/ورود عامل فقط بین اتصال‌های همین یک فرایند API کار می‌کند؛ "
+			"چند worker بدون Redis → یا Redis را فعال کنید یا uvicorn را با workers=1/sticky وب‌سوکت اجرا کنید."
 		)
 		return
 

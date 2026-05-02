@@ -33,6 +33,7 @@ import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
+import '../../widgets/business/business_shell_glyphs.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -494,7 +495,7 @@ class _BusinessShellState extends State<BusinessShell> {
             ),
             child: Padding(
               padding: const EdgeInsets.all(7),
-              child: Icon(Icons.storefront_rounded, size: 18, color: cs.primary),
+              child: BusinessShellStorefrontGlyph(size: 18, color: cs.primary),
             ),
           ),
           const SizedBox(width: 10),
@@ -1937,10 +1938,10 @@ class _BusinessShellState extends State<BusinessShell> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => setState(() => _desktopRailVisible = !_desktopRailVisible),
-              icon: Icon(
-                _desktopRailVisible ? Icons.menu_open_rounded : Icons.menu_rounded,
+              icon: BusinessShellMenuGlyph(
                 color: appBarFg,
                 size: 21,
+                sidebarOpen: _desktopRailVisible,
               ),
             ),
           if (!useRail) const SizedBox(width: 2),
@@ -1961,7 +1962,7 @@ class _BusinessShellState extends State<BusinessShell> {
                   minimumSize: const Size(40, 40),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                icon: Icon(Icons.menu_rounded, color: appBarFg, size: 21),
+                icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
                 onPressed: () => Scaffold.of(ctx).openDrawer(),
                 tooltip: t.menu,
               ),
@@ -2061,7 +2062,7 @@ class _BusinessShellState extends State<BusinessShell> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(7),
-                        child: Icon(Icons.storefront_rounded, size: 18, color: scheme.primary),
+                        child: BusinessShellStorefrontGlyph(size: 18, color: scheme.primary),
                       ),
                     ),
                     const SizedBox(width: 10),

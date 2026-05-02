@@ -13,6 +13,19 @@ export 'crm_chat_ws_client_stub.dart';
 
 const Duration _kCrmWsAuthTimeout = Duration(seconds: 17);
 
+Map<String, dynamic>? _decodedJsonMap(String text) {
+  try {
+    final decoded = jsonDecode(text);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+  } catch (_) {
+    /* نادیده */
+  }
+  return null;
+}
+
 String? _messageEventDataAsUtf16Text(web.MessageEvent e) {
   final raw = e.data;
   if (raw == null) return null;
@@ -131,8 +144,8 @@ class WebCrmChatWs implements CrmChatWsClient {
       try {
         final text = _messageEventDataAsUtf16Text(e);
         if (text == null || text.isEmpty) return;
-        final msg = jsonDecode(text);
-        if (msg is! Map<String, dynamic>) return;
+        final msg = _decodedJsonMap(text);
+        if (msg == null) return;
         if (msg['type'] == 'auth_ok') {
           _authed = true;
           _flushSubscribeQueue();

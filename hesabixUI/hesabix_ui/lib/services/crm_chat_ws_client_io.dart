@@ -97,7 +97,9 @@ class IoCrmChatWs implements CrmChatWsClient {
       (dynamic data) {
         try {
           if (data is! String) return;
-          final msg = jsonDecode(data) as Map<String, dynamic>;
+          final decoded = jsonDecode(data);
+          if (decoded is! Map) return;
+          final msg = Map<String, dynamic>.from(decoded);
           if (msg['type'] == 'auth_ok') {
             _authed = true;
             _flushSubscribeQueue();

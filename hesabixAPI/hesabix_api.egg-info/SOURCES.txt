@@ -373,6 +373,7 @@ app/services/check_service.py
 app/services/credit_service.py
 app/services/crm_calendar_note_service.py
 app/services/crm_chat_realtime.py
+app/services/crm_chat_realtime_fanout.py
 app/services/crm_chat_service.py
 app/services/currency_admin_service.py
 app/services/currency_quant.py
