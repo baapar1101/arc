@@ -1,6 +1,7 @@
 # include داخل server { } — gradle.mirror.hesabix.ir
 # Runflare (mirror-maven): distributions، android/maven2، maven2، gradle-plugins
 # هدر X-Forwarded-For/X-Real-IP به upstream نفرست.
+# همان ریسک لینک مطلق PyPI اینجا کمتر است؛ Maven metadata پاسخ‌ها عمدتاً نسبی/بدون دامنهٔ runflare بوده‌اند.
 
     location = / {
         default_type text/plain; charset utf-8;

@@ -1,5 +1,6 @@
 # include داخل server { } — maven.mirror.hesabix.ir
 # Runflare: هدر X-Forwarded-For/X-Real-IP به upstream نفرست (ممکن است 402 شود).
+# متادیتا/پام معمولاً فقط نسخه می‌دهند و آرتifact از همان مسیر /maven2/... روی آینه کشیده می‌شود (لینک مطلق به runflare کمتر از PyPI/pub است).
 
     location = / {
         default_type text/plain; charset utf-8;

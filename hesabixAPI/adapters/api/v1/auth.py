@@ -80,6 +80,19 @@ async def generate_captcha(request: Request, db: Session = Depends(get_db)) -> d
 	})
 
 
+@router.get(
+	"/public-config",
+	summary="تنظیمات عمومی احراز هویت (مهمان)",
+	description="اطلاعات محدود برای صفحهٔ ورود بدون نیاز به API Key — مثلاً فعال بودن ثبت‌نام",
+	response_model=SuccessResponse,
+)
+async def get_public_auth_config(db: Session = Depends(get_db)) -> dict:
+	from app.services.system_settings_service import is_registration_enabled
+	return success_response({
+		"enable_registration": is_registration_enabled(db),
+	})
+
+
 @router.get("/me", 
 	summary="دریافت اطلاعات کاربر کنونی", 
 	description="دریافت اطلاعات کامل کاربری که در حال حاضر وارد سیستم شده است",

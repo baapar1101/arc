@@ -57,6 +57,12 @@ if [[ ! -f "$SSL_KEY" || ! -f "$SSL_FULL" ]]; then
 fi
 
 install -m 0644 "$SNIPPET_SRC" "$SNIPPET_DST"
+
+if [[ -d "$CACHE_DIR" ]] && ls -A "$CACHE_DIR" >/dev/null 2>&1; then
+  rm -rf "${CACHE_DIR}/"*
+  echo "کش flutter_cache خالی شد (JSON پاب لینک مطلق mirror-flutter را کش قدیمی برنمی‌دارد)."
+fi
+
 cp -a "$SRC_BASE" "$DST_AVAILABLE"
 chmod 644 "$DST_AVAILABLE"
 ln -sf "$DST_AVAILABLE" "$DST_ENABLED"

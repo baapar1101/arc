@@ -25,6 +25,8 @@ import '../services/errors/api_error.dart';
 import '../utils/error_extractor.dart';
 import '../widgets/auth/otp_input_dialog.dart';
 
+enum _LoginTabKind { login, register, forgot, otp }
+
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
   final CalendarController calendarController;
@@ -94,6 +96,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   /// از پاسخ `/auth/captcha` — همه کپچاهای صفحه از یک تنظیم سرور تبعیت می‌کنند.
   String _captchaMode = 'numeric';
 
+  late TabController _tabController;
+  bool _registrationEnabled = true;
+
   List<TextInputFormatter> get _captchaInputFormatters => _captchaMode == 'alphanumeric'
       ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))]
       : <TextInputFormatter>[const EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly];
@@ -127,6 +132,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginCaptchaTimer?.cancel();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
+    _tabController.removeListener(_onAuthTabChanged);
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -194,6 +201,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_onAuthTabChanged);
     // پیش‌بارگذاری کپچا برای هر چهار تب
     _refreshCaptcha('login');
     _refreshCaptcha('register');
@@ -202,6 +211,88 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     unawaited(_loadOtpChannelStatus());
     // ذخیره کد معرف از URL (اگر وجود داشت)
     unawaited(ReferralStore.captureFromCurrentUrl());
+    unawaited(_loadPublicAuthSettings());
+  }
+
+  void _onAuthTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    setState(() {});
+  }
+
+  _LoginTabKind _tabKindAt(int index) {
+    if (_registrationEnabled) {
+      switch (index) {
+        case 0:
+          return _LoginTabKind.login;
+        case 1:
+          return _LoginTabKind.register;
+        case 2:
+          return _LoginTabKind.forgot;
+        default:
+          return _LoginTabKind.otp;
+      }
+    }
+    switch (index) {
+      case 0:
+        return _LoginTabKind.login;
+      case 1:
+        return _LoginTabKind.forgot;
+      default:
+        return _LoginTabKind.otp;
+    }
+  }
+
+  void _applyRegistrationEnabledFromServer(bool enabled) {
+    if (_registrationEnabled == enabled) return;
+    final oldLen = _tabController.length;
+    final oldIndex = _tabController.index;
+    _registrationEnabled = enabled;
+    final newLen = enabled ? 4 : 3;
+    if (oldLen == newLen) {
+      setState(() {});
+      return;
+    }
+    _tabController.removeListener(_onAuthTabChanged);
+    _tabController.dispose();
+    var newIndex = oldIndex;
+    if (oldLen == 4 && newLen == 3) {
+      if (oldIndex <= 0) {
+        newIndex = 0;
+      } else if (oldIndex == 1) {
+        newIndex = 0;
+      } else {
+        newIndex = oldIndex - 1;
+      }
+    } else if (oldLen == 3 && newLen == 4) {
+      if (oldIndex <= 0) {
+        newIndex = 0;
+      } else {
+        newIndex = oldIndex + 1;
+      }
+    }
+    newIndex = newIndex.clamp(0, newLen - 1);
+    _tabController = TabController(length: newLen, vsync: this, initialIndex: newIndex);
+    _tabController.addListener(_onAuthTabChanged);
+    setState(() {});
+  }
+
+  Future<void> _loadPublicAuthSettings() async {
+    try {
+      final api = ApiClient();
+      final res = await api.get<Map<String, dynamic>>('/api/v1/auth/public-config');
+      final body = res.data;
+      var enabled = true;
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic> && data['enable_registration'] is bool) {
+          enabled = data['enable_registration'] as bool;
+        }
+      }
+      if (!mounted) return;
+      _applyRegistrationEnabledFromServer(enabled);
+    } catch (_) {
+      // در خطای شبکه همان پیش‌فرض (ثبت‌نام فعال) حفظ می‌شود
+    }
   }
 
   Future<void> _loadOtpChannelStatus() async {
@@ -1162,9 +1253,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     final String logoAsset = isDark
         ? 'assets/images/logo-light.png'
         : 'assets/images/logo-blue.png';
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
+    return Scaffold(
         resizeToAvoidBottomInset: true,
         body: SafeArea(
           child: LayoutBuilder(
@@ -1198,27 +1287,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall),
                             const SizedBox(height: 12),
                             TabBar(
+                              controller: _tabController,
                               isScrollable: true,
                               tabs: [
                                 Tab(text: t.login),
-                                Tab(text: t.register),
+                                if (_registrationEnabled) Tab(text: t.register),
                                 Tab(text: t.forgotPassword),
                                 Tab(text: t.otpLogin),
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Builder(builder: (innerContext) {
-                              final tabController = DefaultTabController.maybeOf(innerContext);
-                              if (tabController == null) {
-                                return const SizedBox.shrink();
-                              }
-                              return AnimatedBuilder(
-                                animation: tabController,
-                                builder: (context, _) {
-                                final idx = tabController.index;
+                            AnimatedBuilder(
+                              animation: _tabController,
+                              builder: (context, _) {
+                                final idx = _tabController.index;
                                 Widget body;
-                                if (idx == 0) {
-                                  body = Padding(
+                                switch (_tabKindAt(idx)) {
+                                  case _LoginTabKind.login:
+                                    body = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     child: Stack(
                                       children: [
@@ -1304,8 +1390,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       ],
                                     ),
                                   );
-                                } else if (idx == 1) {
-                                  body = Padding(
+                                    break;
+                                  case _LoginTabKind.register:
+                                    body = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     child: Stack(
                                       children: [
@@ -1445,8 +1532,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       ],
                                     ),
                                   );
-                                } else if (idx == 2) {
-                                  body = Padding(
+                                    break;
+                                  case _LoginTabKind.forgot:
+                                    body = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     child: Stack(
                                       children: [
@@ -1518,7 +1606,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       ],
                                     ),
                                   );
-                                } else if (idx == 3) {
+                                    break;
+                                  case _LoginTabKind.otp:
                                   // OTP Login Tab
                                   body = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1738,8 +1827,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       ],
                                     ),
                                   );
-                                } else {
-                                  body = const SizedBox.shrink();
+                                    break;
                                 }
                                 return AnimatedSize(
                                   duration: const Duration(milliseconds: 200),
@@ -1747,8 +1835,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   alignment: Alignment.topCenter,
                                   child: body,
                                 );
-                              });
-                            }),
+                              },
+                            ),
                             const SizedBox(height: 8),
                             Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
                             const SizedBox(height: 12),
@@ -1767,7 +1855,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             },
           ),
         ),
-      ),
     );
   }
 }

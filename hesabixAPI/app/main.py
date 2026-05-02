@@ -1472,6 +1472,8 @@ curl -X GET "https://agent.hesabix.ir/api/v1/auth/me" \\
             for method, details in methods.items():
                 if method in ["get", "post", "put", "delete", "patch"]:
                     # تمام endpoint های auth، users، support و bank-accounts نیاز به احراز هویت دارند
+                    if "/auth/public-config" in path:
+                        continue
                     if "/auth/" in path or "/users" in path or "/support" in path or "/bank-accounts" in path:
                         details["security"] = [{"ApiKeyAuth": []}]
         

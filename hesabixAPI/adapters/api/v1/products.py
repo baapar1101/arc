@@ -53,6 +53,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.product import Product
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form, HTTPException
+from fastapi.responses import Response
 from adapters.api.v1.helpers.product_request_helper import process_product_request
 import os
 
@@ -2818,7 +2819,7 @@ def apply_bulk_product_prices_sheet_endpoint(
 @router.post(
     "/business/{business_id}/bulk-prices-sheet/export/excel",
     summary="خروجی اکسل ورق ویرایش گسترده قیمت",
-    response_class=None,
+    response_class=Response,
 )
 @require_business_access("business_id")
 async def export_bulk_product_prices_sheet_excel_endpoint(
@@ -2829,8 +2830,6 @@ async def export_bulk_product_prices_sheet_excel_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("products", "view")),
 ):
-    from fastapi.responses import Response
-
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     rtl = locale == "fa"
     data, filename = export_bulk_product_price_sheet_excel(
