@@ -1147,6 +1147,12 @@ def create_app() -> FastAPI:
         from app.services.cache_invalidation_subscriber import start_cache_invalidation_subscriber
         start_cache_invalidation_subscriber()
 
+        # چت CRM: وب‌سوکت بین چند worker → Redis pub/sub تا تایپ/رویدادها به هر سوکتی برسد
+        from app.services.crm_chat_realtime_fanout import start_crm_chat_fanout_subscriber
+
+        loop = asyncio.get_running_loop()
+        start_crm_chat_fanout_subscriber(loop)
+
         # سایر background jobs باید فقط در یک process اجرا شوند (leader-only)
         if not _try_acquire_background_jobs_lock():
             logger = logging.getLogger(__name__)

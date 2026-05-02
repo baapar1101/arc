@@ -49,7 +49,8 @@ class CrmChatRealtimeManager:
 				if not socks:
 					self._business_sockets.pop(bid, None)
 
-	async def broadcast_conversation(self, conversation_id: int, payload: dict[str, Any]) -> None:
+	async def deliver_conversation(self, conversation_id: int, payload: dict[str, Any]) -> None:
+		"""فقط سوکت‌های ثبت‌شده روی همین فرایند worker."""
 		socks = list(self._conversation_sockets.get(conversation_id, set()))
 		for ws in socks:
 			try:
@@ -58,7 +59,7 @@ class CrmChatRealtimeManager:
 				logger.debug("crm chat ws send conv %s: %s", conversation_id, exc)
 				await self.remove_from_conversation(conversation_id, ws)
 
-	async def broadcast_business(self, business_id: int, payload: dict[str, Any]) -> None:
+	async def deliver_business(self, business_id: int, payload: dict[str, Any]) -> None:
 		socks = list(self._business_sockets.get(business_id, set()))
 		for ws in socks:
 			try:
@@ -66,6 +67,16 @@ class CrmChatRealtimeManager:
 			except Exception as exc:
 				logger.debug("crm chat ws send biz %s: %s", business_id, exc)
 				await self.remove_from_business(business_id, ws)
+
+	async def broadcast_conversation(self, conversation_id: int, payload: dict[str, Any]) -> None:
+		from app.services.crm_chat_realtime_fanout import broadcast_conversation_cross_worker
+
+		await broadcast_conversation_cross_worker(conversation_id, payload)
+
+	async def broadcast_business(self, business_id: int, payload: dict[str, Any]) -> None:
+		from app.services.crm_chat_realtime_fanout import broadcast_business_cross_worker
+
+		await broadcast_business_cross_worker(business_id, payload)
 
 
 crm_chat_realtime_manager = CrmChatRealtimeManager()
