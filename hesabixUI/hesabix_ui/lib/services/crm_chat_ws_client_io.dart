@@ -16,6 +16,9 @@ class IoCrmChatWs implements CrmChatWsClient {
   final Set<int> _subscribed = {};
   bool _authed = false;
 
+  @override
+  bool get isAuthenticated => _authed;
+
   void _resetSession() {
     _authed = false;
     _subscribed.clear();

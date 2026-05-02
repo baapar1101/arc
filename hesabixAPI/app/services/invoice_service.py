@@ -161,6 +161,9 @@ SUPPORTED_INVOICE_TYPES = {
     INVOICE_WASTE,
 }
 
+# اسنادی که اقلام کالا در invoice_item_lines نگه داشته می‌شود (نه DocumentLine.product_id)
+_INVOICE_DOC_TYPES_WITH_ITEM_LINES = frozenset(SUPPORTED_INVOICE_TYPES)
+
 ALLOWED_INVOICE_PROFIT_METHODS = {"automatic", "manual", "disabled"}
 ALLOWED_INVOICE_PROFIT_BASIS = {
     "purchase_price",
@@ -860,6 +863,9 @@ def _iter_product_movements(
     """
     بازگرداندن حرکات موجودی (ورودی/خروجی) از اسناد قطعی تا تاریخ مشخص برای مجموعه کالا/انبار.
     خروجی به ترتیب زمان/شناسه سند مرتب می‌شود.
+
+    منبع اصلی: جدول invoice_item_lines (اقلام فاکتور). برای اسناد قدیمی، در صورت نبود اقلام فاکتور،
+    از DocumentLine.product_id استفاده می‌شود تا از شمارش دوبل برای اسناد فاکتور جلوگیری شود.
     """
     if not product_ids:
         return []
@@ -875,36 +881,51 @@ def _iter_product_movements(
     if not tracked_ids:
         return []
 
-    q = db.query(DocumentLine, Document).join(Document, Document.id == DocumentLine.document_id).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.is_proforma == False,  # noqa: E712
-            Document.document_date <= up_to_date,
-            DocumentLine.product_id.in_(tracked_ids),
+    movements: List[Dict[str, Any]] = []
+
+    # 1) حرکات از invoice_item_lines (معماری فعلی)
+    iil_q = (
+        db.query(InvoiceItemLine, Document)
+        .join(Document, Document.id == InvoiceItemLine.document_id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.is_proforma == False,  # noqa: E712
+                Document.document_date <= up_to_date,
+                InvoiceItemLine.product_id.in_(tracked_ids),
+            )
         )
     )
     if exclude_document_id is not None:
-        q = q.filter(Document.id != int(exclude_document_id))
-    rows = q.order_by(
+        iil_q = iil_q.filter(Document.id != int(exclude_document_id))
+    iil_rows = iil_q.order_by(
         Document.document_date.asc(),
         Document.registered_at.asc(),
         Document.id.asc(),
-        DocumentLine.id.asc(),
+        InvoiceItemLine.id.asc(),
     ).all()
-    movements = []
-    for line, doc in rows:
+
+    for line, doc in iil_rows:
         info = line.extra_info or {}
-        # اگر خط صراحتاً به عنوان عدم ثبت انبار علامت‌گذاری شده، از حرکت صرف‌نظر کن
+        doc_extra = doc.extra_info or {}
         try:
             posted = info.get("inventory_posted")
             if posted is False:
                 continue
         except Exception:
             pass
-        movement = (info.get("movement") or None)
-        wh_id = info.get("warehouse_id")
+        if doc_extra.get("post_inventory") is False:
+            continue
+        if info.get("inventory_tracked") is False:
+            continue
+        movement = info.get("movement") or None
+        wh_id_raw = info.get("warehouse_id")
+        wh_id: Optional[int]
+        try:
+            wh_id = int(wh_id_raw) if wh_id_raw is not None else None
+        except Exception:
+            wh_id = None
         if movement is None:
-            # fallback از نوع سند اگر صراحتاً مشخص نشده باشد
             inv_move, _ = _movement_from_type(doc.document_type)
             movement = inv_move
         if warehouse_ids:
@@ -927,16 +948,93 @@ def _iter_product_movements(
             cost_price = Decimal(str(info.get("cost_price")))
         if cost_price is None and info.get("unit_price") is not None:
             cost_price = Decimal(str(info.get("unit_price")))
-        movements.append({
-            "document_id": doc.id,
-            "document_date": doc.document_date,
-            "registered_at": doc.registered_at,
-            "product_id": line.product_id,
-            "warehouse_id": wh_id,
-            "movement": movement,
-            "quantity": qty,
-            "cost_price": cost_price,
-        })
+        movements.append(
+            {
+                "document_id": doc.id,
+                "document_date": doc.document_date,
+                "registered_at": doc.registered_at,
+                "product_id": int(line.product_id),
+                "warehouse_id": wh_id,
+                "movement": movement,
+                "quantity": qty,
+                "cost_price": cost_price,
+                "invoice_item_line_id": int(line.id),
+            }
+        )
+
+    # 2) legacy: DocumentLine با product_id (اسناد غیرفاکتور یا دادهٔ قدیمی)
+    q = db.query(DocumentLine, Document).join(Document, Document.id == DocumentLine.document_id).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.is_proforma == False,  # noqa: E712
+            Document.document_date <= up_to_date,
+            DocumentLine.product_id.in_(tracked_ids),
+        )
+    )
+    if exclude_document_id is not None:
+        q = q.filter(Document.id != int(exclude_document_id))
+    rows = q.order_by(
+        Document.document_date.asc(),
+        Document.registered_at.asc(),
+        Document.id.asc(),
+        DocumentLine.id.asc(),
+    ).all()
+    for line, doc in rows:
+        doc_type = str(doc.document_type or "")
+        if doc_type in _INVOICE_DOC_TYPES_WITH_ITEM_LINES:
+            continue
+        info = line.extra_info or {}
+        try:
+            posted = info.get("inventory_posted")
+            if posted is False:
+                continue
+        except Exception:
+            pass
+        movement = (info.get("movement") or None)
+        wh_id_raw = info.get("warehouse_id")
+        wh_id: Optional[int]
+        try:
+            wh_id = int(wh_id_raw) if wh_id_raw is not None else None
+        except Exception:
+            wh_id = None
+        if movement is None:
+            inv_move, _ = _movement_from_type(doc.document_type)
+            movement = inv_move
+        if warehouse_ids:
+            if wh_id is None:
+                continue
+            if int(wh_id) not in warehouse_ids:
+                continue
+        if movement not in ("in", "out"):
+            continue
+        qty = Decimal(str(line.quantity or 0))
+        if qty <= 0:
+            continue
+        cost_price = None
+        if info.get("cogs_amount") is not None and qty > 0 and movement == "out":
+            try:
+                cost_price = Decimal(str(info.get("cogs_amount"))) / qty
+            except Exception:
+                cost_price = None
+        if cost_price is None and info.get("cost_price") is not None:
+            cost_price = Decimal(str(info.get("cost_price")))
+        if cost_price is None and info.get("unit_price") is not None:
+            cost_price = Decimal(str(info.get("unit_price")))
+        movements.append(
+            {
+                "document_id": doc.id,
+                "document_date": doc.document_date,
+                "registered_at": doc.registered_at,
+                "product_id": int(line.product_id),
+                "warehouse_id": wh_id,
+                "movement": movement,
+                "quantity": qty,
+                "cost_price": cost_price,
+                "invoice_item_line_id": 0,
+            }
+        )
+
+    movements.sort(key=_movement_sort_key)
     return movements
 
 
@@ -1025,7 +1123,7 @@ def get_financial_stock_bulk(
 ) -> Dict[int, Decimal]:
     """
     محاسبه موجودی مالی برای لیستی از کالاها.
-    بر اساس حرکات موجودی از اسناد مالی (DocumentLine).
+    بر اساس حرکات موجودی از اقلام فاکتور (invoice_item_lines) و در نبود آن از خطوط سند (DocumentLine).
     بازگشت: Dict[product_id, quantity]
     """
     if not product_ids:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -193,8 +193,19 @@ async def crm_chat_websocket(websocket: WebSocket):
 						db2 = SessionLocal()
 						try:
 							if not _conv_belongs_to_business(db2, scid_int, business_id):
+								logger.warning(
+									"crm_chat_ws typing dropped: conversation_id=%s business_id=%s (not found or wrong tenant)",
+									scid_int,
+									business_id,
+								)
 								continue
 							if not _agent_may(db2, agent_user, business_id, need_write=False):
+								logger.warning(
+									"crm_chat_ws typing dropped: conversation_id=%s business_id=%s user_id=%s (permission)",
+									scid_int,
+									business_id,
+									getattr(agent_user, "id", None),
+								)
 								continue
 						finally:
 							db2.close()
@@ -218,8 +229,19 @@ async def crm_chat_websocket(websocket: WebSocket):
 					db2 = SessionLocal()
 					try:
 						if not _conv_belongs_to_business(db2, scid_int, business_id):
+							logger.warning(
+								"crm_chat_ws subscribe dropped: conversation_id=%s business_id=%s (not found or wrong tenant)",
+								scid_int,
+								business_id,
+							)
 							continue
 						if not _agent_may(db2, agent_user, business_id, need_write=False):
+							logger.warning(
+								"crm_chat_ws subscribe dropped: conversation_id=%s business_id=%s user_id=%s (permission)",
+								scid_int,
+								business_id,
+								getattr(agent_user, "id", None),
+							)
 							continue
 					finally:
 						db2.close()

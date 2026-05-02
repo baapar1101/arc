@@ -1,5 +1,7 @@
 /// کلاینت WebSocket عامل چت CRM — پیاده‌سازی پیش‌فرض (بدون اتصال).
 abstract class CrmChatWsClient {
+  bool get isAuthenticated;
+
   /// بازگشت [true] فقط پس از دریافت پیام معتبر [auth_ok] از سرور.
   Future<bool> connect({
     required String apiKey,
@@ -16,6 +18,9 @@ abstract class CrmChatWsClient {
 CrmChatWsClient createCrmChatWsClient() => _NoopCrmChatWs();
 
 class _NoopCrmChatWs implements CrmChatWsClient {
+  @override
+  bool get isAuthenticated => false;
+
   @override
   Future<bool> connect({
     required String apiKey,

@@ -15,6 +15,13 @@ class Hesabix_Chat_Admin {
 	const OPTION_NAME = 'hesabix_chat_options';
 
 	/**
+	 * user meta: نسخهٔ راه‌دوری که کاربر برای اعلان «به‌روزرسانی» در پیشخوان دکمهٔ بی‌خیال زده است؛ تا انتشار بعدی تکرار نشود.
+	 */
+	const USER_META_DISMISSED_REMOTE_NOTICE_VER = 'hesabix_chat_dismissed_dashboard_update_remote_ver';
+
+	const DISMISS_UPDATE_NOTICE_NONCE_ACTION = 'hesabix_chat_dismiss_update_notice';
+
+	/**
 	 * پیش‌فرض‌ها.
 	 *
 	 * @return array<string, mixed>
@@ -516,6 +523,8 @@ class Hesabix_Chat_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_assets' ) );
 		add_action( 'admin_action_hesabix_clear_widget_debug_log', array( $this, 'action_clear_widget_debug_log' ) );
 		add_action( 'admin_action_hesabix_export_widget_debug_log', array( $this, 'action_export_widget_debug_log' ) );
+		add_action( 'admin_notices', array( $this, 'maybe_render_dashboard_update_notice' ) );
+		add_action( 'admin_post_hesabix_chat_dismiss_update_notice', array( $this, 'handle_post_dismiss_update_notice' ) );
 	}
 
 	public function add_menu() {
@@ -526,6 +535,100 @@ class Hesabix_Chat_Admin {
 			'hesabix-chat',
 			array( $this, 'render_page' )
 		);
+	}
+
+	/**
+	 * @param string $s .
+	 * @return bool
+	 */
+	private static function plausible_plugin_version_slug( $s ) {
+		return is_string( $s ) && $s !== '' && preg_match( '/^[0-9][0-9a-z.+-]*$/i', $s ) === 1;
+	}
+
+	/**
+	 * اعلان پیشخوان در صورت وجود نسخهٔ جدیدتر در منبع (متفاوت از نسخهٔ کنونی نصب‌شده).
+	 */
+	public function maybe_render_dashboard_update_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		// صفحهٔ تنظیمات خود افزونه: آن‌جا تب «به‌روزرسانی» هست؛ اعلان تکراری نباشد.
+		if ( isset( $_GET['page'] ) && 'hesabix-chat' === sanitize_text_field( wp_unslash( (string) $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( ! class_exists( 'Hesabix_Chat_Updater', false ) ) {
+			return;
+		}
+
+		$upd = Hesabix_Chat_Updater::instance()->get_update_dashboard_state( false );
+
+		if ( empty( $upd['configured'] ) || empty( $upd['remote_loaded'] ) || empty( $upd['newer_than_local'] ) ) {
+			return;
+		}
+
+		$remote_ver = isset( $upd['remote_version'] ) ? trim( (string) $upd['remote_version'] ) : '';
+		$local_ver  = isset( $upd['current_version'] ) ? trim( (string) $upd['current_version'] ) : '';
+		if ( ! self::plausible_plugin_version_slug( $remote_ver ) ) {
+			return;
+		}
+
+		$dismissed = get_user_meta( get_current_user_id(), self::USER_META_DISMISSED_REMOTE_NOTICE_VER, true );
+		$dismissed = is_string( $dismissed ) ? trim( $dismissed ) : '';
+		if ( '' !== $dismissed && $dismissed === $remote_ver ) {
+			return;
+		}
+
+		$settings_update_url = admin_url( 'options-general.php?page=hesabix-chat#hesabix-tab-update' );
+
+		$notice_class = ! empty( $upd['update_available'] ) ? 'notice-info' : 'notice-warning';
+		if ( ! empty( $upd['update_available'] ) ) {
+			/* translators: 1: installed version, 2: newer remote version */
+			$body = sprintf( __( 'افزونهٔ «چت حسابیکس» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+		} elseif ( empty( $upd['env_compatible'] ) ) {
+			/* translators: 1: installed version, 2: remote version */
+			$body = sprintf( __( 'نسخهٔ %2$s «چت حسابیکس» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+		} else {
+			/* translators: 1: installed version, 2: remote version */
+			$body = sprintf( __( 'نسخهٔ %2$s «چت حسابیکس» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+		}
+
+		$dismiss_base = wp_nonce_url(
+			admin_url( 'admin-post.php?action=hesabix_chat_dismiss_update_notice&remote_ver=' . rawurlencode( $remote_ver ) ),
+			self::DISMISS_UPDATE_NOTICE_NONCE_ACTION
+		);
+
+		echo '<div class="' . esc_attr( 'notice ' . $notice_class . ' hesabix-chat-dashboard-update-notice' ) . '"><p><strong>'
+			. esc_html__( 'به‌روزرسانی افزونه چت حسابیکس', 'hesabix-chat' )
+			. '</strong></p><p>' . esc_html( $body ) . '</p><p style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
+			. '<a href="' . esc_url( $settings_update_url ) . '" class="button button-primary">' . esc_html__( 'رفتن به به‌روزرسانی افزونه', 'hesabix-chat' ) . '</a>'
+			. '<a href="' . esc_url( $dismiss_base ) . '" class="button button-secondary">' . esc_html__( 'بی‌خیال تا نسخهٔ بعد', 'hesabix-chat' ) . '</a>'
+			. '<span class="description">' . esc_html__( 'تا وقتی نسخهٔ جدیدی در منبع منتشر نشود، با «بی‌خیال» این پیام نشان داده نمی‌شود.', 'hesabix-chat' ) . '</span></p></div>';
+	}
+
+	/**
+	 * ذخیرهٔ «بی‌خیال» برای نسخهٔ راه‌دور کنونی؛ بعد از انتشار نسخهٔ بعدی دوباره اعلان ظاهر می‌شود.
+	 */
+	public function handle_post_dismiss_update_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'مجوز دسترسی ندارید.', 'hesabix-chat' ) );
+		}
+		check_admin_referer( self::DISMISS_UPDATE_NOTICE_NONCE_ACTION );
+
+		$referer_safe = wp_get_referer();
+		if ( ! is_string( $referer_safe ) || $referer_safe === '' ) {
+			$referer_safe = admin_url();
+		}
+
+		if ( isset( $_GET['remote_ver'] ) ) {
+			$rv = sanitize_text_field( wp_unslash( (string) $_GET['remote_ver'] ) );
+			if ( self::plausible_plugin_version_slug( $rv ) ) {
+				update_user_meta( get_current_user_id(), self::USER_META_DISMISSED_REMOTE_NOTICE_VER, $rv );
+			}
+		}
+
+		wp_safe_redirect( $referer_safe );
+		exit;
 	}
 
 	public function register_settings() {

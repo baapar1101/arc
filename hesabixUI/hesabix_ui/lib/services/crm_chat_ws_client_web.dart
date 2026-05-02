@@ -4,11 +4,33 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+// ignore_for_file: deprecated_member_use_from_same_package — dartify برای هر دو dart2js / wasm
+import 'dart:js_util' as js_util show dartify;
+
 import '../config/app_config.dart';
 import 'crm_chat_ws_client_stub.dart';
 export 'crm_chat_ws_client_stub.dart';
 
 const Duration _kCrmWsAuthTimeout = Duration(seconds: 17);
+
+String? _messageEventDataAsUtf16Text(web.MessageEvent e) {
+  final raw = e.data;
+  if (raw == null) return null;
+  try {
+    final boxed = js_util.dartify(raw as Object);
+    if (boxed is String && boxed.isNotEmpty) {
+      return boxed;
+    }
+  } catch (_) {
+    /* مسیر بعدی */
+  }
+  try {
+    if (raw.isA<JSString>()) {
+      return (raw as JSString).toDart;
+    }
+  } catch (_) {}
+  return null;
+}
 
 class WebCrmChatWs implements CrmChatWsClient {
   web.WebSocket? _ws;
@@ -18,6 +40,9 @@ class WebCrmChatWs implements CrmChatWsClient {
   bool _authed = false;
 
   StreamSubscription<web.CloseEvent>? _closeListen;
+
+  @override
+  bool get isAuthenticated => _authed;
 
   void _resetSession() {
     _authed = false;
@@ -104,17 +129,16 @@ class WebCrmChatWs implements CrmChatWsClient {
 
     sock.onMessage.listen((web.MessageEvent e) {
       try {
-        final data = e.data;
-        if (data is JSString) {
-          // ignore: invalid_runtime_check_with_js_interop_types
-          final msg = jsonDecode(data.toDart) as Map<String, dynamic>;
-          if (msg['type'] == 'auth_ok') {
-            _authed = true;
-            _flushSubscribeQueue();
-            completeHandshake(true);
-          }
-          _onMessage?.call(msg);
+        final text = _messageEventDataAsUtf16Text(e);
+        if (text == null || text.isEmpty) return;
+        final msg = jsonDecode(text);
+        if (msg is! Map<String, dynamic>) return;
+        if (msg['type'] == 'auth_ok') {
+          _authed = true;
+          _flushSubscribeQueue();
+          completeHandshake(true);
         }
+        _onMessage?.call(msg);
       } catch (_) {}
     });
 

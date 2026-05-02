@@ -273,3 +273,31 @@ msgstr ""
 #: includes/class-hesabix-chat-admin.php
 msgid "رنگ اصلی (دکمه و هدر)"
 msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "به‌روزرسانی افزونه چت حسابیکس"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "افزونهٔ «چت حسابیکس» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "نسخهٔ %2$s «چت حسابیکس» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "نسخهٔ %2$s «چت حسابیکس» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید."
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "رفتن به به‌روزرسانی افزونه"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "بی‌خیال تا نسخهٔ بعد"
+msgstr ""
+
+#: includes/class-hesabix-chat-admin.php
+msgid "تا وقتی نسخهٔ جدیدی در منبع منتشر نشود، با «بی‌خیال» این پیام نشان داده نمی‌شود."
+msgstr ""

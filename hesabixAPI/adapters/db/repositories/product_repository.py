@@ -177,15 +177,10 @@ class ProductRepository(BaseRepository[Product]):
                 except Exception:
                     pass
             
-            # جدا کردن کالاهای unique و bulk
-            unique_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) == "unique"]
-            bulk_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) != "unique"]
+            # موجودی حسابداری و انبارداری برای همهٔ کالاهای با track_inventory
+            all_tracked_product_ids = [p.id for p in rows if p.track_inventory]
 
-            unique_product_ids = [p.id for p in unique_products]
-            bulk_product_ids = [p.id for p in bulk_products]
-            all_tracked_product_ids = unique_product_ids + bulk_product_ids
-
-            # موجودی حسابداری: فقط از خطوط اسناد مالی (فاکتور خرید/فروش و ...)؛ بدون حواله انبار
+            # موجودی حسابداری: اقلام فاکتور (invoice_item_lines) + در صورت نیاز DocumentLine قدیمی
             if all_tracked_product_ids:
                 try:
                     from app.services.invoice_service import get_financial_stock_bulk
@@ -204,42 +199,8 @@ class ProductRepository(BaseRepository[Product]):
                 except Exception:
                     pass
 
-            # موجودی انبارداری (فیزیکی) برای unique: شمارش نمونه‌های available در انبار
-            if unique_product_ids:
-                try:
-                    from adapters.db.models.product_instance import ProductInstance
-
-                    with query_timeout(self.db, timeout_seconds=30):
-                        warehouse_counts = (
-                            self.db.query(
-                                ProductInstance.product_id,
-                                func.count(ProductInstance.id).label("count"),
-                            )
-                            .filter(
-                                and_(
-                                    ProductInstance.business_id == business_id,
-                                    ProductInstance.product_id.in_(unique_product_ids),
-                                    ProductInstance.status == "available",
-                                )
-                            )
-                            .group_by(ProductInstance.product_id)
-                            .all()
-                        )
-
-                    for pid, count in warehouse_counts:
-                        inventory_data.setdefault(pid, {})
-                        inventory_data[pid]["warehouse"] = float(count)
-
-                    for pid in unique_product_ids:
-                        inv = inventory_data.setdefault(pid, {})
-                        inv.setdefault("warehouse", 0.0)
-                except Exception:
-                    for pid in unique_product_ids:
-                        inv = inventory_data.setdefault(pid, {})
-                        inv.setdefault("warehouse", 0.0)
-
-            # موجودی انبارداری برای bulk: حواله‌های انبار
-            if bulk_product_ids:
+            # موجودی انبارداری (فیزیکی): حواله‌های انبار قطعی — برای bulk و unique
+            if all_tracked_product_ids:
                 try:
                     from app.services.warehouse_service import get_physical_stock_bulk
 
@@ -247,7 +208,7 @@ class ProductRepository(BaseRepository[Product]):
                         warehouse_stocks = get_physical_stock_bulk(
                             db=self.db,
                             business_id=business_id,
-                            product_ids=bulk_product_ids,
+                            product_ids=all_tracked_product_ids,
                             as_of_date=as_of_date_obj,
                         )
                     for pid, stock in warehouse_stocks.items():

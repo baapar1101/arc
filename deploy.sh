@@ -1933,7 +1933,55 @@ server {
     proxy_send_timeout 300;
   }
 
-  location ^~ /assets/ {
+  # /assets وب Flutter (فونت MaterialIcons، shaders، …) نباید همیشه به API پروکسی شود؛
+  # وگرنه وقتی API_DOMAIN و UI_DOMAIN یکی‌اند (ادغام server در nginx)، آیکن‌ها و دارایی‌های استاتیک وب خالی/۴۰۴ می‌شوند.
+  location ^~ /assets/swagger/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
+  }
+
+  location = /assets/logo-blue.png {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
+  }
+
+  location ^~ /assets/icons/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
+  }
+
+  location /assets/ {
+    root /var/www/${UI_DOMAIN};
+    try_files \$uri \$uri/ @hesabix_api_assets_fallback;
+  }
+  location @hesabix_api_assets_fallback {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
@@ -2172,6 +2220,20 @@ server {
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_set_header X-Forwarded-Host \$host;
     proxy_set_header X-Forwarded-Port \$server_port;
+  }
+
+  location ^~ /assets/icons/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 300;
   }
 
   # SPA: مسیرهای عمومی (لینک اشتراک و غیره) → index.html

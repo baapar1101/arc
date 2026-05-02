@@ -202,7 +202,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
   void _onReplyTextChanged() {
     final cid = _selectedConvId;
-    if (cid == null || !_wsLive) return;
+    if (cid == null) return;
     final text = _replyCtrl.text;
     _typingDebounce?.cancel();
     if (text.trim().isEmpty) {
@@ -240,6 +240,22 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     } catch (_) {}
   }
 
+  void _replayAgentTypingOutboundIfAny() {
+    final cid = _selectedConvId;
+    if (cid == null || !_ws.isAuthenticated) return;
+    final text = _replyCtrl.text;
+    _typingDebounce?.cancel();
+    if (text.trim().isEmpty) {
+      _ws.sendTyping(cid, active: false);
+      return;
+    }
+    _ws.sendTyping(cid, active: true);
+    _typingStopTimer?.cancel();
+    _typingStopTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) _ws.sendTyping(cid, active: false);
+    });
+  }
+
   Future<void> _initRealtime() async {
     final key = widget.authStore.apiKey;
     if (key == null || key.isEmpty) {
@@ -269,6 +285,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       if (_selectedConvId != null) {
         _ws.subscribeConversation(_selectedConvId!);
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _replayAgentTypingOutboundIfAny();
+      });
     } else {
       setState(() => _wsLive = false);
       _stopBackupPoll();
