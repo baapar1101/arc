@@ -29,29 +29,57 @@ if (!defined('WPINC')) {
  * Currently plugin version.
  */
 define('HESABIX_V2_VERSION', '2.0.0');
+define('HESABIX_V2_PLUGIN_FILE', __FILE__);
 define('HESABIX_V2_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HESABIX_V2_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('HESABIX_V2_API_BASE_URL', 'https://hsxn.hesabix.ir/api/v1');
+
 /**
- * URL to version.json for update check (raw file from repo).
+ * به‌روزرسانی: نسخه از hesabix-v2.php به‌صورت raw؛ بسته از archive همان شاخه.
+ * مسیر «raw» همان محتوای فایلی است که در مرورگر با /src/branch/… دیده می‌شود.
+ *
  * @see https://source.hesabix.ir/hesabix/ArcWOC
  */
-if (!defined('HESABIX_V2_UPDATE_INFO_URL')) {
-	define('HESABIX_V2_UPDATE_INFO_URL', 'https://source.hesabix.ir/hesabix/ArcWOC/raw/branch/main/version.json');
+if (!defined('HESABIX_V2_UPDATE_RAW_PHP_URL')) {
+	define(
+		'HESABIX_V2_UPDATE_RAW_PHP_URL',
+		'https://source.hesabix.ir/hesabix/ArcWOC/raw/branch/master/hesabix-v2.php'
+	);
+}
+if (!defined('HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL')) {
+	define(
+		'HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL',
+		'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/master.zip'
+	);
 }
 /**
- * Optional: direct ZIP URL for updates. If set, overrides download_url from version.json.
- * Example: archive of default branch (branch name may be main or master):
+ * اختیاری: مانیفست JSON در صورت نیاز به fallback (خالی = غیرفعال).
  */
-if (!defined('HESABIX_V2_UPDATE_ARCHIVE_URL')) {
-	define('HESABIX_V2_UPDATE_ARCHIVE_URL', 'https://source.hesabix.ir/hesabix/ArcWOC/archive/refs/heads/main.zip');
+if (!defined('HESABIX_V2_UPDATE_MANIFEST_URL')) {
+	define(
+		'HESABIX_V2_UPDATE_MANIFEST_URL',
+		'https://source.hesabix.ir/hesabix/ArcWOC/raw/branch/master/version.json'
+	);
 }
 
 /**
- * Plugin updater: check repo for new version and integrate with WordPress one-click update.
+ * @deprecated سازگاری با wp-config قدیمی؛ در صورت تعریف، به‌عنوان نشانی مانیفست JSON هم استفاده می‌شود.
+ */
+if (!defined('HESABIX_V2_UPDATE_INFO_URL')) {
+	define('HESABIX_V2_UPDATE_INFO_URL', '');
+}
+/**
+ * @deprecated سازگاری با wp-config قدیمی؛ اگر HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL خالی باشد خوانده می‌شود.
+ */
+if (!defined('HESABIX_V2_UPDATE_ARCHIVE_URL')) {
+	define('HESABIX_V2_UPDATE_ARCHIVE_URL', HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL);
+}
+
+/**
+ * Plugin updater: مخزن + یکپارچگی با صفحهٔ به‌روزرسانی افزونه‌ها و تب تنظیمات.
  */
 require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-updater.php';
-new Hesabix_V2_Updater();
+Hesabix_V2_Updater::init();
 
 /**
  * Declare compatibility with WooCommerce HPOS (Custom Order Tables).

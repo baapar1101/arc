@@ -22,6 +22,28 @@ if ($invoice_payment_destination !== 'cash_register') {
 	$invoice_payment_destination = 'bank';
 }
 $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
+$hesabix_v2_upd_defaults = array(
+	'current_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
+	'remote_version' => '',
+	'remote_loaded' => false,
+	'configured' => false,
+	'configured_raw_zip' => false,
+	'configured_manifest_only' => false,
+	'source_kind' => '',
+	'download_available' => false,
+	'wp_compatible' => true,
+	'php_compatible' => true,
+	'env_compatible' => true,
+	'requires_wp' => '',
+	'requires_php' => '',
+	'update_available' => false,
+	'newer_than_local' => false,
+	'can_install' => false,
+);
+$hesabix_v2_upd_state = $hesabix_v2_upd_defaults;
+if (class_exists('Hesabix_V2_Updater', false)) {
+	$hesabix_v2_upd_state = array_merge($hesabix_v2_upd_defaults, Hesabix_V2_Updater::instance()->get_update_dashboard_state(false));
+}
 ?>
 
 <div class="wrap hesabix-v2-wrap">
@@ -32,7 +54,32 @@ $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 	<form method="post" action="">
 		<?php wp_nonce_field('hesabix_v2_settings'); ?>
 
-		<h2><?php _e('تنظیمات اتصال', 'hesabix-v2'); ?></h2>
+		<style>
+			.hesabix-v2-settings-tabs { margin: 1em 0 0; padding-top: 4px; }
+			.hesabix-v2-tab-panel { margin-top: 0.5em; }
+			.hesabix-v2-tab-panel[hidden] { display: none !important; }
+			.hesabix-v2-settings-submit-wrap {
+				margin-top: 1.5em;
+				padding: 14px 0 6px;
+				border-top: 1px solid #c3c4c7;
+				position: sticky;
+				bottom: 0;
+				background: #fff;
+				box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.06);
+				z-index: 100;
+			}
+			.hesabix-v2-settings-submit-wrap .submit { margin: 0; padding: 0; }
+		</style>
+		<h2 class="nav-tab-wrapper hesabix-v2-settings-tabs wp-clearfix">
+			<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e('اتصال', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="sync"><?php esc_html_e('همگام‌سازی', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="invoice"><?php esc_html_e('فاکتور', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="extra"><?php esc_html_e('سایر', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="update"><?php esc_html_e('به‌روزرسانی افزونه', 'hesabix-v2'); ?></a>
+		</h2>
+
+		<div class="hesabix-v2-tab-panel" data-tab="connection">
+			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات اتصال', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php _e('آدرس سرور API', 'hesabix-v2'); ?></th>
@@ -63,9 +110,10 @@ $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<h2><?php _e('تنظیمات همگام‌سازی', 'hesabix-v2'); ?></h2>
-		
+		<div class="hesabix-v2-tab-panel" data-tab="sync" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات همگام‌سازی', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php _e('همگام‌سازی خودکار محصولات', 'hesabix-v2'); ?></th>
@@ -195,8 +243,10 @@ $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<h2><?php _e('تنظیمات فاکتور', 'hesabix-v2'); ?></h2>
+		<div class="hesabix-v2-tab-panel" data-tab="invoice" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات فاکتور', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php _e('نوع سند در حسابیکس', 'hesabix-v2'); ?></th>
@@ -360,9 +410,10 @@ $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 			});
 		})(jQuery);
 		</script>
+		</div>
 
-		<h2><?php _e('تنظیمات اضافی', 'hesabix-v2'); ?></h2>
-		
+		<div class="hesabix-v2-tab-panel" data-tab="extra" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات اضافی', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php _e('فیلدهای اضافی checkout', 'hesabix-v2'); ?></th>
@@ -386,8 +437,95 @@ $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<?php submit_button(__('ذخیره تنظیمات', 'hesabix-v2'), 'primary', 'hesabix_v2_save_settings'); ?>
+		<div class="hesabix-v2-tab-panel" data-tab="update" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('به‌روزرسانی افزونه از مخزن', 'hesabix-v2'); ?></h2>
+			<p class="description" style="max-width:54rem;margin-top:0;"><?php esc_html_e('نسخه از فایل hesabix-v2.php در مخزن (مسیر raw) خوانده می‌شود و بستهٔ zip همان شاخه جایگزین می‌شود. برای آدرس دلخواه، ثابت‌های HESABIX_V2_UPDATE_RAW_PHP_URL و HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL را در wp-config تنظیم کنید.', 'hesabix-v2'); ?></p>
+			<?php
+			$upd = $hesabix_v2_upd_state;
+			$upd_remote_disp = __('نامشخص', 'hesabix-v2');
+			if (!empty($upd['remote_loaded']) && isset($upd['remote_version']) && (string) $upd['remote_version'] !== '') {
+				$upd_remote_disp = (string) $upd['remote_version'];
+			}
+			$upd_summary_txt = '';
+			if (empty($upd['configured'])) {
+				$upd_summary_txt = __('منبع به‌روزرسانی تنظیم نشده؛ ثابت‌های فایل اصلی افزونه یا wp-config را بررسی کنید.', 'hesabix-v2');
+			} elseif (empty($upd['remote_loaded'])) {
+				$upd_summary_txt = __('به منبع وصل نشد یا نسخه‌ای خوانده نشد؛ «بررسی مجدد» را بزنید.', 'hesabix-v2');
+			} elseif (!empty($upd['update_available'])) {
+				$upd_summary_txt = __('نسخهٔ جدیدتری موجود است؛ می‌توانید با «به‌روزرسانی خودکار» از بستهٔ zip نصب کنید.', 'hesabix-v2');
+			} elseif (!empty($upd['newer_than_local']) && empty($upd['env_compatible'])) {
+				$upd_summary_txt = __('نسخهٔ جدید روی مخزن است؛ اما نسخهٔ وردپرس یا PHP سایت به حد لازم نمی‌رسد.', 'hesabix-v2');
+			} else {
+				$upd_summary_txt = __('نسخهٔ نصب‌شده با آخرین نسخهٔ تشخیص‌داده‌شده از منبع برابر است (یا از راه‌دور جدیدتر دارید).', 'hesabix-v2');
+			}
+			$upd_install_disabled = empty($upd['update_available']) || empty($upd['can_install']);
+			$upd_requires_label = __('نامشخص', 'hesabix-v2');
+			if (!empty($upd['remote_loaded'])) {
+				$upd_rw = isset($upd['requires_wp']) ? (string) $upd['requires_wp'] : '';
+				$upd_rp = isset($upd['requires_php']) ? (string) $upd['requires_php'] : '';
+				if ('' !== $upd_rw || '' !== $upd_rp) {
+					$upd_requires_label = sprintf(
+						__('وردپرس ≥ %1$s؛ PHP ≥ %2$s', 'hesabix-v2'),
+						'' !== $upd_rw ? $upd_rw : '—',
+						'' !== $upd_rp ? $upd_rp : '—'
+					);
+				}
+			}
+			$upd_source_label = __('نامشخص', 'hesabix-v2');
+			if (empty($upd['configured'])) {
+				$upd_source_label = __('تنظیم نشده', 'hesabix-v2');
+			} elseif (!empty($upd['configured_raw_zip'])) {
+				$upd_source_label = __('فایل خام hesabix-v2.php + بستهٔ zip', 'hesabix-v2');
+			} elseif (!empty($upd['configured_manifest_only'])) {
+				$upd_source_label = __('مانیفست JSON', 'hesabix-v2');
+			} else {
+				$upd_source_label = __('ترکیبی', 'hesabix-v2');
+			}
+			?>
+			<table class="form-table hesabix-v2-upd-versions" role="presentation">
+				<tr>
+					<th scope="row"><?php esc_html_e('نسخهٔ نصب‌شدهٔ فعلی', 'hesabix-v2'); ?></th>
+					<td><strong id="hesabix-v2-upd-current"><?php echo esc_html((string) ($upd['current_version'] ?? '')); ?></strong></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('آخرین نسخهٔ منتشرشده (از منبع)', 'hesabix-v2'); ?></th>
+					<td><strong id="hesabix-v2-upd-remote"><?php echo esc_html($upd_remote_disp); ?></strong></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('نوع منبع', 'hesabix-v2'); ?></th>
+					<td id="hesabix-v2-upd-source"><?php echo esc_html($upd_source_label); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('الزامات اعلام‌شده در منبع', 'hesabix-v2'); ?></th>
+					<td id="hesabix-v2-upd-requires"><?php echo esc_html($upd_requires_label); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('خلاصهٔ وضعیت', 'hesabix-v2'); ?></th>
+					<td id="hesabix-v2-upd-summary"><?php echo esc_html($upd_summary_txt); ?></td>
+				</tr>
+			</table>
+			<p class="submit" style="padding-top:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+				<button type="button" class="button button-secondary" id="hesabix-v2-upd-refresh"><?php esc_html_e('بررسی مجدد از سرور', 'hesabix-v2'); ?></button>
+				<button type="button" class="button button-primary" id="hesabix-v2-upd-install"<?php echo $upd_install_disabled ? ' disabled aria-disabled="true"' : ''; ?>><?php esc_html_e('به‌روزرسانی خودکار (Ajax)', 'hesabix-v2'); ?></button>
+				<span class="description" id="hesabix-v2-upd-inline-status" aria-live="polite" style="flex-basis:100%;"></span>
+			</p>
+			<p class="notice notice-alt" style="max-width:52rem;"><strong><?php esc_html_e('مجوز:', 'hesabix-v2'); ?></strong>
+				<?php
+				if (!empty($upd['can_install'])) {
+					echo esc_html__('شما حق به‌روزرسانی این افزونه از این برگه را دارید.', 'hesabix-v2');
+				} else {
+					echo esc_html__('برای نصب باید «مدیریت ووکامرس» و «به‌روزرسانی افزونه‌ها» هر دو فعال باشند.', 'hesabix-v2');
+				}
+				?>
+			</p>
+			<script type="application/json" id="hesabix-v2-upd-initial-state"><?php echo wp_json_encode($upd); ?></script>
+		</div>
+
+		<div class="hesabix-v2-settings-submit-wrap">
+			<?php submit_button(__('ذخیره تنظیمات', 'hesabix-v2'), 'primary', 'hesabix_v2_save_settings'); ?>
+		</div>
 	</form>
 </div>
 

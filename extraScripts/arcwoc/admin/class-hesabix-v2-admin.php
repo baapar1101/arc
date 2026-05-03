@@ -168,8 +168,9 @@ class Hesabix_V2_Admin
 	 * Register the JavaScript for the admin area.
 	 *
 	 * @since    2.0.0
+	 * @param string $hook_suffix Current admin page hook.
 	 */
-	public function enqueue_scripts()
+	public function enqueue_scripts($hook_suffix = '')
 	{
 		if (isset($_GET['page']) && strpos($_GET['page'], 'hesabix-v2') !== false) {
 			wp_enqueue_script(
@@ -194,6 +195,49 @@ class Hesabix_V2_Admin
 					),
 				)
 			);
+
+			$on_settings_page = ($hook_suffix === 'hesabix-v2_page_hesabix-v2-settings')
+				|| (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-settings');
+
+			if ($on_settings_page) {
+				wp_enqueue_script(
+					'hesabix-v2-admin-update',
+					HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-admin-update.js',
+					array('jquery'),
+					$this->version,
+					true
+				);
+				wp_localize_script(
+					'hesabix-v2-admin-update',
+					'HESABIX_V2_UPD',
+					array(
+						'ajaxUrl' => admin_url('admin-ajax.php'),
+						'nonce' => wp_create_nonce(HESABIX_V2_UPDATE_NONCE_ACTION),
+						'actions' => array(
+							'check' => HESABIX_V2_UPDATE_AJAX_CHECK,
+							'install' => HESABIX_V2_UPDATE_AJAX_INSTALL,
+						),
+						'strings' => array(
+							'checking' => __('در حال بررسی با سرور…', 'hesabix-v2'),
+							'installing' => __('در حال دریافت و نصب به‌روزرسانی، لطفاً صبر کنید…', 'hesabix-v2'),
+							'reloadHint' => __('به‌روزرسانی انجام شد؛ صفحه در حال تازه‌سازی است.', 'hesabix-v2'),
+							'genericError' => __('درخواست ناموفق بود.', 'hesabix-v2'),
+							'remoteShort' => __('نامشخص', 'hesabix-v2'),
+							'sourceLabelOff' => __('تنظیم نشده', 'hesabix-v2'),
+							'sourceRawZip' => __('فایل خام hesabix-v2.php + بستهٔ zip', 'hesabix-v2'),
+							'sourceManifest' => __('مانیفست JSON', 'hesabix-v2'),
+							'sourceMixed' => __('ترکیبی', 'hesabix-v2'),
+							'sourceDisabledSummary' => __('منبع به‌روزرسانی تنظیم نشده؛ ثابت‌ها را در wp-config یا فایل اصلی افزونه بررسی کنید.', 'hesabix-v2'),
+							'summaryNoRemote' => __('به منبع وصل نشد یا نسخه‌ای خوانده نشد؛ «بررسی مجدد» را بزنید.', 'hesabix-v2'),
+							'summaryUpdateReady' => __('نسخهٔ جدیدتری موجود است؛ می‌توانید همین‌جا از بستهٔ zip نصب کنید.', 'hesabix-v2'),
+							'summaryUpToDate' => __('نسخهٔ نصب‌شده با منبع هم‌خوان است (یا نسخهٔ محلی جدیدتر است).', 'hesabix-v2'),
+							'blockedEnv' => __('نسخهٔ جدید روی مخزن است؛ ولی وردپرس یا PHP الزامات را نمی‌گذرد.', 'hesabix-v2'),
+							'requirementsUnknown' => __('نامشخص', 'hesabix-v2'),
+							'requirementsFmt' => __('وردپرس ≥ {{w}}؛ PHP ≥ {{p}}', 'hesabix-v2'),
+						),
+					)
+				);
+			}
 		}
 	}
 
