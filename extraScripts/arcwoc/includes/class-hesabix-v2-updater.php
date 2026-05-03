@@ -133,20 +133,38 @@ class Hesabix_V2_Updater {
 	}
 
 	/**
+	 * آدرس خام hesabix-v2.php برای خواندن نسخه (بدون نیاز به zip).
+	 *
 	 * @return bool
 	 */
-	private function use_source_urls() {
+	private function is_raw_php_url_configured() {
 		$r = $this->get_raw_php_url();
-		$z = $this->get_archive_zip_url();
-		if ($r === '' || $z === '') {
+		if ($r === '') {
 			return false;
 		}
-		$ok_r = (0 === strpos($r, 'https://') || 0 === strpos($r, 'http://'));
-		$ok_z = (0 === strpos($z, 'https://') || 0 === strpos($z, 'http://'));
-		return $ok_r && $ok_z;
+		return (0 === strpos($r, 'https://') || 0 === strpos($r, 'http://'));
 	}
 
 	/**
+	 * هر دو آدرس raw + zip برای مسیر کامل نصب از مخزن.
+	 *
+	 * @return bool
+	 */
+	private function use_source_urls() {
+		if (!$this->is_raw_php_url_configured()) {
+			return false;
+		}
+		$z = $this->get_archive_zip_url();
+		if ($z === '') {
+			return false;
+		}
+		$ok_z = (0 === strpos($z, 'https://') || 0 === strpos($z, 'http://'));
+		return $ok_z;
+	}
+
+	/**
+	 * هدرهای readme افزونه معمولاً داخل DocBlock به صورت « * Version:» هستند.
+	 *
 	 * @param string $php .
 	 * @return array<string, string>
 	 */
@@ -156,15 +174,16 @@ class Hesabix_V2_Updater {
 			'requires' => '',
 			'requires_php' => '',
 		);
-		if (preg_match('/^\s*Version:\s*([0-9][0-9a-z.+-]*)\s*$/mi', $php, $m)) {
+		// خطوط استاندارد وردپرس: «Version:» یا « * Version:»
+		if (preg_match('/^\s*(?:\*\s*)?Version:\s*([0-9][0-9a-z.+-]*)\s*$/mi', $php, $m)) {
 			$out['version'] = $m[1];
 		} elseif (preg_match("/define\s*\(\s*['\"]HESABIX_V2_VERSION['\"]\s*,\s*['\"]([0-9][0-9a-z.+-]*)['\"]\s*\)/s", $php, $m)) {
 			$out['version'] = $m[1];
 		}
-		if (preg_match('/^\s*Requires at least:\s*([0-9.]+)\s*$/mi', $php, $m)) {
+		if (preg_match('/^\s*(?:\*\s*)?Requires at least:\s*([0-9.]+)\s*$/mi', $php, $m)) {
 			$out['requires'] = $m[1];
 		}
-		if (preg_match('/^\s*Requires PHP:\s*([0-9.]+)\s*$/mi', $php, $m)) {
+		if (preg_match('/^\s*(?:\*\s*)?Requires PHP:\s*([0-9.]+)\s*$/mi', $php, $m)) {
 			$out['requires_php'] = $m[1];
 		}
 		return $out;
@@ -190,6 +209,10 @@ class Hesabix_V2_Updater {
 		$headers = $this->parse_main_file_headers($body);
 		if ($headers['version'] === '') {
 			return null;
+		}
+		$zip = esc_url_raw($zip);
+		if ($zip !== '' && 0 !== strpos($zip, 'https://') && 0 !== strpos($zip, 'http://')) {
+			$zip = '';
 		}
 		return array(
 			'version' => (string) $headers['version'],
@@ -272,7 +295,7 @@ class Hesabix_V2_Updater {
 		}
 
 		$cached = get_site_transient($key);
-		if (is_array($cached) && !empty($cached['version']) && !empty($cached['download_url'])) {
+		if (is_array($cached) && !empty($cached['version'])) {
 			return $cached;
 		}
 
@@ -280,7 +303,7 @@ class Hesabix_V2_Updater {
 		if ((bool) apply_filters('hesabix_v2_prefer_json_manifest', false) && $this->get_manifest_url() !== '') {
 			$info = $this->get_info_from_json_manifest();
 		}
-		if ($info === null && $this->use_source_urls()) {
+		if ($info === null && $this->is_raw_php_url_configured()) {
 			$info = $this->get_info_from_source();
 		}
 		if ($info === null && $this->get_manifest_url() !== '') {
