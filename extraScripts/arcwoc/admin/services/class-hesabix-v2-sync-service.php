@@ -46,11 +46,26 @@ class Hesabix_V2_Sync_Service
 	 * @param    int       $variation_id
 	 * @return   array
 	 */
-	public function sync_product($product_id, $variation_id = null)
+	public function sync_product($product_id, $variation_id = null, $wc_currency_override = null)
 	{
 		$start_time = microtime(true);
 
 		try {
+			$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $wc_currency_override);
+			if (!$gate['ok']) {
+				Hesabix_V2_Log_Service::warning('Product sync blocked — currency mismatch', array(
+					'entity_type' => 'product',
+					'entity_id' => $variation_id ? (int) $variation_id : (int) $product_id,
+					'message' => $gate['message'],
+				));
+
+				return array(
+					'success' => false,
+					'message' => $gate['message'],
+					'currency_blocked' => true,
+				);
+			}
+
 			// Get product
 			if ($variation_id) {
 				$product = wc_get_product($variation_id);
@@ -60,7 +75,7 @@ class Hesabix_V2_Sync_Service
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
 				}
 
-				$product_data = Hesabix_V2_Mapper::wc_variation_to_api($parent_product, $product, $product_id);
+				$product_data = Hesabix_V2_Mapper::wc_variation_to_api($parent_product, $product, $product_id, $gate['factor']);
 				$wc_id = $variation_id;
 				$wc_parent_id = $product_id;
 			} else {
@@ -70,7 +85,7 @@ class Hesabix_V2_Sync_Service
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
 				}
 
-				$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $product_id);
+				$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $product_id, $gate['factor']);
 				$wc_id = $product_id;
 				$wc_parent_id = null;
 			}
@@ -163,6 +178,21 @@ class Hesabix_V2_Sync_Service
 		$start_time = microtime(true);
 
 		try {
+			$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, null);
+			if (!$gate['ok']) {
+				Hesabix_V2_Log_Service::warning('Customer sync blocked — currency mismatch', array(
+					'entity_type' => 'customer',
+					'entity_id' => $customer_id,
+					'message' => $gate['message'],
+				));
+
+				return array(
+					'success' => false,
+					'message' => $gate['message'],
+					'currency_blocked' => true,
+				);
+			}
+
 			$customer = new WC_Customer($customer_id);
 			$order = $order_id ? wc_get_order($order_id) : null;
 
@@ -267,6 +297,20 @@ class Hesabix_V2_Sync_Service
 
 			if (!$order) {
 				throw new Exception(__('سفارش یافت نشد', 'hesabix-v2'));
+			}
+
+			$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $order->get_currency());
+			if (!$gate['ok']) {
+				Hesabix_V2_Log_Service::warning('Guest customer sync blocked — currency mismatch', array(
+					'order_id' => $order_id,
+					'message' => $gate['message'],
+				));
+
+				return array(
+					'success' => false,
+					'message' => $gate['message'],
+					'currency_blocked' => true,
+				);
 			}
 
 			$guest_data = apply_filters('hesabix_v2_guest_customer_data', Hesabix_V2_Mapper::wc_guest_to_api($order), $order);
@@ -377,12 +421,33 @@ class Hesabix_V2_Sync_Service
 	{
 		$start_time = microtime(true);
 
-		try {
-			$order = wc_get_order($order_id);
+		$order = wc_get_order($order_id);
+		if (!$order) {
+			return array(
+				'success' => false,
+				'message' => __('سفارش یافت نشد', 'hesabix-v2'),
+			);
+		}
 
-			if (!$order) {
-				throw new Exception(__('سفارش یافت نشد', 'hesabix-v2'));
-			}
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $order->get_currency());
+		if (!$gate['ok']) {
+			Hesabix_V2_Log_Service::error('Order sync blocked — currency mismatch', array(
+				'entity_type' => 'order',
+				'entity_id' => $order_id,
+				'error' => $gate['message'],
+			));
+			$order->add_order_note(
+				sprintf(__('همگام‌سازی حسابیکس متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
+			);
+
+			return array(
+				'success' => false,
+				'message' => $gate['message'],
+				'currency_blocked' => true,
+			);
+		}
+
+		try {
 
 			// Get or create customer (با توجه به تنظیم create_customer_on_order)
 			$sync_settings = get_option('hesabix_v2_sync_settings', array());
@@ -403,7 +468,8 @@ class Hesabix_V2_Sync_Service
 					if ($customer_result['success']) {
 						$person_id = $customer_result['hesabix_id'];
 					} else {
-						throw new Exception(__('خطا در همگام‌سازی مشتری', 'hesabix-v2'));
+						$msg = isset($customer_result['message']) ? (string) $customer_result['message'] : __('خطا در همگام‌سازی مشتری', 'hesabix-v2');
+						throw new Exception($msg);
 					}
 				}
 			} else {
@@ -415,14 +481,15 @@ class Hesabix_V2_Sync_Service
 				if ($guest_result['success']) {
 					$person_id = $guest_result['hesabix_id'];
 				} else {
-					throw new Exception(__('خطا در ایجاد مشتری مهمان', 'hesabix-v2'));
+					$msg = isset($guest_result['message']) ? (string) $guest_result['message'] : __('خطا در ایجاد مشتری مهمان', 'hesabix-v2');
+					throw new Exception($msg);
 				}
 			}
 
 			// Prepare invoice data
 			$invoice_data = apply_filters(
 				'hesabix_v2_invoice_data',
-				Hesabix_V2_Mapper::wc_order_to_invoice($order, $person_id),
+				Hesabix_V2_Mapper::wc_order_to_invoice($order, $person_id, $gate['factor'], $gate['currency_id']),
 				$order
 			);
 
@@ -493,7 +560,18 @@ class Hesabix_V2_Sync_Service
 				);
 			}
 
-			if ($order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false) {
+			$should_queue = $order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false;
+			if ($should_queue && strpos($e->getMessage(), __('هم‌خوان نیست', 'hesabix-v2')) !== false) {
+				$should_queue = false;
+			}
+			if ($should_queue && strpos($e->getMessage(), __('لیست ارزهای کسب‌وکار', 'hesabix-v2')) !== false) {
+				$should_queue = false;
+			}
+			if ($should_queue && strpos($e->getMessage(), __('ارز فروشگاه ووکامرس مشخص نیست', 'hesabix-v2')) !== false) {
+				$should_queue = false;
+			}
+
+			if ($should_queue) {
 				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
 			}
 
@@ -634,6 +712,15 @@ class Hesabix_V2_Sync_Service
 			'failed' => 0,
 			'total_processed' => 0,
 		);
+
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, null);
+		if (!$gate['ok']) {
+			return array(
+				'success' => false,
+				'message' => $gate['message'],
+				'stats' => $stats,
+			);
+		}
 
 		while ($skip < $max_skip) {
 			$res = $this->api->search_persons(

@@ -17,9 +17,14 @@ class Hesabix_V2_Mapper
 	 * @param    int           $wc_id
 	 * @return   array
 	 */
-	public static function wc_product_to_api($product, $wc_id)
+	public static function wc_product_to_api($product, $wc_id, $amount_factor = 1.0)
 	{
 		$name_fa = Hesabix_V2_Validation::sanitize_product_name($product->get_title());
+
+		$f = (float) $amount_factor;
+		if ($f <= 0 || is_nan($f)) {
+			$f = 1.0;
+		}
 
 		$sync_settings = get_option('hesabix_v2_sync_settings', array());
 		$cats_on = !isset($sync_settings['sync_product_categories']) || !empty($sync_settings['sync_product_categories']);
@@ -36,9 +41,9 @@ class Hesabix_V2_Mapper
 		// Get price
 		$sell_price = 0;
 		if ($product->get_regular_price()) {
-			$sell_price = Hesabix_V2_Validation::sanitize_price($product->get_regular_price());
+			$sell_price = Hesabix_V2_Validation::sanitize_price((float) $product->get_regular_price() * $f);
 		} elseif ($product->get_price()) {
-			$sell_price = Hesabix_V2_Validation::sanitize_price($product->get_price());
+			$sell_price = Hesabix_V2_Validation::sanitize_price((float) $product->get_price() * $f);
 		}
 
 		return array(
@@ -64,11 +69,16 @@ class Hesabix_V2_Mapper
 	 * @param    int                     $parent_id
 	 * @return   array
 	 */
-	public static function wc_variation_to_api($parent_product, $variation, $parent_id)
+	public static function wc_variation_to_api($parent_product, $variation, $parent_id, $amount_factor = 1.0)
 	{
 		$variation_id = $variation->get_id();
 		$parent_name = $parent_product->get_title();
 		$variation_name = $variation->get_attribute_summary();
+
+		$f = (float) $amount_factor;
+		if ($f <= 0 || is_nan($f)) {
+			$f = 1.0;
+		}
 
 		// Build full name
 		$full_name = $parent_name;
@@ -92,9 +102,9 @@ class Hesabix_V2_Mapper
 		// Get price
 		$sell_price = 0;
 		if ($variation->get_regular_price()) {
-			$sell_price = Hesabix_V2_Validation::sanitize_price($variation->get_regular_price());
+			$sell_price = Hesabix_V2_Validation::sanitize_price((float) $variation->get_regular_price() * $f);
 		} elseif ($variation->get_price()) {
-			$sell_price = Hesabix_V2_Validation::sanitize_price($variation->get_price());
+			$sell_price = Hesabix_V2_Validation::sanitize_price((float) $variation->get_price() * $f);
 		}
 
 		return array(
@@ -465,10 +475,17 @@ class Hesabix_V2_Mapper
 	 * @since    2.0.0
 	 * @param    WC_Order    $order
 	 * @param    int         $person_id
+	 * @param    float|null  $amount_factor   ضریب مبلغ (مثلاً ۱۰ برای تومان→ریال).
+	 * @param    int|null    $invoice_currency_id شناسهٔ ارز در حسابیکس؛ اگر تهی باشد از تنظیمات/پیش‌فرض حل می‌شود.
 	 * @return   array
 	 */
-	public static function wc_order_to_invoice($order, $person_id)
+	public static function wc_order_to_invoice($order, $person_id, $amount_factor = 1.0, $invoice_currency_id = null)
 	{
+		$f = (float) $amount_factor;
+		if ($f <= 0 || is_nan($f)) {
+			$f = 1.0;
+		}
+
 		$lines = array();
 		$db_service = new Hesabix_V2_DB_Service();
 		$warehouse_id = get_option('hesabix_v2_default_warehouse_id', null);
@@ -491,7 +508,7 @@ class Hesabix_V2_Mapper
 
 			if (!$hesabix_product_id) {
 				$sync_service = new Hesabix_V2_Sync_Service();
-				$sync_result = $sync_service->sync_product($product_id, $variation_id);
+				$sync_result = $sync_service->sync_product($product_id, $variation_id, $order->get_currency());
 				if ($sync_result['success']) {
 					$hesabix_product_id = $sync_result['hesabix_id'];
 				} else {
@@ -504,9 +521,9 @@ class Hesabix_V2_Mapper
 			}
 
 			$quantity = $item->get_quantity();
-			$total = $item->get_total();
+			$total = (float) $item->get_total() * $f;
 			$unit_price = $quantity > 0 ? $total / $quantity : 0;
-			$tax_amount = Hesabix_V2_Validation::sanitize_price($item->get_total_tax());
+			$tax_amount = Hesabix_V2_Validation::sanitize_price((float) $item->get_total_tax() * $f);
 			$line_total = Hesabix_V2_Validation::sanitize_price($total) + $tax_amount;
 
 			$line_extra = array(
@@ -536,8 +553,8 @@ class Hesabix_V2_Mapper
 		if ($order->get_shipping_total() > 0) {
 			$shipping_product_id = self::get_or_create_shipping_product();
 			if ($shipping_product_id) {
-				$ship_total = Hesabix_V2_Validation::sanitize_price($order->get_shipping_total());
-				$ship_tax = Hesabix_V2_Validation::sanitize_price($order->get_shipping_tax());
+				$ship_total = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_total() * $f);
+				$ship_tax = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_tax() * $f);
 				$line_extra = array(
 					'unit_price' => $ship_total,
 					'line_discount' => 0,
@@ -566,9 +583,9 @@ class Hesabix_V2_Mapper
 			if (!is_object($fee_item) || !method_exists($fee_item, 'get_total')) {
 				continue;
 			}
-			$fee_total = Hesabix_V2_Validation::sanitize_price($fee_item->get_total());
+			$fee_total = Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total() * $f);
 			$fee_tax = method_exists($fee_item, 'get_total_tax')
-				? Hesabix_V2_Validation::sanitize_price($fee_item->get_total_tax())
+				? Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total_tax() * $f)
 				: 0.0;
 			if (abs($fee_total) < 0.00001 && abs($fee_tax) < 0.00001) {
 				continue;
@@ -592,7 +609,7 @@ class Hesabix_V2_Mapper
 			if ($fee_total < 0) {
 				$line_extra = array(
 					'unit_price' => 0,
-					'line_discount' => Hesabix_V2_Validation::sanitize_price(-$fee_total),
+					'line_discount' => Hesabix_V2_Validation::sanitize_price(-(float) $fee_total),
 					'tax_amount' => $fee_tax,
 					'line_total' => $fee_total + $fee_tax,
 					'unit' => 'عدد',
@@ -628,9 +645,9 @@ class Hesabix_V2_Mapper
 			);
 		}
 
-		$order_total = (float) $order->get_total();
-		$order_tax = (float) $order->get_total_tax();
-		$order_discount = (float) $order->get_discount_total();
+		$order_total = (float) $order->get_total() * $f;
+		$order_tax = (float) $order->get_total_tax() * $f;
+		$order_discount = (float) $order->get_discount_total() * $f;
 
 		$target_net_rounded = (int) round($order_total, 0);
 		self::adjust_invoice_lines_rounding_to_order_net($lines, $target_net_rounded, $order->get_id());
@@ -680,10 +697,14 @@ class Hesabix_V2_Mapper
 		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 		$is_proforma = !empty($sync['invoice_is_proforma']);
 
+		$currency_id = $invoice_currency_id !== null
+			? (int) $invoice_currency_id
+			: Hesabix_V2_Currency_Service::resolve_invoice_currency_id();
+
 		$payload = array(
 			'invoice_type' => 'invoice_sales',
 			'document_date' => $order->get_date_created()->format('Y-m-d'),
-			'currency_id' => (int) get_option('hesabix_v2_currency_id', 1),
+			'currency_id' => $currency_id,
 			'is_proforma' => $is_proforma,
 			'extra_info' => array(
 				'totals' => array(
@@ -706,7 +727,7 @@ class Hesabix_V2_Mapper
 			$payload['tag_ids'] = $tag_ids;
 		}
 
-		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma);
+		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma, $f);
 
 		return $payload;
 	}
@@ -820,19 +841,25 @@ class Hesabix_V2_Mapper
 	 *
 	 * @param WC_Order $order
 	 * @param bool     $is_proforma
+	 * @param float    $amount_factor ضریب مبلغ نهایی سفارش برای پرداخت هم‌تراز با خطوط فاکتور.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private static function build_wc_order_invoice_payments($order, $is_proforma)
+	private static function build_wc_order_invoice_payments($order, $is_proforma, $amount_factor = 1.0)
 	{
 		$payments = array();
 
 		if ($is_proforma || !$order->is_paid()) {
-			return apply_filters('hesabix_v2_invoice_payments', $payments, $order);
+			return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 		}
 
-		$amount = round((float) $order->get_total(), 0);
+		$f = (float) $amount_factor;
+		if ($f <= 0 || is_nan($f)) {
+			$f = 1.0;
+		}
+
+		$amount = round((float) $order->get_total() * $f, 0);
 		if ($amount <= 0) {
-			return apply_filters('hesabix_v2_invoice_payments', $payments, $order);
+			return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 		}
 
 		$transaction_date = $order->get_date_paid()
@@ -886,7 +913,7 @@ class Hesabix_V2_Mapper
 			}
 		}
 
-		return apply_filters('hesabix_v2_invoice_payments', $payments, $order);
+		return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 	}
 
 	/**

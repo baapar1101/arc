@@ -839,5 +839,27 @@ class Hesabix_V2_Api
 			array('take' => 500, 'skip' => 0)
 		);
 	}
+
+	/**
+	 * ارزهای فعال کسب‌وکار + پیش‌فرض (بدون تکرار).
+	 * GET /currencies/business/{business_id}
+	 *
+	 * @since 2.0.1
+	 * @return array
+	 */
+	public function get_business_currencies()
+	{
+		if (!$this->business_id) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+
+		return $this->request(
+			'GET',
+			"/currencies/business/" . (int) $this->business_id
+		);
+	}
 }
 

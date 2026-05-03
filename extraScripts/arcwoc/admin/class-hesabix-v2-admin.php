@@ -58,6 +58,31 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * هشدار هم‌خوان نبودن ارز ووکامرس با ارز فاکتور حسابیکس (کل ادمین، برای مدیر فروشگاه).
+	 *
+	 * @return void
+	 */
+	public function maybe_admin_notice_currency_mismatch()
+	{
+		if (!is_admin() || !current_user_can('manage_woocommerce')) {
+			return;
+		}
+		if (!class_exists('WooCommerce')) {
+			return;
+		}
+		if (!get_option('hesabix_v2_enabled') || !get_option('hesabix_v2_api_key')) {
+			return;
+		}
+
+		$ev = Hesabix_V2_Currency_Service::evaluate_currency_sync(new Hesabix_V2_Api(), null);
+		if (!empty($ev['ok'])) {
+			return;
+		}
+
+		echo '<div class="notice notice-error"><p>' . esc_html($ev['message']) . '</p></div>';
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    2.0.0
@@ -442,14 +467,18 @@ class Hesabix_V2_Admin
 			if (!empty($url)) {
 				$url = rtrim($url, '/');
 				update_option('hesabix_v2_api_base_url', $url);
+				Hesabix_V2_Currency_Service::invalidate_list_cache();
 			}
 		}
 
 		if (isset($_POST['hesabix_v2_currency_id'])) {
-			$v = absint($_POST['hesabix_v2_currency_id']);
-			if ($v >= 1) {
-				update_option('hesabix_v2_currency_id', $v);
+			$raw = sanitize_text_field(wp_unslash($_POST['hesabix_v2_currency_id']));
+			if ($raw === '' || $raw === '0') {
+				update_option('hesabix_v2_currency_id', 0);
+			} else {
+				update_option('hesabix_v2_currency_id', absint($raw));
 			}
+			Hesabix_V2_Currency_Service::invalidate_list_cache();
 		}
 		if (isset($_POST['hesabix_v2_default_warehouse_id'])) {
 			$v = sanitize_text_field(wp_unslash($_POST['hesabix_v2_default_warehouse_id']));
@@ -893,11 +922,24 @@ class Hesabix_V2_Admin
 			}
 		}
 
+		$currencies = array();
+		$cur_res = $api->get_business_currencies();
+		$cur_rows = Hesabix_V2_Currency_Service::normalize_rows_from_api_response($cur_res);
+		foreach ($cur_rows as $row) {
+			$currencies[] = array(
+				'id' => (int) $row['id'],
+				'code' => isset($row['code']) ? (string) $row['code'] : '',
+				'title' => $row['title'] !== '' ? (string) $row['title'] : (string) $row['name'],
+				'is_default' => !empty($row['is_default']),
+			);
+		}
+
 		wp_send_json(array(
 			'success' => true,
 			'warehouses' => $warehouses,
 			'banks' => $banks,
 			'cash_registers' => $cash_registers,
+			'currencies' => $currencies,
 		));
 	}
 
@@ -1014,6 +1056,7 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_enabled', true);
 		update_option('hesabix_v2_setup_completed', true);
 		delete_transient('hesabix_v2_show_setup_wizard');
+		Hesabix_V2_Currency_Service::invalidate_list_cache();
 
 		wp_send_json(array('success' => true, 'message' => __('راه‌اندازی با موفقیت انجام شد.', 'hesabix-v2')));
 	}

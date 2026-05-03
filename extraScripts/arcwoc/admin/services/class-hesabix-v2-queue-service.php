@@ -27,6 +27,11 @@ class Hesabix_V2_Queue_Service
 			return;
 		}
 
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync(new Hesabix_V2_Api(), null);
+		if (!$gate['ok']) {
+			return;
+		}
+
 		global $wpdb;
 		$table = $wpdb->prefix . 'hesabix_v2_queue';
 

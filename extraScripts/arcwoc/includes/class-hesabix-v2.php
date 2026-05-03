@@ -80,6 +80,11 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-api.php';
 
 		/**
+		 * ارز فاکتور و تطبیق با ووکامرس.
+		 */
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-currency-service.php';
+
+		/**
 		 * The class responsible for data mapping.
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-mapper.php';
@@ -138,6 +143,7 @@ class Hesabix_V2
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_styles');
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
 		$this->loader->add_action('admin_menu', $plugin_admin, 'add_admin_menu');
+		$this->loader->add_action('admin_notices', $plugin_admin, 'maybe_admin_notice_currency_mismatch');
 		
 		// Check if plugin is configured
 		if (get_option('hesabix_v2_enabled')) {

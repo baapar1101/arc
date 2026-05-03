@@ -22,6 +22,7 @@ if ($invoice_payment_destination !== 'cash_register') {
 	$invoice_payment_destination = 'bank';
 }
 $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
+$saved_currency_id = (int) get_option('hesabix_v2_currency_id', 0);
 $hesabix_v2_upd_defaults = array(
 	'current_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
 	'remote_version' => '',
@@ -286,10 +287,12 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php _e('شناسه ارز پیش‌فرض', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('ارز فاکتور (حسابیکس)', 'hesabix-v2'); ?></th>
 				<td>
-					<input type="number" name="hesabix_v2_currency_id" value="<?php echo esc_attr(get_option('hesabix_v2_currency_id', 1)); ?>" min="1" class="small-text">
-					<p class="description"><?php _e('برای فاکتورهای ووکامرس (پیش‌فرض: 1 برای ریال)', 'hesabix-v2'); ?></p>
+					<select name="hesabix_v2_currency_id" id="hesabix_v2_currency_id" class="regular-text">
+						<option value="0" <?php selected($saved_currency_id, 0); ?>><?php _e('ارز پیش‌فرض کسب‌وکار در حسابیکس', 'hesabix-v2'); ?></option>
+					</select>
+					<p class="description"><?php _e('لیست از حسابیکس بارگذاری می‌شود (همراه انبار و بانک). اگر ارز فروشگاه ووکامرس با ارز انتخاب‌شده یکی نباشد — به‌جز جفت تومان/ریال طبق تنظیمات — همگام‌سازی متوقف می‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -300,7 +303,7 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 					</select>
 					<button type="button" id="hesabix_v2_load_warehouses_banks" class="button button-secondary" style="margin-right: 8px;"><?php _e('بارگذاری از حسابیکس', 'hesabix-v2'); ?></button>
 					<span id="hesabix_v2_wh_bank_status" class="description"></span>
-					<p class="description"><?php _e('برای خروج از انبار در فاکتور فروش. ابتدا «بارگذاری از حسابیکس» را بزنید.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('برای خروج از انبار در فاکتور فروش. هنگام باز شدن این صفه لیست از حسابیکس بارگذاری می‌شود؛ در صورت نیاز دکمه را دوباره بزنید.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -336,9 +339,10 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 		</table>
 		<script>
 		(function($){
-			var savedWarehouse = '<?php echo esc_js(get_option('hesabix_v2_default_warehouse_id', '')); ?>';
-			var savedBank = '<?php echo esc_js(get_option('hesabix_v2_default_bank_id', '')); ?>';
+			var savedWarehouse = '<?php echo esc_js((string) get_option('hesabix_v2_default_warehouse_id', '')); ?>';
+			var savedBank = '<?php echo esc_js((string) get_option('hesabix_v2_default_bank_id', '')); ?>';
 			var savedCashRegister = '<?php echo esc_js((string) $saved_cash_register_id); ?>';
+			var savedCurrency = '<?php echo esc_js((string) $saved_currency_id); ?>';
 
 			function hesabixV2TogglePaymentRows() {
 				var v = $('input[name="hesabix_v2_invoice_payment_destination"]:checked').val();
@@ -348,11 +352,15 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 			$('input[name="hesabix_v2_invoice_payment_destination"]').on('change', hesabixV2TogglePaymentRows);
 			hesabixV2TogglePaymentRows();
 
-			$('#hesabix_v2_load_warehouses_banks').on('click', function(){
-				var $btn = $(this);
+			function hesabixV2LoadWarehousesBanksCurrencies(isAuto) {
+				var $btn = $('#hesabix_v2_load_warehouses_banks');
 				var $status = $('#hesabix_v2_wh_bank_status');
-				$btn.prop('disabled', true);
-				$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>');
+				if (!isAuto) {
+					$btn.prop('disabled', true);
+				}
+				if (!isAuto) {
+					$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>');
+				}
 				$.post(hesabix_v2_ajax.ajax_url, {
 					action: 'hesabix_v2_get_warehouses_and_banks',
 					nonce: hesabix_v2_ajax.nonce
@@ -361,30 +369,61 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 						var $wh = $('#hesabix_v2_default_warehouse_id');
 						$wh.find('option:not(:first)').remove();
 						(res.warehouses || []).forEach(function(w){
-							$wh.append($('<option></option>').val(w.id).text((w.code ? w.code + ' - ' : '') + w.name));
+							$wh.append($('<option></option>').val(String(w.id)).text((w.code ? w.code + ' - ' : '') + w.name));
 						});
-						if (savedWarehouse) $wh.val(savedWarehouse);
+						if (savedWarehouse !== '') {
+							$wh.val(String(savedWarehouse));
+						}
 						var $bank = $('#hesabix_v2_default_bank_id');
 						$bank.find('option:not(:first)').remove();
 						(res.banks || []).forEach(function(b){
-							$bank.append($('<option></option>').val(b.id).text((b.code ? b.code + ' - ' : '') + b.name));
+							$bank.append($('<option></option>').val(String(b.id)).text((b.code ? b.code + ' - ' : '') + b.name));
 						});
-						if (savedBank) $bank.val(savedBank);
+						if (savedBank !== '') {
+							$bank.val(String(savedBank));
+						}
 						var $cash = $('#hesabix_v2_default_cash_register_id');
 						$cash.find('option:not(:first)').remove();
 						(res.cash_registers || []).forEach(function(c){
-							$cash.append($('<option></option>').val(c.id).text((c.code ? c.code + ' - ' : '') + c.name));
+							$cash.append($('<option></option>').val(String(c.id)).text((c.code ? c.code + ' - ' : '') + c.name));
 						});
-						if (savedCashRegister) $cash.val(savedCashRegister);
-						$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
+						if (savedCashRegister !== '') {
+							$cash.val(String(savedCashRegister));
+						}
+						var $cur = $('#hesabix_v2_currency_id');
+						var $keep = $cur.find('option[value="0"]');
+						$cur.find('option').not($keep).remove();
+						(res.currencies || []).forEach(function(c){
+							var label = (c.code ? c.code + ' — ' : '') + (c.title || '');
+							if (c.is_default) {
+								label += ' <?php echo esc_js(__('(پیش‌فرض کسب‌وکار)', 'hesabix-v2')); ?>';
+							}
+							$cur.append($('<option></option>').val(String(c.id)).text(label));
+						});
+						if (savedCurrency !== '' && savedCurrency !== '0') {
+							$cur.val(String(savedCurrency));
+						}
+						if (!isAuto) {
+							$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
+						}
 					} else {
 						$status.text(res.message || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
 					}
 				}).fail(function(){
 					$status.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
 				}).always(function(){
-					$btn.prop('disabled', false);
+					if (!isAuto) {
+						$btn.prop('disabled', false);
+					}
 				});
+			}
+
+			$('#hesabix_v2_load_warehouses_banks').on('click', function(){
+				hesabixV2LoadWarehousesBanksCurrencies(false);
+			});
+
+			$(function(){
+				hesabixV2LoadWarehousesBanksCurrencies(true);
 			});
 
 			$('#hesabix_v2_load_invoice_tags').on('click', function(){
