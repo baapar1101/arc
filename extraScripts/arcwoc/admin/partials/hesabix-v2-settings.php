@@ -15,7 +15,6 @@ $wc_status_choices = Hesabix_V2_Invoice_Helper::get_wc_order_status_choices();
 $debug_mode = get_option('hesabix_v2_debug_mode', false);
 $add_checkout_fields = get_option('hesabix_v2_add_checkout_fields', false);
 $api_key = get_option('hesabix_v2_api_key');
-$business_id = get_option('hesabix_v2_business_id');
 $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 $invoice_payment_destination = get_option('hesabix_v2_invoice_payment_destination', 'bank');
 if ($invoice_payment_destination !== 'cash_register') {
@@ -45,6 +44,50 @@ $hesabix_v2_upd_state = $hesabix_v2_upd_defaults;
 if (class_exists('Hesabix_V2_Updater', false)) {
 	$hesabix_v2_upd_state = array_merge($hesabix_v2_upd_defaults, Hesabix_V2_Updater::instance()->get_update_dashboard_state(false));
 }
+
+global $wpdb, $wp_version;
+$hsx_plugin_version = defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '';
+$hsx_mysql_version = isset($wpdb) && method_exists($wpdb, 'db_version') ? $wpdb->db_version() : '';
+$hsx_php_ver = phpversion();
+
+$hsx_wp_ver = $wp_version;
+if ($hsx_wp_ver === '') {
+	$hsx_wp_ver = get_bloginfo('version');
+}
+
+$hsx_wc_ver = '—';
+if (defined('WC_VERSION')) {
+	$hsx_wc_ver = WC_VERSION;
+} elseif (function_exists('WC') && is_callable(array('WC', 'instance'))) {
+	$maybe = WC();
+	if ($maybe && isset($maybe->version)) {
+		$hsx_wc_ver = $maybe->version;
+	}
+}
+
+$hsx_conn_ok = !empty(get_option('hesabix_v2_api_key'));
+
+$hsx_max_exec = (string) ini_get('max_execution_time');
+if ($hsx_max_exec === '' || $hsx_max_exec === false) {
+	$hsx_max_exec_disp = '—';
+} elseif ($hsx_max_exec === '0') {
+	$hsx_max_exec_disp = __('۰ (بدون محدودیت اعلامی با این کاربر وب)', 'hesabix-v2');
+} else {
+	$hsx_max_exec_disp = sprintf(
+		/* translators: %s: max_execution_time from php.ini */
+		__('%s ثانیه', 'hesabix-v2'),
+		$hsx_max_exec
+	);
+}
+
+$mem_wp = '';
+if (defined('WP_MEMORY_LIMIT')) {
+	$mem_wp = (string) WP_MEMORY_LIMIT;
+}
+
+$mem_ini = ini_get('memory_limit');
+$hsx_upload = ini_get('upload_max_filesize') ?: '';
+$hsx_post = ini_get('post_max_size') ?: '';
 ?>
 
 <div class="wrap hesabix-v2-wrap">
@@ -70,6 +113,50 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 				z-index: 100;
 			}
 			.hesabix-v2-settings-submit-wrap .submit { margin: 0; padding: 0; }
+			.hesabix-v2-sysinfo { max-width: 920px; margin-top: 0.75em; }
+			.hesabix-v2-sysinfo-intro {
+				display: flex; flex-wrap: wrap; gap: 12px;
+				align-items: center; justify-content: space-between;
+				margin-bottom: 16px;
+			}
+			.hesabix-v2-sysinfo-badge {
+				display: inline-flex; align-items: center; gap: 8px;
+				padding: 8px 14px; border-radius: 999px;
+				font-weight: 600; font-size: 13px;
+			}
+			.hesabix-v2-sysinfo-badge.connected { background: #d5f5e3; color: #14532d; border: 1px solid #a7dcb5; }
+			.hesabix-v2-sysinfo-badge.offline { background: #fde8ea; color: #7f1d1d; border: 1px solid #f5c6cb; }
+			.hesabix-v2-sysinfo-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+			.hesabix-v2-sysinfo-card {
+				background: #fff; border: 1px solid #dcdcde; border-radius: 8px;
+				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+				overflow: hidden;
+			}
+			.hesabix-v2-sysinfo-card h3 {
+				margin: 0; padding: 10px 14px; font-size: 13px; font-weight: 700;
+				background: linear-gradient(to bottom, #f6f7f7 0%, #f0f0f1 100%);
+				border-bottom: 1px solid #e0e0e0;
+			}
+			.hesabix-v2-sysinfo-card dl {
+				margin: 0; padding: 12px 14px;
+			}
+			.hesabix-v2-sysinfo-card dt {
+				float: left; clear: left; font-weight: 600; font-size: 12px;
+				color: #50575e; width: 48%; padding: 6px 0 6px;
+			}
+			.hesabix-v2-sysinfo-card dd {
+				margin: 0 0 0 50%; padding: 6px 0;
+				text-align: left; direction: ltr;
+				font-size: 12px;
+				word-break: break-word;
+				color: #1d2327;
+			}
+			@media (max-width: 600px) {
+				.hesabix-v2-sysinfo-card dt,
+				.hesabix-v2-sysinfo-card dd {
+					width: auto; margin: 0; float: none; text-align: right; direction: rtl;
+				}
+			}
 		</style>
 		<h2 class="nav-tab-wrapper hesabix-v2-settings-tabs wp-clearfix">
 			<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e('اتصال', 'hesabix-v2'); ?></a>
@@ -77,10 +164,24 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="invoice"><?php esc_html_e('فاکتور', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="extra"><?php esc_html_e('سایر', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="update"><?php esc_html_e('به‌روزرسانی افزونه', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="system"><?php esc_html_e('اطلاعات سیستم', 'hesabix-v2'); ?></a>
 		</h2>
 
 		<div class="hesabix-v2-tab-panel" data-tab="connection">
 			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات اتصال', 'hesabix-v2'); ?></h2>
+
+			<div class="notice notice-warning hesabix-v2-connection-notes" role="region" aria-labelledby="hesabix-v2-connection-notes-title">
+				<p id="hesabix-v2-connection-notes-title"><strong><?php esc_html_e('نکات مهم', 'hesabix-v2'); ?></strong></p>
+				<ul class="hesabix-v2-connection-notes-list">
+					<li><?php esc_html_e('برای اتصال به API حسابیکس و فعال‌سازی این افزونه، باید کلید API و توکن ورود خود را در اینجا وارد کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای یافتن توکن ورود و کلید API، در حسابیکس به مسیر تنظیمات حساب ← کلیدهای API مراجعه کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('اگر می‌خواهید کسب‌وکار دیگری را به افزونه متصل کنید، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.', 'hesabix-v2'); ?></li>
+				</ul>
+				<p class="hesabix-v2-connection-notes-ark">
+					<?php esc_html_e('این نسخه برای اتصال به حسابیکس (صرفاً نسخهٔ آرک) طراحی شده است و به نسخه‌های دیگر از جمله نسخهٔ شادمان متصل نخواهد شد.', 'hesabix-v2'); ?>
+				</p>
+			</div>
+
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php _e('آدرس سرور API', 'hesabix-v2'); ?></th>
@@ -94,16 +195,29 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 				<td>
 					<?php if ($api_key): ?>
 						<span style="color: green;">✓ <?php _e('متصل', 'hesabix-v2'); ?></span>
-						<p class="description">
-							<?php _e('Business ID:', 'hesabix-v2'); ?> <?php echo esc_html($business_id); ?><br>
-							<a href="<?php echo admin_url('admin.php?page=hesabix-v2-setup'); ?>">
-								<?php _e('تغییر تنظیمات اتصال', 'hesabix-v2'); ?>
+						<div
+							id="hesabix-v2-settings-connection-live"
+							class="hesabix-v2-connection-panel hesabix-v2-connection-panel--settings"
+							aria-live="polite"
+						>
+							<p class="hesabix-v2-muted"><?php esc_html_e('در حال دریافت جزئیات کسب‌وکار…', 'hesabix-v2'); ?></p>
+						</div>
+						<p class="description" style="margin-top:10px;">
+							<button
+								type="button"
+								class="button hesabix-v2-test-connection"
+								data-hesabix-connection-result="#hesabix-v2-settings-connection-test-result"
+								data-hesabix-connection-extra="#hesabix-v2-settings-connection-live"
+							><?php esc_html_e('تست اتصال', 'hesabix-v2'); ?></button>
+							<a href="<?php echo esc_url(admin_url('admin.php?page=hesabix-v2-setup')); ?>" class="button hesabix-v2-change-connection-trigger">
+								<?php _e('تغییر کسب‌وکار', 'hesabix-v2'); ?>
 							</a>
 						</p>
+						<div id="hesabix-v2-settings-connection-test-result" class="hesabix-v2-settings-test-result"></div>
 					<?php else: ?>
 						<span style="color: red;">✗ <?php _e('متصل نیست', 'hesabix-v2'); ?></span>
 						<p class="description">
-							<a href="<?php echo admin_url('admin.php?page=hesabix-v2-setup'); ?>">
+							<a href="<?php echo esc_url(admin_url('admin.php?page=hesabix-v2-setup')); ?>">
 								<?php _e('راه‌اندازی اتصال', 'hesabix-v2'); ?>
 							</a>
 						</p>
@@ -562,7 +676,57 @@ if (class_exists('Hesabix_V2_Updater', false)) {
 			<script type="application/json" id="hesabix-v2-upd-initial-state"><?php echo wp_json_encode($upd); ?></script>
 		</div>
 
-		<div class="hesabix-v2-settings-submit-wrap">
+		<div class="hesabix-v2-tab-panel" data-tab="system" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('اطلاعات سیستم', 'hesabix-v2'); ?></h2>
+			<div class="hesabix-v2-sysinfo">
+				<div class="hesabix-v2-sysinfo-intro">
+					<div class="hesabix-v2-sysinfo-headline">
+						<p style="margin:0 0 6px;"><strong><?php esc_html_e('نسخه افزونه:', 'hesabix-v2'); ?></strong> <?php echo esc_html($hsx_plugin_version ?: '—'); ?></p>
+						<p style="margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+							<strong><?php esc_html_e('وضعیت اتصال:', 'hesabix-v2'); ?></strong>
+							<span class="hesabix-v2-sysinfo-badge <?php echo $hsx_conn_ok ? 'connected' : 'offline'; ?>">
+								<?php echo esc_html($hsx_conn_ok ? __('متصل', 'hesabix-v2') : __('قطع', 'hesabix-v2')); ?>
+							</span>
+						</p>
+					</div>
+				</div>
+				<p class="description" style="margin: -4px 0 16px;"><?php esc_html_e('مقادیر زیر تنها جهت تشخیص محیط برای پشتیبانی نمایش داده می‌شود.', 'hesabix-v2'); ?></p>
+				<div class="hesabix-v2-sysinfo-cards">
+					<div class="hesabix-v2-sysinfo-card">
+						<h3><?php esc_html_e('اطلاعات سرور', 'hesabix-v2'); ?></h3>
+						<dl>
+							<dt><?php esc_html_e('نسخه PHP', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_php_ver); ?></dd>
+							<dt><?php esc_html_e('نسخه وردپرس', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_wp_ver); ?></dd>
+							<dt><?php esc_html_e('نسخه ووکامرس', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_wc_ver); ?></dd>
+							<dt><?php esc_html_e('نسخه MySQL', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_mysql_version ?: '—'); ?></dd>
+						</dl>
+					</div>
+					<div class="hesabix-v2-sysinfo-card">
+						<h3><?php esc_html_e('تنظیمات PHP (کلاینت وب)', 'hesabix-v2'); ?></h3>
+						<dl>
+							<dt><?php esc_html_e('حداکثر زمان اجرا', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_max_exec_disp); ?></dd>
+							<dt><?php esc_html_e('محدودیت حافظه (ini)', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($mem_ini ?: '—'); ?></dd>
+							<?php if ('' !== $mem_wp): ?>
+								<dt><?php esc_html_e('WP_MEMORY_LIMIT', 'hesabix-v2'); ?></dt>
+								<dd><?php echo esc_html($mem_wp); ?></dd>
+							<?php endif; ?>
+							<dt><?php esc_html_e('حداکثر آپلود', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_upload ?: '—'); ?></dd>
+							<dt><?php esc_html_e('حداکثر POST', 'hesabix-v2'); ?></dt>
+							<dd><?php echo esc_html($hsx_post ?: '—'); ?></dd>
+						</dl>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="hesabix-v2-settings-save-wrap" class="hesabix-v2-settings-submit-wrap">
 			<?php submit_button(__('ذخیره تنظیمات', 'hesabix-v2'), 'primary', 'hesabix_v2_save_settings'); ?>
 		</div>
 	</form>

@@ -92,6 +92,8 @@ class Hesabix_V2_Api
 			}
 		}
 
+		$audit_headers = Hesabix_V2_Log_Service::sanitize_log_recursive($headers);
+
 		$args = array(
 			'method' => $method,
 			'headers' => $headers,
@@ -99,14 +101,22 @@ class Hesabix_V2_Api
 			'body' => $data ? wp_json_encode($data) : null,
 		);
 
-		// Log request in debug mode (برای خطایابی بهتر)
 		if (get_option('hesabix_v2_debug_mode')) {
-			Hesabix_V2_Log_Service::debug('API Request', array(
-				'method' => $method,
-				'url' => $url,
-				'endpoint' => $endpoint,
-				'data' => $data,
-			));
+			Hesabix_V2_Log_Service::debug(
+				__('درخواست ووکامرس → حسابیکس', 'hesabix-v2'),
+				array(
+					'entity_type' => 'hesabix_api',
+					'request' => array(
+						'direction' => 'woocommerce_to_hesabix',
+						'method' => $method,
+						'url' => $url,
+						'endpoint' => $endpoint,
+						'headers' => $audit_headers,
+						'json_body' => $data,
+						'timeout' => $timeout,
+					),
+				)
+			);
 		}
 
 		$start_time = microtime(true);
@@ -115,12 +125,29 @@ class Hesabix_V2_Api
 
 		if (is_wp_error($response)) {
 			$error_message = $response->get_error_message();
-			
-			Hesabix_V2_Log_Service::error('API Request Error', array(
-				'endpoint' => $endpoint,
-				'error' => $error_message,
-				'execution_time' => $execution_time,
-			));
+
+			Hesabix_V2_Log_Service::error(
+				'API Request Error',
+				array(
+					'entity_type' => 'hesabix_api',
+					'error' => $error_message,
+					'execution_time' => $execution_time,
+					'request' => array(
+						'direction' => 'woocommerce_to_hesabix',
+						'method' => $method,
+						'url' => $url,
+						'endpoint' => $endpoint,
+						'headers' => $audit_headers,
+						'json_body' => $data,
+						'timeout' => $timeout,
+					),
+					'response' => array(
+						'direction' => 'hesabix_to_woocommerce',
+						'type' => 'transport_error',
+						'transport_error' => $error_message,
+					),
+				)
+			);
 
 			return array(
 				'success' => false,
@@ -133,26 +160,62 @@ class Hesabix_V2_Api
 		$body = wp_remote_retrieve_body($response);
 		$result = json_decode($body, true);
 
-		// Log response in debug mode (پاسخ سرور برای بررسی و خطایابی)
 		if (get_option('hesabix_v2_debug_mode')) {
-			Hesabix_V2_Log_Service::debug('API Response', array(
-				'method' => $method,
-				'endpoint' => $endpoint,
-				'status_code' => $status_code,
-				'response' => $result,
-				'raw_body' => $body,
-				'execution_time' => $execution_time,
-			));
+			$raw_preview = (string) $body;
+			if (strlen($raw_preview) > 8192) {
+				$raw_preview = substr($raw_preview, 0, 8192) . "\n…[truncated in log]";
+			}
+			Hesabix_V2_Log_Service::debug(
+				__('پاسخ حسابیکس ← ووکامرس', 'hesabix-v2'),
+				array(
+					'entity_type' => 'hesabix_api',
+					'execution_time' => $execution_time,
+					'request' => array(
+						'_summary' => sprintf('%s %s', $method, $url),
+						'direction_reference' => 'woocommerce_to_hesabix',
+					),
+					'response' => array(
+						'direction' => 'hesabix_to_woocommerce',
+						'method' => $method,
+						'url' => $url,
+						'endpoint' => $endpoint,
+						'status_code' => $status_code,
+						'decoded' => $result,
+						'raw_body_preview' => $raw_preview,
+					),
+				)
+			);
 		}
 
-		// Handle non-JSON responses
 		if (json_last_error() !== JSON_ERROR_NONE) {
-			Hesabix_V2_Log_Service::error('Invalid JSON Response', array(
-				'endpoint' => $endpoint,
-				'status_code' => $status_code,
-				'raw_body' => $body,
-				'json_error' => json_last_error_msg(),
-			));
+			$raw_preview = (string) $body;
+			if (strlen($raw_preview) > 8192) {
+				$raw_preview = substr($raw_preview, 0, 8192) . "\n…[truncated]";
+			}
+			Hesabix_V2_Log_Service::error(
+				'Invalid JSON Response',
+				array(
+					'entity_type' => 'hesabix_api',
+					'error' => json_last_error_msg(),
+					'request' => array(
+						'direction' => 'woocommerce_to_hesabix',
+						'method' => $method,
+						'url' => $url,
+						'endpoint' => $endpoint,
+						'headers' => $audit_headers,
+						'json_body' => $data,
+						'timeout' => $timeout,
+					),
+					'response' => array(
+						'direction' => 'hesabix_to_woocommerce',
+						'type' => 'invalid_json',
+						'status_code' => $status_code,
+						'raw_body_preview' => $raw_preview,
+						'json_error' => json_last_error_msg(),
+					),
+					'execution_time' => $execution_time,
+				)
+			);
 
 			return array(
 				'success' => false,
@@ -319,12 +382,16 @@ class Hesabix_V2_Api
 	public function test_connection()
 	{
 		$result = $this->get_me();
-		
+
 		if (isset($result['success']) && $result['success']) {
-			return array(
-				'success' => true,
-				'message' => __('اتصال با موفقیت برقرار شد', 'hesabix-v2'),
-				'user' => $result['data'] ?? null,
+			$user_data = $result['data'] ?? null;
+			return array_merge(
+				array(
+					'success' => true,
+					'message' => __('اتصال با موفقیت برقرار شد', 'hesabix-v2'),
+					'user' => $user_data,
+				),
+				$this->build_connection_snapshot_payload(is_array($user_data) ? $user_data : array())
 			);
 		}
 
@@ -332,6 +399,157 @@ class Hesabix_V2_Api
 			'success' => false,
 			'message' => $result['message'] ?? __('خطا در برقراری ارتباط', 'hesabix-v2'),
 		);
+	}
+
+	/**
+	 * پس از احراز هویت موفق: کسب‌وکار انتخاب‌شده و سال جاری حسابیکس برای نمایش در پنل.
+	 *
+	 * @since 2.0.6
+	 * @param array $api_user بدنهٔ استاندارد کاربر حسابیکس (همان خروجی /auth/me).
+	 * @return array{connection: array<string,mixed>}
+	 */
+	private function build_connection_snapshot_payload(array $api_user)
+	{
+		$connection = array(
+			'stored_business_id' => (int) $this->business_id,
+			'business' => null,
+			'business_note' => null,
+			'fiscal_year' => null,
+			'fiscal_year_note' => null,
+		);
+
+		$business_id = (int) $this->business_id;
+		if (!$business_id) {
+			return array('connection' => $connection);
+		}
+
+		$list_res = $this->request('POST', '/businesses/list?take=500&skip=0&sort_by=name&sort_desc=false', null);
+		$items = self::normalize_businesses_list_items(is_array($list_res) ? $list_res : array());
+		$business_row = null;
+		foreach ($items as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+			$rid = (int) ($row['id'] ?? $row['business_id'] ?? 0);
+			if ($rid === $business_id) {
+				$business_row = $row;
+				break;
+			}
+		}
+
+		if ($business_row) {
+			$connection['business'] = $business_row;
+		} else {
+			if (isset($list_res['success']) && $list_res['success'] === false) {
+				$connection['business_note'] = isset($list_res['message'])
+					? (string) $list_res['message']
+					: __('دریافت فهرست کسب‌وکارها ناموفق بود.', 'hesabix-v2');
+			} else {
+				$connection['business_note'] = sprintf(
+					__('کسب‌وکار #%d در فهرست کسب‌وکارهای این کلید API دیده نشد.', 'hesabix-v2'),
+					$business_id
+				);
+			}
+		}
+
+		$fy_res = $this->get_current_fiscal_year($business_id);
+		if (isset($fy_res['success']) && $fy_res['success']) {
+			$fy_payload = isset($fy_res['data']) && is_array($fy_res['data']) ? $fy_res['data'] : null;
+			if ($fy_payload !== null && $fy_payload !== array()) {
+				$connection['fiscal_year'] = $fy_payload;
+			} elseif (($fy_payload === null || $fy_payload === array()) && isset($fy_res['message']) && stripos((string) $fy_res['message'], 'NO_CURRENT') !== false) {
+				$connection['fiscal_year_note'] = __('برای این کسب‌وکار سال مالی جاری در حسابیکس تنظیم نشده است.', 'hesabix-v2');
+			}
+		} else {
+			$connection['fiscal_year_note'] = isset($fy_res['message']) && $fy_res['message'] !== ''
+				? self::sanitize_connection_note_message((string) $fy_res['message'])
+				: __('بدون حق مشاهدهٔ سال مالی کسب‌وکار در حسابیکس؛ در صورت نیاز مجوز مشاهدهٔ سال مالی را به کلید برسانید.', 'hesabix-v2');
+		}
+
+		$connection['owner_display'] = $this->infer_owner_display($business_row, $api_user);
+
+		return array('connection' => $connection);
+	}
+
+	/**
+	 * پارس آرایه items از پاسخ POST /businesses/list
+	 *
+	 * @param array $api_result Raw API response body.
+	 * @return array<int, array<string,mixed>>
+	 */
+	private static function normalize_businesses_list_items(array $api_result)
+	{
+		$data = $api_result['data'] ?? $api_result;
+		$list = is_array($data) ? ($data['items'] ?? $data['list'] ?? $data['data'] ?? array()) : array();
+		if (is_array($data) && $list === array() && isset($data[0]) && is_array($data[0])) {
+			$list = $data;
+		}
+		return is_array($list) ? $list : array();
+	}
+
+	/**
+	 * یادداشت خطای کوتاه برای نمایش در پنل (بدون جزییات داخلی API).
+	 */
+	private static function sanitize_connection_note_message($msg)
+	{
+		$m = wp_strip_all_tags($msg);
+		if (strlen($m) > 220) {
+			$m = trim(mb_substr($m, 0, 217)) . '…';
+		}
+		return $m;
+	}
+
+	private function infer_owner_display($business_row, array $api_user)
+	{
+		if (!is_array($business_row)) {
+			return null;
+		}
+		$owner_id = isset($business_row['owner_id']) ? (int) $business_row['owner_id'] : 0;
+		if (!$owner_id) {
+			return null;
+		}
+		$user_id = isset($api_user['id']) ? (int) $api_user['id'] : 0;
+		if ($user_id && $owner_id === $user_id) {
+			$name = '';
+			foreach (array('first_name', 'last_name') as $k) {
+				if (!empty($api_user[ $k ]) && is_string($api_user[ $k ])) {
+					$name .= trim($api_user[ $k ]) . ' ';
+				}
+			}
+			$name = trim($name);
+			if ($name === '') {
+				if (!empty($api_user['email']) && is_string($api_user['email'])) {
+					$name = $api_user['email'];
+				} elseif (!empty($api_user['mobile']) && is_string($api_user['mobile'])) {
+					$name = $api_user['mobile'];
+				}
+			}
+			if ($name !== '') {
+				return sprintf(__('شما (%s)', 'hesabix-v2'), $name);
+			}
+			return sprintf(__('شما — شناسه کاربر: %d', 'hesabix-v2'), $user_id);
+		}
+		return sprintf(__('شناسه کاربر مالک در حسابیکس: %d', 'hesabix-v2'), $owner_id);
+	}
+
+	/**
+	 * سال مالی جاری کسب‌وکار ( نیاز به مجوز fiscal_years.view در حسابیکس ).
+	 *
+	 * @since 2.0.6
+	 * @param int $business_id
+	 * @return array
+	 */
+	public function get_current_fiscal_year($business_id)
+	{
+		$business_id = (int) $business_id;
+		if (!$business_id) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار نامعتبر است.', 'hesabix-v2'),
+			);
+		}
+
+		return $this->request('GET', '/business/' . $business_id . '/fiscal-years/current');
 	}
 
 	// ==================== Businesses ====================

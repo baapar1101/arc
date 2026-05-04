@@ -30,6 +30,55 @@ class Hesabix_V2_Customer_Service
 	}
 
 	/**
+	 * تعداد کاربران با نقش مشتری/مشترک برای همگام‌سازی.
+	 *
+	 * @since 2.0.7
+	 * @return int
+	 */
+	public static function count_sync_customers()
+	{
+		$q = new WP_User_Query(
+			array(
+				'role__in' => array('customer', 'subscriber'),
+				'number' => 1,
+				'count_total' => true,
+				'fields' => 'ID',
+			)
+		);
+
+		return (int) $q->get_total();
+	}
+
+	/**
+	 * اسلایس شناسهٔ مشتریان برای همگام‌سازی دسته‌ای.
+	 *
+	 * @since 2.0.7
+	 * @param int $limit
+	 * @param int $offset
+	 * @return array<int>
+	 */
+	public static function get_sync_customer_ids_slice($limit, $offset)
+	{
+		$limit = max(1, (int) $limit);
+		$offset = max(0, (int) $offset);
+
+		$ids = get_users(
+			array(
+				'role__in' => array('customer', 'subscriber'),
+				'fields' => 'ID',
+				'number' => $limit,
+				'offset' => $offset,
+			)
+		);
+
+		if (!is_array($ids)) {
+			return array();
+		}
+
+		return array_map('intval', $ids);
+	}
+
+	/**
 	 * Get sync status for customer
 	 *
 	 * @since    2.0.0

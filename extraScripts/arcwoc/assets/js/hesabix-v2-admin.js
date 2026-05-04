@@ -12,13 +12,17 @@
 	 * Main Hesabix V2 Admin object
 	 */
 	var HesabixV2Admin = {
-		
+
+		summaryRequest: null,
+
 		/**
 		 * Initialize
 		 */
 		init: function() {
 			this.bindEvents();
+			this.bindChangeBusinessWarning();
 			this.initTooltips();
+			this.bootstrapConnectionPanels();
 		},
 
 		/**
@@ -26,28 +30,272 @@
 		 */
 		bindEvents: function() {
 			// Test connection
-			$(document).on('click', '#test-connection', this.testConnection);
+			$(document).on('click', '.hesabix-v2-test-connection', this.testConnection);
 
-			// Sync products
-			$(document).on('click', '#sync-products', this.syncProducts);
+		},
 
-			// Sync customers
-			$(document).on('click', '#sync-customers', this.syncCustomers);
+		bootstrapConnectionPanels: function() {
+			var $settings = $('#hesabix-v2-settings-connection-live');
+			var $dash = $('#hesabix-v2-dashboard-connection-extra');
+
+			function fill($container) {
+				if (!$container || !$container.length) {
+					return;
+				}
+				var st = hesabix_v2_ajax.strings || {};
+				$container.attr('aria-busy', 'true');
+				HesabixV2Admin.requestConnectionSummary(function(response) {
+					$container.removeAttr('aria-busy');
+					if (response.success) {
+						$container.html(HesabixV2Admin.buildSnapshotMarkup(response));
+					} else {
+						$container.html(
+							'<p class="hesabix-v2-muted">' + HesabixV2Admin.escapeHtml(st.connection_detail_failed) + '</p>' +
+								'<p class="description">' + HesabixV2Admin.escapeHtml(response.message || '') + '</p>'
+						);
+					}
+				});
+			}
+
+			fill($settings);
+			fill($dash);
+		},
+
+		requestConnectionSummary: function(doneCb) {
+			if (typeof hesabix_v2_ajax === 'undefined') {
+				return;
+			}
+			if (this.summaryRequest && this.summaryRequest.abort) {
+				try {
+					this.summaryRequest.abort();
+				} catch (e) { /* noop */ }
+			}
+			this.summaryRequest = $.ajax({
+				url: hesabix_v2_ajax.ajax_url,
+				type: 'POST',
+				data: {
+					action: 'hesabix_v2_connection_summary',
+					nonce: hesabix_v2_ajax.nonce
+				},
+				success: function(response) {
+					if (typeof doneCb === 'function') {
+						doneCb(response || {});
+					}
+				},
+				error: function() {
+					if (typeof doneCb === 'function') {
+						var st = (hesabix_v2_ajax && hesabix_v2_ajax.strings) ? hesabix_v2_ajax.strings : {};
+						doneCb({
+							success: false,
+							message: st.connection_detail_failed || ''
+						});
+					}
+				}
+			});
+		},
+
+		escapeHtml: function(value) {
+			if (value == null || value === '') {
+				return '';
+			}
+			return $('<span/>').text(String(value)).html();
+		},
+
+		buildSnapshotMarkup: function(payload) {
+			var st = (hesabix_v2_ajax && hesabix_v2_ajax.strings) ? hesabix_v2_ajax.strings : {};
+			if (!payload || !payload.connection) {
+				return '<p class="hesabix-v2-muted">' + this.escapeHtml(st.connection_detail_failed) + '</p>';
+			}
+			var conn = payload.connection || {};
+			var rows = [];
+
+			function row(label, value) {
+				if (value == null || value === '') {
+					return '';
+				}
+				return '<tr><th scope="row">' + HesabixV2Admin.escapeHtml(label) +
+					'</th><td>' + HesabixV2Admin.escapeHtml(value) + '</td></tr>';
+			}
+
+			var bid = parseInt(conn.stored_business_id, 10);
+			if (!bid) {
+				return '<p class="hesabix-v2-muted">' +
+					HesabixV2Admin.escapeHtml(st.connection_detail_failed) + '</p>';
+			}
+
+			rows.push(row(st.lbl_business_id, String(bid)));
+
+			var b = conn.business;
+			if (b && b.name) {
+				rows.push(row(st.lbl_linked_business, b.name));
+			}
+			if (b && b.business_type) {
+				rows.push(row(st.lbl_type, b.business_type));
+			}
+			if (b && b.business_field) {
+				rows.push(row(st.lbl_field, b.business_field));
+			}
+			if (b && (b.role || typeof b.is_owner !== 'undefined')) {
+				var rolePart = '';
+				if (b.role) {
+					rolePart += String(b.role);
+				}
+				if (b.is_owner && st.lbl_owner_suffix) {
+					rolePart += (rolePart ? ' — ' : '') + String(st.lbl_owner_suffix);
+				}
+				if (rolePart.trim()) {
+					rows.push(row(st.lbl_your_role, rolePart.trim()));
+				}
+			}
+			if (conn.owner_display) {
+				rows.push(row(st.lbl_owner, conn.owner_display));
+			}
+
+			var fy = conn.fiscal_year;
+			if (fy && fy.title) {
+				var fyLineParts = [];
+				fyLineParts.push(String(fy.title));
+				if (fy.id) {
+					fyLineParts.push('#' + String(fy.id));
+				}
+				var fyLine = fyLineParts.join(' ');
+				if (fy.start_date || fy.end_date) {
+					var start = fy.start_date != null ? String(fy.start_date) : '';
+					var end = fy.end_date != null ? String(fy.end_date) : '';
+					fyLine += ' — ' + start + ' ‒ ' + end;
+				}
+				rows.push(row(st.lbl_fiscal_current, fyLine.trim()));
+			}
+
+			var user = payload.user || {};
+			var who = '';
+			var fn = (user.first_name || '').trim();
+			var ln = (user.last_name || '').trim();
+			if (fn || ln) {
+				who = (fn + ' ' + ln).trim();
+			}
+			if (!who && user.email) {
+				who = user.email;
+			} else if (!who && user.mobile) {
+				who = user.mobile;
+			}
+			if (who || user.id) {
+				var uline = who;
+				if (user.id) {
+					uline += (uline ? ' — ID ' : '') + String(user.id);
+				}
+				rows.push(row(st.lbl_api_key_owner, uline));
+			}
+
+			var notices = '';
+			if (conn.business_note) {
+				notices += '<p class="hesabix-v2-muted hesabix-v2-connection-note">' +
+					this.escapeHtml(conn.business_note) + '</p>';
+			}
+			if (conn.fiscal_year_note) {
+				notices += '<p class="hesabix-v2-muted hesabix-v2-connection-note">' +
+					this.escapeHtml(conn.fiscal_year_note) + '</p>';
+			}
+
+			var body = notices + '<table class="hesabix-v2-connection-detail-table widefat striped"><tbody>' +
+				rows.join('') + '</tbody></table>';
+			return body;
+		},
+
+		bindChangeBusinessWarning: function() {
+			$(document).on('click', '.hesabix-v2-change-connection-trigger', function(e) {
+				var dest = $(this).attr('href');
+				if (!dest) {
+					return;
+				}
+				e.preventDefault();
+				HesabixV2Admin.openChangeBusinessDialog(dest);
+			});
+		},
+
+		openChangeBusinessDialog: function(destUrl) {
+			var st = (hesabix_v2_ajax && hesabix_v2_ajax.strings) ? hesabix_v2_ajax.strings : {};
+			var html = ''
+				+ '<div class="hesabix-v2-warn-overlay" role="presentation">'
+				+ '<div class="hesabix-v2-warn-dialog" role="dialog" aria-labelledby="hesabix-v2-warn-title">'
+				+ '<div class="hesabix-v2-warn-dialog__header"><h3 id="hesabix-v2-warn-title">'
+				+ this.escapeHtml(st.warn_change_business_title)
+				+ '</h3></div>'
+				+ '<div class="hesabix-v2-warn-dialog__body"><p>'
+				+ this.escapeHtml(st.warn_change_business_body)
+				+ '</p></div>'
+				+ '<div class="hesabix-v2-warn-dialog__footer">'
+				+ '<button type="button" class="button button-primary hesabix-v2-warn-ok">' + this.escapeHtml(st.warn_change_business_ok) + '</button> '
+				+ '<button type="button" class="button hesabix-v2-warn-cancel">' + this.escapeHtml(st.warn_change_business_cancel) + '</button>'
+				+ '</div></div></div>';
+
+			var $ovl = $(html);
+			$('body').append($ovl);
+
+			function teardown() {
+				$ovl.remove();
+				$(document).off('keydown.hesabixv2warn');
+			}
+
+			function go() {
+				window.location.href = destUrl;
+			}
+
+			$ovl.on('click', function(ev) {
+				if (ev.target === $ovl[0]) {
+					teardown();
+				}
+			});
+
+			$ovl.find('.hesabix-v2-warn-cancel').on('click', function() {
+				teardown();
+			});
+
+			$ovl.find('.hesabix-v2-warn-ok').on('click', function() {
+				teardown();
+				go();
+			});
+
+			$(document).on('keydown.hesabixv2warn', function(ev) {
+				if (ev.keyCode === 27) {
+					ev.preventDefault();
+					teardown();
+				}
+			});
+
+			setTimeout(function() {
+				$ovl.find('.hesabix-v2-warn-cancel').trigger('focus');
+			}, 30);
 		},
 
 		/**
 		 * Test API connection
 		 */
 		testConnection: function(e) {
-			e.preventDefault();
-			
+			if (e) {
+				e.preventDefault();
+			}
+
 			var $btn = $(this);
-			var $result = $('#connection-result');
-			var originalText = $btn.text();
-			
-			$btn.prop('disabled', true).text(hesabix_v2_ajax.strings.syncing);
+			var resultSel = ($btn.attr('data-hesabix-connection-result') || '#connection-result').trim();
+			var extraSel = ($btn.attr('data-hesabix-connection-extra') || '#hesabix-v2-dashboard-connection-extra').trim();
+			var $result = $(resultSel);
+			var extra = $(extraSel);
+			var originalText = $btn.data('hesabixOriginalLabel');
+			if (typeof originalText !== 'string' || originalText === '') {
+				originalText = $btn.text().trim();
+				$btn.data('hesabixOriginalLabel', originalText);
+			}
+			var st = (hesabix_v2_ajax && hesabix_v2_ajax.strings) ? hesabix_v2_ajax.strings : {};
+			var testingText = st.testing_connection || '';
+
+			$btn.prop('disabled', true).text(testingText || originalText || '…');
 			$result.html('');
-			
+
+			if (extra.length && st.loading_connection_detail) {
+				extra.html('<p class="hesabix-v2-muted">' + HesabixV2Admin.escapeHtml(st.loading_connection_detail) + '</p>');
+			}
+
 			$.ajax({
 				url: hesabix_v2_ajax.ajax_url,
 				type: 'POST',
@@ -56,112 +304,24 @@
 					nonce: hesabix_v2_ajax.nonce
 				},
 				success: function(response) {
-					if (response.success) {
-						$result.html('<div class="notice notice-success"><p>' + response.message + '</p></div>');
-					} else {
-						$result.html('<div class="notice notice-error"><p>' + response.message + '</p></div>');
+					if (extra.length) {
+						if (response.success) {
+							extra.html(HesabixV2Admin.buildSnapshotMarkup(response));
+						} else if (response.connection) {
+							extra.empty();
+						}
 					}
+					var noticeCls = response.success ? 'notice-success' : 'notice-error';
+					var msg = HesabixV2Admin.escapeHtml(response.message || (st.error || ''));
+					$result.html('<div class="notice ' + noticeCls + '"><p>' + msg + '</p></div>');
 				},
 				error: function(xhr, status, error) {
-					$result.html('<div class="notice notice-error"><p>' + hesabix_v2_ajax.strings.error + ': ' + error + '</p></div>');
-				},
-				complete: function() {
-					$btn.prop('disabled', false).text(originalText);
-				}
-			});
-		},
-
-		/**
-		 * Sync all products
-		 */
-		syncProducts: function(e) {
-			e.preventDefault();
-			
-			if (!confirm(hesabix_v2_ajax.strings.confirm_sync)) {
-				return;
-			}
-			
-			var $btn = $(this);
-			var $result = $('#products-result');
-			var originalText = $btn.text();
-			
-			$btn.prop('disabled', true).text(hesabix_v2_ajax.strings.syncing);
-			$result.html('<p>' + hesabix_v2_ajax.strings.syncing + '</p>');
-			
-			$.ajax({
-				url: hesabix_v2_ajax.ajax_url,
-				type: 'POST',
-				data: {
-					action: 'hesabix_v2_sync_products',
-					nonce: hesabix_v2_ajax.nonce
-				},
-				timeout: 300000, // 5 minutes
-				success: function(response) {
-					var message = '<strong>نتیجه همگام‌سازی:</strong><br>' +
-								  'موفق: ' + response.success + '<br>' +
-								  'ناموفق: ' + response.failed + '<br>' +
-								  'کل: ' + response.total;
-
-					if (response.errors && response.errors.length > 0) {
-						message += '<br><br><strong>خطاها:</strong><ul>';
-						response.errors.forEach(function(error) {
-							message += '<li>محصول #' + error.product_id + ': ' + error.message + '</li>';
-						});
-						message += '</ul>';
+					if (extra.length) {
+						extra.empty();
 					}
-
-					var noticeClass = (response.failed > 0)
-						? 'notice-warning'
-						: 'notice-success';
-					$result.html('<div class="notice ' + noticeClass + '"><p>' + message + '</p></div>');
-				},
-				error: function(xhr, status, error) {
-					$result.html('<div class="notice notice-error"><p>خطا: ' + error + '</p></div>');
-				},
-				complete: function() {
-					$btn.prop('disabled', false).text(originalText);
-				}
-			});
-		},
-
-		/**
-		 * Sync all customers
-		 */
-		syncCustomers: function(e) {
-			e.preventDefault();
-			
-			if (!confirm(hesabix_v2_ajax.strings.confirm_sync)) {
-				return;
-			}
-			
-			var $btn = $(this);
-			var $result = $('#customers-result');
-			var originalText = $btn.text();
-			
-			$btn.prop('disabled', true).text(hesabix_v2_ajax.strings.syncing);
-			$result.html('<p>' + hesabix_v2_ajax.strings.syncing + '</p>');
-			
-			$.ajax({
-				url: hesabix_v2_ajax.ajax_url,
-				type: 'POST',
-				data: {
-					action: 'hesabix_v2_sync_customers',
-					nonce: hesabix_v2_ajax.nonce
-				},
-				timeout: 300000, // 5 minutes
-				success: function(response) {
-					var message = '<strong>نتیجه همگام‌سازی:</strong><br>' +
-								  'موفق: ' + response.success + '<br>' +
-								  'ناموفق: ' + response.failed + '<br>' +
-								  'کل: ' + response.total;
-
-					var noticeClass = (response.failed > 0)
-						? 'notice-warning'
-						: 'notice-success';
-					$result.html('<div class="notice ' + noticeClass + '"><p>' + message + '</p></div>');
-				},
-				error: function(xhr, status, error) {
-					$result.html('<div class="notice notice-error"><p>خطا: ' + error + '</p></div>');
+					$result.html('<div class="notice notice-error"><p>'
+						+ HesabixV2Admin.escapeHtml((st.error || '') + ': ' + (error || status))
+						+ '</p></div>');
 				},
 				complete: function() {
 					$btn.prop('disabled', false).text(originalText);
@@ -178,35 +338,22 @@
 					$(this).attr('title', '');
 				},
 				function() {
-					// Restore
 				}
 			);
 		},
 
-		/**
-		 * Show loading
-		 */
 		showLoading: function($element) {
 			$element.html('<div class="hesabix-v2-loading">در حال بارگذاری</div>');
 		},
 
-		/**
-		 * Show success message
-		 */
 		showSuccess: function($element, message) {
 			$element.html('<div class="notice notice-success"><p>' + message + '</p></div>');
 		},
 
-		/**
-		 * Show error message
-		 */
 		showError: function($element, message) {
 			$element.html('<div class="notice notice-error"><p>' + message + '</p></div>');
 		},
 
-		/**
-		 * Format number with Persian digits
-		 */
 		toPersianNumber: function(num) {
 			var persianDigits = '۰۱۲۳۴۵۶۷۸۹';
 			return num.toString().replace(/\d/g, function(x) {
@@ -215,7 +362,6 @@
 		}
 	};
 
-	// Initialize when document is ready
 	$(document).ready(function() {
 		HesabixV2Admin.init();
 
@@ -228,12 +374,20 @@
 				$tabs.filter('[data-tab="' + id + '"]').addClass('nav-tab-active').attr('aria-selected', 'true');
 				$panels.attr('hidden', true);
 				$panels.filter('[data-tab="' + id + '"]').removeAttr('hidden');
+				var $saveWrap = $('#hesabix-v2-settings-save-wrap');
+				if ($saveWrap.length) {
+					if (id === 'system') {
+						$saveWrap.attr('hidden', true);
+					} else {
+						$saveWrap.removeAttr('hidden');
+					}
+				}
 				if (window.history && window.history.replaceState) {
 					window.history.replaceState(null, '', '#hesabix-v2-tab-' + id);
 				}
 			}
-			$tabWrap.on('click', '.nav-tab', function(e) {
-				e.preventDefault();
+			$tabWrap.on('click', '.nav-tab', function(ev) {
+				ev.preventDefault();
 				var id = $(this).data('tab');
 				if (id) {
 					activateTab(id);
@@ -246,8 +400,6 @@
 		}
 	});
 
-	// Expose to global scope if needed
 	window.HesabixV2Admin = HesabixV2Admin;
 
 })(jQuery);
-

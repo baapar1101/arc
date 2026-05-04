@@ -33,7 +33,14 @@ $stats = $db->get_sync_stats();
 			<!-- Connection Status -->
 			<div class="hesabix-v2-card">
 				<h2><?php _e('وضعیت اتصال', 'hesabix-v2'); ?></h2>
-				<button id="test-connection" class="button">
+				<div id="hesabix-v2-dashboard-connection-extra" class="hesabix-v2-connection-panel" aria-live="polite"></div>
+				<button
+					type="button"
+					id="test-connection"
+					class="button hesabix-v2-test-connection"
+					data-hesabix-connection-result="#connection-result"
+					data-hesabix-connection-extra="#hesabix-v2-dashboard-connection-extra"
+				>
 					<?php _e('تست اتصال', 'hesabix-v2'); ?>
 				</button>
 				<div id="connection-result"></div>
@@ -102,6 +109,7 @@ $stats = $db->get_sync_stats();
 								<th><?php _e('نوع', 'hesabix-v2'); ?></th>
 								<th><?php _e('عملیات', 'hesabix-v2'); ?></th>
 								<th><?php _e('وضعیت', 'hesabix-v2'); ?></th>
+								<th><?php _e('پیام', 'hesabix-v2'); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -109,11 +117,34 @@ $stats = $db->get_sync_stats();
 								<tr>
 									<td><?php echo esc_html($log['created_at']); ?></td>
 									<td><?php echo esc_html($log['entity_type']); ?></td>
-									<td><?php echo esc_html($log['action']); ?></td>
+									<td><code><?php echo esc_html($log['action']); ?></code></td>
 									<td>
 										<span class="status-<?php echo esc_attr($log['status']); ?>">
 											<?php echo esc_html($log['status']); ?>
 										</span>
+									</td>
+									<td>
+										<?php
+										if (!empty($log['error_message'])) {
+											echo '<span style="color:#d63638;">' . esc_html(wp_strip_all_tags($log['error_message'])) . '</span>';
+										} elseif (!empty($log['response_data'])) {
+											$r = json_decode($log['response_data'], true);
+											if (is_array($r) && isset($r['status_code'])) {
+												echo '<span>' . esc_html(sprintf(__('پاسخ HTTP %s', 'hesabix-v2'), (string) $r['status_code'])) . '</span>';
+											} else {
+												echo esc_html(wp_strip_all_tags($log['entity_type']));
+											}
+										} elseif (!empty($log['request_data'])) {
+											$q = json_decode($log['request_data'], true);
+											if (is_array($q) && !empty($q['method']) && !empty($q['url'])) {
+												echo '<span dir="ltr" style="font-size:12px">' . esc_html($q['method'] . ' ' . $q['url']) . '</span>';
+											} else {
+												echo '&mdash;';
+											}
+										} else {
+											echo '&mdash;';
+										}
+										?>
 									</td>
 								</tr>
 							<?php endforeach; ?>
@@ -170,37 +201,4 @@ $stats = $db->get_sync_stats();
 	font-weight: bold;
 }
 </style>
-
-<script>
-jQuery(document).ready(function($) {
-	$('#test-connection').on('click', function() {
-		var $btn = $(this);
-		var $result = $('#connection-result');
-		
-		$btn.prop('disabled', true).text('<?php _e('در حال بررسی...', 'hesabix-v2'); ?>');
-		
-		$.ajax({
-			url: hesabix_v2_ajax.ajax_url,
-			type: 'POST',
-			data: {
-				action: 'hesabix_v2_test_connection',
-				nonce: hesabix_v2_ajax.nonce
-			},
-			success: function(response) {
-				if (response.success) {
-					$result.html('<div class="notice notice-success"><p>' + response.message + '</p></div>');
-				} else {
-					$result.html('<div class="notice notice-error"><p>' + response.message + '</p></div>');
-				}
-			},
-			error: function() {
-				$result.html('<div class="notice notice-error"><p><?php _e('خطا در برقراری ارتباط', 'hesabix-v2'); ?></p></div>');
-			},
-			complete: function() {
-				$btn.prop('disabled', false).text('<?php _e('تست اتصال', 'hesabix-v2'); ?>');
-			}
-		});
-	});
-});
-</script>
 

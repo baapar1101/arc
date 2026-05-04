@@ -165,6 +165,7 @@ class Hesabix_V2
 
 		// AJAX actions
 		$this->loader->add_action('wp_ajax_hesabix_v2_test_connection', $plugin_admin, 'ajax_test_connection');
+		$this->loader->add_action('wp_ajax_hesabix_v2_connection_summary', $plugin_admin, 'ajax_connection_summary');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_product', $plugin_admin, 'ajax_sync_product');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_products', $plugin_admin, 'ajax_sync_products');
 		$this->loader->add_action('wp_ajax_hesabix_v2_sync_customers', $plugin_admin, 'ajax_sync_customers');

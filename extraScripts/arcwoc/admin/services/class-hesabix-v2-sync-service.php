@@ -28,6 +28,55 @@ class Hesabix_V2_Sync_Service
 	private $db;
 
 	/**
+	 * پیش‌فرض‌های اندازهٔ دسته برای عملیات سنگین همگام‌سازی و واردات (کاهش تایم‌اوت AJAX).
+	 *
+	 * @since 2.0.7
+	 * @return array<string, int>
+	 */
+	public static function get_bulk_sync_defaults()
+	{
+		return array(
+			'wc_product_parents_per_ajax' => 35,
+			'wc_customers_per_ajax' => 45,
+			'hesabix_person_take' => 80,
+			'hesabix_import_pages_per_ajax' => 3,
+			'errors_preview_cap' => 60,
+		);
+	}
+
+	/**
+	 * تنظیمات ذخیره‌شدهٔ همگام‌سازی دسته‌ای با محدودسازی امن.
+	 *
+	 * @since 2.0.7
+	 * @return array<string, int>
+	 */
+	public static function get_bulk_sync_options()
+	{
+		$d = self::get_bulk_sync_defaults();
+		$raw = get_option('hesabix_v2_bulk_sync', array());
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$o = wp_parse_args($raw, $d);
+
+		$o['wc_product_parents_per_ajax'] = max(5, min(500, absint($o['wc_product_parents_per_ajax'])));
+		$o['wc_customers_per_ajax'] = max(5, min(500, absint($o['wc_customers_per_ajax'])));
+
+		$o['hesabix_person_take'] = max(10, min(200, absint($o['hesabix_person_take'])));
+
+		$o['hesabix_import_pages_per_ajax'] = max(1, min(50, absint($o['hesabix_import_pages_per_ajax'])));
+
+		$o['errors_preview_cap'] = max(10, min(300, absint($o['errors_preview_cap'])));
+
+		/**
+		 * فیلتر نهایی گزینه‌های همگام‌سازی دسته‌ای.
+		 *
+		 * @param array<string,int> $o
+		 */
+		return apply_filters('hesabix_v2_bulk_sync_options', $o);
+	}
+
+	/**
 	 * Initialize the class
 	 *
 	 * @since    2.0.0
@@ -49,6 +98,8 @@ class Hesabix_V2_Sync_Service
 	public function sync_product($product_id, $variation_id = null, $wc_currency_override = null)
 	{
 		$start_time = microtime(true);
+		$wc_payload_for_log = null;
+		$api_last_result = null;
 
 		try {
 			$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $wc_currency_override);
@@ -90,6 +141,8 @@ class Hesabix_V2_Sync_Service
 				$wc_parent_id = null;
 			}
 
+			$wc_payload_for_log = $product_data;
+
 			// اعمال تنظیمات همگام‌سازی قیمت و موجودی (API حسابیکس: base_sales_price، track_inventory)
 			$sync_settings = get_option('hesabix_v2_sync_settings', array());
 			if (empty($sync_settings['sync_product_price'])) {
@@ -104,14 +157,14 @@ class Hesabix_V2_Sync_Service
 
 			if ($existing_mapping) {
 				// Update existing product
-				$result = $this->api->update_product($existing_mapping['hesabix_id'], $product_data);
+				$api_last_result = $this->api->update_product($existing_mapping['hesabix_id'], $product_data);
 			} else {
 				// Create new product
-				$result = $this->api->create_product($product_data);
+				$api_last_result = $this->api->create_product($product_data);
 			}
 
-			if (isset($result['success']) && $result['success']) {
-				$hesabix_id = $result['data']['id'];
+			if (isset($api_last_result['success']) && $api_last_result['success']) {
+				$hesabix_id = $api_last_result['data']['id'];
 
 				// Save mapping
 				$this->db->save_mapping(
@@ -138,18 +191,32 @@ class Hesabix_V2_Sync_Service
 					'message' => __('محصول با موفقیت همگام‌سازی شد', 'hesabix-v2'),
 				);
 			} else {
-				throw new Exception($result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
+				throw new Exception($api_last_result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
 			}
 
 		} catch (Exception $e) {
 			$execution_time = microtime(true) - $start_time;
 
-			Hesabix_V2_Log_Service::error('Product sync failed', array(
+			$elog = array(
 				'entity_type' => 'product',
-				'entity_id' => $product_id,
+				'entity_id' => $variation_id ? (int) $variation_id : (int) $product_id,
 				'error' => $e->getMessage(),
 				'execution_time' => $execution_time,
-			));
+			);
+			if ($wc_payload_for_log !== null) {
+				$elog['request'] = array(
+					'direction' => 'woocommerce_payload',
+					'entity' => 'product',
+					'json_body' => $wc_payload_for_log,
+				);
+			}
+			if (is_array($api_last_result)) {
+				$elog['response'] = array(
+					'direction' => 'hesabix_api',
+					'decoded' => $api_last_result,
+				);
+			}
+			Hesabix_V2_Log_Service::error('Product sync failed', $elog);
 
 			$msg = $e->getMessage();
 			if (strpos($msg, __('محصول یافت نشد', 'hesabix-v2')) === false) {
@@ -176,6 +243,8 @@ class Hesabix_V2_Sync_Service
 	public function sync_customer($customer_id, $order_id = null)
 	{
 		$start_time = microtime(true);
+		$wc_payload_for_log = null;
+		$api_last_result = null;
 
 		try {
 			$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, null);
@@ -207,28 +276,29 @@ class Hesabix_V2_Sync_Service
 				$order
 			);
 
+			$wc_payload_for_log = $customer_data;
+
 			// Check if already synced
 			$existing_mapping = $this->db->get_mapping('customer', $customer_id);
-			$result = null;
 
 			if ($existing_mapping) {
-				$result = $this->api->update_person($existing_mapping['hesabix_id'], $customer_data);
+				$api_last_result = $this->api->update_person($existing_mapping['hesabix_id'], $customer_data);
 				// اگر شخص در حسابیکس حذف شده یا وجود ندارد، mapping را پاک کرده و دوباره ایجاد کن
-				$msg = isset($result['message']) ? (string) $result['message'] : '';
+				$msg = isset($api_last_result['message']) ? (string) $api_last_result['message'] : '';
 				$is_not_found = $msg !== ''
 					&& (stripos($msg, 'not found') !== false
 						|| stripos($msg, 'Entity not found') !== false
 						|| stripos($msg, 'یافت نشد') !== false);
-				if (isset($result['success']) && !$result['success'] && $is_not_found) {
+				if (isset($api_last_result['success']) && !$api_last_result['success'] && $is_not_found) {
 					$this->db->delete_mapping('customer', $customer_id);
-					$result = $this->api->create_person($customer_data);
+					$api_last_result = $this->api->create_person($customer_data);
 				}
 			} else {
-				$result = $this->api->create_person($customer_data);
+				$api_last_result = $this->api->create_person($customer_data);
 			}
 
-			if (isset($result['success']) && $result['success']) {
-				$hesabix_id = self::api_result_entity_id($result);
+			if (isset($api_last_result['success']) && $api_last_result['success']) {
+				$hesabix_id = self::api_result_entity_id($api_last_result);
 				if ($hesabix_id < 1) {
 					throw new Exception(__('شناسه شخص در پاسخ API یافت نشد', 'hesabix-v2'));
 				}
@@ -257,18 +327,32 @@ class Hesabix_V2_Sync_Service
 					'message' => __('مشتری با موفقیت همگام‌سازی شد', 'hesabix-v2'),
 				);
 			} else {
-				throw new Exception($result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
+				throw new Exception($api_last_result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
 			}
 
 		} catch (Exception $e) {
 			$execution_time = microtime(true) - $start_time;
 
-			Hesabix_V2_Log_Service::error('Customer sync failed', array(
+			$elog = array(
 				'entity_type' => 'customer',
 				'entity_id' => $customer_id,
 				'error' => $e->getMessage(),
 				'execution_time' => $execution_time,
-			));
+			);
+			if ($wc_payload_for_log !== null) {
+				$elog['request'] = array(
+					'direction' => 'woocommerce_payload',
+					'entity' => 'customer',
+					'json_body' => $wc_payload_for_log,
+				);
+			}
+			if (is_array($api_last_result)) {
+				$elog['response'] = array(
+					'direction' => 'hesabix_api',
+					'decoded' => $api_last_result,
+				);
+			}
+			Hesabix_V2_Log_Service::error('Customer sync failed', $elog);
 
 			if ($customer_id > 0 && strpos($e->getMessage(), __('مشتری یافت نشد', 'hesabix-v2')) === false) {
 				Hesabix_V2_Queue_Service::enqueue('customer', $customer_id, 'sync_customer');
@@ -291,6 +375,8 @@ class Hesabix_V2_Sync_Service
 	public function sync_guest_customer($order_id)
 	{
 		$start_time = microtime(true);
+		$wc_payload_for_log = null;
+		$api_last_result = null;
 
 		try {
 			$order = wc_get_order($order_id);
@@ -314,6 +400,7 @@ class Hesabix_V2_Sync_Service
 			}
 
 			$guest_data = apply_filters('hesabix_v2_guest_customer_data', Hesabix_V2_Mapper::wc_guest_to_api($order), $order);
+			$wc_payload_for_log = $guest_data;
 			$cache_key = self::guest_contact_transient_key($order);
 			$cached_id = get_transient($cache_key);
 			if ($cached_id !== false && $cached_id !== '') {
@@ -340,10 +427,10 @@ class Hesabix_V2_Sync_Service
 				);
 			}
 
-			$result = $this->api->create_person($guest_data);
+			$api_last_result = $this->api->create_person($guest_data);
 
-			if (isset($result['success']) && $result['success']) {
-				$hesabix_id = self::api_result_entity_id($result);
+			if (isset($api_last_result['success']) && $api_last_result['success']) {
+				$hesabix_id = self::api_result_entity_id($api_last_result);
 				if ($hesabix_id < 1) {
 					throw new Exception(__('شناسه شخص در پاسخ API یافت نشد', 'hesabix-v2'));
 				}
@@ -367,17 +454,33 @@ class Hesabix_V2_Sync_Service
 				);
 			}
 
-			throw new Exception($result['message'] ?? __('خطا در ایجاد مشتری', 'hesabix-v2'));
+			throw new Exception($api_last_result['message'] ?? __('خطا در ایجاد مشتری', 'hesabix-v2'));
 
 		} catch (Exception $e) {
 			$execution_time = microtime(true) - $start_time;
 
-			Hesabix_V2_Log_Service::error('Guest customer creation failed', array(
+			$elog = array(
 				'entity_type' => 'customer',
+				'entity_id' => 0,
 				'order_id' => $order_id,
 				'error' => $e->getMessage(),
 				'execution_time' => $execution_time,
-			));
+			);
+			if ($wc_payload_for_log !== null) {
+				$elog['request'] = array(
+					'direction' => 'woocommerce_payload',
+					'entity' => 'guest_customer',
+					'order_id' => $order_id,
+					'json_body' => $wc_payload_for_log,
+				);
+			}
+			if (is_array($api_last_result)) {
+				$elog['response'] = array(
+					'direction' => 'hesabix_api',
+					'decoded' => $api_last_result,
+				);
+			}
+			Hesabix_V2_Log_Service::error('Guest customer creation failed', $elog);
 
 			if ($order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false) {
 				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
@@ -431,11 +534,23 @@ class Hesabix_V2_Sync_Service
 
 		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $order->get_currency());
 		if (!$gate['ok']) {
-			Hesabix_V2_Log_Service::error('Order sync blocked — currency mismatch', array(
-				'entity_type' => 'order',
-				'entity_id' => $order_id,
-				'error' => $gate['message'],
-			));
+			Hesabix_V2_Log_Service::error(
+				'Order sync blocked — currency mismatch',
+				array(
+					'entity_type' => 'order',
+					'entity_id' => $order_id,
+					'error' => $gate['message'],
+					'request' => array(
+						'direction' => 'woocommerce_order',
+						'order_id' => $order_id,
+						'currency' => $order->get_currency(),
+					),
+					'response' => array(
+						'direction' => 'policy',
+						'detail' => $gate,
+					),
+				)
+			);
 			$order->add_order_note(
 				sprintf(__('همگام‌سازی حسابیکس متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
 			);
@@ -446,6 +561,9 @@ class Hesabix_V2_Sync_Service
 				'currency_blocked' => true,
 			);
 		}
+
+		$wc_payload_for_log = null;
+		$api_last_result = null;
 
 		try {
 
@@ -493,20 +611,22 @@ class Hesabix_V2_Sync_Service
 				$order
 			);
 
+			$wc_payload_for_log = $invoice_data;
+
 			// Check if already synced
 			$existing_mapping = $this->db->get_mapping('order', $order_id);
 			$is_new_invoice = !$existing_mapping;
 
 			if ($existing_mapping) {
 				// Update existing invoice
-				$result = $this->api->update_invoice($existing_mapping['hesabix_id'], $invoice_data);
+				$api_last_result = $this->api->update_invoice($existing_mapping['hesabix_id'], $invoice_data);
 			} else {
 				// Create new invoice
-				$result = $this->api->create_invoice($invoice_data);
+				$api_last_result = $this->api->create_invoice($invoice_data);
 			}
 
-			if (isset($result['success']) && $result['success']) {
-				$hesabix_id = $result['data']['id'];
+			if (isset($api_last_result['success']) && $api_last_result['success']) {
+				$hesabix_id = $api_last_result['data']['id'];
 
 				// Save mapping
 				$this->db->save_mapping(
@@ -539,18 +659,33 @@ class Hesabix_V2_Sync_Service
 					'message' => __('سفارش با موفقیت همگام‌سازی شد', 'hesabix-v2'),
 				);
 			} else {
-				throw new Exception($result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
+				throw new Exception($api_last_result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
 			}
 
 		} catch (Exception $e) {
 			$execution_time = microtime(true) - $start_time;
 
-			Hesabix_V2_Log_Service::error('Order sync failed', array(
+			$elog = array(
 				'entity_type' => 'order',
 				'entity_id' => $order_id,
 				'error' => $e->getMessage(),
 				'execution_time' => $execution_time,
-			));
+			);
+			if ($wc_payload_for_log !== null) {
+				$elog['request'] = array(
+					'direction' => 'woocommerce_payload',
+					'entity' => 'order_invoice',
+					'wc_order_number' => $order->get_order_number(),
+					'json_body' => $wc_payload_for_log,
+				);
+			}
+			if (is_array($api_last_result)) {
+				$elog['response'] = array(
+					'direction' => 'hesabix_api',
+					'decoded' => $api_last_result,
+				);
+			}
+			Hesabix_V2_Log_Service::error('Order sync failed', $elog);
 
 			// Add error note to order (order may not be set if exception was early)
 			$order_for_note = isset($order) ? $order : wc_get_order($order_id);
@@ -687,24 +822,17 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
-	 * واردات اشخاص از حسابیکس به مشتریان ووکامرس (صفحهٔ همگام‌سازی در ادمین افزونه).
+	 * یک مرحله از واردات اشخاص حسابیکس → ووکامرس (چند صفحهٔ API در هر درخواست AJAX).
 	 *
-	 * @param bool $create_missing اگر کاربری با ایمیل موجود نبود، مشتری ووکامرس ایجاد شود.
-	 * @return array
+	 * @since 2.0.7
+	 * @param int  $skip ابتدای skip برای search_persons در این مرحله.
+	 * @param bool $create_missing
+	 * @param int  $take اندازهٔ صفحه API.
+	 * @param int  $pages_to_process حداکثر تعداد صفحهٔ پشت‌سرهم در همین درخواست.
+	 * @return array{success:bool, message?:string, chunk_stats?:array, next_skip?:int, done?:bool, pages_fetched?:int}
 	 */
-	public function import_customers_from_hesabix($create_missing = false)
+	public function import_customers_from_hesabix_chunk($skip, $create_missing, $take, $pages_to_process)
 	{
-		$take = (int) apply_filters('hesabix_v2_import_customers_page_size', 100);
-		if ($take < 10) {
-			$take = 10;
-		}
-		if ($take > 200) {
-			$take = 200;
-		}
-
-		$max_skip = (int) apply_filters('hesabix_v2_import_customers_max_skip', 10000);
-		$skip = 0;
-
 		$stats = array(
 			'matched_updated' => 0,
 			'created' => 0,
@@ -718,15 +846,23 @@ class Hesabix_V2_Sync_Service
 			return array(
 				'success' => false,
 				'message' => $gate['message'],
-				'stats' => $stats,
+				'chunk_stats' => $stats,
+				'next_skip' => (int) $skip,
+				'done' => false,
 			);
 		}
 
-		while ($skip < $max_skip) {
+		$take = max(10, min(200, absint($take)));
+		$pages_to_process = max(1, min(50, absint($pages_to_process)));
+		$new_skip = max(0, absint($skip));
+		$pages_fetched = 0;
+		$done = false;
+
+		for ($step = 0; $step < $pages_to_process && ! $done; $step++) {
 			$res = $this->api->search_persons(
 				array(
 					'take' => $take,
-					'skip' => $skip,
+					'skip' => $new_skip,
 					'sort_by' => 'id',
 					'sort_desc' => false,
 				)
@@ -736,12 +872,18 @@ class Hesabix_V2_Sync_Service
 				return array(
 					'success' => false,
 					'message' => isset($res['message']) ? $res['message'] : __('خطا در دریافت لیست اشخاص', 'hesabix-v2'),
-					'stats' => $stats,
+					'chunk_stats' => $stats,
+					'next_skip' => $new_skip,
+					'done' => false,
+					'pages_fetched' => $pages_fetched,
 				);
 			}
 
 			$items = isset($res['data']['items']) && is_array($res['data']['items']) ? $res['data']['items'] : array();
+			$pages_fetched++;
+
 			if (empty($items)) {
+				$done = true;
 				break;
 			}
 
@@ -753,19 +895,21 @@ class Hesabix_V2_Sync_Service
 				}
 			}
 
-			$skip += count($items);
+			$new_skip += count($items);
 			if (count($items) < $take) {
-				break;
+				$done = true;
 			}
 		}
 
 		return array(
 			'success' => true,
-			'message' => __('واردات به پایان رسید.', 'hesabix-v2'),
-			'stats' => $stats,
+			'message' => __('مرحله واردات انجام شد.', 'hesabix-v2'),
+			'chunk_stats' => $stats,
+			'next_skip' => $new_skip,
+			'done' => $done,
+			'pages_fetched' => $pages_fetched,
 		);
 	}
-
 	/**
 	 * @param array $p
 	 * @param bool  $create_missing

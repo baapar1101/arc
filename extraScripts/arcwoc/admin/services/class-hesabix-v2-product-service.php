@@ -30,6 +30,43 @@ class Hesabix_V2_Product_Service
 	}
 
 	/**
+	 * تعداد تقریبی محصولات منتشرشده (پست والد، بدون واریانت به‌عنوان پست جدا).
+	 *
+	 * @since 2.0.7
+	 * @return int
+	 */
+	public static function count_published_parent_products()
+	{
+		$c = wp_count_posts('product');
+		return isset($c->publish) ? (int) $c->publish : 0;
+	}
+
+	/**
+	 * اسلایس شناسهٔ محصولات والد برای همگام‌سازی دسته‌ای (کاهش تایم‌اوت).
+	 *
+	 * @since 2.0.7
+	 * @param int $limit  حداکثر تعداد پست محصول در این مرحله.
+	 * @param int $offset جابجایی نسبت به فهرست منتشرشده.
+	 * @return array<int>
+	 */
+	public static function get_published_parent_product_ids_slice($limit, $offset)
+	{
+		$limit = max(1, (int) $limit);
+		$offset = max(0, (int) $offset);
+
+		$ids = wc_get_products(
+			array(
+				'status' => 'publish',
+				'limit' => $limit,
+				'offset' => $offset,
+				'return' => 'ids',
+			)
+		);
+
+		return is_array($ids) ? array_map('intval', $ids) : array();
+	}
+
+	/**
 	 * Get product variations
 	 *
 	 * @since    2.0.0

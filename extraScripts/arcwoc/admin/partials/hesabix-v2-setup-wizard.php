@@ -13,6 +13,13 @@ if (!defined('WPINC')) {
 
 <div class="wrap hesabix-v2-wrap hesabix-v2-setup-wizard">
 	<h1><?php _e('راه‌اندازی حسابیکس V2', 'hesabix-v2'); ?></h1>
+
+	<?php if (get_option('hesabix_v2_setup_completed') && get_option('hesabix_v2_api_key')): ?>
+		<div class="notice notice-warning hesabix-v2-setup-reconnect-note">
+			<p><strong><?php esc_html_e('هشدار', 'hesabix-v2'); ?></strong></p>
+			<p><?php esc_html_e('برای اتصال کسب‌وکار دیگری به افزونه، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.', 'hesabix-v2'); ?></p>
+		</div>
+	<?php endif; ?>
 	
 	<div class="wizard-container">
 		<!-- Step 1: API Key -->
