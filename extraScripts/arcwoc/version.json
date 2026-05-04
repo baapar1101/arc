@@ -1,5 +1,5 @@
 {
-	"version": "2.0.5",
+	"version": "3.1.2",
 	"download_url": "https://source.hesabix.ir/hesabix/ArcWOC/archive/master.zip",
 	"requires": "5.0",
 	"tested": "6.4",
@@ -8,7 +8,7 @@
 	"slug": "arcwoc",
 	"homepage": "https://hesabix.ir/",
 	"author": "Hesabix Team",
-	"last_updated": "2024-12-05",
+	"last_updated": "2025-12-05",
 	"sections": {
 		"description": "اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید",
 		"changelog": "<h4>2.0.0</h4>\n<ul>\n<li>نسخه اولیه با پشتیبانی کامل از API V2</li>\n<li>Personal API Keys</li>\n<li>Setup Wizard</li>\n<li>Sync Queue System</li>\n<li>همگام‌سازی محصولات، مشتریان و سفارشات</li>\n</ul>"
