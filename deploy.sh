@@ -45,7 +45,7 @@ IFS=$'\n\t'
 # - Saved inputs: last entered domain, branch, pgAdmin4 options, etc. are stored in .deploy_saved_vars
 #   and used as defaults on next run (override by env vars or leave blank to be prompted again).
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
-# - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (nginx: scripts/install_pip_mirror_nginx.sh؛ بدون ارسال IP به Runflare؛ نصب مانند سایر *.mirror sites).
+# - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (see configure_pip_hesabix_mirror, set_pip_mirror_env).
 #   If PIP_INDEX_URL is set in the environment before deploy, that value is used instead (advanced override).
 # - Flutter/Dart: همیشه آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs). shell.hesabix.ir فقط برای tarball SDK است.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
