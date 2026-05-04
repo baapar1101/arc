@@ -10,6 +10,8 @@ class CurrencyPickerWidget extends StatefulWidget {
   final String? label;
   final String? hintText;
   final bool enabled;
+  /// هم‌ارتفاع‌تر با [TextField] فشرده و [DateInputField] با `isDense`.
+  final bool isDense;
 
   const CurrencyPickerWidget({
     super.key,
@@ -19,6 +21,7 @@ class CurrencyPickerWidget extends StatefulWidget {
     this.label,
     this.hintText,
     this.enabled = true,
+    this.isDense = false,
   });
 
   @override
@@ -82,34 +85,53 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
     }
   }
 
+  InputDecoration _decoration({
+    OutlineInputBorder? border,
+    bool enabled = true,
+    String? errorText,
+  }) {
+    final base = InputDecoration(
+      labelText: widget.label ?? 'ارز',
+      hintText: widget.hintText ?? 'انتخاب ارز',
+      border: border ?? const OutlineInputBorder(),
+      enabled: enabled,
+      errorText: errorText,
+      isDense: widget.isDense,
+      contentPadding: widget.isDense
+          ? const EdgeInsetsDirectional.only(start: 12, top: 8, bottom: 8, end: 12)
+          : null,
+    );
+    return base;
+  }
+
+  Widget _maybeFixedHeight({required Widget child}) {
+    if (widget.isDense) return child;
+    return SizedBox(height: 56, child: child);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return SizedBox(
-        height: 56,
+      return _maybeFixedHeight(
         child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: widget.label ?? 'ارز',
-            hintText: widget.hintText ?? 'انتخاب ارز',
-            border: const OutlineInputBorder(),
-            enabled: false,
-          ),
+          decoration: _decoration(enabled: false),
           child: const Center(
-            child: CircularProgressIndicator(),
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
         ),
       );
     }
 
     if (_error != null) {
-      return SizedBox(
-        height: 56,
+      return _maybeFixedHeight(
         child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: widget.label ?? 'ارز',
-            hintText: widget.hintText ?? 'انتخاب ارز',
+          decoration: _decoration(
             border: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.red),
+              borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
             ),
             enabled: false,
           ),
@@ -134,15 +156,9 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
     }
 
     if (_currencies.isEmpty) {
-      return SizedBox(
-        height: 56,
+      return _maybeFixedHeight(
         child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: widget.label ?? 'ارز',
-            hintText: widget.hintText ?? 'انتخاب ارز',
-            border: const OutlineInputBorder(),
-            enabled: false,
-          ),
+          decoration: _decoration(enabled: false),
           child: const Center(
             child: Text('هیچ ارزی یافت نشد'),
           ),
@@ -150,59 +166,55 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
       );
     }
 
-    return SizedBox(
-      height: 56, // ارتفاع ثابت مثل سایر فیلدها
+    return _maybeFixedHeight(
       child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: widget.label ?? 'ارز',
-          hintText: widget.hintText ?? 'انتخاب ارز',
-          border: const OutlineInputBorder(),
-          enabled: widget.enabled,
-        ),
+        decoration: _decoration(enabled: widget.enabled),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<int>(
             value: _selectedValue,
             isExpanded: true,
+            iconSize: widget.isDense ? 20 : 24,
+            isDense: widget.isDense,
             onChanged: widget.enabled ? (value) {
               setState(() {
                 _selectedValue = value;
               });
               widget.onChanged(value);
             } : null,
-      items: _currencies.map((currency) {
-        final isDefault = currency['is_default'] == true;
-        return DropdownMenuItem<int>(
-          value: currency['id'] as int,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${currency['title']} (${currency['code']})',
-                  style: TextStyle(
-                    fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-              if (isDefault)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'پیش‌فرض',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
+            items: _currencies.map((currency) {
+              final isDefault = currency['is_default'] == true;
+              return DropdownMenuItem<int>(
+                value: currency['id'] as int,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${currency['title']} (${currency['code']})',
+                        style: TextStyle(
+                          fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (isDefault)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'پیش‌فرض',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
-        );
-      }).toList(),
+              );
+            }).toList(),
           ),
         ),
       ),

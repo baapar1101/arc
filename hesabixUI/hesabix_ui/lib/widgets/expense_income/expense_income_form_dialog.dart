@@ -54,7 +54,8 @@ class ExpenseIncomeFormDialog extends StatefulWidget {
   State<ExpenseIncomeFormDialog> createState() => _ExpenseIncomeFormDialogState();
 }
 
-class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
+class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   late DateTime _docDate;
@@ -65,10 +66,12 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
   final List<_ItemLine> _itemLines = <_ItemLine>[];
   final List<_CounterpartyLine> _counterpartyLines = <_CounterpartyLine>[];
   bool _isSaving = false;
+  late final TabController _mobileTabController;
 
   @override
   void initState() {
     super.initState();
+    _mobileTabController = TabController(length: 2, vsync: this);
     final initial = widget.initialDocument;
     if (initial != null) {
       // حالت ویرایش: پرکردن اولیه از سند
@@ -128,6 +131,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
 
   @override
   void dispose() {
+    _mobileTabController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -259,6 +263,11 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
     final sumCounterparties = _counterpartyLines.fold<double>(0, (p, e) => p + e.amount);
     final diff = sumItems - sumCounterparties;
     final padding = ResponsiveHelper.getPadding(context);
+    final scheme = Theme.of(context).colorScheme;
+    final mobilePanelInset = EdgeInsets.symmetric(
+      horizontal: padding,
+      vertical: padding * 0.45,
+    );
 
     return Dialog(
       insetPadding: EdgeInsets.zero,
@@ -266,170 +275,177 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
         child: Scaffold(
           appBar: AppBar(
             title: const Text('هزینه و درآمد'),
+            toolbarHeight: 48,
             leading: IconButton(
               icon: const Icon(Icons.close),
               onPressed: _isSaving ? null : () => Navigator.pop(context),
             ),
           ),
+          resizeToAvoidBottomInset: true,
           body: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // هدر موبایل
-                Padding(
-                  padding: EdgeInsets.all(padding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.initialDocument == null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment<bool>(value: false, label: Text('هزینه')),
-                              ButtonSegment<bool>(value: true, label: Text('درآمد')),
-                            ],
-                            selected: {_isIncome},
-                            onSelectionChanged: _onDocIncomeTypeChanged,
-                          ),
-                        ),
-                      DateInputField(
-                        value: _docDate,
-                        calendarController: widget.calendarController,
-                        onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                        labelText: 'تاریخ سند',
-                        hintText: 'انتخاب تاریخ',
-                      ),
-                      const SizedBox(height: 8),
-                      CurrencyPickerWidget(
-                        businessId: widget.businessId,
-                        selectedCurrencyId: _selectedCurrencyId,
-                        onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
-                        label: 'ارز',
-                        hintText: 'انتخاب ارز',
-                      ),
-                      const SizedBox(height: 8),
-                      ProjectSelectorWidget(
-                        businessId: widget.businessId,
-                        apiClient: widget.apiClient,
-                        selectedProjectId: _selectedProjectId,
-                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
-                        allowNull: true,
-                        labelText: 'پروژه',
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'توضیحات کلی سند',
-                          hintText: 'توضیحات اختیاری...',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                // پنل‌ها با TabBar
-                Expanded(
-                  child: DefaultTabController(
-                    length: 2,
-                    child: Column(
-                      children: [
-                        TabBar(
-                          tabs: const [
-                            Tab(text: 'حساب‌ها'),
-                            Tab(text: 'طرف‌حساب‌ها'),
-                          ],
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _ItemLinesPanel(
-                                businessId: widget.businessId,
-                                isIncome: _isIncome,
-                                lines: _itemLines,
-                                onChanged: (ls) => setState(() {
-                                  _itemLines.clear();
-                                  _itemLines.addAll(ls);
-                                }),
+            child: Theme(
+              data: Theme.of(context).copyWith(visualDensity: VisualDensity.compact),
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(padding, padding, padding, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (widget.initialDocument == null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: SegmentedButton<bool>(
+                                segments: const [
+                                  ButtonSegment<bool>(value: false, label: Text('هزینه')),
+                                  ButtonSegment<bool>(value: true, label: Text('درآمد')),
+                                ],
+                                selected: {_isIncome},
+                                onSelectionChanged: _onDocIncomeTypeChanged,
                               ),
-                              _CounterpartyLinesPanel(
-                                businessId: widget.businessId,
-                                lines: _counterpartyLines,
-                                onChanged: (ls) => setState(() {
-                                  _counterpartyLines.clear();
-                                  _counterpartyLines.addAll(ls);
-                                }),
-                              ),
-                            ],
+                            ),
+                          DateInputField(
+                            value: _docDate,
+                            calendarController: widget.calendarController,
+                            isDense: true,
+                            onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                            labelText: 'تاریخ سند',
+                            hintText: 'انتخاب تاریخ',
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          CurrencyPickerWidget(
+                            businessId: widget.businessId,
+                            selectedCurrencyId: _selectedCurrencyId,
+                            isDense: true,
+                            onChanged: (currencyId) =>
+                                setState(() => _selectedCurrencyId = currencyId),
+                            label: 'ارز',
+                            hintText: 'انتخاب ارز',
+                          ),
+                          const SizedBox(height: 8),
+                          ProjectSelectorWidget(
+                            businessId: widget.businessId,
+                            apiClient: widget.apiClient,
+                            selectedProjectId: _selectedProjectId,
+                            isDense: true,
+                            onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                            allowNull: true,
+                            labelText: 'پروژه',
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _descriptionController,
+                            decoration: const InputDecoration(
+                              labelText: 'توضیحات کلی سند',
+                              hintText: 'توضیحات اختیاری...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            maxLines: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: scheme.outlineVariant),
+                    TabBar(
+                      controller: _mobileTabController,
+                      labelColor: scheme.primary,
+                      unselectedLabelColor: scheme.onSurfaceVariant,
+                      onTap: (_) => setState(() {}),
+                      tabs: const [
+                        Tab(text: 'حساب‌ها'),
+                        Tab(text: 'طرف‌حساب‌ها'),
                       ],
                     ),
-                  ),
-                ),
-                const Divider(height: 1),
-                // فوتر موبایل
-                Padding(
-                  padding: EdgeInsets.all(padding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      alignment: Alignment.topCenter,
+                      child: _mobileTabController.index == 0
+                          ? _ItemLinesPanel(
+                              businessId: widget.businessId,
+                              isIncome: _isIncome,
+                              lines: _itemLines,
+                              panelPadding: mobilePanelInset,
+                              onChanged: (ls) => setState(() {
+                                _itemLines.clear();
+                                _itemLines.addAll(ls);
+                              }),
+                            )
+                          : _CounterpartyLinesPanel(
+                              businessId: widget.businessId,
+                              lines: _counterpartyLines,
+                              panelPadding: mobilePanelInset,
+                              onChanged: (ls) => setState(() {
+                                _counterpartyLines.clear();
+                                _counterpartyLines.addAll(ls);
+                              }),
+                            ),
+                    ),
+                    Divider(height: 1, color: scheme.outlineVariant),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(padding, padding * 0.75, padding, padding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _TotalChip(label: 'حساب‌ها', value: sumItems),
-                          _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
-                          _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: _buildBalanceActionButtons(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: _isSaving ? null : () => Navigator.pop(context),
-                              child: Text(t.cancel),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              _TotalChip(label: 'حساب‌ها', value: sumItems),
+                              _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
+                              _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: _buildBalanceActionButtons(),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _isSaving || diff != 0 || _itemLines.isEmpty || _counterpartyLines.isEmpty
-                                  ? null
-                                  : _onSave,
-                              icon: _isSaving
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.save),
-                              label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
-                            ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                                  child: Text(t.cancel),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed:
+                                      _isSaving || diff != 0 || _itemLines.isEmpty || _counterpartyLines.isEmpty
+                                          ? null
+                                          : _onSave,
+                                  icon: _isSaving
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.save),
+                                  label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -445,7 +461,12 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
     final padding = ResponsiveHelper.getPadding(context);
     final size = MediaQuery.sizeOf(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final maxDialogWidth = min(size.width * 0.92, 1080.0);
+    final vDesk = padding * 0.5;
+    final colSep = padding * 0.4;
+    final itemPanelPad = EdgeInsets.fromLTRB(0, vDesk, colSep, vDesk);
+    final cpPanelPad = EdgeInsets.fromLTRB(colSep, vDesk, 0, vDesk);
 
     return Dialog(
       insetPadding: ResponsiveHelper.getDialogPadding(context),
@@ -456,172 +477,226 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: maxDialogWidth,
-            maxHeight: size.height * 0.88,
+            maxHeight: size.height * 0.92,
           ),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // هدر دسکتاپ: ردیف عنوان و نوع سند؛ ردیف سه فیلد هم‌عرض (تاریخ / ارز / پروژه)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(padding, padding, padding, padding * 0.4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'هزینه و درآمد',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const Spacer(),
-                          if (widget.initialDocument == null)
-                            SegmentedButton<bool>(
-                              segments: const [
-                                ButtonSegment<bool>(value: false, label: Text('هزینه')),
-                                ButtonSegment<bool>(value: true, label: Text('درآمد')),
-                              ],
-                              selected: {_isIncome},
-                              onSelectionChanged: _onDocIncomeTypeChanged,
-                            ),
-                        ],
-                      ),
-                      SizedBox(height: padding * 0.5),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: DateInputField(
-                              value: _docDate,
-                              calendarController: widget.calendarController,
-                              onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                              labelText: 'تاریخ سند',
-                              hintText: 'انتخاب تاریخ',
-                            ),
-                          ),
-                          SizedBox(width: padding * 0.5),
-                          Expanded(
-                            child: CurrencyPickerWidget(
-                              businessId: widget.businessId,
-                              selectedCurrencyId: _selectedCurrencyId,
-                              onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
-                              label: 'ارز',
-                              hintText: 'انتخاب ارز',
-                            ),
-                          ),
-                          SizedBox(width: padding * 0.5),
-                          Expanded(
-                            child: ProjectSelectorWidget(
-                              businessId: widget.businessId,
-                              apiClient: widget.apiClient,
-                              selectedProjectId: _selectedProjectId,
-                              onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
-                              allowNull: true,
-                              labelText: 'پروژه',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(padding, 0, padding, padding * 0.45),
-                  child: TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'توضیحات کلی سند',
-                      hintText: 'توضیحات اختیاری...',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    minLines: 1,
-                    maxLines: 2,
-                  ),
-                ),
-                Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                // پنل‌ها دسکتاپ
                 Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _ItemLinesPanel(
-                          businessId: widget.businessId,
-                          isIncome: _isIncome,
-                          lines: _itemLines,
-                          onChanged: (ls) => setState(() {
-                            _itemLines.clear();
-                            _itemLines.addAll(ls);
-                          }),
-                        ),
-                      ),
-                      VerticalDivider(width: 1, color: theme.colorScheme.outlineVariant),
-                      Expanded(
-                        child: _CounterpartyLinesPanel(
-                          businessId: widget.businessId,
-                          lines: _counterpartyLines,
-                          onChanged: (ls) => setState(() {
-                            _counterpartyLines.clear();
-                            _counterpartyLines.addAll(ls);
-                          }),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                // فوتر دسکتاپ
-                Padding(
-                  padding: EdgeInsets.fromLTRB(padding, padding * 0.45, padding, padding * 0.75),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(bottom: padding * 1.1),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: padding),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                _TotalChip(label: 'حساب‌ها', value: sumItems),
-                                _TotalChip(label: 'طرف‌حساب‌ها', value: sumCounterparties),
-                                _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
-                              ],
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(0, padding, 0, padding * 0.4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'هزینه و درآمد',
+                                        style: theme.textTheme.titleLarge,
+                                      ),
+                                      const Spacer(),
+                                      if (widget.initialDocument == null)
+                                        SegmentedButton<bool>(
+                                          segments: const [
+                                            ButtonSegment<bool>(
+                                              value: false,
+                                              label: Text('هزینه'),
+                                            ),
+                                            ButtonSegment<bool>(
+                                              value: true,
+                                              label: Text('درآمد'),
+                                            ),
+                                          ],
+                                          selected: {_isIncome},
+                                          onSelectionChanged: _onDocIncomeTypeChanged,
+                                        ),
+                                    ],
+                                  ),
+                                  SizedBox(height: padding * 0.5),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: DateInputField(
+                                          value: _docDate,
+                                          calendarController: widget.calendarController,
+                                          isDense: true,
+                                          onChanged: (d) =>
+                                              setState(() => _docDate = d ?? DateTime.now()),
+                                          labelText: 'تاریخ سند',
+                                          hintText: 'انتخاب تاریخ',
+                                        ),
+                                      ),
+                                      SizedBox(width: padding * 0.5),
+                                      Expanded(
+                                        child: CurrencyPickerWidget(
+                                          businessId: widget.businessId,
+                                          selectedCurrencyId: _selectedCurrencyId,
+                                          isDense: true,
+                                          onChanged: (currencyId) =>
+                                              setState(() => _selectedCurrencyId = currencyId),
+                                          label: 'ارز',
+                                          hintText: 'انتخاب ارز',
+                                        ),
+                                      ),
+                                      SizedBox(width: padding * 0.5),
+                                      Expanded(
+                                        child: ProjectSelectorWidget(
+                                          businessId: widget.businessId,
+                                          apiClient: widget.apiClient,
+                                          selectedProjectId: _selectedProjectId,
+                                          isDense: true,
+                                          onChanged: (projectId) =>
+                                              setState(() => _selectedProjectId = projectId),
+                                          allowNull: true,
+                                          labelText: 'پروژه',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: _buildBalanceActionButtons(),
+                              padding: EdgeInsets.fromLTRB(0, 0, 0, padding * 0.45),
+                              child: TextField(
+                                controller: _descriptionController,
+                                decoration: const InputDecoration(
+                                  labelText: 'توضیحات کلی سند',
+                                  hintText: 'توضیحات اختیاری...',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                minLines: 1,
+                                maxLines: 2,
+                              ),
+                            ),
+                            Divider(height: 1, color: scheme.outlineVariant),
+                            LayoutBuilder(
+                              builder: (context, lc) {
+                                final usable = lc.maxWidth - 1;
+                                final half = usable > 2 ? usable / 2 : lc.maxWidth / 2;
+                                return IntrinsicHeight(
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      SizedBox(
+                                        width: half,
+                                        child: _ItemLinesPanel(
+                                          businessId: widget.businessId,
+                                          isIncome: _isIncome,
+                                          lines: _itemLines,
+                                          panelPadding: itemPanelPad,
+                                          onChanged: (ls) => setState(() {
+                                            _itemLines.clear();
+                                            _itemLines.addAll(ls);
+                                          }),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 1,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: scheme.outlineVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: half,
+                                        child: _CounterpartyLinesPanel(
+                                          businessId: widget.businessId,
+                                          lines: _counterpartyLines,
+                                          panelPadding: cpPanelPad,
+                                          onChanged: (ls) => setState(() {
+                                            _counterpartyLines.clear();
+                                            _counterpartyLines.addAll(ls);
+                                          }),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            Divider(height: 1, color: scheme.outlineVariant),
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(0, padding * 0.5, 0, 0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 6,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            _TotalChip(label: 'حساب‌ها', value: sumItems),
+                                            _TotalChip(
+                                              label: 'طرف‌حساب‌ها',
+                                              value: sumCounterparties,
+                                            ),
+                                            _TotalChip(
+                                              label: 'اختلاف',
+                                              value: diff,
+                                              isError: diff != 0,
+                                            ),
+                                          ],
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6),
+                                          child: _buildBalanceActionButtons(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed:
+                                        _isSaving ? null : () => Navigator.pop(context),
+                                    child: Text(t.cancel),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton.icon(
+                                    onPressed: _isSaving ||
+                                            diff != 0 ||
+                                            _itemLines.isEmpty ||
+                                            _counterpartyLines.isEmpty
+                                        ? null
+                                        : _onSave,
+                                    icon: _isSaving
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(Icons.save),
+                                    label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      TextButton(
-                        onPressed: _isSaving ? null : () => Navigator.pop(context),
-                        child: Text(t.cancel),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: _isSaving || diff != 0 || _itemLines.isEmpty || _counterpartyLines.isEmpty
-                            ? null
-                            : _onSave,
-                        icon: _isSaving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.save),
-                        label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -787,12 +862,14 @@ class _ItemLinesPanel extends StatefulWidget {
   final bool isIncome;
   final List<_ItemLine> lines;
   final ValueChanged<List<_ItemLine>> onChanged;
+  final EdgeInsetsGeometry? panelPadding;
   
   const _ItemLinesPanel({
     required this.businessId,
     required this.isIncome,
     required this.lines,
     required this.onChanged,
+    this.panelPadding,
   });
 
   @override
@@ -805,13 +882,50 @@ class _ItemLinesPanelState extends State<_ItemLinesPanel> {
     final t = AppLocalizations.of(context);
     final padding = ResponsiveHelper.getPadding(context);
     final spacing = ResponsiveHelper.getGridSpacing(context);
-    final hPad = padding;
-    final vPad = padding * 0.65;
-    
+    final defaultPad =
+        EdgeInsets.fromLTRB(padding, padding * 0.65, padding, padding * 0.65);
+    final inset = widget.panelPadding ?? defaultPad;
+    final lineGap = spacing * 0.65;
+
+    Widget body;
+    if (widget.lines.isEmpty) {
+      body = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: Text(t.noDataFound)),
+      );
+    } else {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < widget.lines.length; i++) ...[
+            if (i > 0) SizedBox(height: lineGap),
+            _ItemLineTile(
+              key: ValueKey(widget.lines[i].rowId),
+              businessId: widget.businessId,
+              isIncome: widget.isIncome,
+              line: widget.lines[i],
+              onChanged: (l) {
+                final newLines = List<_ItemLine>.from(widget.lines);
+                newLines[i] = l;
+                widget.onChanged(newLines);
+              },
+              onDelete: () {
+                final newLines = List<_ItemLine>.from(widget.lines);
+                newLines.removeAt(i);
+                widget.onChanged(newLines);
+              },
+            ),
+          ],
+        ],
+      );
+    }
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, vPad),
+      padding: inset,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -837,34 +951,8 @@ class _ItemLinesPanelState extends State<_ItemLinesPanel> {
               ),
             ],
           ),
-          SizedBox(height: spacing),
-          Expanded(
-            child: widget.lines.isEmpty
-                ? Center(child: Text(t.noDataFound))
-                : ListView.separated(
-                    itemCount: widget.lines.length,
-                    separatorBuilder: (_, _) => SizedBox(height: spacing * 0.85),
-                    itemBuilder: (ctx, i) {
-                      final line = widget.lines[i];
-                      return _ItemLineTile(
-                        key: ValueKey(line.rowId),
-                        businessId: widget.businessId,
-                        isIncome: widget.isIncome,
-                        line: line,
-                        onChanged: (l) {
-                          final newLines = List<_ItemLine>.from(widget.lines);
-                          newLines[i] = l;
-                          widget.onChanged(newLines);
-                        },
-                        onDelete: () {
-                          final newLines = List<_ItemLine>.from(widget.lines);
-                          newLines.removeAt(i);
-                          widget.onChanged(newLines);
-                        },
-                      );
-                    },
-                  ),
-          ),
+          SizedBox(height: lineGap),
+          body,
         ],
       ),
     );
@@ -933,14 +1021,14 @@ class _ItemLineTileState extends State<_ItemLineTile> {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
     final padding = ResponsiveHelper.getPadding(context);
-    final tilePad = padding * 0.72;
+    final tilePad = padding * 0.45;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 3),
+      margin: const EdgeInsets.symmetric(vertical: 2),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.65)),
       ),
       clipBehavior: Clip.antiAlias,
@@ -981,12 +1069,13 @@ class _ItemLineTileState extends State<_ItemLineTile> {
           hintText: t.search,
           isRequired: true,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         TextFormField(
           controller: _amountController,
           decoration: InputDecoration(
             labelText: t.amount,
             hintText: '1,000,000',
+            isDense: true,
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [
@@ -1003,21 +1092,26 @@ class _ItemLineTileState extends State<_ItemLineTile> {
             widget.onChanged(widget.line.copyWith(amount: val));
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         TextFormField(
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
+            isDense: true,
           ),
           onChanged: (v) => widget.onChanged(widget.line.copyWith(
             description: v.trim().isEmpty ? null : v.trim()
           )),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              padding: EdgeInsets.zero,
+              iconSize: 20,
               onPressed: widget.onDelete,
               icon: const Icon(Icons.delete_outline),
               tooltip: t.delete,
@@ -1059,14 +1153,15 @@ class _ItemLineTileState extends State<_ItemLineTile> {
                 isRequired: true,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             SizedBox(
-              width: 180,
+              width: 146,
               child: TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: t.amount,
                   hintText: '1,000,000',
+                  isDense: true,
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [
@@ -1084,19 +1179,24 @@ class _ItemLineTileState extends State<_ItemLineTile> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             IconButton(
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              padding: EdgeInsets.zero,
+              iconSize: 20,
               onPressed: widget.onDelete,
               icon: const Icon(Icons.delete_outline),
               tooltip: t.delete,
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextFormField(
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
+            isDense: true,
           ),
           onChanged: (v) => widget.onChanged(widget.line.copyWith(
             description: v.trim().isEmpty ? null : v.trim()
@@ -1111,11 +1211,13 @@ class _CounterpartyLinesPanel extends StatefulWidget {
   final int businessId;
   final List<_CounterpartyLine> lines;
   final ValueChanged<List<_CounterpartyLine>> onChanged;
-  
+  final EdgeInsetsGeometry? panelPadding;
+
   const _CounterpartyLinesPanel({
     required this.businessId,
     required this.lines,
     required this.onChanged,
+    this.panelPadding,
   });
 
   @override
@@ -1128,13 +1230,49 @@ class _CounterpartyLinesPanelState extends State<_CounterpartyLinesPanel> {
     final t = AppLocalizations.of(context);
     final padding = ResponsiveHelper.getPadding(context);
     final spacing = ResponsiveHelper.getGridSpacing(context);
-    final hPad = padding;
-    final vPad = padding * 0.65;
-    
+    final defaultPad =
+        EdgeInsets.fromLTRB(padding, padding * 0.65, padding, padding * 0.65);
+    final inset = widget.panelPadding ?? defaultPad;
+    final lineGap = spacing * 0.65;
+
+    Widget body;
+    if (widget.lines.isEmpty) {
+      body = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: Text(t.noDataFound)),
+      );
+    } else {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < widget.lines.length; i++) ...[
+            if (i > 0) SizedBox(height: lineGap),
+            _CounterpartyLineTile(
+              key: ValueKey(widget.lines[i].rowId),
+              businessId: widget.businessId,
+              line: widget.lines[i],
+              onChanged: (l) {
+                final newLines = List<_CounterpartyLine>.from(widget.lines);
+                newLines[i] = l;
+                widget.onChanged(newLines);
+              },
+              onDelete: () {
+                final newLines = List<_CounterpartyLine>.from(widget.lines);
+                newLines.removeAt(i);
+                widget.onChanged(newLines);
+              },
+            ),
+          ],
+        ],
+      );
+    }
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, vPad),
+      padding: inset,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -1160,33 +1298,8 @@ class _CounterpartyLinesPanelState extends State<_CounterpartyLinesPanel> {
               ),
             ],
           ),
-          SizedBox(height: spacing),
-          Expanded(
-            child: widget.lines.isEmpty
-                ? Center(child: Text(t.noDataFound))
-                : ListView.separated(
-                    itemCount: widget.lines.length,
-                    separatorBuilder: (_, _) => SizedBox(height: spacing * 0.85),
-                    itemBuilder: (ctx, i) {
-                      final line = widget.lines[i];
-                      return _CounterpartyLineTile(
-                        key: ValueKey(line.rowId),
-                        businessId: widget.businessId,
-                        line: line,
-                        onChanged: (l) {
-                          final newLines = List<_CounterpartyLine>.from(widget.lines);
-                          newLines[i] = l;
-                          widget.onChanged(newLines);
-                        },
-                        onDelete: () {
-                          final newLines = List<_CounterpartyLine>.from(widget.lines);
-                          newLines.removeAt(i);
-                          widget.onChanged(newLines);
-                        },
-                      );
-                    },
-                  ),
-          ),
+          SizedBox(height: lineGap),
+          body,
         ],
       ),
     );
@@ -1252,14 +1365,14 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
     final padding = ResponsiveHelper.getPadding(context);
-    final tilePad = padding * 0.72;
+    final tilePad = padding * 0.45;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 3),
+      margin: const EdgeInsets.symmetric(vertical: 2),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.65)),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1278,8 +1391,11 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
       children: [
         DropdownButtonFormField<TransactionType>(
           value: widget.line.transactionType,
+          isDense: true,
           decoration: const InputDecoration(
             labelText: 'نوع تراکنش',
+            isDense: true,
+            contentPadding: EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12),
           ),
           items: TransactionType.values.map((type) {
             return DropdownMenuItem(
@@ -1293,11 +1409,12 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             }
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         TextFormField(
           controller: _amountController,
           decoration: InputDecoration(
             labelText: t.amount,
+            isDense: true,
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [
@@ -1309,23 +1426,28 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             widget.onChanged(widget.line.copyWith(amount: val));
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         _buildTransactionTypeFields(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         TextFormField(
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
+            isDense: true,
           ),
           onChanged: (v) => widget.onChanged(widget.line.copyWith(
             description: v.trim().isEmpty ? null : v.trim()
           )),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             IconButton(
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              padding: EdgeInsets.zero,
+              iconSize: 20,
               onPressed: widget.onDelete,
               icon: const Icon(Icons.delete_outline),
               tooltip: t.delete,
@@ -1344,8 +1466,10 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: DropdownButtonFormField<TransactionType>(
                 value: widget.line.transactionType,
+                isDense: true,
                 decoration: const InputDecoration(
                   labelText: 'نوع تراکنش',
+                  isDense: true,
                 ),
                 items: TransactionType.values.map((type) {
                   return DropdownMenuItem(
@@ -1360,13 +1484,14 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             SizedBox(
-              width: 150,
+              width: 130,
               child: TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: t.amount,
+                  isDense: true,
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [
@@ -1379,21 +1504,26 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             IconButton(
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              padding: EdgeInsets.zero,
+              iconSize: 20,
               onPressed: widget.onDelete,
               icon: const Icon(Icons.delete_outline),
               tooltip: t.delete,
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _buildTransactionTypeFields(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextFormField(
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
+            isDense: true,
           ),
           onChanged: (v) => widget.onChanged(widget.line.copyWith(
             description: v.trim().isEmpty ? null : v.trim()

@@ -18,6 +18,7 @@ class ProjectSelectorWidget extends StatefulWidget {
   final bool enabled;
   final AuthStore? authStore; // برای بررسی دسترسی‌ها
   final CalendarController? calendarController; // برای دیالوگ ایجاد پروژه
+  final bool isDense;
 
   const ProjectSelectorWidget({
     Key? key,
@@ -30,6 +31,7 @@ class ProjectSelectorWidget extends StatefulWidget {
     this.enabled = true,
     this.authStore,
     this.calendarController,
+    this.isDense = false,
   }) : super(key: key);
 
   @override
@@ -77,11 +79,16 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int?>(
       value: _loading ? null : widget.selectedProjectId,
+      isDense: widget.isDense,
       decoration: InputDecoration(
         labelText: widget.labelText ?? 'پروژه',
         border: const OutlineInputBorder(),
         errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
         suffixIcon: _buildSuffixIcon(),
+        isDense: widget.isDense,
+        contentPadding: widget.isDense
+            ? const EdgeInsetsDirectional.only(start: 12, top: 12, bottom: 12, end: 12)
+            : null,
       ),
       isExpanded: true,
       items: [
