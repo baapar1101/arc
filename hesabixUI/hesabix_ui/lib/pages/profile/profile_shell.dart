@@ -62,7 +62,7 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.newBusiness, Icons.add_business, Icons.add_business, '/user/profile/new-business'),
       _Dest(t.businesses, Icons.business, Icons.business, '/user/profile/businesses'),
       _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
-      _Dest('تنظیمات حساب', Icons.settings_outlined, Icons.settings, '/user/profile/account-settings'),
+      _Dest(t.accountSettingsTitle, Icons.settings_outlined, Icons.settings, '/user/profile/account-settings'),
     ];
 
     // اضافه کردن منوی اپراتور پشتیبانی

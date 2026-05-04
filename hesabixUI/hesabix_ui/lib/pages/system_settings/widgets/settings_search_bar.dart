@@ -5,11 +5,14 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 class SettingsSearchBar extends StatefulWidget {
   final ValueChanged<String> onSearchChanged;
   final String? initialQuery;
+  /// حاشهٔ عمودی کمتر برای نمای پهن (دسکتاپ)
+  final bool dense;
 
   const SettingsSearchBar({
     super.key,
     required this.onSearchChanged,
     this.initialQuery,
+    this.dense = false,
   });
 
   @override
@@ -47,7 +50,7 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: widget.dense ? 10 : 16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(8),

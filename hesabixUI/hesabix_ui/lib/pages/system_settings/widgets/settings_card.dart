@@ -91,9 +91,10 @@ class SettingsCard extends StatelessWidget {
                   ),
                 ),
                 
-                // آیکون فلش
                 Icon(
-                  Icons.chevron_right,
+                  Directionality.of(context) == TextDirection.rtl
+                      ? Icons.chevron_left
+                      : Icons.chevron_right,
                   size: 20,
                   color: colorScheme.onSurface.withValues(alpha: 0.4),
                 ),

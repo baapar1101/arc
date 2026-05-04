@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../models/settings_category.dart';
 import '../models/settings_item.dart';
+import '../utils/localization_helper.dart';
 
 /// سرویس دسته‌بندی تنظیمات سیستم
 class SettingsCategorizationService {
@@ -434,23 +437,31 @@ class SettingsCategorizationService {
     return getCategories().expand((category) => category.items).toList();
   }
 
-  /// جستجو در تنظیمات
-  static List<SettingsItem> searchItems(String query, {List<SettingsCategory>? categories}) {
+  /// جستجو در تنظیمات (کلیدهای داخلی، متن ترجمه‌شده، و عنوان/توضیح دسته)
+  static List<SettingsItem> searchItems(
+    String query, {
+    required AppLocalizations t,
+    List<SettingsCategory>? categories,
+  }) {
     final searchCategories = categories ?? getCategories();
     final lowerQuery = query.toLowerCase().trim();
 
     if (lowerQuery.isEmpty) {
-      return getAllItems();
+      return [];
     }
 
-    final allItems = searchCategories.expand((category) => category.items).toList();
-
-    return allItems.where((item) {
-      // اینجا باید localization استفاده شود، فعلاً فقط بر اساس ID جستجو می‌کنیم
-      return item.id.toLowerCase().contains(lowerQuery) ||
-          item.title.toLowerCase().contains(lowerQuery) ||
-          item.description.toLowerCase().contains(lowerQuery);
-    }).toList();
+    final out = <SettingsItem>[];
+    for (final category in searchCategories) {
+      final categoryHit =
+          LocalizationHelper.categoryMatchesSearch(t, category, lowerQuery);
+      for (final item in category.items) {
+        if (categoryHit ||
+            LocalizationHelper.itemMatchesSearch(t, item, lowerQuery)) {
+          out.add(item);
+        }
+      }
+    }
+    return out;
   }
 
   /// فیلتر بر اساس دسته

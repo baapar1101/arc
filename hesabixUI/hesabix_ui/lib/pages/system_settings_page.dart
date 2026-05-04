@@ -61,14 +61,16 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   }
 
   void _onSearchChanged(String query) {
+    if (!mounted) return;
+    final t = AppLocalizations.of(context);
     setState(() {
       _searchQuery = query;
       _isSearching = query.trim().isNotEmpty;
 
       if (_isSearching) {
-        // جستجو در همه آیتم‌ها
         _searchResults = SettingsCategorizationService.searchItems(
           query,
+          t: t,
           categories: _categories,
         );
       } else {
@@ -104,36 +106,42 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final t = AppLocalizations.of(context);
+    final width = MediaQuery.sizeOf(context).width;
+    const kDesktopLoose = 900.0;
+    final isDesktopLoose = width >= kDesktopLoose;
+    final pagePadding = isDesktopLoose
+        ? const EdgeInsets.fromLTRB(8, 8, 8, 12)
+        : const EdgeInsets.all(16);
+    final sectionGap =
+        isDesktopLoose ? 12.0 : 20.0;
+    final innerGap = isDesktopLoose ? 12.0 : 16.0;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: pagePadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // بخش Welcome
-            _buildWelcomeSection(theme, colorScheme, t),
+            _buildWelcomeSection(theme, colorScheme, t, width),
 
-            const SizedBox(height: 20),
+            SizedBox(height: sectionGap),
 
-            // نوار جستجو
             SettingsSearchBar(
               onSearchChanged: _onSearchChanged,
               initialQuery: _searchQuery,
+              dense: isDesktopLoose,
             ),
 
-            // دکمه‌های کنترل (Expand All / Collapse All)
             if (!_isSearching) _buildControlButtons(theme, colorScheme, t),
 
-            const SizedBox(height: 16),
+            SizedBox(height: innerGap),
 
-            // لیست دسته‌ها یا نتایج جستجو
             _isSearching
-                ? _buildSearchResults(theme, colorScheme, t)
-                : _buildCategoriesList(theme, colorScheme, t),
+                ? _buildSearchResults(theme, colorScheme, t, isDesktopLoose)
+                : _buildCategoriesList(theme, colorScheme, t, isDesktopLoose),
 
-            const SizedBox(height: 20),
+            SizedBox(height: isDesktopLoose ? 12 : 20),
           ],
         ),
       ),
@@ -144,40 +152,62 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
+    double width,
   ) {
     final totalItems = _categories.fold<int>(
       0,
       (sum, category) => sum + category.items.length,
     );
 
-    return Row(
+    const kNarrowWelcome = 560.0;
+    final statsText =
+        '${_categories.length} ${t.settingsCategoriesCount} • $totalItems ${t.settingsCount}';
+    final statsStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurface.withValues(alpha: 0.6),
+    );
+
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t.systemAdministration,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  fontSize: 24,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                t.systemSettingsDescription,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
+        Text(
+          t.systemAdministration,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+            fontSize: 24,
           ),
         ),
+        const SizedBox(height: 4),
         Text(
-          '${_categories.length} ${t.settingsCategoriesCount} • $totalItems ${t.settingsCount}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
+          t.systemSettingsDescription,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+
+    if (width < kNarrowWelcome) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          titleBlock,
+          const SizedBox(height: 10),
+          Text(statsText, style: statsStyle),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: titleBlock),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            statsText,
+            style: statsStyle,
+            textAlign: TextAlign.end,
           ),
         ),
       ],
@@ -227,6 +257,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
+    bool compactSpacing,
   ) {
     if (_categories.isEmpty) {
       return Center(
@@ -252,7 +283,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
             color: colorScheme.onSurface,
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: compactSpacing ? 12 : 16),
         ..._categories.map((category) {
           return SettingsCategorySection(
             key: ValueKey(category.id),
@@ -272,6 +303,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
+    bool compactSpacing,
   ) {
     if (_searchResults.isEmpty) {
       return Center(
@@ -339,14 +371,16 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: compactSpacing ? 12 : 16),
         ...groupedResults.entries.map((entry) {
           final categoryId = entry.key;
           final items = entry.value;
-          final category = _categories.firstWhere(
-            (cat) => cat.id == categoryId,
-            orElse: () => _categories.first,
-          );
+          final categoryMatch =
+              _categories.where((cat) => cat.id == categoryId).toList();
+          if (categoryMatch.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          final category = categoryMatch.first;
 
           // ایجاد یک دسته موقت فقط با آیتم‌های جستجو شده
           final searchCategory = SettingsCategory(

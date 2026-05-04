@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart' show BuildContext, Locale;
 import '../core/api_client.dart';
 import '../l10n/app_localizations.dart';
 import '../services/errors/api_error.dart';
+import '../services/document_policy_guard.dart';
 
 /// استخراج پیام خطای قابل‌نمایش برای کاربر (زبان از [AppLocalizations] یا آخرین locale برنامه).
 class ErrorExtractor {
@@ -177,6 +178,13 @@ class ErrorExtractor {
   static String _userMessage(Object e, AppLocalizations t) {
     if (e is dio.DioException) {
       return _dioExceptionMessage(e, t);
+    }
+    if (e is DocumentPolicyException) {
+      final msg = e.message.trim();
+      if (msg.isNotEmpty) return msg;
+      final code = e.code?.trim();
+      if (code != null && code.isNotEmpty) return code;
+      return t.errorDataSaveFailed;
     }
 
     final errorMessage = e.toString();

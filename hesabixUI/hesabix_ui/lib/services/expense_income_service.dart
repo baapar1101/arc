@@ -119,6 +119,7 @@ class ExpenseIncomeService {
       final data = response.data['data'] as Map<String, dynamic>;
       return _mapApiToExpenseIncomeDocument(data);
     } catch (e) {
+      if (e is DocumentPolicyException) rethrow;
       throw _handleError(e);
     }
   }

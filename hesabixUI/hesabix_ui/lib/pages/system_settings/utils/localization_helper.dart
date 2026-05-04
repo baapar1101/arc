@@ -1,5 +1,8 @@
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../models/settings_category.dart';
+import '../models/settings_item.dart';
+
 /// Helper class for getting localized strings from keys
 class LocalizationHelper {
   /// Get localized title for a settings item
@@ -19,6 +22,8 @@ class LocalizationHelper {
         return t.settingsShareLinks;
       case 'settingsRedisCache':
         return t.settingsRedisCache;
+      case 'settingsFirewall':
+        return t.settingsFirewall;
       case 'settingsStoragePlans':
         return t.settingsStoragePlans;
       case 'settingsDocumentMonetization':
@@ -89,6 +94,8 @@ class LocalizationHelper {
         return t.settingsShareLinksDescription;
       case 'settingsRedisCacheDescription':
         return t.settingsRedisCacheDescription;
+      case 'settingsFirewallDescription':
+        return t.settingsFirewallDescription;
       case 'settingsStoragePlansDescription':
         return t.settingsStoragePlansDescription;
       case 'settingsDocumentMonetizationDescription':
@@ -189,6 +196,32 @@ class LocalizationHelper {
       default:
         return key;
     }
+  }
+
+  /// جستجو روی کلیدهای داخلی، متن لوکالایز شده عنوان/توضیح آیتم
+  static bool itemMatchesSearch(
+    AppLocalizations t,
+    SettingsItem item,
+    String lowerQuery,
+  ) {
+    if (lowerQuery.isEmpty) return false;
+    final title = getTitle(t, item.title).toLowerCase();
+    final desc = getDescription(t, item.description).toLowerCase();
+    return item.id.toLowerCase().contains(lowerQuery) ||
+        item.title.toLowerCase().contains(lowerQuery) ||
+        item.description.toLowerCase().contains(lowerQuery) ||
+        title.contains(lowerQuery) ||
+        desc.contains(lowerQuery);
+  }
+
+  /// اگر عنوان/توضیح دسته با جُستار هم‌خوان باشد، همهٔ آیتم‌های همان دسته در نتیجه می‌آیند
+  static bool categoryMatchesSearch(AppLocalizations t, SettingsCategory category, String lowerQuery) {
+    if (lowerQuery.isEmpty) return false;
+    final title = getCategoryTitle(t, category.title).toLowerCase();
+    final descKey = category.description;
+    final desc =
+        descKey != null ? getCategoryDescription(t, descKey).toLowerCase() : '';
+    return title.contains(lowerQuery) || desc.contains(lowerQuery);
   }
 }
 
