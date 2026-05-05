@@ -2064,6 +2064,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
               ),
             ],
           ),
+            ),
+          ),
         ),
       ),
     );
@@ -3426,7 +3428,6 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                     },
                     label: t.people,
                     hintText: t.search,
-                    dense: true,
                     isRequired: true,
                   ),
                 ),

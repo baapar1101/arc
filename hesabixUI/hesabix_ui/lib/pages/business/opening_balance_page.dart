@@ -703,7 +703,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: BankAccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccountId: null,
-                onChanged: allowEdit ? (opt) {
+                onChanged: (opt) {
+                  if (!allowEdit) return;
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('bank', opt.id)) {
                     if (mounted) {
@@ -726,7 +727,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     'credit': 0.0,
                   });
                   setState(() {});
-                } : null,
+                },
                 label: 'افزودن بانک',
                 hintText: 'انتخاب و افزودن بانک',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
@@ -737,7 +738,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: CashRegisterComboboxWidget(
                 businessId: widget.businessId,
                 selectedRegisterId: null,
-                onChanged: allowEdit ? (opt) {
+                onChanged: (opt) {
+                  if (!allowEdit) return;
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('cash', opt.id)) {
                     if (mounted) {
@@ -760,7 +762,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     'credit': 0.0,
                   });
                   setState(() {});
-                } : null,
+                },
                 label: 'افزودن صندوق',
                 hintText: 'انتخاب و افزودن صندوق',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
@@ -771,7 +773,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: PettyCashComboboxWidget(
                 businessId: widget.businessId,
                 selectedPettyCashId: null,
-                onChanged: allowEdit ? (opt) {
+                onChanged: (opt) {
+                  if (!allowEdit) return;
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('petty', opt.id)) {
                     if (mounted) {
@@ -794,7 +797,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     'credit': 0.0,
                   });
                   setState(() {});
-                } : null,
+                },
                 label: 'افزودن تنخواه',
                 hintText: 'انتخاب و افزودن تنخواه',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
@@ -881,7 +884,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           alignment: AlignmentDirectional.centerStart,
             child: PersonComboboxWidget(
             businessId: widget.businessId,
-            onChanged: allowEdit ? (p) {
+            onChanged: (p) {
+              if (!allowEdit) return;
               if (p == null) return;
               if (_isPersonDuplicate(p.id)) {
                 if (mounted) {
@@ -901,7 +905,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 'credit': 0.0
               });
               setState(() {});
-            } : null,
+            },
             label: 'افزودن شخص',
             searchHint: 'نام/کد/تلفن...',
           ),
@@ -992,7 +996,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               width: 420,
               child: ProductComboboxWidget(
                 businessId: widget.businessId,
-                onChanged: allowEditInventory ? (p) {
+                onChanged: (p) {
+                  if (!allowEditInventory) return;
                   if (p == null) return;
                   final productId = p['id'] as int?;
                   if (productId == null) return;
@@ -1010,7 +1015,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   }
                   _inventoryLines.add({'product': p, 'warehouseId': null, 'quantity': 0.0, 'cost_price': 0.0});
                   setState(() {});
-                } : null,
+                },
                 label: 'افزودن کالا',
               ),
             ),
@@ -1019,11 +1024,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
-                onChanged: allowEditInventory ? (acc) {
+                onChanged: (acc) {
+                  if (!allowEditInventory) return;
                   _inventoryAccount = acc;
                   _inventoryAccountId = acc?.id;
                   setState(() {});
-                } : null,
+                },
                 label: 'حساب موجودی',
                 hintText: 'انتخاب حساب موجودی کالا',
                 isRequired: false,
@@ -1134,7 +1140,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: null,
-                onChanged: allowEdit ? (acc) {
+                onChanged: (acc) {
+                  if (!allowEdit) return;
                   if (acc != null) {
                     if (_isAccountDuplicate(acc.id)) {
                       if (mounted) {
@@ -1150,7 +1157,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     _otherAccountLines.add({'account': acc, 'debit': 0.0, 'credit': 0.0});
                     setState(() {});
                   }
-                } : null,
+                },
                 label: 'افزودن حساب',
                 hintText: 'جستجو و انتخاب حساب',
               ),
@@ -1160,11 +1167,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
-                onChanged: allowEdit ? (acc) {
+                onChanged: (acc) {
+                  if (!allowEdit) return;
                   _equityAccount = acc;
                   _equityAccountId = acc?.id;
                   setState(() {});
-                } : null,
+                },
                 label: 'حساب حقوق صاحبان سهام',
                 hintText: 'انتخاب حساب سرمایه/سنواتی',
               ),
@@ -1374,7 +1382,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _inventoryAccount = acc;
                     _inventoryAccountId = acc?.id;
@@ -1390,7 +1399,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _equityAccount = acc;
                     _equityAccountId = acc?.id;
@@ -1410,7 +1420,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _bankControlAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _bankControlAccount = acc;
                     _bankControlAccountId = acc?.id;
@@ -1426,7 +1437,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _cashControlAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _cashControlAccount = acc;
                     _cashControlAccountId = acc?.id;
@@ -1446,7 +1458,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _pettyControlAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _pettyControlAccount = acc;
                     _pettyControlAccountId = acc?.id;
@@ -1462,7 +1475,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personReceivableAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _personReceivableAccount = acc;
                     _personReceivableAccountId = acc?.id;
@@ -1482,7 +1496,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personPayableAccount,
-                onChanged: isPosted ? null : (acc) {
+                onChanged: (acc) {
+                  if (isPosted) return;
                   setState(() {
                     _personPayableAccount = acc;
                     _personPayableAccountId = acc?.id;
