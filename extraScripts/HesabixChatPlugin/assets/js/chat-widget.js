@@ -1392,102 +1392,6 @@
 	root.appendChild( wrap );
 	host.appendChild( root );
 
-	var threadBarSwitching = false;
-
-	function buildThreadOptions() {
-		var opts = [];
-		var curId = state.session ? String( state.session.conversation_id ) : null;
-		if ( state.session && state.session.visitor_token ) {
-			var pfx = ( cfg.strings && cfg.strings.threadCurrentPrefix ) || '';
-			opts.push( {
-				conversation_id: state.session.conversation_id,
-				visitor_token: state.session.visitor_token,
-				label: pfx + ' #' + state.session.conversation_id,
-				saved_at: Date.now()
-			} );
-		}
-		var hist = loadThreadHistory();
-		for ( var hi = 0; hi < hist.length; hi++ ) {
-			var h = hist[ hi ];
-			if ( ! h || h.conversation_id == null || ! h.visitor_token ) {
-				continue;
-			}
-			if ( curId && String( h.conversation_id ) === curId ) {
-				continue;
-			}
-			var ts = h.saved_at ? new Date( h.saved_at ) : null;
-			var st =
-				ts && ! isNaN( ts.getTime() )
-					? ts.toLocaleDateString() +
-					  ' · ' +
-					  ts.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } )
-					: '';
-			var lb = st ? '#' + h.conversation_id + ' · ' + st : '#' + h.conversation_id;
-			opts.push( {
-				conversation_id: h.conversation_id,
-				visitor_token: h.visitor_token,
-				label: lb,
-				saved_at: h.saved_at || 0
-			} );
-		}
-		return opts;
-	}
-
-	function refreshThreadBar() {
-		if ( ! threadBar || ! threadSel ) {
-			return;
-		}
-		var opts = buildThreadOptions();
-		if ( opts.length <= 1 ) {
-			threadBar.classList.add( 'hesabix-chat--hidden' );
-			return;
-		}
-		threadBar.classList.remove( 'hesabix-chat--hidden' );
-		var selId = state.session ? String( state.session.conversation_id ) : '';
-		threadSel.innerHTML = '';
-		for ( var oi = 0; oi < opts.length; oi++ ) {
-			var it = opts[ oi ];
-			var opt = document.createElement( 'option' );
-			opt.value = String( it.conversation_id );
-			opt.textContent = it.label;
-			opt.setAttribute( 'data-vtok', it.visitor_token );
-			if ( String( it.conversation_id ) === selId ) {
-				opt.selected = true;
-			}
-			threadSel.appendChild( opt );
-		}
-	}
-
-	threadSel.addEventListener( 'change', function () {
-		if ( threadBarSwitching ) {
-			return;
-		}
-		var opt = threadSel.options[ threadSel.selectedIndex ];
-		if ( ! opt ) {
-			return;
-		}
-		var vid = opt.value;
-		var vtk = opt.getAttribute( 'data-vtok' );
-		if ( ! vid || ! vtk ) {
-			return;
-		}
-		if ( state.session && String( state.session.conversation_id ) === vid ) {
-			return;
-		}
-		threadBarSwitching = true;
-		state.session = { conversation_id: +vid, visitor_token: vtk };
-		saveSession( +vid, vtk );
-		unbindRealtime();
-		afterSessionReady( false )
-			.then( function () {
-				threadBarSwitching = false;
-				refreshThreadBar();
-			} )
-			.catch( function () {
-				threadBarSwitching = false;
-			} );
-	} );
-
 	function setupVisitorFileUpload() {
 		var wantsFileUi = !!( cfg.showFileUpload );
 		var wantsVoiceUi = !!( cfg.showVoiceMessage );
@@ -1695,6 +1599,103 @@
 		chatWarn( 'خطا حین ساخت ویجت (قبل از اتصال رویدادها)', ( initEx && initEx.message ) || initEx, initEx );
 		return;
 	}
+
+	/* بیرون از try تا در strict mode همان scope تابع‌های enterChatMode / afterSessionReady باشد */
+	var threadBarSwitching = false;
+
+	function buildThreadOptions() {
+		var opts = [];
+		var curId = state.session ? String( state.session.conversation_id ) : null;
+		if ( state.session && state.session.visitor_token ) {
+			var pfx = ( cfg.strings && cfg.strings.threadCurrentPrefix ) || '';
+			opts.push( {
+				conversation_id: state.session.conversation_id,
+				visitor_token: state.session.visitor_token,
+				label: pfx + ' #' + state.session.conversation_id,
+				saved_at: Date.now()
+			} );
+		}
+		var hist = loadThreadHistory();
+		for ( var hi = 0; hi < hist.length; hi++ ) {
+			var h = hist[ hi ];
+			if ( ! h || h.conversation_id == null || ! h.visitor_token ) {
+				continue;
+			}
+			if ( curId && String( h.conversation_id ) === curId ) {
+				continue;
+			}
+			var ts = h.saved_at ? new Date( h.saved_at ) : null;
+			var st =
+				ts && ! isNaN( ts.getTime() )
+					? ts.toLocaleDateString() +
+					  ' · ' +
+					  ts.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } )
+					: '';
+			var lb = st ? '#' + h.conversation_id + ' · ' + st : '#' + h.conversation_id;
+			opts.push( {
+				conversation_id: h.conversation_id,
+				visitor_token: h.visitor_token,
+				label: lb,
+				saved_at: h.saved_at || 0
+			} );
+		}
+		return opts;
+	}
+
+	function refreshThreadBar() {
+		if ( ! threadBar || ! threadSel ) {
+			return;
+		}
+		var opts = buildThreadOptions();
+		if ( opts.length <= 1 ) {
+			threadBar.classList.add( 'hesabix-chat--hidden' );
+			return;
+		}
+		threadBar.classList.remove( 'hesabix-chat--hidden' );
+		var selId = state.session ? String( state.session.conversation_id ) : '';
+		threadSel.innerHTML = '';
+		for ( var oi = 0; oi < opts.length; oi++ ) {
+			var it = opts[ oi ];
+			var opt = document.createElement( 'option' );
+			opt.value = String( it.conversation_id );
+			opt.textContent = it.label;
+			opt.setAttribute( 'data-vtok', it.visitor_token );
+			if ( String( it.conversation_id ) === selId ) {
+				opt.selected = true;
+			}
+			threadSel.appendChild( opt );
+		}
+	}
+
+	threadSel.addEventListener( 'change', function () {
+		if ( threadBarSwitching ) {
+			return;
+		}
+		var opt = threadSel.options[ threadSel.selectedIndex ];
+		if ( ! opt ) {
+			return;
+		}
+		var vid = opt.value;
+		var vtk = opt.getAttribute( 'data-vtok' );
+		if ( ! vid || ! vtk ) {
+			return;
+		}
+		if ( state.session && String( state.session.conversation_id ) === vid ) {
+			return;
+		}
+		threadBarSwitching = true;
+		state.session = { conversation_id: +vid, visitor_token: vtk };
+		saveSession( +vid, vtk );
+		unbindRealtime();
+		afterSessionReady( false )
+			.then( function () {
+				threadBarSwitching = false;
+				refreshThreadBar();
+			} )
+			.catch( function () {
+				threadBarSwitching = false;
+			} );
+	} );
 
 	function showFormError( el, msg ) {
 		if ( ! el ) {

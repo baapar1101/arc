@@ -2940,6 +2940,8 @@
   "workflowEmpty": "This workflow is empty",
   "workflowErrorDisplay": "Error displaying workflow",
   "workflowExecutionLogs": "Execution logs",
+  "workflowExecutionLogCopyOne": "Copy this log",
+  "workflowExecutionLogsCopyAll": "Copy all logs",
   "workflowNoLogs": "No logs found",
   "workflowNoExecutions": "No executions yet",
   "workflowStarted": "Started",

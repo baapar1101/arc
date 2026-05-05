@@ -2982,6 +2982,8 @@
   "workflowEmpty": "این ورک‌فلو خالی است",
   "workflowErrorDisplay": "خطا در نمایش ورکفلو",
   "workflowExecutionLogs": "لاگ اجرا",
+  "workflowExecutionLogCopyOne": "کپی این لاگ",
+  "workflowExecutionLogsCopyAll": "کپی همهٔ لاگ‌ها",
   "workflowNoLogs": "لاگی یافت نشد",
   "workflowNoExecutions": "هنوز اجرایی وجود ندارد",
   "workflowStarted": "شروع",

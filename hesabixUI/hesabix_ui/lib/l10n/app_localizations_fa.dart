@@ -7551,6 +7551,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowExecutionLogs => 'لاگ اجرا';
 
   @override
+  String get workflowExecutionLogCopyOne => 'کپی این لاگ';
+
+  @override
+  String get workflowExecutionLogsCopyAll => 'کپی همهٔ لاگ‌ها';
+
+  @override
   String get workflowNoLogs => 'لاگی یافت نشد';
 
   @override

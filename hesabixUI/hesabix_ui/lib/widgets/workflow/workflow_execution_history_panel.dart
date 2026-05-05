@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
@@ -7,6 +8,7 @@ import 'workflow_analytics_dialog.dart';
 import 'workflow_timeline_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/workflow_log_clipboard.dart';
 
 
 /// Panel برای نمایش تاریخچه اجرای workflow
@@ -70,6 +72,27 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
         );
       }
     }
+  }
+
+  Future<void> _copyAllLogsToClipboard() async {
+    if (_logs.isEmpty) return;
+    final text = formatWorkflowExecutionLogsForClipboard(_logs);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    SnackBarHelper.show(
+      context,
+      message: AppLocalizations.of(context).reportTemplateCopied,
+    );
+  }
+
+  Future<void> _copyOneLogToClipboard(Map<String, dynamic> log) async {
+    final text = formatWorkflowExecutionLogForClipboard(log);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    SnackBarHelper.show(
+      context,
+      message: AppLocalizations.of(context).reportTemplateCopied,
+    );
   }
 
   Future<void> _loadLogs(int executionId) async {
@@ -426,11 +449,27 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                 ],
                 const Divider(),
                 const SizedBox(height: 8),
-                Text(
-                  'لاگ‌های اجرا',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'لاگ‌های اجرا',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.copy_all_outlined, size: 20),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      tooltip: AppLocalizations.of(context).workflowExecutionLogsCopyAll,
+                      onPressed: _logs.isEmpty ? null : _copyAllLogsToClipboard,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 if (_logs.isEmpty)
@@ -526,8 +565,19 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              if (createdAt != null) ...[
-                const Spacer(),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 32,
+                  minHeight: 32,
+                ),
+                tooltip: AppLocalizations.of(context).workflowExecutionLogCopyOne,
+                onPressed: () => _copyOneLogToClipboard(log),
+              ),
+              if (createdAt != null)
                 Text(
                   _formatDate(createdAt),
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -535,7 +585,6 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                     fontSize: 10,
                   ),
                 ),
-              ],
             ],
           ),
           const SizedBox(height: 4),

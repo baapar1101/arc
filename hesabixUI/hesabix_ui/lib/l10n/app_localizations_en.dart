@@ -7586,6 +7586,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workflowExecutionLogs => 'Execution logs';
 
   @override
+  String get workflowExecutionLogCopyOne => 'Copy this log';
+
+  @override
+  String get workflowExecutionLogsCopyAll => 'Copy all logs';
+
+  @override
   String get workflowNoLogs => 'No logs found';
 
   @override

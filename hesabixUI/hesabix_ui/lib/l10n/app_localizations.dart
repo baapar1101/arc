@@ -14303,6 +14303,18 @@ abstract class AppLocalizations {
   /// **'Execution logs'**
   String get workflowExecutionLogs;
 
+  /// No description provided for @workflowExecutionLogCopyOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy this log'**
+  String get workflowExecutionLogCopyOne;
+
+  /// No description provided for @workflowExecutionLogsCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy all logs'**
+  String get workflowExecutionLogsCopyAll;
+
   /// No description provided for @workflowNoLogs.
   ///
   /// In en, this message translates to:

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
@@ -16,6 +17,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/workflow/workflow_analytics_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/workflow_log_clipboard.dart';
 
 class WorkflowsPage extends StatefulWidget {
   final int businessId;
@@ -746,6 +748,21 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                         ),
                       ),
                       IconButton(
+                        icon: const Icon(Icons.copy_all_outlined),
+                        tooltip: t.workflowExecutionLogsCopyAll,
+                        onPressed: logs.isEmpty
+                            ? null
+                            : () async {
+                                final text = formatWorkflowExecutionLogsForClipboard(logs);
+                                await Clipboard.setData(ClipboardData(text: text));
+                                if (!dialogContext.mounted) return;
+                                SnackBarHelper.show(
+                                  dialogContext,
+                                  message: t.reportTemplateCopied,
+                                );
+                              },
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(dialogContext).pop(),
                         tooltip: t.workflowClose,
@@ -804,6 +821,25 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                                           fontSize: 11,
                                         ),
                                         visualDensity: VisualDensity.compact,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.copy_outlined, size: 20),
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 32,
+                                          minHeight: 32,
+                                        ),
+                                        tooltip: t.workflowExecutionLogCopyOne,
+                                        onPressed: () async {
+                                          final text = formatWorkflowExecutionLogForClipboard(log);
+                                          await Clipboard.setData(ClipboardData(text: text));
+                                          if (!dialogContext.mounted) return;
+                                          SnackBarHelper.show(
+                                            dialogContext,
+                                            message: t.reportTemplateCopied,
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
