@@ -174,6 +174,7 @@ adapters/db/models/business_ftp_backup_setting.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
 adapters/db/models/business_print_settings.py
+adapters/db/models/business_user_menu_preferences.py
 adapters/db/models/business_user_quick_links.py
 adapters/db/models/captcha.py
 adapters/db/models/cash_register.py
@@ -361,6 +362,7 @@ app/services/business_dashboard_service.py
 app/services/business_ftp_access.py
 app/services/business_ftp_queue_jobs.py
 app/services/business_ftp_service.py
+app/services/business_menu_preferences_service.py
 app/services/business_notification_service.py
 app/services/business_quick_links_service.py
 app/services/business_sample_data_service.py
@@ -635,6 +637,8 @@ migrations/versions/20260608_000001_user_ui_preferences.py
 migrations/versions/20260609_000001_product_general_barcodes.py
 migrations/versions/20260610_000001_user_inapp_alert_preferences.py
 migrations/versions/20260610_000002_business_print_settings_footer_meta.py
+migrations/versions/20260611_000001_business_user_menu_preferences.py
+migrations/versions/20260611_000001_notification_send_logs_and_daily_stats.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
