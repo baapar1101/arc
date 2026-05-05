@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, cast, Integer
@@ -166,7 +166,15 @@ def _invoice_line_unit_display_for_pdf(pl: Dict[str, Any]) -> str:
 router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد خرید"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد فاکتور",
+    description=(
+        "ثبت فاکتور جدید برای کسب‌وکار. بدنه درخواست همان ساختار پذیرفته‌شده توسط سرویس ایجاد فاکتور است "
+        "(نوع سند، تاریخ، طرف حساب، خطوط کالا/خدمت، استعلام انبار، اقساط و غیره در `extra_info`). "
+        "انتخاب دستی نرخ تسعیر ارز فقط با مجوز مشاهدهٔ تاریخچه نرخ (`currency_revaluation.view`) مجاز است."
+    ),
+)
 @require_business_access("business_id")
 def create_invoice_endpoint(
     request: Request,
@@ -187,7 +195,11 @@ def create_invoice_endpoint(
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 
 
-@router.get("/business/{business_id}/{invoice_id}/installments")
+@router.get(
+    "/business/{business_id}/{invoice_id}/installments",
+    summary="طرح اقساط فاکتور",
+    description="در صورت ثبت طرح اقساط روی فاکتور، جزئیات برنامه (اقساط، مبالغ، سررسیدها) برگردانده می‌شود.",
+)
 @require_business_access("business_id")
 def get_invoice_installments_endpoint(
     request: Request,
@@ -201,7 +213,11 @@ def get_invoice_installments_endpoint(
     return success_response(data=data, request=request, message="INSTALLMENT_PLAN_FETCHED")
 
 
-@router.get("/business/{business_id}/{invoice_id}/share-link")
+@router.get(
+    "/business/{business_id}/{invoice_id}/share-link",
+    summary="وضعیت لینک اشتراک‌گذاری فاکتور",
+    description="اگر لینک عمومی فعال برای مشاهدهٔ فاکتور وجود داشته باشد، آدرس و محدودیت‌های آن؛ در غیر این صورت بدون خطا با دادهٔ خالی.",
+)
 @require_business_access("business_id")
 def get_invoice_share_link_endpoint(
     request: Request,
@@ -221,7 +237,14 @@ def get_invoice_share_link_endpoint(
     )
 
 
-@router.post("/business/{business_id}/{invoice_id}/share-link")
+@router.post(
+    "/business/{business_id}/{invoice_id}/share-link",
+    summary="ایجاد یا تمدید لینک اشتراک‌گذاری فاکتور",
+    description=(
+        "ایجاد لینک عمومی با امکان تعیین مدت اعتبار، حداکثر بازدید و جایگزینی لینک قبلی. "
+        "بدنه مطابق مدل `InvoiceShareLinkCreateRequest` است."
+    ),
+)
 @require_business_access("business_id")
 def create_invoice_share_link_endpoint(
     request: Request,
@@ -250,7 +273,11 @@ def create_invoice_share_link_endpoint(
     )
 
 
-@router.delete("/business/{business_id}/{invoice_id}/share-link")
+@router.delete(
+    "/business/{business_id}/{invoice_id}/share-link",
+    summary="لغو لینک اشتراک‌گذاری فاکتور",
+    description="ابطال لینک عمومی فعال؛ در صورت نبود لینک فعال پاسخ 404 برمی‌گردد.",
+)
 @require_business_access("business_id")
 def delete_invoice_share_link_endpoint(
     request: Request,
@@ -271,7 +298,14 @@ def delete_invoice_share_link_endpoint(
     return success_response(data=None, request=request, message="INVOICE_SHARE_LINK_REVOKED")
 
 
-@router.post("/business/{business_id}/installments/search")
+@router.post(
+    "/business/{business_id}/installments/search",
+    summary="جستجوی اقساط",
+    description=(
+        "لیست اقساط با فیلترهای اختیاری: سال مالی، بازه سررسید، وضعیت، شخص، فاکتور، صفحه‌بندی (`take`/`skip`) و غیره. "
+        "جزئیات فیلدها در docstring تابع آمده است."
+    ),
+)
 @require_business_access("business_id")
 def search_installments_endpoint(
     request: Request,
@@ -303,7 +337,11 @@ def search_installments_endpoint(
     return success_response(data=formatted, request=request, message="INSTALLMENTS_LIST_FETCHED")
 
 
-@router.post("/business/{business_id}/installments/export/excel")
+@router.post(
+    "/business/{business_id}/installments/export/excel",
+    summary="خروجی Excel اقساط",
+    description="همان فیلترهای `installments/search`؛ در صورت نبود کتابخانه XLSX ممکن است CSV برگردد.",
+)
 @require_business_access("business_id")
 def export_installments_excel_endpoint(
     request: Request,
@@ -332,7 +370,11 @@ def export_installments_excel_endpoint(
     return Response(content=content, media_type=mime, headers=headers)
 
 
-@router.post("/business/{business_id}/installments/export/pdf")
+@router.post(
+    "/business/{business_id}/installments/export/pdf",
+    summary="خروجی PDF گزارش اقساط",
+    description="PDF گزارش اقساط با همان فیلترهای جستجو؛ پارامترهای `paper_size` و `orientation` در بدنه اختیاری هستند.",
+)
 @require_business_access("business_id")
 def export_installments_pdf_endpoint(
     request: Request,
@@ -453,23 +495,23 @@ def export_installments_pdf_endpoint(
     stats = data.get("stats") or {}
 
     now = datetime.datetime.now()
-    footer_text = ""
     try:
-        footer_label = "زمان چاپ" if is_fa else "Printed at"
-        issuer_label = "صادرکننده" if is_fa else "Issued by"
-        issuer_name = ""
+        from app.services.print_footer_settings import build_print_meta_footer_line
+
+        pn = ""
         try:
-            issuer_name = ctx.get_user_name() or ""
+            pn = ctx.get_user_name() or ""
         except Exception:
-            issuer_name = ""
-        try:
-            fd = CalendarConverter.format_datetime(now, "jalali" if calendar_type == "jalali" else "gregorian")
-            printed_at_str = fd.get("formatted") or fd.get("date_only", "")
-        except Exception:
-            printed_at_str = now.strftime("%Y/%m/%d %H:%M")
-        footer_text = f"{footer_label}: {printed_at_str}"
-        if issuer_name:
-            footer_text += f" | {issuer_label}: {issuer_name}"
+            pn = ""
+        cal = "jalali" if calendar_type == "jalali" else "gregorian"
+        footer_text = build_print_meta_footer_line(
+            db,
+            business_id,
+            now=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+            calendar_type=cal,
+        )
     except Exception:
         footer_text = ""
 
@@ -511,7 +553,14 @@ def export_installments_pdf_endpoint(
     )
 
 
-@router.put("/business/{business_id}/{invoice_id}")
+@router.put(
+    "/business/{business_id}/{invoice_id}",
+    summary="ویرایش فاکتور",
+    description=(
+        "به‌روزرسانی فاکتور موجود. خطاهای رایج: شخص نامعتبر (`INVALID_PERSON`)، تکراری بودن شماره فاکتور (`DUPLICATE_DOCUMENT_CODE`). "
+        "همان قواعد انتخاب نرخ ارز دستی مانند ایجاد فاکتور اعمال می‌شود."
+    ),
+)
 @require_business_access("business_id")
 def update_invoice_endpoint(
     request: Request,
@@ -564,7 +613,7 @@ def update_invoice_endpoint(
 @router.delete(
     "/business/{business_id}/{invoice_id}",
     summary="حذف فاکتور",
-    description="حذف یک فاکتور",
+    description="حذف یک فاکتور پس از اعتبارسنجی مالکیت و نوع سند؛ در صورت وجود وابستگی به اسناد دیگر ممکن است خطای منطقی برگردد.",
 )
 @require_business_access("business_id")
 def delete_invoice_endpoint(
@@ -599,7 +648,10 @@ def delete_invoice_endpoint(
 @router.post(
     "/business/{business_id}/bulk-delete",
     summary="حذف گروهی فاکتورها",
-    description="حذف چندین فاکتور به صورت همزمان. فاکتورهایی که به هر دلیل حذف نشوند در skipped با دلیل برگردانده می‌شوند.",
+    description=(
+        'بدنه: `{"invoice_ids": [int, ...]}` — حذف چند فاکتور همزمان؛ '
+        "شناسه‌های حذف‌شده در `deleted` و موارد رد شده با دلیل در `skipped` برمی‌گردد."
+    ),
 )
 @require_business_access("business_id")
 def bulk_delete_invoices_endpoint(
@@ -629,7 +681,14 @@ def bulk_delete_invoices_endpoint(
     )
 
 
-@router.get("/business/{business_id}/{invoice_id}/delete-info")
+@router.get(
+    "/business/{business_id}/{invoice_id}/delete-info",
+    summary="پیش‌نمایش اثرات حذف فاکتور",
+    description=(
+        "قبل از حذف، ارتباطات سند را برمی‌گرداند: کارپوشه مودیان، اقساط، اسناد دریافت/پرداخت و حواله‌های انبار. "
+        "برای نمایش هشدار در رابط کاربری استفاده می‌شود."
+    ),
+)
 @require_business_access("business_id")
 def get_invoice_delete_info(
     request: Request,
@@ -752,7 +811,10 @@ def get_invoice_delete_info(
 def list_invoice_tags_endpoint(
     request: Request,
     business_id: int,
-    include_inactive: bool = False,
+    include_inactive: bool = Query(
+        default=False,
+        description="در صورت true برچسب‌های غیرفعال نیز در لیست می‌آیند",
+    ),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("invoices", "view")),
@@ -764,6 +826,7 @@ def list_invoice_tags_endpoint(
 @router.post(
     "/business/{business_id}/tags",
     summary="ایجاد برچسب فاکتور",
+    description='بدنه: `{"name": "...", "color": "#RRGGBB?"}` — برچسب برای فیلتر و نمایش روی فاکتورها.',
 )
 @require_business_access("business_id")
 def create_invoice_tag_endpoint(
@@ -783,6 +846,7 @@ def create_invoice_tag_endpoint(
 @router.patch(
     "/business/{business_id}/tags/{tag_id}",
     summary="ویرایش برچسب فاکتور",
+    description="فیلدهای ارسالی (نام، رنگ، فعال/غیرفعال و ...) طبق بدنه درخواست به‌روز می‌شوند.",
 )
 @require_business_access("business_id")
 def update_invoice_tag_endpoint(
@@ -798,7 +862,11 @@ def update_invoice_tag_endpoint(
     return success_response(data={"item": item}, request=request, message="INVOICE_TAG_UPDATED")
 
 
-@router.get("/business/{business_id}/{invoice_id}")
+@router.get(
+    "/business/{business_id}/{invoice_id}",
+    summary="جزئیات یک فاکتور",
+    description="خروجی کامل سند به شکل دیکشنری (شامل خطوط، مبالغ، اضافه‌اطلاعات، برچسب‌ها پس از فرمت‌دهی).",
+)
 @require_business_access("business_id")
 def get_invoice_endpoint(
     request: Request,
@@ -817,7 +885,14 @@ def get_invoice_endpoint(
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
 
-@router.post("/business/{business_id}/backfill-profit-ledger")
+@router.post(
+    "/business/{business_id}/backfill-profit-ledger",
+    summary="پر کردن دفتر سود قطعی (شناسایی)",
+    description=(
+        "برای اسناد قبلی، مقادیر بهای تمام‌شده و سود ناخالص قطعی را مطابق تنظیم «زمان شناسایی قطعی» کسب‌وکار ذخیره می‌کند. "
+        "اختیاری: `fiscal_year_id`, `invoice_ids`, `limit`, `use_background` برای صف صف پس‌زمینه."
+    ),
+)
 @require_business_access("business_id")
 def backfill_invoice_profit_ledger_endpoint(
     request: Request,
@@ -899,7 +974,14 @@ def backfill_invoice_profit_ledger_endpoint(
     return success_response(data=result, request=request, message="PROFIT_LEDGER_BACKFILLED")
 
 
-@router.post("/business/{business_id}/recalculate-all-profits")
+@router.post(
+    "/business/{business_id}/recalculate-all-profits",
+    summary="محاسبه مجدد سود همه فاکتورها",
+    description=(
+        "معادل فراخوانی `recalculate-profits` بدون فیلتر؛ پس از تغییر تنظیمات محاسبه سود کسب‌وکار استفاده می‌شود. "
+        "در صورت حجم بالا، صف پس‌زمینه به‌کار می‌رود."
+    ),
+)
 @require_business_access("business_id")
 def recalculate_all_invoice_profits_endpoint(
     request: Request,
@@ -944,7 +1026,14 @@ def recalculate_all_invoice_profits_endpoint(
     )
 
 
-@router.post("/business/{business_id}/recalculate-profits")
+@router.post(
+    "/business/{business_id}/recalculate-profits",
+    summary="محاسبه مجدد سود فاکتورها (با فیلتر)",
+    description=(
+        "بدنه: `invoice_ids` اختیاری، `document_type`, `fiscal_year_id`, `batch_size` (پیش‌فرض ۱۰۰)، "
+        "`use_background` (پیش‌فرض true). فقط انواع فروش/برگشت از فروش/تولید در منطق فعلی پردازش می‌شوند."
+    ),
+)
 @require_business_access("business_id")
 def recalculate_invoice_profits_endpoint(
     request: Request,
@@ -1118,7 +1207,10 @@ def recalculate_invoice_profits_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
-    description="دریافت فایل PDF یک فاکتور با پشتیبانی از قالب سفارشی (invoices/detail)",
+    description=(
+        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض ماژول `invoices/detail`، "
+        "در نهایت HTML پیش‌فرض. پارامترهای query مانند `show_stamp` می‌توانند چاپ را کنترل کنند."
+    ),
 )
 @require_business_access("business_id")
 async def export_single_invoice_pdf(
@@ -1127,7 +1219,10 @@ async def export_single_invoice_pdf(
     request: Request,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    template_id: int | None = None,
+    template_id: int | None = Query(
+        default=None,
+        description="شناسه قالب گزارش منتشرشده برای جزئیات فاکتور؛ در صورت خالی بودن از پیش‌فرض کسب‌وکار استفاده می‌شود.",
+    ),
     _: None = Depends(require_business_permission_by_entity_dep("invoices", "view", Document, "invoice_id")),
 ):
     """
@@ -1192,6 +1287,8 @@ async def export_single_invoice_pdf(
         "show_payments": True,
         "show_installment_plan": True,
         "show_share_qr": False,
+        "show_footer_print_time": True,
+        "show_footer_preparer": True,
         "footer_note": None,
     }
     invoice_footer_note: Optional[str] = None
@@ -1240,6 +1337,12 @@ async def export_single_invoice_pdf(
                                 getattr(r, "show_installment_plan", True)
                             ),
                             "show_share_qr": bool(getattr(r, "show_share_qr", False)),
+                            "show_footer_print_time": bool(
+                                getattr(r, "show_footer_print_time", True)
+                            ),
+                            "show_footer_preparer": bool(
+                                getattr(r, "show_footer_preparer", True)
+                            ),
                             "footer_note": getattr(r, "footer_note", None),
                         }
                     elif r.document_type == doc.document_type:
@@ -1251,6 +1354,12 @@ async def export_single_invoice_pdf(
                                 getattr(r, "show_installment_plan", True)
                             ),
                             "show_share_qr": bool(getattr(r, "show_share_qr", False)),
+                            "show_footer_print_time": bool(
+                                getattr(r, "show_footer_print_time", True)
+                            ),
+                            "show_footer_preparer": bool(
+                                getattr(r, "show_footer_preparer", True)
+                            ),
                             "footer_note": getattr(r, "footer_note", None),
                         }
                 if per_type_cfg is None:
@@ -1286,6 +1395,12 @@ async def export_single_invoice_pdf(
                 _shq = _normalize_bool(_qp_print.get("show_share_qr"))
                 if _shq is not None:
                     print_settings["show_share_qr"] = _shq
+                _sft = _normalize_bool(_qp_print.get("show_footer_print_time"))
+                if _sft is not None:
+                    print_settings["show_footer_print_time"] = _sft
+                _sfp = _normalize_bool(_qp_print.get("show_footer_preparer"))
+                if _sfp is not None:
+                    print_settings["show_footer_preparer"] = _sfp
             except Exception:
                 pass
 
@@ -1348,6 +1463,12 @@ async def export_single_invoice_pdf(
         _qf = _norm_bool_pdf(_qp_fb.get("show_share_qr"))
         if _qf is not None:
             print_settings["show_share_qr"] = _qf
+        _qft = _norm_bool_pdf(_qp_fb.get("show_footer_print_time"))
+        if _qft is not None:
+            print_settings["show_footer_print_time"] = _qft
+        _qfp = _norm_bool_pdf(_qp_fb.get("show_footer_preparer"))
+        if _qfp is not None:
+            print_settings["show_footer_preparer"] = _qfp
     except Exception:
         pass
 
@@ -1955,6 +2076,8 @@ async def export_single_invoice_pdf(
         "customer_balance_info": customer_balance_info,
         "show_invoice_verify_qr": show_invoice_verify_qr,
         "invoice_verify_qr_data_uri": invoice_verify_qr_data_uri,
+        "show_footer_print_time": bool(print_settings.get("show_footer_print_time", True)),
+        "show_footer_preparer": bool(print_settings.get("show_footer_preparer", True)),
     }
 
     # تلاش برای رندر با قالب سفارشی
@@ -1996,27 +2119,30 @@ async def export_single_invoice_pdf(
     # حالت پیش‌فرض صفحه برای فاکتور: افقی (landscape)، مگر این‌که صراحتاً چیز دیگری ارسال شده باشد
     if not orientation:
         orientation = "landscape"
-    # متن فوتر با زمان چاپ (بر اساس تقویم انتخاب‌شده کاربر) و نام صادرکننده
+    # متن فوتر با زمان چاپ (بر اساس تقویم انتخاب‌شده کاربر) و نام تهیه‌کنندهٔ سند
     try:
         now = template_context["generated_at"]
         footer_text = ""
+        show_ft = bool(print_settings.get("show_footer_print_time", True))
+        show_prep = bool(print_settings.get("show_footer_preparer", True))
         if isinstance(now, datetime.datetime):
             footer_label = "زمان چاپ" if is_fa else "Printed at"
-            issuer_label = "صادرکننده" if is_fa else "Issued by"
+            preparer_label = "تهیه‌کننده" if is_fa else "Prepared by"
+            printed_at_str = ""
             try:
                 if calendar_type == "jalali":
                     fd = CalendarConverter.format_datetime(now, "jalali")
                 else:
                     fd = CalendarConverter.format_datetime(now, "gregorian")
-                printed_at_str = fd.get("formatted") or fd.get("date_only", "")
-                if printed_at_str:
-                    footer_text = f"{footer_label}: {printed_at_str}"
-                    if issuer_name:
-                        footer_text += f" | {issuer_label}: {issuer_name}"
+                printed_at_str = fd.get("formatted") or fd.get("date_only", "") or ""
             except Exception:
-                footer_text = f"{footer_label}: {now.strftime('%Y/%m/%d %H:%M')}"
-                if issuer_name:
-                    footer_text += f" | {issuer_label}: {issuer_name}"
+                printed_at_str = now.strftime("%Y/%m/%d %H:%M")
+            parts: List[str] = []
+            if show_ft and printed_at_str:
+                parts.append(f"{footer_label}: {printed_at_str}")
+            if show_prep and issuer_name:
+                parts.append(f"{preparer_label}: {issuer_name}")
+            footer_text = " | ".join(parts)
     except Exception:
         footer_text = ""
 
@@ -2103,7 +2229,16 @@ def _apply_invoice_list_text_search(
     return q.filter(or_(*parts))
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="لیست و جستجوی فاکتورها",
+    description=(
+        "ترکیب استاندارد `QueryInfo` (take، skip، sort، search، filters) با فیلترهای فاکتور: "
+        "`document_type`, `is_proforma`, `currency_id`, `fiscal_year_id` (یا هدر `X-Fiscal-Year-ID`), "
+        "`project_id`, `person_id`, بازه `from_date`/`to_date`, برچسب‌ها، فاکتور اقساطی (`is_installment_sale`) و … . "
+        "خروجی شامل آیتم‌های غنی، مانده و وضعیت مودیان است؛ نتیجه ممکن است کش کوتاه‌مدت داشته باشد."
+    ),
+)
 @require_business_access("business_id")
 async def search_invoices_endpoint(
 	request: Request,
@@ -2547,7 +2682,14 @@ def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None
         item["counterparty"] = ""
 
 
-@router.post("/business/{business_id}/tax-workspace/search")
+@router.post(
+    "/business/{business_id}/tax-workspace/search",
+    summary="جستجو در کارپوشه مودیان",
+    description=(
+        "فقط اسنادی که در کارپوشه مالیاتی علامت خورده‌اند؛ فیلتر `tax_status` در بدنه اختیاری است. "
+        "بدنه ترکیبی از `QueryInfo` و فیلدهای تخت مشابه لیست فاکتور است."
+    ),
+)
 @require_business_access("business_id")
 async def search_tax_workspace_endpoint(
     request: Request,
@@ -2789,7 +2931,11 @@ def _ensure_sales_or_return(doc: Document) -> None:
         )
 
 
-@router.post("/business/{business_id}/{invoice_id}/tax-workspace/add")
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/add",
+    summary="افزودن فاکتور به کارپوشه مودیان",
+    description="فقط فاکتور فروش یا برگشت از فروش غیرپیش‌فاکتور؛ وضعیت اولیه معمولاً `not_sent`.",
+)
 @require_business_access("business_id")
 def add_invoice_to_tax_workspace(
     request: Request,
@@ -2818,7 +2964,11 @@ def add_invoice_to_tax_workspace(
     )
 
 
-@router.post("/business/{business_id}/{invoice_id}/tax-workspace/remove")
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/remove",
+    summary="حذف فاکتور از کارپوشه مودیان",
+    description="فقط در صورتی مجاز است که فاکتور هنوز به‌صورت نهایی به سامانه ارسال نشده باشد (`sent`/`finalized` ممنوع).",
+)
 @require_business_access("business_id")
 def remove_invoice_from_tax_workspace(
     request: Request,
@@ -2851,7 +3001,11 @@ def remove_invoice_from_tax_workspace(
         message="INVOICE_REMOVED_FROM_TAX_WORKSPACE",
     )
 
-@router.post("/business/{business_id}/{invoice_id}/tax-workspace/send-to-system")
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/send-to-system",
+    summary="ارسال تکی فاکتور به سامانه مودیان",
+    description="فاکتور باید در کارپوشه باشد و قبلاً قطعی ارسال نشده باشد؛ پس از فراخوانی، وضعیت و کدهای رهگیری در سند به‌روز می‌شوند.",
+)
 @require_business_access("business_id")
 def send_invoice_to_tax_system(
     request: Request,
@@ -2893,7 +3047,11 @@ def send_invoice_to_tax_system(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/send-to-system-batch")
+@router.post(
+    "/business/{business_id}/tax-workspace/send-to-system-batch",
+    summary="ارسال گروهی به سامانه مودیان",
+    description='بدنه: `{"invoice_ids": [1,2,...]}` — برای هر شناسه نتیجه در `succeeded` یا جزئیات خطا در `failed`.',
+)
 @require_business_access("business_id")
 def send_invoices_to_tax_system_batch(
     request: Request,
@@ -2956,7 +3114,11 @@ def send_invoices_to_tax_system_batch(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/remove-batch")
+@router.post(
+    "/business/{business_id}/tax-workspace/remove-batch",
+    summary="حذف گروهی از کارپوشه مودیان",
+    description='بدنه: `{"invoice_ids": [...]}` — اسناد ارسال‌شده به سامانه از کارپوشه حذف نمی‌شوند.',
+)
 @require_business_access("business_id")
 def remove_invoices_from_tax_workspace_batch(
     request: Request,
@@ -3004,7 +3166,11 @@ def remove_invoices_from_tax_workspace_batch(
     )
 
 
-@router.get("/business/{business_id}/tax-workspace/health")
+@router.get(
+    "/business/{business_id}/tax-workspace/health",
+    summary="سلامت اتصال سامانه مالیاتی",
+    description="وضعیت پیکربندی و اتصال (مثلاً سامانه مودیان) برای این کسب‌وکار؛ مناسب داشبورد و عیب‌یابی.",
+)
 @require_business_access("business_id")
 def get_tax_system_health(
     request: Request,
@@ -3024,14 +3190,18 @@ def get_tax_system_health(
     )
 
 
-@router.get("/business/{business_id}/tax-workspace/failed-invoices")
+@router.get(
+    "/business/{business_id}/tax-workspace/failed-invoices",
+    summary="صف ارسال ناموفق (Dead Letter)",
+    description="ردیف‌های صف خطای ارسال مالیاتی با امکان فیلتر و صفحه‌بندی.",
+)
 @require_business_access("business_id")
 def get_failed_invoices(
     request: Request,
     business_id: int,
-    status: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0,
+    status: Optional[str] = Query(default=None, description="فیلتر وضعیت رکورد در صف (در صورت پشتیبانی سرویس)"),
+    limit: int = Query(default=100, ge=1, le=1000, description="حداکثر تعداد رکورد"),
+    offset: int = Query(default=0, ge=0, description="جابجایی صفحه"),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -3063,7 +3233,11 @@ def get_failed_invoices(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/failed-invoices/{failed_id}/retry")
+@router.post(
+    "/business/{business_id}/tax-workspace/failed-invoices/{failed_id}/retry",
+    summary="تلاش مجدد ارسال رکورد ناموفق",
+    description="یک رکورد از صف Dead Letter را دوباره برای ارسال به سامانه مالیاتی تلاش می‌کند.",
+)
 @require_business_access("business_id")
 def retry_failed_invoice_endpoint(
     request: Request,
@@ -3085,7 +3259,11 @@ def retry_failed_invoice_endpoint(
     )
 
 
-@router.get("/business/{business_id}/{invoice_id}/tax-timeline")
+@router.get(
+    "/business/{business_id}/{invoice_id}/tax-timeline",
+    summary="تایم‌لاین مالیاتی فاکتور",
+    description="رویدادهای ارسال، استعلام و خطا مرتبط با وضعیت مالیاتی سند (شامل تلاقی با صف ناموفق).",
+)
 @require_business_access("business_id")
 def get_invoice_tax_timeline(
     request: Request,
@@ -3144,7 +3322,14 @@ def get_invoice_tax_timeline(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/inquire-status")
+@router.post(
+    "/business/{business_id}/tax-workspace/inquire-status",
+    summary="استعلام وضعیت از سامانه مالیاتی",
+    description=(
+        "حداقل یکی از `invoice_ids` یا `tracking_codes` در بدنه لازم است. "
+        "نتیجهٔ استعلام برای اسناد به‌روزرسانی و در پاسخ برمی‌گردد."
+    ),
+)
 @require_business_access("business_id")
 def inquire_tax_status_endpoint(
     request: Request,
@@ -3181,7 +3366,11 @@ def inquire_tax_status_endpoint(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/validate-batch")
+@router.post(
+    "/business/{business_id}/tax-workspace/validate-batch",
+    summary="اعتبارسنجی گروهی قبل از ارسال مالیاتی",
+    description='بدنه: `{"invoice_ids": [...]}` — فهرست `validated` و ردها با `issues` در `invalid`.',
+)
 @require_business_access("business_id")
 def validate_invoices_for_tax_batch(
     request: Request,
@@ -3251,7 +3440,14 @@ def validate_invoices_for_tax_batch(
     )
 
 
-@router.post("/business/{business_id}/tax-workspace/quick-actions")
+@router.post(
+    "/business/{business_id}/tax-workspace/quick-actions",
+    summary="عملیات سریع کارپوشه مالیاتی",
+    description=(
+        "بدنه باید شامل `action` باشد: `send_all_pending`, `inquire_all_sent`, `retry_all_failed`. "
+        "در پس‌زمینه از همان endpointهای ارسال گروهی یا استعلام استفاده می‌شود."
+    ),
+)
 @require_business_access("business_id")
 def tax_workspace_quick_actions(
     request: Request,
@@ -3346,7 +3542,10 @@ def tax_workspace_quick_actions(
 @router.post(
     "/business/{business_id}/export/excel",
     summary="خروجی Excel لیست فاکتورها",
-    description="خروجی Excel لیست فاکتورها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description=(
+        "فیلتر مشابه جستجو (متن، نوع سند، پیش‌فاکتور، ارز، سال مالی، پروژه، بازه تاریخ، برچسب، تیک/اسکیپ). "
+        "`export_columns` ستون‌ها و برچسب‌ها را مشخص می‌کند؛ `selected_only` و `selected_indices` برای خروج فقط سطرهای انتخاب‌شده در گرید."
+    ),
 )
 @require_business_access("business_id")
 async def export_invoices_excel(
@@ -3721,7 +3920,10 @@ async def export_invoices_excel(
 @router.post(
     "/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست فاکتورها",
-    description="خروجی PDF لیست فاکتورها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description=(
+        "همان منطق فیلتر و ستون‌های Excel؛ علاوه بر آن `template_id` برای قالب سفارشی ماژول invoices/list، "
+        "`disposition` برای attachment/inline، `paper_size` و `orientation` برای چاپ."
+    ),
 )
 @require_business_access("business_id")
 async def export_invoices_pdf(
@@ -3980,7 +4182,23 @@ async def export_invoices_pdf(
     title_text = "لیست فاکتورها" if is_fa else "Invoices List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
 
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
 
@@ -4194,9 +4412,13 @@ async def export_invoices_pdf(
     )
 
 
-@router.post("/business/{business_id}/import/template",
+@router.post(
+    "/business/{business_id}/import/template",
     summary="دانلود تمپلیت ایمپورت فاکتورها",
-    description="فایل Excel تمپلیت برای ایمپورت فاکتورها را برمی‌گرداند",
+    description=(
+        "فایل XLSX با هدر ستون‌ها و چند ردیف نمونه؛ ستون `invoice_number` ردیف‌های یک فاکتور را گروه‌بندی می‌کند. "
+        "انواع مجاز در ستون invoice_type در توضیحات هدر فایل آمده است."
+    ),
 )
 @require_business_access("business_id")
 async def download_invoices_import_template(
@@ -4296,16 +4518,23 @@ async def download_invoices_import_template(
     )
 
 
-@router.post("/business/{business_id}/import/excel",
+@router.post(
+    "/business/{business_id}/import/excel",
     summary="ایمپورت فاکتورها از فایل Excel",
-    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+    description=(
+        "فرم چندبخشی: فیلد `file` (xlsx)، فرم `dry_run` (true/false) — در حالت dry_run فقط اعتبارسنجی و خلاصه بدون ثبت سند. "
+        "خروجی شامل `summary` (تعداد، معتبر، نامعتبر، ایجادشده) و آرایه `errors` به تفکیک شماره فاکتور است."
+    ),
 )
 @require_business_access("business_id")
 async def import_invoices_excel(
     request: Request,
     business_id: int,
-    file: UploadFile = File(...),
-    dry_run: str = Form(default="true"),
+    file: UploadFile = File(..., description="فایل Excel (.xlsx) مطابق تمپلیت ایمپورت"),
+    dry_run: str = Form(
+        default="true",
+        description="true: فقط اعتبارسنجی و گزارش؛ false: ثبت فاکتورهای معتبر",
+    ),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("invoices", "add")),
@@ -4707,7 +4936,14 @@ async def import_invoices_excel(
         raise ApiError("IMPORT_ERROR", f"خطا در پردازش فایل: {e}", http_status=500)
 
 
-@router.post("/business/{business_id}/invoices/calculate-remaining")
+@router.post(
+    "/business/{business_id}/invoices/calculate-remaining",
+    summary="مانده چند فاکتور (پرداخت‌شده و باقیمانده)",
+    description=(
+        "بدنه: `{\"invoice_ids\": [int, ...]}` — برای هر شناسه مبلغ کل، پرداخت‌شده، مانده و وضعیت تسویه برمی‌گردد. "
+        "برای نمایش در لیست یا فاکتور اقساطی کاربرد دارد."
+    ),
+)
 @require_business_access("business_id")
 async def calculate_invoices_remaining_endpoint(
     request: Request,

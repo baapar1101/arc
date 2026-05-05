@@ -1,7 +1,7 @@
 # noqa: D100
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -27,6 +27,10 @@ class CrmChatConversationStartPublic(BaseModel):
 	email: str = Field(default="", max_length=255, description="خالی اگر در ویجت اختیاری/پنهان باشد")
 	phone: str = Field(..., min_length=5, max_length=64)
 	page_url: Optional[str] = Field(None, max_length=2048)
+	device_type: Optional[Literal["mobile", "tablet", "desktop"]] = Field(
+		default=None,
+		description="طبقهٔ دستگاه بازدیدکننده از ویجت وب (اختیاری؛ از کلاینت)",
+	)
 
 	@field_validator("email", mode="before")
 	@classmethod

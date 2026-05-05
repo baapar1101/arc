@@ -30,6 +30,7 @@ import 'package:uuid/uuid.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
+import 'business_shell_side_nav_scope.dart';
 
 
 class WorkflowVisualEditorPage extends StatefulWidget {
@@ -61,17 +62,28 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   final _uuid = const Uuid();
   WorkflowAutoLayoutType _layoutType = WorkflowAutoLayoutType.hierarchical;
   bool _testRunBusy = false;
+  VoidCallback? _restoreDesktopRailAfterQuit;
 
   @override
   void initState() {
     super.initState();
     _workflow = widget.workflow;
     _loadData();
-    _focusNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
+      if (shellScope?.canControlDesktopRail ?? false) {
+        shellScope!.setRailVisible(false);
+        final scope = shellScope;
+        _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
+      }
+      _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
+    _restoreDesktopRailAfterQuit?.call();
     _focusNode.dispose();
     _editorState.dispose();
     super.dispose();

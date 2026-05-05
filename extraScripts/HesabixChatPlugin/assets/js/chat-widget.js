@@ -348,6 +348,85 @@
 		clearRememberedPanelOpen();
 	}
 
+	function historyStorageKey() {
+		return 'hesabix_wp_hist_1_' + simpleKey( cfg.apiBase + '|' + cfg.publicKey );
+	}
+
+	function loadThreadHistory() {
+		try {
+			var raw = localStorage.getItem( historyStorageKey() );
+			if ( ! raw ) {
+				return [];
+			}
+			var o = JSON.parse( raw );
+			if ( ! o || o.v !== 1 || ! Array.isArray( o.items ) ) {
+				return [];
+			}
+			return o.items;
+		} catch ( eH ) {
+			return [];
+		}
+	}
+
+	function saveThreadHistory( items ) {
+		try {
+			localStorage.setItem(
+				historyStorageKey(),
+				JSON.stringify( { v: 1, items: items } )
+			);
+		} catch ( eS ) {}
+	}
+
+	function pushThreadHistory( sess ) {
+		if ( ! sess || sess.conversation_id == null || ! sess.visitor_token ) {
+			return;
+		}
+		var arr = loadThreadHistory();
+		var filt = arr.filter( function ( x ) {
+			return String( x.conversation_id ) !== String( sess.conversation_id );
+		} );
+		filt.unshift( {
+			conversation_id: sess.conversation_id,
+			visitor_token: sess.visitor_token,
+			saved_at: Date.now()
+		} );
+		if ( filt.length > 20 ) {
+			filt = filt.slice( 0, 20 );
+		}
+		saveThreadHistory( filt );
+	}
+
+	function detectVisitorDeviceType() {
+		try {
+			var ua = navigator.userAgent || '';
+			var uaTablet = /iPad|Tablet|PlayBook|Silk|Nexus (7|10)/i.test( ua );
+			var uaMobile = /Mobi|Android.*Mobile|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test( ua );
+			if ( typeof window.matchMedia === 'function' ) {
+				try {
+					if (
+						window.matchMedia( '(pointer: coarse)' ).matches &&
+						Math.min( screen.width, screen.height ) >= 600 &&
+						/Tablet|iPad|PlayBook/i.test( ua )
+					) {
+						return 'tablet';
+					}
+				} catch ( eMm ) {}
+			}
+			if ( uaTablet ) {
+				return 'tablet';
+			}
+			if ( /Android/i.test( ua ) && ! /Mobile/i.test( ua ) ) {
+				return 'tablet';
+			}
+			if ( uaMobile ) {
+				return 'mobile';
+			}
+			return 'desktop';
+		} catch ( eDt ) {
+			return 'desktop';
+		}
+	}
+
 	function parseJsonSafe( text ) {
 		try {
 			return JSON.parse( text );
@@ -427,7 +506,8 @@
 				last_name: body.last_name,
 				email: body.email,
 				phone: body.phone,
-				page_url: window.location.href
+				page_url: window.location.href,
+				device_type: detectVisitorDeviceType()
 			} )
 		} ).then( function ( j ) {
 			return j.data || j;
@@ -1106,6 +1186,24 @@
 	header.appendChild( hBrand );
 	header.appendChild( hact );
 
+	var threadBar = document.createElement( 'div' );
+	threadBar.className = 'hesabix-chat-thread-bar hesabix-chat--hidden';
+	var threadBarInner = document.createElement( 'div' );
+	threadBarInner.className = 'hesabix-chat-thread-inner';
+	var threadBarLbl = document.createElement( 'span' );
+	threadBarLbl.className = 'hesabix-chat-thread-label';
+	threadBarLbl.textContent =
+		( cfg.strings && cfg.strings.threadPickerLabel ) ? String( cfg.strings.threadPickerLabel ) : '';
+	var threadSel = document.createElement( 'select' );
+	threadSel.className = 'hesabix-chat-thread-select';
+	threadSel.setAttribute(
+		'aria-label',
+		( cfg.strings && cfg.strings.threadPickerLabel ) ? String( cfg.strings.threadPickerLabel ) : 'Conversation'
+	);
+	threadBarInner.appendChild( threadBarLbl );
+	threadBarInner.appendChild( threadSel );
+	threadBar.appendChild( threadBarInner );
+
 	var msgBox = document.createElement( 'div' );
 	msgBox.className = 'hesabix-chat-messages';
 
@@ -1262,6 +1360,7 @@
 	peerTypingEl.setAttribute( 'aria-live', 'polite' );
 
 	surface.appendChild( header );
+	surface.appendChild( threadBar );
 	surface.appendChild( formEl );
 	surface.appendChild( msgBox );
 	surface.appendChild( peerTypingEl );
@@ -1292,6 +1391,102 @@
 	}
 	root.appendChild( wrap );
 	host.appendChild( root );
+
+	var threadBarSwitching = false;
+
+	function buildThreadOptions() {
+		var opts = [];
+		var curId = state.session ? String( state.session.conversation_id ) : null;
+		if ( state.session && state.session.visitor_token ) {
+			var pfx = ( cfg.strings && cfg.strings.threadCurrentPrefix ) || '';
+			opts.push( {
+				conversation_id: state.session.conversation_id,
+				visitor_token: state.session.visitor_token,
+				label: pfx + ' #' + state.session.conversation_id,
+				saved_at: Date.now()
+			} );
+		}
+		var hist = loadThreadHistory();
+		for ( var hi = 0; hi < hist.length; hi++ ) {
+			var h = hist[ hi ];
+			if ( ! h || h.conversation_id == null || ! h.visitor_token ) {
+				continue;
+			}
+			if ( curId && String( h.conversation_id ) === curId ) {
+				continue;
+			}
+			var ts = h.saved_at ? new Date( h.saved_at ) : null;
+			var st =
+				ts && ! isNaN( ts.getTime() )
+					? ts.toLocaleDateString() +
+					  ' · ' +
+					  ts.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } )
+					: '';
+			var lb = st ? '#' + h.conversation_id + ' · ' + st : '#' + h.conversation_id;
+			opts.push( {
+				conversation_id: h.conversation_id,
+				visitor_token: h.visitor_token,
+				label: lb,
+				saved_at: h.saved_at || 0
+			} );
+		}
+		return opts;
+	}
+
+	function refreshThreadBar() {
+		if ( ! threadBar || ! threadSel ) {
+			return;
+		}
+		var opts = buildThreadOptions();
+		if ( opts.length <= 1 ) {
+			threadBar.classList.add( 'hesabix-chat--hidden' );
+			return;
+		}
+		threadBar.classList.remove( 'hesabix-chat--hidden' );
+		var selId = state.session ? String( state.session.conversation_id ) : '';
+		threadSel.innerHTML = '';
+		for ( var oi = 0; oi < opts.length; oi++ ) {
+			var it = opts[ oi ];
+			var opt = document.createElement( 'option' );
+			opt.value = String( it.conversation_id );
+			opt.textContent = it.label;
+			opt.setAttribute( 'data-vtok', it.visitor_token );
+			if ( String( it.conversation_id ) === selId ) {
+				opt.selected = true;
+			}
+			threadSel.appendChild( opt );
+		}
+	}
+
+	threadSel.addEventListener( 'change', function () {
+		if ( threadBarSwitching ) {
+			return;
+		}
+		var opt = threadSel.options[ threadSel.selectedIndex ];
+		if ( ! opt ) {
+			return;
+		}
+		var vid = opt.value;
+		var vtk = opt.getAttribute( 'data-vtok' );
+		if ( ! vid || ! vtk ) {
+			return;
+		}
+		if ( state.session && String( state.session.conversation_id ) === vid ) {
+			return;
+		}
+		threadBarSwitching = true;
+		state.session = { conversation_id: +vid, visitor_token: vtk };
+		saveSession( +vid, vtk );
+		unbindRealtime();
+		afterSessionReady( false )
+			.then( function () {
+				threadBarSwitching = false;
+				refreshThreadBar();
+			} )
+			.catch( function () {
+				threadBarSwitching = false;
+			} );
+	} );
 
 	function setupVisitorFileUpload() {
 		var wantsFileUi = !!( cfg.showFileUpload );
@@ -1575,6 +1770,10 @@
 		if ( ! state.session || ! msg || ! sameConversationId( msg.conversation_id, state.session.conversation_id ) ) {
 			return;
 		}
+		var rr = String( msg.reader_role || '' ).toLowerCase().replace( /^\s+|\s+$/g, '' );
+		if ( rr !== 'agent' ) {
+			return;
+		}
 		var ids = msg.message_ids;
 		var at = msg.read_at;
 		if ( ! ids || ! ids.length ) {
@@ -1588,6 +1787,10 @@
 		} );
 		var changed = false;
 		state.messages.forEach( function ( m ) {
+			var sr = String( m.sender_role || '' ).toLowerCase().replace( /^\s+|\s+$/g, '' );
+			if ( sr !== 'visitor' ) {
+				return;
+			}
 			if ( m && m.id != null && idset[ m.id ] && at != null && at !== '' ) {
 				m.read_at = at;
 				changed = true;
@@ -2140,6 +2343,7 @@
 		if ( wsConnLabel ) {
 			updateWsConn( 'offline' );
 		}
+		refreshThreadBar();
 	}
 
 	function enterFormMode() {
@@ -2172,6 +2376,9 @@
 			wsConnLabel.className = 'hesabix-chat-ws-conn';
 			wsConnLabel.title = '';
 			wsConnLabel.removeAttribute( 'aria-label' );
+		}
+		if ( threadBar ) {
+			threadBar.classList.add( 'hesabix-chat--hidden' );
 		}
 		unbindRealtime();
 	}
@@ -2275,11 +2482,15 @@
 				if ( ! cid || ! tok ) {
 					throw new Error( cfg.strings.errorGeneric );
 				}
+				var prevSess = loadSession();
 				state.seenAgentJoinIds = {};
 				state.agentJoinBannerText = '';
 				state.agentTypingName = '';
 				saveSession( cid, tok );
 				state.session = { conversation_id: cid, visitor_token: tok };
+				if ( prevSess && String( prevSess.conversation_id ) !== String( cid ) ) {
+					pushThreadHistory( prevSess );
+				}
 				state.agentAttendanceNoticeShown = false;
 				state.slowReplyVisible = false;
 				if ( state.slowReplyTimer ) {
@@ -2368,6 +2579,9 @@
 	btnNew.addEventListener( 'click', function () {
 		if ( ! window.confirm( cfg.strings.newChatHint ) ) {
 			return;
+		}
+		if ( state.session ) {
+			pushThreadHistory( state.session );
 		}
 		clearSession();
 		state.session = null;

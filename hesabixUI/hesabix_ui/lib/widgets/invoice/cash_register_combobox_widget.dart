@@ -23,6 +23,8 @@ class CashRegisterComboboxWidget extends StatefulWidget {
   final String hintText;
   final bool isRequired;
   final int? filterCurrencyId;
+  /// نمایش به‌صورت [TextFormField] outline فشرده (هم‌ارتفاع با فیلدهای فرم).
+  final bool dense;
 
   const CashRegisterComboboxWidget({
     super.key,
@@ -33,6 +35,7 @@ class CashRegisterComboboxWidget extends StatefulWidget {
     this.hintText = 'جست‌وجو و انتخاب صندوق',
     this.isRequired = false,
     this.filterCurrencyId,
+    this.dense = false,
   });
 
   @override
@@ -42,6 +45,7 @@ class CashRegisterComboboxWidget extends StatefulWidget {
 class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget> {
   final CashRegisterService _service = CashRegisterService();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _displayFieldController = TextEditingController();
   Timer? _debounceTimer;
   int _seq = 0;
   String _latestQuery = '';
@@ -59,6 +63,9 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
     super.initState();
     _loadCurrencies();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncDenseDisplayText();
+    });
   }
 
   @override
@@ -67,13 +74,43 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
     if (oldWidget.filterCurrencyId != widget.filterCurrencyId) {
       _performSearch(_latestQuery);
     }
+    if (oldWidget.selectedRegisterId != widget.selectedRegisterId ||
+        oldWidget.dense != widget.dense) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncDenseDisplayText();
+      });
+    }
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _displayFieldController.dispose();
     super.dispose();
+  }
+
+  String _displayLineText() {
+    final selected = _items.firstWhere(
+      (e) => e.id == widget.selectedRegisterId,
+      orElse: () => const CashRegisterOption('', ''),
+    );
+    final currencyText = _formatCurrencyLabel(selected.currencyId);
+    if (widget.selectedRegisterId != null && widget.selectedRegisterId!.isNotEmpty) {
+      if (selected.name.isNotEmpty) {
+        return currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name;
+      }
+      return widget.hintText;
+    }
+    return widget.hintText;
+  }
+
+  void _syncDenseDisplayText() {
+    if (!widget.dense) return;
+    final next = _displayLineText();
+    if (_displayFieldController.text != next) {
+      _displayFieldController.text = next;
+    }
   }
 
   Future<void> _load() async {
@@ -94,6 +131,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
       setState(() {
         _currencyById = map;
       });
+      _syncDenseDisplayText();
     } catch (_) {
       // ignore errors
     }
@@ -169,6 +207,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
           _isSearching = false;
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
     } catch (e) {
       if (seq != _seq || query != _latestQuery) return;
@@ -182,6 +221,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
           _isSearching = false;
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
       SnackBarHelper.showError(
       context,
@@ -253,6 +293,34 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
             ? (currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name)
             : widget.hintText)
         : widget.hintText;
+
+    if (widget.dense) {
+      return TextFormField(
+        controller: _displayFieldController,
+        readOnly: true,
+        onTap: _openPicker,
+        validator: widget.isRequired
+            ? (_) {
+                if (widget.selectedRegisterId == null || widget.selectedRegisterId!.isEmpty) {
+                  return 'انتخاب ${widget.label} الزامی است';
+                }
+                return null;
+              }
+            : null,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          isDense: true,
+          contentPadding: const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12),
+          suffixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          suffixIcon: Icon(Icons.arrow_drop_down, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          prefixIcon: Icon(Icons.point_of_sale, color: theme.colorScheme.primary, size: 20),
+          prefixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          border: const OutlineInputBorder(),
+        ),
+        style: theme.textTheme.bodyMedium,
+      );
+    }
 
     return InkWell(
       onTap: _openPicker,

@@ -78,6 +78,7 @@ class ActionRegistry:
             CreateInvoiceAction,
             UpdateInventoryAction,
             CreateNotificationAction,
+            SendBusinessSmsAction,
             HttpRequestAction,
             SetVariableAction,
             LogAction,
@@ -119,6 +120,7 @@ class ActionRegistry:
         self.register("send_telegram", SendTelegramAction())
         self.register("send_bale", SendBaleAction())
         self.register("create_notification", CreateNotificationAction())
+        self.register("send_business_sms", SendBusinessSmsAction())
         
         # Document actions
         self.register("create_document", CreateDocumentAction())

@@ -1,0 +1,439 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+
+import '../../core/api_client.dart';
+import '../../core/auth_store.dart';
+import '../../services/announcements_service.dart';
+import '../../services/in_app_notification_preferences_controller.dart';
+import '../../services/notification_alert_sound_player.dart';
+import '../../services/notifications_ws_client.dart';
+import '../../utils/snackbar_helper.dart';
+
+String _localizedAnnouncementLevel(BuildContext context, String raw) {
+  final t = AppLocalizations.of(context);
+  final level = raw.toLowerCase().trim();
+  switch (level) {
+    case 'info':
+      return t.notificationCenterLevelInfo;
+    case 'warning':
+      return t.notificationCenterLevelWarning;
+    case 'critical':
+      return t.notificationCenterLevelCritical;
+    default:
+      return t.notificationCenterLevelUnknown(raw);
+  }
+}
+
+/// دکمهٔ زنگولهٔ اعلانات با badge و دیالوگ مرکز اعلان.
+/// در پنل کاربر و پنل کسب‌وکار قابل استفاده است.
+class NotificationBellButton extends StatefulWidget {
+  final AuthStore authStore;
+  final Color? iconColor;
+  /// هم‌خط با آیکن‌های نوار ابزار در [BusinessShell] (ارتفاع ۴۴).
+  final bool denseToolbar;
+
+  const NotificationBellButton({
+    super.key,
+    required this.authStore,
+    this.iconColor,
+    this.denseToolbar = false,
+  });
+
+  @override
+  State<NotificationBellButton> createState() => _NotificationBellButtonState();
+}
+
+class _NotificationBellButtonState extends State<NotificationBellButton> {
+  NotificationsWsClient? _ws;
+  final List<Map<String, dynamic>> _notifications = <Map<String, dynamic>>[];
+  int _unreadCount = 0;
+  final Set<int> _busyAnnIds = <int>{};
+  bool _clearingAll = false;
+  Timer? _announceResyncDebounce;
+
+  void _onPrefsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleAnnouncementsResync() {
+    _announceResyncDebounce?.cancel();
+    _announceResyncDebounce = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) {
+        _loadInitialNotifications();
+      }
+    });
+  }
+
+  Future<void> _confirmClearAllNotifications(BuildContext dialogContext, StateSetter dialogSetState) async {
+    final t = AppLocalizations.of(dialogContext);
+    final ok = await showDialog<bool>(
+      context: dialogContext,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.notificationCenterClearAllTitle),
+        content: Text(t.notificationCenterClearAllMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.notificationCenterClearAllCancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.notificationCenterClearAllConfirm)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _clearingAll = true);
+    dialogSetState(() {});
+    try {
+      await AnnouncementsService(ApiClient()).clearAllVisible();
+      if (!mounted) return;
+      setState(() {
+        _notifications.clear();
+        _unreadCount = 0;
+        _clearingAll = false;
+      });
+      dialogSetState(() {});
+      if (mounted) {
+        SnackBarHelper.show(context, message: t.notificationCenterCleared);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _clearingAll = false);
+        dialogSetState(() {});
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    InAppNotificationPreferencesController.instance.addListener(_onPrefsChanged);
+    unawaited(InAppNotificationPreferencesController.instance.refreshFromApi());
+    _loadInitialNotifications();
+    final apiKey = widget.authStore.apiKey;
+    if (apiKey != null && apiKey.isNotEmpty) {
+      _ws = createNotificationsWsClient();
+      _ws!.connect(
+        apiKey: apiKey,
+        onMessage: (msg) {
+          try {
+            final type = '${msg['type'] ?? ''}';
+            if (type == 'notification') {
+              final prefs = InAppNotificationPreferencesController.instance;
+              if (prefs.mode == InAppAlertMode.doNotDisturb) {
+                return;
+              }
+              final title = '${msg['title'] ?? 'پیام'}';
+              final body = '${msg['body'] ?? ''}';
+              final level = '${msg['level'] ?? 'info'}';
+              final dynamic aid = msg['announcement_id'];
+              final int? annId = aid is int ? aid : int.tryParse('$aid');
+              if (!mounted) return;
+              setState(() {
+                _notifications.insert(0, <String, dynamic>{
+                  'title': title,
+                  'body': body,
+                  'level': level,
+                  if (annId != null) 'id': annId,
+                });
+                _unreadCount = (_unreadCount + 1).clamp(0, 99);
+              });
+              if (prefs.mode == InAppAlertMode.normal && prefs.soundEnabled) {
+                unawaited(NotificationAlertSoundPlayer.playForSoundAssetId(prefs.soundAssetId));
+              }
+              if (mounted) {
+                ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text('$title: $body'), duration: const Duration(seconds: 4)));
+              }
+              _scheduleAnnouncementsResync();
+            }
+          } catch (_) {}
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    InAppNotificationPreferencesController.instance.removeListener(_onPrefsChanged);
+    _announceResyncDebounce?.cancel();
+    try {
+      _ws?.disconnect();
+    } catch (_) {}
+    super.dispose();
+  }
+
+  Future<void> _loadInitialNotifications() async {
+    try {
+      final annSvc = AnnouncementsService(ApiClient());
+      final data = await annSvc.listAnnouncements(page: 1, limit: 5, onlyUnread: true);
+      final items = (data['items'] as List? ?? const <dynamic>[])
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final total = (data['total'] is int) ? data['total'] as int : (int.tryParse('${data['total']}') ?? items.length);
+      if (!mounted) return;
+      setState(() {
+        _notifications.clear();
+        for (final it in items) {
+          _notifications.add(<String, dynamic>{
+            'title': '${it['title'] ?? 'اعلان'}',
+            'body': '${it['body'] ?? ''}',
+            'level': '${it['level'] ?? 'info'}',
+            'id': it['id'],
+          });
+        }
+        _unreadCount = total.clamp(0, 99);
+      });
+    } catch (_) {}
+  }
+
+  void _openNotificationCenter() {
+    setState(() {
+      _unreadCount = 0;
+    });
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            final items = _notifications.take(10).toList();
+            final ColorScheme cs = Theme.of(context).colorScheme;
+            final bool isDark = Theme.of(context).brightness == Brightness.dark;
+            final Color headerOn = isDark ? cs.onSurface : Colors.white;
+            final double dialogWidth = math.max(
+              280,
+              math.min(MediaQuery.sizeOf(context).width - 88, 1200),
+            );
+            return AlertDialog(
+              constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              titlePadding: EdgeInsets.zero,
+              title: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? cs.surfaceContainerHighest : null,
+                  gradient: isDark
+                      ? null
+                      : LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.notifications_active, color: headerOn),
+                    const SizedBox(width: 8),
+                    Text('مرکز اعلان‌ها', style: TextStyle(color: headerOn, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: AppLocalizations.of(context).notificationCenterClearAllTooltip,
+                      icon: _clearingAll
+                          ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: headerOn))
+                          : Icon(Icons.delete_outline, color: headerOn),
+                      onPressed: _clearingAll ? null : () => _confirmClearAllNotifications(context, dialogSetState),
+                    ),
+                    IconButton(
+                      tooltip: 'بستن',
+                      icon: Icon(Icons.close, color: headerOn),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              content: SizedBox(
+                width: double.infinity,
+                height: 420,
+                child: items.isEmpty
+                    ? const Center(child: Text('اعلانی وجود ندارد'))
+                    : ListView.separated(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemBuilder: (_, i) {
+                          final it = items[i];
+                          final level = '${it['level'] ?? 'info'}'.toLowerCase().trim();
+                          IconData icon;
+                          Color levelColor;
+                          switch (level) {
+                            case 'warning':
+                              icon = Icons.warning_amber_rounded;
+                              levelColor = Colors.orange;
+                              break;
+                            case 'critical':
+                              icon = Icons.error_outline;
+                              levelColor = Colors.red;
+                              break;
+                            default:
+                              icon = Icons.notifications_none;
+                              levelColor = cs.primary;
+                          }
+                          final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
+                          final bool busy = annId != null && _busyAnnIds.contains(annId);
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
+                              border: Border(left: BorderSide(color: levelColor, width: 3)),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(color: levelColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                                  child: Icon(icon, color: levelColor),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 4),
+                                      Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: levelColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              _localizedAnnouncementLevel(context, level),
+                                              style: TextStyle(color: levelColor, fontSize: 11),
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                              context.go('/user/profile/announcements');
+                                            },
+                                            icon: const Icon(Icons.open_in_new, size: 16),
+                                            label: const Text('جزئیات'),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (annId != null)
+                                  IconButton(
+                                    tooltip: 'خوانده شد',
+                                    icon: busy
+                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.done_all, size: 20),
+                                    onPressed: busy ? null : () async => _markNotificationRead(annId, dialogSetState: dialogSetState),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemCount: items.length,
+                      ),
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('بستن'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/user/profile/announcements');
+                  },
+                  icon: const Icon(Icons.notifications, size: 18),
+                  label: const Text('مشاهده همه اعلان‌ها'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _markNotificationRead(int id, {StateSetter? dialogSetState}) async {
+    void refreshDialog() {
+      if (dialogSetState != null) {
+        dialogSetState(() {});
+      }
+    }
+    setState(() => _busyAnnIds.add(id));
+    refreshDialog();
+    try {
+      await AnnouncementsService(ApiClient()).markRead(id);
+      if (!mounted) return;
+      setState(() {
+        _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == id : int.tryParse('${e['id']}') == id));
+      });
+      refreshDialog();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busyAnnIds.remove(id));
+      } else {
+        _busyAnnIds.remove(id);
+      }
+      refreshDialog();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.iconColor ?? Theme.of(context).colorScheme.onSurface;
+    final icon = Icon(Icons.notifications_none, size: widget.denseToolbar ? 21 : null);
+    return Padding(
+      padding: EdgeInsetsDirectional.only(end: widget.denseToolbar ? 2 : 4),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: 'اعلان‌ها',
+            visualDensity: widget.denseToolbar ? VisualDensity.compact : VisualDensity.standard,
+            style: widget.denseToolbar
+                ? IconButton.styleFrom(
+                    minimumSize: const Size(38, 38),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )
+                : null,
+            onPressed: _openNotificationCenter,
+            icon: icon,
+            color: color,
+          ),
+          if (_unreadCount > 0)
+            Positioned(
+              right: 4,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                constraints: const BoxConstraints(minWidth: 18),
+                child: Text(
+                  _unreadCount > 99 ? '99+' : '$_unreadCount',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

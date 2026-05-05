@@ -682,7 +682,23 @@ async def export_single_receipt_payment_pdf(
     title_text = f"سند {doc_type_name}" if is_fa else f"{doc_type_name} Document"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = auth_context.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=(result.get("created_by_name") or pn or None),
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
 
     # تلاش برای رندر با قالب سفارشی (receipts_payments/detail)
     resolved_html = None
@@ -882,7 +898,23 @@ async def export_receipts_payments_pdf(
     title_text = "لیست اسناد دریافت و پرداخت" if is_fa else "Receipts & Payments List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = auth_context.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
 
     # Create headers HTML
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)

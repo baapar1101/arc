@@ -15,6 +15,9 @@ class NotificationsService {
     bool? emailEnabled,
     bool? smsEnabled,
     bool? inappEnabled,
+    String? inappAlertMode,
+    bool? inappSoundEnabled,
+    String? inappSoundAssetId,
   }) async {
     final body = <String, dynamic>{
       if (telegramEnabled != null) 'telegram_enabled': telegramEnabled,
@@ -22,6 +25,9 @@ class NotificationsService {
       if (emailEnabled != null) 'email_enabled': emailEnabled,
       if (smsEnabled != null) 'sms_enabled': smsEnabled,
       if (inappEnabled != null) 'inapp_enabled': inappEnabled,
+      if (inappAlertMode != null) 'inapp_alert_mode': inappAlertMode,
+      if (inappSoundEnabled != null) 'inapp_sound_enabled': inappSoundEnabled,
+      if (inappSoundAssetId != null) 'inapp_sound_asset_id': inappSoundAssetId,
     };
     await _api.put<Map<String, dynamic>>('/api/v1/notifications/settings', data: body);
   }

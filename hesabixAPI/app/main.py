@@ -465,51 +465,62 @@ def create_app() -> FastAPI:
         description="""
         # Hesabix API
 
-        API جامع برای مدیریت کاربران، احراز هویت و سیستم معرفی
+        REST API برای اپ وب، اپ موبایل و یکپارچه‌سازی با سایر سرویس‌ها: احراز هویت، کسب‌وکار، اسناد مالی، انبار، اشخاص، گزارش و اعلان‌ها.
 
-        ## ویژگی‌های اصلی:
-        - **احراز هویت**: ثبت‌نام، ورود، فراموشی رمز عبور
-        - **مدیریت کاربران**: لیست، جستجو، فیلتر و آمار کاربران
-        - **سیستم معرفی**: آمار و مدیریت معرفی‌ها
-        - **خروجی**: PDF و Excel برای گزارش‌ها
-        - **امنیت**: کپچا، کلیدهای API، رمزگذاری
+        ---
 
-        ## 🔐 احراز هویت (Authentication)
+        ## دامنه و نسخه
 
-        ### کلیدهای API
-        تمام endpoint های محافظت شده نیاز به کلید API دارند که در header `Authorization` ارسال می‌شود:
+        - مسیر پایه نسخه فعلی: `/api/v1/...`
+        - در این محیط، آدرس سرور را از بالای صفحه (Servers) یا از آدرس بار مرورگر بردارید؛ مثال‌های `curl` فقط الگو هستند.
+
+        ---
+
+        ## احراز هویت (مهم)
+
+        سرور هدر `Authorization` را **فقط** با پیشوند **`ApiKey`** می‌پذیرد. فرمت **`Bearer`** با پیاده‌سازی فعلی کار نمی‌کند.
 
         ```
-        Authorization: Bearer sk_your_api_key_here
+        Authorization: ApiKey <کلید_کامل_برگشتی_از_API>
         ```
 
-        ### نحوه دریافت کلید API:
-        1. **ثبت‌نام**: با ثبت‌نام، یک کلید session دریافت می‌کنید
-        2. **ورود**: با ورود موفق، کلید session دریافت می‌کنید
-        3. **کلیدهای شخصی**: از endpoint `/api/v1/auth/api-keys` می‌توانید کلیدهای شخصی ایجاد کنید
+        **انواع کلید (مطابق کد سرویس):**
 
-        ### انواع کلیدهای API:
-        - **Session Keys**: کلیدهای موقت که با ورود ایجاد می‌شوند
-        - **Personal Keys**: کلیدهای دائمی که خودتان ایجاد می‌کنید
+        | نوع | معمولاً از کجا | پیشوند نمونه در کلید |
+        |-----|------------------|----------------------|
+        | Session (ورود / ثبت‌نام) | پاسخ `POST /api/v1/auth/login` یا `POST /api/v1/auth/register` — فیلد `data.api_key` | `ak_live_` |
+        | شخصی | `POST /api/v1/auth/api-keys` (نیاز به ورود) | `hsx_` |
 
-        ### مثال درخواست با احراز هویت:
+        **Swagger UI — دکمه Authorize:** در فیلد مربوط به `Authorization`، **یک رشته‌ی کامل** وارد کنید: کلمه‌ی `ApiKey`، یک فاصله، و سپس خود کلید (مثال: `ApiKey ak_live_xxxxxxxx`).
+
+        **نمونه `curl`:**
+
         ```bash
-        curl -X GET "http://localhost:8000/api/v1/auth/me" \\
-             -H "Authorization: Bearer sk_1234567890abcdef" \\
-             -H "Accept: application/json"
+        curl -s -X GET "<BASE_URL>/api/v1/auth/me" \\
+          -H "Authorization: ApiKey ak_live_REPLACE_ME" \\
+          -H "Accept: application/json"
         ```
 
-        ## 🛡️ مجوزهای دسترسی (Permissions)
+        ---
 
-        برخی endpoint ها نیاز به مجوزهای خاص دارند:
+        ## هدرهای پرکاربرد
 
-        ### مجوزهای اپلیکیشن (App-Level Permissions):
-        - `user_management`: دسترسی به مدیریت کاربران
-        - `superadmin`: دسترسی کامل به سیستم
-        - `business_management`: مدیریت کسب و کارها
-        - `system_settings`: دسترسی به تنظیمات سیستم
+        | هدر | الزامی | توضیح کوتاه |
+        |-----|--------|-------------|
+        | `Authorization` | برای مسیرهای محافظت‌شده | `ApiKey <کلید>` |
+        | `Accept-Language` | خیر | `fa` یا `en` (زبان پیام‌ها و در صورت امکان برچسب‌ها) |
+        | `X-Calendar-Type` | خیر | `jalali` (پیش‌فرض) یا `gregorian` — قالب تاریخ در پاسخ |
+        | `X-Timezone` | خیر | در صورت پشتیبانی، منطقه‌ی زمانی اختیاری |
+        | `X-Business-ID` | بسته به سناریو | برای زمینه‌ی کسب‌وکار؛ دسترسی واقعی با عضویت/مجوز در بک‌اند کنترل می‌شود |
 
-        ### مثال مجوزها در JSON:
+        ---
+
+        ## مجوزها
+
+        علاوه بر داشتن کلید معتبر، برخی مسیرها نیاز به **مجوز اپلیکیشن** یا **عضویت در کسب‌وکار** دارند (مثلاً مدیریت کاربران سطح سیستم).
+
+        نمونه‌ی فیلد `app_permissions` در مدل کاربر (مفهومی):
+
         ```json
         {
           "user_management": true,
@@ -519,127 +530,87 @@ def create_app() -> FastAPI:
         }
         ```
 
-        ### endpoint های محافظت شده:
-        - تمام endpoint های `/api/v1/users/*` نیاز به مجوز `user_management` دارند
-        - endpoint های `/api/v1/auth/me` و `/api/v1/auth/api-keys/*` نیاز به احراز هویت دارند
+        مسیرهایی مانند `/api/v1/users` معمولاً به مجوزهای مدیریتی نیاز دارند؛ جزئیات هر endpoint در همین سند OpenAPI آمده است.
 
-        ## 🌍 چندزبانه (Internationalization)
+        ---
 
-        API از چندزبانه پشتیبانی می‌کند:
+        ## شکل پاسخ‌های موفق
 
-        ### هدر زبان:
-        ```
-        Accept-Language: fa
-        Accept-Language: en
-        Accept-Language: fa-IR
-        Accept-Language: en-US
-        ```
-
-        ### زبان‌های پشتیبانی شده:
-        - **فارسی (fa)**: پیش‌فرض
-        - **انگلیسی (en)**
-
-        ### مثال درخواست با زبان فارسی:
-        ```bash
-        curl -X GET "http://localhost:8000/api/v1/auth/me" \\
-             -H "Authorization: Bearer sk_1234567890abcdef" \\
-             -H "Accept-Language: fa" \\
-             -H "Accept: application/json"
-        ```
-
-        ## 📅 تقویم (Calendar)
-
-        API از تقویم شمسی (جلالی) پشتیبانی می‌کند:
-
-        ### هدر تقویم:
-        ```
-        X-Calendar-Type: jalali
-        X-Calendar-Type: gregorian
-        ```
-
-        ### انواع تقویم:
-        - **جلالی (jalali)**: تقویم شمسی - پیش‌فرض
-        - **میلادی (gregorian)**: تقویم میلادی
-
-        ### مثال درخواست با تقویم شمسی:
-        ```bash
-        curl -X GET "http://localhost:8000/api/v1/users" \\
-             -H "Authorization: Bearer sk_1234567890abcdef" \\
-             -H "X-Calendar-Type: jalali" \\
-             -H "Accept: application/json"
-        ```
-
-        ## 📊 فرمت پاسخ‌ها (Response Format)
-
-        تمام پاسخ‌ها در فرمت زیر هستند:
+        بسیاری از پاسخ‌های موفق شبیه ساختار زیر هستند (`message` اختیاری است):
 
         ```json
         {
           "success": true,
-          "message": "پیام توضیحی",
-          "data": {
-            // داده‌های اصلی
-          }
+          "data": { },
+          "message": "پیام اختیاری",
+          "calendar_type": "jalali"
         }
         ```
 
-        ### کدهای خطا:
-        - **200**: موفقیت
-        - **400**: خطا در اعتبارسنجی داده‌ها
-        - **401**: احراز هویت نشده
-        - **403**: دسترسی غیرمجاز
-        - **404**: منبع یافت نشد
-        - **422**: خطا در اعتبارسنجی
-        - **500**: خطای سرور
+        خطاها معمولاً با کدهای HTTP استاندارد و بدنه‌ی توضیح‌دار برمی‌گردند؛ برای جزئیات، همان operation را در لیست زیر باز کنید.
 
-        ## 🔒 امنیت (Security)
+        ---
 
-        ### کپچا:
-        برای عملیات حساس از کپچا استفاده می‌شود:
-        - دریافت کپچا: `POST /api/v1/auth/captcha`
-        - استفاده در ثبت‌نام، ورود، فراموشی رمز عبور
+        ## کدهای وضعیت HTTP (خلاصه)
 
-        ### رمزگذاری:
-        - رمزهای عبور با bcrypt رمزگذاری می‌شوند
-        - کلیدهای API با SHA-256 هش می‌شوند
+        | کد | معنی رایج |
+        |----|-----------|
+        | 200 | موفق |
+        | 400 | درخواست نامعتبر |
+        | 401 | کلید نامعتبر یا نبودن احراز هویت |
+        | 403 | ممنوع (مجوز یا محدودیت) |
+        | 404 | یافت نشد |
+        | 422 | اعتبارسنجی بدنه/پارامتر (FastAPI/Pydantic) |
+        | 429 | محدودیت نرخ درخواست |
+        | 500 | خطای داخلی سرور |
 
-        ## 📝 مثال کامل درخواست:
+        ---
+
+        ## امنیت
+
+        - **کپچا:** `POST /api/v1/auth/captcha` — در ورود، ثبت‌نام و برخی عملیات حساس استفاده می‌شود.
+        - **رمز عبور:** با الگوریتم‌های هش امن (مانند Argon2، با پشتیبانی از رکوردهای قدیمی bcrypt).
+        - **کلید API:** فقط نسخه‌ی هش در پایگاه داده نگه داشته می‌شود.
+
+        ---
+
+        ## جریان نمونه: ورود و فراخوانی محافظت‌شده
 
         ```bash
-        # 1. دریافت کپچا
-        curl -X POST "http://localhost:8000/api/v1/auth/captcha"
+        # 1) کپچا
+        curl -s -X POST "<BASE_URL>/api/v1/auth/captcha"
 
-        # 2. ورود
-        curl -X POST "http://localhost:8000/api/v1/auth/login" \\
-             -H "Content-Type: application/json" \\
-             -H "Accept-Language: fa" \\
-             -H "X-Calendar-Type: jalali" \\
-             -d '{
-               "identifier": "user@example.com",
-               "password": "password123",
-               "captcha_id": "captcha_id_from_step_1",
-               "captcha_code": "12345"
-             }'
+        # 2) ورود — api_key را از data در پاسخ JSON بردارید
+        curl -s -X POST "<BASE_URL>/api/v1/auth/login" \\
+          -H "Content-Type: application/json" \\
+          -H "Accept-Language: fa" \\
+          -H "X-Calendar-Type: jalali" \\
+          -d '{"identifier":"you@example.com","password":"***","captcha_id":"...","captcha_code":"..."}'
 
-        # 3. استفاده از API با کلید دریافتی
-        curl -X GET "http://localhost:8000/api/v1/users" \\
-             -H "Authorization: Bearer sk_1234567890abcdef" \\
-             -H "Accept-Language: fa" \\
-             -H "X-Calendar-Type: jalali" \\
-             -H "Accept: application/json"
+        # 3) فراخوانی با همان کلید (پیشوند ApiKey اجباری است)
+        curl -s -X GET "<BASE_URL>/api/v1/auth/me" \\
+          -H "Authorization: ApiKey ak_live_xxxx" \\
+          -H "Accept-Language: fa" \\
+          -H "X-Calendar-Type: jalali"
         ```
 
-        ## 🚀 شروع سریع:
+        ---
 
-        1. **ثبت‌نام**: `POST /api/v1/auth/register`
-        2. **ورود**: `POST /api/v1/auth/login`
-        3. **دریافت اطلاعات کاربر**: `GET /api/v1/auth/me`
-        4. **مدیریت کاربران**: `GET /api/v1/users` (نیاز به مجوز usermanager)
+        ## شروع سریع
 
-        ## 📞 پشتیبانی:
-        - **ایمیل**: support@hesabix.ir
-        - **مستندات**: `/docs` (Swagger UI)
-        - **ReDoc**: `/redoc`
+        1. `POST /api/v1/auth/register` — ثبت‌نام (در صورت فعال بودن کپچا، مرحله‌ی کپچا را رعایت کنید)
+        2. `POST /api/v1/auth/login` — ورود و دریافت `data.api_key`
+        3. `GET /api/v1/auth/me` — تأیید کلید با هدر `Authorization: ApiKey ...`
+        4. `GET /api/v1/users` — فقط با مجوزهای لازم (مثلاً `user_management`)
+
+        ---
+
+        ## راهنما و تماس
+
+        - **ایمیل:** support@hesabix.ir
+        - **Swagger UI:** همین صفحه (`/docs`)
+        - **ReDoc:** `/redoc`
+        - **اسکیمای باز:** `/openapi.json`
         """,
         contact={
             "name": "Hesabix Team",
@@ -1387,79 +1358,27 @@ def create_app() -> FastAPI:
             external_docs=application.openapi_external_docs,
         )
         
-        # اضافه کردن security schemes با مستندات کامل
+        # یک طرح امنیتی؛ مقدار کامل هدر: "ApiKey <token>" (Bearer پشتیبانی نمی‌شود)
         openapi_schema["components"]["securitySchemes"] = {
             "ApiKeyAuth": {
                 "type": "apiKey",
                 "in": "header",
                 "name": "Authorization",
                 "description": """
-## 🔐 احراز هویت با کلید API
+**فرمت اجباری (همان‌طور که سرور دریافت می‌کند):**
 
-کلید API برای دسترسی به تمام endpoint های محافظت شده استفاده می‌شود.
-
-### فرمت Header:
 ```
-Authorization: Bearer sk_your_api_key_here
+Authorization: ApiKey <کلید>
 ```
 
-### انواع کلید API:
+- **Session:** پس از `POST /api/v1/auth/login` یا `POST /api/v1/auth/register` مقدار `data.api_key` را بردارید (پیشوند رایج: `ak_live_`).
+- **شخصی:** `POST /api/v1/auth/api-keys` (پیشوند رایج: `hsx_`).
 
-#### 1️⃣ Session Keys (کلیدهای موقت)
-- با ورود یا ثبت‌نام ایجاد می‌شوند
-- معمولاً 30 روز اعتبار دارند
-- به صورت خودکار با خروج باطل می‌شوند
-- فرمت: `sk_session_...`
+**Swagger Authorize:** مقدار ورودی = `ApiKey` + فاصله + کلید کامل. مثال: `ApiKey ak_live_...`
 
-#### 2️⃣ Personal Keys (کلیدهای دائمی)
-- توسط کاربر ایجاد می‌شوند
-- بدون تاریخ انقضا (تا زمان حذف توسط کاربر)
-- می‌توان محدودیت IP تعریف کرد
-- فرمت: `sk_personal_...`
-
-### نحوه دریافت کلید:
-
-**روش 1: ثبت‌نام**
-```bash
-POST /api/v1/auth/register
-```
-
-**روش 2: ورود**
-```bash
-POST /api/v1/auth/login
-```
-
-**روش 3: ایجاد کلید شخصی**
-```bash
-POST /api/v1/auth/api-keys
-```
-
-### مثال استفاده:
-```bash
-curl -X GET "https://agent.hesabix.ir/api/v1/auth/me" \\
-  -H "Authorization: Bearer sk_1234567890abcdef" \\
-  -H "Accept-Language: fa" \\
-  -H "X-Calendar-Type: jalali"
-```
-
-### نکات امنیتی:
-- ⚠️ کلید API را در کد خود hardcode نکنید
-- 🔒 از متغیرهای محیطی استفاده کنید
-- 🛡️ کلید را با دیگران به اشتراک نگذارید
-- 🔄 به صورت دوره‌ای کلیدهای قدیمی را حذف کنید
-- 📱 برای هر اپلیکیشن یک کلید جداگانه استفاده کنید
+**نمونه:** `curl -H "Authorization: ApiKey ak_live_xxxx" ...`
                 """,
-                "x-displayName": "کلید API (API Key)"
-            },
-            "BearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "API Key",
-                "description": """
-احراز هویت با Bearer Token
-
-این همان ApiKeyAuth است، فقط با فرمت استاندارد HTTP Bearer.
-                """
+                "x-displayName": "Authorization: ApiKey"
             }
         }
         

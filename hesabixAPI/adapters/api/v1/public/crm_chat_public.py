@@ -17,6 +17,7 @@ from adapters.api.v1.schema_models.crm_chat import (
 )
 from adapters.db.session import get_db
 from app.core.i18n import get_request_translator
+from app.core.rate_limiter import get_client_ip
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import crm_chat_service as chat_svc
 
@@ -105,6 +106,8 @@ async def public_start_conversation(
 			phone=body.phone,
 			page_url=body.page_url,
 			origin_header=_origin(request),
+			client_ip=get_client_ip(request),
+			device_type=body.device_type,
 		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

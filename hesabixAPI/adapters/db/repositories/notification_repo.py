@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from adapters.db.models.notification_config import NotificationTemplate, UserNotificationSetting
+from adapters.db.models.notification_config import (
+	NotificationTemplate,
+	UserNotificationSetting,
+	UserInappAlertPreference,
+)
 
 
 class NotificationTemplateRepository:
@@ -110,5 +114,47 @@ class UserNotificationSettingRepository:
 	def list_for_user(self, *, user_id: int) -> List[UserNotificationSetting]:
 		stmt = select(self.model).where(self.model.user_id == user_id)
 		return list(self.db.execute(stmt).scalars().all())
+
+
+class UserInappAlertPreferenceRepository:
+	def __init__(self, db: Session) -> None:
+		self.db = db
+		self.model = UserInappAlertPreference
+
+	def get_for_user(self, *, user_id: int) -> Optional[UserInappAlertPreference]:
+		stmt = select(self.model).where(self.model.user_id == user_id)
+		return self.db.execute(stmt).scalars().first()
+
+	def get_or_defaults(self, *, user_id: int) -> Tuple[str, bool, str]:
+		row = self.get_for_user(user_id=user_id)
+		if row is None:
+			return ("normal", True, "default")
+		return (row.alert_mode, row.sound_enabled, row.sound_asset_id)
+
+	def upsert(
+		self,
+		*,
+		user_id: int,
+		alert_mode: str,
+		sound_enabled: bool,
+		sound_asset_id: str,
+	) -> UserInappAlertPreference:
+		obj = self.get_for_user(user_id=user_id)
+		if obj is None:
+			obj = self.model(
+				user_id=user_id,
+				alert_mode=alert_mode,
+				sound_enabled=sound_enabled,
+				sound_asset_id=sound_asset_id,
+			)
+			self.db.add(obj)
+		else:
+			obj.alert_mode = alert_mode
+			obj.sound_enabled = sound_enabled
+			obj.sound_asset_id = sound_asset_id
+			self.db.add(obj)
+		self.db.commit()
+		self.db.refresh(obj)
+		return obj
 
 

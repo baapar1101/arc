@@ -88,6 +88,27 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     return int.tryParse(v.toString());
   }
 
+  static Map<String, dynamic>? _extraMetadataMap(dynamic v) {
+    if (v is! Map) return null;
+    return Map<String, dynamic>.from(v);
+  }
+
+  (IconData, String)? _visitorDeviceIconAndLabel(Map<String, dynamic>? meta, AppLocalizations t) {
+    if (meta == null) return null;
+    final dt = (meta['device_type'] ?? '').toString().toLowerCase().trim();
+    if (dt.isEmpty) return null;
+    if (dt == 'mobile') {
+      return (Icons.smartphone, t.crmWebChatVisitorDeviceMobile);
+    }
+    if (dt == 'tablet') {
+      return (Icons.tablet, t.crmWebChatVisitorDeviceTablet);
+    }
+    if (dt == 'desktop') {
+      return (Icons.computer, t.crmWebChatVisitorDeviceDesktop);
+    }
+    return (Icons.devices, t.crmWebChatVisitorDeviceUnknown);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1785,9 +1806,13 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final visitorName = '${conv['visitor_first_name'] ?? ''} ${conv['visitor_last_name'] ?? ''}'.trim();
     final email = (conv['visitor_email']?.toString() ?? '').trim();
     final phone = (conv['visitor_phone']?.toString() ?? '').trim();
+    final extraMeta = _extraMetadataMap(conv['extra_metadata']);
+    final visitorIp = (extraMeta?['visitor_ip'] ?? '').toString().trim();
+    final deviceUi = _visitorDeviceIconAndLabel(extraMeta, t);
     final metaParts = <String>[
       if (email.isNotEmpty) email,
       if (phone.isNotEmpty) phone,
+      if (visitorIp.isNotEmpty) t.crmWebChatVisitorIpLine(visitorIp),
       t.crmWebChatWidgetLine(_widgetName((conv['widget_id'] as num?)?.toInt())),
     ];
 
@@ -1811,6 +1836,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
+                    if (deviceUi != null) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: deviceUi.$2,
+                        child: Icon(
+                          deviceUi.$1,
+                          size: 22,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

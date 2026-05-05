@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' show min;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -459,41 +458,36 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
     final sumCounterparties = _counterpartyLines.fold<double>(0, (p, e) => p + e.amount);
     final diff = sumItems - sumCounterparties;
     final padding = ResponsiveHelper.getPadding(context);
-    final size = MediaQuery.sizeOf(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final maxDialogWidth = min(size.width * 0.92, 1080.0);
     final vDesk = padding * 0.5;
     final colSep = padding * 0.4;
     final itemPanelPad = EdgeInsets.fromLTRB(0, vDesk, colSep, vDesk);
     final cpPanelPad = EdgeInsets.fromLTRB(colSep, vDesk, 0, vDesk);
 
     return Dialog(
-      insetPadding: ResponsiveHelper.getDialogPadding(context),
+      insetPadding: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Theme(
-        data: theme.copyWith(visualDensity: VisualDensity.compact),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: maxDialogWidth,
-            maxHeight: size.height * 0.92,
-          ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.only(bottom: padding * 1.1),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: padding),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      child: SafeArea(
+        child: Theme(
+          data: theme.copyWith(visualDensity: VisualDensity.compact),
+          child: SizedBox.expand(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.only(bottom: padding * 1.1),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: padding),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
                             Padding(
                               padding: EdgeInsets.fromLTRB(0, padding, 0, padding * 0.4),
                               child: Column(
@@ -702,6 +696,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
               ],
             ),
           ),
+        ),
         ),
       ),
     );
@@ -1048,6 +1043,7 @@ class _ItemLineTileState extends State<_ItemLineTile> {
         AccountTreeComboboxWidget(
           businessId: widget.businessId,
           documentTypeFilter: widget.isIncome ? 'income' : 'expense',
+          dense: true,
           selectedAccount: widget.line.accountId != null
               ? Account(
                   id: int.tryParse(widget.line.accountId!),
@@ -1131,6 +1127,7 @@ class _ItemLineTileState extends State<_ItemLineTile> {
               child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 documentTypeFilter: widget.isIncome ? 'income' : 'expense',
+                dense: true,
                 selectedAccount: widget.line.accountId != null
                     ? Account(
                         id: int.tryParse(widget.line.accountId!),
@@ -1541,6 +1538,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: BankAccountComboboxWidget(
                 businessId: widget.businessId,
+                dense: true,
                 selectedAccountId: widget.line.bankAccountId,
                 onChanged: (opt) {
                   widget.onChanged(widget.line.copyWith(
@@ -1561,6 +1559,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: CashRegisterComboboxWidget(
                 businessId: widget.businessId,
+                dense: true,
                 selectedRegisterId: widget.line.cashRegisterId,
                 onChanged: (opt) {
                   widget.onChanged(widget.line.copyWith(
@@ -1581,6 +1580,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: PettyCashComboboxWidget(
                 businessId: widget.businessId,
+                dense: true,
                 selectedPettyCashId: widget.line.pettyCashId,
                 onChanged: (opt) {
                   widget.onChanged(widget.line.copyWith(
@@ -1602,6 +1602,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: CheckComboboxWidget(
                 businessId: widget.businessId,
+                dense: true,
                 selectedCheckId: widget.line.checkId,
                 onChanged: (opt) {
                   widget.onChanged(widget.line.copyWith(
@@ -1621,6 +1622,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
             Expanded(
               child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
+                dense: true,
                 selectedAccount: widget.line.accountId != null
                     ? Account(
                         id: int.tryParse(widget.line.accountId!),

@@ -16,6 +16,7 @@ from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from jinja2.sandbox import SandboxedEnvironment
 from jinja2 import BaseLoader, TemplateSyntaxError, UndefinedError
@@ -307,7 +308,324 @@ class BusinessNotificationService:
                 f"خطا در محاسبه هزینه: {str(e)}",
                 http_status=500
             )
-    
+
+    def estimate_sms_template_cost(
+        self,
+        business_id: int,
+        template_id: int,
+    ) -> Dict[str, Any]:
+        """
+        برآورد هزینه ارسال بر اساس طول متن خام قالب و قیمت‌گذاری اعلامی در تنظیمات ادمین.
+        پس از رندر قالب متن نهایی ممکن است متفاوت باشد؛ هزینه واقعی همان لحظه ارسال محاسبه می‌شود.
+        """
+        template = self.template_repo.get_by_id(template_id, business_id)
+        if not template:
+            raise ApiError("TEMPLATE_NOT_FOUND", "قالب یافت نشد", http_status=404)
+        if template.channel != "sms":
+            raise ApiError(
+                "TEMPLATE_NOT_SMS",
+                "قالب انتخاب‌شده برای پیامک نیست",
+                http_status=400,
+            )
+
+        body = template.body or ""
+        sms_count = calculate_sms_count(body)
+        total_cost = self._calculate_sms_cost(sms_count, template.event_type)
+        unit_cost = self._calculate_sms_cost(1, template.event_type)
+        price_per_sms = float(unit_cost)
+
+        return {
+            "template_id": template.id,
+            "template_name": template.name,
+            "event_type": template.event_type,
+            "body_char_count": len(body),
+            "sms_segments": sms_count,
+            "price_per_sms": price_per_sms,
+            "estimated_total": float(total_cost),
+            "disclaimer": "estimate_based_on_raw_template",
+        }
+
+    def send_sms_by_template(
+        self,
+        business_id: int,
+        template_id: int,
+        context: Dict[str, Any],
+        person_id: int,
+        recipient_mobile_override: Optional[str] = None,
+        triggered_by_user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        ارسال پیامک با یک قالب مشخص (برای ورک‌فلو و اتوماسیون).
+
+        قالب باید متعلق به همان business، کانال sms، وضعیت approved و فعال باشد.
+        هزینه و کیف پول مطابق تنظیمات قیمت‌گذاری پیامک و الگوی send_to_person.
+        """
+        template = self.template_repo.get_by_id(template_id, business_id)
+        if not template:
+            raise ApiError("TEMPLATE_NOT_FOUND", "قالب یافت نشد", http_status=404)
+        if template.channel != "sms":
+            raise ApiError(
+                "TEMPLATE_NOT_SMS",
+                "قالب انتخاب‌شده برای پیامک نیست",
+                http_status=400,
+            )
+        if template.status != "approved" or not template.is_active:
+            raise ApiError(
+                "TEMPLATE_NOT_APPROVED",
+                "قالب تایید نشده یا غیرفعال است",
+                http_status=400,
+            )
+
+        person = (
+            self.db.query(Person)
+            .filter(and_(Person.id == person_id, Person.business_id == business_id))
+            .first()
+        )
+        if not person:
+            raise ApiError("PERSON_NOT_FOUND", "شخص یافت نشد", http_status=404)
+
+        sms_destination: Optional[str] = None
+        if recipient_mobile_override and str(recipient_mobile_override).strip():
+            try:
+                sms_destination = normalize_phone_number(str(recipient_mobile_override).strip())
+            except Exception as e:
+                raise ApiError(
+                    "INVALID_RECIPIENT_MOBILE",
+                    f"شماره موبایل مقصد معتبر نیست: {e}",
+                    http_status=400,
+                )
+        elif person.mobile:
+            try:
+                sms_destination = normalize_phone_number(person.mobile)
+            except Exception:
+                sms_destination = None
+
+        if not sms_destination:
+            raise ApiError(
+                "NO_SMS_RECIPIENT",
+                "شماره موبایل در پرونده شخص ثبت نشده و شماره مقصد هم ارسال نشده است.",
+                http_status=400,
+            )
+
+        business = self.db.query(Business).filter(Business.id == business_id).first()
+        if business:
+            context.setdefault("business_name", business.name)
+            context.setdefault("business_phone", business.phone or "")
+
+        event_type = template.event_type
+        ch = "sms"
+
+        try:
+            if not self._check_daily_limit(business_id, template.id, ch):
+                result = {
+                    "success": False,
+                    "error": "DAILY_LIMIT",
+                    "error_message": "محدودیت ارسال روزانه",
+                }
+                self.db.commit()
+                return result
+
+            rendered_body = self.template_renderer.render(template.body, context)
+
+            wallet_charge_result = None
+            total_cost: Decimal = Decimal("0")
+
+            try:
+                sms_count = calculate_sms_count(rendered_body)
+                if sms_count <= 0:
+                    self.db.commit()
+                    return {
+                        "success": False,
+                        "error": "INVALID_SMS_COUNT",
+                        "error_message": "تعداد پیامک محاسبه شده نامعتبر است",
+                    }
+
+                total_cost = self._calculate_sms_cost(sms_count, event_type)
+            except ApiError as cost_error:
+                logger.error(f"خطا در محاسبه هزینه: {cost_error}")
+                self.db.commit()
+                return {
+                    "success": False,
+                    "error": cost_error.code or "COST_ERROR",
+                    "error_message": cost_error.message or "خطا در محاسبه هزینه پیامک",
+                }
+
+            try:
+                account = _get_wallet_account_for_update(self.db, business_id)
+                available_balance = Decimal(str(account.available_balance or 0))
+
+                if available_balance < total_cost:
+                    ins = self._handle_insufficient_funds(
+                        business_id=business_id,
+                        user_id=triggered_by_user_id,
+                        required_amount=total_cost,
+                        available_amount=available_balance,
+                        template_name=template.name,
+                        event_type=event_type,
+                        template_id=template.id,
+                        person_id=person_id,
+                        person=person,
+                        channel=ch,
+                        rendered_body=rendered_body,
+                        context=context,
+                    )
+                    self.db.commit()
+                    return ins
+
+                wallet_charge_result = charge_wallet_for_notification(
+                    db=self.db,
+                    business_id=business_id,
+                    user_id=triggered_by_user_id or 0,
+                    amount=total_cost,
+                    sms_count=sms_count,
+                    event_type=event_type,
+                    template_id=template.id,
+                    template_name=template.name,
+                )
+            except ApiError as e:
+                if e.code == "INSUFFICIENT_FUNDS":
+                    ins = self._handle_insufficient_funds(
+                        business_id=business_id,
+                        user_id=triggered_by_user_id,
+                        required_amount=total_cost,
+                        available_amount=Decimal("0"),
+                        template_name=template.name,
+                        event_type=event_type,
+                        template_id=template.id,
+                        person_id=person_id,
+                        person=person,
+                        channel=ch,
+                        rendered_body=rendered_body,
+                        context=context,
+                    )
+                    self.db.commit()
+                    return ins
+                raise
+
+            to_phone = sms_destination
+            send_result = self._send_message(
+                channel=ch,
+                recipient=person,
+                subject=None,
+                body=rendered_body,
+                to_phone_override=to_phone,
+            )
+
+            if wallet_charge_result:
+                try:
+                    total_cost = self._calculate_sms_cost(
+                        calculate_sms_count(rendered_body),
+                        event_type,
+                    )
+                    send_result["cost"] = total_cost
+                except Exception as cost_error:
+                    logger.warning(f"خطا در محاسبه مجدد هزینه: {cost_error}")
+
+            if not send_result["success"] and wallet_charge_result:
+                try:
+                    account = _get_wallet_account_for_update(self.db, business_id)
+                    account.available_balance += total_cost
+                    self.db.flush()
+
+                    from adapters.db.models.wallet import WalletTransaction
+
+                    reversal_tx = WalletTransaction(
+                        business_id=int(business_id),
+                        type="notification_sms_reversal",
+                        status="succeeded",
+                        amount=total_cost,
+                        fee_amount=Decimal("0"),
+                        description=f"بازگشت مبلغ - خطا در ارسال پیامک: {send_result.get('error', 'خطای نامشخص')}",
+                        document_id=wallet_charge_result.get("document_id"),
+                        extra_info=json.dumps(
+                            {
+                                "source": "business_notification",
+                                "original_transaction_id": wallet_charge_result.get(
+                                    "wallet_transaction_id"
+                                ),
+                                "reason": "send_failed",
+                                "error": send_result.get("error"),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    )
+                    self.db.add(reversal_tx)
+                    self.db.flush()
+                except Exception as reversal_error:
+                    logger.error(
+                        f"خطا در بازگشت مبلغ به کیف پول: {reversal_error}",
+                        exc_info=True,
+                    )
+
+            recipient_identifier = sms_destination or person.mobile
+            log = self._create_log(
+                business_id=business_id,
+                template_id=template.id,
+                recipient_type="person",
+                recipient_id=person_id,
+                recipient_identifier=recipient_identifier,
+                channel=ch,
+                subject=None,
+                body=rendered_body,
+                context_data=context,
+                event_type=event_type,
+                triggered_by_user_id=triggered_by_user_id,
+                send_result=send_result,
+            )
+
+            if send_result["success"]:
+                self.stat_repo.increment_sent(
+                    business_id=business_id,
+                    template_id=template.id,
+                    target_date=date.today(),
+                    channel=ch,
+                    cost=send_result.get("cost", Decimal("0")),
+                )
+            else:
+                self.stat_repo.increment_failed(
+                    business_id=business_id,
+                    template_id=template.id,
+                    target_date=date.today(),
+                    channel=ch,
+                )
+
+            self.db.commit()
+
+            display_name = ""
+            if person.first_name or person.last_name:
+                display_name = " ".join(
+                    filter(None, [person.first_name, person.last_name])
+                ).strip()
+            if not display_name:
+                display_name = person.alias_name or ""
+
+            return {
+                "success": send_result["success"],
+                "template_id": template.id,
+                "event_type": event_type,
+                "log_id": log.id,
+                "message": (
+                    "ارسال با موفقیت انجام شد"
+                    if send_result["success"]
+                    else (send_result.get("error") or "خطا در ارسال")
+                ),
+                "error": None if send_result["success"] else (send_result.get("error") or "SEND_FAILED"),
+                "recipient": {
+                    "type": "person",
+                    "id": person_id,
+                    "name": display_name,
+                },
+                "cost": float(total_cost) if wallet_charge_result else 0.0,
+            }
+
+        except ApiError:
+            self.db.rollback()
+            raise
+        except Exception as e:
+            logger.error(f"send_sms_by_template failed: {e}", exc_info=True)
+            self.db.rollback()
+            raise
+
     def send_to_person(
         self,
         business_id: int,

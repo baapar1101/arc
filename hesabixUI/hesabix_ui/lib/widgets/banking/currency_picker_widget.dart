@@ -98,7 +98,7 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
       errorText: errorText,
       isDense: widget.isDense,
       contentPadding: widget.isDense
-          ? const EdgeInsetsDirectional.only(start: 12, top: 8, bottom: 8, end: 12)
+          ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
           : null,
     );
     return base;

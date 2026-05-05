@@ -44,3 +44,17 @@ class UserNotificationSetting(Base):
 	)
 
 
+class UserInappAlertPreference(Base):
+	"""ترجیحات هشدار درون‌برنامه‌ای (حالت عادی/سکوت/DND و صدا)."""
+
+	__tablename__ = "user_inapp_alert_preferences"
+
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+	# normal | silent | do_not_disturb
+	alert_mode: Mapped[str] = mapped_column(String(32), default="normal", nullable=False)
+	sound_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+	# شناسه ثابت اپ کلاینت؛ پیش‌فرض default یا s_1 … s_27
+	sound_asset_id: Mapped[str] = mapped_column(String(64), default="default", nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+

@@ -482,6 +482,39 @@ SEND_EMAIL_TRANSLATIONS = {
 }
 
 
+# ترجمه‌های اکشن «ارسال پیامک قالب کسب‌وکار»
+SEND_BUSINESS_SMS_TRANSLATIONS = {
+    "fa": {
+        "action_name": "ارسال پیامک (قالب تاییدشده)",
+        "action_description": "ارسال پیامک با قالب SMS تاییدشده مدیر؛ هزینه از کیف پول طبق تنظیمات قیمت‌گذاری پیامک کسر می‌شود",
+        "field_template_id": "شناسه قالب",
+        "field_template_id_desc": "قالب SMS فعال و تاییدشده در همین کسب‌وکار",
+        "field_person_id": "شناسه شخص",
+        "field_person_id_desc": "مخاطب در دفتر اشخاص همین کسب‌وکار (می‌توان از خروجی نود قبلی استفاده کرد)",
+        "field_recipient_mobile": "شماره مقصد",
+        "field_recipient_mobile_desc": "اختیاری؛ اگر خالی باشد از موبایل پرونده شخص استفاده می‌شود",
+        "field_template_context": "متغیرهای قالب",
+        "field_template_context_desc": "شیء کلید-مقدار برای متغیرهای Jinja؛ مقادیر را ثابت یا با ارجاع به نودهای قبلی پر کنید",
+        "field_stop_workflow_on_send_failure": "توقف ورک‌فلو اگر ارسال ناموفق",
+        "field_stop_workflow_on_send_failure_desc": "در خطای سرویس پیامک (غیر از کمبود کیف پول) اجرا متوقف شود",
+    },
+    "en": {
+        "action_name": "Send SMS (approved template)",
+        "action_description": "Send SMS using an admin-approved business template; wallet is charged per notification SMS pricing settings",
+        "field_template_id": "Template ID",
+        "field_template_id_desc": "Active approved SMS template for this business",
+        "field_person_id": "Person ID",
+        "field_person_id_desc": "Recipient in this business directory (can reference a previous node)",
+        "field_recipient_mobile": "Destination mobile",
+        "field_recipient_mobile_desc": "Optional; if empty, the person's saved mobile is used",
+        "field_template_context": "Template variables",
+        "field_template_context_desc": "Key-value map for Jinja variables; values can be literals or expressions from prior nodes",
+        "field_stop_workflow_on_send_failure": "Stop workflow on SMS send failure",
+        "field_stop_workflow_on_send_failure_desc": "Fail the run on provider errors (not insufficient wallet balance)",
+    },
+}
+
+
 # ترجمه‌های اکشن AI Agent
 AI_AGENT_TRANSLATIONS = {
     "fa": {
@@ -1025,6 +1058,7 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
             "send_telegram": SEND_TELEGRAM_TRANSLATIONS,
             "send_bale": SEND_BALE_TRANSLATIONS,
             "send_email": SEND_EMAIL_TRANSLATIONS,
+            "send_business_sms": SEND_BUSINESS_SMS_TRANSLATIONS,
             "ai_agent": AI_AGENT_TRANSLATIONS,
             "business_backup": BUSINESS_BACKUP_TRANSLATIONS,
             "crm_web_chat_send_message": CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS,

@@ -53,6 +53,7 @@ import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
+import 'business_shell_side_nav_scope.dart';
 
 
 class NewInvoicePage extends StatefulWidget {
@@ -79,6 +80,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   String _invoiceWarehouseReleaseMode = 'draft';
   bool _warehouseReleaseModeFromLocal = false;
   int? _documentWarehouseId; // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
+  VoidCallback? _restoreDesktopRailAfterQuit;
 
   bool get _postInventory => _invoiceWarehouseReleaseMode != 'none';
   late TabController _tabController;
@@ -299,6 +301,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // بارگذاری تنظیمات چاپ کسب‌وکار
     _loadPrintSettings();
     _loadPrintTemplates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
+      if (shellScope?.canControlDesktopRail ?? false) {
+        shellScope!.setRailVisible(false);
+        final scope = shellScope;
+        _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.copyFromInvoiceId != null) {
         await _loadInvoiceCopyFrom(widget.copyFromInvoiceId!);
@@ -1886,6 +1897,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   @override
   void dispose() {
+    _restoreDesktopRailAfterQuit?.call();
     disposeInvoiceAdjustmentRows(_adjustmentRows);
     _adjustmentRows = [];
     _tabController.dispose();

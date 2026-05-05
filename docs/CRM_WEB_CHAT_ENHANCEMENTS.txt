@@ -1,0 +1,39 @@
+CRM web chat — planned/follow-up (device, IP, read ticks, history)
+================================================================
+
+A) Analysis summary
+--------------------
+1) Device (mobile / tablet / desktop): optional field `device_type` in POST
+   /api/v1/public/crm-chat/conversations/start; stored in
+   `crm_chat_conversations.extra_metadata.device_type` (set by client).
+   Server also stores `extra_metadata.visitor_ip` from `get_client_ip(request)`.
+2) Operator UI (Hesabix panel): read `extra_metadata` on each conversation;
+   show small device icon + tooltip, and "IP: …" for support.
+3) Read receipts: visitor messages already have `read_at` when the agent
+   marks read; the WordPress widget already draws double-tick SVG and
+   `applyMessagesReadFromEvent` should only update *visitor* rows when
+   `reader_role === 'agent'` (so agent-side read receipts stay correct).
+4) History: keep a local list of `{ conversation_id, visitor_token }` in
+   localStorage (per apiBase+publicKey), push the current session before
+   "new chat" or before starting a second conversation; add a <select> in
+   the chat step to switch threads and reload messages + WebSocket.
+
+B) Done in repo (this branch/session where writable)
+-----------------------------------------------------
+- hesabixAPI/adapters/api/v1/schema_models/crm_chat.py — added optional
+  device_type on CrmChatConversationStartPublic.
+- docs/_apply_crm_web_chat_enhancements.py — applies crm_chat_service +
+  crm_chat_public in one run (use sudo; both files need owner write).
+
+C) Must apply manually (permission root/www-data only)
+--------------------------------------------------------
+Run once:
+  sudo python3 docs/_apply_crm_web_chat_enhancements.py
+
+Then merge widget JS/CSS + PHP strings + Flutter UI + ARB (see diffs in
+issue/PR) or apply the same edits with a user that owns those files.
+
+D) Grep: other callers of start_conversation_public
+---------------------------------------------------
+If any test or script calls start_conversation_public, new kwargs are
+optional — no break.

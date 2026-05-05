@@ -333,6 +333,26 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
             });
           },
         ),
+        SwitchListTile(
+          title: const Text('نمایش زمان چاپ در پاورقی صفحهٔ PDF'),
+          subtitle: const Text('متن «زمان چاپ» در نوار پایین هر صفحهٔ خروجی PDF فاکتور'),
+          value: cfg.showFooterPrintTime,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showFooterPrintTime: v));
+            });
+          },
+        ),
+        SwitchListTile(
+          title: const Text('نمایش تهیه‌کننده در پاورقی صفحهٔ PDF'),
+          subtitle: const Text('نام کاربری که فاکتور را ثبت کرده در کنار زمان چاپ (نوار پایین صفحه)'),
+          value: cfg.showFooterPreparer,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showFooterPreparer: v));
+            });
+          },
+        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _footerController,
@@ -354,6 +374,8 @@ class _PrintConfig {
   final bool showPayments;
   final bool showInstallmentPlan;
   final bool showShareQr;
+  final bool showFooterPrintTime;
+  final bool showFooterPreparer;
   final String? footerNote;
 
   const _PrintConfig({
@@ -362,6 +384,8 @@ class _PrintConfig {
     required this.showPayments,
     required this.showInstallmentPlan,
     required this.showShareQr,
+    required this.showFooterPrintTime,
+    required this.showFooterPreparer,
     required this.footerNote,
   });
 
@@ -372,6 +396,8 @@ class _PrintConfig {
       showPayments: true,
       showInstallmentPlan: true,
       showShareQr: false,
+      showFooterPrintTime: true,
+      showFooterPreparer: true,
       footerNote: null,
     );
   }
@@ -395,6 +421,8 @@ class _PrintConfig {
       showPayments: _b('show_payments', true),
       showInstallmentPlan: _b('show_installment_plan', true),
       showShareQr: _b('show_share_qr', false),
+      showFooterPrintTime: _b('show_footer_print_time', true),
+      showFooterPreparer: _b('show_footer_preparer', true),
       footerNote: (json['footer_note'] as String?)?.trim().isEmpty == true
           ? null
           : json['footer_note'] as String?,
@@ -408,6 +436,8 @@ class _PrintConfig {
       'show_payments': showPayments,
       'show_installment_plan': showInstallmentPlan,
       'show_share_qr': showShareQr,
+      'show_footer_print_time': showFooterPrintTime,
+      'show_footer_preparer': showFooterPreparer,
       'footer_note': footerNote,
     };
   }
@@ -418,6 +448,8 @@ class _PrintConfig {
     bool? showPayments,
     bool? showInstallmentPlan,
     bool? showShareQr,
+    bool? showFooterPrintTime,
+    bool? showFooterPreparer,
     String? footerNote,
   }) {
     return _PrintConfig(
@@ -426,6 +458,8 @@ class _PrintConfig {
       showPayments: showPayments ?? this.showPayments,
       showInstallmentPlan: showInstallmentPlan ?? this.showInstallmentPlan,
       showShareQr: showShareQr ?? this.showShareQr,
+      showFooterPrintTime: showFooterPrintTime ?? this.showFooterPrintTime,
+      showFooterPreparer: showFooterPreparer ?? this.showFooterPreparer,
       footerNote: footerNote ?? this.footerNote,
     );
   }

@@ -249,7 +249,23 @@ async def export_documents_pdf_endpoint(
     title_text = "لیست اسناد حسابداری" if is_fa else "Documents List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
     rows_html = []
     for item in items:
@@ -871,6 +887,33 @@ async def get_document_pdf_endpoint(
     if not orientation:
         # برای سند حسابداری (جدول عریض) پیش‌فرض landscape مناسب‌تر است
         orientation = "landscape"
+    base_footer = (
+        f"{'سند' if is_fa else 'Document'}: {doc.get('code') or '-'}"
+        + (f" • {business_name}" if business_name else "")
+    )
+    try:
+        from app.services.print_footer_settings import (
+            build_print_meta_footer_line,
+            merge_document_code_footer_with_meta,
+        )
+
+        cal_str = str(calendar_type) if calendar_type else ("jalali" if is_fa else "gregorian")
+        if cal_str not in ("jalali", "gregorian"):
+            cal_str = "jalali" if is_fa else "gregorian"
+        meta_ft = build_print_meta_footer_line(
+            db,
+            business_id,
+            now=now_dt,
+            preparer_name=(doc.get("created_by_name") or None),
+            is_fa=is_fa,
+            calendar_type=cal_str,
+        )
+        footer_text = merge_document_code_footer_with_meta(
+            base_footer=base_footer,
+            meta_line=meta_ft,
+        )
+    except Exception:
+        footer_text = base_footer
     html_content = resolved_html or render_template(
         "pdf/documents/detail.html",
         {
@@ -878,10 +921,7 @@ async def get_document_pdf_endpoint(
             "title_text": doc.get("document_type_name") or ("سند" if is_fa else "Document"),
             "paper_size": paper_size,
             "orientation": orientation,
-            "footer_text": (
-                f"{'سند' if is_fa else 'Document'}: {doc.get('code') or '-'}"
-                + (f" • {business_name}" if business_name else "")
-            ),
+            "footer_text": footer_text,
         },
     )
 
@@ -2452,7 +2492,23 @@ async def export_daily_purchases_report_pdf(
             pass
 
     title_text = "گزارش خرید روزانه" if is_fa else "Daily Purchases Report"
-    footer_text = ""
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=generated_at,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = ""
     final_html = render_template(
         "pdf/daily_purchases/list.html",
         {
@@ -6434,8 +6490,29 @@ async def export_journal_ledger_report_pdf(
     title_text = "گزارش دفتر روزنامه" if is_fa else "Journal Ledger Report"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
-    
+    try:
+        from app.services.print_footer_settings import (
+            build_generated_at_pdf_footer,
+            get_default_print_footer_flags,
+        )
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+        journal_show_gen_date_header, _ = get_default_print_footer_flags(db, business_id)
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+        journal_show_gen_date_header = True
+
     # Create headers HTML
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
     
@@ -6596,7 +6673,7 @@ async def export_journal_ledger_report_pdf(
                     <div class="title">{title_text}</div>
                     {f'<div class="meta"><strong>{label_biz}:</strong> {escape(business_name)}</div>' if business_name else ''}
                 </div>
-                <div class="meta">{label_date}: {now}</div>
+                {f'<div class="meta">{label_date}: {now}</div>' if journal_show_gen_date_header else ''}
             </div>
             <table class="report-table">
                 <thead>

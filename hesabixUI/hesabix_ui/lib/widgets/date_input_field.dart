@@ -257,14 +257,21 @@ class _DateInputFieldState extends State<DateInputField> {
         labelText: widget.labelText,
         hintText: widget.hintText,
         suffixIcon: IconButton(
-          icon: const Icon(Icons.calendar_today),
+          padding: EdgeInsets.zero,
+          constraints: widget.isDense
+              ? const BoxConstraints(minWidth: 40, minHeight: 40, maxWidth: 44, maxHeight: 44)
+              : null,
+          icon: Icon(Icons.calendar_today, size: widget.isDense ? 20 : 24),
           tooltip: t.dateInputOpenCalendar,
           onPressed: widget.enabled ? _selectDate : null,
         ),
+        suffixIconConstraints: widget.isDense
+            ? const BoxConstraints(maxHeight: 44, maxWidth: 48)
+            : null,
         border: const OutlineInputBorder(),
         isDense: widget.isDense,
         contentPadding: widget.isDense
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
             : null,
       ),
       inputFormatters: [

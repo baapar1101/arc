@@ -43,6 +43,8 @@ class CheckComboboxWidget extends StatefulWidget {
   final CheckPickerMode mode;
   final AuthStore? authStore;
   final CalendarController? calendarController;
+  /// نمایش به‌صورت [TextFormField] outline فشرده (هم‌ارتفاع با فیلدهای فرم).
+  final bool dense;
 
   const CheckComboboxWidget({
     super.key,
@@ -56,6 +58,7 @@ class CheckComboboxWidget extends StatefulWidget {
     this.mode = CheckPickerMode.any,
     this.authStore,
     this.calendarController,
+    this.dense = false,
   });
 
   @override
@@ -65,6 +68,7 @@ class CheckComboboxWidget extends StatefulWidget {
 class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
   final CheckService _service = CheckService();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _displayFieldController = TextEditingController();
   Timer? _debounceTimer;
   void Function(void Function())? _setModalState;
 
@@ -80,6 +84,9 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncDenseDisplayText();
+    });
   }
 
   @override
@@ -88,13 +95,38 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
     if (oldWidget.selectedCheckId != widget.selectedCheckId) {
       _ensureSelectedCheckLoaded();
     }
+    if (oldWidget.selectedCheckNumber != widget.selectedCheckNumber ||
+        oldWidget.dense != widget.dense) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncDenseDisplayText();
+      });
+    }
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _displayFieldController.dispose();
     super.dispose();
+  }
+
+  String _displayLineText() {
+    if (_selectedOption != null && _selectedOption!.number.isNotEmpty) {
+      return _selectedOption!.number;
+    }
+    if (widget.selectedCheckNumber != null && widget.selectedCheckNumber!.isNotEmpty) {
+      return widget.selectedCheckNumber!;
+    }
+    return widget.hintText;
+  }
+
+  void _syncDenseDisplayText() {
+    if (!widget.dense) return;
+    final next = _displayLineText();
+    if (_displayFieldController.text != next) {
+      _displayFieldController.text = next;
+    }
   }
 
   Future<void> _load() async {
@@ -108,6 +140,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
       if (_selectedOption != null) {
         setState(() => _selectedOption = null);
       }
+      _syncDenseDisplayText();
       return;
     }
     final existing = _items.firstWhere(
@@ -118,6 +151,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
       setState(() {
         _selectedOption = existing;
       });
+      _syncDenseDisplayText();
       return;
     }
     try {
@@ -130,6 +164,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
         _items = [..._items, option];
         _selectedOption = option;
       });
+      _syncDenseDisplayText();
     } catch (_) {
       // نادیده گرفتن خطا برای جلوگیری از قطع تجربه کاربر
     }
@@ -247,6 +282,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
           }
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
     } catch (e) {
       if (seq != _seq || query != _latestQuery) return;
@@ -260,6 +296,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
           _isSearching = false;
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
       SnackBarHelper.showError(
       context,
@@ -325,6 +362,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
                 });
               }
               widget.onChanged(opt);
+              _syncDenseDisplayText();
               Navigator.pop(context);
             },
             onAddNew: _addNewCheck,
@@ -337,15 +375,27 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final text = () {
-      if (_selectedOption != null && _selectedOption!.number.isNotEmpty) {
-        return _selectedOption!.number;
-      }
-      if (widget.selectedCheckNumber != null && widget.selectedCheckNumber!.isNotEmpty) {
-        return widget.selectedCheckNumber!;
-      }
-      return widget.hintText;
-    }();
+    final text = _displayLineText();
+
+    if (widget.dense) {
+      return TextFormField(
+        controller: _displayFieldController,
+        readOnly: true,
+        onTap: _openPicker,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          isDense: true,
+          contentPadding: const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12),
+          suffixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          suffixIcon: Icon(Icons.arrow_drop_down, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          prefixIcon: Icon(Icons.receipt_long, color: theme.colorScheme.primary, size: 20),
+          prefixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          border: const OutlineInputBorder(),
+        ),
+        style: theme.textTheme.bodyMedium,
+      );
+    }
 
     return InkWell(
       onTap: _openPicker,

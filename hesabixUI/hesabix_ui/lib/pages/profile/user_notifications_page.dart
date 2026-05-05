@@ -8,11 +8,13 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
+import '../../services/in_app_notification_preferences_controller.dart';
 import '../../services/notifications_service.dart';
 import '../../services/telegram_integration_service.dart';
 import '../../services/bale_integration_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/in_app_notification_behavior_section.dart';
 
 class UserNotificationsPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -55,6 +57,9 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   bool _email = true;
   bool _sms = true;
   bool _inapp = true;
+  InAppAlertMode _inappAlertMode = InAppAlertMode.normal;
+  bool _inappSoundEnabled = true;
+  String _inappSoundAssetId = 'default';
   bool _saving = false;
   bool _emailVerified = false;
   bool _mobileVerified = false;
@@ -114,8 +119,12 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         _email = (s['email_enabled'] ?? false) == true;
         _sms = (s['sms_enabled'] ?? false) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
+        _inappAlertMode = inAppAlertModeFromApi(s['inapp_alert_mode']?.toString());
+        _inappSoundEnabled = (s['inapp_sound_enabled'] ?? true) == true;
+        _inappSoundAssetId = '${s['inapp_sound_asset_id'] ?? 'default'}';
         _loading = false;
       });
+      InAppNotificationPreferencesController.instance.applyFromSettingsMap(s);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -511,8 +520,16 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       emailEnabled: _email,
       smsEnabled: _sms,
       inappEnabled: _inapp,
+      inappAlertMode: inAppAlertModeToApi(_inappAlertMode),
+      inappSoundEnabled: _inappSoundEnabled,
+      inappSoundAssetId: _inappSoundAssetId,
     );
       if (!mounted) return;
+      InAppNotificationPreferencesController.instance.applyFromSettingsMap({
+        'inapp_alert_mode': inAppAlertModeToApi(_inappAlertMode),
+        'inapp_sound_enabled': _inappSoundEnabled,
+        'inapp_sound_asset_id': _inappSoundAssetId,
+      });
       SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
@@ -691,6 +708,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
               _buildTelegramChannelTile(t, theme, colorScheme, options[i]),
             ] else if (options[i].key == 'bale') ...[
               _buildBaleChannelTile(t, theme, colorScheme, options[i]),
+            ] else if (options[i].key == 'inapp') ...[
+              _buildInAppChannelTile(t, theme, colorScheme, options[i]),
             ] else ...[
               SwitchListTile.adaptive(
                 value: options[i].enabled,
@@ -740,6 +759,38 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           const SizedBox(height: 8),
         ],
       ),
+    );
+  }
+
+  Widget _buildInAppChannelTile(AppLocalizations t, ThemeData theme, ColorScheme colorScheme, _ChannelOption option) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile.adaptive(
+          value: option.enabled,
+          onChanged: option.canEnable ? option.onChanged : null,
+          title: Text(option.title),
+          subtitle: Text(option.description),
+          secondary: Icon(
+            option.icon,
+            color: option.enabled && option.canEnable ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          activeColor: colorScheme.primary,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: InAppNotificationBehaviorSection(
+            enabled: option.enabled,
+            alertMode: _inappAlertMode,
+            soundEnabled: _inappSoundEnabled,
+            soundAssetId: _inappSoundAssetId,
+            onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
+            onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
+            onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
+          ),
+        ),
+      ],
     );
   }
 

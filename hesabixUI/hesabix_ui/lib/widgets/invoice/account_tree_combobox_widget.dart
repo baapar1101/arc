@@ -14,6 +14,8 @@ class AccountTreeComboboxWidget extends StatefulWidget {
   final bool isRequired;
   /// 'expense' یا 'income' برای فیلتر کردن درخت حساب‌ها
   final String? documentTypeFilter;
+  /// هم‌ارتفاع با سایر فیلدهای Outline فشرده (دیالوگ هزینه/درآمد و مشابه).
+  final bool dense;
 
   const AccountTreeComboboxWidget({
     super.key,
@@ -24,6 +26,7 @@ class AccountTreeComboboxWidget extends StatefulWidget {
     this.hintText = 'انتخاب حساب',
     this.isRequired = false,
     this.documentTypeFilter,
+    this.dense = false,
   });
 
   @override
@@ -82,16 +85,23 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hintText,
+        isDense: widget.dense,
+        contentPadding: widget.dense
+            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
+            : null,
+        suffixIconConstraints: widget.dense
+            ? const BoxConstraints(maxHeight: 44, maxWidth: 48)
+            : null,
         suffixIcon: _isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: Padding(
-                  padding: EdgeInsets.all(12),
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  padding: EdgeInsets.all(widget.dense ? 8 : 12),
+                  child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : const Icon(Icons.account_tree),
+            : Icon(Icons.account_tree, size: widget.dense ? 20 : 24),
         border: const OutlineInputBorder(),
       ),
       readOnly: true,

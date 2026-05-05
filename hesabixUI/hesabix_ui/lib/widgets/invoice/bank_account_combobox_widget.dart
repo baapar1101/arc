@@ -24,6 +24,8 @@ class BankAccountComboboxWidget extends StatefulWidget {
   final String hintText;
   final bool isRequired;
   final int? filterCurrencyId;
+  /// نمایش به‌صورت [TextFormField] outline فشرده (هم‌ارتفاع با فیلدهای فرم).
+  final bool dense;
 
   const BankAccountComboboxWidget({
     super.key,
@@ -34,6 +36,7 @@ class BankAccountComboboxWidget extends StatefulWidget {
     this.hintText = 'جست‌وجو و انتخاب بانک',
     this.isRequired = false,
     this.filterCurrencyId,
+    this.dense = false,
   });
 
   @override
@@ -43,6 +46,7 @@ class BankAccountComboboxWidget extends StatefulWidget {
 class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   final BankAccountService _service = BankAccountService();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _displayFieldController = TextEditingController();
   Timer? _debounceTimer;
   int _seq = 0;
   String _latestQuery = '';
@@ -60,6 +64,9 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
     super.initState();
     _loadCurrencies();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncDenseDisplayText();
+    });
   }
 
   @override
@@ -69,13 +76,43 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
       // بازخوانی با فیلتر جدید ارز
       _performSearch(_latestQuery);
     }
+    if (oldWidget.selectedAccountId != widget.selectedAccountId ||
+        oldWidget.dense != widget.dense) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncDenseDisplayText();
+      });
+    }
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _displayFieldController.dispose();
     super.dispose();
+  }
+
+  String _displayLineText() {
+    final selected = _items.firstWhere(
+      (e) => e.id == widget.selectedAccountId,
+      orElse: () => const BankAccountOption('', ''),
+    );
+    final currencyText = _formatCurrencyLabel(selected.currencyId);
+    if (widget.selectedAccountId != null && widget.selectedAccountId!.isNotEmpty) {
+      if (selected.name.isNotEmpty) {
+        return currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name;
+      }
+      return widget.hintText;
+    }
+    return widget.hintText;
+  }
+
+  void _syncDenseDisplayText() {
+    if (!widget.dense) return;
+    final next = _displayLineText();
+    if (_displayFieldController.text != next) {
+      _displayFieldController.text = next;
+    }
   }
 
   Future<void> _load() async {
@@ -96,6 +133,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
       setState(() {
         _currencyById = map;
       });
+      _syncDenseDisplayText();
     } catch (_) {
       // ignore errors, currency labels will be omitted
     }
@@ -177,6 +215,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
           _isSearching = false;
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
     } catch (e) {
       if (seq != _seq || query != _latestQuery) return;
@@ -190,6 +229,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
           _isSearching = false;
         }
       });
+      _syncDenseDisplayText();
       _setModalState?.call(() {});
       SnackBarHelper.showError(
       context,
@@ -261,6 +301,34 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
             ? (currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name)
             : widget.hintText)
         : widget.hintText;
+
+    if (widget.dense) {
+      return TextFormField(
+        controller: _displayFieldController,
+        readOnly: true,
+        onTap: _openPicker,
+        validator: widget.isRequired
+            ? (_) {
+                if (widget.selectedAccountId == null || widget.selectedAccountId!.isEmpty) {
+                  return 'انتخاب ${widget.label} الزامی است';
+                }
+                return null;
+              }
+            : null,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          isDense: true,
+          contentPadding: const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12),
+          suffixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          suffixIcon: Icon(Icons.arrow_drop_down, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          prefixIcon: Icon(Icons.account_balance, color: theme.colorScheme.primary, size: 20),
+          prefixIconConstraints: const BoxConstraints(maxHeight: 44, maxWidth: 48),
+          border: const OutlineInputBorder(),
+        ),
+        style: theme.textTheme.bodyMedium,
+      );
+    }
 
     return InkWell(
       onTap: _openPicker,

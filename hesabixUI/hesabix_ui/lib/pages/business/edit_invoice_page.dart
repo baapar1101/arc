@@ -40,6 +40,7 @@ import '../../widgets/invoice/keep_alive_tab_child.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../models/account_model.dart';
 import '../../services/account_service.dart';
+import 'business_shell_side_nav_scope.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -118,6 +119,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   bool _useInstallments = false;
   final GlobalKey<InvoiceInstallmentsEditorState> _installmentsEditorKey =
       GlobalKey<InvoiceInstallmentsEditorState>();
+  VoidCallback? _restoreDesktopRailAfterQuit;
 
   bool get _canPickFxRate =>
       widget.authStore.hasBusinessPermission('currency_revaluation', 'view');
@@ -185,6 +187,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     });
     _tabController = TabController(length: _getTabCount(), vsync: this);
     _loadInvoice();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
+      if (shellScope?.canControlDesktopRail ?? false) {
+        shellScope!.setRailVisible(false);
+        final scope = shellScope;
+        _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
+      }
+    });
   }
 
   bool _extraInfoHasInstallmentPlan(Map<String, dynamic> extra) {
@@ -338,6 +349,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
   @override
   void dispose() {
+    _restoreDesktopRailAfterQuit?.call();
     disposeInvoiceAdjustmentRows(_adjustmentRows);
     _adjustmentRows = [];
     _tabController.dispose();

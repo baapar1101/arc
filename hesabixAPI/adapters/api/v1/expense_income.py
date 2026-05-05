@@ -436,7 +436,23 @@ async def export_expense_income_pdf_endpoint(
     title_text = "لیست اسناد هزینه/درآمد" if is_fa else "Expense/Income List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
-    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=now,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
     rows_html = []
     for item in items:
@@ -656,6 +672,23 @@ async def get_expense_income_pdf_endpoint(
         counterparty_lines_fmt.append(cp_copy)
 
     # زمینه قالب
+    try:
+        from app.services.print_footer_settings import build_print_meta_footer_line
+
+        _now_ft = datetime.datetime.now()
+        cal_str = str(calendar_type) if calendar_type else ("jalali" if is_fa else "gregorian")
+        if cal_str not in ("jalali", "gregorian"):
+            cal_str = "jalali" if is_fa else "gregorian"
+        _footer_text = build_print_meta_footer_line(
+            db,
+            business_id,
+            now=_now_ft,
+            preparer_name=(item.get("created_by_name") or None),
+            is_fa=is_fa,
+            calendar_type=cal_str,
+        )
+    except Exception:
+        _footer_text = ""
     template_context = {
         "business_id": business_id,
         "business_name": business_name,
@@ -671,6 +704,7 @@ async def get_expense_income_pdf_endpoint(
         "generated_at": datetime.datetime.now(),
         "document_date_jalali": doc_date_j,
         "document_date_gregorian": doc_date_g,
+        "footer_text": _footer_text,
     }
 
     # تلاش برای استفاده از قالب سفارشی

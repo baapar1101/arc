@@ -11593,6 +11593,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatVisitorCurrentPageLabel => 'Visitor\'s current page';
 
   @override
+  String crmWebChatVisitorIpLine(String ip) {
+    return 'IP: $ip';
+  }
+
+  @override
+  String get crmWebChatVisitorDeviceMobile => 'Mobile';
+
+  @override
+  String get crmWebChatVisitorDeviceTablet => 'Tablet';
+
+  @override
+  String get crmWebChatVisitorDeviceDesktop => 'Desktop';
+
+  @override
+  String get crmWebChatVisitorDeviceUnknown => 'Device';
+
+  @override
   String crmWebChatWidgetLine(String name) {
     return 'Widget: $name';
   }

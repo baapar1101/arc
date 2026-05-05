@@ -95,9 +95,12 @@
   "last_name": "رضایی",
   "email": "ali@example.com",
   "phone": "09123456789",
-  "page_url": "https://shop.example.com/contact"
+  "page_url": "https://shop.example.com/contact",
+  "device_type": "mobile"
 }
 ```
+
+فیلد **`device_type`** اختیاری است: یکی از `"mobile"`، `"tablet"`، `"desktop"` (ویجت رسمی Hesabix آن را از مرورگر می‌فرستد). سرور آدرس IP بازدیدکننده را در پایگاه ذخیره می‌کند و در پنل اپراتور با **`extra_metadata`** مکالمه برمی‌گردد.
 
 **پاسخ موفق (در `data`):**
 

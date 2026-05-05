@@ -449,6 +449,23 @@
   line-height: 1.8;
 }
 
+/* جداکنندهٔ بخش‌ها در توضیحات بالای Swagger (--- در مارک‌داون) */
+.swagger-ui .info .description hr,
+.swagger-ui .markdown hr {
+  border: 0;
+  border-top: 1px solid var(--hesabix-border);
+  margin: 1.75rem 0;
+  opacity: 0.9;
+}
+
+/* کمی فشرده‌تر کردن تیترهای سطح دو در بلوک intro برای سلسله‌مراتب واضح‌تر */
+.swagger-ui .info .description h2,
+.swagger-ui .info .markdown h2 {
+  font-size: 1.35rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid rgba(54, 96, 146, 0.2);
+}
+
 /* ==================== Tables ==================== */
 .swagger-ui table {
   border-collapse: collapse;

@@ -815,3 +815,186 @@ class CreateNotificationAction(ActionHandler):
             "channels": channels
         }
 
+
+class SendBusinessSmsAction(ActionHandler):
+    """ارسال پیامک با قالب نوتیفیکیشن تاییدشدهٔ همان کسب‌وکار (کسر کیف پول و سند حسابداری طبق سرویس موجود)."""
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "ارسال پیامک (قالب تاییدشده)",
+            "description": "ارسال پیامک با یکی از قالب‌های SMS تاییدشده؛ پارامترهای قالب از ترکیب trigger، متغیرها و template_context پر می‌شود",
+            "config_schema": {
+                "template_id": {
+                    "type": "integer",
+                    "ui_type": "sms_template_selector",
+                    "description": "قالب SMS تاییدشده در همین کسب‌وکار (از لیست انتخاب کنید یا مرجع نود قبلی)",
+                    "required": True,
+                },
+                "person_id": {
+                    "type": "integer",
+                    "ui_type": "person_selector",
+                    "description": "شناسه شخص (مشتری/طرف حساب) در همین کسب‌وکار",
+                    "required": True,
+                },
+                "recipient_mobile": {
+                    "type": "string",
+                    "description": "اختیاری؛ خالی = استفاده از موبایل پرونده شخص. می‌توان شماره ثابت یا مرجع نود قبلی گذاشت",
+                    "required": False,
+                },
+                "template_context": {
+                    "type": "object",
+                    "ui_type": "json_editor",
+                    "description": "متغیرهای قالب Jinja؛ مقادیر ثابت یا ارجاع مانند $node_id.field",
+                    "required": False,
+                },
+                "stop_workflow_on_send_failure": {
+                    "type": "boolean",
+                    "description": "اگر فعال باشد، در خطای ارسال از طرف پیام‌رسان (غیر از کمبود موجودی) ورک‌فلو متوقف می‌شود",
+                    "default": False,
+                    "required": False,
+                },
+            },
+        }
+
+    @log_action_execution
+    def execute(
+        self,
+        context: Dict[str, Any],
+        config: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from adapters.db.models.workflow import WorkflowLog, WorkflowLogLevel
+        from app.services.business_notification_service import BusinessNotificationService
+        from app.services.workflow.dry_run import dry_run_skip
+        from app.core.responses import ApiError
+
+        sk = dry_run_skip(context, "ارسال پیامک (قالب کسب‌وکار)")
+        if sk is not None:
+            return sk
+
+        db = context.get("db")
+        business_id = context.get("business_id")
+        execution_id = context.get("execution_id")
+        user_id = context.get("user_id")
+
+        if db is None or business_id is None:
+            raise ApiError(
+                "WORKFLOW_CONTEXT_INVALID",
+                "زمینه اجرای workflow ناقص است",
+                http_status=500,
+            )
+
+        raw_tid = WorkflowEngine._resolve_value_static(
+            config.get("template_id"), context, node_results
+        )
+        raw_pid = WorkflowEngine._resolve_value_static(
+            config.get("person_id"), context, node_results
+        )
+        if raw_tid is None or raw_pid is None:
+            raise ApiError(
+                "WORKFLOW_SMS_CONFIG",
+                "template_id و person_id الزامی هستند",
+                http_status=400,
+            )
+        try:
+            template_id = int(raw_tid)
+            person_id = int(raw_pid)
+        except (TypeError, ValueError):
+            raise ApiError(
+                "WORKFLOW_SMS_CONFIG",
+                "template_id و person_id باید عدد صحیح باشند",
+                http_status=400,
+            )
+
+        recipient_raw = config.get("recipient_mobile")
+        recipient_mobile = None
+        if recipient_raw is not None and str(recipient_raw).strip():
+            recipient_mobile = WorkflowEngine._resolve_value_static(
+                recipient_raw, context, node_results
+            )
+            if recipient_mobile is not None:
+                recipient_mobile = str(recipient_mobile).strip() or None
+
+        merged: Dict[str, Any] = {}
+        td = context.get("trigger_data")
+        if isinstance(td, dict):
+            merged.update(td)
+        variables = context.get("variables")
+        if isinstance(variables, dict):
+            merged.update(variables)
+
+        tc = config.get("template_context")
+        if isinstance(tc, dict):
+            for key, val in tc.items():
+                merged[str(key)] = WorkflowEngine._resolve_value_static(
+                    val, context, node_results
+                )
+
+        svc = BusinessNotificationService(db)
+        result = svc.send_sms_by_template(
+            business_id=int(business_id),
+            template_id=template_id,
+            context=merged,
+            person_id=person_id,
+            recipient_mobile_override=recipient_mobile,
+            triggered_by_user_id=int(user_id) if user_id is not None else None,
+        )
+
+        def _append_workflow_log(level: WorkflowLogLevel, msg: str, data: Dict[str, Any]) -> None:
+            try:
+                wl = WorkflowLog(
+                    execution_id=execution_id,
+                    level=level,
+                    message=msg,
+                    data=data,
+                )
+                db.add(wl)
+                db.commit()
+            except Exception:
+                logger.exception("workflow sms log failed")
+
+        ok = bool(result.get("success"))
+        err_code = (result.get("error") or "UNKNOWN") if not ok else ""
+        payload = {
+            "template_id": result.get("template_id"),
+            "log_id": result.get("log_id"),
+            "event_type": result.get("event_type"),
+            "cost": result.get("cost"),
+            "recipient": result.get("recipient"),
+        }
+        if ok:
+            _append_workflow_log(
+                WorkflowLogLevel.INFO,
+                "پیامک با قالب کسب‌وکار با موفقیت ارسال شد",
+                {**payload, "success": True},
+            )
+        else:
+            _append_workflow_log(
+                WorkflowLogLevel.ERROR,
+                f"ارسال پیامک ناموفق: {err_code} — {result.get('message') or result.get('error_message')}",
+                {**payload, "success": False, "error": err_code},
+            )
+
+        if not ok and err_code == "INSUFFICIENT_FUNDS":
+            raise ApiError(
+                "INSUFFICIENT_FUNDS",
+                result.get("error_message") or "موجودی کیف پول کافی نیست",
+                http_status=400,
+            )
+
+        raw_stop = WorkflowEngine._resolve_value_static(
+            config.get("stop_workflow_on_send_failure"), context, node_results
+        )
+        stop_on_fail = raw_stop in (True, "true", "1", 1, "True", "yes", "on")
+        if not ok and stop_on_fail and err_code != "INSUFFICIENT_FUNDS":
+            msg = result.get("message") or result.get("error_message") or "ارسال پیامک ناموفق بود"
+            raise ApiError(
+                "SMS_SEND_FAILED",
+                msg,
+                http_status=502,
+            )
+
+        out = dict(result)
+        out["success"] = ok
+        return out
+

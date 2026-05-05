@@ -1469,19 +1469,20 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       SnackBarHelper.showError(context, message: 'دسترسی لازم برای حذف را ندارید');
       return;
     }
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('تأیید حذف'),
         content: Text('حذف سند ${document.code} غیرقابل بازگشت است. آیا ادامه می‌دهید؟'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('انصراف'),
           ),
           FilledButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await _performDelete(document);
             },
             child: const Text('حذف'),
@@ -1493,70 +1494,75 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
   /// انجام عملیات حذف
   Future<void> _performDelete(ExpenseIncomeDocument document) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
     try {
-      // نمایش لودینگ هنگام حذف
-      showDialog(
+      showDialog<void>(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
       final success = await _service.delete(document.id);
       if (success) {
-        if (mounted) {
-          Navigator.pop(context); // بستن لودینگ
-          SnackBarHelper.showSuccess(context, message: 'سند ${document.code} با موفقیت حذف شد');
-          setState(() {
-            _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف
-          });
-          _refreshData();
+        if (navigator.canPop()) {
+          navigator.pop();
         }
+        if (!mounted) return;
+        SnackBarHelper.showSuccess(context, message: 'سند ${document.code} با موفقیت حذف شد');
+        setState(() {
+          _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف
+        });
+        _refreshData();
       } else {
-        if (mounted) Navigator.pop(context);
-        throw Exception('خطا در حذف سند');
+        if (navigator.canPop()) {
+          navigator.pop();
+        }
+        if (!mounted) return;
+        SnackBarHelper.showError(context, message: 'خطا در حذف سند');
       }
     } catch (e) {
-      if (mounted) {
-        // بستن لودینگ در صورت بروز خطا
-        Navigator.pop(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
 
-        String message = 'خطا در حذف سند';
-        int? statusCode;
-        if (e is DioException) {
-          statusCode = e.response?.statusCode;
-          final data = e.response?.data;
-          try {
-            final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
-            if (detail is Map<String, dynamic>) {
-              final err = detail['error'];
-              if (err is Map<String, dynamic>) {
-                final m = err['message'];
-                if (m is String && m.trim().isNotEmpty) {
-                  message = m;
-                }
+      String message = 'خطا در حذف سند';
+      int? statusCode;
+      if (e is DioException) {
+        statusCode = e.response?.statusCode;
+        final data = e.response?.data;
+        try {
+          final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
+          if (detail is Map<String, dynamic>) {
+            final err = detail['error'];
+            if (err is Map<String, dynamic>) {
+              final m = err['message'];
+              if (m is String && m.trim().isNotEmpty) {
+                message = m;
               }
             }
-          } catch (_) {
-            // ignore parse errors
           }
-
-          if (statusCode == 404) {
-            message = 'سند یافت نشد یا قبلاً حذف شده است';
-            _refreshData();
-          } else if (statusCode == 403) {
-            message = 'دسترسی لازم برای حذف این سند را ندارید';
-          } else if (statusCode == 409) {
-            // پیام از سرور استخراج شده است (مثلاً سند قفل/دارای وابستگی)
-            if (message == 'خطا در حذف سند') {
-              message = 'حذف این سند امکان‌پذیر نیست';
-            }
-          }
-        } else {
-          message = ErrorExtractor.forContext(e, context);
+        } catch (_) {
+          // ignore parse errors
         }
 
-        SnackBarHelper.showError(context, message: message);
+        if (statusCode == 404) {
+          message = 'سند یافت نشد یا قبلاً حذف شده است';
+          _refreshData();
+        } else if (statusCode == 403) {
+          message = 'دسترسی لازم برای حذف این سند را ندارید';
+        } else if (statusCode == 409) {
+          // پیام از سرور استخراج شده است (مثلاً سند قفل/دارای وابستگی)
+          if (message == 'خطا در حذف سند') {
+            message = 'حذف این سند امکان‌پذیر نیست';
+          }
+        }
+      } else {
+        message = ErrorExtractor.forContext(e, context);
       }
+
+      SnackBarHelper.showError(context, message: message);
     }
   }
 
@@ -1588,6 +1594,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     // تایید کاربر
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('تأیید حذف گروهی'),
@@ -1614,27 +1621,32 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
     if (confirmed != true) return;
 
-    // نمایش لودینگ
+    // نمایش لودینگ (همان navigator ریشه که دیالوگ روی آن باز می‌شود — هماهنگ با invoices_list_page)
     if (!context.mounted) return;
-    final ctx = context;
-    showDialog(
-      context: ctx,
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       await _service.deleteMultiple(ids);
-      if (!ctx.mounted) return;
-      Navigator.pop(ctx); // بستن لودینگ
-      SnackBarHelper.showSuccess(ctx, message: '${ids.length} سند با موفقیت حذف شد');
+      if (!mounted) return;
+      if (rootNavigator.canPop()) {
+        rootNavigator.pop();
+      }
+      SnackBarHelper.showSuccess(context, message: '${ids.length} سند با موفقیت حذف شد');
       setState(() {
         _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف گروهی
       });
       _refreshData();
     } catch (e) {
+      if (rootNavigator.canPop()) {
+        rootNavigator.pop();
+      }
       if (!mounted) return;
-      Navigator.pop(context); // بستن لودینگ
       final message = e is DioException && (e.message?.trim().isNotEmpty ?? false)
           ? e.message!
           : ErrorExtractor.forContext(e, context);

@@ -1056,6 +1056,8 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_payments": bool(getattr(row, "show_payments", True)),
             "show_installment_plan": bool(getattr(row, "show_installment_plan", True)),
             "show_share_qr": bool(getattr(row, "show_share_qr", False)),
+            "show_footer_print_time": bool(getattr(row, "show_footer_print_time", True)),
+            "show_footer_preparer": bool(getattr(row, "show_footer_preparer", True)),
             "footer_note": getattr(row, "footer_note", None),
         }
 
@@ -1066,6 +1068,8 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_payments": True,
         "show_installment_plan": True,
         "show_share_qr": False,
+        "show_footer_print_time": True,
+        "show_footer_preparer": True,
         "footer_note": None,
     }
     per_type: Dict[str, Any] = {}
@@ -1144,6 +1148,12 @@ def update_business_print_settings(
             True,
         )
         default_row.show_share_qr = _get_bool(default_data, "show_share_qr", False)
+        default_row.show_footer_print_time = _get_bool(
+            default_data, "show_footer_print_time", True
+        )
+        default_row.show_footer_preparer = _get_bool(
+            default_data, "show_footer_preparer", True
+        )
         default_row.footer_note = (
             (default_data.get("footer_note") or None)
             if isinstance(default_data.get("footer_note"), str)
@@ -1190,6 +1200,8 @@ def update_business_print_settings(
             True,
         )
         row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
+        row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
+        row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
         row.footer_note = (
             (cfg.get("footer_note") or None)
             if isinstance(cfg.get("footer_note"), str)

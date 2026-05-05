@@ -391,7 +391,57 @@ class NotificationService:
 					self.db.add(outbox)
 					self.db.commit()
 			elif channel == "inapp":
-				ok = self.inapp.notify(user_id=user_id, title=subject_inapp, body=body_inapp, level="info")
+				# محدود کردن طول body برای پشتیبانی (همان متن در WS و اعلان DB)
+				ws_body = body_inapp or ""
+				if event_key.startswith("support."):
+					_max = 500
+					if len(ws_body) > _max:
+						ws_body = ws_body[:_max] + "..."
+				title_inapp = subject_inapp or "پیام سیستم"
+				announcement_id: Optional[int] = None
+				# اعلان DB فقط اگر outbox تازه باشد (retry روی همان ردیف اعلان تکراری نسازد)
+				if reuse_outbox is None:
+					try:
+						audience_filters: Optional[Dict[str, Any]] = {"allowed_user_ids": [user_id]}
+						if event_key.startswith("support."):
+							if event_key == "support.ticket_status_changed":
+								ticket_user_id = context.get("user_id") or user_id
+								audience_filters = {"allowed_user_ids": [ticket_user_id]}
+							elif event_key not in ("support.operator_reply", "support.ticket_assigned"):
+								audience_filters = {"require_permissions": ["support_operator"]}
+						a = Announcement(
+							title=title_inapp,
+							body=ws_body,
+							level="info",
+							is_pinned=False,
+							is_active=True,
+							starts_at=None,
+							ends_at=None,
+							audience_filters=audience_filters,
+							created_by=None,
+						)
+						self.db.add(a)
+						self.db.commit()
+						self.db.refresh(a)
+						announcement_id = a.id
+						link = UserAnnouncement(
+							user_id=user_id,
+							announcement_id=a.id,
+							first_seen_at=None,
+							read_at=None,
+							dismissed_at=None,
+						)
+						self.db.add(link)
+						self.db.commit()
+					except Exception:
+						pass
+				ok = self.inapp.push_realtime(
+					user_id=user_id,
+					title=title_inapp,
+					body=ws_body,
+					level="info",
+					announcement_id=announcement_id,
+				)
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "inapp_failed")
 				outbox.status = "sent" if ok else "failed"
 				if not ok:
@@ -399,56 +449,9 @@ class NotificationService:
 					outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=5)
 				self.db.add(outbox)
 				self.db.commit()
-				# Persist as an announcement for visibility in UI even if realtime WS is not connected
-				# retry همان ردیف outbox: اعلان تکراری در DB نساز
 				if reuse_outbox is not None:
 					sent = ok
 					break
-				# اعلان In-App در UI فقط برای گیرندهٔ هدف؛ بدون این فیلتر، user_list همه را مجاز می‌داند
-				try:
-					audience_filters: Optional[Dict[str, Any]] = {"allowed_user_ids": [user_id]}
-					if event_key.startswith("support."):
-						if event_key == "support.ticket_status_changed":
-							ticket_user_id = context.get("user_id") or user_id
-							audience_filters = {"allowed_user_ids": [ticket_user_id]}
-						elif event_key not in ("support.operator_reply", "support.ticket_assigned"):
-							# ticket_created، user_reply و ... فقط برای اپراتورهای پشتیبانی
-							audience_filters = {"require_permissions": ["support_operator"]}
-					
-					# محدود کردن محتوای حساس برای اعلان‌های پشتیبانی
-					announcement_body = body_inapp or ""
-					if event_key.startswith("support."):
-						# محدود کردن طول body برای جلوگیری از نمایش اطلاعات حساس
-						max_body_length = 500
-						if len(announcement_body) > max_body_length:
-							announcement_body = announcement_body[:max_body_length] + "..."
-					
-					a = Announcement(
-						title=subject_inapp or "پیام سیستم",
-						body=announcement_body,
-						level="info",
-						is_pinned=False,
-						is_active=True,
-						starts_at=None,
-						ends_at=None,
-						audience_filters=audience_filters,
-						created_by=None,
-					)
-					self.db.add(a)
-					self.db.commit()
-					self.db.refresh(a)
-					link = UserAnnouncement(
-						user_id=user_id,
-						announcement_id=a.id,
-						first_seen_at=None,
-						read_at=None,
-						dismissed_at=None,
-					)
-					self.db.add(link)
-					self.db.commit()
-				except Exception:
-					# do not fail notification if persistence fails
-					pass
 				sent = ok
 				break
 			else:

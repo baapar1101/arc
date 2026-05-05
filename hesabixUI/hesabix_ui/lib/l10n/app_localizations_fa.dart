@@ -11536,6 +11536,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatVisitorCurrentPageLabel => 'صفحهٔ فعلی بازدیدکننده';
 
   @override
+  String crmWebChatVisitorIpLine(String ip) {
+    return 'IP: $ip';
+  }
+
+  @override
+  String get crmWebChatVisitorDeviceMobile => 'موبایل';
+
+  @override
+  String get crmWebChatVisitorDeviceTablet => 'تبلت';
+
+  @override
+  String get crmWebChatVisitorDeviceDesktop => 'رایانه';
+
+  @override
+  String get crmWebChatVisitorDeviceUnknown => 'دستگاه';
+
+  @override
   String crmWebChatWidgetLine(String name) {
     return 'ویجت: $name';
   }

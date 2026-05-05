@@ -43,7 +43,7 @@ class WorkflowNodeWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     try {
       final theme = Theme.of(context);
-      final color = _getNodeColor(node.type, theme);
+      final color = _getNodeColor(node.type, theme, node.key);
 
       // بررسی اعتبار موقعیت
       final validPosition = _isValidPosition(node.position) 
@@ -59,7 +59,7 @@ class WorkflowNodeWidget extends StatelessWidget {
       final isSelectedForClosure = isSelected;
       
       // ایجاد icon data و text style
-      final iconData = _getNodeIcon(nodeTypeForClosure);
+      final iconData = _getNodeIcon(nodeTypeForClosure, node.key);
       final textStyle = themeForClosure.textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.bold,
         color: colorForClosure,
@@ -572,7 +572,13 @@ class WorkflowNodeWidget extends StatelessWidget {
     );
   }
 
-  Color _getNodeColor(WorkflowNodeType type, ThemeData theme) {
+  Color _getNodeColor(WorkflowNodeType type, ThemeData theme, String? nodeKey) {
+    if (type == WorkflowNodeType.action && nodeKey == 'send_business_sms') {
+      return Colors.teal.shade700;
+    }
+    if (type == WorkflowNodeType.action && nodeKey == 'send_email') {
+      return Colors.indigo.shade600;
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Colors.green;
@@ -585,7 +591,23 @@ class WorkflowNodeWidget extends StatelessWidget {
     }
   }
 
-  IconData _getNodeIcon(WorkflowNodeType type) {
+  IconData _getNodeIcon(WorkflowNodeType type, String? nodeKey) {
+    if (type == WorkflowNodeType.action) {
+      switch (nodeKey) {
+        case 'send_business_sms':
+          return Icons.sms_outlined;
+        case 'send_email':
+          return Icons.email_outlined;
+        case 'send_telegram':
+          return Icons.send;
+        case 'send_bale':
+          return Icons.chat;
+        case 'http_request':
+          return Icons.http;
+        default:
+          return Icons.play_arrow;
+      }
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Icons.bolt;

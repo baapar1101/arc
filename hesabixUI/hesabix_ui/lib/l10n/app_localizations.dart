@@ -21593,6 +21593,36 @@ abstract class AppLocalizations {
   /// **'Visitor\'\'s current page'**
   String get crmWebChatVisitorCurrentPageLabel;
 
+  /// No description provided for @crmWebChatVisitorIpLine.
+  ///
+  /// In en, this message translates to:
+  /// **'IP: {ip}'**
+  String crmWebChatVisitorIpLine(String ip);
+
+  /// No description provided for @crmWebChatVisitorDeviceMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get crmWebChatVisitorDeviceMobile;
+
+  /// No description provided for @crmWebChatVisitorDeviceTablet.
+  ///
+  /// In en, this message translates to:
+  /// **'Tablet'**
+  String get crmWebChatVisitorDeviceTablet;
+
+  /// No description provided for @crmWebChatVisitorDeviceDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Desktop'**
+  String get crmWebChatVisitorDeviceDesktop;
+
+  /// No description provided for @crmWebChatVisitorDeviceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get crmWebChatVisitorDeviceUnknown;
+
   /// No description provided for @crmWebChatWidgetLine.
   ///
   /// In en, this message translates to:

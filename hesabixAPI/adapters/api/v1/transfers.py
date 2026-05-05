@@ -744,7 +744,23 @@ async def export_single_transfer_pdf(
         generated_at = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
     
     title_text = f"سند {doc_type_name}" if is_fa else f"{doc_type_name} Document"
-    footer_text = f"تولید شده در {generated_at}" if is_fa else f"Generated at {generated_at}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = auth_context.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=generated_at,
+            preparer_name=(result.get("created_by_name") or pn or None),
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {generated_at}" if is_fa else f"Generated at {generated_at}"
 
     # تلاش برای رندر با قالب سفارشی (transfers/detail)
     resolved_html = None
@@ -1609,7 +1625,23 @@ async def export_transfers_pdf(
         business_name = ""
 
     title_text = "لیست انتقال‌ها" if is_fa else "Transfers List"
-    footer_text = f"تولید شده در {generated_at}" if is_fa else f"Generated at {generated_at}"
+    try:
+        from app.services.print_footer_settings import build_generated_at_pdf_footer
+
+        pn = ""
+        try:
+            pn = ctx.get_user_name() or ""
+        except Exception:
+            pn = ""
+        footer_text = build_generated_at_pdf_footer(
+            db,
+            business_id,
+            formatted_generated_at=generated_at,
+            preparer_name=pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"تولید شده در {generated_at}" if is_fa else f"Generated at {generated_at}"
 
     # Template context
     template_context: Dict[str, Any] = {

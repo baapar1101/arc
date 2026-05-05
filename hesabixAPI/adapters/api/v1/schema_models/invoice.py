@@ -187,17 +187,19 @@ class InvoiceListResponse(BaseModel):
 
 
 class InvoiceUpdateRequest(BaseModel):
-    """درخواست ویرایش فاکتور"""
-    person_id: Optional[int] = Field(None, gt=0)
-    invoice_date: Optional[str] = None
-    due_date: Optional[str] = None
-    items: Optional[List[InvoiceItemRequest]] = None
-    discount_amount: Optional[Decimal] = Field(None, ge=0)
-    shipping_cost: Optional[Decimal] = Field(None, ge=0)
-    other_costs: Optional[Decimal] = Field(None, ge=0)
-    description: Optional[str] = Field(None, max_length=1000)
-    reference_code: Optional[str] = Field(None, max_length=50)
-    status: Optional[Literal["draft", "confirmed", "paid", "cancelled"]] = None
+    """درخواست ویرایش فاکتور؛ فقط فیلدهای ارسال‌شده به‌روزرسانی می‌شوند."""
+    person_id: Optional[int] = Field(None, description="شناسه مشتری/تامین‌کننده", gt=0)
+    invoice_date: Optional[str] = Field(None, description="تاریخ فاکتور (ISO یا جلالی مطابق سایر APIها)")
+    due_date: Optional[str] = Field(None, description="تاریخ سررسید")
+    items: Optional[List[InvoiceItemRequest]] = Field(None, description="اقلام جایگزین؛ در صورت ارسال، جایگزین اقلام قبلی می‌شود")
+    discount_amount: Optional[Decimal] = Field(None, description="تخفیف کلی", ge=0)
+    shipping_cost: Optional[Decimal] = Field(None, description="هزینه حمل", ge=0)
+    other_costs: Optional[Decimal] = Field(None, description="سایر هزینه‌ها", ge=0)
+    description: Optional[str] = Field(None, description="توضیحات فاکتور", max_length=1000)
+    reference_code: Optional[str] = Field(None, description="شماره مرجع/سفارش", max_length=50)
+    status: Optional[Literal["draft", "confirmed", "paid", "cancelled"]] = Field(
+        None, description="وضعیت سند (در صورت پشتیبانی در منطق کسب‌وکار)"
+    )
     project_id: Optional[int] = Field(None, description="شناسه پروژه", gt=0)
 
 

@@ -721,6 +721,8 @@ async def export_kardex_pdf_endpoint(
 
     # تلاش برای رندر با قالب سفارشی (kardex/list) و سپس قالب پیش‌فرض فایل
     resolved_html = None
+    kardex_lines_footer = None
+    is_fa = negotiate_locale(request.headers.get("Accept-Language")) == "fa"
     try:
         from app.services.report_template_service import ReportTemplateService
         explicit_template_id = None
@@ -762,6 +764,25 @@ async def export_kardex_pdf_endpoint(
                 generated_at = generated_at.rsplit(":", 1)[0]
         except Exception:
             generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+        try:
+            from app.services.print_footer_settings import build_report_title_and_time_footer
+
+            _kt = "گزارش کاردکس" if is_fa else "Kardex Report"
+            _pn = ""
+            try:
+                _pn = ctx.get_user_name() or ""
+            except Exception:
+                _pn = ""
+            kardex_lines_footer = build_report_title_and_time_footer(
+                db,
+                business_id,
+                title=_kt,
+                time_part=generated_at,
+                preparer_name=_pn or None,
+                is_fa=is_fa,
+            )
+        except Exception:
+            kardex_lines_footer = f"{'گزارش کاردکس' if is_fa else 'Kardex Report'} • {generated_at}"
         # پارامترهای صفحه از کوئری (اختیاری)
         try:
             qp = request.query_params
@@ -785,7 +806,7 @@ async def export_kardex_pdf_endpoint(
             "filters_summary": filters_summary,
             "fa_font_url_regular": fa_font_url_regular,
             "fa_font_url_bold": fa_font_url_bold,
-            "footer_text": f"{'گزارش کاردکس' if is_fa else 'Kardex Report'} • {generated_at}",
+            "footer_text": kardex_lines_footer,
             "page_totals": page_totals,
             "all_totals": all_totals,
             "all_count": all_count,
@@ -801,6 +822,33 @@ async def export_kardex_pdf_endpoint(
         )
     except Exception:
         resolved_html = None
+
+    if kardex_lines_footer is None:
+        gen_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+        try:
+            from app.core.calendar import CalendarConverter
+
+            _ct = getattr(request.state, "calendar_type", "jalali")
+            _n = datetime.datetime.now()
+            _g = CalendarConverter.format_datetime(_n, _ct).get("formatted") or ""
+            gen_at = " ".join(_g.split(" ")[:2])
+            if gen_at.count(":") >= 2:
+                gen_at = gen_at.rsplit(":", 1)[0]
+        except Exception:
+            pass
+        try:
+            from app.services.print_footer_settings import build_report_title_and_time_footer
+
+            kardex_lines_footer = build_report_title_and_time_footer(
+                db,
+                business_id,
+                title="گزارش کاردکس" if is_fa else "Kardex Report",
+                time_part=gen_at,
+                preparer_name=ctx.get_user_name() or None,
+                is_fa=is_fa,
+            )
+        except Exception:
+            kardex_lines_footer = f"{'گزارش کاردکس' if is_fa else 'Kardex Report'} • {gen_at}"
 
     # Inject Persian fonts (YekanBakhFaNum/Vazirmatn) for PDF rendering (CSS fallback)
     font_face_css = ""
@@ -870,7 +918,7 @@ async def export_kardex_pdf_endpoint(
                 "filters_summary": filters_summary,
                 "fa_font_url_regular": fa_font_url_regular,
                 "fa_font_url_bold": fa_font_url_bold,
-                "footer_text": f"{'گزارش کاردکس' if is_fa else 'Kardex Report'} • {generated_at if 'generated_at' in locals() else ''}",
+                "footer_text": kardex_lines_footer,
                 "page_totals": page_totals,
                 "all_totals": all_totals,
                 "all_count": all_count,

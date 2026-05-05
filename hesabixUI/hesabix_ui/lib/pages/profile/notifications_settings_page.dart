@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/api_client.dart';
+import '../../services/in_app_notification_preferences_controller.dart';
 import '../../services/notifications_service.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/in_app_notification_behavior_section.dart';
 
 class NotificationsSettingsPage extends StatefulWidget {
   const NotificationsSettingsPage({super.key});
@@ -25,6 +27,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   bool _email = true;
   bool _sms = true;
   bool _inapp = true;
+  InAppAlertMode _inappAlertMode = InAppAlertMode.normal;
+  bool _inappSoundEnabled = true;
+  String _inappSoundAssetId = 'default';
   bool _saving = false;
   // Admin advanced config
   final _tgTokenCtrl = TextEditingController();
@@ -153,10 +158,14 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _email = (s['email_enabled'] ?? true) == true;
         _sms = (s['sms_enabled'] ?? true) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
+        _inappAlertMode = inAppAlertModeFromApi(s['inapp_alert_mode']?.toString());
+        _inappSoundEnabled = (s['inapp_sound_enabled'] ?? true) == true;
+        _inappSoundAssetId = '${s['inapp_sound_asset_id'] ?? 'default'}';
         _tgProxyEnabled = proxyEnabled;
         _loading = false;
         _adminLoading = false;
       });
+      InAppNotificationPreferencesController.instance.applyFromSettingsMap(s);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -178,8 +187,16 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         emailEnabled: _email,
         smsEnabled: _sms,
         inappEnabled: _inapp,
+        inappAlertMode: inAppAlertModeToApi(_inappAlertMode),
+        inappSoundEnabled: _inappSoundEnabled,
+        inappSoundAssetId: _inappSoundAssetId,
       );
       if (!mounted) return;
+      InAppNotificationPreferencesController.instance.applyFromSettingsMap({
+        'inapp_alert_mode': inAppAlertModeToApi(_inappAlertMode),
+        'inapp_sound_enabled': _inappSoundEnabled,
+        'inapp_sound_asset_id': _inappSoundAssetId,
+      });
       SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
@@ -625,6 +642,15 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                       icon: const Icon(Icons.send_outlined, size: 20),
                       label: Text(t.notificationsTestButton(t.notificationsChannelInApp)),
                     ),
+                  ),
+                  InAppNotificationBehaviorSection(
+                    enabled: _inapp,
+                    alertMode: _inappAlertMode,
+                    soundEnabled: _inappSoundEnabled,
+                    soundAssetId: _inappSoundAssetId,
+                    onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
+                    onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
+                    onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
                   ),
                   if (_isAdmin) ...[
                     const SizedBox(height: 24),

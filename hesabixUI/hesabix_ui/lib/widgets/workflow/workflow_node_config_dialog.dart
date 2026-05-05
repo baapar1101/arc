@@ -62,6 +62,11 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   Map<String, dynamic>? _translations;
   List<Map<String, dynamic>> _currencies = [];
   bool _loadingCurrencies = false;
+  List<Map<String, dynamic>> _smsTemplates = [];
+  bool _loadingSmsTemplates = false;
+  Map<String, dynamic>? _smsTemplateDetail;
+  Map<String, dynamic>? _smsCostEstimate;
+  bool _loadingSmsCost = false;
 
   /// همگام با انتخاب reference از نود قبلی (initialValue به‌تنهایی به‌روز نمی‌شود)
   final Map<String, TextEditingController> _workflowTextControllers = {};
@@ -184,9 +189,85 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     
     // بارگذاری ارزها اگر لازم باشد
     _loadCurrenciesIfNeeded();
+
+    // قالب‌های SMS برای نود ارسال پیامک
+    _loadSmsTemplatesIfNeeded();
     
     // بارگذاری ترجمه‌ها
     _loadTranslations();
+  }
+
+  Future<void> _loadSmsTemplatesIfNeeded() async {
+    if (widget.businessId == null) return;
+    var need = widget.node.key == 'send_business_sms';
+    if (!need && _configSchema != null) {
+      for (final e in _configSchema!.entries) {
+        final s = e.value;
+        if (s is Map<String, dynamic> && s['ui_type'] == 'sms_template_selector') {
+          need = true;
+          break;
+        }
+      }
+    }
+    if (!need) return;
+
+    setState(() => _loadingSmsTemplates = true);
+    try {
+      final list = await _workflowService.listApprovedSmsTemplates(
+        businessId: widget.businessId!,
+      );
+      if (!mounted) return;
+      setState(() {
+        _smsTemplates = list;
+        _loadingSmsTemplates = false;
+      });
+      await _prefetchSmsTemplateDetailForCurrentConfig();
+    } catch (e) {
+      debugPrint('خطا در بارگذاری قالب‌های SMS: $e');
+      if (mounted) setState(() => _loadingSmsTemplates = false);
+    }
+  }
+
+  Future<void> _prefetchSmsTemplateDetailForCurrentConfig() async {
+    if (widget.businessId == null || widget.node.key != 'send_business_sms') return;
+    final id = _parseIntOrNull(_config['template_id']);
+    if (id == null) {
+      if (mounted) {
+        setState(() {
+          _smsTemplateDetail = null;
+          _smsCostEstimate = null;
+        });
+      }
+      return;
+    }
+    setState(() => _loadingSmsCost = true);
+    try {
+      final results = await Future.wait([
+        _workflowService.getNotificationTemplate(
+          businessId: widget.businessId!,
+          templateId: id,
+        ),
+        _workflowService.estimateSmsTemplateCost(
+          businessId: widget.businessId!,
+          templateId: id,
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _smsTemplateDetail = results[0];
+        _smsCostEstimate = results[1];
+        _loadingSmsCost = false;
+      });
+    } catch (e) {
+      debugPrint('جزئیات/برآورد قالب SMS: $e');
+      if (mounted) {
+        setState(() {
+          _smsTemplateDetail = null;
+          _smsCostEstimate = null;
+          _loadingSmsCost = false;
+        });
+      }
+    }
   }
   
   Future<void> _loadTranslations() async {
@@ -707,7 +788,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          Icon(_getNodeIcon(widget.node.type), color: _getNodeColor(widget.node.type, theme)),
+          Icon(
+            _getNodeIcon(widget.node.type, widget.node.key),
+            color: _getNodeColor(widget.node.type, theme, widget.node.key),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1030,7 +1114,9 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
       case 'integer':
         // بررسی ui_type برای فیلدهای خاص number/integer
         final uiType = schema['ui_type'] as String?;
-        if (uiType == 'currency_selector') {
+        if (uiType == 'sms_template_selector') {
+          return _buildSmsTemplateSelector(key, schema, value, required, description);
+        } else if (uiType == 'currency_selector') {
           return _buildCurrencySelector(key, schema, value, required, description);
         } else if (uiType == 'person_selector') {
           return _buildPersonSelector(key, schema, value, required, description);
@@ -1213,7 +1299,9 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         keyLower.contains('error') ||
         keyLower.contains('on_error') ||
         keyLower.contains('break_on_error') ||
-        keyLower.contains('continue_on_error')) {
+        keyLower.contains('continue_on_error') ||
+        keyLower.contains('stop_workflow') ||
+        keyLower.contains('send_failure')) {
       return AppLocalizations.of(context).workflowConfigGroupErrorManagement;
     }
     
@@ -1227,7 +1315,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         keyLower == 'url' ||
         keyLower == 'method' ||
         keyLower == 'document_type' ||
-        keyLower == 'invoice_type') {
+        keyLower == 'invoice_type' ||
+        keyLower == 'template_id' ||
+        keyLower == 'person_id' ||
+        keyLower == 'recipient_mobile') {
       return AppLocalizations.of(context).workflowConfigGroupMainSettings;
     }
     
@@ -1408,7 +1499,13 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         .join(' ');
   }
 
-  Color _getNodeColor(WorkflowNodeType type, ThemeData theme) {
+  Color _getNodeColor(WorkflowNodeType type, ThemeData theme, String? nodeKey) {
+    if (type == WorkflowNodeType.action && nodeKey == 'send_business_sms') {
+      return Colors.teal.shade700;
+    }
+    if (type == WorkflowNodeType.action && nodeKey == 'send_email') {
+      return Colors.indigo.shade600;
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Colors.green;
@@ -1421,7 +1518,23 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
   }
 
-  IconData _getNodeIcon(WorkflowNodeType type) {
+  IconData _getNodeIcon(WorkflowNodeType type, [String? nodeKey]) {
+    if (type == WorkflowNodeType.action) {
+      switch (nodeKey) {
+        case 'send_business_sms':
+          return Icons.sms_outlined;
+        case 'send_email':
+          return Icons.email_outlined;
+        case 'send_telegram':
+          return Icons.send;
+        case 'send_bale':
+          return Icons.chat;
+        case 'http_request':
+          return Icons.http;
+        default:
+          return Icons.play_arrow;
+      }
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Icons.bolt;
@@ -1965,6 +2078,316 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             ),
         ],
       ),
+    );
+  }
+
+  bool _workflowLangIsFa() {
+    final code = Localizations.localeOf(context).languageCode.toLowerCase();
+    return code == 'fa' || code.startsWith('fa');
+  }
+
+  String _formatSmsEstimateNumber(dynamic n) {
+    if (n == null) return '—';
+    final d = n is num ? n.toDouble() : double.tryParse('$n');
+    if (d == null) return '—';
+    return d.toStringAsFixed(d == d.roundToDouble() ? 0 : 2);
+  }
+
+  Widget _smsEstimateRow(
+    ThemeData theme,
+    String label,
+    String value, {
+    bool emphasize = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: emphasize ? FontWeight.w600 : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: emphasize ? FontWeight.bold : null,
+                color: emphasize ? theme.colorScheme.primary : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// انتخاب قالب SMS (لیست از API)
+  Widget _buildSmsTemplateSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    final isFa = _workflowLangIsFa();
+
+    if (currentValue?.toString().trim().startsWith(r'$') ?? false) {
+      return _buildReferenceTextField(key, schema, currentValue, required, description);
+    }
+
+    if (widget.businessId == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Text(
+          isFa
+              ? 'برای بارگذاری قالب‌ها، زمینهٔ کسب‌وکار لازم است.'
+              : 'Business context is required to load SMS templates.',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+        ),
+      );
+    }
+
+    final selectedId = _parseIntOrNull(currentValue);
+    final validIds = <int>{};
+    for (final t in _smsTemplates) {
+      final id = _parseIntOrNull(t['id']);
+      if (id != null) {
+        validIds.add(id);
+      }
+    }
+
+    final int? dropdownValue =
+        selectedId != null && validIds.contains(selectedId) ? selectedId : null;
+
+    final detailMatches =
+        _smsTemplateDetail != null && _parseIntOrNull(_smsTemplateDetail!['id']) == dropdownValue;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_loadingSmsTemplates)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: LinearProgressIndicator(),
+            ),
+          if (!_loadingSmsTemplates && _smsTemplates.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                isFa
+                    ? 'قالب SMS فعال و تاییدشده‌ای یافت نشد. می‌توانید با «ارجاع از نود قبلی» شناسه قالب را وارد کنید.'
+                    : 'No approved active SMS templates. Use «previous node» to set template_id.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+            ),
+          DropdownButtonFormField<int>(
+            value: dropdownValue,
+            decoration: InputDecoration(
+              labelText: _formatKey(key),
+              border: const OutlineInputBorder(),
+              helperText: description,
+              suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+            ),
+            hint: Text(isFa ? 'انتخاب قالب پیامک' : 'Select SMS template'),
+            items: [
+              for (final tpl in _smsTemplates)
+                if (_parseIntOrNull(tpl['id']) != null)
+                  DropdownMenuItem<int>(
+                    value: _parseIntOrNull(tpl['id']),
+                    child: Text(
+                      '${tpl['name'] ?? tpl['id']} (${tpl['event_type'] ?? ''})',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+            ],
+            onChanged: _loadingSmsTemplates
+                ? null
+                : (v) async {
+                    setState(() {
+                      if (v != null) {
+                        _config[key] = v;
+                      } else if (!required) {
+                        _config.remove(key);
+                      }
+                      _smsTemplateDetail = null;
+                      _smsCostEstimate = null;
+                    });
+                    if (v == null || widget.businessId == null) {
+                      return;
+                    }
+                    setState(() => _loadingSmsCost = true);
+                    try {
+                      final results = await Future.wait([
+                        _workflowService.getNotificationTemplate(
+                          businessId: widget.businessId!,
+                          templateId: v,
+                        ),
+                        _workflowService.estimateSmsTemplateCost(
+                          businessId: widget.businessId!,
+                          templateId: v,
+                        ),
+                      ]);
+                      if (!mounted) return;
+                      setState(() {
+                        _smsTemplateDetail = results[0];
+                        _smsCostEstimate = results[1];
+                        _loadingSmsCost = false;
+                      });
+                    } catch (_) {
+                      if (mounted) {
+                        setState(() {
+                          _smsTemplateDetail = null;
+                          _smsCostEstimate = null;
+                          _loadingSmsCost = false;
+                        });
+                      }
+                    }
+                  },
+          ),
+          if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.link, size: 16),
+                label: Text(AppLocalizations.of(context).workflowConfigUsePreviousNode),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              isFa
+                  ? 'هزینه بر اساس طول متن (بخش پیامک) و قیمت‌گذاری ادمین است؛ کمبود موجودی ورک‌فلو را متوقف می‌کند.'
+                  : 'Cost depends on SMS segments and admin pricing; insufficient wallet stops the workflow.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          if (_loadingSmsCost)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: LinearProgressIndicator(),
+            )
+          else if (_smsCostEstimate != null &&
+              dropdownValue != null &&
+              _parseIntOrNull(_smsCostEstimate!['template_id']) == dropdownValue)
+            Card(
+              margin: const EdgeInsets.only(top: 10),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.calculate_outlined, size: 18, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            isFa ? 'برآورد هزینه (متن خام قالب)' : 'Cost estimate (raw template)',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isFa
+                          ? 'پس از جایگزینی متغیرها طول متن و هزینه ممکن است عوض شود.'
+                          : 'After variables are filled, length and cost may change.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _smsEstimateRow(
+                      theme,
+                      isFa ? 'تعداد کاراکتر متن خام' : 'Raw body characters',
+                      '${_smsCostEstimate!['body_char_count'] ?? '—'}',
+                    ),
+                    _smsEstimateRow(
+                      theme,
+                      isFa ? 'تعداد بخش پیامک (تقریبی)' : 'SMS segments (approx.)',
+                      '${_smsCostEstimate!['sms_segments'] ?? '—'}',
+                    ),
+                    _smsEstimateRow(
+                      theme,
+                      isFa ? 'قیمت هر بخش' : 'Price per segment',
+                      _formatSmsEstimateNumber(_smsCostEstimate!['price_per_sms']),
+                    ),
+                    const Divider(height: 16),
+                    _smsEstimateRow(
+                      theme,
+                      isFa ? 'جمع تقریبی (ارز کیف پول)' : 'Estimated total (wallet currency)',
+                      _formatSmsEstimateNumber(_smsCostEstimate!['estimated_total']),
+                      emphasize: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (detailMatches) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                isFa
+                    ? 'متغیرهای قالب (در «متغیرهای قالب» JSON وارد کنید)'
+                    : 'Template variables (fill template_context JSON)',
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildSmsTemplateVariableChips(theme, isFa),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmsTemplateVariableChips(ThemeData theme, bool isFa) {
+    final raw = _smsTemplateDetail?['available_variables'];
+    final keys = <String>[];
+    if (raw is List) {
+      for (final e in raw) {
+        if (e is Map && e['key'] != null) {
+          keys.add(e['key'].toString());
+        } else {
+          keys.add(e.toString());
+        }
+      }
+    } else if (raw is Map) {
+      keys.addAll(raw.keys.map((k) => k.toString()));
+    }
+    if (keys.isEmpty) {
+      return Text(
+        isFa ? 'لیست متغیر برای این قالب ثبت نشده است.' : 'No variable list on this template.',
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: keys
+          .map(
+            (k) => Chip(
+              visualDensity: VisualDensity.compact,
+              label: Text(k, style: theme.textTheme.bodySmall),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -4073,8 +4496,8 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
                               leading: Icon(
-                                _getNodeIcon(node.type),
-                                color: _getNodeColor(node.type, theme),
+                                _getNodeIcon(node.type, node.key),
+                                color: _getNodeColor(node.type, theme, node.key),
                               ),
                               title: Text(node.label),
                               subtitle: Text(_getNodeTypeLabel(node.type)),
@@ -4451,6 +4874,19 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
             'subject', t.workflowFieldEmailSubject, t.workflowFieldDescEmailSubject, 'string'),
       ];
     }
+    if (key == 'send_business_sms') {
+      return [
+        _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
+        _workflowSuggestedField('template_id', t.workflowFieldId, t.workflowFieldDescId, 'number'),
+        _workflowSuggestedField('log_id', t.workflowFieldDocumentId, t.workflowFieldDescDocumentId, 'number'),
+        _workflowSuggestedField('event_type', t.workflowFieldType, t.workflowFieldDescType, 'string'),
+        _workflowSuggestedField('cost', t.workflowFieldAmount, t.workflowFieldDescAmount, 'number'),
+        _workflowSuggestedField('message', t.workflowFieldSentMessage, t.workflowFieldDescSentMessage, 'string'),
+        _workflowSuggestedField('person_id', t.workflowFieldPersonId, t.workflowFieldDescPersonId, 'number'),
+        _workflowSuggestedField(
+            'error', t.workflowFieldGenStatus, t.workflowFieldDescGenStatus, 'string'),
+      ];
+    }
     if (key == 'http_request') {
       return [
         _workflowSuggestedField('success', t.workflowFieldSuccess, t.workflowFieldDescSuccess, 'boolean'),
@@ -4645,7 +5081,13 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
     }
   }
 
-  Color _getNodeColor(WorkflowNodeType type, ThemeData theme) {
+  Color _getNodeColor(WorkflowNodeType type, ThemeData theme, String? nodeKey) {
+    if (type == WorkflowNodeType.action && nodeKey == 'send_business_sms') {
+      return Colors.teal.shade700;
+    }
+    if (type == WorkflowNodeType.action && nodeKey == 'send_email') {
+      return Colors.indigo.shade600;
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Colors.green;
@@ -4658,7 +5100,23 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
     }
   }
 
-  IconData _getNodeIcon(WorkflowNodeType type) {
+  IconData _getNodeIcon(WorkflowNodeType type, [String? nodeKey]) {
+    if (type == WorkflowNodeType.action) {
+      switch (nodeKey) {
+        case 'send_business_sms':
+          return Icons.sms_outlined;
+        case 'send_email':
+          return Icons.email_outlined;
+        case 'send_telegram':
+          return Icons.send;
+        case 'send_bale':
+          return Icons.chat;
+        case 'http_request':
+          return Icons.http;
+        default:
+          return Icons.play_arrow;
+      }
+    }
     switch (type) {
       case WorkflowNodeType.trigger:
         return Icons.bolt;

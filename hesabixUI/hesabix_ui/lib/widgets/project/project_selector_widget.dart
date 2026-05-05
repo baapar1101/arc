@@ -87,7 +87,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
         suffixIcon: _buildSuffixIcon(),
         isDense: widget.isDense,
         contentPadding: widget.isDense
-            ? const EdgeInsetsDirectional.only(start: 12, top: 12, bottom: 12, end: 12)
+            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
             : null,
       ),
       isExpanded: true,

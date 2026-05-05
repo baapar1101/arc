@@ -107,6 +107,7 @@ def list_templates(
     status: Optional[str] = Query(None),
     channel: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None, description="فقط قالب‌های فعال یا غیرفعال"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     ctx: AuthContext = Depends(get_current_user),
@@ -119,7 +120,8 @@ def list_templates(
     filters = {
         "status": status,
         "channel": channel,
-        "event_type": event_type
+        "event_type": event_type,
+        "is_active": is_active,
     }
     
     repo = BusinessNotificationTemplateRepository(db)
@@ -198,6 +200,25 @@ def get_template(
         "updated_at": template.updated_at.isoformat()
     }
     
+    return success_response(data, request)
+
+
+@router.get("/businesses/{business_id}/templates/{template_id}/sms-cost-estimate")
+def sms_cost_estimate(
+    request: Request,
+    business_id: int,
+    template_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    برآورد هزینه پیامک برای ورک‌فلو / UI (بر اساس متن خام قالب و قیمت‌گذاری سیستم).
+    """
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+
+    svc = BusinessNotificationService(db)
+    data = svc.estimate_sms_template_cost(business_id, template_id)
     return success_response(data, request)
 
 

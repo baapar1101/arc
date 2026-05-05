@@ -4423,6 +4423,18 @@
   "crmWebChatConversationNotFoundRefresh": "Conversation not found — try refreshing",
   "crmWebChatVisitorStartPageLabel": "Page where chat started (visitor)",
   "crmWebChatVisitorCurrentPageLabel": "Visitor''s current page",
+  "crmWebChatVisitorIpLine": "IP: {ip}",
+  "@crmWebChatVisitorIpLine": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
+  "crmWebChatVisitorDeviceMobile": "Mobile",
+  "crmWebChatVisitorDeviceTablet": "Tablet",
+  "crmWebChatVisitorDeviceDesktop": "Desktop",
+  "crmWebChatVisitorDeviceUnknown": "Device",
   "crmWebChatWidgetLine": "Widget: {name}",
   "@crmWebChatWidgetLine": {
     "placeholders": {

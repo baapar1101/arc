@@ -1014,6 +1014,8 @@ async def get_actions_metadata(
             translation_context = "send_telegram"
         elif "email" in action_key:
             translation_context = "send_email"
+        elif action_key == "send_business_sms":
+            translation_context = "send_business_sms"
         elif action_key in _wf_data_action_keys:
             translation_context = action_key
 
@@ -1048,6 +1050,7 @@ async def get_workflow_translations(
         CREATE_INVOICE_TRANSLATIONS,
         SEND_TELEGRAM_TRANSLATIONS,
         SEND_EMAIL_TRANSLATIONS,
+        SEND_BUSINESS_SMS_TRANSLATIONS,
         OTHER_ACTIONS_TRANSLATIONS,
         BUSINESS_BACKUP_TRANSLATIONS,
     )
@@ -1062,6 +1065,7 @@ async def get_workflow_translations(
     all_translations["create_invoice"] = CREATE_INVOICE_TRANSLATIONS.get(lang, {})
     all_translations["send_telegram"] = SEND_TELEGRAM_TRANSLATIONS.get(lang, {})
     all_translations["send_email"] = SEND_EMAIL_TRANSLATIONS.get(lang, {})
+    all_translations["send_business_sms"] = SEND_BUSINESS_SMS_TRANSLATIONS.get(lang, {})
     all_translations["others"] = OTHER_ACTIONS_TRANSLATIONS.get(lang, {})
     all_translations["business_backup"] = BUSINESS_BACKUP_TRANSLATIONS.get(lang, {})
     all_translations["crm_web_chat_send_message"] = CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS.get(lang, {})

@@ -175,6 +175,7 @@ def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
 		"visitor_email": c.visitor_email,
 		"visitor_phone": c.visitor_phone,
 		"page_url": c.page_url,
+		"extra_metadata": c.extra_metadata if c.extra_metadata else {},
 		"lead_id": c.lead_id,
 		"person_id": c.person_id,
 		"assigned_to_user_id": c.assigned_to_user_id,
@@ -372,6 +373,8 @@ async def start_conversation_public(
 	phone: str,
 	page_url: Optional[str],
 	origin_header: Optional[str],
+	client_ip: Optional[str] = None,
+	device_type: Optional[str] = None,
 ) -> Dict[str, Any]:
 	w = get_widget_by_public_key(db, public_key)
 	if not origin_allowed(w, origin_header):
@@ -392,6 +395,14 @@ async def start_conversation_public(
 	visitor_token = secrets.token_urlsafe(32)
 	th = _hash_visitor_token(visitor_token)
 
+	meta: Dict[str, Any] = {}
+	raw_ip = (client_ip or "").strip().split("%")[0].strip()
+	if raw_ip:
+		meta["visitor_ip"] = raw_ip[:45]
+	dt = (device_type or "").strip().lower()
+	if dt in ("mobile", "tablet", "desktop"):
+		meta["device_type"] = dt
+
 	c = CrmChatConversation(
 		business_id=w.business_id,
 		widget_id=w.id,
@@ -403,6 +414,7 @@ async def start_conversation_public(
 		visitor_token_hash=th,
 		page_url=(page_url or None) if page_url else None,
 		last_message_at=None,
+		extra_metadata=meta if meta else None,
 	)
 	db.add(c)
 	db.commit()

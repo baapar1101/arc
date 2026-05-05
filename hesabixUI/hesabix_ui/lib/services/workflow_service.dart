@@ -259,6 +259,51 @@ class WorkflowService {
     return _asMap(res.data?['data']);
   }
 
+  /// قالب‌های SMS تاییدشده و فعال (انتخاب در نود ورک‌فلو)
+  Future<List<Map<String, dynamic>>> listApprovedSmsTemplates({
+    required int businessId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business-notifications/businesses/$businessId/templates',
+      query: <String, dynamic>{
+        'channel': 'sms',
+        'status': 'approved',
+        'is_active': true,
+        'limit': 200,
+        'offset': 0,
+      },
+    );
+    final data = _asMap(res.data?['data']);
+    final items = data['items'];
+    if (items is List) {
+      return items
+          .map<Map<String, dynamic>>((dynamic e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  Future<Map<String, dynamic>> getNotificationTemplate({
+    required int businessId,
+    required int templateId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business-notifications/businesses/$businessId/templates/$templateId',
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  /// برآورد هزینه پیامک (متن خام قالب × قیمت ادمین)
+  Future<Map<String, dynamic>> estimateSmsTemplateCost({
+    required int businessId,
+    required int templateId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business-notifications/businesses/$businessId/templates/$templateId/sms-cost-estimate',
+    );
+    return _asMap(res.data?['data']);
+  }
+
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) {
       return value;

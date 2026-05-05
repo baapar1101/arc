@@ -8,12 +8,24 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields
-from adapters.db.repositories.notification_repo import UserNotificationSettingRepository
+from adapters.db.repositories.notification_repo import (
+	UserNotificationSettingRepository,
+	UserInappAlertPreferenceRepository,
+)
 from adapters.db.repositories.notification_outbox_repository import NotificationOutboxRepository
 from app.services.notification_service import NotificationService
 from adapters.api.v1.schemas import QueryInfo
 
 router = APIRouter(prefix="/notifications", tags=["اطلاع‌رسانی"])
+
+
+def _valid_inapp_sound_id(s: str) -> bool:
+	if s == "default":
+		return True
+	if s.startswith("s_") and s[2:].isdigit():
+		n = int(s[2:])
+		return 1 <= n <= 27
+	return False
 
 
 class SettingsPayload(BaseModel):
@@ -22,6 +34,9 @@ class SettingsPayload(BaseModel):
 	email_enabled: Optional[bool] = None
 	sms_enabled: Optional[bool] = None
 	inapp_enabled: Optional[bool] = None
+	inapp_alert_mode: Optional[str] = None  # normal | silent | do_not_disturb
+	inapp_sound_enabled: Optional[bool] = None
+	inapp_sound_asset_id: Optional[str] = None  # default یا s_1 … s_27
 
 
 @router.get("/settings", summary="دریافت تنظیمات نوتیفیکیشن کاربر")
@@ -38,6 +53,8 @@ def get_settings(
 	mobile_verified = getattr(user, "mobile_verified", False)
 	
 	repo = UserNotificationSettingRepository(db)
+	inapp_prefs_repo = UserInappAlertPreferenceRepository(db)
+	mode, sound_on, sound_id = inapp_prefs_repo.get_or_defaults(user_id=user_id)
 	rows = repo.list_for_user(user_id=user_id)
 	
 	# Defaults: بر اساس وضعیت احراز هویت
@@ -78,6 +95,9 @@ def get_settings(
 	# افزودن اطلاعات وضعیت احراز هویت به پاسخ
 	res["email_verified"] = email_verified
 	res["mobile_verified"] = mobile_verified
+	res["inapp_alert_mode"] = mode
+	res["inapp_sound_enabled"] = sound_on
+	res["inapp_sound_asset_id"] = sound_id
 	
 	return success_response(res, request)
 
@@ -99,6 +119,7 @@ def put_settings(
 	mobile_verified = getattr(user, "mobile_verified", False)
 	
 	repo = UserNotificationSettingRepository(db)
+	inapp_prefs_repo = UserInappAlertPreferenceRepository(db)
 	
 	# بررسی و اعمال محدودیت‌ها
 	if payload.telegram_enabled is not None:
@@ -129,6 +150,37 @@ def put_settings(
 	if payload.inapp_enabled is not None:
 		# InApp همیشه قابل تنظیم است (نیازی به احراز هویت ندارد)
 		repo.upsert(user_id=user_id, channel="inapp", event_key=None, enabled=payload.inapp_enabled)
+	
+	if any(
+		x is not None
+		for x in (
+			payload.inapp_alert_mode,
+			payload.inapp_sound_enabled,
+			payload.inapp_sound_asset_id,
+		)
+	):
+		cur_mode, cur_sound_on, cur_sound_id = inapp_prefs_repo.get_or_defaults(user_id=user_id)
+		next_mode = payload.inapp_alert_mode if payload.inapp_alert_mode is not None else cur_mode
+		next_sound_on = payload.inapp_sound_enabled if payload.inapp_sound_enabled is not None else cur_sound_on
+		next_sound_id = payload.inapp_sound_asset_id if payload.inapp_sound_asset_id is not None else cur_sound_id
+		if next_mode not in ("normal", "silent", "do_not_disturb"):
+			raise ApiError(
+				"INVALID_INAPP_ALERT_MODE",
+				"حالت هشدار درون‌برنامه‌ای نامعتبر است",
+				http_status=400,
+			)
+		if not _valid_inapp_sound_id(next_sound_id):
+			raise ApiError(
+				"INVALID_INAPP_SOUND_ID",
+				"شناسه صدای هشدار نامعتبر است",
+				http_status=400,
+			)
+		inapp_prefs_repo.upsert(
+			user_id=user_id,
+			alert_mode=next_mode,
+			sound_enabled=next_sound_on,
+			sound_asset_id=next_sound_id,
+		)
 	
 	return success_response({"ok": True}, request)
 

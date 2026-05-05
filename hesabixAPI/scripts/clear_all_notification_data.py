@@ -17,7 +17,11 @@ from sqlalchemy import inspect
 from adapters.db.session import SessionLocal
 from adapters.db.models.notification import NotificationOutbox, NotificationDeliveryAttempt
 from adapters.db.models.announcement import Announcement, UserAnnouncement
-from adapters.db.models.notification_config import NotificationTemplate, UserNotificationSetting
+from adapters.db.models.notification_config import (
+	NotificationTemplate,
+	UserNotificationSetting,
+	UserInappAlertPreference,
+)
 from adapters.db.models.business_notification import (
 	NotificationEventType,
 	BusinessNotificationTemplate,
@@ -45,6 +49,7 @@ def main() -> None:
 		("notification_event_types", NotificationEventType),
 		("notification_templates", NotificationTemplate),
 		("user_notification_settings", UserNotificationSetting),
+		("user_inapp_alert_preferences", UserInappAlertPreference),
 	]
 
 	db = SessionLocal()

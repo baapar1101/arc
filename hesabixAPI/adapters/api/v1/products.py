@@ -4521,6 +4521,26 @@ async def export_inventory_kardex_report_pdf(
     except Exception:
         generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
 
+    try:
+        from app.services.print_footer_settings import build_report_title_and_time_footer
+
+        _t = "گزارش کاردکس موجودی" if is_fa else "Inventory Kardex Report"
+        _pn = ""
+        try:
+            _pn = ctx.get_user_name() or ""
+        except Exception:
+            _pn = ""
+        inventory_kardex_footer_text = build_report_title_and_time_footer(
+            db,
+            business_id,
+            title=_t,
+            time_part=generated_at,
+            preparer_name=_pn or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        inventory_kardex_footer_text = f"{'گزارش کاردکس موجودی' if is_fa else 'Inventory Kardex Report'} • {generated_at}"
+
     # Apply selected rows filtering (prefer stable keys)
     if selected_only and selected_row_keys is not None and isinstance(selected_row_keys, list):
         try:
@@ -4630,7 +4650,7 @@ async def export_inventory_kardex_report_pdf(
             "orientation": orientation,
             "fa_font_url_regular": fa_font_url_regular,
             "fa_font_url_bold": fa_font_url_bold,
-            "footer_text": f"{'گزارش کاردکس موجودی' if is_fa else 'Inventory Kardex Report'} • {generated_at}",
+            "footer_text": inventory_kardex_footer_text,
             "filters_summary": filters_summary,
             "items": items,
         }
@@ -4656,7 +4676,7 @@ async def export_inventory_kardex_report_pdf(
             "orientation": orientation or "landscape",
             "fa_font_url_regular": fa_font_url_regular,
             "fa_font_url_bold": fa_font_url_bold,
-            "footer_text": f"{'گزارش کاردکس موجودی' if is_fa else 'Inventory Kardex Report'} • {generated_at}",
+            "footer_text": inventory_kardex_footer_text,
             "filters_summary": filters_summary,
             "items": items,
         })
