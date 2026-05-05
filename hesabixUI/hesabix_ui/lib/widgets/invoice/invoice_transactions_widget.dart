@@ -40,6 +40,8 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final num? invoiceTotal; // مبلغ کل فاکتور
   /// داخل [SingleChildScrollView] یا محور عمودی بدون ارتفاع محدود؛ لیست به‌اندازهٔ محتوا بلند می‌شود و اسکرول به والد سپرده می‌شود.
   final bool shrinkWrapBody;
+  /// حالت فشرده برای دیالوگ‌های پرتراکم (مثلاً دریافت/پرداخت).
+  final bool compactMode;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -53,6 +55,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     this.authStore,
     this.invoiceTotal,
     this.shrinkWrapBody = false,
+    this.compactMode = false,
   });
 
   @override
@@ -194,6 +197,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     final isDesktop = _isDesktop(context);
     final showFillRemaining =
         widget.invoiceTotal != null && widget.invoiceTotal! > 0;
+    final titleStyle = widget.compactMode
+        ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)
+        : theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold);
 
     Widget fillRemainingIconButton() {
       if (!showFillRemaining) return const SizedBox.shrink();
@@ -205,6 +211,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             ? 'پر کردن ماندهٔ باقی‌مانده در تراکنش (ردیف با مبلغ صفر یا تراکنش جدید)'
             : 'ماندهٔ مثبت برای پر کردن وجود ندارد',
         style: IconButton.styleFrom(
+          visualDensity:
+              widget.compactMode ? VisualDensity.compact : null,
           foregroundColor: enabled
               ? theme.colorScheme.secondary
               : theme.colorScheme.onSurfaceVariant,
@@ -217,15 +225,13 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         Icon(
           Icons.receipt_long_outlined,
           color: theme.colorScheme.primary,
-          size: 24,
+          size: widget.compactMode ? 20 : 24,
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: widget.compactMode ? 6 : 8),
         Expanded(
           child: Text(
             'تراکنش‌ها',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: titleStyle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -250,6 +256,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ? 'افزودن تراکنش'
                 : 'ابتدا باید ردیف‌های کالا را اضافه کنید',
             style: IconButton.styleFrom(
+              visualDensity:
+                  widget.compactMode ? VisualDensity.compact : null,
               backgroundColor: _canAddTransaction
                   ? theme.colorScheme.primary
                   : theme.colorScheme.surfaceContainerHighest,
@@ -266,6 +274,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDesktop = _isDesktop(context);
+    final gap = widget.compactMode ? 10.0 : 16.0;
 
     if (widget.shrinkWrapBody) {
       return Column(
@@ -273,7 +282,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildHeaderRow(theme),
-          const SizedBox(height: 16),
+          SizedBox(height: gap),
           _buildMobileLayout(theme, shrinkWrap: true),
         ],
       );
@@ -283,7 +292,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildHeaderRow(theme),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
 
         // محتوای اصلی: دو ستونه در دسکتاپ، یک ستونه در موبایل
         Expanded(
@@ -297,13 +306,15 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   
   // چیدمان موبایل: یک ستون
   Widget _buildMobileLayout(ThemeData theme, {bool shrinkWrap = false}) {
+    final separatorGap = widget.compactMode ? 8.0 : 12.0;
+    final sectionGap = widget.compactMode ? 10.0 : 16.0;
     final listSection = widget.transactions.isEmpty
         ? _buildEmptyState(theme)
         : ListView.separated(
             shrinkWrap: shrinkWrap,
             physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
             itemCount: widget.transactions.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            separatorBuilder: (context, index) => SizedBox(height: separatorGap),
             itemBuilder: (context, index) {
               final transaction = widget.transactions[index];
               return _buildTransactionCard(transaction, index);
@@ -317,10 +328,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         // نمایش مانده فاکتور یا پیام عدم وجود ردیف کالا
         if (widget.invoiceTotal != null && widget.invoiceTotal! > 0) ...[
           _buildBalanceCard(theme),
-          const SizedBox(height: 16),
+          SizedBox(height: sectionGap),
         ] else if (widget.invoiceTotal != null && widget.invoiceTotal! == 0) ...[
           _buildNoItemsMessage(theme),
-          const SizedBox(height: 16),
+          SizedBox(height: sectionGap),
         ],
 
         // لیست تراکنش‌ها
@@ -334,6 +345,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   
   // چیدمان دسکتاپ: دو ستون
   Widget _buildDesktopLayout(ThemeData theme) {
+    final separatorGap = widget.compactMode ? 8.0 : 12.0;
+    final sectionGap = widget.compactMode ? 8.0 : 12.0;
+    final colGap = widget.compactMode ? 10.0 : 16.0;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -348,9 +362,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 children: [
                   Text(
                     'لیست تراکنش‌ها',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: (widget.compactMode
+                            ? theme.textTheme.titleSmall
+                            : theme.textTheme.titleMedium)
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   Text(
@@ -361,14 +376,15 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: sectionGap),
               // لیست تراکنش‌ها
               Expanded(
                 child: widget.transactions.isEmpty
                     ? _buildEmptyState(theme)
                     : ListView.separated(
                         itemCount: widget.transactions.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: separatorGap),
                         itemBuilder: (context, index) {
                           final transaction = widget.transactions[index];
                           return _buildTransactionCard(transaction, index);
@@ -379,7 +395,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           ),
         ),
         
-        const SizedBox(width: 16),
+        SizedBox(width: colGap),
         
         // ستون سمت چپ: کارت مانده فاکتور یا پیام عدم وجود ردیف کالا
         if (widget.invoiceTotal != null && widget.invoiceTotal! > 0)
@@ -391,11 +407,12 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 // هدر کارت مانده
                 Text(
                   'خلاصه مالی',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: (widget.compactMode
+                          ? theme.textTheme.titleSmall
+                          : theme.textTheme.titleMedium)
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: sectionGap),
                 // کارت مانده (sticky در بالای صفحه)
                 Flexible(
                   child: SingleChildScrollView(
@@ -414,11 +431,12 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 // هدر
                 Text(
                   'خلاصه مالی',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: (widget.compactMode
+                          ? theme.textTheme.titleSmall
+                          : theme.textTheme.titleMedium)
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: sectionGap),
                 // پیام عدم وجود ردیف کالا
                 Flexible(
                   child: SingleChildScrollView(
@@ -469,10 +487,13 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
 
   Widget _buildTransactionCard(InvoiceTransaction transaction, int index) {
     final theme = Theme.of(context);
+    final cardPad = widget.compactMode ? 10.0 : 16.0;
+    final headerGap = widget.compactMode ? 8.0 : 12.0;
+    final iconSize = widget.compactMode ? 18.0 : 20.0;
     
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(cardPad),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -482,7 +503,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 Icon(
                   _getTransactionIcon(transaction.type),
                   color: theme.colorScheme.primary,
-                  size: 20,
+                  size: iconSize,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -504,16 +525,20 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                   onPressed: () => _editTransaction(index),
                   icon: const Icon(Icons.edit),
                   tooltip: 'ویرایش',
+                  visualDensity:
+                      widget.compactMode ? VisualDensity.compact : null,
                 ),
                 IconButton(
                   onPressed: () => _removeTransaction(index),
                   icon: const Icon(Icons.delete),
                   tooltip: 'حذف',
                   color: theme.colorScheme.error,
+                  visualDensity:
+                      widget.compactMode ? VisualDensity.compact : null,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: headerGap),
             
             // جزئیات تراکنش
             _buildTransactionDetails(transaction),

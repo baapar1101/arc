@@ -478,47 +478,48 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(padding, padding * 0.55, padding, padding * 0.35),
+                    child: Row(
+                      children: [
+                        Text(
+                          'هزینه و درآمد',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        const Spacer(),
+                        if (widget.initialDocument == null)
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment<bool>(value: false, label: Text('هزینه')),
+                              ButtonSegment<bool>(value: true, label: Text('درآمد')),
+                            ],
+                            selected: {_isIncome},
+                            onSelectionChanged: _onDocIncomeTypeChanged,
+                          ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _isSaving ? null : () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          tooltip: 'بستن',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: scheme.outlineVariant),
                   Expanded(
                     child: Scrollbar(
                       thumbVisibility: true,
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.only(bottom: padding * 1.1),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: padding),
-                          child: Column(
+                        padding: EdgeInsets.fromLTRB(padding, padding * 0.6, padding, padding * 0.75),
+                        child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                             Padding(
-                              padding: EdgeInsets.fromLTRB(0, padding, 0, padding * 0.4),
+                              padding: EdgeInsets.fromLTRB(0, 0, 0, padding * 0.4),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'هزینه و درآمد',
-                                        style: theme.textTheme.titleLarge,
-                                      ),
-                                      const Spacer(),
-                                      if (widget.initialDocument == null)
-                                        SegmentedButton<bool>(
-                                          segments: const [
-                                            ButtonSegment<bool>(
-                                              value: false,
-                                              label: Text('هزینه'),
-                                            ),
-                                            ButtonSegment<bool>(
-                                              value: true,
-                                              label: Text('درآمد'),
-                                            ),
-                                          ],
-                                          selected: {_isIncome},
-                                          onSelectionChanged: _onDocIncomeTypeChanged,
-                                        ),
-                                    ],
-                                  ),
-                                  SizedBox(height: padding * 0.5),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -624,81 +625,79 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                                 );
                               },
                             ),
-                            Divider(height: 1, color: scheme.outlineVariant),
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(0, padding * 0.5, 0, 0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Wrap(
-                                          spacing: 10,
-                                          runSpacing: 6,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
-                                          children: [
-                                            _TotalChip(label: 'حساب‌ها', value: sumItems),
-                                            _TotalChip(
-                                              label: 'طرف‌حساب‌ها',
-                                              value: sumCounterparties,
-                                            ),
-                                            _TotalChip(
-                                              label: 'اختلاف',
-                                              value: diff,
-                                              isError: diff != 0,
-                                            ),
-                                          ],
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: _buildBalanceActionButtons(),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed:
-                                        _isSaving ? null : () => Navigator.pop(context),
-                                    child: Text(t.cancel),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  FilledButton.icon(
-                                    onPressed: _isSaving ||
-                                            diff != 0 ||
-                                            _itemLines.isEmpty ||
-                                            _counterpartyLines.isEmpty
-                                        ? null
-                                        : _onSave,
-                                    icon: _isSaving
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Icon(Icons.save),
-                                    label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  Divider(height: 1, color: scheme.outlineVariant),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(padding, padding * 0.5, padding, padding * 0.55),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  _TotalChip(label: 'حساب‌ها', value: sumItems),
+                                  _TotalChip(
+                                    label: 'طرف‌حساب‌ها',
+                                    value: sumCounterparties,
+                                  ),
+                                  _TotalChip(
+                                    label: 'اختلاف',
+                                    value: diff,
+                                    isError: diff != 0,
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: _buildBalanceActionButtons(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _isSaving ? null : () => Navigator.pop(context),
+                          child: Text(t.cancel),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: _isSaving ||
+                                  diff != 0 ||
+                                  _itemLines.isEmpty ||
+                                  _counterpartyLines.isEmpty
+                              ? null
+                              : _onSave,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         ),
-      ),
     );
   }
 

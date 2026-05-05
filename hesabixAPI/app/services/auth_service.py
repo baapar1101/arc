@@ -60,15 +60,16 @@ def _generate_referral_code(db: Session) -> str:
 def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None, base_url: str | None = None, client_ip: str | None = None) -> int:
 	from app.core.responses import ApiError
 	from app.services.system_settings_service import is_registration_enabled, get_max_users
+	repo = UserRepository(db)
 	
-	# بررسی فعال بودن ثبت‌نام
-	if not is_registration_enabled(db):
+	# در استقرار اولیه (بدون هیچ کاربر)، ثبت‌نام اولیه همیشه مجاز است
+	is_first_user_bootstrap = repo.count_all() == 0
+	if not is_first_user_bootstrap and not is_registration_enabled(db):
 		raise ApiError("REGISTRATION_DISABLED", "ثبت‌نام در حال حاضر غیرفعال است", http_status=403)
 	
 	# بررسی محدودیت تعداد کاربران
 	max_users = get_max_users(db)
 	if max_users > 0:  # 0 به معنی نامحدود است
-		repo = UserRepository(db)
 		current_user_count = repo.count_all()
 		if current_user_count >= max_users:
 			raise ApiError("MAX_USERS_REACHED", f"حداکثر تعداد کاربران ({max_users}) رسیده است", http_status=403)
@@ -85,7 +86,6 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 		# در غیر این صورت، هیچ شناسهٔ معتبری ارائه نشده است
 		raise ApiError("IDENTIFIER_REQUIRED", "Email or mobile is required")
 
-	repo = UserRepository(db)
 	if email_n and repo.get_by_email(email_n):
 		raise ApiError("EMAIL_IN_USE", "Email is already in use")
 	if mobile_n and repo.get_by_mobile(mobile_n):

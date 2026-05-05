@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
@@ -28,7 +29,11 @@ class InAppProvider:
 
 			anyio.from_thread.run(realtime_manager.send_to_user, user_id, payload)
 		except Exception:
-			pass
+			# Fallback for contexts where anyio thread portal is unavailable.
+			try:
+				asyncio.run(realtime_manager.send_to_user(user_id, payload))
+			except Exception:
+				pass
 		return True
 
 

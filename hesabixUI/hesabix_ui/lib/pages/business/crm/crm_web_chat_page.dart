@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/pages/business/business_shell_side_nav_scope.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/crm_chat_service.dart';
@@ -42,6 +43,52 @@ class CrmWebChatPage extends StatefulWidget {
 }
 
 class _CrmWebChatPageState extends State<CrmWebChatPage> {
+  static const double _kSurfaceRadius = 12;
+  static const double _kPillRadius = 999;
+  static const double _kCompactMobileWidth = 390;
+  static const double _kDesktopSidebarWidthFactor = 0.33;
+  static const double _kDesktopSidebarMinWidth = 280;
+  static const double _kDesktopSidebarMaxWidth = 360;
+
+  EdgeInsets _conversationCardPadding(bool compactMobile) => compactMobile
+      ? const EdgeInsets.fromLTRB(10, 8, 6, 8)
+      : const EdgeInsets.fromLTRB(12, 10, 8, 10);
+  EdgeInsets _statusChipPadding(bool compactMobile) => compactMobile
+      ? const EdgeInsets.symmetric(horizontal: 6, vertical: 3)
+      : const EdgeInsets.symmetric(horizontal: 8, vertical: 4);
+  EdgeInsets _composerPadding(bool compactMobile) => EdgeInsets.fromLTRB(
+        12,
+        compactMobile ? 6 : 8,
+        12,
+        compactMobile ? 10 : 12,
+      );
+  EdgeInsets _threadListPadding(bool compactMobile) =>
+      EdgeInsets.all(compactMobile ? 10 : 12);
+  EdgeInsets _threadHeaderPadding(bool compactMobile) => EdgeInsets.fromLTRB(
+        12,
+        compactMobile ? 10 : 12,
+        12,
+        compactMobile ? 10 : 12,
+      );
+  EdgeInsets _messageBubblePadding(bool compactMobile) => EdgeInsets.symmetric(
+        horizontal: compactMobile ? 10 : 12,
+        vertical: compactMobile ? 8 : 10,
+      );
+  TextStyle? _conversationTitleStyle(ThemeData theme, bool compactMobile) =>
+      (compactMobile ? theme.textTheme.bodyMedium : theme.textTheme.titleSmall)
+          ?.copyWith(fontWeight: FontWeight.w600, height: 1.2);
+  TextStyle? _conversationMetaStyle(ThemeData theme, ColorScheme cs) =>
+      theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.25);
+  TextStyle? _conversationTimeStyle(ThemeData theme, ColorScheme cs) =>
+      theme.textTheme.labelSmall?.copyWith(
+        color: cs.onSurfaceVariant.withValues(alpha: 0.92),
+        fontWeight: FontWeight.w500,
+      );
+  TextStyle? _messageBodyStyle(ThemeData theme) =>
+      theme.textTheme.bodyMedium?.copyWith(height: 1.35);
+  TextStyle? _messageMetaStyle(ThemeData theme, ColorScheme cs) =>
+      theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant, height: 1.25);
+
   late final CrmChatService _svc;
   late final BusinessStorageService _storage;
   final CrmChatWsClient _ws = createCrmChatWsClient();
@@ -80,6 +127,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   bool _loadingOlderMsgs = false;
   bool _mobileShowList = true;
   final TextEditingController _convSearchCtrl = TextEditingController();
+  VoidCallback? _restoreDesktopRailAfterQuit;
 
   static int? _intFrom(dynamic v) {
     if (v == null) return null;
@@ -116,6 +164,15 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     _svc = CrmChatService(apiClient: widget.apiClient);
     _storage = BusinessStorageService(widget.apiClient);
     _replyCtrl.addListener(_onReplyTextChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
+      if (shellScope?.canControlDesktopRail ?? false) {
+        shellScope!.setRailVisible(false);
+        final scope = shellScope;
+        _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
+      }
+    });
     unawaited(_bootstrap());
   }
 
@@ -521,6 +578,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
   @override
   void dispose() {
+    _restoreDesktopRailAfterQuit?.call();
     _replyCtrl.removeListener(_onReplyTextChanged);
     _typingDebounce?.cancel();
     _typingStopTimer?.cancel();
@@ -876,6 +934,35 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     if (_wsLive) return t.crmWebChatSocketLive;
     if (_fallbackPoll != null) return t.crmWebChatSocketPolling;
     return t.crmWebChatSocketOffline;
+  }
+
+  Widget _buildConnectionChip(ThemeData theme, ColorScheme cs, AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(_kPillRadius),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _wsLive ? Icons.wifi : Icons.wifi_off,
+            size: 16,
+            color: _wsLive ? cs.primary : cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _socketStatusText(t),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _messageHasReadReceipt(Map<dynamic, dynamic> m) => m['read_at'] != null;
@@ -1484,7 +1571,10 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.crmWebChatPageTitle),
+        title: Text(
+          t.crmWebChatPageTitle,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -1496,37 +1586,6 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
           },
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4, top: 4, bottom: 4),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Icon(
-                    _wsLive ? Icons.wifi : Icons.wifi_off,
-                    size: 20,
-                    color: _wsLive
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.outline,
-                  ),
-                  Text(
-                    _socketStatusText(t),
-                    textAlign: TextAlign.end,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontSize: 10,
-                      height: 1.1,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: t.crmWebChatRefreshTooltip,
@@ -1541,6 +1600,8 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
   }
 
   Widget _buildMainBody(ThemeData theme, AppLocalizations t, ColorScheme cs, {required bool wide}) {
+    final screenW = MediaQuery.sizeOf(context).width;
+    final compactMobile = screenW < _kCompactMobileWidth;
     if (!wide) {
       if (_selectedConvId != null && !_mobileShowList) {
         return _buildThreadPanel(context, theme, cs);
@@ -1549,11 +1610,14 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         theme: theme,
         t: t,
         cs: cs,
-        width: MediaQuery.sizeOf(context).width,
+        width: screenW,
+        compactMobile: compactMobile,
       );
     }
-    final screenW = MediaQuery.sizeOf(context).width;
-    final sidebarW = (screenW * 0.38).clamp(272.0, 420.0);
+    final sidebarW = (screenW * _kDesktopSidebarWidthFactor).clamp(
+      _kDesktopSidebarMinWidth,
+      _kDesktopSidebarMaxWidth,
+    );
     return Row(
       children: [
         _buildConversationsListColumn(
@@ -1561,6 +1625,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
           t: t,
           cs: cs,
           width: sidebarW,
+          compactMobile: false,
         ),
         const VerticalDivider(width: 1),
         Expanded(
@@ -1585,14 +1650,33 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     required AppLocalizations t,
     required ColorScheme cs,
     required double width,
+    required bool compactMobile,
   }) {
+    final titleStyle = _conversationTitleStyle(theme, compactMobile);
+    final cardPad = _conversationCardPadding(compactMobile);
+    final chipPad = _statusChipPadding(compactMobile);
     return SizedBox(
       width: width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            padding: EdgeInsets.fromLTRB(12, compactMobile ? 8 : 10, 12, 2),
+            child: Row(
+              children: [
+                _buildConnectionChip(theme, cs, t),
+                const Spacer(),
+                IconButton(
+                  tooltip: t.crmWebChatRefreshTooltip,
+                  visualDensity: compactMobile ? VisualDensity.compact : VisualDensity.standard,
+                  onPressed: () => _loadAll(silent: true),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, compactMobile ? 6 : 8, 12, 6),
             child: TextField(
               controller: _convSearchCtrl,
               onChanged: _onConvSearchChanged,
@@ -1606,7 +1690,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: EdgeInsets.fromLTRB(12, compactMobile ? 6 : 8, 12, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1640,13 +1724,14 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: EdgeInsets.symmetric(horizontal: compactMobile ? 8 : 10),
             child: Wrap(
               spacing: 4,
               children: [
                 ChoiceChip(
                   label: Text(t.crmWebChatFilterAll),
                   selected: _statusFilter == null,
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                   onSelected: (_) async {
                     setState(() => _statusFilter = null);
                     await _persistStatusFilter();
@@ -1656,6 +1741,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                 ChoiceChip(
                   label: Text(t.crmWebChatStatusOpen),
                   selected: _statusFilter == 'open',
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                   onSelected: (_) async {
                     setState(() => _statusFilter = 'open');
                     await _persistStatusFilter();
@@ -1665,6 +1751,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                 ChoiceChip(
                   label: Text(t.crmWebChatStatusPending),
                   selected: _statusFilter == 'pending',
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                   onSelected: (_) async {
                     setState(() => _statusFilter = 'pending');
                     await _persistStatusFilter();
@@ -1674,6 +1761,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                 ChoiceChip(
                   label: Text(t.crmWebChatStatusResolved),
                   selected: _statusFilter == 'resolved',
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                   onSelected: (_) async {
                     setState(() => _statusFilter = 'resolved');
                     await _persistStatusFilter();
@@ -1692,6 +1780,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                       child: Text(t.crmWebChatNoConversations),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
                       itemCount: _conversations.length + (_convHasMore && _loadingMoreConvs ? 1 : 0),
                       itemBuilder: (ctx, i) {
                         if (i == _conversations.length) {
@@ -1715,69 +1804,120 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                             '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}'.trim();
                         final sub = c['visitor_email']?.toString() ?? '';
                         final ph = c['visitor_phone']?.toString() ?? '';
-                        final purl = c['page_url']?.toString().trim() ?? '';
                         final sel = _selectedConvId == id;
                         final lma = c['last_message_at']?.toString() ?? '';
-                        return ListTile(
-                          selected: sel,
-                          title: Text(
-                            title.isEmpty ? t.crmWebChatConversationNumber(id) : title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            [
-                              sub,
-                              ph,
-                              if (purl.isNotEmpty) purl,
-                              if (lma.isNotEmpty) lma,
-                            ].join(' · '),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: SizedBox(
-                            width: 112,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _statusLabel(t, c['status']?.toString()),
-                                    style: theme.textTheme.bodySmall,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (widget.authStore.canEditCrmWebChatConversations())
-                                  PopupMenuButton<String>(
-                                    icon: Icon(Icons.more_vert, size: 20, color: cs.onSurfaceVariant),
-                                    padding: EdgeInsets.zero,
-                                    onSelected: (v) async {
-                                      if (v != 'delete') return;
-                                      final ok = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: Text(t.crmWebChatDeleteConversation),
-                                          content: Text(t.crmWebChatDeleteConversationConfirm),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-                                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
-                                          ],
-                                        ),
-                                      );
-                                      if (ok == true && mounted) await _deleteConversation(id);
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      PopupMenuItem<String>(
-                                        value: 'delete',
-                                        child: Text(t.crmWebChatDeleteConversation),
-                                      ),
-                                    ],
-                                  ),
-                              ],
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          elevation: sel ? 1.2 : 0,
+                          color: sel ? cs.primaryContainer.withValues(alpha: 0.28) : cs.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(_kSurfaceRadius),
+                            side: BorderSide(
+                              color: sel
+                                  ? cs.primary.withValues(alpha: 0.4)
+                                  : cs.outlineVariant.withValues(alpha: 0.55),
                             ),
                           ),
-                          onTap: () => _selectConversation(id),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(_kSurfaceRadius),
+                            onTap: () => _selectConversation(id),
+                            child: Padding(
+                              padding: cardPad,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title.isEmpty ? t.crmWebChatConversationNumber(id) : title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: titleStyle?.copyWith(
+                                            letterSpacing: 0.1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          [sub, ph].where((x) => x.trim().isNotEmpty).join(' · '),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                          ) ??
+                                              _conversationMetaStyle(theme, cs),
+                                        ),
+                                        if (lma.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            lma,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: cs.onSurfaceVariant,
+                                            ) ??
+                                                _conversationTimeStyle(theme, cs),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: chipPad,
+                                        decoration: BoxDecoration(
+                                          color: cs.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(_kPillRadius),
+                                        ),
+                                        child: Text(
+                                          _statusLabel(t, c['status']?.toString()),
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.1,
+                                          ),
+                                        ),
+                                      ),
+                                      if (widget.authStore.canEditCrmWebChatConversations())
+                                        PopupMenuButton<String>(
+                                          icon: Icon(
+                                            Icons.more_vert,
+                                            size: compactMobile ? 17 : 18,
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          onSelected: (v) async {
+                                            if (v != 'delete') return;
+                                            final ok = await showDialog<bool>(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: Text(t.crmWebChatDeleteConversation),
+                                                content: Text(t.crmWebChatDeleteConversationConfirm),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                                                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+                                                ],
+                                              ),
+                                            );
+                                            if (ok == true && mounted) await _deleteConversation(id);
+                                          },
+                                          itemBuilder: (ctx) => [
+                                            PopupMenuItem<String>(
+                                              value: 'delete',
+                                              child: Text(t.crmWebChatDeleteConversation),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -1790,6 +1930,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
 
   Widget _buildThreadPanel(BuildContext context, ThemeData theme, ColorScheme cs) {
     final t = AppLocalizations.of(context);
+    final compactMobile = MediaQuery.sizeOf(context).width < _kCompactMobileWidth;
     final c = _conversations.firstWhere(
       (e) {
         if (e is! Map) return false;
@@ -1820,9 +1961,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       children: [
         if (_loadingMsgs) LinearProgressIndicator(minHeight: 2, color: cs.primary),
         Material(
-          color: cs.surfaceContainerHighest,
+          color: cs.surfaceContainerLow,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: _threadHeaderPadding(compactMobile),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1830,7 +1971,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CircleAvatar(
-                      radius: 22,
+                      radius: compactMobile ? 19 : 22,
                       child: Text(
                         _firstCharForAvatar(conv['visitor_first_name']?.toString()),
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1941,7 +2082,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         Expanded(
           child: ListView.builder(
             controller: _msgScroll,
-            padding: const EdgeInsets.all(12),
+            padding: _threadListPadding(compactMobile),
             itemCount: _messages.length + (_loadingOlderMsgs ? 1 : 0),
             itemBuilder: (ctx, i) {
               if (_loadingOlderMsgs && i == 0) {
@@ -1969,14 +2110,21 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
               return Align(
                 alignment: agent ? Alignment.centerLeft : Alignment.centerRight,
                 child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  constraints: const BoxConstraints(maxWidth: 520),
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  padding: _messageBubblePadding(compactMobile),
+                  constraints: BoxConstraints(maxWidth: compactMobile ? 420 : 520),
                   decoration: BoxDecoration(
                     color: isDeleted
                         ? cs.surfaceContainerHighest
-                        : (agent ? cs.primaryContainer : cs.secondaryContainer),
-                    borderRadius: BorderRadius.circular(12),
+                        : (agent
+                            ? cs.surfaceContainerLow
+                            : cs.secondaryContainer.withValues(alpha: 0.45)),
+                    border: Border.all(
+                      color: agent
+                          ? cs.outlineVariant.withValues(alpha: 0.45)
+                          : cs.secondary.withValues(alpha: 0.22),
+                    ),
+                    borderRadius: BorderRadius.circular(_kSurfaceRadius),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1993,7 +2141,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                           ),
                         )
                       else if (body.isNotEmpty)
-                        Text(body, style: theme.textTheme.bodyMedium),
+                        Text(body, style: _messageBodyStyle(theme)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -2001,7 +2149,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                             child: Text(
                               '$who  ·  ${_formatMsgTime(m['created_at'])}'
                               '${m['edited_at'] != null ? '  ${t.crmWebChatMessageEditedBadge}' : ''}',
-                              style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: _messageMetaStyle(theme, cs),
                             ),
                           ),
                           if (!isDeleted && !agent)
@@ -2077,7 +2225,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
             color: cs.surface,
             elevation: 1,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              padding: _composerPadding(compactMobile),
               child: CallbackShortcuts(
                 bindings: <ShortcutActivator, VoidCallback>{
                   const SingleActivator(LogicalKeyboardKey.enter, control: true): _sendReply,
@@ -2129,11 +2277,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                       ),
                     if (_allowWebChatVoice) const SizedBox(width: 4),
                     Expanded(child: _buildComposerField(theme, cs, t)),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: (_sendingFile || _recordingVoice) ? null : _sendReply,
-                      child: Text(t.crmWebChatSend),
-                    ),
+                    SizedBox(width: compactMobile ? 6 : 8),
+                    compactMobile
+                        ? IconButton.filled(
+                            tooltip: t.crmWebChatSend,
+                            onPressed: (_sendingFile || _recordingVoice) ? null : _sendReply,
+                            icon: const Icon(Icons.send_rounded),
+                          )
+                        : FilledButton(
+                            onPressed: (_sendingFile || _recordingVoice) ? null : _sendReply,
+                            child: Text(t.crmWebChatSend),
+                          ),
                   ],
                 ),
               ),

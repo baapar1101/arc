@@ -31,6 +31,7 @@ import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
+import '../../services/business_menu_preferences_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
@@ -98,6 +99,9 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
+  final BusinessMenuPreferencesService _menuPreferencesService =
+      BusinessMenuPreferencesService(ApiClient());
+  BusinessMenuPreferencesDto _menuPreferences = BusinessMenuPreferencesDto.empty();
 
   /// فقط زمانی که `NavigationRail`/ریل کناری برای دسکتاپ نشان داده می‌شود؛ موبایل از drawer استفاده می‌کند.
   bool _desktopRailVisible = true;
@@ -642,6 +646,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
     _loadBusinessPlugins();
+    _loadMenuPreferences();
     // به‌روزرسانی خودکار ساعت در نوار بالا هر دقیقه
     _dateTimeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
@@ -653,6 +658,22 @@ class _BusinessShellState extends State<BusinessShell> {
     BusinessPanelUiStore.instance.removeListener(_onBusinessPanelUiChanged);
     _dateTimeUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant BusinessShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _loadMenuPreferences();
+    }
+  }
+
+  Future<void> _loadMenuPreferences() async {
+    try {
+      final data = await _menuPreferencesService.getPreferences(widget.businessId);
+      if (!mounted) return;
+      setState(() => _menuPreferences = data);
+    } catch (_) {}
   }
 
     Future<void> showAddReceiptPaymentDialog() async {
@@ -1574,7 +1595,7 @@ class _BusinessShellState extends State<BusinessShell> {
     ];
 
     // فیلتر کردن منو بر اساس دسترسی‌ها
-    final menuItems = _getFilteredMenuItems(allMenuItems);
+    final menuItems = _applyMenuPreferences(_getFilteredMenuItems(allMenuItems));
 
     int selectedIndex = 0;
     for (int i = 0; i < menuItems.length; i++) {
@@ -2900,6 +2921,71 @@ class _BusinessShellState extends State<BusinessShell> {
     return null;
   }
 
+  String _menuKey(_MenuItem item) {
+    if (item.key != null && item.key!.trim().isNotEmpty) {
+      return item.key!;
+    }
+    final p = item.path;
+    if (p != null && p.trim().isNotEmpty) {
+      final normalized = p.split('?').first;
+      final tail = BusinessRoutePaths.stripBusinessPrefixAndTab(normalized, widget.businessId);
+      if (tail.isNotEmpty) return tail;
+    }
+    if (item.type == _MenuItemType.expandable) {
+      final children = item.children ?? const <_MenuItem>[];
+      for (final child in children) {
+        final kp = child.path;
+        if (kp == null || kp.isEmpty) continue;
+        final childTail = BusinessRoutePaths.stripBusinessPrefixAndTab(kp.split('?').first, widget.businessId);
+        if (childTail.isNotEmpty) {
+          final segment = childTail.split('/').first;
+          if (segment.isNotEmpty) return 'group:$segment';
+        }
+      }
+    }
+    return 'label:${item.label.trim()}';
+  }
+
+  List<_MenuItem> _applyMenuPreferences(List<_MenuItem> items) {
+    final hidden = _menuPreferences.hiddenKeys.toSet();
+
+    List<_MenuItem> applyChildren(_MenuItem parent) {
+      final children = parent.children ?? const <_MenuItem>[];
+      if (children.isEmpty) return children;
+      final parentKey = _menuKey(parent);
+      final order = _menuPreferences.childrenOrder[parentKey] ?? const <String>[];
+      final filtered = children.where((child) => !hidden.contains(_menuKey(child))).toList();
+      if (order.isEmpty) return filtered;
+
+      final byKey = <String, _MenuItem>{for (final it in filtered) _menuKey(it): it};
+      final out = <_MenuItem>[];
+      for (final key in order) {
+        final found = byKey.remove(key);
+        if (found != null) out.add(found);
+      }
+      out.addAll(byKey.values);
+      return out;
+    }
+
+    final visibleRoot = items
+        .where((item) => !hidden.contains(_menuKey(item)))
+        .map((item) => item.type == _MenuItemType.expandable
+            ? item.copyWith(children: applyChildren(item))
+            : item)
+        .toList();
+
+    final order = _menuPreferences.rootOrder;
+    if (order.isEmpty) return visibleRoot;
+    final byKey = <String, _MenuItem>{for (final it in visibleRoot) _menuKey(it): it};
+    final out = <_MenuItem>[];
+    for (final key in order) {
+      final found = byKey.remove(key);
+      if (found != null) out.add(found);
+    }
+    out.addAll(byKey.values);
+    return out;
+  }
+
   // فیلتر کردن منو بر اساس دسترسی‌ها
   List<_MenuItem> _getFilteredMenuItems(List<_MenuItem> allItems) {
     
@@ -3074,6 +3160,7 @@ class _BusinessShellState extends State<BusinessShell> {
 enum _MenuItemType { simple, expandable, separator }
 
 class _MenuItem {
+  final String? key;
   final String label;
   final IconData icon;
   final IconData selectedIcon;
@@ -3083,6 +3170,7 @@ class _MenuItem {
   final bool hasAddButton;
   
   const _MenuItem({
+    this.key,
     required this.label,
     required this.icon,
     required this.selectedIcon,
@@ -3091,4 +3179,26 @@ class _MenuItem {
     this.children,
     this.hasAddButton = false,
   });
+
+  _MenuItem copyWith({
+    String? key,
+    String? label,
+    IconData? icon,
+    IconData? selectedIcon,
+    String? path,
+    _MenuItemType? type,
+    List<_MenuItem>? children,
+    bool? hasAddButton,
+  }) {
+    return _MenuItem(
+      key: key ?? this.key,
+      label: label ?? this.label,
+      icon: icon ?? this.icon,
+      selectedIcon: selectedIcon ?? this.selectedIcon,
+      path: path ?? this.path,
+      type: type ?? this.type,
+      children: children ?? this.children,
+      hasAddButton: hasAddButton ?? this.hasAddButton,
+    );
+  }
 }

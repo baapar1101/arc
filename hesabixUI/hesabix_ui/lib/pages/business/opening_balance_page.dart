@@ -499,23 +499,62 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
     final validation = _computeValidation();
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+    final canSave = !(_loading || !canEdit || (validation['save_disabled'] == true) || isPosted);
+    final canFinalize = !(_loading || !canEdit || (validation['finalize_disabled'] == true) || isPosted);
+    final isCompactAppBar = MediaQuery.sizeOf(context).width < 760;
     return Scaffold(
       appBar: AppBar(
         title: Text(t.openingBalance),
-        actions: [
-          TextButton.icon(
-            onPressed: (_loading || !canEdit || (validation['save_disabled'] == true) || isPosted) ? null : _save,
-            icon: const Icon(Icons.save),
-            label: Text(t.save),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: (_loading || !canEdit || (validation['finalize_disabled'] == true) || isPosted) ? null : _post,
-            icon: const Icon(Icons.how_to_reg),
-            label: const Text('نهایی‌سازی'),
-          ),
-          const SizedBox(width: 12),
-        ],
+        actions: isCompactAppBar
+            ? [
+                PopupMenuButton<String>(
+                  tooltip: 'اقدامات',
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'save' && canSave) _save();
+                    if (value == 'finalize' && canFinalize) _post();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      value: 'save',
+                      enabled: canSave,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.save_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          Text(t.save),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'finalize',
+                      enabled: canFinalize,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.how_to_reg, size: 18),
+                          SizedBox(width: 8),
+                          Text('نهایی‌سازی'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+              ]
+            : [
+                TextButton.icon(
+                  onPressed: canSave ? _save : null,
+                  icon: const Icon(Icons.save),
+                  label: Text(t.save),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: canFinalize ? _post : null,
+                  icon: const Icon(Icons.how_to_reg),
+                  label: const Text('نهایی‌سازی'),
+                ),
+                const SizedBox(width: 12),
+              ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -529,7 +568,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenHeight = constraints.maxHeight;
-        final tabHeight = screenHeight * 0.5; // 50% از ارتفاع صفحه برای تب‌ها
+        final tabHeight = (screenHeight - 320).clamp(280.0, 560.0);
+        final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
         
         return SingleChildScrollView(
           child: Padding(
@@ -537,20 +577,17 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(t.openingBalance, style: Theme.of(context).textTheme.titleLarge),
-                    if ((_document?['extra_info']?['posted'] ?? false) == true)
-                      Chip(
-                        label: const Text('نهایی شده'),
-                        avatar: const Icon(Icons.check_circle, size: 18),
-                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                        labelStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                if (isPosted)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Chip(
+                      label: const Text('نهایی شده'),
+                      avatar: const Icon(Icons.check_circle, size: 18),
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                    ),
+                  ),
+                if (isPosted) const SizedBox(height: 12),
                 _buildValidationWarnings(),
                 const SizedBox(height: 8),
                 Card(
@@ -563,23 +600,37 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                         const SizedBox(height: 8),
                         Text('تاریخ سند: ${_document?['document_date'] ?? '-'}'),
                         const SizedBox(height: 8),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            Expanded(child: Text('جمع بدهکار: ${totals['debit']?.toStringAsFixed(2) ?? '0'}')),
-                            Expanded(child: Text('جمع بستانکار: ${totals['credit']?.toStringAsFixed(2) ?? '0'}')),
-                            Expanded(child: Text('اختلاف: ${(totals['diff'] as double).toStringAsFixed(2)}')),
+                            Chip(
+                              label: Text('جمع بدهکار: ${formatNumberForInput(totals['debit'], decimalPlaces: 0)}'),
+                              avatar: const Icon(Icons.call_received_outlined, size: 18),
+                            ),
+                            Chip(
+                              label: Text('جمع بستانکار: ${formatNumberForInput(totals['credit'], decimalPlaces: 0)}'),
+                              avatar: const Icon(Icons.call_made_outlined, size: 18),
+                            ),
+                            Chip(
+                              label: Text('اختلاف: ${formatNumberForInput(totals['diff'], decimalPlaces: 0)}'),
+                              avatar: const Icon(Icons.balance_outlined, size: 18),
+                              backgroundColor: ((totals['diff'] ?? 0).abs() > 0.01)
+                                  ? Theme.of(context).colorScheme.errorContainer
+                                  : null,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Switch(value: _autoBalance, onChanged: (v) => setState(() => _autoBalance = v)),
-                            const SizedBox(width: 8),
-                            const Text('بستن خودکار اختلاف به حقوق صاحبان سهام'),
-                          ],
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          value: _autoBalance,
+                          onChanged: isPosted ? null : (v) => setState(() => _autoBalance = v),
+                          title: const Text('بستن خودکار اختلاف به حقوق صاحبان سهام'),
                         ),
                         const SizedBox(height: 8),
-                        _buildQuickSelectors(),
+                        _buildQuickSelectors(isPosted: isPosted),
                       ],
                     ),
                   ),
@@ -636,16 +687,23 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Widget _buildBankCashPettyTab() {
+    final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+    final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
+    final allowEdit = canEdit && !isPosted;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
+            SizedBox(
+              width: 320,
               child: BankAccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccountId: null,
-                onChanged: (opt) {
+                onChanged: allowEdit ? (opt) {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('bank', opt.id)) {
                     if (mounted) {
@@ -661,25 +719,25 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   final bankId = int.tryParse(opt.id);
                   if (bankId == null) return;
                   _bankCashPettyLines.add({
-                    'type': 'bank', 
-                    'refId': bankId, 
+                    'type': 'bank',
+                    'refId': bankId,
                     'name': opt.name ?? 'نامشخص',
                     'debit': 0.0,
                     'credit': 0.0,
                   });
                   setState(() {});
-                },
+                } : null,
                 label: 'افزودن بانک',
                 hintText: 'انتخاب و افزودن بانک',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
+            SizedBox(
+              width: 320,
               child: CashRegisterComboboxWidget(
                 businessId: widget.businessId,
                 selectedRegisterId: null,
-                onChanged: (opt) {
+                onChanged: allowEdit ? (opt) {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('cash', opt.id)) {
                     if (mounted) {
@@ -695,25 +753,25 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   final cashId = int.tryParse(opt.id);
                   if (cashId == null) return;
                   _bankCashPettyLines.add({
-                    'type': 'cash', 
-                    'refId': cashId, 
+                    'type': 'cash',
+                    'refId': cashId,
                     'name': opt.name ?? 'نامشخص',
                     'debit': 0.0,
                     'credit': 0.0,
                   });
                   setState(() {});
-                },
+                } : null,
                 label: 'افزودن صندوق',
                 hintText: 'انتخاب و افزودن صندوق',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
+            SizedBox(
+              width: 320,
               child: PettyCashComboboxWidget(
                 businessId: widget.businessId,
                 selectedPettyCashId: null,
-                onChanged: (opt) {
+                onChanged: allowEdit ? (opt) {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('petty', opt.id)) {
                     if (mounted) {
@@ -729,14 +787,14 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   final pettyId = int.tryParse(opt.id);
                   if (pettyId == null) return;
                   _bankCashPettyLines.add({
-                    'type': 'petty', 
-                    'refId': pettyId, 
+                    'type': 'petty',
+                    'refId': pettyId,
                     'name': opt.name ?? 'نامشخص',
                     'debit': 0.0,
                     'credit': 0.0,
                   });
                   setState(() {});
-                },
+                } : null,
                 label: 'افزودن تنخواه',
                 hintText: 'انتخاب و افزودن تنخواه',
                 filterCurrencyId: widget.authStore.selectedCurrencyId,
@@ -769,9 +827,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -784,14 +844,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                   ],
                 ),
-                trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _bankCashPettyLines.removeAt(index); setState(() {}); }),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: allowEdit ? () { _bankCashPettyLines.removeAt(index); setState(() {}); } : null,
+                ),
               );
                   },
                 ),
@@ -806,13 +871,17 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Widget _buildPersonsTab() {
+    final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+    final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
+    final allowEdit = canEdit && !isPosted;
+
     return Column(
       children: [
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
             child: PersonComboboxWidget(
             businessId: widget.businessId,
-            onChanged: (p) {
+            onChanged: allowEdit ? (p) {
               if (p == null) return;
               if (_isPersonDuplicate(p.id)) {
                 if (mounted) {
@@ -832,7 +901,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 'credit': 0.0
               });
               setState(() {});
-            },
+            } : null,
             label: 'افزودن شخص',
             searchHint: 'نام/کد/تلفن...',
           ),
@@ -861,9 +930,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -876,14 +947,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                   ],
                 ),
-                trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _personLines.removeAt(index); setState(() {}); }),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: allowEdit ? () { _personLines.removeAt(index); setState(() {}); } : null,
+                ),
               );
                   },
                 ),
@@ -908,13 +984,15 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
 
     return Column(
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
-              flex: 2,
+            SizedBox(
+              width: 420,
               child: ProductComboboxWidget(
                 businessId: widget.businessId,
-                onChanged: (p) {
+                onChanged: allowEditInventory ? (p) {
                   if (p == null) return;
                   final productId = p['id'] as int?;
                   if (productId == null) return;
@@ -932,20 +1010,20 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   }
                   _inventoryLines.add({'product': p, 'warehouseId': null, 'quantity': 0.0, 'cost_price': 0.0});
                   setState(() {});
-                },
+                } : null,
                 label: 'افزودن کالا',
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
+            SizedBox(
+              width: 320,
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
-                onChanged: (acc) {
+                onChanged: allowEditInventory ? (acc) {
                   _inventoryAccount = acc;
                   _inventoryAccountId = acc?.id;
                   setState(() {});
-                },
+                } : null,
                 label: 'حساب موجودی',
                 hintText: 'انتخاب حساب موجودی کالا',
                 isRequired: false,
@@ -1041,15 +1119,22 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Widget _buildOtherAccountsTab() {
+    final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+    final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
+    final allowEdit = canEdit && !isPosted;
+
     return Column(
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
+            SizedBox(
+              width: 320,
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: null,
-                onChanged: (acc) {
+                onChanged: allowEdit ? (acc) {
                   if (acc != null) {
                     if (_isAccountDuplicate(acc.id)) {
                       if (mounted) {
@@ -1065,21 +1150,21 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     _otherAccountLines.add({'account': acc, 'debit': 0.0, 'credit': 0.0});
                     setState(() {});
                   }
-                },
+                } : null,
                 label: 'افزودن حساب',
                 hintText: 'جستجو و انتخاب حساب',
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
+            SizedBox(
+              width: 320,
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
-                onChanged: (acc) {
+                onChanged: allowEdit ? (acc) {
                   _equityAccount = acc;
                   _equityAccountId = acc?.id;
                   setState(() {});
-                },
+                } : null,
                 label: 'حساب حقوق صاحبان سهام',
                 hintText: 'انتخاب حساب سرمایه/سنواتی',
               ),
@@ -1090,8 +1175,9 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         Expanded(
           child: _otherAccountLines.isEmpty
               ? const Center(child: Text('هیچ موردی اضافه نشده است'))
-              : ListView.builder(
+              : ListView.separated(
                   itemCount: _otherAccountLines.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
               final m = _otherAccountLines[index];
               return ListTile(
@@ -1108,9 +1194,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1123,14 +1211,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                           NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
+                          if (!allowEdit) return;
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
+                        enabled: allowEdit,
                       ),
                     ),
                   ],
                 ),
-                trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _otherAccountLines.removeAt(index); setState(() {}); }),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: allowEdit ? () { _otherAccountLines.removeAt(index); setState(() {}); } : null,
+                ),
               );
             },
           ),
@@ -1192,9 +1285,9 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     final diff = (totals['diff'] ?? 0.0);
     if (diff.abs() > 0.01) {
       if (!_autoBalance) {
-        msgs.add(_warn('سند متوازن نیست. اختلاف ${diff.toStringAsFixed(2)}. برای نهایی‌سازی، تراز را برابر کنید یا Auto-balance را روشن کنید.'));
+        msgs.add(_warn('سند متوازن نیست. اختلاف ${diff.toStringAsFixed(2)}. برای نهایی‌سازی، تراز را برابر کنید یا «تراز خودکار» را روشن کنید.'));
       } else if (_autoBalance && _equityAccountId == null) {
-        msgs.add(_warn('Auto-balance فعال است اما «حساب حقوق صاحبان سهام» انتخاب نشده است.'));
+        msgs.add(_warn('تراز خودکار فعال است اما «حساب حقوق صاحبان سهام» انتخاب نشده است.'));
       }
     }
     if (msgs.isEmpty) return const SizedBox.shrink();
@@ -1225,7 +1318,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
 
   // Deprecated helpers removed
 
-  Widget _buildQuickSelectors() {
+  Widget _buildQuickSelectors({required bool isPosted}) {
     final textStyle = Theme.of(context).textTheme.bodyMedium;
     final hasDefaults = _inventoryAccountId != null || 
                         _equityAccountId != null || 
@@ -1281,7 +1374,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _inventoryAccount = acc;
                     _inventoryAccountId = acc?.id;
@@ -1297,7 +1390,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _equityAccount = acc;
                     _equityAccountId = acc?.id;
@@ -1317,7 +1410,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _bankControlAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _bankControlAccount = acc;
                     _bankControlAccountId = acc?.id;
@@ -1333,7 +1426,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _cashControlAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _cashControlAccount = acc;
                     _cashControlAccountId = acc?.id;
@@ -1353,7 +1446,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _pettyControlAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _pettyControlAccount = acc;
                     _pettyControlAccountId = acc?.id;
@@ -1369,7 +1462,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personReceivableAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _personReceivableAccount = acc;
                     _personReceivableAccountId = acc?.id;
@@ -1389,7 +1482,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personPayableAccount,
-                onChanged: (acc) {
+                onChanged: isPosted ? null : (acc) {
                   setState(() {
                     _personPayableAccount = acc;
                     _personPayableAccountId = acc?.id;

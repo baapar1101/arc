@@ -3,6 +3,7 @@ from adapters.db.session import Base  # re-export Base for Alembic
 # Import models to register with SQLAlchemy metadata
 from .user import User  # noqa: F401
 from .user_ui_preferences import UserUiPreferences  # noqa: F401
+from .business_user_menu_preferences import BusinessUserMenuPreference  # noqa: F401
 from .api_key import ApiKey  # noqa: F401
 from .captcha import Captcha  # noqa: F401
 from .auth_security_event import AuthSecurityEvent  # noqa: F401

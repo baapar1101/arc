@@ -68,6 +68,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final Set<int> _invoiceLineAttrsNoCacheLogged = {};
   final Set<int> _invoiceLineAttrsLoggedUniquePid = {};
   final Set<int> _invoiceLineAttrsLoggedNoAttrPid = {};
+  int? _preferredAddRowCount;
   /// فوکوس به‌ازای [InvoiceLineItem.lineKey]؛ با جابه‌جایی ردیف نیازی به بازچین‌شدن نیست
   final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
 
@@ -392,25 +393,91 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return num.tryParse(value.toString()) ?? fallback;
   }
 
-  void _addRow() {
-    InvoiceLinePreferences.getDefaultDiscountType().then((discountType) {
-      if (!mounted) return;
-      setState(() {
+  int _defaultAddRowCountForDevice(BuildContext context) {
+    return ResponsiveHelper.isMobile(context) ? 1 : 3;
+  }
+
+  int _currentAddRowCount(BuildContext context) {
+    return _preferredAddRowCount ?? _defaultAddRowCountForDevice(context);
+  }
+
+  Future<void> _addRows([int count = 1]) async {
+    final safeCount = count < 1 ? 1 : count;
+    final discountType = await InvoiceLinePreferences.getDefaultDiscountType();
+    if (!mounted) return;
+    late final InvoiceLineItem firstLine;
+    setState(() {
+      for (int i = 0; i < safeCount; i++) {
         final newLine = InvoiceLineItem(
           taxRate: _getDefaultTaxRateForInvoiceType(),
           discountType: discountType,
         );
+        if (i == 0) {
+          firstLine = newLine;
+        }
         _rows.add(newLine);
         _ensureFocusNodesForLine(newLine.lineKey);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final nodes = _focusNodesByLineKey[newLine.lineKey];
-          if (nodes != null && mounted) {
-            nodes['product']?.requestFocus();
-          }
-        });
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final nodes = _focusNodesByLineKey[firstLine.lineKey];
+        if (nodes != null && mounted) {
+          nodes['product']?.requestFocus();
+        }
       });
-      _notify();
     });
+    _notify();
+  }
+
+  Future<void> _addRowsByPreferredCount() async {
+    await _addRows(_currentAddRowCount(context));
+  }
+
+  Widget _buildAddRowsButton(BuildContext context, {required bool compact}) {
+    final t = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final options = <int>[1, 2, 5, 10];
+    final addCount = _currentAddRowCount(context);
+
+    final addLabel = compact ? t.add : '${t.add} ($addCount)';
+    final baseStyle = compact
+        ? ElevatedButton.styleFrom(
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
+            elevation: 4,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          )
+        : null;
+
+    return ElevatedButton.icon(
+      onPressed: _addRowsByPreferredCount,
+      icon: const Icon(Icons.add),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(addLabel),
+          PopupMenuButton<int>(
+            tooltip: 'انتخاب تعداد ردیف',
+            icon: const Icon(Icons.arrow_drop_down),
+            onSelected: (value) {
+              setState(() {
+                _preferredAddRowCount = value;
+              });
+              _addRows(value);
+            },
+            itemBuilder: (menuContext) => options
+                .map(
+                  (value) => PopupMenuItem<int>(
+                    value: value,
+                    child: Text('افزودن $value ردیف'),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+      style: baseStyle,
+    );
   }
 
   void _removeRow(int index) {
@@ -801,14 +868,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             right: 0,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: FloatingActionButton.extended(
-                onPressed: _addRow,
-                icon: const Icon(Icons.add),
-                label: Text(t.add),
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                elevation: 4,
-              ),
+              child: _buildAddRowsButton(context, compact: true),
             ),
           )
         else
@@ -818,11 +878,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             right: 0,
             child: Padding(
               padding: const EdgeInsets.only(top: 0, right: 0),
-              child: ElevatedButton.icon(
-                onPressed: _addRow,
-                icon: const Icon(Icons.add),
-                label: Text(t.add),
-              ),
+              child: _buildAddRowsButton(context, compact: false),
             ),
           ),
       ],

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/business_panel_ui_store.dart';
+import '../../core/api_client.dart';
+import '../../models/business_dashboard_models.dart';
+import '../../services/business_dashboard_service.dart';
+import '../../services/business_menu_preferences_service.dart';
 
 class AppearanceSettingsPage extends StatefulWidget {
   const AppearanceSettingsPage({super.key});
@@ -17,6 +21,33 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   BusinessPanelSidebarTabBehavior _draftSidebarTabBehavior =
       BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
   bool _saving = false;
+  final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
+  final BusinessMenuPreferencesService _menuPreferencesService =
+      BusinessMenuPreferencesService(ApiClient());
+  List<BusinessWithPermission> _businesses = const [];
+  int? _selectedBusinessId;
+  List<String> _rootOrder = const [];
+  Set<String> _hiddenKeys = <String>{};
+  bool _menuPrefsLoading = false;
+
+  static const List<_MenuEditorItem> _menuCatalog = <_MenuEditorItem>[
+    _MenuEditorItem(key: 'dashboard', labelFa: 'داشبورد'),
+    _MenuEditorItem(key: 'persons', labelFa: 'اشخاص'),
+    _MenuEditorItem(key: 'group:products', labelFa: 'کالاها و خدمات'),
+    _MenuEditorItem(key: 'group:bank-accounts', labelFa: 'بانکداری'),
+    _MenuEditorItem(key: 'group:chart-of-accounts', labelFa: 'حسابداری'),
+    _MenuEditorItem(key: 'group:warehouses', labelFa: 'مدیریت انبار'),
+    _MenuEditorItem(key: 'group:ai', labelFa: 'هوش مصنوعی'),
+    _MenuEditorItem(key: 'group:crm', labelFa: 'CRM'),
+    _MenuEditorItem(key: 'warranty', labelFa: 'گارانتی'),
+    _MenuEditorItem(key: 'repair-shop', labelFa: 'تعمیرگاه'),
+    _MenuEditorItem(key: 'customer-club', labelFa: 'باشگاه مشتریان'),
+    _MenuEditorItem(key: 'distribution', labelFa: 'پخش مویرگی'),
+    _MenuEditorItem(key: 'zohal/inquiries', labelFa: 'استعلامات'),
+    _MenuEditorItem(key: 'settings', labelFa: 'تنظیمات'),
+    _MenuEditorItem(key: 'report-templates', labelFa: 'قالب‌ها'),
+    _MenuEditorItem(key: 'plugin-marketplace', labelFa: 'بازار افزونه‌ها'),
+  ];
 
   @override
   void initState() {
@@ -31,6 +62,10 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     });
     try {
       await BusinessPanelUiStore.instance.hydrateIfNeeded();
+      final auth = ApiClient.getAuthStore();
+      _businesses = await _businessService.getUserBusinesses();
+      _selectedBusinessId = auth?.currentBusiness?.id ?? (_businesses.isNotEmpty ? _businesses.first.id : null);
+      await _loadMenuPrefsForSelectedBusiness();
       if (!mounted) return;
       final store = BusinessPanelUiStore.instance;
       setState(() {
@@ -47,6 +82,30 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     }
   }
 
+  Future<void> _loadMenuPrefsForSelectedBusiness() async {
+    final bid = _selectedBusinessId;
+    if (bid == null) return;
+    _menuPrefsLoading = true;
+    try {
+      final prefs = await _menuPreferencesService.getPreferences(bid);
+      final defaultOrder = _menuCatalog.map((e) => e.key).toList();
+      final ordered = <String>[];
+      for (final key in prefs.rootOrder) {
+        if (defaultOrder.contains(key) && !ordered.contains(key)) ordered.add(key);
+      }
+      for (final key in defaultOrder) {
+        if (!ordered.contains(key)) ordered.add(key);
+      }
+      _rootOrder = ordered;
+      _hiddenKeys = prefs.hiddenKeys.toSet();
+    } catch (_) {
+      _rootOrder = _menuCatalog.map((e) => e.key).toList();
+      _hiddenKeys = <String>{};
+    } finally {
+      _menuPrefsLoading = false;
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -54,6 +113,17 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
         navigationMode: _draft,
         sidebarTabBehavior: _draftSidebarTabBehavior,
       );
+      final bid = _selectedBusinessId;
+      if (bid != null) {
+        await _menuPreferencesService.putPreferences(
+          bid,
+          BusinessMenuPreferencesDto(
+            rootOrder: _rootOrder,
+            hiddenKeys: _hiddenKeys.toList(),
+            childrenOrder: const {},
+          ),
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).appearanceSaved)),
@@ -166,6 +236,102 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('چیدمان منوی پنل کسب‌وکار', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      value: _selectedBusinessId,
+                      decoration: const InputDecoration(
+                        labelText: 'کسب‌وکار',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: _businesses
+                          .map(
+                            (b) => DropdownMenuItem<int>(
+                              value: b.id,
+                              child: Text(b.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) async {
+                              if (v == null) return;
+                              setState(() => _selectedBusinessId = v);
+                              await _loadMenuPrefsForSelectedBusiness();
+                              if (mounted) setState(() {});
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    if (_menuPrefsLoading)
+                      const LinearProgressIndicator()
+                    else
+                      SizedBox(
+                        height: 360,
+                        child: ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
+                          itemCount: _rootOrder.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex--;
+                              final item = _rootOrder.removeAt(oldIndex);
+                              _rootOrder.insert(newIndex, item);
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            final key = _rootOrder[index];
+                            final item = _menuCatalog.firstWhere(
+                              (e) => e.key == key,
+                              orElse: () => _MenuEditorItem(key: key, labelFa: key),
+                            );
+                            final hidden = _hiddenKeys.contains(key);
+                            return ListTile(
+                              key: ValueKey('menu_pref_$key'),
+                              leading: ReorderableDragStartListener(
+                                index: index,
+                                child: const Icon(Icons.drag_indicator),
+                              ),
+                              title: Text(item.labelFa),
+                              subtitle: Text(
+                                hidden ? 'مخفی' : 'نمایش',
+                                style: TextStyle(
+                                  color: hidden ? theme.colorScheme.error : theme.colorScheme.primary,
+                                ),
+                              ),
+                              trailing: Switch(
+                                value: !hidden,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) {
+                                        setState(() {
+                                          if (v) {
+                                            _hiddenKeys.remove(key);
+                                          } else {
+                                            _hiddenKeys.add(key);
+                                          }
+                                        });
+                                      },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'برای تغییر ترتیب، آیتم‌ها را بکشید. تغییرات برای کاربر و کسب‌وکار انتخاب‌شده ذخیره می‌شود.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -183,4 +349,14 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       ),
     );
   }
+}
+
+class _MenuEditorItem {
+  final String key;
+  final String labelFa;
+
+  const _MenuEditorItem({
+    required this.key,
+    required this.labelFa,
+  });
 }

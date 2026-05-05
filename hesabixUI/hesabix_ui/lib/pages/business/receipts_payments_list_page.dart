@@ -1289,7 +1289,8 @@ class BulkSettlementDialog extends StatefulWidget {
   State<BulkSettlementDialog> createState() => _BulkSettlementDialogState();
 }
 
-class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
+class _BulkSettlementDialogState extends State<BulkSettlementDialog>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   late DateTime _docDate;
@@ -1301,12 +1302,14 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
   List<Map<String, dynamic>>? _businessCurrenciesCache;
   String _documentCurrencyUnitLabel = 'ریال';
+  late final TabController _mobileTabController;
   // استراتژی پیش‌فرض انتخاب قسط جاری برای این کسب‌وکار
   late String _defaultInstallmentSelectionStrategy; // 'first_remaining' | 'nearest_due' | 'prefer_partial'
 
   @override
   void initState() {
     super.initState();
+    _mobileTabController = TabController(length: 2, vsync: this);
     // بارگذاری استراتژی پیش‌فرض از localStorage
     final key = 'installment_strategy_${widget.businessId}';
     final storedStrategy = web_utils.getLocalStorageValue(key);
@@ -1463,6 +1466,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
 
   @override
   void dispose() {
+    _mobileTabController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -1624,6 +1628,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         child: Scaffold(
           appBar: AppBar(
             title: Text(t.receiptsAndPayments),
+            toolbarHeight: 48,
             leading: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => Navigator.pop(context),
@@ -1631,124 +1636,152 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           ),
           body: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(padding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (widget.initialDocument == null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: SegmentedButton<bool>(
-                              segments: [
-                                ButtonSegment<bool>(value: true, label: Text(t.receipts)),
-                                ButtonSegment<bool>(value: false, label: Text(t.payments)),
-                              ],
-                              selected: {_isReceipt},
-                              onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+            child: Theme(
+              data: Theme.of(context).copyWith(visualDensity: VisualDensity.compact),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.all(padding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (widget.initialDocument == null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: SegmentedButton<bool>(
+                                segments: [
+                                  ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                                  ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                                ],
+                                selected: {_isReceipt},
+                                onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                              ),
                             ),
+                          DateInputField(
+                            value: _docDate,
+                            calendarController: widget.calendarController,
+                            isDense: true,
+                            onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                            labelText: 'تاریخ سند',
+                            hintText: 'انتخاب تاریخ',
                           ),
-                        DateInputField(
-                          value: _docDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                          labelText: 'تاریخ سند',
-                          hintText: 'انتخاب تاریخ',
-                        ),
-                        const SizedBox(height: 12),
-                        CurrencyPickerWidget(
-                          businessId: widget.businessId,
-                          selectedCurrencyId: _selectedCurrencyId,
-                          onChanged: (currencyId) => setState(() {
-                            _selectedCurrencyId = currencyId;
-                            _syncDocumentCurrencyUnitLabel();
-                          }),
-                          label: 'ارز',
-                          hintText: 'انتخاب ارز',
-                        ),
-                        const SizedBox(height: 12),
-                        ProjectSelectorWidget(
-                          businessId: widget.businessId,
-                          apiClient: widget.apiClient,
-                          selectedProjectId: _selectedProjectId,
-                          onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
-                          allowNull: true,
-                          labelText: 'پروژه',
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _descriptionController,
-                          decoration: const InputDecoration(
-                            labelText: 'توضیحات کلی سند',
-                            hintText: 'توضیحات اختیاری...',
-                            border: OutlineInputBorder(),
+                          const SizedBox(height: 8),
+                          CurrencyPickerWidget(
+                            businessId: widget.businessId,
+                            selectedCurrencyId: _selectedCurrencyId,
+                            isDense: true,
+                            onChanged: (currencyId) => setState(() {
+                              _selectedCurrencyId = currencyId;
+                              _syncDocumentCurrencyUnitLabel();
+                            }),
+                            label: 'ارز',
+                            hintText: 'انتخاب ارز',
                           ),
-                          maxLines: 2,
-                        ),
-                        const Divider(height: 32),
-                        _PersonsPanel(
-                          businessId: widget.businessId,
-                          lines: _personLines,
-                          onChanged: (ls) {
-                            debugPrint('⚫ [BulkSettlementDialog] onChanged - old lines count: ${_personLines.length}, new lines count: ${ls.length}');
-                            for (int i = 0; i < ls.length && i < _personLines.length; i++) {
-                              if (_personLines[i].amount != ls[i].amount) {
-                                debugPrint('⚫ [BulkSettlementDialog] line $i amount changed: ${_personLines[i].amount} -> ${ls[i].amount}');
-                              }
-                            }
-                            setState(() {
-                              _personLines.clear();
-                              _personLines.addAll(ls);
-                            });
-                            debugPrint('⚫ [BulkSettlementDialog] after setState - _personLines[0].amount: ${_personLines.isNotEmpty ? _personLines[0].amount : "N/A"}');
-                          },
-                          calendarController: widget.calendarController,
-                          apiClient: widget.apiClient,
-                          selectedCurrencyId: _selectedCurrencyId,
-                          currencyUnitLabel: _documentCurrencyUnitLabel,
-                          isReceipt: _isReceipt,
-                        ),
-                        const SizedBox(height: 16),
-                        Card(
-                          elevation: 0,
-                          clipBehavior: Clip.antiAlias,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  t.accounts,
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                InvoiceTransactionsWidget(
-                                  transactions: _centerTransactions,
-                                  onChanged: (txs) => setState(() {
-                                    _centerTransactions.clear();
-                                    _centerTransactions.addAll(txs);
-                                  }),
-                                  businessId: widget.businessId,
-                                  calendarController: widget.calendarController,
-                                  invoiceType: InvoiceType.sales,
-                                  selectedCurrencyId: _selectedCurrencyId,
-                                  checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
-                                  authStore: widget.authStore,
-                                  shrinkWrapBody: true,
-                                ),
-                              ],
+                          const SizedBox(height: 8),
+                          ProjectSelectorWidget(
+                            businessId: widget.businessId,
+                            apiClient: widget.apiClient,
+                            selectedProjectId: _selectedProjectId,
+                            isDense: true,
+                            onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                            allowNull: true,
+                            labelText: 'پروژه',
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _descriptionController,
+                            decoration: const InputDecoration(
+                              labelText: 'توضیحات کلی سند',
+                              hintText: 'توضیحات اختیاری...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
                             ),
+                            maxLines: 2,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                  const Divider(height: 1),
+                  TabBar(
+                    controller: _mobileTabController,
+                    onTap: (_) => setState(() {}),
+                    tabs: [
+                      Tab(text: t.people),
+                      Tab(text: t.accounts),
+                    ],
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 200),
+                    alignment: Alignment.topCenter,
+                    child: _mobileTabController.index == 0
+                        ? Padding(
+                            padding: EdgeInsets.fromLTRB(padding, padding * 0.55, padding, padding * 0.45),
+                            child: _PersonsPanel(
+                              businessId: widget.businessId,
+                              lines: _personLines,
+                              onChanged: (ls) {
+                                setState(() {
+                                  _personLines.clear();
+                                  _personLines.addAll(ls);
+                                });
+                              },
+                              calendarController: widget.calendarController,
+                              apiClient: widget.apiClient,
+                              selectedCurrencyId: _selectedCurrencyId,
+                              currencyUnitLabel: _documentCurrencyUnitLabel,
+                              isReceipt: _isReceipt,
+                            ),
+                          )
+                        : Padding(
+                            padding: EdgeInsets.fromLTRB(padding, padding * 0.65, padding, padding * 0.65),
+                            child: Card(
+                              elevation: 0,
+                              surfaceTintColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                side: BorderSide(
+                                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.65),
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      t.accounts,
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    InvoiceTransactionsWidget(
+                                      transactions: _centerTransactions,
+                                      onChanged: (txs) => setState(() {
+                                        _centerTransactions.clear();
+                                        _centerTransactions.addAll(txs);
+                                      }),
+                                      businessId: widget.businessId,
+                                      calendarController: widget.calendarController,
+                                      invoiceType: InvoiceType.sales,
+                                      selectedCurrencyId: _selectedCurrencyId,
+                                      checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
+                                      authStore: widget.authStore,
+                                      shrinkWrapBody: true,
+                                      compactMode: true,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
                 const Divider(height: 1),
                 // فوتر موبایل
                 Padding(
@@ -1813,20 +1846,21 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
     final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
-      insetPadding: ResponsiveHelper.getDialogPadding(context),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 1400,
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
+      insetPadding: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      child: SafeArea(
+        child: Theme(
+          data: Theme.of(context).copyWith(visualDensity: VisualDensity.compact),
+          child: SizedBox.expand(
+            child: Form(
+              key: _formKey,
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // هدر دسکتاپ
               Padding(
-                padding: EdgeInsets.fromLTRB(padding, padding, padding, padding / 2),
+                padding: EdgeInsets.fromLTRB(padding, padding * 0.55, padding, padding * 0.35),
                 child: Row(
                   children: [
                     Expanded(
@@ -1844,23 +1878,25 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                         selected: {_isReceipt},
                         onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
                       ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     SizedBox(
-                      width: 200,
+                      width: 188,
                       child: DateInputField(
                         value: _docDate,
                         calendarController: widget.calendarController,
+                        isDense: true,
                         onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
                         labelText: 'تاریخ سند',
                         hintText: 'انتخاب تاریخ',
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     SizedBox(
-                      width: 200,
+                      width: 188,
                       child: CurrencyPickerWidget(
                         businessId: widget.businessId,
                         selectedCurrencyId: _selectedCurrencyId,
+                        isDense: true,
                         onChanged: (currencyId) => setState(() {
                           _selectedCurrencyId = currencyId;
                           _syncDocumentCurrencyUnitLabel();
@@ -1869,13 +1905,14 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                         hintText: 'انتخاب ارز',
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     SizedBox(
-                      width: 200,
+                      width: 188,
                       child: ProjectSelectorWidget(
                         businessId: widget.businessId,
                         apiClient: widget.apiClient,
                         selectedProjectId: _selectedProjectId,
+                        isDense: true,
                         onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
                         allowNull: true,
                         labelText: 'پروژه',
@@ -1885,13 +1922,14 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(padding, 0, padding, padding / 2),
+                padding: EdgeInsets.fromLTRB(padding, 0, padding, padding * 0.45),
                 child: TextField(
                   controller: _descriptionController,
                   decoration: const InputDecoration(
                     labelText: 'توضیحات کلی سند',
                     hintText: 'توضیحات اختیاری...',
                     border: OutlineInputBorder(),
+                    isDense: true,
                   ),
                   maxLines: 2,
                 ),
@@ -1928,19 +1966,48 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                     const VerticalDivider(width: 1),
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.all(padding),
-                        child: InvoiceTransactionsWidget(
-                          transactions: _centerTransactions,
-                          onChanged: (txs) => setState(() {
-                            _centerTransactions.clear();
-                            _centerTransactions.addAll(txs);
-                          }),
-                          businessId: widget.businessId,
-                          calendarController: widget.calendarController,
-                          invoiceType: InvoiceType.sales,
-                          selectedCurrencyId: _selectedCurrencyId,
-                          checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
-                          authStore: widget.authStore,
+                        padding: EdgeInsets.fromLTRB(padding, padding * 0.65, padding, padding * 0.65),
+                        child: Card(
+                          elevation: 0,
+                          surfaceTintColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.65),
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  t.accounts,
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Expanded(
+                                  child: InvoiceTransactionsWidget(
+                                    transactions: _centerTransactions,
+                                    onChanged: (txs) => setState(() {
+                                      _centerTransactions.clear();
+                                      _centerTransactions.addAll(txs);
+                                    }),
+                                    businessId: widget.businessId,
+                                    calendarController: widget.calendarController,
+                                    invoiceType: InvoiceType.sales,
+                                    selectedCurrencyId: _selectedCurrencyId,
+                                    checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
+                                    authStore: widget.authStore,
+                                    compactMode: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1950,7 +2017,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
               const Divider(height: 1),
               // فوتر دسکتاپ
               Padding(
-                padding: EdgeInsets.fromLTRB(padding, padding / 2, padding, padding),
+                padding: EdgeInsets.fromLTRB(padding, padding * 0.5, padding, padding * 0.55),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -2670,9 +2737,10 @@ class _PersonsPanelState extends State<_PersonsPanel> {
     final t = AppLocalizations.of(context);
     final padding = ResponsiveHelper.getPadding(context);
     final spacing = ResponsiveHelper.getGridSpacing(context);
+    final lineGap = spacing * 0.65;
 
     return Padding(
-      padding: EdgeInsets.all(padding),
+      padding: EdgeInsets.fromLTRB(padding, padding * 0.65, padding, padding * 0.65),
       child: LayoutBuilder(
         builder: (context, constraints) {
           // داخل SingleChildScrollView ارتفاع نامحدود است؛ Expanded اینجا ارتفاع صفر می‌دهد.
@@ -2684,7 +2752,7 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                   shrinkWrap: !hasBoundedHeight,
                   physics: hasBoundedHeight ? null : const NeverScrollableScrollPhysics(),
                   itemCount: widget.lines.length,
-                  separatorBuilder: (_, _) => SizedBox(height: spacing),
+                  separatorBuilder: (_, _) => SizedBox(height: lineGap),
                   itemBuilder: (ctx, i) {
                     final line = widget.lines[i];
                     return _PersonLineTile(
@@ -2724,6 +2792,9 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                     ),
                   ),
                   IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       final newLines = List<_PersonLine>.from(widget.lines);
                       newLines.add(_PersonLine.empty());
@@ -2734,7 +2805,7 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                   ),
                 ],
               ),
-              SizedBox(height: spacing),
+              SizedBox(height: lineGap),
               if (hasBoundedHeight) Expanded(child: listContent) else listContent,
             ],
           );
@@ -3302,9 +3373,22 @@ class _PersonLineTileState extends State<_PersonLineTile> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final padding = ResponsiveHelper.getPadding(context);
+    final tilePad = padding * 0.45;
     return Card(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.65),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(tilePad),
         child: Column(
           children: [
             Row(
@@ -3342,12 +3426,13 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                     },
                     label: t.people,
                     hintText: t.search,
+                    dense: true,
                     isRequired: true,
                   ),
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 180,
+                  width: isMobile ? 150 : 170,
                   child: AmountFieldWordsTooltip(
                     controller: _amountController,
                     currencyUnit: widget.currencyUnit,
@@ -3356,6 +3441,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                       decoration: InputDecoration(
                         labelText: t.amount,
                         hintText: '1,000,000',
+                        isDense: true,
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
@@ -3381,6 +3467,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  padding: EdgeInsets.zero,
+                  iconSize: 20,
                   onPressed: widget.onDelete,
                   icon: const Icon(Icons.delete_outline),
                 ),
@@ -3392,6 +3482,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               focusNode: _descFocusNode,
               decoration: InputDecoration(
                 labelText: t.description,
+                isDense: true,
               ),
               // IMPORTANT: اینجا trim نکن تا هر keypress باعث sync مجدد controller و reset شدن کرسر نشود.
               // trim را موقع ذخیره‌سازی/ارسال به API انجام می‌دهیم.
@@ -3400,6 +3491,9 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             const SizedBox(height: 8),
             // سوئیچ لینک به فاکتور (فقط برای اسناد غیراقساطی)
             SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
               title: const Text('لینک به فاکتور'),
               subtitle: Text(widget.isReceipt 
                   ? 'این دریافت را به فاکتور فروش مرتبط کن (قابل استفاده نیست اگر اقساط فعال باشد)'
@@ -3436,6 +3530,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   labelText: 'فاکتور',
                   hintText: _loadingInvoices ? 'در حال بارگذاری...' : 'انتخاب فاکتور',
                   border: const OutlineInputBorder(),
+                  isDense: true,
                 ),
                 items: _loadingInvoices
                     ? [
@@ -3615,7 +3710,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         isDense: true,
                         labelText: 'روش انتخاب قسط جاری',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                       isExpanded: true,
                       items: const [
@@ -3632,6 +3727,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   Tooltip(
                     message: 'تنظیم استراتژی پیش‌فرض اقساط برای این کسب‌وکار',
                     child: IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: () async {
                         final ancestor = context.findAncestorStateOfType<_BulkSettlementDialogState>();
                         if (ancestor == null) return;
@@ -3652,6 +3748,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                                         isDense: true,
                                         labelText: 'استراتژی پیش‌فرض',
                                         border: OutlineInputBorder(),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                       ),
                                       items: const [
                                         DropdownMenuItem(value: 'first_remaining', child: Text('اولین قسط با مانده')),

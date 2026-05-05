@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
@@ -8,10 +9,32 @@ export 'notifications_ws_client_stub.dart';
 
 class WebNotificationsWsClient implements NotificationsWsClient {
   web.WebSocket? _ws;
+  String? _apiKey;
+  void Function(Map<String, dynamic>)? _onMessage;
+  Timer? _reconnectTimer;
+  bool _manualDisconnect = false;
+
+  void _scheduleReconnect() {
+    if (_manualDisconnect) return;
+    if (_reconnectTimer?.isActive == true) return;
+    _reconnectTimer = Timer(const Duration(seconds: 3), () {
+      final key = _apiKey;
+      if (key == null || key.isEmpty || _manualDisconnect) return;
+      connect(apiKey: key, onMessage: _onMessage);
+    });
+  }
+
   @override
   void connect({required String apiKey, void Function(Map<String, dynamic>)? onMessage}) {
-    // قطع اتصال قبلی در صورت وجود
-    disconnect();
+    _apiKey = apiKey;
+    _onMessage = onMessage;
+    _manualDisconnect = false;
+    _reconnectTimer?.cancel();
+    // قطع اتصال قبلی بدون غیرفعال‌سازی reconnect
+    try {
+      _ws?.close();
+    } catch (_) {}
+    _ws = null;
     
     try {
       final apiBase = AppConfig.apiBaseUrl; // e.g. http://localhost:8000
@@ -32,9 +55,11 @@ class WebNotificationsWsClient implements NotificationsWsClient {
         // Connection failed, silently ignore
         // در محیط production، این خطا را log نمی‌کنیم تا console شلوغ نشود
         _ws = null;
+        _scheduleReconnect();
       }, onError: (error) {
         // مدیریت خطاهای listener
         _ws = null;
+        _scheduleReconnect();
       });
       
       _ws!.onMessage.listen((web.MessageEvent e) {
@@ -43,7 +68,7 @@ class WebNotificationsWsClient implements NotificationsWsClient {
           if (data is JSString) {
             final jsonStr = data.toDart;
             final Map<String, dynamic> msg = jsonDecode(jsonStr) as Map<String, dynamic>;
-            onMessage?.call(msg);
+            _onMessage?.call(msg);
           }
         } catch (_) {
           // Ignore message parsing errors
@@ -55,17 +80,22 @@ class WebNotificationsWsClient implements NotificationsWsClient {
       // Handle close events
       _ws!.onClose.listen((web.CloseEvent event) {
         _ws = null;
+        _scheduleReconnect();
       }, onError: (error) {
         _ws = null;
+        _scheduleReconnect();
       });
     } catch (_) {
       // Silently ignore connection errors - WebSocket is optional
       _ws = null;
+      _scheduleReconnect();
     }
   }
 
   @override
   void disconnect() {
+    _manualDisconnect = true;
+    _reconnectTimer?.cancel();
     try {
       _ws?.close();
     } catch (_) {}

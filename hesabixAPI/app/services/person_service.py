@@ -7,6 +7,7 @@ from app.core.responses import ApiError
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, or_, func, String
 from adapters.db.models.person import Person, PersonBankAccount, PersonSocialContact, PersonType
+from adapters.db.models.person_group import PersonGroup
 from adapters.db.models.business import Business
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.document import Document
@@ -368,6 +369,64 @@ def get_persons_by_business(
         if search_conditions:
             query = query.filter(or_(*search_conditions))
     
+    def apply_text_filter(base_query, column, operator: str, value):
+        q = base_query
+        if operator == '=':
+            q = q.filter(column == value)
+        elif operator in ('like', '*'):
+            q = q.filter(column.ilike(f"%{value}%"))
+        elif operator == '*?':  # starts with
+            q = q.filter(column.ilike(f"{value}%"))
+        elif operator == '?*':  # ends with
+            q = q.filter(column.ilike(f"%{value}"))
+        elif operator == 'in' and isinstance(value, list):
+            vals = [v for v in value if v is not None and str(v).strip() != ""]
+            if vals:
+                q = q.filter(column.in_(vals))
+        return q
+
+    def _to_int_or_none(v):
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    column_aliases = {
+        # UI ستون نوع شخص را با person_type می‌فرستد ولی در DB/سرویس person_types است.
+        'person_type': 'person_types',
+    }
+    text_columns = {
+        'alias_name': Person.alias_name,
+        'first_name': Person.first_name,
+        'last_name': Person.last_name,
+        'company_name': Person.company_name,
+        'name_prefix': Person.name_prefix,
+        'legal_entity_type': Person.legal_entity_type,
+        'mobile': Person.mobile,
+        'phone': Person.phone,
+        'fax': Person.fax,
+        'email': Person.email,
+        'website': Person.website,
+        'payment_id': Person.payment_id,
+        'national_id': Person.national_id,
+        'registration_number': Person.registration_number,
+        'economic_id': Person.economic_id,
+        'country': Person.country,
+        'province': Person.province,
+        'city': Person.city,
+        'address': Person.address,
+        'postal_code': Person.postal_code,
+    }
+    number_columns = {
+        'code': Person.code,
+        'person_group_id': Person.person_group_id,
+        'share_count': Person.share_count,
+        'commission_sale_percent': Person.commission_sale_percent,
+        'commission_sales_return_percent': Person.commission_sales_return_percent,
+        'commission_sales_amount': Person.commission_sales_amount,
+        'commission_sales_return_amount': Person.commission_sales_return_amount,
+    }
+
     # اعمال فیلترها
     if query_info.get('filters'):
         for filter_item in query_info['filters']:
@@ -384,20 +443,25 @@ def get_persons_by_business(
             if not field or not operator:
                 continue
 
-            # کد
-            if field == 'code':
-                if operator == '=':
-                    query = query.filter(Person.code == value)
-                elif operator == 'in' and isinstance(value, list):
-                    query = query.filter(Person.code.in_(value))
-                continue
+            field = column_aliases.get(field, field)
 
-            # گروه اشخاص
-            if field == 'person_group_id':
+            # فیلترهای عددی
+            if field in number_columns:
+                col = number_columns[field]
                 if operator == '=':
-                    query = query.filter(Person.person_group_id == value)
+                    if field in ('code', 'person_group_id', 'share_count'):
+                        iv = _to_int_or_none(value)
+                        if iv is not None:
+                            query = query.filter(col == iv)
+                    else:
+                        query = query.filter(col == value)
                 elif operator == 'in' and isinstance(value, list):
-                    query = query.filter(Person.person_group_id.in_(value))
+                    if field in ('code', 'person_group_id', 'share_count'):
+                        ivals = [iv for iv in (_to_int_or_none(v) for v in value) if iv is not None]
+                        if ivals:
+                            query = query.filter(col.in_(ivals))
+                    else:
+                        query = query.filter(col.in_(value))
                 continue
 
             # انواع شخص چندانتخابی (رشته JSON)
@@ -405,73 +469,30 @@ def get_persons_by_business(
                 if operator == '=' and isinstance(value, str):
                     query = query.filter(Person.person_types.ilike(f'%"{value}"%'))
                 elif operator == 'in' and isinstance(value, list):
-                    sub_filters = [Person.person_types.ilike(f'%"{v}"%') for v in value]
+                    sub_filters = [Person.person_types.ilike(f'%"{v}"%') for v in value if v is not None and str(v).strip() != ""]
                     if sub_filters:
                         query = query.filter(or_(*sub_filters))
                 continue
 
-            # فیلترهای متنی عمومی (حمایت از عملگرهای contains/startsWith/endsWith)
-            def apply_text_filter(column):
-                nonlocal query
+            # ستون نمایشی گروه اشخاص در UI (person_group_name)
+            if field == 'person_group_name':
                 if operator == '=':
-                    query = query.filter(column == value)
-                elif operator == 'like' or operator == '*':
-                    query = query.filter(column.ilike(f"%{value}%"))
-                elif operator == '*?':  # starts with
-                    query = query.filter(column.ilike(f"{value}%"))
-                elif operator == '?*':  # ends with
-                    query = query.filter(column.ilike(f"%{value}"))
-
-            if field == 'country':
-                apply_text_filter(Person.country)
+                    query = query.filter(Person.person_group.has(PersonGroup.name == value))
+                elif operator in ('like', '*'):
+                    query = query.filter(Person.person_group.has(PersonGroup.name.ilike(f"%{value}%")))
+                elif operator == '*?':
+                    query = query.filter(Person.person_group.has(PersonGroup.name.ilike(f"{value}%")))
+                elif operator == '?*':
+                    query = query.filter(Person.person_group.has(PersonGroup.name.ilike(f"%{value}")))
+                elif operator == 'in' and isinstance(value, list):
+                    vals = [v for v in value if v is not None and str(v).strip() != ""]
+                    if vals:
+                        query = query.filter(Person.person_group.has(PersonGroup.name.in_(vals)))
                 continue
 
-            if field == 'province':
-                apply_text_filter(Person.province)
-                continue
-
-            if field == 'alias_name':
-                apply_text_filter(Person.alias_name)
-                continue
-
-            if field == 'first_name':
-                apply_text_filter(Person.first_name)
-                continue
-
-            if field == 'last_name':
-                apply_text_filter(Person.last_name)
-                continue
-
-            if field == 'company_name':
-                apply_text_filter(Person.company_name)
-                continue
-
-            if field == 'mobile':
-                apply_text_filter(Person.mobile)
-                continue
-
-            if field == 'email':
-                apply_text_filter(Person.email)
-                continue
-
-            if field == 'national_id':
-                apply_text_filter(Person.national_id)
-                continue
-
-            if field == 'registration_number':
-                apply_text_filter(Person.registration_number)
-                continue
-
-            if field == 'economic_id':
-                apply_text_filter(Person.economic_id)
-                continue
-
-            if field == 'city':
-                apply_text_filter(Person.city)
-                continue
-
-            if field == 'address':
-                apply_text_filter(Person.address)
+            # فیلترهای متنی عمومی
+            if field in text_columns:
+                query = apply_text_filter(query, text_columns[field], operator, value)
                 continue
     
     # شمارش کل رکوردها

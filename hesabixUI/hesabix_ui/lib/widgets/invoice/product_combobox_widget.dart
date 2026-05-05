@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart' as dio;
 import '../../services/product_service.dart';
-import '../../services/warehouse_service.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
@@ -66,7 +64,6 @@ class ProductComboboxWidget extends StatefulWidget {
 
 class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   final ProductService _service = ProductService(apiClient: ApiClient());
-  final WarehouseService _warehouseService = WarehouseService();
   final CategoryService _categoryService = CategoryService(ApiClient());
   final TextEditingController _searchCtrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -503,154 +500,6 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     }
   }
 
-  Future<void> _searchByBarcode(BuildContext bottomSheetContext) async {
-    final barcodeController = TextEditingController();
-    
-    await showDialog<Map<String, dynamic>?>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('جستجو با بارکد/سریال'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: barcodeController,
-              decoration: const InputDecoration(
-                labelText: 'بارکد یا سریال نامبر',
-                hintText: 'بارکد یا سریال را وارد کنید',
-                prefixIcon: Icon(Icons.qr_code_scanner),
-              ),
-              autofocus: true,
-              onSubmitted: (value) async {
-                if (value.trim().isNotEmpty) {
-                  await _performBarcodeSearch(value.trim(), context, bottomSheetContext);
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (barcodeController.text.trim().isNotEmpty) {
-                await _performBarcodeSearch(barcodeController.text.trim(), context, bottomSheetContext);
-              }
-            },
-            child: const Text('جستجو'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _performBarcodeSearch(String code, BuildContext dialogContext, BuildContext bottomSheetContext) async {
-    try {
-      final instanceData = await _warehouseService.searchInstanceByCode(
-        businessId: widget.businessId,
-        code: code,
-      );
-      
-      // بررسی اینکه آیا چند نتیجه برگردانده شده یا نه
-      final multipleResults = instanceData['multiple_results'] == true;
-      final items = instanceData['items'] as List?;
-      
-      Map<String, dynamic>? selectedInstance;
-      
-      if (multipleResults && items != null && items.isNotEmpty) {
-        // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
-        if (!dialogContext.mounted) return;
-        selectedInstance = await showDialog<Map<String, dynamic>>(
-          context: dialogContext,
-          builder: (context) => _InstanceSelectionDialog(
-            instances: items,
-            searchCode: code,
-          ),
-        );
-        
-        if (selectedInstance == null) {
-          return; // کاربر انصراف داد
-        }
-      } else {
-        // اگر یک نتیجه یا نتیجه مستقیم برگردانده شد
-        selectedInstance = instanceData;
-      }
-      
-      final productId = selectedInstance['product_id'] as int?;
-      if (productId == null) {
-        if (dialogContext.mounted) {
-          SnackBarHelper.show(dialogContext, message: 'کالای یونیکی با این بارکد/سریال یافت نشد');
-        }
-        return;
-      }
-      
-      // دریافت اطلاعات کالا
-      final product = await _service.getProduct(
-        businessId: widget.businessId,
-        productId: productId,
-      );
-      
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext).pop();
-        
-        // به‌روزرسانی لیست: اضافه کردن محصول انتخاب شده به لیست یا refresh لیست
-        if (mounted) {
-          // بررسی اینکه آیا محصول در لیست وجود دارد یا نه
-          final existsInList = _items.any((item) => (item['id'] as num?)?.toInt() == productId);
-          if (!existsInList) {
-            // اگر در لیست نیست، به ابتدای لیست اضافه کن
-            setState(() {
-              _items = [product, ..._items];
-            });
-            _syncPickerState();
-          } else {
-            // اگر در لیست است، لیست را refresh کن تا محصول در ابتدا قرار بگیرد
-            await _loadRecent();
-          }
-        }
-        
-        // انتخاب محصول
-        _select(product);
-
-        // بستن bottom sheet (بعد از انتخاب موفق)
-        if (bottomSheetContext.mounted && Navigator.canPop(bottomSheetContext)) {
-          Navigator.pop(bottomSheetContext);
-        }
-      }
-    } on dio.DioException catch (e) {
-      String errorMessage = 'خطا در جستجو';
-      if (e.response != null) {
-        final data = e.response?.data;
-        if (data is Map<String, dynamic>) {
-          final error = data['error'];
-          if (error is Map<String, dynamic>) {
-            final code = error['code'] as String?;
-            final message = error['message'] as String?;
-            if (code == 'NOT_FOUND' || message?.contains('not found') == true) {
-              errorMessage = 'کالای یونیکی با این بارکد/سریال یافت نشد';
-            } else if (message != null) {
-              errorMessage = message;
-            }
-          }
-        }
-      }
-      if (dialogContext.mounted) {
-        SnackBarHelper.show(dialogContext, message: errorMessage);
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        SnackBarHelper.show(
-        dialogContext,
-        message:
-            'خطا در جستجو: ${ErrorExtractor.forContext(e, dialogContext)}',
-      );
-      }
-    }
-  }
-
   void _openPicker() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < _mobileBreakpoint;
@@ -673,7 +522,6 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
             onAddNewProduct: widget.authStore != null ? (bottomSheetContext) => _addNewProduct(bottomSheetContext) : null,
-            onSearchByBarcode: (bottomSheetContext) => _searchByBarcode(bottomSheetContext),
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -706,7 +554,6 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
             onAddNewProduct: widget.authStore != null ? (dialogContext) => _addNewProduct(dialogContext) : null,
-            onSearchByBarcode: (dialogContext) => _searchByBarcode(dialogContext),
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -797,7 +644,6 @@ class _ProductPickerBottomSheet extends StatefulWidget {
   final bool loadingCategories;
   final VoidCallback onClose;
   final void Function(BuildContext bottomSheetContext)? onAddNewProduct;
-  final Future<void> Function(BuildContext bottomSheetContext) onSearchByBarcode;
   final void Function(String query) onQueryChanged;
   final void Function(int? categoryId) onCategorySelected;
   final void Function(Map<String, dynamic> product) onProductSelected;
@@ -815,7 +661,6 @@ class _ProductPickerBottomSheet extends StatefulWidget {
     this.loadingCategories = false,
     required this.onClose,
     required this.onAddNewProduct,
-    required this.onSearchByBarcode,
     required this.onQueryChanged,
     required this.onCategorySelected,
     required this.onProductSelected,
@@ -904,12 +749,6 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
-                IconButton(
-                  onPressed: () async => widget.onSearchByBarcode(context),
-                  icon: const Icon(Icons.qr_code_scanner),
-                  tooltip: 'جستجو با بارکد/سریال',
-                  color: colorScheme.primary,
-                ),
                 if (widget.canAddNewProduct && widget.onAddNewProduct != null)
                   IconButton(
                     onPressed: () => widget.onAddNewProduct!(context),
@@ -1081,125 +920,6 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
   }
 }
 
-/// Dialog برای انتخاب instance از بین چند نتیجه
-class _InstanceSelectionDialog extends StatelessWidget {
-  final List<dynamic> instances;
-  final String searchCode;
-
-  const _InstanceSelectionDialog({
-    required this.instances,
-    required this.searchCode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // هدر
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search, color: cs.onPrimaryContainer),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'چند نتیجه پیدا شد',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: cs.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'برای "$searchCode"',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: cs.onPrimaryContainer.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: cs.onPrimaryContainer),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // لیست نتایج
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: instances.length,
-                itemBuilder: (context, index) {
-                  final instance = Map<String, dynamic>.from(instances[index] as Map);
-                  final serialNumber = instance['serial_number']?.toString() ?? '-';
-                  final barcode = instance['barcode']?.toString() ?? '-';
-                  final productName = instance['product_name']?.toString() ?? 'نامشخص';
-                  final warehouseName = instance['warehouse_name']?.toString();
-                  
-                  return ListTile(
-                    leading: const Icon(Icons.inventory_2),
-                    title: Text(productName),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (serialNumber != '-') 
-                          Text('سریال: $serialNumber'),
-                        if (barcode != '-') 
-                          Text('بارکد: $barcode'),
-                        if (warehouseName != null)
-                          Text('انبار: $warehouseName'),
-                      ],
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      Navigator.of(context).pop(instance);
-                    },
-                  );
-                },
-              ),
-            ),
-            // دکمه انصراف
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('انصراف'),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Dialog برای انتخاب محصول در دسکتاپ با split view (درخت دسته‌بندی + لیست محصولات)
 class _ProductPickerDialog extends StatelessWidget {
   final String label;
@@ -1213,7 +933,6 @@ class _ProductPickerDialog extends StatelessWidget {
   final bool loadingCategories;
   final VoidCallback onClose;
   final void Function(BuildContext dialogContext)? onAddNewProduct;
-  final Future<void> Function(BuildContext dialogContext) onSearchByBarcode;
   final void Function(String query) onQueryChanged;
   final void Function(int? categoryId) onCategorySelected;
   final void Function(Map<String, dynamic> product) onProductSelected;
@@ -1230,7 +949,6 @@ class _ProductPickerDialog extends StatelessWidget {
     this.loadingCategories = false,
     required this.onClose,
     required this.onAddNewProduct,
-    required this.onSearchByBarcode,
     required this.onQueryChanged,
     required this.onCategorySelected,
     required this.onProductSelected,
@@ -1265,12 +983,6 @@ class _ProductPickerDialog extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    onPressed: () async => onSearchByBarcode(context),
-                    icon: const Icon(Icons.qr_code_scanner),
-                    tooltip: 'جستجو با بارکد/سریال',
-                    color: colorScheme.primary,
-                  ),
                   if (canAddNewProduct && onAddNewProduct != null)
                     IconButton(
                       onPressed: () => onAddNewProduct!(context),

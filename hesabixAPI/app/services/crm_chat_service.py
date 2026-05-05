@@ -110,6 +110,8 @@ def _visitor_message_workflow_payload(
 	}
 	if file_storage_id:
 		payload["file_storage_id"] = file_storage_id
+		# Compatibility alias for actions expecting attachment_file_id.
+		payload["attachment_file_id"] = file_storage_id
 	payload.update(build_crm_chat_visitor_message_trigger_enrichment(db, business_id, c.id))
 	return payload
 
@@ -750,6 +752,10 @@ async def post_agent_message(
 			"sender_role": "agent",
 			"agent_user_id": user_id,
 		}
+		if fid:
+			sent_payload["file_storage_id"] = fid
+			# Compatibility alias for actions expecting attachment_file_id.
+			sent_payload["attachment_file_id"] = fid
 		if automation_context:
 			sent_payload.update(automation_context)
 		_fire(db, business_id, "crm.chat.message.sent", sent_payload, user_id)

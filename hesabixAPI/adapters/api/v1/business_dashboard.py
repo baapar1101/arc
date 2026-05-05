@@ -28,6 +28,10 @@ from app.services.business_quick_links_service import (
     get_or_create_quick_links,
     save_quick_links,
 )
+from app.services.business_menu_preferences_service import (
+    get_or_create_menu_preferences,
+    save_menu_preferences,
+)
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/business", tags=["business-dashboard"])
@@ -534,6 +538,46 @@ def put_quick_links_saved(
     items = payload.get("items") or []
     data = save_quick_links(
         db, business_id=business_id, user_id=ctx.get_user_id(), items_in=items, ctx=ctx
+    )
+    db.commit()
+    return success_response(data, request)
+
+
+@router.get(
+    "/{business_id}/menu-preferences",
+    summary="شخصی‌سازی منوی کاربر برای این کسب‌وکار",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_menu_preferences(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = get_or_create_menu_preferences(db, business_id, ctx.get_user_id())
+    db.commit()
+    return success_response(data, request)
+
+
+@router.put(
+    "/{business_id}/menu-preferences",
+    summary="ذخیره شخصی‌سازی منوی کاربر",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def put_menu_preferences(
+    request: Request,
+    business_id: int,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = save_menu_preferences(
+        db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        payload=payload if isinstance(payload, dict) else {},
     )
     db.commit()
     return success_response(data, request)

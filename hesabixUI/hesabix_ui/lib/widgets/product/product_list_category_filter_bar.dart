@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -149,18 +150,11 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Scrollbar(
-                    thumbVisibility: false,
-                    thickness: 4,
-                    radius: const Radius.circular(4),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const ClampingScrollPhysics(),
-                      primary: false,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
+                  child: _HorizontalWheelScrollView(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
                         Padding(
                           padding: const EdgeInsetsDirectional.only(end: 6),
                           child: FilterChip(
@@ -200,7 +194,6 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                           ),
                         ),
                       ],
-                      ),
                     ),
                   ),
                 ),
@@ -208,18 +201,11 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
             ),
             if (path != null && path.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Scrollbar(
-                thumbVisibility: false,
-                thickness: 4,
-                radius: const Radius.circular(4),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  primary: false,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
+              _HorizontalWheelScrollView(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                     TextButton(
                       onPressed: () => widget.onCategoryChanged(null),
                       child: Text(t.all),
@@ -267,7 +253,6 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                         ),
                     ],
                   ],
-                  ),
                 ),
               ),
             ],
@@ -283,18 +268,11 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                 ),
               ),
               const SizedBox(height: 4),
-              Scrollbar(
-                thumbVisibility: false,
-                thickness: 4,
-                radius: const Radius.circular(4),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  primary: false,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
+              _HorizontalWheelScrollView(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                     for (final c in childLevel)
                       Padding(
                         padding: const EdgeInsetsDirectional.only(end: 6),
@@ -310,11 +288,67 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
                         ),
                       ),
                   ],
-                  ),
                 ),
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HorizontalWheelScrollView extends StatefulWidget {
+  final Widget child;
+
+  const _HorizontalWheelScrollView({required this.child});
+
+  @override
+  State<_HorizontalWheelScrollView> createState() => _HorizontalWheelScrollViewState();
+}
+
+class _HorizontalWheelScrollViewState extends State<_HorizontalWheelScrollView> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+
+    // For mouse wheel, map vertical movement to horizontal scrolling.
+    final offset = event.scrollDelta.dy.abs() > event.scrollDelta.dx.abs()
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    if (offset == 0) return;
+
+    final position = _controller.position;
+    final target = (position.pixels + offset).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target == position.pixels) return;
+    _controller.jumpTo(target.toDouble());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerSignal: _onPointerSignal,
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: false,
+        thickness: 4,
+        radius: const Radius.circular(4),
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          physics: const ClampingScrollPhysics(),
+          primary: false,
+          child: widget.child,
         ),
       ),
     );

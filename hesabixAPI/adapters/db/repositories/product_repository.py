@@ -10,6 +10,7 @@ from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
+from ..models.product_instance import ProductInstance
 from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
 
@@ -32,9 +33,12 @@ class ProductRepository(BaseRepository[Product]):
             if not field_set:
                 field_set = {"name", "code", "description", "general_barcodes", "barcode"}
 
-            # فیلد legacy «barcode» همان بارکدهای عمومی است
+            # فیلد legacy «barcode» علاوه بر بارکد عمومی، بارکد/سریال کالاهای یونیک را هم پوشش می‌دهد
             if "barcode" in field_set:
                 field_set.add("general_barcodes")
+                field_set.add("unique_instance_codes")
+            if "serial" in field_set or "serial_number" in field_set:
+                field_set.add("unique_instance_codes")
 
             if "name" in field_set:
                 ors.append(Product.name.ilike(like))
@@ -58,6 +62,19 @@ class ProductRepository(BaseRepository[Product]):
                     Product.general_barcodes.ilike(like),
                 )
                 ors.append(or_(alias_match, partial_col))
+
+            if "unique_instance_codes" in field_set:
+                instance_match = exists(
+                    select(1).select_from(ProductInstance).where(
+                        ProductInstance.business_id == business_id,
+                        ProductInstance.product_id == Product.id,
+                        or_(
+                            ProductInstance.barcode.ilike(like),
+                            ProductInstance.serial_number.ilike(like),
+                        ),
+                    )
+                )
+                ors.append(instance_match)
 
             if ors:
                 stmt = stmt.where(or_(*ors))

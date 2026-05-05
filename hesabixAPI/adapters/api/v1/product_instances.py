@@ -3,7 +3,7 @@
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, Request, Body, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from datetime import date
 
 from adapters.db.session import get_db
@@ -12,6 +12,7 @@ from app.core.permissions import require_business_access
 from app.core.responses import success_response, ApiError
 from adapters.db.models.product_instance import ProductInstance
 from adapters.db.models.product import Product
+from adapters.db.models.product_general_barcode_alias import ProductGeneralBarcodeAlias
 from adapters.db.models.warehouse import Warehouse
 from app.services.product_attribute_service import validate_custom_attributes
 
@@ -404,7 +405,7 @@ def search_instance_by_code(
 			request=request,
 		)
 	
-	# اگر تطابق دقیق پیدا نشد، جستجوی جزئی انجام می‌دهیم
+	# اگر تطابق دقیق پیدا نشد، جستجوی جزئی در کالاهای یونیک انجام می‌دهیم
 	partial_query = db.query(ProductInstance).filter(
 		and_(
 			ProductInstance.business_id == business_id,
@@ -418,7 +419,105 @@ def search_instance_by_code(
 	instances = partial_query.order_by(ProductInstance.created_at.desc()).limit(20).all()
 	
 	if not instances:
-		raise ApiError("NOT_FOUND", "Product instance not found", http_status=404)
+		# fallback: جستجو در بارکدهای عمومی کالا (products.general_barcodes)
+		code_norm = code_trimmed.lower()
+		product_query = db.query(Product).filter(Product.business_id == business_id)
+
+		# تلاش برای تطابق دقیق توکن از جدول alias
+		exact_product_by_alias = (
+			product_query.join(
+				ProductGeneralBarcodeAlias,
+				and_(
+					ProductGeneralBarcodeAlias.product_id == Product.id,
+					ProductGeneralBarcodeAlias.business_id == business_id,
+				),
+			)
+			.filter(ProductGeneralBarcodeAlias.token_normalized == code_norm)
+			.first()
+		)
+
+		if exact_product_by_alias:
+			return success_response(
+				data={
+					"id": None,
+					"product_id": exact_product_by_alias.id,
+					"product_name": exact_product_by_alias.name,
+					"serial_number": None,
+					"barcode": code_trimmed,
+					"warehouse_id": None,
+					"warehouse_name": None,
+					"status": "general_barcode",
+					"custom_attributes": {},
+					"entry_date": None,
+				},
+				request=request,
+			)
+
+		# جستجوی جزئی در alias و رشته خام general_barcodes
+		partial_products = (
+			product_query.outerjoin(
+				ProductGeneralBarcodeAlias,
+				and_(
+					ProductGeneralBarcodeAlias.product_id == Product.id,
+					ProductGeneralBarcodeAlias.business_id == business_id,
+				),
+			)
+			.filter(
+				or_(
+					Product.general_barcodes.ilike(f"%{code_trimmed}%"),
+					func.lower(ProductGeneralBarcodeAlias.token_normalized).ilike(f"%{code_norm}%"),
+				)
+			)
+			.order_by(Product.created_at.desc())
+			.limit(20)
+			.distinct(Product.id)
+			.all()
+		)
+
+		if not partial_products:
+			raise ApiError("NOT_FOUND", "Product instance not found", http_status=404)
+
+		if len(partial_products) == 1:
+			product = partial_products[0]
+			return success_response(
+				data={
+					"id": None,
+					"product_id": product.id,
+					"product_name": product.name,
+					"serial_number": None,
+					"barcode": code_trimmed,
+					"warehouse_id": None,
+					"warehouse_name": None,
+					"status": "general_barcode",
+					"custom_attributes": {},
+					"entry_date": None,
+				},
+				request=request,
+			)
+
+		items = []
+		for product in partial_products:
+			items.append({
+				"id": None,
+				"product_id": product.id,
+				"product_name": product.name,
+				"serial_number": None,
+				"barcode": code_trimmed,
+				"warehouse_id": None,
+				"warehouse_name": None,
+				"status": "general_barcode",
+				"custom_attributes": {},
+				"entry_date": None,
+			})
+
+		return success_response(
+			data={
+				"items": items,
+				"total": len(items),
+				"multiple_results": True,
+			},
+			request=request,
+		)
 	
 	# اگر فقط یک نتیجه پیدا شد، همان را برگردان (برای سازگاری با API قبلی)
 	if len(instances) == 1:
