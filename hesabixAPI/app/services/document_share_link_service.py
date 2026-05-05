@@ -5,6 +5,7 @@ import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import or_
@@ -172,6 +173,117 @@ def _strip_invoice_for_public(raw: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _safe_decimal(v: Any) -> Decimal:
+    try:
+        return Decimal(str(v or 0))
+    except Exception:
+        return Decimal(0)
+
+
+def _build_public_installments(extra_info: Dict[str, Any]) -> Dict[str, Any]:
+    plan = (extra_info or {}).get("installment_plan")
+    if not isinstance(plan, dict):
+        return {
+            "has_installments": False,
+            "summary": None,
+            "schedule": [],
+        }
+
+    schedule_raw = plan.get("schedule")
+    rows = schedule_raw if isinstance(schedule_raw, list) else []
+    now_date = datetime.utcnow().date()
+    schedule: List[Dict[str, Any]] = []
+
+    principal_total = _safe_decimal(plan.get("principal_total"))
+    interest_total = _safe_decimal(plan.get("interest_total"))
+    down_payment = _safe_decimal(plan.get("down_payment"))
+    paid_total = Decimal(0)
+    remaining_total = Decimal(0)
+
+    paid_count = 0
+    overdue_count = 0
+
+    for idx, r in enumerate(rows):
+        if not isinstance(r, dict):
+            continue
+        seq = int(r.get("seq") or (idx + 1))
+        principal = _safe_decimal(r.get("principal"))
+        interest = _safe_decimal(r.get("interest"))
+        total = _safe_decimal(r.get("total")) or (principal + interest)
+        paid = _safe_decimal(r.get("paid_amount"))
+        if paid < 0:
+            paid = Decimal(0)
+        if paid > total:
+            paid = total
+        remaining = total - paid
+        if remaining < 0:
+            remaining = Decimal(0)
+
+        due_raw = r.get("due_date")
+        due_iso = str(due_raw) if due_raw is not None else None
+        due_dt = None
+        try:
+            if due_iso:
+                due_dt = datetime.fromisoformat(due_iso.replace("Z", "+00:00")).date()
+        except Exception:
+            due_dt = None
+
+        status = str(r.get("status") or "").strip().lower()
+        if not status:
+            if total > 0 and paid >= total:
+                status = "paid"
+            elif paid > 0:
+                status = "partial"
+            elif due_dt and due_dt < now_date:
+                status = "overdue"
+            else:
+                status = "pending"
+
+        if status == "paid":
+            paid_count += 1
+        if status == "overdue":
+            overdue_count += 1
+
+        paid_total += paid
+        remaining_total += remaining
+
+        schedule.append(
+            {
+                "seq": seq,
+                "due_date": due_iso,
+                "principal": float(principal),
+                "interest": float(interest),
+                "total": float(total),
+                "paid_amount": float(paid),
+                "remaining": float(remaining),
+                "status": status,
+            }
+        )
+
+    if principal_total <= 0:
+        principal_total = sum((_safe_decimal(x.get("principal")) for x in schedule), Decimal(0))
+    if interest_total < 0:
+        interest_total = Decimal(0)
+    grand_total = principal_total + interest_total
+    installment_count = len(schedule)
+
+    return {
+        "has_installments": installment_count > 0,
+        "summary": {
+            "down_payment": float(down_payment),
+            "principal_total": float(principal_total),
+            "interest_total": float(interest_total),
+            "grand_total": float(grand_total),
+            "paid_total": float(paid_total),
+            "remaining_total": float(remaining_total),
+            "installment_count": installment_count,
+            "paid_count": paid_count,
+            "overdue_count": overdue_count,
+        },
+        "schedule": schedule,
+    }
+
+
 def build_public_payload(
     db: Session, link: DocumentShareLink, *, allow_inactive: bool = False
 ) -> Dict[str, Any]:
@@ -207,6 +319,7 @@ def build_public_payload(
 
     inv = invoice_document_to_dict(db, document, persist_link_cleanup=False)
     public_invoice = _strip_invoice_for_public(inv or {})
+    installments = _build_public_installments(public_invoice.get("extra_info") or {})
 
     return {
         "share_link": serialize_document_share_link(link, db=db),
@@ -218,6 +331,7 @@ def build_public_payload(
             "address": getattr(business, "address", None),
         },
         "invoice": public_invoice,
+        "installments": installments,
         "authenticity": {
             "verified": True,
             "message_fa": "این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.",

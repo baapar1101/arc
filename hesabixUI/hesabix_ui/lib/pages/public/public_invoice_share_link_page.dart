@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hesabix_ui/core/date_utils.dart';
@@ -131,6 +133,30 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     );
   }
 
+  Future<void> _exportPdf() async {
+    try {
+      final bytes = await _service.fetchPdfByCode(
+        widget.code,
+        calendarType: _useJalaliCalendar ? 'jalali' : 'gregorian',
+      );
+      if (bytes.isEmpty) return;
+      await Printing.layoutPdf(
+        name: 'invoice_${widget.code}.pdf',
+        onLayout: (_) async => Uint8List.fromList(bytes),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.userMessage(e))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.userMessage(e))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -139,6 +165,11 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
       appBar: AppBar(
         title: const Text('نمایش فاکتور'),
         actions: [
+          IconButton(
+            onPressed: _loading ? null : _exportPdf,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'خروجی PDF',
+          ),
           IconButton(
             onPressed: _fetch,
             icon: const Icon(Icons.refresh),
@@ -197,6 +228,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     }
     final business = data['business'] as Map<String, dynamic>?;
     final invoice = data['invoice'] as Map<String, dynamic>?;
+    final installments = data['installments'] as Map<String, dynamic>?;
     final auth = data['authenticity'] as Map<String, dynamic>?;
     final shareLink = data['share_link'] as Map<String, dynamic>?;
     if (invoice == null) {
@@ -234,6 +266,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ),
               const SizedBox(height: 16),
               _buildTotalsCard(theme, totals, curSuffix),
+              if ((installments?['has_installments'] == true)) ...[
+                const SizedBox(height: 16),
+                _buildInstallmentsCard(theme, installments!, curSuffix),
+              ],
               const SizedBox(height: 32),
               Align(
                 alignment: Alignment.center,
@@ -754,6 +790,91 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 : null,
           ),
         ],
+      ),
+    );
+  }
+
+  String _statusLabel(String? status) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'paid':
+        return 'پرداخت‌شده';
+      case 'partial':
+        return 'پرداخت ناقص';
+      case 'overdue':
+        return 'سررسید گذشته';
+      case 'pending':
+      default:
+        return 'در انتظار';
+    }
+  }
+
+  Widget _buildInstallmentsCard(
+    ThemeData theme,
+    Map<String, dynamic> installments,
+    String? curSuffix,
+  ) {
+    final summary = installments['summary'] as Map<String, dynamic>?;
+    final schedule = (installments['schedule'] as List<dynamic>?) ?? const [];
+    final s = _suffix(curSuffix);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'اطلاعات اقساط',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if (summary != null) ...[
+              _totRow('تعداد اقساط', summary['installment_count'], theme),
+              _totRow('تعداد پرداخت‌شده', summary['paid_count'], theme),
+              _totRow('تعداد سررسید گذشته', summary['overdue_count'], theme),
+              _totRow('پیش‌پرداخت${s != '' ? s : ''}', summary['down_payment'], theme),
+              _totRow('جمع اصل${s != '' ? s : ''}', summary['principal_total'], theme),
+              _totRow('جمع سود${s != '' ? s : ''}', summary['interest_total'], theme),
+              _totRow('جمع کل${s != '' ? s : ''}', summary['grand_total'], theme),
+              _totRow('پرداخت‌شده${s != '' ? s : ''}', summary['paid_total'], theme),
+              _totRow('مانده${s != '' ? s : ''}', summary['remaining_total'], theme, strong: true),
+              const Divider(height: 24),
+            ],
+            if (schedule.isEmpty)
+              const Text('برنامه زمانی اقساط ثبت نشده است.')
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('قسط')),
+                    DataColumn(label: Text('سررسید')),
+                    DataColumn(label: Text('اصل'), numeric: true),
+                    DataColumn(label: Text('سود'), numeric: true),
+                    DataColumn(label: Text('مبلغ'), numeric: true),
+                    DataColumn(label: Text('پرداخت'), numeric: true),
+                    DataColumn(label: Text('مانده'), numeric: true),
+                    DataColumn(label: Text('وضعیت')),
+                  ],
+                  rows: [
+                    for (final raw in schedule)
+                      if (raw is Map)
+                        DataRow(
+                          cells: [
+                            DataCell(Text(_formatInt(_asNum(raw['seq'])))),
+                            DataCell(Text(_formatDateField(raw['due_date']))),
+                            DataCell(Text(_formatAmount(_asNum(raw['principal'])))),
+                            DataCell(Text(_formatAmount(_asNum(raw['interest'])))),
+                            DataCell(Text(_formatAmount(_asNum(raw['total'])))),
+                            DataCell(Text(_formatAmount(_asNum(raw['paid_amount'])))),
+                            DataCell(Text(_formatAmount(_asNum(raw['remaining'])))),
+                            DataCell(Text(_statusLabel(raw['status']?.toString()))),
+                          ],
+                        ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

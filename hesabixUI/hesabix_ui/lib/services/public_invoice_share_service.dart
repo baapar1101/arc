@@ -42,4 +42,35 @@ class PublicInvoiceShareService {
       );
     }
   }
+
+  Future<List<int>> fetchPdfByCode(String code, {String? calendarType}) async {
+    try {
+      final response = await _apiClient.get<List<int>>(
+        '/api/v1/public/invoice-links/${Uri.encodeComponent(code)}/pdf',
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {
+            if (calendarType != null && calendarType.trim().isNotEmpty)
+              'X-Calendar-Type': calendarType.trim(),
+          },
+        ),
+      );
+      final bytes = response.data;
+      if (bytes != null && bytes.isNotEmpty) {
+        return bytes;
+      }
+      throw DioException(
+        requestOptions: response.requestOptions,
+        error: {'message': 'PDF خالی دریافت شد'},
+        response: response,
+      );
+    } on DioException {
+      rethrow;
+    } catch (e) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/v1/public/invoice-links/$code/pdf'),
+        error: e,
+      );
+    }
+  }
 }

@@ -1835,6 +1835,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
           ),
         ),
       ),
+      ),
     );
   }
 
