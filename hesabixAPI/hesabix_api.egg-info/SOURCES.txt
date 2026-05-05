@@ -430,6 +430,7 @@ app/services/person_share_link_service.py
 app/services/petty_cash_service.py
 app/services/pnl_service.py
 app/services/price_list_service.py
+app/services/print_footer_settings.py
 app/services/product_attribute_service.py
 app/services/product_general_barcode_service.py
 app/services/product_service.py
@@ -632,6 +633,8 @@ migrations/versions/20260606_000001_business_crm_allow_web_chat_voice.py
 migrations/versions/20260607_000001_users_last_activity_signature.py
 migrations/versions/20260608_000001_user_ui_preferences.py
 migrations/versions/20260609_000001_product_general_barcodes.py
+migrations/versions/20260610_000001_user_inapp_alert_preferences.py
+migrations/versions/20260610_000002_business_print_settings_footer_meta.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

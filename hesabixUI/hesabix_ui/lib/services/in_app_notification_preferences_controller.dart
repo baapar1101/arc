@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/api_client.dart';
+import '../utils/notification_sound_catalog.dart';
 import 'notifications_service.dart';
 
 /// حالت هشدار درون‌برنامه‌ای (هم‌ارز رشته‌های API).
