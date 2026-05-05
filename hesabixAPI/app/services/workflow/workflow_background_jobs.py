@@ -38,7 +38,11 @@ def _prune_fired_sets() -> None:
 def _cron_should_fire_now(schedule: str, timezone_name: str, now_utc: datetime) -> Tuple[bool, str]:
     """
     آیا این دقیقه (به‌زمان محلی تریگر) زمان اجرای cron است؟
-    برمی‌گرداند: (bool, minute_key برای dedup)
+    برمی‌گرداند: (bool, dedup_key)
+
+    dedup_key باید از **اسلات cron** (prev_fire) باشد نه از ساعت فعلی؛
+    وگرنه با پنجرهٔ ۹۰ ثانیه‌ای، یک اسلات مشترک در دو دقیقهٔ متوالی wall-clock
+    دوبار اجرا می‌شد (minute_key فرق می‌کرد و مجموعهٔ in-memory مانع تکرار نمی‌شد).
     """
     if not schedule or not str(schedule).strip():
         return False, ""
@@ -49,20 +53,21 @@ def _cron_should_fire_now(schedule: str, timezone_name: str, now_utc: datetime) 
     if now_utc.tzinfo is None:
         now_utc = now_utc.replace(tzinfo=pytz.UTC)
     local_now = now_utc.astimezone(tz)
-    minute_key = local_now.strftime("%Y%m%d%H%M")
     local_naive = local_now.replace(tzinfo=None)
     try:
         itr = croniter(str(schedule).strip(), local_naive)
         prev_fire = itr.get_prev(datetime)
     except Exception as e:
         logger.warning("croniter parse failed schedule=%r: %s", schedule, e)
-        return False, minute_key
+        return False, ""
     if not isinstance(prev_fire, datetime):
-        return False, minute_key
+        return False, ""
     delta = (local_naive - prev_fire.replace(tzinfo=None)).total_seconds()
     if 0 <= delta < 90:
-        return True, minute_key
-    return False, minute_key
+        # دقیقهٔ اسلات برنامه‌ریزی‌شده (۵ فیلد cron = وضوح دقیقه)
+        slot_key = prev_fire.replace(tzinfo=None).strftime("%Y%m%d%H%M")
+        return True, slot_key
+    return False, ""
 
 
 def _tick_scheduled_workflows(db: Session, now_utc: Optional[datetime] = None) -> int:

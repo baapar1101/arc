@@ -14,6 +14,7 @@ from app.services.opening_balance_service import (
     upsert_opening_balance,
     post_opening_balance,
     preview_opening_balance,
+    unpost_opening_balance,
 )
 
 
@@ -86,5 +87,22 @@ async def post_opening_balance_endpoint(
 ):
     posted = post_opening_balance(db, business_id, ctx.get_user_id(), fiscal_year_id)
     return success_response(data=format_datetime_fields(posted, request), request=request, message="OPENING_BALANCE_POSTED")
+
+
+@router.post(
+    "/businesses/{business_id}/opening-balance/unpost",
+    summary="لغو نهایی‌سازی تراز افتتاحیه",
+    description="فقط در صورتی مجاز است که در همان سال مالی به‌جز سند افتتاحیه، سند دیگری ثبت نشده باشد",
+)
+async def unpost_opening_balance_endpoint(
+    request: Request,
+    business_id: int,
+    fiscal_year_id: Optional[int] = Query(None, description="شناسه سال مالی (در غیر این صورت سال جاری)"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("opening_balance", "edit")),
+):
+    data = unpost_opening_balance(db, business_id, ctx.get_user_id(), fiscal_year_id, request=request)
+    return success_response(data=format_datetime_fields(data, request), request=request, message="OPENING_BALANCE_UNPOSTED")
 
 

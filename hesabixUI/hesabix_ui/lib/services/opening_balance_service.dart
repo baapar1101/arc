@@ -45,6 +45,19 @@ class OpeningBalanceService {
     throw Exception('خطا در نهایی‌سازی تراز افتتاحیه: ${resp.statusMessage}');
   }
 
+  Future<Map<String, dynamic>> unpost({required int businessId, int? fiscalYearId}) async {
+    final resp = await _apiClient.post(
+      '/businesses/$businessId/opening-balance/unpost',
+      query: {
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      },
+    );
+    if (resp.statusCode == 200) {
+      return (resp.data?['data'] as Map<String, dynamic>? ?? {});
+    }
+    throw Exception('خطا در لغو نهایی‌سازی تراز افتتاحیه: ${resp.statusMessage}');
+  }
+
 }
 
 

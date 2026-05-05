@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -23,6 +26,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+
+/// اقدامات سروری که تا پایان درخواست دکمه‌ها را در حالت بارگذاری نگه می‌دارند.
+enum _OpeningBalanceSubmitting { save, finalize, unpost }
 
 class OpeningBalancePage extends StatefulWidget {
   final int businessId;
@@ -59,19 +65,235 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   Account? _pettyControlAccount;
   Account? _personReceivableAccount;
   Account? _personPayableAccount;
+  Timer? _draftAutoSaveTimer;
+  String? _lastDraftSnapshot;
+  _OpeningBalanceSubmitting? _submitting;
+
+  String get _draftStorageKey => 'opening_balance_draft_${widget.businessId}';
+
+  Widget _smallActionProgress({required Color? color}) {
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(strokeWidth: 2, color: color),
+    );
+  }
+
+  Widget _toolbarLeadingIcon({
+    required _OpeningBalanceSubmitting action,
+    required IconData idleIcon,
+  }) {
+    if (_submitting == action) return _smallActionProgress(color: Theme.of(context).colorScheme.primary);
+    return Icon(idleIcon);
+  }
+
+  Widget _toolbarFinalizeIcon() {
+    if (_submitting == _OpeningBalanceSubmitting.finalize) {
+      return _smallActionProgress(color: Theme.of(context).colorScheme.onPrimary);
+    }
+    return const Icon(Icons.how_to_reg);
+  }
+
+  Widget _toolbarUnpostIcon() {
+    if (_submitting == _OpeningBalanceSubmitting.unpost) {
+      return _smallActionProgress(color: Theme.of(context).colorScheme.primary);
+    }
+    return const Icon(Icons.undo_outlined);
+  }
 
   @override
   void initState() {
     super.initState();
     _service = OpeningBalanceService(ApiClient());
     _bootstrap();
+    _startDraftAutoSave();
   }
 
   Future<void> _bootstrap() async {
     await _initializeAccounts();
     if (mounted) {
       await _load();
+      await _restoreDraftIfAvailable();
     }
+  }
+
+  void _startDraftAutoSave() {
+    _draftAutoSaveTimer?.cancel();
+    _draftAutoSaveTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || _loading || _submitting != null) return;
+      final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+      if (isPosted) return;
+      await _persistDraftIfChanged();
+    });
+  }
+
+  Map<String, dynamic> _buildDraftPayload() {
+    final otherAccountLines = _otherAccountLines.map((m) {
+      final acc = m['account'] as Account?;
+      return {
+        'account': acc == null
+            ? null
+            : {
+                'id': acc.id,
+                'code': acc.code,
+                'name': acc.name,
+                'account_type': acc.accountType,
+              },
+        'debit': m['debit'],
+        'credit': m['credit'],
+      };
+    }).toList();
+
+    return {
+      'saved_at': DateTime.now().toIso8601String(),
+      'auto_balance': _autoBalance,
+      'inventory_account_id': _inventoryAccountId,
+      'equity_account_id': _equityAccountId,
+      'bank_control_id': _bankControlAccountId,
+      'cash_control_id': _cashControlAccountId,
+      'petty_control_id': _pettyControlAccountId,
+      'ar_control_id': _personReceivableAccountId,
+      'ap_control_id': _personPayableAccountId,
+      'bank_cash_petty_lines': _bankCashPettyLines,
+      'person_lines': _personLines,
+      'inventory_lines': _inventoryLines,
+      'other_account_lines': otherAccountLines,
+    };
+  }
+
+  Future<void> _persistDraftIfChanged() async {
+    try {
+      final payload = _buildDraftPayload();
+      final snapshot = jsonEncode(payload);
+      if (snapshot == _lastDraftSnapshot) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_draftStorageKey, snapshot);
+      _lastDraftSnapshot = snapshot;
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftStorageKey);
+      _lastDraftSnapshot = null;
+    } catch (_) {}
+  }
+
+  Future<void> _restoreDraftIfAvailable() async {
+    try {
+      final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
+      if (isPosted) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_draftStorageKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+
+      final bankLines = (decoded['bank_cash_petty_lines'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final personLines = (decoded['person_lines'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final inventoryLines = (decoded['inventory_lines'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final otherLinesRaw = (decoded['other_account_lines'] as List<dynamic>? ?? const <dynamic>[]);
+      if (bankLines.isEmpty && personLines.isEmpty && inventoryLines.isEmpty && otherLinesRaw.isEmpty) return;
+
+      final accountService = AccountService();
+      Future<Account?> loadAccountById(int? id) async {
+        if (id == null) return null;
+        try {
+          final data = await accountService.getAccount(businessId: widget.businessId, accountId: id);
+          return Account.fromJson(data);
+        } catch (_) {
+          return null;
+        }
+      }
+
+      final inventoryId = decoded['inventory_account_id'] as int?;
+      final equityId = decoded['equity_account_id'] as int?;
+      final bankControlId = decoded['bank_control_id'] as int?;
+      final cashControlId = decoded['cash_control_id'] as int?;
+      final pettyControlId = decoded['petty_control_id'] as int?;
+      final arControlId = decoded['ar_control_id'] as int?;
+      final apControlId = decoded['ap_control_id'] as int?;
+
+      final invAcc = await loadAccountById(inventoryId);
+      final eqAcc = await loadAccountById(equityId);
+      final bankAcc = await loadAccountById(bankControlId);
+      final cashAcc = await loadAccountById(cashControlId);
+      final pettyAcc = await loadAccountById(pettyControlId);
+      final arAcc = await loadAccountById(arControlId);
+      final apAcc = await loadAccountById(apControlId);
+
+      if (!mounted) return;
+      setState(() {
+        _autoBalance = decoded['auto_balance'] as bool? ?? _autoBalance;
+
+        _inventoryAccountId = inventoryId ?? _inventoryAccountId;
+        _equityAccountId = equityId ?? _equityAccountId;
+        _bankControlAccountId = bankControlId ?? _bankControlAccountId;
+        _cashControlAccountId = cashControlId ?? _cashControlAccountId;
+        _pettyControlAccountId = pettyControlId ?? _pettyControlAccountId;
+        _personReceivableAccountId = arControlId ?? _personReceivableAccountId;
+        _personPayableAccountId = apControlId ?? _personPayableAccountId;
+
+        _inventoryAccount = invAcc ?? _inventoryAccount;
+        _equityAccount = eqAcc ?? _equityAccount;
+        _bankControlAccount = bankAcc ?? _bankControlAccount;
+        _cashControlAccount = cashAcc ?? _cashControlAccount;
+        _pettyControlAccount = pettyAcc ?? _pettyControlAccount;
+        _personReceivableAccount = arAcc ?? _personReceivableAccount;
+        _personPayableAccount = apAcc ?? _personPayableAccount;
+
+        _bankCashPettyLines
+          ..clear()
+          ..addAll(bankLines);
+        _personLines
+          ..clear()
+          ..addAll(personLines);
+        _inventoryLines
+          ..clear()
+          ..addAll(inventoryLines);
+
+        _otherAccountLines.clear();
+        for (final rawLine in otherLinesRaw) {
+          if (rawLine is! Map) continue;
+          final m = Map<String, dynamic>.from(rawLine);
+          final accountMap = m['account'] is Map ? Map<String, dynamic>.from(m['account'] as Map) : null;
+          _otherAccountLines.add({
+            'account': accountMap == null
+                ? null
+                : Account(
+                    id: accountMap['id'] as int?,
+                    code: accountMap['code']?.toString() ?? '',
+                    name: accountMap['name']?.toString() ?? '',
+                    accountType: accountMap['account_type']?.toString() ?? 'asset',
+                    businessId: widget.businessId,
+                  ),
+            'debit': (m['debit'] as num?)?.toDouble() ?? 0.0,
+            'credit': (m['credit'] as num?)?.toDouble() ?? 0.0,
+          });
+        }
+      });
+
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'پیش‌نویس ذخیره‌نشده بازیابی شد',
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        );
+      }
+      _lastDraftSnapshot = raw;
+    } catch (_) {}
   }
 
   Future<void> _initializeAccounts() async {
@@ -490,6 +712,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   @override
+  void dispose() {
+    _draftAutoSaveTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     // Guard: view permission
@@ -499,8 +727,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
     final validation = _computeValidation();
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
-    final canSave = !(_loading || !canEdit || (validation['save_disabled'] == true) || isPosted);
-    final canFinalize = !(_loading || !canEdit || (validation['finalize_disabled'] == true) || isPosted);
+    final serverBusy = _submitting != null;
+    final canSave = !(_loading || serverBusy || !canEdit || (validation['save_disabled'] == true) || isPosted);
+    final canFinalize =
+        !(_loading || serverBusy || !canEdit || (validation['finalize_disabled'] == true) || isPosted);
+    final canUnpost = !(_loading || serverBusy || !canEdit || !isPosted);
     final isCompactAppBar = MediaQuery.sizeOf(context).width < 760;
     return Scaffold(
       appBar: AppBar(
@@ -511,50 +742,78 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   tooltip: 'اقدامات',
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
+                    if (serverBusy) return;
                     if (value == 'save' && canSave) _save();
                     if (value == 'finalize' && canFinalize) _post();
+                    if (value == 'unpost' && canUnpost) _confirmUnpost();
                   },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<String>(
-                      value: 'save',
-                      enabled: canSave,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.save_outlined, size: 18),
-                          const SizedBox(width: 8),
-                          Text(t.save),
+                  itemBuilder: (context) => isPosted
+                      ? [
+                          PopupMenuItem<String>(
+                            value: 'unpost',
+                            enabled: canUnpost,
+                            child: const Row(
+                              children: [
+                                Icon(Icons.undo, size: 18),
+                                SizedBox(width: 8),
+                                Text('لغو نهایی‌سازی'),
+                              ],
+                            ),
+                          ),
+                        ]
+                      : [
+                          PopupMenuItem<String>(
+                            value: 'save',
+                            enabled: canSave,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.save_outlined, size: 18),
+                                const SizedBox(width: 8),
+                                Text(t.save),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'finalize',
+                            enabled: canFinalize,
+                            child: const Row(
+                              children: [
+                                Icon(Icons.how_to_reg, size: 18),
+                                SizedBox(width: 8),
+                                Text('نهایی‌سازی'),
+                              ],
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'finalize',
-                      enabled: canFinalize,
-                      child: const Row(
-                        children: [
-                          Icon(Icons.how_to_reg, size: 18),
-                          SizedBox(width: 8),
-                          Text('نهایی‌سازی'),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(width: 8),
               ]
-            : [
-                TextButton.icon(
-                  onPressed: canSave ? _save : null,
-                  icon: const Icon(Icons.save),
-                  label: Text(t.save),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: canFinalize ? _post : null,
-                  icon: const Icon(Icons.how_to_reg),
-                  label: const Text('نهایی‌سازی'),
-                ),
-                const SizedBox(width: 12),
-              ],
+            : isPosted
+                ? [
+                    OutlinedButton.icon(
+                      onPressed: canUnpost ? _confirmUnpost : null,
+                      icon: _toolbarUnpostIcon(),
+                      label: const Text('لغو نهایی‌سازی'),
+                    ),
+                    const SizedBox(width: 12),
+                  ]
+                : [
+                    TextButton.icon(
+                      onPressed: canSave ? _save : null,
+                      icon: _toolbarLeadingIcon(
+                        action: _OpeningBalanceSubmitting.save,
+                        idleIcon: Icons.save,
+                      ),
+                      label: Text(t.save),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: canFinalize ? _post : null,
+                      icon: _toolbarFinalizeIcon(),
+                      label: const Text('نهایی‌سازی'),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -678,14 +937,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
-  bool _isBankCashPettyDuplicate(String type, dynamic refId) {
-    final int? refIdInt = refId is int ? refId : (refId is String ? int.tryParse(refId) : (refId is num ? refId.toInt() : null));
-    if (refIdInt == null) return false;
-    return _bankCashPettyLines.any((line) => 
-      line['type'] == type && (line['refId'] as int? ?? 0) == refIdInt
-    );
-  }
-
   Widget _buildBankCashPettyTab() {
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
@@ -706,17 +957,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 onChanged: (opt) {
                   if (!allowEdit) return;
                   if (opt == null) return;
-                  if (_isBankCashPettyDuplicate('bank', opt.id)) {
-                    if (mounted) {
-                      SnackBarHelper.show(
-                        context,
-                        message: 'این حساب بانکی قبلاً اضافه شده است',
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        isError: true,
-                      );
-                    }
-                    return;
-                  }
                   final bankId = int.tryParse(opt.id);
                   if (bankId == null) return;
                   _bankCashPettyLines.add({
@@ -741,17 +981,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 onChanged: (opt) {
                   if (!allowEdit) return;
                   if (opt == null) return;
-                  if (_isBankCashPettyDuplicate('cash', opt.id)) {
-                    if (mounted) {
-                      SnackBarHelper.show(
-                        context,
-                        message: 'این صندوق قبلاً اضافه شده است',
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        isError: true,
-                      );
-                    }
-                    return;
-                  }
                   final cashId = int.tryParse(opt.id);
                   if (cashId == null) return;
                   _bankCashPettyLines.add({
@@ -776,17 +1005,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 onChanged: (opt) {
                   if (!allowEdit) return;
                   if (opt == null) return;
-                  if (_isBankCashPettyDuplicate('petty', opt.id)) {
-                    if (mounted) {
-                      SnackBarHelper.show(
-                        context,
-                        message: 'این تنخواه قبلاً اضافه شده است',
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        isError: true,
-                      );
-                    }
-                    return;
-                  }
                   final pettyId = int.tryParse(opt.id);
                   if (pettyId == null) return;
                   _bankCashPettyLines.add({
@@ -806,6 +1024,23 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           ],
         ),
         const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            onPressed: allowEdit && _bankCashPettyLines.isNotEmpty
+                ? () {
+                    final last = Map<String, dynamic>.from(_bankCashPettyLines.last);
+                    last['debit'] = 0.0;
+                    last['credit'] = 0.0;
+                    _bankCashPettyLines.add(last);
+                    setState(() {});
+                  }
+                : null,
+            icon: const Icon(Icons.content_copy_outlined),
+            label: const Text('تکرار آخرین سطر'),
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: _bankCashPettyLines.isEmpty
               ? const Center(child: Text('هیچ موردی اضافه نشده است'))
@@ -868,11 +1103,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
-  bool _isPersonDuplicate(int? personId) {
-    if (personId == null) return false;
-    return _personLines.any((line) => line['personId'] == personId);
-  }
-
   Widget _buildPersonsTab() {
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
@@ -887,17 +1117,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             onChanged: (p) {
               if (!allowEdit) return;
               if (p == null) return;
-              if (_isPersonDuplicate(p.id)) {
-                if (mounted) {
-                  SnackBarHelper.show(
-                    context,
-                    message: 'این شخص قبلاً اضافه شده است',
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    isError: true,
-                  );
-                }
-                return;
-              }
               _personLines.add({
                 'personId': p.id, 
                 'personName': p.aliasName ?? 'نامشخص',
@@ -911,6 +1130,23 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           ),
         ),
         const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            onPressed: allowEdit && _personLines.isNotEmpty
+                ? () {
+                    final last = Map<String, dynamic>.from(_personLines.last);
+                    last['debit'] = 0.0;
+                    last['credit'] = 0.0;
+                    _personLines.add(last);
+                    setState(() {});
+                  }
+                : null,
+            icon: const Icon(Icons.content_copy_outlined),
+            label: const Text('تکرار آخرین سطر'),
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: _personLines.isEmpty
               ? const Center(child: Text('هیچ موردی اضافه نشده است'))
@@ -972,15 +1208,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
-  bool _isInventoryDuplicate(int productId, int? warehouseId) {
-    return _inventoryLines.any((line) {
-      final product = line['product'] as Map<String, dynamic>?;
-      final pid = product?['id'] as int?;
-      final wid = line['warehouseId'] as int?;
-      return pid == productId && wid == warehouseId;
-    });
-  }
-
   Widget _buildInventoryTab() {
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
@@ -1001,18 +1228,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   if (p == null) return;
                   final productId = p['id'] as int?;
                   if (productId == null) return;
-                  // چک می‌کنیم که آیا این کالا با انبار null قبلاً اضافه شده یا نه
-                  if (_isInventoryDuplicate(productId, null)) {
-                    if (mounted) {
-                      SnackBarHelper.show(
-                        context,
-                        message: 'این کالا قبلاً اضافه شده است. لطفاً مورد موجود را ویرایش کنید یا حذف کنید',
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        isError: true,
-                      );
-                    }
-                    return;
-                  }
                   _inventoryLines.add({'product': p, 'warehouseId': null, 'quantity': 0.0, 'cost_price': 0.0});
                   setState(() {});
                 },
@@ -1038,6 +1253,23 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           ],
         ),
         const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            onPressed: allowEditInventory && _inventoryLines.isNotEmpty
+                ? () {
+                    final last = Map<String, dynamic>.from(_inventoryLines.last);
+                    last['quantity'] = 0.0;
+                    last['cost_price'] = 0.0;
+                    _inventoryLines.add(last);
+                    setState(() {});
+                  }
+                : null,
+            icon: const Icon(Icons.content_copy_outlined),
+            label: const Text('تکرار آخرین سطر'),
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: _inventoryLines.isEmpty
               ? const Center(child: Text('هیچ موردی اضافه نشده است'))
@@ -1059,29 +1291,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                         selectDefaultWhenUnset: true,
                         onChanged: (wid) {
                           if (!allowEditInventory) return;
-                          final product = m['product'] as Map<String, dynamic>?;
-                          final pid = product?['id'] as int?;
-                          if (pid != null && wid != null) {
-                            final isDuplicate = _inventoryLines.asMap().entries.any((entry) {
-                              if (entry.key == index) return false;
-                              final otherLine = entry.value;
-                              final otherProduct = otherLine['product'] as Map<String, dynamic>?;
-                              final otherPid = otherProduct?['id'] as int?;
-                              final otherWid = otherLine['warehouseId'] as int?;
-                              return otherPid == pid && otherWid == wid;
-                            });
-                            if (isDuplicate) {
-                              if (mounted) {
-                                SnackBarHelper.show(
-                                  context,
-                                  message: 'این کالا با این انبار قبلاً اضافه شده است',
-                                  backgroundColor: Theme.of(context).colorScheme.error,
-                                  isError: true,
-                                );
-                              }
-                              return;
-                            }
-                          }
                           m['warehouseId'] = wid;
                           setState(() {});
                         },
@@ -1116,14 +1325,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
-  bool _isAccountDuplicate(int? accountId) {
-    if (accountId == null) return false;
-    return _otherAccountLines.any((line) {
-      final acc = line['account'] as Account?;
-      return acc?.id == accountId;
-    });
-  }
-
   Widget _buildOtherAccountsTab() {
     final isPosted = (_document?['extra_info']?['posted'] ?? false) == true;
     final canEdit = widget.authStore.hasBusinessPermission('opening_balance', 'edit');
@@ -1143,17 +1344,6 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 onChanged: (acc) {
                   if (!allowEdit) return;
                   if (acc != null) {
-                    if (_isAccountDuplicate(acc.id)) {
-                      if (mounted) {
-                        SnackBarHelper.show(
-                          context,
-                          message: 'این حساب قبلاً اضافه شده است',
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                          isError: true,
-                        );
-                      }
-                      return;
-                    }
                     _otherAccountLines.add({'account': acc, 'debit': 0.0, 'credit': 0.0});
                     setState(() {});
                   }
@@ -1180,6 +1370,23 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           ],
         ),
         const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            onPressed: allowEdit && _otherAccountLines.isNotEmpty
+                ? () {
+                    final last = Map<String, dynamic>.from(_otherAccountLines.last);
+                    last['debit'] = 0.0;
+                    last['credit'] = 0.0;
+                    _otherAccountLines.add(last);
+                    setState(() {});
+                  }
+                : null,
+            icon: const Icon(Icons.content_copy_outlined),
+            label: const Text('تکرار آخرین سطر'),
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: _otherAccountLines.isEmpty
               ? const Center(child: Text('هیچ موردی اضافه نشده است'))
@@ -1517,6 +1724,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Future<void> _save() async {
+    if (_submitting != null) return;
+
     final accountLines = <Map<String, dynamic>>[];
     for (final m in _bankCashPettyLines) {
       final debit = (m['debit'] as double? ?? 0.0);
@@ -1621,16 +1830,17 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (_equityAccountId != null) 'equity_account_id': _equityAccountId,
     };
 
+    setState(() => _submitting = _OpeningBalanceSubmitting.save);
     try {
       final saved = await _service.save(businessId: widget.businessId, payload: payload);
+      if (!mounted) return;
       setState(() => _document = saved);
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: 'ذخیره شد',
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        );
-      }
+      await _clearDraft();
+      SnackBarHelper.show(
+        context,
+        message: 'ذخیره شد',
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -1640,6 +1850,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           isError: true,
         );
       }
+    } finally {
+      if (mounted) setState(() => _submitting = null);
     }
   }
 
@@ -1666,16 +1878,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Future<void> _post() async {
+    if (_submitting != null) return;
+
+    setState(() => _submitting = _OpeningBalanceSubmitting.finalize);
     try {
       final posted = await _service.post(businessId: widget.businessId);
+      if (!mounted) return;
       setState(() => _document = posted);
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: 'تراز افتتاحیه نهایی شد',
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        );
-      }
+      await _clearDraft();
+      SnackBarHelper.show(
+        context,
+        message: 'تراز افتتاحیه نهایی شد',
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -1685,6 +1900,58 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           isError: true,
         );
       }
+    } finally {
+      if (mounted) setState(() => _submitting = null);
+    }
+  }
+
+  Future<void> _confirmUnpost() async {
+    if (_submitting != null) return;
+
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('لغو نهایی‌سازی تراز افتتاحیه'),
+            content: const Text(
+              'فقط در صورتی مجاز است که در همین سال مالی به‌جز سند افتتاحیه، سند حسابداری دیگری ثبت نشده باشد. '
+              'در غیر این صورت پیام خطا از سامانه نشان داده می‌شود.\nآیا ادامه می‌دهید؟',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('خیر')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('بله')),
+            ],
+          ),
+        ) ??
+        false;
+    if (!ok || !mounted) return;
+
+    setState(() => _submitting = _OpeningBalanceSubmitting.unpost);
+    try {
+      final fyIdRaw = _document?['fiscal_year_id'];
+      final int? fiscalYearId =
+          fyIdRaw is int ? fyIdRaw : (fyIdRaw is num ? fyIdRaw.toInt() : int.tryParse('$fyIdRaw'));
+      final restored = await _service.unpost(
+        businessId: widget.businessId,
+        fiscalYearId: fiscalYearId,
+      );
+      if (!mounted) return;
+      setState(() => _document = restored);
+      SnackBarHelper.show(
+        context,
+        message: 'نهایی‌سازی تراز افتتاحیه لغو شد؛ اکنون می‌توانید ویرایش کنید.',
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در لغو نهایی‌سازی: ${ErrorExtractor.forContext(e, context)}',
+          backgroundColor: Theme.of(context).colorScheme.error,
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = null);
     }
   }
 }

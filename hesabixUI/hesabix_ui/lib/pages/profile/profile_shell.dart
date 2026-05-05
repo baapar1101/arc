@@ -26,6 +26,8 @@ class ProfileShell extends StatefulWidget {
 class _ProfileShellState extends State<ProfileShell> {
   /// هم‌تراز با [BusinessShell] — نوار بالای پنل کاربر.
   static const double _kProfileAppBarToolbarHeight = 44;
+  static const Color _kTopMenuBlueLight = Color(0xFF0D47A1);
+  static const Color _kTopMenuBlueDark = Color(0xFF1565C0);
 
   int _hoverIndex = -1;
 
@@ -111,8 +113,12 @@ class _ProfileShellState extends State<ProfileShell> {
       context.go('/login');
     }
 
-    final Color appBarBg = scheme.primary;
-    final Color appBarFg = scheme.onPrimary;
+    final Color appBarBg = isDark ? _kTopMenuBlueDark : _kTopMenuBlueLight;
+    final Brightness appBarBrightness =
+        ThemeData.estimateBrightnessForColor(appBarBg);
+    final Color appBarFg = appBarBrightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
 
     final appBar = AppBar(
       toolbarHeight: _kProfileAppBarToolbarHeight,

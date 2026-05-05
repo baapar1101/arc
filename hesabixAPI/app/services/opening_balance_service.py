@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from adapters.db.models.document import Document
 from app.core.responses import ApiError
 
 
-def _ensure_fiscal_year(db: Session, business_id: int, fiscal_year_id: Optional[int]) -> Tuple[int, date]:
+def _ensure_fiscal_year(db: Session, business_id: int, fiscal_year_id: Optional[int]) -> Tuple[int, date, date]:
     fy_repo = FiscalYearRepository(db)
     fiscal_year = None
     if fiscal_year_id:
@@ -23,7 +23,120 @@ def _ensure_fiscal_year(db: Session, business_id: int, fiscal_year_id: Optional[
         fiscal_year = fy_repo.get_current_for_business(business_id)
         if not fiscal_year:
             raise ApiError("NO_CURRENT_FISCAL_YEAR", "سال مالی فعالی برای این کسب‌وکار یافت نشد", http_status=400)
-    return int(fiscal_year.id), fiscal_year.start_date
+    return int(fiscal_year.id), fiscal_year.start_date, fiscal_year.end_date
+
+
+_CLIENT_CANNOT_SET_EXTRA_INFO_KEYS = frozenset({"posted", "posted_by", "posted_at"})
+
+
+def _norm_ob_amount(v: Any) -> Decimal:
+    try:
+        return Decimal(str(v or 0))
+    except Exception:
+        return Decimal(0)
+
+
+def _validate_opening_balance_no_duplicate_refs(
+    account_lines: List[Dict[str, Any]],
+    inventory_lines: List[Dict[str, Any]],
+) -> None:
+    """
+    جلوگیری از ثبت چند بار همان طرف سندِ وابسته به مرجع (بانک، صندوق، تنخواه، شخص، یا کالا در یک انبار).
+    چند سطر متوالی با یک account_id خالص در «سایر حساب‌ها» مجاز است.
+    """
+    banks: set[int] = set()
+    cash_regs: set[int] = set()
+    petty_ids: set[int] = set()
+    person_ids: set[int] = set()
+
+    for ln in account_lines:
+        debit = _norm_ob_amount(ln.get("debit"))
+        credit = _norm_ob_amount(ln.get("credit"))
+        if debit <= 0 and credit <= 0:
+            continue
+
+        if ln.get("bank_account_id") is not None:
+            bid = int(ln["bank_account_id"])
+            if bid in banks:
+                raise ApiError(
+                    "DUPLICATE_OPENING_BALANCE_BANK",
+                    "حداقل دو سطر برای یک حساب بانکی ثبت شده؛ لطفاً تکراری را ادغام یا حذف کنید.",
+                    http_status=400,
+                )
+            banks.add(bid)
+            continue
+        if ln.get("cash_register_id") is not None:
+            cid = int(ln["cash_register_id"])
+            if cid in cash_regs:
+                raise ApiError(
+                    "DUPLICATE_OPENING_BALANCE_CASH_REGISTER",
+                    "حداقل دو سطر برای یک صندوق ثبت شده؛ لطفاً تکراری را ادغام یا حذف کنید.",
+                    http_status=400,
+                )
+            cash_regs.add(cid)
+            continue
+        if ln.get("petty_cash_id") is not None:
+            pid = int(ln["petty_cash_id"])
+            if pid in petty_ids:
+                raise ApiError(
+                    "DUPLICATE_OPENING_BALANCE_PETTY_CASH",
+                    "حداقل دو سطر برای یک تنخواه ثبت شده؛ لطفاً تکراری را ادغام یا حذف کنید.",
+                    http_status=400,
+                )
+            petty_ids.add(pid)
+            continue
+        if ln.get("person_id") is not None:
+            pid = int(ln["person_id"])
+            if pid in person_ids:
+                raise ApiError(
+                    "DUPLICATE_OPENING_BALANCE_PERSON",
+                    "حداقل دو سطر برای یک شخص ثبت شده؛ لطفاً تکراری را ادغام یا حذف کنید.",
+                    http_status=400,
+                )
+            person_ids.add(pid)
+            continue
+
+    prod_wh: set[Tuple[int, int]] = set()
+    for inv in inventory_lines:
+        qty = _norm_ob_amount(inv.get("quantity"))
+        if qty <= 0:
+            continue
+        info = dict(inv.get("extra_info") or {})
+        wid = info.get("warehouse_id")
+        if wid is None:
+            continue
+        key = (int(inv.get("product_id")), int(wid))
+        if key in prod_wh:
+            raise ApiError(
+                "DUPLICATE_OPENING_BALANCE_PRODUCT_WAREHOUSE",
+                "حداقل دو سطر برای یک کالا در یک انبار ثبت شده؛ لطفاً تکراری را ادغام یا حذف کنید.",
+                http_status=400,
+            )
+        prod_wh.add(key)
+
+
+def _coerce_document_date(raw: Any, fallback: date) -> date:
+    if raw is None or raw == "":
+        return fallback
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw.split("T")[0]).date()
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_DOCUMENT_DATE", "تاریخ سند نامعتبر است", http_status=400)
+    raise ApiError("INVALID_DOCUMENT_DATE", "تاریخ سند نامعتبر است", http_status=400)
+
+
+def _validate_ob_document_date_in_fiscal_year(document_date: date, fy_start: date, fy_end: date) -> None:
+    if document_date < fy_start or document_date > fy_end:
+        raise ApiError(
+            "OPENING_BALANCE_DATE_OUTSIDE_FISCAL_YEAR",
+            "تاریخ سند تراز افتتاحیه باید در بازهٔ سال مالی (از تاریخ شروع تا پایان) باشد",
+            http_status=400,
+        )
 
 
 def _find_existing_ob_document(db: Session, business_id: int, fiscal_year_id: int) -> Optional[Document]:
@@ -47,7 +160,7 @@ def get_opening_balance(
     business_id: int,
     fiscal_year_id: Optional[int],
 ) -> Optional[Dict[str, Any]]:
-    fy_id, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     existing = _find_existing_ob_document(db, business_id, fy_id)
     if not existing:
         return None
@@ -67,7 +180,10 @@ def _merge_opening_balance_extra_info(
     merged: Dict[str, Any] = dict(existing.extra_info or {}) if existing else {}
     incoming = data.get("extra_info")
     if isinstance(incoming, dict):
-        merged.update(incoming)
+        for k, v in incoming.items():
+            if k in _CLIENT_CANNOT_SET_EXTRA_INFO_KEYS:
+                continue
+            merged[k] = v
     merged["auto_balance_to_equity"] = bool(auto_balance_to_equity)
     if inventory_account_id is not None:
         merged["inventory_account_id"] = int(inventory_account_id)
@@ -85,7 +201,7 @@ def upsert_opening_balance(
     data: Dict[str, Any],
 ) -> Dict[str, Any]:
     repo = DocumentRepository(db)
-    fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
+    fy_id, fy_start_date, fy_end_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
     existing = _find_existing_ob_document(db, business_id, fy_id)
     if existing and (existing.extra_info or {}).get("posted") is True:
         raise ApiError(
@@ -94,7 +210,8 @@ def upsert_opening_balance(
             http_status=409,
         )
 
-    document_date = data.get("document_date") or fy_start_date
+    document_date = _coerce_document_date(data.get("document_date"), fy_start_date)
+    _validate_ob_document_date_in_fiscal_year(document_date, fy_start_date, fy_end_date)
     currency_id = data.get("currency_id")
     if not currency_id:
         raise ApiError("CURRENCY_REQUIRED", "currency_id الزامی است", http_status=400)
@@ -104,6 +221,8 @@ def upsert_opening_balance(
     inventory_account_id: Optional[int] = data.get("inventory_account_id")
     auto_balance_to_equity: bool = bool(data.get("auto_balance_to_equity", False))
     equity_account_id: Optional[int] = data.get("equity_account_id")
+
+    _validate_opening_balance_no_duplicate_refs(account_lines, inventory_lines)
 
     # Build document lines
     lines: List[Dict[str, Any]] = []
@@ -254,9 +373,10 @@ def preview_opening_balance(
 ) -> Dict[str, Any]:
     """پیش‌نمایش تراز افتتاحیه بدون ذخیره"""
     repo = DocumentRepository(db)
-    fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
+    fy_id, fy_start_date, fy_end_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
 
-    document_date = data.get("document_date") or fy_start_date
+    document_date = _coerce_document_date(data.get("document_date"), fy_start_date)
+    _validate_ob_document_date_in_fiscal_year(document_date, fy_start_date, fy_end_date)
     currency_id = data.get("currency_id")
     if not currency_id:
         raise ApiError("CURRENCY_REQUIRED", "currency_id الزامی است", http_status=400)
@@ -266,6 +386,8 @@ def preview_opening_balance(
     inventory_account_id: Optional[int] = data.get("inventory_account_id")
     auto_balance_to_equity: bool = bool(data.get("auto_balance_to_equity", False))
     equity_account_id: Optional[int] = data.get("equity_account_id")
+
+    _validate_opening_balance_no_duplicate_refs(account_lines, inventory_lines)
 
     # Build document lines (بدون ذخیره)
     lines: List[Dict[str, Any]] = []
@@ -402,7 +524,7 @@ def post_opening_balance(
     user_id: int,
     fiscal_year_id: Optional[int],
 ) -> Dict[str, Any]:
-    fy_id, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     existing = _find_existing_ob_document(db, business_id, fy_id)
     if not existing:
         raise ApiError("OPENING_BALANCE_NOT_FOUND", "سند تراز افتتاحیه برای این سال مالی یافت نشد", http_status=404)
@@ -417,6 +539,74 @@ def post_opening_balance(
     updated = repo.update_document(existing.id, payload)
     if not updated:
         raise ApiError("POST_FAILED", "نهایی‌سازی تراز افتتاحیه ناموفق بود", http_status=500)
+    return repo.get_document_details(updated.id) or {}
+
+
+def unpost_opening_balance(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    fiscal_year_id: Optional[int],
+    request: Any = None,
+) -> Dict[str, Any]:
+    """لغو نهایی‌سازی؛ فقط وقتی مجاز است که جز سند افتتاحیه، سند حسابداری دیگری در همان سال مالی نباشد."""
+    fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    existing = _find_existing_ob_document(db, business_id, fy_id)
+    if not existing:
+        raise ApiError("OPENING_BALANCE_NOT_FOUND", "سند تراز افتتاحیه برای این سال مالی یافت نشد", http_status=404)
+
+    extra = dict(existing.extra_info or {})
+    if extra.get("posted") is not True:
+        return DocumentRepository(db).to_dict_with_lines(existing)
+
+    from sqlalchemy import and_
+
+    other_count = (
+        db.query(Document)
+        .filter(
+            and_(
+                Document.business_id == int(business_id),
+                Document.fiscal_year_id == int(fy_id),
+                Document.document_type != "opening_balance",
+            )
+        )
+        .count()
+    )
+    if other_count > 0:
+        raise ApiError(
+            "OPENING_BALANCE_UNPOST_BLOCKED",
+            "به‌دلیل ثبت اسناد دیگر در همین سال مالی، لغو نهایی‌سازی تراز افتتاحیه مجاز نیست",
+            http_status=409,
+        )
+
+    extra["posted"] = False
+    extra.pop("posted_by", None)
+
+    repo = DocumentRepository(db)
+    updated = repo.update_document(existing.id, {"extra_info": extra})
+    if not updated:
+        raise ApiError("UNPOST_FAILED", "لغو نهایی‌سازی تراز افتتاحیه ناموفق بود", http_status=500)
+
+    try:
+        from app.services.activity_log_service import log_activity
+
+        log_activity(
+            db,
+            user_id=int(user_id),
+            category="accounting",
+            action="opening_balance_unpost",
+            description="لغو نهایی‌سازی تراز افتتاحیه",
+            business_id=int(business_id),
+            entity_type="document",
+            entity_id=int(existing.id),
+            before_data={"posted": True},
+            after_data={"posted": False},
+            request=request,
+        )
+        db.commit()
+    except Exception:
+        pass
+
     return repo.get_document_details(updated.id) or {}
 
 

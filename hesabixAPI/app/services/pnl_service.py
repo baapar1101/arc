@@ -129,7 +129,7 @@ def get_pnl_period_report(
             'pagination': اطلاعات pagination
         }
     """
-    fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    fy_id, fy_start_date, _fy_end = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     
     # تبدیل تاریخ‌ها
     date_from_obj = None
@@ -300,7 +300,7 @@ def get_pnl_cumulative_report(
             'pagination': اطلاعات pagination
         }
     """
-    fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    fy_id, fy_start_date, _fy_end = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     
     # تاریخ پایان
     date_to_obj = None

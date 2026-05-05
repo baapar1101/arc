@@ -76,9 +76,11 @@ class BusinessShell extends StatefulWidget {
 class _BusinessShellState extends State<BusinessShell> {
   /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
   static const double _kBizAppBarToolbarHeight = 44;
-  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی بلندتر برای تب‌های ثابت و ظاهر حرفه‌ای.
-  static const double _kUnifiedBizTabBarHeight = 48;
-  static const double _kBizTabStripVerticalPadding = 7;
+  static const Color _kTopMenuBlueLight = Color(0xFF0D47A1);
+  static const Color _kTopMenuBlueDark = Color(0xFF1565C0);
+  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی فشرده‌تر از قبل.
+  static const double _kUnifiedBizTabBarHeight = 44;
+  static const double _kBizTabStripVerticalPadding = 6;
   /// ارتفاع ثابت بدنهٔ هر تب داخل نوار (نوار − پدینگ عمودی).
   static const double _kBizTabChipInnerHeight =
       _kUnifiedBizTabBarHeight - (_kBizTabStripVerticalPadding * 2);
@@ -1154,6 +1156,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // ساختار متمرکز منو
     final allMenuItems = <_MenuItem>[
       _MenuItem(
+        key: 'dashboard',
         label: t.businessDashboard,
         icon: Icons.dashboard_outlined,
         selectedIcon: Icons.dashboard,
@@ -1161,6 +1164,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.simple,
       ),
       _MenuItem(
+        key: 'sep_practical_tools',
         label: t.practicalTools,
         icon: Icons.category,
         selectedIcon: Icons.category,
@@ -1168,6 +1172,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
+        key: 'persons',
         label: t.people,
         icon: Icons.people,
         selectedIcon: Icons.people,
@@ -1176,6 +1181,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'group:products',
         label: t.productsAndServices,
         icon: Icons.inventory_2,
         selectedIcon: Icons.inventory_2,
@@ -1183,6 +1189,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'products',
             label: t.products,
             icon: Icons.shopping_cart,
             selectedIcon: Icons.shopping_cart,
@@ -1191,6 +1198,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'categories',
             label: t.categories,
             icon: Icons.category,
             selectedIcon: Icons.category,
@@ -1199,6 +1207,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'product-attributes',
             label: t.productAttributes,
             icon: Icons.tune,
             selectedIcon: Icons.tune,
@@ -1209,6 +1218,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'group:accounts',
         label: t.banking,
         icon: Icons.account_balance,
         selectedIcon: Icons.account_balance,
@@ -1216,6 +1226,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'accounts',
             label: t.accounts,
             icon: Icons.account_balance_wallet,
             selectedIcon: Icons.account_balance_wallet,
@@ -1224,6 +1235,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'petty-cash',
             label: t.pettyCash,
             icon: Icons.money,
             selectedIcon: Icons.money,
@@ -1232,6 +1244,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'cash-box',
             label: t.cashBox,
             icon: Icons.savings,
             selectedIcon: Icons.savings,
@@ -1240,6 +1253,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'wallet',
             label: t.wallet,
             icon: Icons.wallet,
             selectedIcon: Icons.wallet,
@@ -1250,6 +1264,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'sep_accounting',
         label: t.accounting,
         icon: Icons.calculate,
         selectedIcon: Icons.calculate,
@@ -1257,6 +1272,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
+        key: 'quick-sales',
         label: 'فروش سریع',
         icon: Icons.point_of_sale,
         selectedIcon: Icons.point_of_sale,
@@ -1265,6 +1281,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'invoice',
         label: t.invoice,
         icon: Icons.receipt,
         selectedIcon: Icons.receipt,
@@ -1273,14 +1290,16 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'receipts-payments',
         label: t.receiptsAndPayments,
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
         path: _bu('receipts-payments'),
         type: _MenuItemType.simple,
         hasAddButton: true,
-      ), 
+      ),
       _MenuItem(
+        key: 'expense-income',
         label: t.expenseAndIncome,
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
@@ -1289,6 +1308,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'transfers',
         label: t.transfers,
         icon: Icons.swap_horiz,
         selectedIcon: Icons.swap_horiz,
@@ -1297,6 +1317,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'checks',
         label: t.checks,
         icon: Icons.receipt_long,
         selectedIcon: Icons.receipt_long,
@@ -1305,6 +1326,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'documents',
         label: t.documents,
         icon: Icons.description,
         selectedIcon: Icons.description,
@@ -1313,6 +1335,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'group:chart-of-accounts',
         label: t.accountingMenu,
         icon: Icons.calculate,
         selectedIcon: Icons.calculate,
@@ -1320,6 +1343,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'chart-of-accounts',
             label: t.chartOfAccounts,
             icon: Icons.table_chart,
             selectedIcon: Icons.table_chart,
@@ -1328,6 +1352,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'opening-balance',
             label: t.openingBalance,
             icon: Icons.play_arrow,
             selectedIcon: Icons.play_arrow,
@@ -1336,6 +1361,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'year-end-closing',
             label: t.yearEndClosing,
             icon: Icons.stop,
             selectedIcon: Icons.stop,
@@ -1344,6 +1370,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'currency-revaluation',
             label: t.currencyRevaluation,
             icon: Icons.payments,
             selectedIcon: Icons.payments,
@@ -1354,6 +1381,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'reports',
         label: t.reports,
         icon: Icons.assessment,
         selectedIcon: Icons.assessment,
@@ -1362,6 +1390,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'sep_services_plugins',
         label: t.servicesAndPlugins,
         icon: Icons.extension,
         selectedIcon: Icons.extension,
@@ -1369,6 +1398,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
+        key: 'group:warehouses',
         label: t.warehouseManagement,
         icon: Icons.warehouse,
         selectedIcon: Icons.warehouse,
@@ -1376,6 +1406,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'warehouses',
             label: t.warehouses,
             icon: Icons.store,
             selectedIcon: Icons.store,
@@ -1384,6 +1415,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'warehouse-docs',
             label: 'حواله‌های انبار',
             icon: Icons.description,
             selectedIcon: Icons.description,
@@ -1392,6 +1424,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'stock-count',
             label: 'انبار گردانی',
             icon: Icons.inventory,
             selectedIcon: Icons.inventory,
@@ -1402,6 +1435,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'storage-files',
         label: t.storageSpace,
         icon: Icons.storage,
         selectedIcon: Icons.storage,
@@ -1410,6 +1444,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'tax-workspace',
         label: t.taxpayers,
         icon: Icons.account_balance,
         selectedIcon: Icons.account_balance,
@@ -1418,6 +1453,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'group:ai',
         label: 'هوش مصنوعی',
         icon: Icons.smart_toy_outlined,
         selectedIcon: Icons.smart_toy,
@@ -1425,6 +1461,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'ai/subscription',
             label: 'اشتراک AI',
             icon: Icons.subscriptions_outlined,
             selectedIcon: Icons.subscriptions,
@@ -1433,6 +1470,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'ai/usage',
             label: 'آمار استفاده',
             icon: Icons.bar_chart_outlined,
             selectedIcon: Icons.bar_chart,
@@ -1443,6 +1481,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'workflows',
         label: workflowLabel,
         icon: Icons.hub_outlined,
         selectedIcon: Icons.hub,
@@ -1451,6 +1490,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'group:crm',
         label: 'CRM',
         icon: Icons.handshake_outlined,
         selectedIcon: Icons.handshake,
@@ -1458,6 +1498,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'crm/dashboard',
             label: 'داشبورد',
             icon: Icons.dashboard_outlined,
             selectedIcon: Icons.dashboard,
@@ -1466,6 +1507,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'crm/notes-calendar',
             label: t.crmMenuNotesCalendar,
             icon: Icons.calendar_month_outlined,
             selectedIcon: Icons.calendar_month,
@@ -1474,6 +1516,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'crm/web-chat',
             label: 'چت وب',
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
@@ -1482,6 +1525,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'crm/process-definitions',
             label: 'فرایندها و مراحل قیف',
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
@@ -1490,6 +1534,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/leads',
             label: 'سرنخ‌ها',
             icon: Icons.contact_phone_outlined,
             selectedIcon: Icons.contact_phone,
@@ -1498,6 +1543,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/deals',
             label: 'فرصت‌های فروش',
             icon: Icons.trending_up_outlined,
             selectedIcon: Icons.trending_up,
@@ -1506,6 +1552,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/activities',
             label: 'فعالیت‌ها',
             icon: Icons.history,
             selectedIcon: Icons.history,
@@ -1514,6 +1561,7 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/reports',
             label: 'گزارشات',
             icon: Icons.assessment_outlined,
             selectedIcon: Icons.assessment,
@@ -1524,6 +1572,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        key: 'warranty',
         label: t.warranty ?? 'گارانتی',
         icon: Icons.verified_user,
         selectedIcon: Icons.verified_user,
@@ -1532,6 +1581,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'repair-shop',
         label: 'تعمیرگاه',
         icon: Icons.build_circle_outlined,
         selectedIcon: Icons.build_circle,
@@ -1540,6 +1590,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'customer-club',
         label: t.customerClubMenu,
         icon: Icons.card_giftcard_outlined,
         selectedIcon: Icons.card_giftcard,
@@ -1548,6 +1599,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'distribution',
         label: t.distributionMenu,
         icon: Icons.local_shipping_outlined,
         selectedIcon: Icons.local_shipping,
@@ -1556,6 +1608,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'zohal/inquiries',
         label: 'استعلامات',
         icon: Icons.search_outlined,
         selectedIcon: Icons.search,
@@ -1564,6 +1617,7 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'sep_others',
         label: t.others,
         icon: Icons.more_horiz,
         selectedIcon: Icons.more_horiz,
@@ -1571,6 +1625,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
+        key: 'settings',
         label: t.settings,
         icon: Icons.settings,
         selectedIcon: Icons.settings,
@@ -1578,6 +1633,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.simple,
       ),
       _MenuItem(
+        key: 'report-templates',
         label: t.templates,
         icon: Icons.picture_as_pdf,
         selectedIcon: Icons.picture_as_pdf,
@@ -1585,6 +1641,7 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.simple,
       ),
       _MenuItem(
+        key: 'plugin-marketplace',
         label: t.pluginMarketplace,
         icon: Icons.store,
         selectedIcon: Icons.store,
@@ -1933,8 +1990,12 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
 
-    final Color appBarBg = scheme.primary;
-    final Color appBarFg = scheme.onPrimary;
+    final Color appBarBg = isDark ? _kTopMenuBlueDark : _kTopMenuBlueLight;
+    final Brightness appBarBrightness =
+        ThemeData.estimateBrightnessForColor(appBarBg);
+    final Color appBarFg = appBarBrightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
 
     final appBar = AppBar(
       toolbarHeight: _kBizAppBarToolbarHeight,
@@ -2968,7 +3029,8 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     final visibleRoot = items
-        .where((item) => !hidden.contains(_menuKey(item)))
+        .where((item) =>
+            item.type == _MenuItemType.separator || !hidden.contains(_menuKey(item)))
         .map((item) => item.type == _MenuItemType.expandable
             ? item.copyWith(children: applyChildren(item))
             : item)
@@ -2977,6 +3039,15 @@ class _BusinessShellState extends State<BusinessShell> {
     final order = _menuPreferences.rootOrder;
     if (order.isEmpty) return visibleRoot;
     final byKey = <String, _MenuItem>{for (final it in visibleRoot) _menuKey(it): it};
+    final nonSepKeys =
+        byKey.entries.where((e) => e.value.type != _MenuItemType.separator).map((e) => e.key).toSet();
+    // اگر ترجیحات قدیمی/ناسازگار باشند، ترتیب پیش‌فرض فعلی حفظ شود (جداکننده‌ها در محاسبه لحاظ نمی‌شوند).
+    final knownNonSep =
+        order.where(nonSepKeys.contains).length;
+    final knownCount = knownNonSep;
+    if (knownCount < 3 || knownCount * 3 < byKey.length) {
+      return visibleRoot;
+    }
     final out = <_MenuItem>[];
     for (final key in order) {
       final found = byKey.remove(key);

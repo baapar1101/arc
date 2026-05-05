@@ -7,6 +7,12 @@ import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/business_menu_preferences_service.dart';
 
+/// کلیدهای جداکننده در [business_shell] — همیشه در rootOrder حفظ می‌شوند.
+const String _sepPracticalTools = 'sep_practical_tools';
+const String _sepAccounting = 'sep_accounting';
+const String _sepServicesPlugins = 'sep_services_plugins';
+const String _sepOthers = 'sep_others';
+
 class AppearanceSettingsPage extends StatefulWidget {
   const AppearanceSettingsPage({super.key});
 
@@ -26,28 +32,140 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       BusinessMenuPreferencesService(ApiClient());
   List<BusinessWithPermission> _businesses = const [];
   int? _selectedBusinessId;
-  List<String> _rootOrder = const [];
-  Set<String> _hiddenKeys = <String>{};
   bool _menuPrefsLoading = false;
 
-  static const List<_MenuEditorItem> _menuCatalog = <_MenuEditorItem>[
-    _MenuEditorItem(key: 'dashboard', labelFa: 'داشبورد'),
-    _MenuEditorItem(key: 'persons', labelFa: 'اشخاص'),
-    _MenuEditorItem(key: 'group:products', labelFa: 'کالاها و خدمات'),
-    _MenuEditorItem(key: 'group:bank-accounts', labelFa: 'بانکداری'),
-    _MenuEditorItem(key: 'group:chart-of-accounts', labelFa: 'حسابداری'),
-    _MenuEditorItem(key: 'group:warehouses', labelFa: 'مدیریت انبار'),
-    _MenuEditorItem(key: 'group:ai', labelFa: 'هوش مصنوعی'),
-    _MenuEditorItem(key: 'group:crm', labelFa: 'CRM'),
-    _MenuEditorItem(key: 'warranty', labelFa: 'گارانتی'),
-    _MenuEditorItem(key: 'repair-shop', labelFa: 'تعمیرگاه'),
-    _MenuEditorItem(key: 'customer-club', labelFa: 'باشگاه مشتریان'),
-    _MenuEditorItem(key: 'distribution', labelFa: 'پخش مویرگی'),
-    _MenuEditorItem(key: 'zohal/inquiries', labelFa: 'استعلامات'),
-    _MenuEditorItem(key: 'settings', labelFa: 'تنظیمات'),
-    _MenuEditorItem(key: 'report-templates', labelFa: 'قالب‌ها'),
-    _MenuEditorItem(key: 'plugin-marketplace', labelFa: 'بازار افزونه‌ها'),
+  /// ترتیب ریشه بدون داشبورد و بدون جداکننده‌ها (فقط برای بخش‌های چهارگانه).
+  List<String> _orderPractical = [];
+  List<String> _orderAccounting = [];
+  List<String> _orderPrograms = [];
+  List<String> _orderOther = [];
+
+  Set<String> _hiddenKeys = <String>{};
+  Map<String, List<String>> _childrenOrder = {};
+
+  static const List<String> _defaultOrderPractical = [
+    'persons',
+    'group:products',
+    'group:accounts',
   ];
+
+  static const List<String> _defaultOrderAccounting = [
+    'quick-sales',
+    'invoice',
+    'receipts-payments',
+    'expense-income',
+    'transfers',
+    'checks',
+    'documents',
+    'group:chart-of-accounts',
+    'reports',
+  ];
+
+  static const List<String> _defaultOrderPrograms = [
+    'group:warehouses',
+    'storage-files',
+    'tax-workspace',
+    'group:ai',
+    'workflows',
+    'group:crm',
+    'warranty',
+    'repair-shop',
+    'customer-club',
+    'distribution',
+    'zohal/inquiries',
+  ];
+
+  static const List<String> _defaultOrderOther = [
+    'settings',
+    'report-templates',
+    'plugin-marketplace',
+  ];
+
+  static const Map<String, List<String>> _defaultChildrenOrder = {
+    'group:products': ['products', 'categories', 'product-attributes'],
+    'group:accounts': ['accounts', 'petty-cash', 'cash-box', 'wallet'],
+    'group:chart-of-accounts': [
+      'chart-of-accounts',
+      'opening-balance',
+      'year-end-closing',
+      'currency-revaluation',
+    ],
+    'group:warehouses': ['warehouses', 'warehouse-docs', 'stock-count'],
+    'group:ai': ['ai/subscription', 'ai/usage'],
+    'group:crm': [
+      'crm/dashboard',
+      'crm/notes-calendar',
+      'crm/web-chat',
+      'crm/process-definitions',
+      'crm/leads',
+      'crm/deals',
+      'crm/activities',
+      'crm/reports',
+    ],
+  };
+
+  /// برچسب نمایشی آیتم ریشه (فقط فارسی؛ با منوی فعلی هم‌خوان است).
+  static const Map<String, String> _rootLabelsFa = {
+    'dashboard': 'داشبورد',
+    'persons': 'اشخاص',
+    'group:products': 'کالاها و خدمات',
+    'group:accounts': 'بانکداری',
+    'quick-sales': 'فروش سریع',
+    'invoice': 'فاکتور',
+    'receipts-payments': 'دریافت و پرداخت',
+    'expense-income': 'هزینه و درآمد',
+    'transfers': 'انتقال وجه',
+    'checks': 'چک‌ها',
+    'documents': 'اسناد',
+    'group:chart-of-accounts': 'حسابداری پیشرفته',
+    'reports': 'گزارش‌ها',
+    'group:warehouses': 'مدیریت انبار',
+    'storage-files': 'فضای ذخیره‌سازی',
+    'tax-workspace': 'مودیان',
+    'group:ai': 'هوش مصنوعی',
+    'workflows': 'اتوماسیون‌ها',
+    'group:crm': 'CRM',
+    'warranty': 'گارانتی',
+    'repair-shop': 'تعمیرگاه',
+    'customer-club': 'باشگاه مشتریان',
+    'distribution': 'پخش مویرگی',
+    'zohal/inquiries': 'استعلامات',
+    'settings': 'تنظیمات',
+    'report-templates': 'قالب‌ها',
+    'plugin-marketplace': 'بازار افزونه‌ها',
+  };
+
+  static const Map<String, String> _childLabelsFa = {
+    'products': 'کالاها',
+    'categories': 'دسته‌بندی‌ها',
+    'product-attributes': 'خصوصیات کالا',
+    'accounts': 'حساب‌های بانکی',
+    'petty-cash': 'تنخواه',
+    'cash-box': 'صندوق',
+    'wallet': 'کیف‌پول',
+    'chart-of-accounts': 'جدول حساب‌ها',
+    'opening-balance': 'مانده اول دوره',
+    'year-end-closing': 'بستن سال مالی',
+    'currency-revaluation': 'محاسبات ارزی',
+    'warehouses': 'انبارها',
+    'warehouse-docs': 'حواله‌های انبار',
+    'stock-count': 'انبار گردانی',
+    'ai/subscription': 'اشتراک AI',
+    'ai/usage': 'آمار استفاده',
+    'crm/dashboard': 'داشبورد CRM',
+    'crm/notes-calendar': 'یادداشت‌ها و تقویم',
+    'crm/web-chat': 'چت وب',
+    'crm/process-definitions': 'فرایندها و مراحل قیف',
+    'crm/leads': 'سرنخ‌ها',
+    'crm/deals': 'فرصت‌های فروش',
+    'crm/activities': 'فعالیت‌ها',
+    'crm/reports': 'گزارشات CRM',
+  };
+
+  /// نگاشت کلیدهای قدیمی (در صورت ذخیره قبلی) به کلیدهای فعلی.
+  static final Map<String, String> _legacyRootKeyMigrate = {
+    'group:bank-accounts': 'group:accounts',
+  };
 
   @override
   void initState() {
@@ -55,87 +173,149 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await BusinessPanelUiStore.instance.hydrateIfNeeded();
-      final auth = ApiClient.getAuthStore();
-      _businesses = await _businessService.getUserBusinesses();
-      _selectedBusinessId = auth?.currentBusiness?.id ?? (_businesses.isNotEmpty ? _businesses.first.id : null);
-      await _loadMenuPrefsForSelectedBusiness();
-      if (!mounted) return;
-      final store = BusinessPanelUiStore.instance;
-      setState(() {
-        _draft = store.mode;
-        _draftSidebarTabBehavior = store.sidebarTabBehavior;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+  String _migrateKey(String key) => _legacyRootKeyMigrate[key] ?? key;
+
+  static const Map<String, String> _legacyChildKeyMigrate = {
+    'product_attributes': 'product-attributes',
+  };
+
+  String _migrateChildKey(String key) =>
+      _legacyChildKeyMigrate[key] ?? _migrateKey(key);
+
+  String _migrateAnyMenuKey(String key) => _migrateChildKey(key);
+
+  List<String> _mergeOrder(List<String> saved, List<String> defaults) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final k in saved.map(_migrateKey)) {
+      if (!defaults.contains(k)) continue;
+      if (seen.add(k)) out.add(k);
     }
+    for (final k in defaults) {
+      if (seen.add(k)) out.add(k);
+    }
+    return out;
   }
 
-  Future<void> _loadMenuPrefsForSelectedBusiness() async {
-    final bid = _selectedBusinessId;
-    if (bid == null) return;
-    _menuPrefsLoading = true;
-    try {
-      final prefs = await _menuPreferencesService.getPreferences(bid);
-      final defaultOrder = _menuCatalog.map((e) => e.key).toList();
-      final ordered = <String>[];
-      for (final key in prefs.rootOrder) {
-        if (defaultOrder.contains(key) && !ordered.contains(key)) ordered.add(key);
-      }
-      for (final key in defaultOrder) {
-        if (!ordered.contains(key)) ordered.add(key);
-      }
-      _rootOrder = ordered;
-      _hiddenKeys = prefs.hiddenKeys.toSet();
-    } catch (_) {
-      _rootOrder = _menuCatalog.map((e) => e.key).toList();
-      _hiddenKeys = <String>{};
-    } finally {
-      _menuPrefsLoading = false;
+  Map<String, List<String>> _mergedChildrenOrder(Map<String, List<String>>? fromServer) {
+    final merged = <String, List<String>>{};
+    for (final entry in _defaultChildrenOrder.entries) {
+      final parent = entry.key;
+      final defaults = entry.value;
+      final rawSaved = fromServer?[parent];
+      merged[parent] = _mergeChildOrder(rawSaved, defaults);
     }
+    return merged;
   }
 
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      await BusinessPanelUiStore.instance.updateAppearancePreferences(
-        navigationMode: _draft,
-        sidebarTabBehavior: _draftSidebarTabBehavior,
-      );
-      final bid = _selectedBusinessId;
-      if (bid != null) {
-        await _menuPreferencesService.putPreferences(
-          bid,
-          BusinessMenuPreferencesDto(
-            rootOrder: _rootOrder,
-            hiddenKeys: _hiddenKeys.toList(),
-            childrenOrder: const {},
-          ),
-        );
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).appearanceSaved)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).appearanceSaveError)),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
+  List<String> _mergeChildOrder(List<String>? saved, List<String> defaults) {
+    final migrated = saved?.map(_migrateChildKey).toList() ?? const <String>[];
+    return _mergeOrder(migrated, defaults);
+  }
+
+  List<String> _canonicalFlatRoot() {
+    return [
+      'dashboard',
+      _sepPracticalTools,
+      ..._orderPractical,
+      _sepAccounting,
+      ..._orderAccounting,
+      _sepServicesPlugins,
+      ..._orderPrograms,
+      _sepOthers,
+      ..._orderOther,
+    ];
+  }
+
+  void _applyBucketsFromFlat(List<String> flat) {
+    List<String> norm = flat.map(_migrateKey).toList();
+
+    int indexOfSep(String sep) {
+      final i = norm.indexWhere((e) => e == sep);
+      return i;
     }
+
+    final ip = indexOfSep(_sepPracticalTools);
+    final ia = indexOfSep(_sepAccounting);
+    final ig = indexOfSep(_sepServicesPlugins);
+    final io = indexOfSep(_sepOthers);
+
+    if (ip < 0 || ia < ip || ig < ia || io < ig) {
+      _bucketingFallbackFromMixedOrder(
+        norm.where((k) => k != 'dashboard' && !k.startsWith('sep_')).toList(),
+      );
+      return;
+    }
+
+    List<String> sliceExclusive(int lo, int hi) {
+      if (hi <= lo + 1) return [];
+      final sub = norm.sublist(lo + 1, hi);
+      return sub.where((k) => k != 'dashboard' && !k.startsWith('sep_')).toList();
+    }
+
+    List<String> tailExclusive(int sepIndex) {
+      if (sepIndex < 0 || sepIndex + 1 >= norm.length) return [];
+      final sub = norm.sublist(sepIndex + 1);
+      return sub.where((k) => k != 'dashboard' && !k.startsWith('sep_')).toList();
+    }
+
+    final p = sliceExclusive(ip, ia);
+    final a = sliceExclusive(ia, ig);
+    final g = sliceExclusive(ig, io);
+    final o = tailExclusive(io);
+
+    _orderPractical = _mergeOrder(p, _defaultOrderPractical);
+    _orderAccounting = _mergeOrder(a, _defaultOrderAccounting);
+    _orderPrograms = _mergeOrder(g, _defaultOrderPrograms);
+    _orderOther = _mergeOrder(o, _defaultOrderOther);
+  }
+
+  /// وقتی rootOrder بدون sep ذخیره شده یا جداکننده‌ها نامعتبر باشند؛ بر اساس «عضویت کلید در بلوک پیش‌فرض» خرد می‌شود.
+  void _bucketingFallbackFromMixedOrder(List<String> keysWithoutSepOrDashboard) {
+    final p = <String>[];
+    final a = <String>[];
+    final g = <String>[];
+    final o = <String>[];
+
+    for (final key in keysWithoutSepOrDashboard) {
+      final k = _migrateKey(key);
+      if (k.startsWith('sep_')) continue;
+      if (_defaultOrderPractical.contains(k)) {
+        p.add(k);
+      } else if (_defaultOrderAccounting.contains(k)) {
+        a.add(k);
+      } else if (_defaultOrderPrograms.contains(k)) {
+        g.add(k);
+      } else if (_defaultOrderOther.contains(k)) {
+        o.add(k);
+      }
+    }
+
+    _orderPractical = _mergeOrder(p, _defaultOrderPractical);
+    _orderAccounting = _mergeOrder(a, _defaultOrderAccounting);
+    _orderPrograms = _mergeOrder(g, _defaultOrderPrograms);
+    _orderOther = _mergeOrder(o, _defaultOrderOther);
+  }
+
+  void _deserializeFromPrefs(BusinessMenuPreferencesDto prefs) {
+    final flat = prefs.rootOrder.map(_migrateAnyMenuKey).toList();
+    if (flat.any((k) =>
+        k == _sepPracticalTools ||
+        k == _sepAccounting ||
+        k == _sepServicesPlugins ||
+        k == _sepOthers)) {
+      _applyBucketsFromFlat(flat);
+    } else {
+      // قدیمی: لیست بدون جداکننده
+      _bucketingFallbackFromMixedOrder(
+        flat.where((k) => k != 'dashboard' && !k.startsWith('sep_')).toList(),
+      );
+    }
+
+    final hiddenRaw = prefs.hiddenKeys.map(_migrateAnyMenuKey).where((k) => !k.startsWith('sep_')).toSet();
+    _hiddenKeys = hiddenRaw;
+
+    _childrenOrder = _mergedChildrenOrder(prefs.childrenOrder);
   }
 
   @override
@@ -272,60 +452,26 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                     const SizedBox(height: 12),
                     if (_menuPrefsLoading)
                       const LinearProgressIndicator()
-                    else
-                      SizedBox(
-                        height: 360,
-                        child: ReorderableListView.builder(
-                          buildDefaultDragHandles: false,
-                          itemCount: _rootOrder.length,
-                          onReorder: (oldIndex, newIndex) {
-                            setState(() {
-                              if (newIndex > oldIndex) newIndex--;
-                              final item = _rootOrder.removeAt(oldIndex);
-                              _rootOrder.insert(newIndex, item);
-                            });
-                          },
-                          itemBuilder: (context, index) {
-                            final key = _rootOrder[index];
-                            final item = _menuCatalog.firstWhere(
-                              (e) => e.key == key,
-                              orElse: () => _MenuEditorItem(key: key, labelFa: key),
-                            );
-                            final hidden = _hiddenKeys.contains(key);
-                            return ListTile(
-                              key: ValueKey('menu_pref_$key'),
-                              leading: ReorderableDragStartListener(
-                                index: index,
-                                child: const Icon(Icons.drag_indicator),
-                              ),
-                              title: Text(item.labelFa),
-                              subtitle: Text(
-                                hidden ? 'مخفی' : 'نمایش',
-                                style: TextStyle(
-                                  color: hidden ? theme.colorScheme.error : theme.colorScheme.primary,
-                                ),
-                              ),
-                              trailing: Switch(
-                                value: !hidden,
-                                onChanged: _saving
-                                    ? null
-                                    : (v) {
-                                        setState(() {
-                                          if (v) {
-                                            _hiddenKeys.remove(key);
-                                          } else {
-                                            _hiddenKeys.add(key);
-                                          }
-                                        });
-                                      },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                    else ...[
+                      _dashboardRow(theme),
+                      const SizedBox(height: 16),
+                      _menuSection(theme, title: 'ابزارهای کاربردی', order: _orderPractical,
+                          setOrder: (v) => setState(() => _orderPractical = v)),
+                      const Divider(height: 24),
+                      _menuSection(theme, title: 'حسابداری', order: _orderAccounting,
+                          setOrder: (v) => setState(() => _orderAccounting = v)),
+                      const Divider(height: 24),
+                      _menuSection(theme, title: 'برنامه‌های جانبی', order: _orderPrograms,
+                          setOrder: (v) => setState(() => _orderPrograms = v)),
+                      const Divider(height: 24),
+                      _menuSection(theme, title: 'سایر', order: _orderOther,
+                          setOrder: (v) => setState(() => _orderOther = v)),
+                    ],
                     const SizedBox(height: 8),
                     Text(
-                      'برای تغییر ترتیب، آیتم‌ها را بکشید. تغییرات برای کاربر و کسب‌وکار انتخاب‌شده ذخیره می‌شود.',
+                      'در هر بخش می‌توانید ترتیب را با کشیدن عوض کنید. '
+                      'آیتم‌های بازشونده را برای مرتب‌سازی زیرمنوها باز کنید. '
+                      'جداکننده‌های بصری در منو به‌صورت خودکار حفظ می‌شوند.',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -349,14 +495,287 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       ),
     );
   }
-}
 
-class _MenuEditorItem {
-  final String key;
-  final String labelFa;
+  Widget _dashboardRow(ThemeData theme) {
+    const key = 'dashboard';
+    final hidden = _hiddenKeys.contains(key);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.dashboard_outlined, color: theme.colorScheme.primary),
+      title: Text(_rootLabelsFa[key] ?? key, style: theme.textTheme.titleSmall),
+      subtitle: Text(
+        hidden ? 'مخفی' : 'بعد از ذخیره، در اول منو نمایش داده می‌شود',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: hidden ? theme.colorScheme.error : theme.colorScheme.outline,
+        ),
+      ),
+      trailing: Switch(
+        value: !hidden,
+        onChanged: _saving
+            ? null
+            : (v) {
+                setState(() {
+                  if (v) {
+                    _hiddenKeys.remove(key);
+                  } else {
+                    _hiddenKeys.add(key);
+                  }
+                });
+              },
+      ),
+    );
+  }
 
-  const _MenuEditorItem({
-    required this.key,
-    required this.labelFa,
-  });
+  Widget _menuSection(
+    ThemeData theme, {
+    required String title,
+    required List<String> order,
+    required void Function(List<String>) setOrder,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: order.length,
+            onReorder: (oldIndex, newIndex) {
+              var ni = newIndex;
+              if (ni > oldIndex) ni--;
+              final copy = List<String>.from(order);
+              final item = copy.removeAt(oldIndex);
+              copy.insert(ni, item);
+              setOrder(copy);
+            },
+            itemBuilder: (context, index) => _menuKeyTile(theme, order, index, title),
+        ),
+      ],
+    );
+  }
+
+  Widget _menuKeyTile(ThemeData theme, List<String> orderList, int index, String sectionTitle) {
+    final key = orderList[index];
+    final label = _rootLabelsFa[key] ?? key;
+    final hidden = _hiddenKeys.contains(key);
+    final childKeys = _defaultChildrenOrder[key];
+
+    Widget titleRow = Row(
+      children: [
+        ReorderableDragStartListener(
+          index: index,
+          child: Icon(Icons.drag_indicator, color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+              color: hidden ? theme.colorScheme.onSurface.withValues(alpha: 0.45) : null,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (childKeys == null) {
+      return ListTile(
+        key: ValueKey('${sectionTitle}_$key'),
+        dense: true,
+        minVerticalPadding: 8,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        title: titleRow,
+        subtitle: Text(
+          hidden ? 'مخفی' : 'نمایش',
+          style: TextStyle(color: hidden ? theme.colorScheme.error : theme.colorScheme.primary, fontSize: 11),
+        ),
+        trailing: Switch(
+          value: !hidden,
+          onChanged: _saving
+              ? null
+              : (v) {
+                  setState(() {
+                    if (v) {
+                      _hiddenKeys.remove(key);
+                    } else {
+                      _hiddenKeys.add(key);
+                    }
+                  });
+                },
+        ),
+      );
+    }
+
+    final cOrder = _childrenOrder[key] ?? childKeys;
+
+    return ExpansionTile(
+      key: ValueKey('exp_${sectionTitle}_$key'),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+      childrenPadding: const EdgeInsetsDirectional.only(bottom: 8),
+      initiallyExpanded: false,
+      leading: ReorderableDragStartListener(
+        index: index,
+        child: Icon(Icons.drag_indicator, color: theme.colorScheme.onSurfaceVariant),
+      ),
+      title: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Switch(
+            value: !hidden,
+            onChanged: _saving
+                ? null
+                : (v) {
+                    setState(() {
+                      if (v) {
+                        _hiddenKeys.remove(key);
+                      } else {
+                        _hiddenKeys.add(key);
+                      }
+                    });
+                  },
+          ),
+        ],
+      ),
+      subtitle: Text(
+        hidden ? 'کل گروه مخفی است' : 'زیرمنوها را اینجا مرتب کنید',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: hidden ? theme.colorScheme.error : theme.colorScheme.outline,
+        ),
+      ),
+      children: hidden
+          ? const <Widget>[]
+          : [
+              ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: cOrder.length,
+                  onReorder: (o, n) {
+                    var nn = n;
+                    if (nn > o) nn--;
+                    setState(() {
+                      final src = List<String>.from(_childrenOrder[key] ?? childKeys);
+                      final mv = src.removeAt(o);
+                      src.insert(nn, mv);
+                      _childrenOrder[key] = src;
+                    });
+                  },
+                  itemBuilder: (_, ci) {
+                    final ck = cOrder[ci];
+                    final cHidden = _hiddenKeys.contains(ck);
+                    return ListTile(
+                      key: ValueKey('child_${key}_$ck'),
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      leading: ReorderableDragStartListener(index: ci, child: Icon(Icons.drag_handle, size: 18, color: theme.colorScheme.outline)),
+                      title: Text(_childLabelsFa[ck] ?? ck),
+                      subtitle: Text(
+                        cHidden ? 'مخفی' : 'نمایش',
+                        style: TextStyle(fontSize: 11, color: cHidden ? theme.colorScheme.error : theme.colorScheme.primary),
+                      ),
+                      trailing: Switch(
+                        value: !cHidden,
+                        onChanged: _saving
+                            ? null
+                            : (v) {
+                                setState(() {
+                                  if (v) {
+                                    _hiddenKeys.remove(ck);
+                                  } else {
+                                    _hiddenKeys.add(ck);
+                                  }
+                                });
+                              },
+                      ),
+                    );
+                  },
+                ),
+            ],
+    );
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await BusinessPanelUiStore.instance.hydrateIfNeeded();
+      final auth = ApiClient.getAuthStore();
+      _businesses = await _businessService.getUserBusinesses();
+      _selectedBusinessId = auth?.currentBusiness?.id ?? (_businesses.isNotEmpty ? _businesses.first.id : null);
+      await _loadMenuPrefsForSelectedBusiness();
+      if (!mounted) return;
+      final store = BusinessPanelUiStore.instance;
+      setState(() {
+        _draft = store.mode;
+        _draftSidebarTabBehavior = store.sidebarTabBehavior;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMenuPrefsForSelectedBusiness() async {
+    final bid = _selectedBusinessId;
+    if (bid == null) return;
+    setState(() => _menuPrefsLoading = true);
+    try {
+      final prefs = await _menuPreferencesService.getPreferences(bid);
+      if (!mounted) return;
+      setState(() => _deserializeFromPrefs(prefs));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _orderPractical = [..._defaultOrderPractical];
+        _orderAccounting = [..._defaultOrderAccounting];
+        _orderPrograms = [..._defaultOrderPrograms];
+        _orderOther = [..._defaultOrderOther];
+        _hiddenKeys = <String>{};
+        _childrenOrder = _mergedChildrenOrder(null);
+      });
+    } finally {
+      if (mounted) setState(() => _menuPrefsLoading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await BusinessPanelUiStore.instance.updateAppearancePreferences(
+        navigationMode: _draft,
+        sidebarTabBehavior: _draftSidebarTabBehavior,
+      );
+      final bid = _selectedBusinessId;
+      if (bid != null) {
+        await _menuPreferencesService.putPreferences(
+          bid,
+          BusinessMenuPreferencesDto(
+            rootOrder: _canonicalFlatRoot(),
+            hiddenKeys: _hiddenKeys.toList(),
+            childrenOrder: {..._childrenOrder},
+          ),
+        );
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).appearanceSaved)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).appearanceSaveError)),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 }

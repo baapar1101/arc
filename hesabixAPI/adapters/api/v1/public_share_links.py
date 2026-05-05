@@ -10,7 +10,7 @@ from adapters.db.models.person import Person
 from adapters.db.session import get_db
 from app.core.responses import ApiError, success_response
 from app.core.settings import get_settings
-from app.core.calendar_converter import CalendarConverter
+from app.core.calendar import CalendarConverter
 from app.services.pdf.template_renderer import render_template
 from app.services.person_share_link_service import (
     get_share_link_by_code,

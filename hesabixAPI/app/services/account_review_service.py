@@ -211,7 +211,7 @@ def get_accounts_review_report(
             'pagination': اطلاعات pagination (فقط برای جزئیات)
         }
     """
-    fy_id, fy_start_date = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    fy_id, fy_start_date, _fy_end = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     
     # تبدیل تاریخ‌ها
     date_from_obj = None

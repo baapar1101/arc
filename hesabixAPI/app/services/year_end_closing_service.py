@@ -28,7 +28,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
 from app.core.responses import ApiError
-from app.services.opening_balance_service import upsert_opening_balance
+from app.services.opening_balance_service import post_opening_balance, upsert_opening_balance
 from app.services.invoice_service import _compute_available_stock, _iter_product_movements
 from app.services.file_storage_service import FileStorageService
 from collections import defaultdict, deque
@@ -1506,7 +1506,8 @@ def _create_opening_balance_for_new_fiscal_year(
         user_id=user_id,
         data=opening_balance_data,
     )
-    
+    post_opening_balance(db, business_id, user_id, new_fiscal_year_id)
+
     # دریافت سند ایجاد شده
     doc_repo = DocumentRepository(db)
     created_doc = db.query(Document).filter(Document.id == created_doc_dict.get('id')).first()
