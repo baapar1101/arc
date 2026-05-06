@@ -11,7 +11,7 @@ import '../../services/workflow_marketplace_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
-/// مخزن ورک‌فلو: مرور و نصب
+/// مخزن ورک‌فلو: مرور، نصب و مدیریت انتشار
 class WorkflowMarketplacePage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -61,15 +61,16 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
     super.dispose();
   }
 
+  bool get _isBrowseTab => _tabController.index == 0;
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _busy = true;
     });
     try {
-      final mine = _tabController.index == 1;
       final Map<String, dynamic> raw;
-      if (mine) {
+      if (!_isBrowseTab) {
         raw = await _service.listMyPackages(
           businessId: widget.businessId,
           skip: 0,
@@ -111,101 +112,226 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
     if (rawId == null) return;
     final packageId = rawId is int ? rawId : int.tryParse(rawId.toString());
     if (packageId == null) return;
+
+    final isMy = !_isBrowseTab;
     setState(() => _busy = true);
     try {
-      final detail = await _service.getPackage(packageId);
+      final detail = isMy
+          ? await _service.getMyPackage(businessId: widget.businessId, packageId: packageId)
+          : await _service.getPackage(packageId);
       if (!mounted) return;
+
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
         builder: (ctx) {
           final canInstall = widget.authStore.hasBusinessPermission('workflows', 'add') ||
               widget.authStore.hasBusinessPermission('workflows', 'edit');
           final nameCtrl = TextEditingController();
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.65,
-              minChildSize: 0.35,
-              maxChildSize: 0.95,
-              builder: (context, scrollController) {
-                return SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(detail['title']?.toString() ?? '', style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 8),
-                      if (detail['short_description'] != null &&
-                          detail['short_description'].toString().trim().isNotEmpty)
-                        Text(detail['short_description'].toString()),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
+          final statusStr = (detail['status'] ?? 'published').toString().toLowerCase();
+          final isPublished = statusStr == 'published';
+          final isHidden = statusStr == 'hidden';
+          final canEditPublish = widget.authStore.hasBusinessPermission('workflows', 'edit');
+
+          final mq = MediaQuery.of(ctx);
+          final maxH = mq.size.height * 0.92;
+
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxH),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Chip(
-                            label: Text('${t.workflowMarketplaceVersion}: ${detail['version_label'] ?? '-'}'),
+                          Text(
+                            detail['title']?.toString() ?? '',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          Chip(
-                            label: Text('${t.workflowMarketplaceInstallCount}: ${detail['install_count'] ?? 0}'),
-                          ),
-                          if (detail['publisher_display_name'] != null)
-                            Chip(
-                              label: Text(
-                                '${t.workflowMarketplacePublisher}: ${detail['publisher_display_name']}',
+                          const SizedBox(height: 8),
+                          if (detail['short_description'] != null &&
+                              detail['short_description'].toString().trim().isNotEmpty)
+                            Text(detail['short_description'].toString()),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              Chip(
+                                label: Text('${t.workflowMarketplaceVersion}: ${detail['version_label'] ?? '-'}'),
+                                visualDensity: VisualDensity.compact,
                               ),
-                            ),
+                              Chip(
+                                label: Text('${t.workflowMarketplaceInstallCount}: ${detail['install_count'] ?? 0}'),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              if (isMy && isPublished)
+                                Chip(
+                                  avatar: Icon(Icons.public, size: 16, color: Theme.of(context).colorScheme.primary),
+                                  label: Text(t.workflowMarketplaceStatusLive),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              if (isMy && isHidden)
+                                Chip(
+                                  avatar: Icon(Icons.visibility_off_outlined, size: 16),
+                                  label: Text(t.workflowMarketplaceStatusPrivate),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              if (isMy && detail['publisher_display_name'] != null)
+                                Chip(
+                                  label: Text(
+                                    '${t.workflowMarketplacePublisher}: ${detail['publisher_display_name']}',
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(t.workflowMarketplaceLongDescriptionLabel, style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 8),
+                          Text(
+                            (detail['long_description'] ?? detail['short_description'] ?? '-').toString(),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          if (detail['changelog'] != null && detail['changelog'].toString().trim().isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(t.workflowMarketplaceChangelog, style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 8),
+                            Text(detail['changelog'].toString()),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(t.workflowMarketplaceLongDescriptionLabel, style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 8),
-                      Text(
-                        (detail['long_description'] ?? detail['short_description'] ?? '-').toString(),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      if (detail['changelog'] != null && detail['changelog'].toString().trim().isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Text(t.workflowMarketplaceChangelog, style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        Text(detail['changelog'].toString()),
-                      ],
-                      if (canInstall) ...[
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: nameCtrl,
-                          decoration: InputDecoration(
-                            labelText: t.workflowMarketplaceNameAfterInstall,
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                                      Navigator.of(ctx).pop();
-                                      await _installPackage(
-                                        packageId: packageId,
-                                        name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
+                    ),
+                  ),
+                  Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    elevation: 2,
+                    shadowColor: Colors.black26,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_isBrowseTab && canInstall) ...[
+                            TextField(
+                              controller: nameCtrl,
+                              decoration: InputDecoration(
+                                labelText: t.workflowMarketplaceNameAfterInstall,
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.icon(
+                              onPressed: () async {
+                                Navigator.of(ctx).pop();
+                                await _installPackage(
+                                  packageId: packageId,
+                                  name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
+                                );
+                              },
+                              icon: const Icon(Icons.download_done_outlined),
+                              label: Text(t.workflowMarketplaceInstall),
+                            ),
+                          ],
+                          if (isMy && canEditPublish) ...[
+                            if (isPublished) ...[
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final ok = await showDialog<bool>(
+                                    context: ctx,
+                                    builder: (dCtx) {
+                                      return AlertDialog(
+                                        title: Text(t.workflowMarketplaceUnpublishConfirmTitle),
+                                        content: Text(t.workflowMarketplaceUnpublishConfirmBody),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(t.cancel)),
+                                          FilledButton(
+                                            onPressed: () => Navigator.pop(dCtx, true),
+                                            child: Text(t.workflowMarketplaceUnpublish),
+                                          ),
+                                        ],
                                       );
                                     },
-                            icon: const Icon(Icons.download_done_outlined),
-                            label: Text(t.workflowMarketplaceInstall),
-                          ),
-                        ),
-                      ],
-                    ],
+                                  );
+                                  if (ok != true || !ctx.mounted) return;
+                                  Navigator.of(ctx).pop();
+                                  await _unpublishPackage(packageId);
+                                },
+                                icon: const Icon(Icons.public_off_outlined),
+                                label: Text(t.workflowMarketplaceUnpublish),
+                              ),
+                            ],
+                            if (isHidden) ...[
+                              FilledButton.icon(
+                                onPressed: () async {
+                                  Navigator.of(ctx).pop();
+                                  await _republishPackage(packageId);
+                                },
+                                icon: const Icon(Icons.publish_outlined),
+                                label: Text(t.workflowMarketplaceRepublish),
+                              ),
+                            ],
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
           );
         },
       );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _unpublishPackage(int packageId) async {
+    final t = AppLocalizations.of(context);
+    setState(() => _busy = true);
+    try {
+      await _service.unpublish(businessId: widget.businessId, packageId: packageId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.workflowMarketplaceRemovedFromRepo);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.workflowMarketplaceError}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _republishPackage(int packageId) async {
+    final t = AppLocalizations.of(context);
+    setState(() => _busy = true);
+    try {
+      await _service.republish(businessId: widget.businessId, packageId: packageId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.workflowMarketplaceRepublishedToast);
+      await _load();
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -262,6 +388,9 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(t.workflowMarketplaceTitle),
@@ -280,91 +409,395 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          if (_tabController.index == 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: t.workflowMarketplaceSearchHint,
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: _busy ? null : _load,
-                      ),
-                    ),
-                    onSubmitted: (_) => _load(),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _tagController,
-                    decoration: InputDecoration(
-                      labelText: t.workflowMarketplaceTagFilterHint,
-                      border: const OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _load(),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _items.isEmpty
-                    ? Center(child: Text(t.workflowMarketplaceEmpty))
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _items.length,
-                          itemBuilder: (context, i) {
-                            final item = _items[i];
-                            final pub = item['published_at']?.toString();
-                            final parsed = pub == null ? null : DateTime.tryParse(pub)?.toLocal();
-                            final dateStr = parsed == null
-                                ? '-'
-                                : HesabixDateUtils.formatDateTime(parsed, widget.calendarController.isJalali);
-                            final tags = (item['tags'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                title: Text(item['title']?.toString() ?? ''),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (item['short_description'] != null &&
-                                        item['short_description'].toString().trim().isNotEmpty)
-                                      Text(item['short_description'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'} · '
-                                      '${t.workflowMarketplacePublishedAt}: $dateStr · '
-                                      '${t.workflowMarketplaceInstallCount}: ${item['install_count'] ?? 0}',
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                    if (tags.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8),
-                                        child: Wrap(
-                                          spacing: 4,
-                                          runSpacing: 4,
-                                          children: tags.map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact)).toList(),
-                                        ),
-                                      ),
-                                  ],
+          Column(
+            children: [
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _load,
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                    SliverToBoxAdapter(child: _MarketplaceHero(theme: theme, t: t)),
+                    if (_isBrowseTab) ...[
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                                  labelText: t.workflowMarketplaceSearchHint,
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.search),
+                                    onPressed: _busy ? null : _load,
+                                  ),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                                 ),
-                                isThreeLine: true,
-                                trailing: const Icon(Icons.chevron_left),
-                                onTap: () => _openDetail(item),
+                                onSubmitted: (_) => _load(),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _tagController,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                                  labelText: t.workflowMarketplaceTagFilterHint,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                onSubmitted: (_) => _load(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_loading)
+                      const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                    else if (_items.isEmpty)
+                      SliverFillRemaining(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 56, color: cs.outline),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _isBrowseTab ? t.workflowMarketplaceEmpty : t.workflowMarketplaceMyEmpty,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        sliver: SliverLayoutBuilder(
+                          builder: (context, constraints) {
+                            final w = constraints.crossAxisExtent;
+                            final crossAxisCount = w >= 1100
+                                ? 3
+                                : w >= 720
+                                    ? 2
+                                    : 1;
+                            if (crossAxisCount == 1) {
+                              return SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (c, i) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _WorkflowMarketCard(
+                                      item: _items[i],
+                                      calendarController: widget.calendarController,
+                                      onOpen: () => _openDetail(_items[i]),
+                                      showPrivateBadge: !_isBrowseTab,
+                                    ),
+                                  ),
+                                  childCount: _items.length,
+                                ),
+                              );
+                            }
+                            return SliverGrid(
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio: crossAxisCount >= 3 ? 0.72 : 0.78,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (c, i) => _WorkflowMarketCard(
+                                  item: _items[i],
+                                  calendarController: widget.calendarController,
+                                  onOpen: () => _openDetail(_items[i]),
+                                  showPrivateBadge: !_isBrowseTab,
+                                ),
+                                childCount: _items.length,
                               ),
                             );
                           },
                         ),
                       ),
+                  ],
+                ),
+                  ),
+              ),
+            ],
+          ),
+          if (_busy && !_loading)
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: ModalBarrier(dismissible: false, color: Color(0x22000000)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketplaceHero extends StatelessWidget {
+  const _MarketplaceHero({required this.theme, required this.t});
+
+  final ThemeData theme;
+  final AppLocalizations t;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              cs.primaryContainer.withValues(alpha: 0.95),
+              cs.tertiaryContainer.withValues(alpha: 0.7),
+              cs.secondaryContainer.withValues(alpha: 0.45),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: cs.surface.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(Icons.hub_outlined, size: 36, color: cs.primary),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.workflowMarketplaceTitle,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    t.workflowMarketplaceSubtitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onPrimaryContainer.withValues(alpha: 0.9),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkflowMarketCard extends StatelessWidget {
+  const _WorkflowMarketCard({
+    required this.item,
+    required this.calendarController,
+    required this.onOpen,
+    required this.showPrivateBadge,
+  });
+
+  final Map<String, dynamic> item;
+  final CalendarController calendarController;
+  final VoidCallback onOpen;
+  final bool showPrivateBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final pub = item['published_at']?.toString();
+    final parsed = pub == null ? null : DateTime.tryParse(pub)?.toLocal();
+    final dateStr = parsed == null
+        ? '-'
+        : HesabixDateUtils.formatDateTime(parsed, calendarController.isJalali);
+    final tags = (item['tags'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    final statusStr = (item['status'] ?? 'published').toString().toLowerCase();
+    final isHidden = statusStr == 'hidden';
+
+    return Material(
+      color: cs.surfaceContainerLowest,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.65)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: cs.primaryContainer.withValues(alpha: 0.75),
+                    child: Icon(Icons.account_tree_outlined, color: cs.onPrimaryContainer, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item['title']?.toString() ?? '',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (showPrivateBadge && isHidden) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: cs.errorContainer.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                t.workflowMarketplaceStatusPrivate,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.onErrorContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_left, color: cs.outline),
+                ],
+              ),
+              if (item['short_description'] != null &&
+                  item['short_description'].toString().trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  item['short_description'].toString(),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant, height: 1.35),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _SmallMetaChip(icon: Icons.tag, label: '${t.workflowMarketplaceVersion}: ${item['version_label'] ?? '-'}'),
+                  _SmallMetaChip(
+                    icon: Icons.downloading_outlined,
+                    label: '${t.workflowMarketplaceInstallCount}: ${item['install_count'] ?? 0}',
+                  ),
+                  _SmallMetaChip(icon: Icons.schedule, label: dateStr),
+                ],
+              ),
+              if (tags.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'}',
+                  style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: tags
+                      .take(6)
+                      .map(
+                        (x) => Chip(
+                          label: Text(x, style: theme.textTheme.labelSmall),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: EdgeInsets.zero,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ] else
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'}',
+                    style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallMetaChip extends StatelessWidget {
+  const _SmallMetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

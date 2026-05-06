@@ -295,11 +295,43 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
         ),
         SwitchListTile(
           title: const Text('نمایش مهر / امضای شرکت'),
-          subtitle: const Text('نمایش مهر و امضای ثبت‌شده در پایین فاکتور'),
+          subtitle: const Text('درج تصویر مهر و امضای ثبت‌شده داخل بلوک فروشنده (در صورت خاموشی، تصویر بارگذاری نمی‌شود)'),
           value: cfg.showStamp,
           onChanged: (v) {
             setState(() {
               _updateCurrentConfig(cfg.copyWith(showStamp: v));
+            });
+          },
+        ),
+        SwitchListTile(
+          title: const Text('نمایش بلوک امضا / مهر فروشنده'),
+          subtitle: const Text('کل بخش امضای فروشنده در انتهای صفحهٔ PDF؛ می‌توانید بدون خاموش کردن بقیهٔ فاکتور مخفی کنید'),
+          value: cfg.showSellerSignatureArea,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showSellerSignatureArea: v));
+            });
+          },
+        ),
+        SwitchListTile(
+          title: const Text('نمایش بلوک امضای خریدار'),
+          subtitle: const Text('قاب خالی امضای خریدار در پایین چاپ فاکتور'),
+          value: cfg.showBuyerSignatureArea,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showBuyerSignatureArea: v));
+            });
+          },
+        ),
+        SwitchListTile(
+          title: const Text('نمایش تراز و وضعیت حساب طرف سند'),
+          subtitle: const Text(
+            'برای پیش‌فاکتور: تراز فعلی و تراز احتمالی؛ برای فاکتور قطعی: تراز حساب شخص (در یک کادر جدا از پرداخت‌ها)',
+          ),
+          value: cfg.showCustomerBalance,
+          onChanged: (v) {
+            setState(() {
+              _updateCurrentConfig(cfg.copyWith(showCustomerBalance: v));
             });
           },
         ),
@@ -371,6 +403,9 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
 class _PrintConfig {
   final bool showLogo;
   final bool showStamp;
+  final bool showSellerSignatureArea;
+  final bool showBuyerSignatureArea;
+  final bool showCustomerBalance;
   final bool showPayments;
   final bool showInstallmentPlan;
   final bool showShareQr;
@@ -381,6 +416,9 @@ class _PrintConfig {
   const _PrintConfig({
     required this.showLogo,
     required this.showStamp,
+    required this.showSellerSignatureArea,
+    required this.showBuyerSignatureArea,
+    required this.showCustomerBalance,
     required this.showPayments,
     required this.showInstallmentPlan,
     required this.showShareQr,
@@ -393,6 +431,9 @@ class _PrintConfig {
     return const _PrintConfig(
       showLogo: true,
       showStamp: true,
+      showSellerSignatureArea: true,
+      showBuyerSignatureArea: true,
+      showCustomerBalance: true,
       showPayments: true,
       showInstallmentPlan: true,
       showShareQr: false,
@@ -418,6 +459,9 @@ class _PrintConfig {
     return _PrintConfig(
       showLogo: _b('show_logo', true),
       showStamp: _b('show_stamp', true),
+      showSellerSignatureArea: _b('show_seller_signature_area', true),
+      showBuyerSignatureArea: _b('show_buyer_signature_area', true),
+      showCustomerBalance: _b('show_customer_balance', true),
       showPayments: _b('show_payments', true),
       showInstallmentPlan: _b('show_installment_plan', true),
       showShareQr: _b('show_share_qr', false),
@@ -433,6 +477,9 @@ class _PrintConfig {
     return {
       'show_logo': showLogo,
       'show_stamp': showStamp,
+      'show_seller_signature_area': showSellerSignatureArea,
+      'show_buyer_signature_area': showBuyerSignatureArea,
+      'show_customer_balance': showCustomerBalance,
       'show_payments': showPayments,
       'show_installment_plan': showInstallmentPlan,
       'show_share_qr': showShareQr,
@@ -445,6 +492,9 @@ class _PrintConfig {
   _PrintConfig copyWith({
     bool? showLogo,
     bool? showStamp,
+    bool? showSellerSignatureArea,
+    bool? showBuyerSignatureArea,
+    bool? showCustomerBalance,
     bool? showPayments,
     bool? showInstallmentPlan,
     bool? showShareQr,
@@ -455,6 +505,9 @@ class _PrintConfig {
     return _PrintConfig(
       showLogo: showLogo ?? this.showLogo,
       showStamp: showStamp ?? this.showStamp,
+      showSellerSignatureArea: showSellerSignatureArea ?? this.showSellerSignatureArea,
+      showBuyerSignatureArea: showBuyerSignatureArea ?? this.showBuyerSignatureArea,
+      showCustomerBalance: showCustomerBalance ?? this.showCustomerBalance,
       showPayments: showPayments ?? this.showPayments,
       showInstallmentPlan: showInstallmentPlan ?? this.showInstallmentPlan,
       showShareQr: showShareQr ?? this.showShareQr,

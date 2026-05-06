@@ -83,6 +83,39 @@ class WorkflowMarketplaceService {
     return _asMap(res.data?['data']);
   }
 
+  /// جزئیات بستهٔ منتشرشده توسط خود کاربر (شامل بسته‌های خارج از انتشار)
+  Future<Map<String, dynamic>> getMyPackage({
+    required int businessId,
+    required int packageId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/marketplace/my-packages/$packageId',
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> unpublish({
+    required int businessId,
+    required int packageId,
+  }) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/marketplace/my-packages/$packageId/unpublish',
+      data: const <String, dynamic>{},
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> republish({
+    required int businessId,
+    required int packageId,
+  }) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/marketplace/my-packages/$packageId/republish',
+      data: const <String, dynamic>{},
+    );
+    return _asMap(res.data?['data']);
+  }
+
   Map<String, dynamic> _asMap(dynamic v) {
     if (v is Map<String, dynamic>) return v;
     if (v is Map) return Map<String, dynamic>.from(v);

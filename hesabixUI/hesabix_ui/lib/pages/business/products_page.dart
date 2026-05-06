@@ -14,6 +14,7 @@ import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/bulk_default_warehouse_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
 import '../../widgets/product/product_unique_instances_tab.dart';
+import '../../widgets/product/product_commercial_insights_tab.dart';
 import '../../widgets/product/product_label_print_dialog.dart';
 import '../../models/warehouse_model.dart';
 import '../../widgets/attached_files/attached_files_widget.dart';
@@ -309,13 +310,22 @@ class _ProductsPageState extends State<ProductsPage> {
     return '-';
   }
   
-  Widget _buildSectionCard(ThemeData theme, String title, Widget child) {
+  Widget _buildSectionCard(
+    ThemeData theme,
+    String title,
+    Widget child, {
+    BuildContext? layoutContext,
+    List<Widget>? footer,
+  }) {
+    final isMobile = layoutContext != null && ResponsiveHelper.isMobile(layoutContext);
+    final outer = isMobile ? 12.0 : 16.0;
+    final titleSpacing = isMobile ? 8.0 : 12.0;
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(outer),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -323,8 +333,9 @@ class _ProductsPageState extends State<ProductsPage> {
               title,
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: titleSpacing),
             child,
+            if (footer != null) ...footer,
           ],
         ),
       ),
@@ -339,22 +350,27 @@ class _ProductsPageState extends State<ProductsPage> {
       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: ResponsiveHelper.getGridMaxCrossAxisExtent(
           context,
-          mobile: double.infinity,
+          mobile: 168,
           tablet: 260,
           desktop: 300,
         ),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: isMobile ? 3.0 : 2.15,
+        mainAxisSpacing: isMobile ? 8 : 12,
+        crossAxisSpacing: isMobile ? 8 : 12,
+        childAspectRatio: isMobile ? 3.25 : 2.15,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
+        final tilePad = isMobile ? 8.0 : 12.0;
+        final iconSize = isMobile ? 16.0 : 18.0;
+        final valueStyle = isMobile
+            ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)
+            : theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
         return Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(tilePad),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
             border: Border.all(
               color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
@@ -364,13 +380,14 @@ class _ProductsPageState extends State<ProductsPage> {
             children: [
               Row(
                 children: [
-                  Icon(item.icon, size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
+                  Icon(item.icon, size: iconSize, color: theme.colorScheme.primary),
+                  SizedBox(width: isMobile ? 6 : 8),
                   Expanded(
                     child: Text(
                       item.label,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: isMobile ? 12 : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -378,10 +395,10 @@ class _ProductsPageState extends State<ProductsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: isMobile ? 4 : 8),
               Text(
                 item.value.isEmpty ? '-' : item.value,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: valueStyle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -421,6 +438,25 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
   
+  Widget _buildGeneralBarcodesWrap(ThemeData theme, Map<String, dynamic> product) {
+    final tokens = parseGeneralBarcodeTokens(product['general_barcodes']?.toString());
+    if (tokens.isEmpty) {
+      return Text('-', style: theme.textTheme.bodyMedium);
+    }
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final code in tokens)
+          Chip(
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            label: Text(code, style: theme.textTheme.bodySmall),
+          ),
+      ],
+    );
+  }
+
   Widget _buildProductDialogHeader({
     required BuildContext context,
     required AppLocalizations t,
@@ -549,14 +585,30 @@ class _ProductsPageState extends State<ProductsPage> {
       _InfoTileData(label: t.minOrderQty, value: _formatNumber(product['min_order_qty']), icon: Icons.numbers),
     ];
     
+    final overviewCompact = ResponsiveHelper.isMobile(dialogContext);
+    final sectionGap = overviewCompact ? 12.0 : 16.0;
+    final imageGap = overviewCompact ? 12.0 : 16.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(overviewCompact ? 12 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
               final isMobile = ResponsiveHelper.isMobile(context);
+              final generalFooter = <Widget>[
+                SizedBox(height: overviewCompact ? 10 : 12),
+                Text(
+                  t.productGeneralBarcodes,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _buildGeneralBarcodesWrap(theme, product),
+              ];
               if (isMobile) {
                 // موبایل: Column layout
                 return Column(
@@ -564,42 +616,73 @@ class _ProductsPageState extends State<ProductsPage> {
                   children: [
                     if (fullImageUrl != null) ...[
                       _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
-                      const SizedBox(height: 16),
+                      SizedBox(height: imageGap),
                     ],
-                    _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems, dialogContext)),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems, dialogContext)),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems, dialogContext)),
-                  ],
-                );
-              } else {
-                // دسکتاپ/تبلت: Row layout
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (fullImageUrl != null) ...[
-                      _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
-                      const SizedBox(width: 20),
-                    ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems, dialogContext)),
-                          const SizedBox(height: 16),
-                          _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems, dialogContext)),
-                          const SizedBox(height: 16),
-                          _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems, dialogContext)),
-                        ],
-                      ),
+                    _buildSectionCard(
+                      theme,
+                      t.generalInformation,
+                      _buildInfoGrid(theme, generalItems, dialogContext),
+                      layoutContext: dialogContext,
+                      footer: generalFooter,
+                    ),
+                    SizedBox(height: sectionGap),
+                    _buildSectionCard(
+                      theme,
+                      t.pricing,
+                      _buildInfoGrid(theme, pricingItems, dialogContext),
+                      layoutContext: dialogContext,
+                    ),
+                    SizedBox(height: sectionGap),
+                    _buildSectionCard(
+                      theme,
+                      t.inventory,
+                      _buildInfoGrid(theme, inventoryItems, dialogContext),
+                      layoutContext: dialogContext,
                     ),
                   ],
                 );
               }
+              // دسکتاپ/تبلت: Row layout
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (fullImageUrl != null) ...[
+                    _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
+                    const SizedBox(width: 20),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionCard(
+                          theme,
+                          t.generalInformation,
+                          _buildInfoGrid(theme, generalItems, dialogContext),
+                          layoutContext: dialogContext,
+                          footer: generalFooter,
+                        ),
+                        SizedBox(height: sectionGap),
+                        _buildSectionCard(
+                          theme,
+                          t.pricing,
+                          _buildInfoGrid(theme, pricingItems, dialogContext),
+                          layoutContext: dialogContext,
+                        ),
+                        SizedBox(height: sectionGap),
+                        _buildSectionCard(
+                          theme,
+                          t.inventory,
+                          _buildInfoGrid(theme, inventoryItems, dialogContext),
+                          layoutContext: dialogContext,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: sectionGap),
           _buildSectionCard(
             theme,
             t.description,
@@ -607,6 +690,7 @@ class _ProductsPageState extends State<ProductsPage> {
               description.isEmpty ? '-' : description,
               style: theme.textTheme.bodyMedium,
             ),
+            layoutContext: dialogContext,
           ),
         ],
       ),
@@ -883,7 +967,13 @@ class _ProductsPageState extends State<ProductsPage> {
             final showInstancesTab = isUniqueProduct &&
                 widget.authStore.hasBusinessPermission('inventory', 'read') &&
                 parsedProductId != null;
-            final dialogTabCount = showInstancesTab ? 4 : 3;
+            final showCommercialTab = product['track_inventory'] == true &&
+                widget.authStore.canReadSection('invoices') &&
+                parsedProductId != null;
+            var dialogTabCount = showInstancesTab ? 4 : 3;
+            if (showCommercialTab) {
+              dialogTabCount++;
+            }
 
             Widget buildDocumentsTab() {
               final canUpload = widget.authStore.canWriteSection('products');
@@ -992,6 +1082,11 @@ class _ProductsPageState extends State<ProductsPage> {
                                   icon: const Icon(Icons.warehouse_outlined),
                                   text: t.productStock,
                                 ),
+                                if (showCommercialTab)
+                                  const Tab(
+                                    icon: Icon(Icons.show_chart_outlined),
+                                    text: 'بازرگانی و قیمت',
+                                  ),
                                 Tab(
                                   icon: const Icon(Icons.attach_file),
                                   text: t.documents,
@@ -1029,6 +1124,11 @@ class _ProductsPageState extends State<ProductsPage> {
                               trackInventory: product['track_inventory'] == true,
                               t: t,
                             ),
+                            if (showCommercialTab)
+                              ProductCommercialInsightsTab(
+                                businessId: widget.businessId,
+                                productId: parsedProductId!,
+                              ),
                             buildDocumentsTab(),
                           ],
                         ),
@@ -1314,6 +1414,16 @@ class _ProductsPageState extends State<ProductsPage> {
               filterType: ColumnFilterType.categoryTree,
             ),
             TextColumn('item_type', t.service, width: ColumnWidth.small),
+            TextColumn(
+              'general_barcodes',
+              t.productGeneralBarcodes,
+              width: ColumnWidth.medium,
+              formatter: (row) {
+                final tokens = parseGeneralBarcodeTokens(row['general_barcodes']?.toString());
+                if (tokens.isEmpty) return '-';
+                return tokens.join('، ');
+              },
+            ),
             NumberColumn(
               'base_sales_price',
               t.salesPrice,

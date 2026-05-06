@@ -50,6 +50,7 @@ class PublicInvoiceShareService {
         responseType: ResponseType.bytes,
         options: Options(
           headers: {
+            'Accept': 'application/pdf',
             if (calendarType != null && calendarType.trim().isNotEmpty)
               'X-Calendar-Type': calendarType.trim(),
           },

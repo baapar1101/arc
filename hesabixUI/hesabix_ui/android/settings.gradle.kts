@@ -1,13 +1,13 @@
-val hesabixGradleMirror: String = run {
-    val p = java.util.Properties()
-    val gradleProps = file("gradle.properties")
-    if (gradleProps.isFile) {
-        gradleProps.inputStream().use { p.load(it) }
-    }
-    p.getProperty("hesabix.gradle.mirror", "https://gradle.mirror.hesabix.ir").trimEnd('/')
-}
-
 pluginManagement {
+    val hesabixGradleMirror: String = run {
+        val p = java.util.Properties()
+        val gradleProps = file("gradle.properties")
+        if (gradleProps.isFile) {
+            gradleProps.inputStream().use { p.load(it) }
+        }
+        p.getProperty("hesabix.gradle.mirror", "https://gradle.mirror.hesabix.ir").trimEnd('/')
+    }
+
     val flutterSdkPath =
         run {
             val properties = java.util.Properties()
@@ -23,6 +23,8 @@ pluginManagement {
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
+        // Fallback if mirror misses an artifact (init script mirrors composite builds too)
+        gradlePluginPortal()
     }
 }
 

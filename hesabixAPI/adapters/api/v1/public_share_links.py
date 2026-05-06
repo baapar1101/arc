@@ -358,6 +358,8 @@ async def get_public_invoice_document_pdf(
 		"show_footer_preparer": False,
 		"invoice_footer_note": None,
 		"customer_balance_info": {},
+		"show_seller_signature_area": True,
+		"show_buyer_signature_area": True,
 		"paper_size": None,
 		"orientation": "landscape",
 		"footer_text": "",

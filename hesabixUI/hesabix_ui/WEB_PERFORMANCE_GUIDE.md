@@ -125,7 +125,7 @@ flutter build web --pwa-strategy offline-first
 
 ```dart
 // فقط برای صفحات خاص که خیلی کم استفاده می‌شوند
-import 'pages/admin/system_logs_page.dart' deferred as logs_page;
+import 'pages/admin/service_logs_page.dart' deferred as service_logs_page;
 ```
 
 ### 2. Prefetch Strategy

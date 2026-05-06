@@ -928,6 +928,26 @@
   "warehouse": "انبارداری",
   "warehouses": "مدیریت انبارها",
   "warehouseTransfers": "صدور حواله",
+  "@permissionsWarehouseInventoryHint": {
+    "description": "صفحهٔ دسترسی کاربران: توضیح تفاوت مدیریت انبار و مجوز حواله"
+  },
+  "permissionsWarehouseInventoryHint": "مدیریت انبارها و حواله‌های انبار مجوزهای جدا دارند. «مدیریت انبارها» برای تعریف و ویرایش انبارهاست. برای دسترسی به لیست حواله، ثبت و قطعی حواله، حواله از فاکتور، انبارگردانی و سایر عملیات موجودی مرتبط، گزینه‌های بخش «صدور حواله» را هم فعال کنید.",
+  "@permissionsGroupHintChecks": {
+    "description": "صفحهٔ دسترسی کاربران: راهنمای گروه چک و ارتباط با اسناد حسابداری"
+  },
+  "permissionsGroupHintChecks": "ثبت چک جدید همیشه یک سند حسابداری هم ایجاد می‌کند؛ علاوه بر مجوزهای چک، حداقل یکی از افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را فعال کنید. بعضی فرایندهای چک (مانند وصول، واگذاری، پرداخت و …) نیز ممکن است سند ثبت کنند.",
+  "@permissionsGroupHintAccountingDocuments": {
+    "description": "صفحهٔ دسترسی کاربران: دامنهٔ مجوزهای اسناد حسابداری"
+  },
+  "permissionsGroupHintAccountingDocuments": "این مجوزها برای ثبت اسناد دستی و همچنین اسناد خودکاری که سیستم با عملیات‌هایی مانند چک، دریافت و پرداخت اشخاص یا فاکتور (در صورت کاربرد) ایجاد می‌کند، اعمال می‌شود.",
+  "@checkFormNeedsChecksWritePermission": {
+    "description": "دیالوگ فرم چک وقتی مجوز افزودن/ویرایش چک نیست"
+  },
+  "checkFormNeedsChecksWritePermission": "شما مجوز افزودن یا ویرایش چک را ندارید.",
+  "@checkFormNeedsAccountingDocumentsPermission": {
+    "description": "دیالوگ فرم چک وقتی مجوز ثبت سند حسابداری نیست"
+  },
+  "checkFormNeedsAccountingDocumentsPermission": "شما مجوز ثبت سند حسابداری ندارید. ذخیرهٔ چک یک سند حسابداری ایجاد می‌کند؛ از مدیر بخواهید حداقل یکی از گزینه‌های افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را برای شما فعال کند.",
   "productAttributes": "ویژگی‌های کالا و خدمات",
   "title": "عنوان",
   "description": "توضیحات",
@@ -1239,6 +1259,12 @@
   "inserted": "ایجاد شده",
   "updated": "به‌روزرسانی",
   "skipped": "رد شده",
+  "importSkippedApply": "ناموفق در ذخیره",
+  "importPreviewInsert": "ایجاد (پیش‌نمایش)",
+  "importPreviewUpdate": "به‌روزرسانی (پیش‌نمایش)",
+  "importPreviewSkipConflict": "رد تداخل (پیش‌نمایش)",
+  "importWarningsTitle": "هشدارها",
+  "personImportSuccess": "ایمپورت با موفقیت انجام شد",
   "yes": "بله",
   "no": "خیر",
   "row": "ردیف",
@@ -3509,6 +3535,20 @@
   },
   "serviceLogsRestartSuccessDefault": "سرویس با موفقیت راه‌اندازی مجدد شد",
   "serviceLogsFollowTailChip": "آخر خط",
+  "serviceLogsEmptyAllowedList": "سرور فهرست خالی از سرویس‌های مجاز برگرداند.",
+  "serviceLogsNoFilterMatches": "هیچ خطی با فیلتر یا جستجوی فعلی هم‌خوان نیست",
+  "serviceLogsAllowedServicesFetchFailed": "به‌روزرسانی لیست سرویس از سرور نشد؛ فهرست پیش‌فرض نمایش داده می‌شود. {error}",
+  "@serviceLogsAllowedServicesFetchFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "serviceLogsStatusLoadFailed": "دریافت وضعیت سرویس ممکن نشد: {error}",
+  "@serviceLogsStatusLoadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "settingsDatabaseBackup": "بکاپ دیتابیس",
   "settingsDatabaseBackupDescription": "تهیه بکاپ از کل دیتابیس و ارسال به ایمیل، FTP یا دانلود مستقیم",
   "warranty": "گارانتی",
@@ -4186,6 +4226,15 @@
   "workflowMarketplaceInstalled": "ورک‌فلو به‌صورت پیش‌نویس اضافه شد.",
   "workflowMarketplaceNameAfterInstall": "نام ورک‌فلو پس از افزودن (اختیاری)",
   "workflowMarketplaceError": "خطا در مخزن ورک‌فلو",
+  "workflowMarketplaceStatusLive": "فعال در مخزن",
+  "workflowMarketplaceStatusPrivate": "خارج از مخزن",
+  "workflowMarketplaceMyEmpty": "هنوز چیزی در مخزن منتشر نکرده‌اید.",
+  "workflowMarketplaceUnpublish": "حذف از مخزن",
+  "workflowMarketplaceUnpublishConfirmTitle": "از فهرست عمومی حذف شود؟",
+  "workflowMarketplaceUnpublishConfirmBody": "دیگران این ورک‌فلو را نمی‌بینند؛ در فهرست «انتشارات من» باقی می‌ماند و می‌توانید بعداً دوباره منتشر کنید.",
+  "workflowMarketplaceRepublish": "انتشار مجدد در مخزن",
+  "workflowMarketplaceRemovedFromRepo": "از مخزن عمومی حذف شد.",
+  "workflowMarketplaceRepublishedToast": "دوباره در مخزن منتشر شد.",
   "distributionMenu": "پخش مویرگی",
   "distributionTabDashboard": "داشبورد",
   "distributionTabToday": "برنامه امروز",

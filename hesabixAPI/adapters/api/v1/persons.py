@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, For
 from fastapi import UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from typing import Dict, Any, List, Optional
 
 from adapters.db.session import get_db
@@ -21,6 +21,17 @@ from app.core.cache import get_cache
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep, require_business_access_dep
 from app.core.i18n import negotiate_locale
+from app.services.person_excel_import import (
+    ALLOWED_CONFLICT_POLICY,
+    ALLOWED_MATCH_BY,
+    MAX_PERSON_IMPORT_DATA_ROWS,
+    MAX_PERSON_IMPORT_FILE_BYTES,
+    build_person_update_request_for_import,
+    match_key_for_row,
+    prepare_person_import_item,
+    validate_row_as_create_request,
+    parse_positive_int_code,
+)
 from app.services.person_service import (
     invalidate_persons_cache,
     create_person,
@@ -811,6 +822,7 @@ async def download_persons_import_template(
     request: Request,
     auth_context: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("people", "add")),
 ):
     import io
     import datetime
@@ -1121,82 +1133,113 @@ async def import_persons_excel(
     conflict_policy: str = Form(default="upsert"),
     auth_context: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("people", "add")),
 ):
     import io
-    import json
-    import re
-    from openpyxl import load_workbook
-    from fastapi import HTTPException
     import logging
     import zipfile
 
+    from openpyxl import load_workbook
+    from adapters.api.v1.schema_models.person import ALLOWED_PERSON_NAME_PREFIXES
+
     logger = logging.getLogger(__name__)
-    
+
     def validate_excel_file(content: bytes) -> bool:
-        """
-        Validate if the content is a valid Excel file
-        """
         try:
-            # Check if it starts with PK signature (zip file)
-            if not content.startswith(b'PK'):
+            if not content.startswith(b"PK"):
                 return False
-            
-            # Try to open as zip file
-            with zipfile.ZipFile(io.BytesIO(content), 'r') as zip_file:
+            with zipfile.ZipFile(io.BytesIO(content), "r") as zip_file:
                 file_list = zip_file.namelist()
-                # Check for Excel structure (xl/ folder for .xlsx files)
-                excel_structure = any(f.startswith('xl/') for f in file_list)
-                if excel_structure:
-                    return True
-                
-                # Check for older Excel format (.xls) - this would be a different structure
-                # But since we only support .xlsx, we'll return False for .xls
-                return False
+                return any(f.startswith("xl/") for f in file_list)
         except zipfile.BadZipFile:
             logger.error("File is not a valid zip file")
             return False
         except Exception as e:
-            logger.error(f"Error validating Excel file: {str(e)}")
+            logger.error("Error validating Excel file: %s", str(e))
             return False
-    
-    try:
-        # Convert dry_run string to boolean
-        dry_run_bool = dry_run.lower() in ('true', '1', 'yes', 'on')
-        
-        logger.info(f"Import request: business_id={business_id}, dry_run={dry_run_bool}, match_by={match_by}, conflict_policy={conflict_policy}")
-        logger.info(f"File info: filename={file.filename}, content_type={file.content_type}")
 
-        if not file.filename or not file.filename.lower().endswith('.xlsx'):
-            logger.error(f"Invalid file format: {file.filename}")
+    def _api_error_message(exc: ApiError) -> str:
+        det = getattr(exc, "detail", None)
+        if isinstance(det, dict):
+            err = det.get("error")
+            if isinstance(err, dict) and err.get("message"):
+                return str(err["message"])
+        return str(exc)
+
+    def find_existing_person(session: Session, data: dict) -> Optional[Person]:
+        if match_by_n == "national_id":
+            nid = data.get("national_id")
+            nid = str(nid).strip() if nid is not None else ""
+            if not nid:
+                return None
+            return (
+                session.query(Person)
+                .filter(and_(Person.business_id == business_id, Person.national_id == nid))
+                .first()
+            )
+        if match_by_n == "email":
+            em = data.get("email")
+            if em is None or str(em).strip() == "":
+                return None
+            norm = str(em).strip().lower()
+            return (
+                session.query(Person)
+                .filter(and_(Person.business_id == business_id, func.lower(Person.email) == norm))
+                .first()
+            )
+        if match_by_n == "code":
+            code_int = parse_positive_int_code(data.get("code"))
+            if code_int is None:
+                return None
+            return (
+                session.query(Person)
+                .filter(and_(Person.business_id == business_id, Person.code == code_int))
+                .first()
+            )
+        return None
+
+    try:
+        dry_run_bool = dry_run.lower() in ("true", "1", "yes", "on")
+        match_by_n = str(match_by or "").strip().lower()
+        conflict_n = str(conflict_policy or "").strip().lower()
+
+        if match_by_n not in ALLOWED_MATCH_BY:
+            raise HTTPException(status_code=400, detail="match_by نامعتبر است (code، national_id یا email)")
+        if conflict_n not in ALLOWED_CONFLICT_POLICY:
+            raise HTTPException(status_code=400, detail="conflict_policy نامعتبر است (insert، update یا upsert)")
+
+        logger.info(
+            "Person Excel import: business_id=%s dry_run=%s match_by=%s conflict_policy=%s",
+            business_id,
+            dry_run_bool,
+            match_by_n,
+            conflict_n,
+        )
+
+        if not file.filename or not file.filename.lower().endswith(".xlsx"):
             raise HTTPException(status_code=400, detail="فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود")
 
         content = await file.read()
-        logger.info(f"File content size: {len(content)} bytes")
-        
-        # Log first few bytes for debugging
-        logger.info(f"File header (first 20 bytes): {content[:20].hex()}")
-        logger.info(f"File header (first 20 bytes as text): {content[:20]}")
-        
-        # Check if content is empty or too small
+        if len(content) > MAX_PERSON_IMPORT_FILE_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"حجم فایل بیش از حد مجاز است (حداکثر {MAX_PERSON_IMPORT_FILE_BYTES // (1024 * 1024)} مگابایت)",
+            )
+
         if len(content) < 100:
-            logger.error(f"File too small: {len(content)} bytes")
             raise HTTPException(status_code=400, detail="فایل خیلی کوچک است یا خالی است")
-        
-        # Validate Excel file format
+
         if not validate_excel_file(content):
-            logger.error("File is not a valid Excel file")
             raise HTTPException(status_code=400, detail="فرمت فایل معتبر نیست. فایل Excel معتبر نیست")
-        
+
         try:
-            # Try to load the workbook with additional error handling
             wb = load_workbook(filename=io.BytesIO(content), data_only=True)
-            logger.info(f"Successfully loaded workbook with {len(wb.worksheets)} worksheets")
-        except zipfile.BadZipFile as e:
-            logger.error(f"Bad zip file error: {str(e)}")
+        except zipfile.BadZipFile:
             raise HTTPException(status_code=400, detail="فایل Excel خراب است یا فرمت آن معتبر نیست")
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error(f"Error loading workbook: {str(e)}")
-            raise HTTPException(status_code=400, detail=f"امکان خواندن فایل وجود ندارد: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"امکان خواندن فایل وجود ندارد: {str(e)}") from e
 
         ws = wb.active
         rows = list(ws.iter_rows(values_only=True))
@@ -1205,27 +1248,37 @@ async def import_persons_excel(
 
         headers = [str(h).strip() if h is not None else "" for h in rows[0]]
         data_rows = rows[1:]
+        if len(data_rows) > MAX_PERSON_IMPORT_DATA_ROWS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"تعداد ردیف‌های داده از حد مجاز ({MAX_PERSON_IMPORT_DATA_ROWS}) بیشتر است",
+            )
 
-        # helper to map enum strings (fa/en) to internal value
         def normalize_person_type(value: str) -> Optional[str]:
             if not value:
                 return None
             value = str(value).strip()
             mapping = {
-                'customer': 'مشتری', 'marketer': 'بازاریاب', 'employee': 'کارمند', 'supplier': 'تامین‌کننده',
-                'partner': 'همکار', 'seller': 'فروشنده', 'shareholder': 'سهامدار'
+                "customer": "مشتری",
+                "marketer": "بازاریاب",
+                "employee": "کارمند",
+                "supplier": "تامین‌کننده",
+                "partner": "همکار",
+                "seller": "فروشنده",
+                "shareholder": "سهامدار",
             }
             for en, fa in mapping.items():
                 if value.lower() == en or value == fa:
                     return fa
-            return value  # assume already fa
+            return value
 
-        errors: list[dict] = []
-        valid_items: list[dict] = []
+        errors: List[Dict[str, Any]] = []
+        warnings: List[Dict[str, Any]] = []
+        valid_rows: List[tuple[int, PersonCreateRequest]] = []
+        seen_match: Dict[str, int] = {}
 
         for idx, row in enumerate(data_rows, start=2):
-            item: dict[str, Any] = {}
-            row_errors: list[str] = []
+            item: Dict[str, Any] = {}
             for ci, key in enumerate(headers):
                 if not key:
                     continue
@@ -1233,129 +1286,164 @@ async def import_persons_excel(
                 if isinstance(val, str):
                     val = val.strip()
                 item[key] = val
-            # normalize types
-            if 'person_type' in item and item['person_type']:
-                item['person_type'] = normalize_person_type(item['person_type'])
-            if 'person_types' in item and item['person_types']:
-                # split by comma
-                parts = [normalize_person_type(p.strip()) for p in str(item['person_types']).split(',') if str(p).strip()]
-                item['person_types'] = parts
 
-            # پیشوند و نوع حقوقی (اختیاری؛ برای ایمپورت نرم‌گیر)
-            from adapters.api.v1.schema_models.person import ALLOWED_PERSON_NAME_PREFIXES
+            if not any(v not in (None, "") for v in item.values()):
+                continue
 
-            raw_prefix = item.get('name_prefix')
+            if "person_type" in item and item["person_type"]:
+                item["person_type"] = normalize_person_type(item["person_type"])  # type: ignore[arg-type]
+            if "person_types" in item and item["person_types"]:
+                parts = [
+                    normalize_person_type(p.strip())
+                    for p in str(item["person_types"]).split(",")
+                    if str(p).strip()
+                ]
+                item["person_types"] = [p for p in parts if p is not None]
+
+            raw_prefix = item.get("name_prefix")
             if raw_prefix is not None and str(raw_prefix).strip():
                 ps = str(raw_prefix).strip()
-                item['name_prefix'] = ps if ps in ALLOWED_PERSON_NAME_PREFIXES else None
+                item["name_prefix"] = ps if ps in ALLOWED_PERSON_NAME_PREFIXES else None
             else:
-                item.pop('name_prefix', None)
+                item.pop("name_prefix", None)
 
-            if item.get('legal_entity_type') is not None and str(item.get('legal_entity_type')).strip() != '':
-                v = str(item['legal_entity_type']).strip().lower()
-                if v in ('legal', 'حقوقی', 'حقوقي'):
-                    item['legal_entity_type'] = 'legal'
+            if item.get("legal_entity_type") is not None and str(item.get("legal_entity_type")).strip() != "":
+                v = str(item["legal_entity_type"]).strip().lower()
+                if v in ("legal", "حقوقی", "حقوقي"):
+                    item["legal_entity_type"] = "legal"
                 else:
-                    item['legal_entity_type'] = 'natural'
+                    item["legal_entity_type"] = "natural"
             else:
-                item.pop('legal_entity_type', None)
+                item.pop("legal_entity_type", None)
 
-            # alias_name required
-            if not item.get('alias_name'):
-                row_errors.append('alias_name الزامی است')
-
-            # shareholder rule
-            if (item.get('person_type') == 'سهامدار') or (isinstance(item.get('person_types'), list) and 'سهامدار' in item.get('person_types', [])):
-                sc = item.get('share_count')
-                try:
-                    sc_val = int(sc) if sc is not None and str(sc).strip() != '' else None
-                except Exception:
-                    sc_val = None
-                if sc_val is None or sc_val <= 0:
-                    row_errors.append('برای سهامدار share_count باید > 0 باشد')
-                else:
-                    item['share_count'] = sc_val
-
+            prepped, prep_errs = prepare_person_import_item(item)
+            row_errors: List[str] = list(prep_errs)
+            create_req, pyd_errs = validate_row_as_create_request(prepped)
+            row_errors.extend(pyd_errs)
             if row_errors:
                 errors.append({"row": idx, "errors": row_errors})
                 continue
 
-            valid_items.append(item)
+            if create_req is None:
+                errors.append({"row": idx, "errors": ["اعتبارسنجی ناموفق"]})
+                continue
+            mk = match_key_for_row(match_by_n, prepped)
+            if mk is not None:
+                if mk in seen_match:
+                    warnings.append(
+                        {
+                            "row": idx,
+                            "message": (
+                                "همان کلید تطبیق در ردیف "
+                                f"{seen_match[mk]} تکرار شده؛ در صورت اجرا آخرین ردیف اعمال می‌شود"
+                            ),
+                        }
+                    )
+                seen_match[mk] = idx
 
-        inserted = 0
-        updated = 0
-        skipped = 0
+            valid_rows.append((idx, create_req))
 
-        if not dry_run_bool and valid_items:
-            # apply import with conflict policy
-            from adapters.db.models.person import Person
-            from sqlalchemy import and_
+        validation_error_count = len(errors)
 
-            def find_existing(session: Session, data: dict) -> Optional[Person]:
-                if match_by == 'national_id' and data.get('national_id'):
-                    return session.query(Person).filter(and_(Person.business_id == business_id, Person.national_id == data['national_id'])).first()
-                if match_by == 'email' and data.get('email'):
-                    return session.query(Person).filter(and_(Person.business_id == business_id, Person.email == data['email'])).first()
-                if match_by == 'code' and data.get('code'):
-                    try:
-                        code_int = int(data['code'])
-                        return session.query(Person).filter(and_(Person.business_id == business_id, Person.code == code_int)).first()
-                    except Exception:
-                        return None
-                return None
+        inserted = updated = skipped = skipped_apply = 0
+        would_insert = would_update = would_skip_conflict = 0
 
-            for data in valid_items:
-                existing = find_existing(db, data)
-                match_value = None
+        for row_idx, create_req in valid_rows:
+            data_dump = create_req.model_dump(mode="python")
+            existing = find_existing_person(db, data_dump)
+
+            if existing is None:
+                would_insert += 1
+            elif conflict_n == "insert":
+                would_skip_conflict += 1
+            elif conflict_n in ("update", "upsert"):
+                would_update += 1
+
+        if dry_run_bool:
+            summary = {
+                "total": len(data_rows),
+                "valid": len(valid_rows),
+                "invalid": validation_error_count,
+                "inserted": 0,
+                "updated": 0,
+                "skipped": 0,
+                "skipped_apply": 0,
+                "dry_run": True,
+                "would_insert": would_insert,
+                "would_update": would_update,
+                "would_skip_conflict": would_skip_conflict,
+            }
+            return success_response(
+                data={"summary": summary, "errors": errors, "warnings": warnings},
+                request=request,
+                message="پیش‌نمایش ایمپورت اشخاص (اجرای واقعی انجام نشد)",
+            )
+
+        for row_idx, create_req in valid_rows:
+            data_dump = create_req.model_dump(mode="python")
+            existing = find_existing_person(db, data_dump)
+
+            if existing is None:
                 try:
-                    match_value = data.get(match_by)
+                    create_person(db, business_id, create_req)
+                    inserted += 1
+                except ApiError as e:
+                    logger.warning("person import create failed business_id=%s row=%s: %s", business_id, row_idx, _api_error_message(e))
+                    errors.append({"row": row_idx, "errors": [_api_error_message(e)]})
+                    skipped_apply += 1
                 except Exception:
-                    match_value = None
-                if existing is None:
-                    # create
-                    try:
-                        create_person(db, business_id, PersonCreateRequest(**data))
-                        inserted += 1
-                    except Exception as e:
-                        logger.error(f"Create person failed for data={data}: {str(e)}")
-                        skipped += 1
-                else:
-                    if conflict_policy == 'insert':
-                        logger.info(f"Skipping existing person (match_by={match_by}, value={match_value}) due to conflict_policy=insert")
-                        skipped += 1
-                    elif conflict_policy in ('update', 'upsert'):
-                        try:
-                            update_person(db, existing.id, business_id, PersonUpdateRequest(**data))
-                            updated += 1
-                        except Exception as e:
-                            logger.error(f"Update person failed for id={existing.id}, data={data}: {str(e)}")
-                            skipped += 1
+                    logger.exception("person import create failed business_id=%s row=%s", business_id, row_idx)
+                    errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در ایجاد شخص"]})
+                    skipped_apply += 1
+            elif conflict_n == "insert":
+                skipped += 1
+            elif conflict_n in ("update", "upsert"):
+                try:
+                    upd = build_person_update_request_for_import(headers, create_req)
+                    update_person(db, existing.id, business_id, upd)
+                    updated += 1
+                except ApiError as e:
+                    logger.warning("person import update failed business_id=%s row=%s: %s", business_id, row_idx, _api_error_message(e))
+                    errors.append({"row": row_idx, "errors": [_api_error_message(e)]})
+                    skipped_apply += 1
+                except ValueError as e:
+                    logger.warning("person import update validation business_id=%s row=%s: %s", business_id, row_idx, str(e))
+                    errors.append({"row": row_idx, "errors": [str(e)]})
+                    skipped_apply += 1
+                except Exception:
+                    logger.exception("person import update failed business_id=%s row=%s", business_id, row_idx)
+                    errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در بروزرسانی شخص"]})
+                    skipped_apply += 1
+
+        skipped += skipped_apply
 
         summary = {
             "total": len(data_rows),
-            "valid": len(valid_items),
-            "invalid": len(errors),
+            "valid": len(valid_rows),
+            "invalid": validation_error_count,
             "inserted": inserted,
             "updated": updated,
             "skipped": skipped,
-            "dry_run": dry_run_bool,
+            "skipped_apply": skipped_apply,
+            "dry_run": False,
+            "would_insert": would_insert,
+            "would_update": would_update,
+            "would_skip_conflict": would_skip_conflict,
         }
 
-        # Invalidate کش لیست اشخاص یک بار در انتها (فقط اگر dry_run نباشد و تغییراتی انجام شده باشد)
-        if not dry_run_bool and (inserted > 0 or updated > 0):
+        if inserted > 0 or updated > 0:
             invalidate_persons_cache(business_id, fiscal_year_id=None)
 
         return success_response(
-            data={
-                "summary": summary,
-                "errors": errors,
-            },
+            data={"summary": summary, "errors": errors, "warnings": warnings},
             request=request,
             message="نتیجه ایمپورت اشخاص",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Import error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
+        logger.error("Import error: %s", str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}") from e
 
 
 @router.post("/businesses/{business_id}/reports/debtors",

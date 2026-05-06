@@ -93,6 +93,27 @@ class TestAuthContextPermissions:
         assert ctx.has_business_permission("sales", "read") == False
         assert ctx.has_business_permission("sales", "write") == False
         assert ctx.can_read_section("sales") == False
+
+    def test_accounting_write_from_accounting_documents_add(self):
+        """accounting_documents.* باید به‌عنوان accounting.write برای API شناخته شود."""
+        user = Mock(spec=User)
+        user.app_permissions = {}
+        ctx = AuthContext(user=user, api_key_id=1, business_id=1)
+        ctx.business_permissions = {
+            "accounting_documents": {"add": True, "view": True},
+        }
+        assert ctx.has_business_permission("accounting", "write") is True
+        assert ctx.has_any_permission("accounting", "write") is True
+        assert ctx.has_business_permission("accounting", "delete") is False
+
+    def test_accounting_delete_from_accounting_documents(self):
+        user = Mock(spec=User)
+        user.app_permissions = {}
+        ctx = AuthContext(user=user, api_key_id=1, business_id=1)
+        ctx.business_permissions = {
+            "accounting_documents": {"delete": True, "view": True},
+        }
+        assert ctx.has_business_permission("accounting", "delete") is True
     
     def test_section_with_empty_permissions(self):
         """تست بخش با دسترسی‌های خالی"""

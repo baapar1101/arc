@@ -443,6 +443,40 @@ class AuthStore with ChangeNotifier {
     }
   }
 
+  bool _directBusinessPermission(String section, String action) {
+    final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
+    if (sectionPerms == null) {
+      return false;
+    }
+    if (sectionPerms.isEmpty) {
+      return action == 'read' || action == 'view';
+    }
+    if (sectionPerms[action] == true) {
+      return true;
+    }
+    if (action == 'view' && sectionPerms['read'] == true) return true;
+    if (action == 'read' && sectionPerms['view'] == true) return true;
+    return false;
+  }
+
+  /// همان نقش مجوزهای `warehouse_transfers` در UI برای `inventory.*` در کد قدیمی.
+  bool _inventoryViaWarehouseTransfers(String action) {
+    switch (action) {
+      case 'read':
+      case 'view':
+        return _directBusinessPermission('warehouse_transfers', 'view') ||
+            _directBusinessPermission('warehouse_transfers', 'read');
+      case 'write':
+        return _directBusinessPermission('warehouse_transfers', 'add') ||
+            _directBusinessPermission('warehouse_transfers', 'edit') ||
+            _directBusinessPermission('warehouse_transfers', 'draft');
+      case 'delete':
+        return _directBusinessPermission('warehouse_transfers', 'delete');
+      default:
+        return false;
+    }
+  }
+
   // بررسی دسترسی‌های کسب و کار
   bool hasBusinessPermission(String section, String action) {
     
@@ -453,17 +487,13 @@ class AuthStore with ChangeNotifier {
     if (_businessPermissions == null) {
       return false;
     }
-    
-    final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
-    
-    // اگر سکشن در دسترسی‌ها موجود نیست، هیچ دسترسی‌ای وجود ندارد
-    if (sectionPerms == null) {
-      return false;
+
+    if (section == 'inventory') {
+      if (_directBusinessPermission(section, action)) return true;
+      return _inventoryViaWarehouseTransfers(action);
     }
-    
-    final hasPermission = sectionPerms[action] == true;
-    
-    return hasPermission;
+
+    return _directBusinessPermission(section, action);
   }
 
   // دسترسی‌های کلی
@@ -479,6 +509,17 @@ class AuthStore with ChangeNotifier {
 
   bool canDeleteSection(String section) {
     return hasBusinessPermission(section, 'delete');
+  }
+
+  /// ثبت یا ویرایش سند حسابداری (شامل اسناد خودکار از چک، دریافت‌وپرداخت و …).
+  /// هم‌ارز بررسیٔ `accounting.write` در سرور.
+  bool canCreateOrEditAccountingDocuments() {
+    if (_currentBusiness?.isOwner == true) {
+      return true;
+    }
+    return hasBusinessPermission('accounting_documents', 'add') ||
+        hasBusinessPermission('accounting_documents', 'edit') ||
+        hasBusinessPermission('accounting_documents', 'draft');
   }
 
   // دسترسی‌های خاص

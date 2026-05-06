@@ -514,6 +514,46 @@ SEND_BUSINESS_SMS_TRANSLATIONS = {
     },
 }
 
+# ترجمه‌های اکشن «ایجاد Notification» (شامل کانال SMS)
+CREATE_NOTIFICATION_TRANSLATIONS = {
+    "fa": {
+        "action_name": "ایجاد Notification",
+        "action_description": "ایجاد یک اعلان برای کاربر (کانال‌های in-app، ایمیل، پیامک و ...)",
+        "field_user_id": "شناسه کاربر",
+        "field_user_id_desc": "اختیاری؛ در صورت خالی بود از کاربر اجراکننده ورک‌فلو استفاده می‌شود",
+        "field_event_key": "نام رویداد",
+        "field_event_key_desc": "رویداد از فهرست سیستم انتخاب کنید، مقدار دلخواه وارد کنید، یا از خروجی نود قبلی ارجاع دهید",
+        "field_title": "عنوان",
+        "field_title_desc": "عنوان notification",
+        "field_message": "متن",
+        "field_message_desc": "متن notification",
+        "field_channels": "کانال‌های ارسال",
+        "field_channels_desc": "مثلاً inapp، email، sms",
+        "field_priority": "اولویت",
+        "field_priority_desc": "سطح اولویت (low / normal / high / urgent)",
+        "field_category": "دسته‌بندی",
+        "field_category_desc": "دسته اختیاری برای دسته‌بندی اعلان",
+    },
+    "en": {
+        "action_name": "Create notification",
+        "action_description": "Create a user notification (in-app, email, SMS, etc.)",
+        "field_user_id": "User ID",
+        "field_user_id_desc": "Optional; defaults to the workflow run user when empty",
+        "field_event_key": "Event name",
+        "field_event_key_desc": "Pick a system event, type a custom code, or reference a previous node output",
+        "field_title": "Title",
+        "field_title_desc": "Notification title",
+        "field_message": "Message",
+        "field_message_desc": "Notification body",
+        "field_channels": "Channels",
+        "field_channels_desc": "e.g. inapp, email, sms",
+        "field_priority": "Priority",
+        "field_priority_desc": "Priority level (low / normal / high / urgent)",
+        "field_category": "Category",
+        "field_category_desc": "Optional category label",
+    },
+}
+
 
 # ترجمه‌های اکشن AI Agent
 AI_AGENT_TRANSLATIONS = {
@@ -1059,6 +1099,7 @@ def get_translation(key: str, lang: str = "fa", context: str = None) -> str:
             "send_bale": SEND_BALE_TRANSLATIONS,
             "send_email": SEND_EMAIL_TRANSLATIONS,
             "send_business_sms": SEND_BUSINESS_SMS_TRANSLATIONS,
+            "create_notification": CREATE_NOTIFICATION_TRANSLATIONS,
             "ai_agent": AI_AGENT_TRANSLATIONS,
             "business_backup": BUSINESS_BACKUP_TRANSLATIONS,
             "crm_web_chat_send_message": CRM_WEB_CHAT_SEND_MESSAGE_TRANSLATIONS,

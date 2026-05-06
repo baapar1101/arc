@@ -1404,9 +1404,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['accounting_documents', 'chart_of_accounts', 'opening_balance', 'currency_revaluation'],
       },
       {
-        'title': 'انبارداری',
+        'title': t.warehouseManagement,
         'icon': Icons.warehouse,
         'sections': ['warehouses', 'warehouse_transfers'],
+        'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
         'title': 'گزارش‌ها',
@@ -1467,16 +1468,27 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
             );
           }
           
+          final String? groupInfo = switch (sectionKey) {
+            'checks' => t.permissionsGroupHintChecks,
+            'accounting_documents' => t.permissionsGroupHintAccountingDocuments,
+            _ => null,
+          };
           sectionWidgets.add(
             _buildPermissionGroup(
               _getSectionTitle(sectionKey),
               permissionItems,
               theme,
               colorScheme,
+              groupInfo: groupInfo,
             ),
           );
         }
       }
+
+      final hintKey = config['permissionHintKey'] as String?;
+      final String? hintText = hintKey == 'warehouse_inventory_bridge'
+          ? t.permissionsWarehouseInventoryHint
+          : null;
       
       sections.add(
         _buildPermissionSection(
@@ -1485,6 +1497,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           sectionWidgets,
           theme,
           colorScheme,
+          hintText: hintText,
         ),
       );
       
@@ -1644,8 +1657,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     IconData icon,
     List<Widget> permissions,
     ThemeData theme,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    String? hintText,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
@@ -1685,6 +1699,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
               ],
             ),
           ),
+          if (hintText != null && hintText.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _buildPermissionHintBox(theme, colorScheme, hintText),
+            ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1696,12 +1715,52 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     );
   }
 
+  Widget _buildPermissionHintBox(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String text,
+  ) {
+    final border = colorScheme.secondary.withValues(alpha: 0.35);
+    final bg = colorScheme.secondaryContainer.withValues(alpha: 0.25);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 20,
+              color: colorScheme.secondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPermissionGroup(
     String groupTitle,
     List<Widget> permissions,
     ThemeData theme,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    String? groupInfo,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1723,6 +1782,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
               color: colorScheme.primary,
             ),
           ),
+          if (groupInfo != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              groupInfo,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           ...permissions,
         ],

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../services/product_service.dart';
 import '../../services/category_service.dart';
@@ -6,9 +7,205 @@ import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
-import '../../utils/error_extractor.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
+import '../../utils/number_formatters.dart' show formatWithThousands;
 
+/// متن خلاصه‌ی نمایشی کالا (کد - نام یا فقط نام)
+String _pickerProductDisplayLine(Map<String, dynamic>? p) {
+  if (p == null) return '';
+  final code = p['code']?.toString() ?? '';
+  final name = p['name']?.toString() ?? '';
+  if (code.isNotEmpty && name.isNotEmpty) return '$code - $name';
+  return name.isNotEmpty ? name : code;
+}
+
+String _pickerFormatMoney(dynamic v) {
+  return formatWithThousands(v, decimalPlaces: 2);
+}
+
+String _pickerFormatQty(dynamic v) {
+  return formatWithThousands(v, decimalPlaces: 3);
+}
+
+class _ProductSearchSuggestionTile extends StatelessWidget {
+  const _ProductSearchSuggestionTile({
+    required this.item,
+    required this.onTap,
+    this.dense = false,
+  });
+
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final title = _pickerProductDisplayLine(item);
+    final itemType = item['item_type']?.toString() ?? '';
+    final purchaseStr = _pickerFormatMoney(item['base_purchase_price']);
+    final salesStr = _pickerFormatMoney(item['base_sales_price']);
+    final trackInventory = item['track_inventory'] == true;
+    final String metricsLine;
+    if (!trackInventory) {
+      metricsLine = 'خرید $purchaseStr · فروش $salesStr · بدون موجودی انباردیاری';
+    } else {
+      final wh = item['inventory_stock_warehouse'];
+      final acc = item['inventory_stock_accounting'];
+      final hasLoaded = wh != null || acc != null;
+      final stockPart = !hasLoaded
+          ? 'موجودی: —'
+          : 'موجودی انبار ${_pickerFormatQty(wh ?? acc ?? 0)} · حساب ${_pickerFormatQty(acc ?? wh ?? 0)}';
+      metricsLine = 'خرید $purchaseStr · فروش $salesStr · $stockPart';
+    }
+
+    final padH = dense ? 10.0 : 14.0;
+    final padV = dense ? 8.0 : 10.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        hoverColor: cs.primary.withValues(alpha: 0.06),
+        child: Padding(
+          padding: EdgeInsetsDirectional.only(
+            start: padH + 36,
+            end: padH,
+            top: padV,
+            bottom: padV,
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              PositionedDirectional(
+                start: -30,
+                top: dense ? 1 : 2,
+                child: Icon(Icons.inventory_2_outlined, size: dense ? 18 : 20, color: cs.primary),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.25),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                  if (itemType.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      itemType,
+                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.2),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    metricsLine,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      height: 1.35,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _buildProductSuggestionsScrollArea({
+  required BuildContext context,
+  required _ProductPickerState state,
+  required ScrollController scrollController,
+  required void Function(Map<String, dynamic> product) onProductSelected,
+  bool dense = false,
+}) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+
+  if (state.isLoading && state.items.isEmpty) {
+    return SizedBox.expand(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: SizedBox(width: dense ? 24 : 32, height: dense ? 24 : 32, child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      ),
+    );
+  }
+
+  if (!state.isLoading && state.items.isEmpty) {
+    return SizedBox.expand(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.inventory_2_outlined, size: dense ? 40 : 48, color: colorScheme.onSurface.withValues(alpha: 0.45)),
+              const SizedBox(height: 12),
+              Text(
+                'کالایی یافت نشد',
+                style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurface.withValues(alpha: 0.72)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
+      Expanded(
+        child: ListView.separated(
+          controller: scrollController,
+          padding: EdgeInsets.symmetric(vertical: dense ? 4 : 6),
+          itemCount: state.items.length +
+              ((state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0),
+          separatorBuilder: (separatorContext, separatorIndex) {
+            if (separatorIndex >= state.items.length - 1) return const SizedBox.shrink();
+            return Divider(height: 1, color: colorScheme.outline.withValues(alpha: 0.12));
+          },
+          itemBuilder: (context, index) {
+            if (index == state.items.length &&
+                (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))) {
+              return const Padding(
+                padding: EdgeInsets.all(14),
+                child: Center(
+                  child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              );
+            }
+            if (index >= state.items.length) return const SizedBox.shrink();
+            final it = state.items[index];
+            return _ProductSearchSuggestionTile(
+              item: it,
+              dense: dense,
+              onTap: () => onProductSelected(it),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
 
 class _ProductPickerState {
   final List<Map<String, dynamic>> items;
@@ -67,6 +264,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   final CategoryService _categoryService = CategoryService(ApiClient());
   final TextEditingController _searchCtrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _overlayScrollController = ScrollController();
+  final FocusNode _fieldFocus = FocusNode();
+  final LayerLink _layerLink = LayerLink();
   Timer? _debounce;
   bool _loading = false;
   bool _loadingMore = false;
@@ -77,12 +277,14 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   String? _currentSearchQuery;
   static const int _pageSize = 20;
   late final ValueNotifier<_ProductPickerState> _pickerStateNotifier;
-  
+  OverlayEntry? _desktopOverlayEntry;
+  double _desktopFieldWidth = 0;
+  bool _suppressFieldNotifications = false;
+
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
   bool _loadingCategories = false;
   int? _selectedCategoryId;
-  static const double _mobileBreakpoint = 700.0;
 
   @override
   void initState() {
@@ -95,10 +297,12 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         hasMore: false,
       ),
     );
+    _fieldFocus.addListener(_onDesktopFocusChanged);
+    _scrollController.addListener(_onPickerListScroll);
+    _overlayScrollController.addListener(_onOverlayListScroll);
     _initializeSelectedProduct();
     _loadCategories();
     _loadRecent();
-    _scrollController.addListener(_onScroll);
   }
 
   Future<void> _loadCategories() async {
@@ -191,28 +395,24 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     debugPrint('[ProductCombobox] _initializeSelectedProduct called');
     if (widget.selectedProduct == null) {
       debugPrint('[ProductCombobox] selectedProduct is null, clearing _searchCtrl');
-      _searchCtrl.text = '';
+      _setFieldQuiet('');
       return;
     }
 
     final productId = widget.selectedProduct!['id'] as int?;
     final hasCode = widget.selectedProduct!['code'] != null;
     final hasName = widget.selectedProduct!['name'] != null;
-    
+
     debugPrint('[ProductCombobox] productId: $productId, hasCode: $hasCode, hasName: $hasName');
 
-    // اگر اطلاعات کامل (code و name) موجود است، از آن استفاده می‌کنیم
     if (hasCode || hasName) {
-      final code = widget.selectedProduct!['code']?.toString() ?? '';
-      final name = widget.selectedProduct!['name']?.toString() ?? '';
-      final displayText = code.isNotEmpty ? '$code - $name' : name;
+      final displayText = _pickerProductDisplayLine(Map<String, dynamic>.from(widget.selectedProduct!));
       debugPrint('[ProductCombobox] Setting _searchCtrl.text to: "$displayText"');
-      _searchCtrl.text = displayText;
-      if (mounted) setState(() {}); // به‌روزرسانی UI
+      _setFieldQuiet(displayText);
+      if (mounted) setState(() {});
       return;
     }
 
-    // اگر فقط id موجود است، باید اطلاعات کامل را از API دریافت کنیم
     if (productId != null) {
       try {
         final product = await _service.getProduct(
@@ -220,10 +420,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           productId: productId,
         );
         if (mounted && product.isNotEmpty) {
-          final code = product['code']?.toString() ?? '';
-          final name = product['name']?.toString() ?? '';
-          _searchCtrl.text = code.isNotEmpty ? '$code - $name' : name;
-          // اضافه کردن به لیست items اگر وجود نداشته باشد
+          _setFieldQuiet(_pickerProductDisplayLine(product));
           if (mounted) {
             final existsInList = _items.any((item) => (item['id'] as num?)?.toInt() == productId);
             if (!existsInList) {
@@ -236,23 +433,146 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         }
       } catch (e) {
         debugPrint('Error loading product info: $e');
-        // در صورت خطا، حداقل id را نمایش می‌دهیم
         if (mounted) {
-          _searchCtrl.text = 'کالا #$productId';
+          _setFieldQuiet('کالا #$productId');
         }
       }
     } else {
-      _searchCtrl.text = '';
+      _setFieldQuiet('');
+    }
+  }
+
+  void _setFieldQuiet(String text) {
+    _suppressFieldNotifications = true;
+    _searchCtrl.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _suppressFieldNotifications = false;
+  }
+
+  void _onDesktopFocusChanged() {
+    if (!mounted) return;
+    if (ResponsiveHelper.isMobile(context)) return;
+    if (_fieldFocus.hasFocus) {
+      _showDesktopOverlay();
+      if (_searchCtrl.text.trim().isEmpty) {
+        unawaited(_loadRecent());
+      }
+    } else {
+      Future.delayed(const Duration(milliseconds: 180), () {
+        if (!mounted || _fieldFocus.hasFocus) return;
+        _removeDesktopOverlay();
+      });
+    }
+  }
+
+  void _removeDesktopOverlay() {
+    _desktopOverlayEntry?.remove();
+    _desktopOverlayEntry = null;
+  }
+
+  void _showDesktopOverlay() {
+    if (!mounted || ResponsiveHelper.isMobile(context)) return;
+    if (_desktopOverlayEntry != null) {
+      _desktopOverlayEntry!.markNeedsBuild();
+      return;
+    }
+    final overlayHost = Overlay.maybeOf(context);
+    final overlayResolved = overlayHost ?? Overlay.of(context);
+    _desktopOverlayEntry = OverlayEntry(
+      builder: (ctx) => _buildDesktopOverlayStack(ctx),
+    );
+    overlayResolved.insert(_desktopOverlayEntry!);
+  }
+
+  Widget _buildDesktopOverlayStack(BuildContext overlayContext) {
+    final width = math.max(_desktopFieldWidth, 280.0);
+    final cs = Theme.of(overlayContext).colorScheme;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTapDown: (_) {
+              _fieldFocus.unfocus();
+              _removeDesktopOverlay();
+            },
+          ),
+        ),
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          followerAnchor: Alignment.topCenter,
+          targetAnchor: Alignment.bottomCenter,
+          offset: const Offset(0, 6),
+          child: ValueListenableBuilder<_ProductPickerState>(
+            valueListenable: _pickerStateNotifier,
+            builder: (context, state, _) {
+              return Material(
+                elevation: 14,
+                surfaceTintColor: cs.surfaceTint,
+                color: cs.surfaceContainerHigh,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                clipBehavior: Clip.antiAlias,
+                shadowColor: Colors.black.withValues(alpha: 0.22),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: SizedBox(
+                    width: width,
+                    child: _buildProductSuggestionsScrollArea(
+                      context: context,
+                      state: state,
+                      scrollController: _overlayScrollController,
+                      onProductSelected: (p) {
+                        _select(p);
+                        _removeDesktopOverlay();
+                      },
+                      dense: true,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _onDesktopFieldChanged(String value) {
+    if (_suppressFieldNotifications) return;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      if (widget.selectedProduct != null) {
+        widget.onChanged(null);
+      }
+    } else {
+      final sel = widget.selectedProduct;
+      if (sel != null && trimmed != _pickerProductDisplayLine(Map<String, dynamic>.from(sel)).trim()) {
+        widget.onChanged(null);
+      }
+    }
+    _onQueryChanged(value);
+    if (_fieldFocus.hasFocus && !ResponsiveHelper.isMobile(context) && _desktopOverlayEntry == null) {
+      _showDesktopOverlay();
     }
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _searchCtrl.dispose();
-    _scrollController.removeListener(_onScroll);
+    _removeDesktopOverlay();
+    _fieldFocus.removeListener(_onDesktopFocusChanged);
+    _fieldFocus.dispose();
+    _scrollController.removeListener(_onPickerListScroll);
     _scrollController.dispose();
+    _overlayScrollController.removeListener(_onOverlayListScroll);
+    _overlayScrollController.dispose();
     _pickerStateNotifier.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -265,9 +585,19 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     );
   }
 
-  void _onScroll() {
+  void _onPickerListScroll() {
+    if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      // وقتی به 200 پیکسل مانده به پایین رسیدیم، صفحه بعدی را بارگذاری کن
+      if (_hasMore && !_loadingMore && !_loading) {
+        _loadMore();
+      }
+    }
+  }
+
+  void _onOverlayListScroll() {
+    if (!_overlayScrollController.hasClients) return;
+    final pos = _overlayScrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 160) {
       if (_hasMore && !_loadingMore && !_loading) {
         _loadMore();
       }
@@ -275,9 +605,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   Future<void> _loadRecent() async {
-    // Reset scroll position when loading recent
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
+    }
+    if (_overlayScrollController.hasClients) {
+      _overlayScrollController.jumpTo(0);
     }
     setState(() {
       _loading = true;
@@ -295,6 +627,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         skip: 0,
         searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+        includeInventory: true,
       );
       if (!mounted) return;
       setState(() {
@@ -343,6 +676,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
+    if (_overlayScrollController.hasClients) {
+      _overlayScrollController.jumpTo(0);
+    }
     setState(() {
       _loading = true;
       _currentSkip = 0;
@@ -359,6 +695,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         skip: 0,
         searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+        includeInventory: true,
       );
       if (!mounted) return;
       setState(() {
@@ -397,6 +734,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         skip: _currentSkip,
         searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+        includeInventory: true,
       );
       if (!mounted) return;
       setState(() {
@@ -421,17 +759,17 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     debugPrint('[ProductCombobox] _select called with item: $item');
     if (item == null) {
       debugPrint('[ProductCombobox] Item is null, clearing selection');
+      _suppressFieldNotifications = true;
       _searchCtrl.clear();
+      _suppressFieldNotifications = false;
       widget.onChanged(null);
-      if (mounted) setState(() {}); // به‌روزرسانی UI
+      if (mounted) setState(() {});
       return;
     }
-    final code = item['code']?.toString() ?? '';
-    final name = item['name']?.toString() ?? '';
-    final displayText = code.isNotEmpty ? '$code - $name' : name;
+    final displayText = _pickerProductDisplayLine(item);
     debugPrint('[ProductCombobox] Setting _searchCtrl.text to: "$displayText"');
     debugPrint('[ProductCombobox] Calling widget.onChanged with item: $item');
-    _searchCtrl.text = displayText;
+    _setFieldQuiet(displayText);
     widget.onChanged(item);
     debugPrint('[ProductCombobox] After onChanged, _searchCtrl.text is: "${_searchCtrl.text}"');
     if (mounted) {
@@ -501,8 +839,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   void _openPicker() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < _mobileBreakpoint;
+    _removeDesktopOverlay();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     if (isMobile) {
       // موبایل: bottom sheet
@@ -533,7 +872,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               _select(product);
               Navigator.pop(ctx);
             },
-            isMobile: true,
+            isMobile: isMobile,
           );
         },
       );
@@ -575,58 +914,140 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    // استفاده از _searchCtrl.text برای نمایش، چون همیشه به‌روز است
-    // اما اگر خالی باشد، از widget.selectedProduct استفاده می‌کنیم
-    String display;
+    final isMobileUi = ResponsiveHelper.isMobile(context);
+
+    String displayTooltip;
     if (_searchCtrl.text.isNotEmpty) {
-      display = _searchCtrl.text;
-      debugPrint('[ProductCombobox] build: Using _searchCtrl.text: "$display"');
+      displayTooltip = _searchCtrl.text;
     } else if (widget.selectedProduct != null) {
-      final code = widget.selectedProduct!['code']?.toString() ?? '';
-      final name = widget.selectedProduct!['name']?.toString() ?? '';
-      display = code.isNotEmpty ? '$code - $name' : (name.isNotEmpty ? name : widget.hintText);
-      debugPrint('[ProductCombobox] build: Using widget.selectedProduct - code: "$code", name: "$name", display: "$display"');
+      displayTooltip = _pickerProductDisplayLine(Map<String, dynamic>.from(widget.selectedProduct!));
+      if (displayTooltip.isEmpty) displayTooltip = widget.hintText;
     } else {
-      display = widget.hintText;
-      debugPrint('[ProductCombobox] build: No product selected, using hintText: "$display"');
+      displayTooltip = widget.hintText;
     }
 
-    return InkWell(
-      onTap: _openPicker,
-      child: Tooltip(
-        message: display,
-        waitDuration: const Duration(milliseconds: 600),
-        preferBelow: true,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(8),
-            color: colorScheme.surface,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  display,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500, 
-                    fontSize: 13.5,
+    if (isMobileUi) {
+      return InkWell(
+        onTap: _openPicker,
+        child: Tooltip(
+          message: displayTooltip,
+          waitDuration: const Duration(milliseconds: 600),
+          preferBelow: true,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.surface,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    displayTooltip,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13.5,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
-            ],
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
+              ],
+            ),
           ),
         ),
+      );
+    }
+
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          if ((_desktopFieldWidth - w).abs() > 0.5) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if ((_desktopFieldWidth - w).abs() > 0.5) {
+                setState(() => _desktopFieldWidth = w);
+                _desktopOverlayEntry?.markNeedsBuild();
+              }
+            });
+          }
+
+          return Tooltip(
+            message: displayTooltip.length > 120 ? '${displayTooltip.substring(0, 120)}…' : displayTooltip,
+            waitDuration: const Duration(milliseconds: 600),
+            child: TextField(
+              controller: _searchCtrl,
+              focusNode: _fieldFocus,
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+                fontSize: 13.5,
+              ),
+              minLines: 1,
+              maxLines: 1,
+              decoration: InputDecoration(
+                isDense: false,
+                hintText: widget.hintText,
+                labelText: widget.label,
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                prefixIcon: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 20),
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsetsDirectional.only(end: 6),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'انتخاب پیشرفته (دسته‌ها و افزودن)',
+                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                      onPressed: () => _openPicker(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
+                ),
+              ),
+              onTap: () {
+                final allowOverlay = !ResponsiveHelper.isMobile(context);
+                Future.microtask(() {
+                  if (!mounted) return;
+                  if (!_fieldFocus.hasFocus) _fieldFocus.requestFocus();
+                  if (!allowOverlay) return;
+                  _showDesktopOverlay();
+                  if (_searchCtrl.text.trim().isEmpty) {
+                    unawaited(_loadRecent());
+                  }
+                });
+              },
+              onChanged: _onDesktopFieldChanged,
+            ),
+          );
+        },
       ),
     );
   }
@@ -792,7 +1213,7 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                       tooltip: 'فیلتر دسته‌بندی',
                       color: widget.selectedCategoryId != null
                           ? colorScheme.primary
-                          : colorScheme.onSurface.withOpacity(0.6),
+                          : colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 Expanded(
@@ -834,88 +1255,19 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
               child: ValueListenableBuilder<_ProductPickerState>(
                 valueListenable: widget.pickerStateNotifier,
                 builder: (context, state, _) {
-                  return _buildList(theme, state);
+                  return _buildProductSuggestionsScrollArea(
+                    context: context,
+                    state: state,
+                    scrollController: widget.scrollController,
+                    onProductSelected: widget.onProductSelected,
+                    dense: false,
+                  );
                 },
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildList(ThemeData theme, _ProductPickerState state) {
-    final colorScheme = theme.colorScheme;
-
-    if (state.isLoading && state.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (!state.isLoading && state.items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'کالایی یافت نشد',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.75),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
-        Expanded(
-          child: ListView.separated(
-            controller: widget.scrollController,
-            itemCount: state.items.length + ((state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0),
-            separatorBuilder: (separatorContext, separatorIndex) {
-              if (separatorIndex >= state.items.length - 1) return const SizedBox.shrink();
-              return const Divider(height: 1);
-            },
-            itemBuilder: (context, index) {
-              // فوتر لودینگ: هم برای صفحه بعد (load more) و هم برای واکشی نتیجه جدید (refresh search)
-              if (index == state.items.length && (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))) {
-                return const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                );
-              }
-              // گارد ایمن: در صورت تغییر همزمان طول لیست هنگام rebuild، از RangeError جلوگیری کن
-              if (index >= state.items.length) {
-                return const SizedBox.shrink();
-              }
-              final it = state.items[index];
-              final code = it['code']?.toString() ?? '';
-              final name = it['name']?.toString() ?? '';
-              final itemType = it['item_type']?.toString() ?? '';
-              return ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: Text(code.isNotEmpty ? '$code - $name' : name),
-                subtitle: itemType.isNotEmpty ? Text(itemType) : null,
-                onTap: () => widget.onProductSelected(it),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }
@@ -960,7 +1312,7 @@ class _ProductPickerDialog extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Dialog(
-      child: Container(
+      child: SizedBox(
         width: 900,
         height: 600,
         child: Column(
@@ -971,7 +1323,7 @@ class _ProductPickerDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
                 border: Border(
-                  bottom: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+                  bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
                 ),
               ),
               child: Row(
@@ -1019,7 +1371,7 @@ class _ProductPickerDialog extends StatelessWidget {
                     width: 280,
                     decoration: BoxDecoration(
                       border: Border(
-                        right: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+                        right: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
                       ),
                     ),
                     child: Column(
@@ -1030,7 +1382,7 @@ class _ProductPickerDialog extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
                             border: Border(
-                              bottom: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+                              bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
                             ),
                           ),
                           child: Row(
@@ -1063,7 +1415,13 @@ class _ProductPickerDialog extends StatelessWidget {
                     child: ValueListenableBuilder<_ProductPickerState>(
                       valueListenable: pickerStateNotifier,
                       builder: (context, state, _) {
-                        return _buildProductList(theme, colorScheme, state);
+                        return _buildProductSuggestionsScrollArea(
+                          context: context,
+                          state: state,
+                          scrollController: scrollController,
+                          onProductSelected: onProductSelected,
+                          dense: false,
+                        );
                       },
                     ),
                   ),
@@ -1073,79 +1431,6 @@ class _ProductPickerDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildProductList(ThemeData theme, ColorScheme colorScheme, _ProductPickerState state) {
-    if (state.isLoading && state.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (!state.isLoading && state.items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: colorScheme.onSurface.withOpacity(0.5),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'کالایی یافت نشد',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.75),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
-        Expanded(
-          child: ListView.separated(
-            controller: scrollController,
-            itemCount: state.items.length +
-                ((state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0),
-            separatorBuilder: (separatorContext, separatorIndex) {
-              if (separatorIndex >= state.items.length - 1) return const SizedBox.shrink();
-              return const Divider(height: 1);
-            },
-            itemBuilder: (context, index) {
-              if (index == state.items.length &&
-                  (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))) {
-                return const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                );
-              }
-              if (index >= state.items.length) {
-                return const SizedBox.shrink();
-              }
-              final it = state.items[index];
-              final code = it['code']?.toString() ?? '';
-              final name = it['name']?.toString() ?? '';
-              final itemType = it['item_type']?.toString() ?? '';
-              return ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: Text(code.isNotEmpty ? '$code - $name' : name),
-                subtitle: itemType.isNotEmpty ? Text(itemType) : null,
-                onTap: () => onProductSelected(it),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }

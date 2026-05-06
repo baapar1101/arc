@@ -730,7 +730,8 @@ class CreateNotificationAction(ActionHandler):
                 },
                 "event_key": {
                     "type": "string",
-                    "description": "کلید رویداد",
+                    "ui_type": "notification_event_type_selector",
+                    "description": "کلید رویداد (از لیست سیستم، مقدار دستی یا ارجاع به نود قبلی مانند $node_id.field)",
                     "required": True
                 },
                 "title": {

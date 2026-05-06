@@ -231,6 +231,61 @@ class AuthContext:
 		logger.info(f"=== is_business_owner END (result: {is_owner}) ===")
 		return is_owner
 	
+	def _business_permission_direct(self, section: str, action: str) -> bool:
+		"""بررسی مستقیم JSON دسترسی کسب‌وکار برای یک سکشن (بدون پل سازگاری)."""
+		if not self.business_permissions:
+			return False
+		if section not in self.business_permissions:
+			return False
+		section_perms = self.business_permissions[section]
+		if not section_perms:
+			return action in ("read", "view")
+		if section_perms.get(action, False):
+			return True
+		if action == "view" and section_perms.get("read", False):
+			return True
+		if action == "read" and section_perms.get("view", False):
+			return True
+		return False
+
+	def _inventory_granular_fallback(self, action: str) -> bool:
+		"""UI دسترسی‌ها از warehouse_transfers است؛ APIهای قدیمی هنوز inventory.* می‌خواهند."""
+		if action in ("read", "view"):
+			return self._business_permission_direct("warehouse_transfers", "view") or self._business_permission_direct(
+				"warehouse_transfers", "read"
+			)
+		if action == "write":
+			return (
+				self._business_permission_direct("warehouse_transfers", "add")
+				or self._business_permission_direct("warehouse_transfers", "edit")
+				or self._business_permission_direct("warehouse_transfers", "draft")
+			)
+		if action == "delete":
+			return self._business_permission_direct("warehouse_transfers", "delete")
+		return False
+
+	def _accounting_granular_fallback(self, action: str) -> bool:
+		"""UI مجوزهای حسابداری را در سکشن‌های جزئی (مانند accounting_documents) ذخیره می‌کند؛
+		بخشی از API همچنان accounting.write/delete/view می‌خواهند (مثل ثبت چک و سند خودکار)."""
+		if action == "write":
+			return (
+				self._business_permission_direct("accounting", "add")
+				or self._business_permission_direct("accounting", "edit")
+				or self._business_permission_direct("accounting", "draft")
+				or self._business_permission_direct("accounting_documents", "add")
+				or self._business_permission_direct("accounting_documents", "edit")
+				or self._business_permission_direct("accounting_documents", "draft")
+			)
+		if action == "delete":
+			return self._business_permission_direct("accounting", "delete") or self._business_permission_direct(
+				"accounting_documents", "delete"
+			)
+		if action in ("read", "view"):
+			return self._business_permission_direct("accounting_documents", "view") or self._business_permission_direct(
+				"accounting_documents", "read"
+			)
+		return False
+
 	# بررسی دسترسی‌های کسب و کار
 	def has_business_permission(self, section: str, action: str) -> bool:
 		"""بررسی دسترسی در سطح کسب و کار"""
@@ -248,25 +303,18 @@ class AuthContext:
 		# بررسی دسترسی‌های عادی
 		if not self.business_permissions:
 			return False
-		
-		# بررسی وجود بخش
-		if section not in self.business_permissions:
-			return False
-		
-		section_perms = self.business_permissions[section]
-		
-		# اگر بخش خالی است، فقط خواندن
-		if not section_perms:
-			return action in ("read", "view")
-		
-		# بررسی دسترسی خاص (view و read معادل هم در نظر گرفته می‌شوند)
-		if section_perms.get(action, False):
-			return True
-		if action == "view" and section_perms.get("read", False):
-			return True
-		if action == "read" and section_perms.get("view", False):
-			return True
-		return False
+
+		if section == "inventory":
+			if self._business_permission_direct("inventory", action):
+				return True
+			return self._inventory_granular_fallback(action)
+
+		if section == "accounting":
+			if self._business_permission_direct("accounting", action):
+				return True
+			return self._accounting_granular_fallback(action)
+
+		return self._business_permission_direct(section, action)
 	
 	def can_read_section(self, section: str) -> bool:
 		"""بررسی دسترسی خواندن بخش در کسب و کار"""
@@ -276,8 +324,20 @@ class AuthContext:
 		# SuperAdmin و مالک کسب و کار دسترسی کامل دارند
 		if self.is_superadmin() or self.is_business_owner():
 			return True
-		
-		return section in self.business_permissions
+
+		if not self.business_permissions:
+			return False
+
+		if section in self.business_permissions:
+			return True
+
+		if section == "inventory":
+			return self._inventory_granular_fallback("read")
+
+		if section == "accounting":
+			return self.has_business_permission("accounting", "view") or self.has_business_permission("accounting", "read")
+
+		return False
 	
 	def can_write_section(self, section: str) -> bool:
 		"""بررسی دسترسی نوشتن در بخش"""

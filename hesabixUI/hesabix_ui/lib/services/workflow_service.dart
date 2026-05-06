@@ -259,6 +259,24 @@ class WorkflowService {
     return _asMap(res.data?['data']);
   }
 
+  /// انواع رویداد نوتیفیکیشن (فهرست سیستم برای انتخاب در ورک‌فلو)
+  Future<List<Map<String, dynamic>>> listNotificationEventTypes({String? category}) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business-notifications/event-types',
+      query: <String, dynamic>{
+        if (category != null && category.isNotEmpty) 'category': category,
+      },
+    );
+    final data = _asMap(res.data?['data']);
+    final items = data['items'];
+    if (items is List) {
+      return items
+          .map<Map<String, dynamic>>((dynamic e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
   /// قالب‌های SMS تاییدشده و فعال (انتخاب در نود ورک‌فلو)
   Future<List<Map<String, dynamic>>> listApprovedSmsTemplates({
     required int businessId,

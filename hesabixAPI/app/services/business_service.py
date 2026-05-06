@@ -1059,6 +1059,9 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_footer_print_time": bool(getattr(row, "show_footer_print_time", True)),
             "show_footer_preparer": bool(getattr(row, "show_footer_preparer", True)),
             "footer_note": getattr(row, "footer_note", None),
+            "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
+            "show_seller_signature_area": bool(getattr(row, "show_seller_signature_area", True)),
+            "show_buyer_signature_area": bool(getattr(row, "show_buyer_signature_area", True)),
         }
 
     default_settings: Dict[str, Any] = {
@@ -1071,6 +1074,9 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_footer_print_time": True,
         "show_footer_preparer": True,
         "footer_note": None,
+        "show_customer_balance": True,
+        "show_seller_signature_area": True,
+        "show_buyer_signature_area": True,
     }
     per_type: Dict[str, Any] = {}
 
@@ -1154,6 +1160,15 @@ def update_business_print_settings(
         default_row.show_footer_preparer = _get_bool(
             default_data, "show_footer_preparer", True
         )
+        default_row.show_customer_balance = _get_bool(
+            default_data, "show_customer_balance", True
+        )
+        default_row.show_seller_signature_area = _get_bool(
+            default_data, "show_seller_signature_area", True
+        )
+        default_row.show_buyer_signature_area = _get_bool(
+            default_data, "show_buyer_signature_area", True
+        )
         default_row.footer_note = (
             (default_data.get("footer_note") or None)
             if isinstance(default_data.get("footer_note"), str)
@@ -1202,6 +1217,9 @@ def update_business_print_settings(
         row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
         row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
         row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
+        row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
+        row.show_seller_signature_area = _get_bool(cfg, "show_seller_signature_area", True)
+        row.show_buyer_signature_area = _get_bool(cfg, "show_buyer_signature_area", True)
         row.footer_note = (
             (cfg.get("footer_note") or None)
             if isinstance(cfg.get("footer_note"), str)

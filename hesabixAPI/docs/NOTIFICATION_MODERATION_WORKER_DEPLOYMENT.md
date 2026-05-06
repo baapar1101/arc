@@ -12,6 +12,8 @@
 - ✅ قابل مشاهده در بخش Monitoring
 - ✅ لاگ‌گیری از طریق journalctl
 
+**مرتبط:** راهنمای اندپوینت‌های لاگ/ری‌استارت سرویس، Docker و ژورنال میزبان: [SERVICE_LOGS_ADMIN_API.md](./SERVICE_LOGS_ADMIN_API.md)
+
 ---
 
 ## 🛠️ راه‌اندازی با Systemd
@@ -200,6 +202,8 @@ Authorization: Bearer {token}
 GET /api/v1/admin/system-services/logs?service_name=hesabix-notification-moderation&lines=100
 Authorization: Bearer {token}
 ```
+
+اگر این درخواست‌ها در محیط شما **۵۰۳** می‌دهند (مثلاً API داخل کانتینر بدون دسترسی به journald میزبان)، جزئیات استقرار در [SERVICE_LOGS_ADMIN_API.md](./SERVICE_LOGS_ADMIN_API.md) آمده است.
 
 ---
 

@@ -57,6 +57,12 @@ class BusinessPrintSettings(Base):
     show_footer_print_time: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_footer_preparer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 
+    # نمایش تراز/وضعیت حساب شخص در PDF تک‌فاکتور (پیش‌فاکتور: تراز فعلی و احتمالی)
+    show_customer_balance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    # بلوک‌های امضا و مهر در پایین PDF (جدا از «بارگذاری تصویر مهر» با show_stamp)
+    show_seller_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    show_buyer_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+
     # متن ثابت انتهای فاکتور (پاورقی قابل تنظیم برای این نوع سند)
     footer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

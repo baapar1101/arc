@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-# اسکریپت مدیریت نسخه سراسری برای پروژه Flutter
-# این اسکریپت نسخه را در pubspec.yaml تغییر می‌دهد و Flutter به طور خودکار
-# این نسخه را به تمام پلتفرم‌ها (Android, iOS, Windows, Linux, macOS, Web) منتقل می‌کند
+# Global version management script for the Flutter project
+# Updates version in pubspec.yaml; Flutter propagates it to all platforms
+# (Android, iOS, Windows, Linux, macOS, Web)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
@@ -19,55 +19,55 @@ INCREMENT_TYPE=""
 
 print_usage() {
   cat <<EOF
-استفاده: ./update_version.sh [گزینه‌ها]
+Usage: ./update_version.sh [options]
 
-گزینه‌ها:
-  --project PATH      مسیر پروژه Flutter (پیش‌فرض: $DEFAULT_PROJECT)
-  --set VERSION       تنظیم نسخه به صورت دستی (مثال: 1.0.23)
-  --build NUMBER      تنظیم شماره بیلد (مثال: 23)
-  --set-full VERSION  تنظیم نسخه کامل (مثال: 1.0.23+23)
-  --increment TYPE    افزایش نسخه (major|minor|patch|build)
-  --show              نمایش نسخه فعلی
-  --help              نمایش راهنما
+Options:
+  --project PATH      Path to Flutter project (default: $DEFAULT_PROJECT)
+  --set VERSION       Set semantic version manually (e.g. 1.0.23)
+  --build NUMBER      Set build number (e.g. 23)
+  --set-full VERSION  Set full version (e.g. 1.0.23+23)
+  --increment TYPE    Bump version (major|minor|patch|build)
+  --show              Show current version
+  --help              Show this help
 
-مثال‌ها:
-  # نمایش نسخه فعلی
+Examples:
+  # Show current version
   ./update_version.sh --show
 
-  # تنظیم نسخه به 1.0.24
+  # Set version to 1.0.24
   ./update_version.sh --set 1.0.24
 
-  # تنظیم شماره بیلد به 24
+  # Set build number to 24
   ./update_version.sh --build 24
 
-  # تنظیم نسخه کامل
+  # Set full version
   ./update_version.sh --set-full 1.0.24+24
 
-  # افزایش نسخه patch (1.0.23 -> 1.0.24)
+  # Bump patch (1.0.23 -> 1.0.24)
   ./update_version.sh --increment patch
 
-  # افزایش نسخه minor (1.0.23 -> 1.1.0)
+  # Bump minor (1.0.23 -> 1.1.0)
   ./update_version.sh --increment minor
 
-  # افزایش نسخه major (1.0.23 -> 2.0.0)
+  # Bump major (1.0.23 -> 2.0.0)
   ./update_version.sh --increment major
 
-  # افزایش شماره بیلد (23 -> 24)
+  # Bump build number (23 -> 24)
   ./update_version.sh --increment build
 
-نکته: Flutter به طور خودکار نسخه را به تمام پلتفرم‌ها منتقل می‌کند:
-  - Android: versionName و versionCode
-  - iOS: CFBundleShortVersionString و CFBundleVersion
+Note: Flutter propagates this version to all platforms:
+  - Android: versionName and versionCode
+  - iOS: CFBundleShortVersionString and CFBundleVersion
   - Windows: FLUTTER_VERSION_MAJOR, MINOR, PATCH, BUILD
-  - Linux: از pubspec.yaml
-  - macOS: CFBundleShortVersionString و CFBundleVersion
-  - Web: از pubspec.yaml
+  - Linux: from pubspec.yaml
+  - macOS: CFBundleShortVersionString and CFBundleVersion
+  - Web: from pubspec.yaml
 EOF
 }
 
-warn() { echo "[هشدار] $*" >&2; }
-die() { echo "[خطا] $*" >&2; exit 1; }
-info() { echo "[اطلاعات] $*"; }
+warn() { echo "[WARN] $*" >&2; }
+die() { echo "[ERROR] $*" >&2; exit 1; }
+info() { echo "[INFO] $*"; }
 
 find_pubspec() {
   local search_dir="$1"
@@ -81,9 +81,9 @@ find_pubspec() {
 auto_detect_project_dir() {
   if [ -n "$USER_PROJECT" ]; then
     local p="$USER_PROJECT"
-    [ -d "$p" ] || die "مسیر پروژه وجود ندارد: $p"
+    [ -d "$p" ] || die "Project path does not exist: $p"
     local pubspec=$(find_pubspec "$p")
-    [ -n "$pubspec" ] || die "فایل pubspec.yaml در مسیر یافت نشد: $p"
+    [ -n "$pubspec" ] || die "pubspec.yaml not found under: $p"
     echo "$(cd "$p" && pwd)"
     return 0
   fi
@@ -108,66 +108,63 @@ auto_detect_project_dir() {
     fi
   fi
 
-  die "پروژه Flutter یافت نشد. لطفاً مسیر را با --project مشخص کنید."
+  die "Flutter project not found. Specify path with --project."
 }
 
 get_current_version() {
   local pubspec_file="$1"
   local version_line=$(grep -E "^version:" "$pubspec_file" | head -n 1)
   if [ -z "$version_line" ]; then
-    die "خط version در pubspec.yaml یافت نشد"
+    die "No version: line found in pubspec.yaml"
   fi
-  
-  # استخراج نسخه از خط version: 1.0.23+23
+
+  # Parse version line: version: 1.0.23+23
   local version_str=$(echo "$version_line" | sed -E 's/^version:\s*//' | tr -d ' ')
   echo "$version_str"
 }
 
 parse_version() {
   local version_str="$1"
-  # فرمت: MAJOR.MINOR.PATCH+BUILD
+  # Format: MAJOR.MINOR.PATCH+BUILD
   if [[ "$version_str" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\+([0-9]+)$ ]]; then
     echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
   else
-    die "فرمت نسخه نامعتبر: $version_str (باید به صورت MAJOR.MINOR.PATCH+BUILD باشد)"
+    die "Invalid version format: $version_str (expected MAJOR.MINOR.PATCH+BUILD)"
   fi
 }
 
 update_version_in_pubspec() {
   local pubspec_file="$1"
   local new_version="$2"
-  
-  # پشتیبان‌گیری از فایل
+
+  # Backup file
   local backup_file="${pubspec_file}.bak"
   cp "$pubspec_file" "$backup_file"
-  
-  # جایگزینی نسخه
+
+  # Replace version line
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
     sed -i '' "s/^version:.*/version: $new_version/" "$pubspec_file"
   else
-    # Linux
     sed -i "s/^version:.*/version: $new_version/" "$pubspec_file"
   fi
-  
-  # بررسی موفقیت
+
+  # Verify
   local updated=$(get_current_version "$pubspec_file")
   if [ "$updated" != "$new_version" ]; then
     mv "$backup_file" "$pubspec_file"
-    die "خطا در به‌روزرسانی نسخه"
+    die "Failed to update version"
   fi
-  
-  # حذف فایل پشتیبان در صورت موفقیت
+
   rm -f "$backup_file"
-  info "نسخه به‌روزرسانی شد: $new_version"
+  info "Version updated: $new_version"
 }
 
 increment_version() {
   local version_str="$1"
   local increment_type="$2"
-  
+
   read -r major minor patch build <<< "$(parse_version "$version_str")"
-  
+
   case "$increment_type" in
     major)
       major=$((major + 1))
@@ -185,10 +182,10 @@ increment_version() {
       build=$((build + 1))
       ;;
     *)
-      die "نوع افزایش نامعتبر: $increment_type (باید یکی از: major, minor, patch, build باشد)"
+      die "Invalid increment type: $increment_type (use: major, minor, patch, build)"
       ;;
   esac
-  
+
   echo "$major.$minor.$patch+$build"
 }
 
@@ -196,48 +193,48 @@ show_version() {
   local pubspec_file="$1/pubspec.yaml"
   local version_str=$(get_current_version "$pubspec_file")
   read -r major minor patch build <<< "$(parse_version "$version_str")"
-  
+
   echo ""
   echo "=========================================="
-  echo "نسخه فعلی برنامه:"
+  echo "Current application version:"
   echo "=========================================="
-  echo "  نسخه کامل: $version_str"
-  echo "  Major:     $major"
-  echo "  Minor:     $minor"
-  echo "  Patch:     $patch"
-  echo "  Build:     $build"
+  echo "  Full:  $version_str"
+  echo "  Major: $major"
+  echo "  Minor: $minor"
+  echo "  Patch: $patch"
+  echo "  Build: $build"
   echo ""
-  echo "این نسخه در تمام پلتفرم‌ها استفاده می‌شود:"
-  echo "  ✓ Android: versionName=$major.$minor.$patch, versionCode=$build"
-  echo "  ✓ iOS:     CFBundleShortVersionString=$major.$minor.$patch, CFBundleVersion=$build"
-  echo "  ✓ Windows: FLUTTER_VERSION=$major.$minor.$patch, BUILD=$build"
-  echo "  ✓ Linux:   از pubspec.yaml"
-  echo "  ✓ macOS:   CFBundleShortVersionString=$major.$minor.$patch, CFBundleVersion=$build"
-  echo "  ✓ Web:     از pubspec.yaml"
+  echo "This version is used on all platforms:"
+  echo "  OK Android: versionName=$major.$minor.$patch, versionCode=$build"
+  echo "  OK iOS:     CFBundleShortVersionString=$major.$minor.$patch, CFBundleVersion=$build"
+  echo "  OK Windows: FLUTTER_VERSION=$major.$minor.$patch, BUILD=$build"
+  echo "  OK Linux:   from pubspec.yaml"
+  echo "  OK macOS:   CFBundleShortVersionString=$major.$minor.$patch, CFBundleVersion=$build"
+  echo "  OK Web:     from pubspec.yaml"
   echo "=========================================="
   echo ""
 }
 
-# پارس کردن آرگومان‌ها
+# Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project)
-      [[ $# -ge 2 ]] || die "مقدار برای --project ارائه نشده است"
+      [[ $# -ge 2 ]] || die "Missing value for --project"
       USER_PROJECT="$2"; shift 2 ;;
     --set)
-      [[ $# -ge 2 ]] || die "مقدار برای --set ارائه نشده است"
+      [[ $# -ge 2 ]] || die "Missing value for --set"
       ACTION="set"
       VERSION="$2"; shift 2 ;;
     --build)
-      [[ $# -ge 2 ]] || die "مقدار برای --build ارائه نشده است"
+      [[ $# -ge 2 ]] || die "Missing value for --build"
       ACTION="build"
       BUILD_NUMBER="$2"; shift 2 ;;
     --set-full)
-      [[ $# -ge 2 ]] || die "مقدار برای --set-full ارائه نشده است"
+      [[ $# -ge 2 ]] || die "Missing value for --set-full"
       ACTION="set-full"
       VERSION="$2"; shift 2 ;;
     --increment)
-      [[ $# -ge 2 ]] || die "مقدار برای --increment ارائه نشده است"
+      [[ $# -ge 2 ]] || die "Missing value for --increment"
       ACTION="increment"
       INCREMENT_TYPE="$2"; shift 2 ;;
     --show)
@@ -245,7 +242,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       print_usage; exit 0 ;;
     *)
-      warn "آرگومان ناشناخته: $1"; shift ;;
+      warn "Unknown argument: $1"; shift ;;
   esac
 done
 
@@ -258,7 +255,7 @@ APP_DIR="$(auto_detect_project_dir)"
 PUBSPEC_FILE="$APP_DIR/pubspec.yaml"
 
 if [ ! -f "$PUBSPEC_FILE" ]; then
-  die "فایل pubspec.yaml یافت نشد: $PUBSPEC_FILE"
+  die "pubspec.yaml not found: $PUBSPEC_FILE"
 fi
 
 CURRENT_VERSION=$(get_current_version "$PUBSPEC_FILE")
@@ -269,27 +266,24 @@ case "$ACTION" in
     show_version "$APP_DIR"
     ;;
   set)
-    # بررسی فرمت نسخه (باید MAJOR.MINOR.PATCH باشد)
     if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      die "فرمت نسخه نامعتبر: $VERSION (باید به صورت MAJOR.MINOR.PATCH باشد، مثال: 1.0.24)"
+      die "Invalid version format: $VERSION (expected MAJOR.MINOR.PATCH, e.g. 1.0.24)"
     fi
     NEW_VERSION="$VERSION+$CURRENT_BUILD"
     update_version_in_pubspec "$PUBSPEC_FILE" "$NEW_VERSION"
     show_version "$APP_DIR"
     ;;
   build)
-    # بررسی اینکه شماره بیلد یک عدد است
     if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-      die "شماره بیلد باید یک عدد باشد: $BUILD_NUMBER"
+      die "Build number must be numeric: $BUILD_NUMBER"
     fi
     NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$CURRENT_PATCH+$BUILD_NUMBER"
     update_version_in_pubspec "$PUBSPEC_FILE" "$NEW_VERSION"
     show_version "$APP_DIR"
     ;;
   set-full)
-    # بررسی فرمت نسخه کامل
     if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$ ]]; then
-      die "فرمت نسخه نامعتبر: $VERSION (باید به صورت MAJOR.MINOR.PATCH+BUILD باشد، مثال: 1.0.24+24)"
+      die "Invalid version format: $VERSION (expected MAJOR.MINOR.PATCH+BUILD, e.g. 1.0.24+24)"
     fi
     update_version_in_pubspec "$PUBSPEC_FILE" "$VERSION"
     show_version "$APP_DIR"
@@ -297,17 +291,17 @@ case "$ACTION" in
   increment)
     NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
     update_version_in_pubspec "$PUBSPEC_FILE" "$NEW_VERSION"
-    info "نسخه از $CURRENT_VERSION به $NEW_VERSION افزایش یافت"
+    info "Version bumped from $CURRENT_VERSION to $NEW_VERSION"
     show_version "$APP_DIR"
     ;;
   *)
-    die "عملیات نامعتبر: $ACTION"
+    die "Invalid action: $ACTION"
     ;;
 esac
 
 echo ""
-info "✓ عملیات با موفقیت انجام شد!"
-info "برای اعمال تغییرات در بیلدها، دستورات build را اجرا کنید:"
+info "Done successfully."
+info "Run build commands to propagate changes into binaries:"
 echo "  ./build_android.sh"
 echo "  ./build_windows.ps1"
 echo "  flutter build ios"
@@ -315,7 +309,5 @@ echo "  flutter build linux"
 echo "  flutter build macos"
 echo "  flutter build web"
 echo ""
-
-
 
 

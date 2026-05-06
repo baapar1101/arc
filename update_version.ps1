@@ -1,6 +1,6 @@
-# اسکریپت مدیریت نسخه سراسری برای پروژه Flutter (PowerShell)
-# این اسکریپت نسخه را در pubspec.yaml تغییر می‌دهد و Flutter به طور خودکار
-# این نسخه را به تمام پلتفرم‌ها (Android, iOS, Windows, Linux, macOS, Web) منتقل می‌کند
+# Global version management script for the Flutter project (PowerShell)
+# Updates version in pubspec.yaml; Flutter propagates it to all platforms
+# (Android, iOS, Windows, Linux, macOS, Web)
 
 param(
     [string]$Project = "",
@@ -20,49 +20,49 @@ $REPO_ROOT = $SCRIPT_DIR
 $DEFAULT_PROJECT = "hesabixUI\hesabix_ui"
 
 function Print-Usage {
-    Write-Host "استفاده: .\update_version.ps1 [گزینه‌ها]"
+    Write-Host "Usage: .\update_version.ps1 [options]"
     Write-Host ""
-    Write-Host "گزینه‌ها:"
-    Write-Host "  -Project PATH      مسیر پروژه Flutter (پیش‌فرض: $DEFAULT_PROJECT)"
-    Write-Host "  -Set VERSION       تنظیم نسخه به صورت دستی (مثال: 1.0.23)"
-    Write-Host "  -Build NUMBER      تنظیم شماره بیلد (مثال: 23)"
-    Write-Host "  -SetFull VERSION   تنظیم نسخه کامل (مثال: 1.0.23+23)"
-    Write-Host "  -Increment TYPE    افزایش نسخه (major|minor|patch|build)"
-    Write-Host "  -Show              نمایش نسخه فعلی"
-    Write-Host "  -Help              نمایش راهنما"
+    Write-Host "Options:"
+    Write-Host "  -Project PATH      Path to Flutter project (default: $DEFAULT_PROJECT)"
+    Write-Host "  -Set VERSION       Set semantic version manually (e.g. 1.0.23)"
+    Write-Host "  -Build NUMBER      Set build number (e.g. 23)"
+    Write-Host "  -SetFull VERSION   Set full version (e.g. 1.0.23+23)"
+    Write-Host "  -Increment TYPE    Bump version (major|minor|patch|build)"
+    Write-Host "  -Show              Show current version"
+    Write-Host "  -Help              Show this help"
     Write-Host ""
-    Write-Host "مثال‌ها:"
-    Write-Host "  # نمایش نسخه فعلی"
+    Write-Host "Examples:"
+    Write-Host "  # Show current version"
     Write-Host "  .\update_version.ps1 -Show"
     Write-Host ""
-    Write-Host "  # تنظیم نسخه به 1.0.24"
+    Write-Host "  # Set version to 1.0.24"
     Write-Host "  .\update_version.ps1 -Set 1.0.24"
     Write-Host ""
-    Write-Host "  # تنظیم شماره بیلد به 24"
+    Write-Host "  # Set build number to 24"
     Write-Host "  .\update_version.ps1 -Build 24"
     Write-Host ""
-    Write-Host "  # تنظیم نسخه کامل"
+    Write-Host "  # Set full version"
     Write-Host "  .\update_version.ps1 -SetFull 1.0.24+24"
     Write-Host ""
-    Write-Host "  # افزایش نسخه patch (1.0.23 -> 1.0.24)"
+    Write-Host "  # Bump patch (1.0.23 -> 1.0.24)"
     Write-Host "  .\update_version.ps1 -Increment patch"
     Write-Host ""
-    Write-Host "  # افزایش نسخه minor (1.0.23 -> 1.1.0)"
+    Write-Host "  # Bump minor (1.0.23 -> 1.1.0)"
     Write-Host "  .\update_version.ps1 -Increment minor"
     Write-Host ""
-    Write-Host "  # افزایش نسخه major (1.0.23 -> 2.0.0)"
+    Write-Host "  # Bump major (1.0.23 -> 2.0.0)"
     Write-Host "  .\update_version.ps1 -Increment major"
     Write-Host ""
-    Write-Host "  # افزایش شماره بیلد (23 -> 24)"
+    Write-Host "  # Bump build number (23 -> 24)"
     Write-Host "  .\update_version.ps1 -Increment build"
     Write-Host ""
-    Write-Host "نکته: Flutter به طور خودکار نسخه را به تمام پلتفرم‌ها منتقل می‌کند:"
-    Write-Host "  - Android: versionName و versionCode"
-    Write-Host "  - iOS: CFBundleShortVersionString و CFBundleVersion"
+    Write-Host "Note: Flutter propagates this version to all platforms:"
+    Write-Host "  - Android: versionName and versionCode"
+    Write-Host "  - iOS: CFBundleShortVersionString and CFBundleVersion"
     Write-Host "  - Windows: FLUTTER_VERSION_MAJOR, MINOR, PATCH, BUILD"
-    Write-Host "  - Linux: از pubspec.yaml"
-    Write-Host "  - macOS: CFBundleShortVersionString و CFBundleVersion"
-    Write-Host "  - Web: از pubspec.yaml"
+    Write-Host "  - Linux: from pubspec.yaml"
+    Write-Host "  - macOS: CFBundleShortVersionString and CFBundleVersion"
+    Write-Host "  - Web: from pubspec.yaml"
 }
 
 if ($Help) {
@@ -75,7 +75,7 @@ function Get-CurrentVersion {
     
     $versionLine = Get-Content $PubspecFile | Select-String -Pattern "^version:" | Select-Object -First 1
     if (-not $versionLine) {
-        Write-Host "[خطا] خط version در pubspec.yaml یافت نشد" -ForegroundColor Red
+        Write-Host "[ERROR] No version: line found in pubspec.yaml" -ForegroundColor Red
         exit 1
     }
     
@@ -94,7 +94,7 @@ function Parse-Version {
             Build = [int]$Matches[4]
         }
     } else {
-        Write-Host "[خطا] فرمت نسخه نامعتبر: $VersionStr (باید به صورت MAJOR.MINOR.PATCH+BUILD باشد)" -ForegroundColor Red
+        Write-Host "[ERROR] Invalid version format: $VersionStr (expected MAJOR.MINOR.PATCH+BUILD)" -ForegroundColor Red
         exit 1
     }
 }
@@ -105,30 +105,29 @@ function Update-VersionInPubspec {
         [string]$NewVersion
     )
     
-    # پشتیبان‌گیری
+    # Backup
     $backupFile = "$PubspecFile.bak"
     Copy-Item $PubspecFile $backupFile
     
     try {
-        # جایگزینی نسخه
+        # Replace version line
         $content = Get-Content $PubspecFile
         $content = $content -replace "^version:.*", "version: $NewVersion"
         $content | Set-Content $PubspecFile -Encoding UTF8
         
-        # بررسی موفقیت
+        # Verify
         $updated = Get-CurrentVersion $PubspecFile
         if ($updated -ne $NewVersion) {
             Copy-Item $backupFile $PubspecFile
-            Write-Host "[خطا] خطا در به‌روزرسانی نسخه" -ForegroundColor Red
+            Write-Host "[ERROR] Failed to update version" -ForegroundColor Red
             exit 1
         }
         
-        # حذف فایل پشتیبان
         Remove-Item $backupFile -ErrorAction SilentlyContinue
-        Write-Host "[اطلاعات] نسخه به‌روزرسانی شد: $NewVersion" -ForegroundColor Green
+        Write-Host "[INFO] Version updated: $NewVersion" -ForegroundColor Green
     } catch {
         Copy-Item $backupFile $PubspecFile
-        Write-Host "[خطا] خطا در به‌روزرسانی نسخه: $_" -ForegroundColor Red
+        Write-Host "[ERROR] Failed to update version: $_" -ForegroundColor Red
         exit 1
     }
 }
@@ -162,7 +161,7 @@ function Increment-Version {
             $build++
         }
         default {
-            Write-Host "[خطا] نوع افزایش نامعتبر: $IncrementType (باید یکی از: major, minor, patch, build باشد)" -ForegroundColor Red
+            Write-Host "[ERROR] Invalid increment type: $IncrementType (use: major, minor, patch, build)" -ForegroundColor Red
             exit 1
         }
     }
@@ -179,26 +178,26 @@ function Show-Version {
     
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host "نسخه فعلی برنامه:" -ForegroundColor Cyan
+    Write-Host "Current application version:" -ForegroundColor Cyan
     Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host "  نسخه کامل: $versionStr"
-    Write-Host "  Major:     $($version.Major)"
-    Write-Host "  Minor:     $($version.Minor)"
-    Write-Host "  Patch:     $($version.Patch)"
-    Write-Host "  Build:     $($version.Build)"
+    Write-Host "  Full:  $versionStr"
+    Write-Host "  Major: $($version.Major)"
+    Write-Host "  Minor: $($version.Minor)"
+    Write-Host "  Patch: $($version.Patch)"
+    Write-Host "  Build: $($version.Build)"
     Write-Host ""
-    Write-Host "این نسخه در تمام پلتفرم‌ها استفاده می‌شود:" -ForegroundColor Yellow
-    Write-Host "  ✓ Android: versionName=$($version.Major).$($version.Minor).$($version.Patch), versionCode=$($version.Build)"
-    Write-Host "  ✓ iOS:     CFBundleShortVersionString=$($version.Major).$($version.Minor).$($version.Patch), CFBundleVersion=$($version.Build)"
-    Write-Host "  ✓ Windows: FLUTTER_VERSION=$($version.Major).$($version.Minor).$($version.Patch), BUILD=$($version.Build)"
-    Write-Host "  ✓ Linux:   از pubspec.yaml"
-    Write-Host "  ✓ macOS:   CFBundleShortVersionString=$($version.Major).$($version.Minor).$($version.Patch), CFBundleVersion=$($version.Build)"
-    Write-Host "  ✓ Web:     از pubspec.yaml"
+    Write-Host "This version is used on all platforms:" -ForegroundColor Yellow
+    Write-Host "  OK Android: versionName=$($version.Major).$($version.Minor).$($version.Patch), versionCode=$($version.Build)"
+    Write-Host "  OK iOS:     CFBundleShortVersionString=$($version.Major).$($version.Minor).$($version.Patch), CFBundleVersion=$($version.Build)"
+    Write-Host "  OK Windows: FLUTTER_VERSION=$($version.Major).$($version.Minor).$($version.Patch), BUILD=$($version.Build)"
+    Write-Host "  OK Linux:   from pubspec.yaml"
+    Write-Host "  OK macOS:   CFBundleShortVersionString=$($version.Major).$($version.Minor).$($version.Patch), CFBundleVersion=$($version.Build)"
+    Write-Host "  OK Web:     from pubspec.yaml"
     Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host ""
 }
 
-# تشخیص خودکار مسیر پروژه
+# Auto-detect project path
 $APP_DIR = $null
 
 if ($Project) {
@@ -206,7 +205,7 @@ if ($Project) {
     if (Test-Path $pubspecPath) {
         $APP_DIR = Resolve-Path $Project
     } else {
-        Write-Host "[خطا] مسیر پروژه وجود ندارد یا pubspec.yaml یافت نشد: $Project" -ForegroundColor Red
+        Write-Host "[ERROR] Project path missing or pubspec.yaml not found: $Project" -ForegroundColor Red
         exit 1
     }
 } else {
@@ -226,7 +225,7 @@ if ($Project) {
     }
     
     if (-not $APP_DIR) {
-        Write-Host "[خطا] پروژه Flutter یافت نشد. لطفاً مسیر را با -Project مشخص کنید." -ForegroundColor Red
+        Write-Host "[ERROR] Flutter project not found. Specify path with -Project." -ForegroundColor Red
         exit 1
     }
 }
@@ -234,14 +233,13 @@ if ($Project) {
 $PUBSPEC_FILE = Join-Path $APP_DIR "pubspec.yaml"
 
 if (-not (Test-Path $PUBSPEC_FILE)) {
-    Write-Host "[خطا] فایل pubspec.yaml یافت نشد: $PUBSPEC_FILE" -ForegroundColor Red
+    Write-Host "[ERROR] pubspec.yaml not found: $PUBSPEC_FILE" -ForegroundColor Red
     exit 1
 }
 
 $CURRENT_VERSION = Get-CurrentVersion $PUBSPEC_FILE
 $CURRENT_VERSION_OBJ = Parse-Version $CURRENT_VERSION
 
-# تعیین عملیات
 $action = $null
 if ($Show) { $action = "show" }
 elseif ($Set) { $action = "set" }
@@ -260,7 +258,7 @@ switch ($action) {
     }
     "set" {
         if ($Set -notmatch "^\d+\.\d+\.\d+$") {
-            Write-Host "[خطا] فرمت نسخه نامعتبر: $Set (باید به صورت MAJOR.MINOR.PATCH باشد، مثال: 1.0.24)" -ForegroundColor Red
+            Write-Host "[ERROR] Invalid version format: $Set (expected MAJOR.MINOR.PATCH, e.g. 1.0.24)" -ForegroundColor Red
             exit 1
         }
         $NEW_VERSION = "$Set+$($CURRENT_VERSION_OBJ.Build)"
@@ -269,7 +267,7 @@ switch ($action) {
     }
     "build" {
         if ($Build -notmatch "^\d+$") {
-            Write-Host "[خطا] شماره بیلد باید یک عدد باشد: $Build" -ForegroundColor Red
+            Write-Host "[ERROR] Build number must be numeric: $Build" -ForegroundColor Red
             exit 1
         }
         $NEW_VERSION = "$($CURRENT_VERSION_OBJ.Major).$($CURRENT_VERSION_OBJ.Minor).$($CURRENT_VERSION_OBJ.Patch)+$Build"
@@ -278,7 +276,7 @@ switch ($action) {
     }
     "set-full" {
         if ($SetFull -notmatch "^\d+\.\d+\.\d+\+\d+$") {
-            Write-Host "[خطا] فرمت نسخه نامعتبر: $SetFull (باید به صورت MAJOR.MINOR.PATCH+BUILD باشد، مثال: 1.0.24+24)" -ForegroundColor Red
+            Write-Host "[ERROR] Invalid version format: $SetFull (expected MAJOR.MINOR.PATCH+BUILD, e.g. 1.0.24+24)" -ForegroundColor Red
             exit 1
         }
         Update-VersionInPubspec $PUBSPEC_FILE $SetFull
@@ -287,14 +285,14 @@ switch ($action) {
     "increment" {
         $NEW_VERSION = Increment-Version $CURRENT_VERSION $Increment
         Update-VersionInPubspec $PUBSPEC_FILE $NEW_VERSION
-        Write-Host "[اطلاعات] نسخه از $CURRENT_VERSION به $NEW_VERSION افزایش یافت" -ForegroundColor Green
+        Write-Host "[INFO] Version bumped from $CURRENT_VERSION to $NEW_VERSION" -ForegroundColor Green
         Show-Version $APP_DIR
     }
 }
 
 Write-Host ""
-Write-Host "[اطلاعات] ✓ عملیات با موفقیت انجام شد!" -ForegroundColor Green
-Write-Host "[اطلاعات] برای اعمال تغییرات در بیلدها، دستورات build را اجرا کنید:" -ForegroundColor Yellow
+Write-Host "[INFO] Done successfully." -ForegroundColor Green
+Write-Host "[INFO] Run build commands to propagate changes into binaries:" -ForegroundColor Yellow
 Write-Host "  .\build_android.sh"
 Write-Host "  .\build_windows.ps1"
 Write-Host "  flutter build ios"
@@ -302,7 +300,5 @@ Write-Host "  flutter build linux"
 Write-Host "  flutter build macos"
 Write-Host "  flutter build web"
 Write-Host ""
-
-
 
 

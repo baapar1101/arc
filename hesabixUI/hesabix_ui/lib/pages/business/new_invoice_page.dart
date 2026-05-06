@@ -91,7 +91,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   bool _isDraft = false;
   bool _isSaving = false;
   String? _invoiceNumber;
-  final bool _autoGenerateInvoiceNumber = true;
+  bool _autoGenerateInvoiceNumber = true;
   Customer? _selectedCustomer;
   Person? _selectedSeller;
   Person? _selectedSupplier; // برای فاکتورهای خرید
@@ -2098,6 +2098,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               _invoiceNumber = number;
                             });
                           },
+                          onAutoGenerateChanged: (auto) {
+                            setState(() {
+                              _autoGenerateInvoiceNumber = auto;
+                            });
+                          },
                           isRequired: true,
                           label: 'شماره فاکتور',
                           hintText: 'مثال: INV-2024-001',
@@ -2405,6 +2410,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onChanged: (number) {
                                   setState(() {
                                     _invoiceNumber = number;
+                                  });
+                                },
+                                onAutoGenerateChanged: (auto) {
+                                  setState(() {
+                                    _autoGenerateInvoiceNumber = auto;
                                   });
                                 },
                                 isRequired: true,
@@ -2945,6 +2955,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (_selectedCurrencyId == null) {
       return 'ارز فاکتور الزامی است';
     }
+    String? manualInvoiceCode;
+    if (!_autoGenerateInvoiceNumber) {
+      final raw = _invoiceNumber?.trim();
+      if (raw == null || raw.isEmpty) {
+        return 'شماره فاکتور الزامی است';
+      }
+      if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(raw)) {
+        return 'شماره فاکتور فقط می‌تواند شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد';
+      }
+      manualInvoiceCode = raw;
+    }
     if (_lineItems.isEmpty) {
       return 'حداقل یک ردیف کالا/خدمت وارد کنید';
     }
@@ -3207,6 +3228,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'currency_id': _selectedCurrencyId,
       'is_proforma': _isDraft,
       'extra_info': extraInfo,
+      if (manualInvoiceCode != null) 'code': manualInvoiceCode,
       if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,

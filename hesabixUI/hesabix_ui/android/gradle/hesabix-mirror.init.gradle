@@ -1,0 +1,22 @@
+// Injects Hesabix Gradle mirror into pluginManagement for every Gradle build in this invocation,
+// including composite builds (e.g. Flutter SDK includeBuild .../flutter_tools/gradle).
+// Loaded via: gradlew --init-script gradle/hesabix-mirror.init.gradle
+// Override base URL: env HESABIX_GRADLE_MIRROR or -Dhesabix.gradle.mirror=...
+
+def mirrorBase =
+    System.getenv("HESABIX_GRADLE_MIRROR") ?: System.getProperty("hesabix.gradle.mirror")
+if (mirrorBase == null || mirrorBase.trim().isEmpty()) {
+    mirrorBase = "https://gradle.mirror.hesabix.ir"
+}
+mirrorBase = mirrorBase.replaceAll(/\/+$/, "")
+
+gradle.beforeSettings { settings ->
+    settings.pluginManagement {
+        repositories {
+            maven { url("${mirrorBase}/android/maven2/") }
+            maven { url("${mirrorBase}/maven2/") }
+            maven { url("${mirrorBase}/gradle-plugins/") }
+            gradlePluginPortal()
+        }
+    }
+}

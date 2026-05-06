@@ -3925,12 +3925,12 @@ def create_invoice(
             raise ApiError("FX_REVALUATION_ERROR", "خطا در محاسبه تسعیر ارز", http_status=400)
         new_extra_info = _normalize_document_extra_info_for_storage(new_extra_info) or new_extra_info
 
-    # Create document با کنترل رقابت در شماره‌گذاری
+    # Create document با کنترل رقابت در شماره‌گذاری (خودکار) یا ثبت شماره دستی
     from app.services.document_numbering_service import generate_document_code
 
     document: Optional[Document] = None
     max_code_attempts = 5
-    
+
     # دریافت project_id (اختیاری)
     project_id = data.get("project_id")
     if project_id:
@@ -3941,13 +3941,19 @@ def create_invoice(
         ).first()
         if not project:
             raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
-    
-    for attempt in range(max_code_attempts):
-        doc_code = generate_document_code(db, business_id, invoice_type, document_date)
-        candidate = Document(
+
+    requested_code = str(data.get("code") or "").strip()
+    if requested_code:
+        if not re.match(r"^[A-Za-z0-9_-]+$", requested_code):
+            raise ApiError(
+                "INVALID_DOCUMENT_CODE",
+                "شماره فاکتور فقط می‌تواند شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد",
+                http_status=400,
+            )
+        candidate_manual = Document(
             business_id=business_id,
             fiscal_year_id=fiscal_year.id,
-            code=doc_code,
+            code=requested_code,
             document_type=invoice_type,
             document_date=document_date,
             currency_id=int(currency_id),
@@ -3960,24 +3966,56 @@ def create_invoice(
         )
         try:
             with db.begin_nested():
-                db.add(candidate)
+                db.add(candidate_manual)
                 db.flush()
         except IntegrityError as exc:
-            # اگر به دلیل تکرار کد شکست خورد، دوباره تلاش کن
             msg = str(getattr(exc.orig, "args", exc))
             if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
-                continue
+                raise ApiError(
+                    "DUPLICATE_DOCUMENT_CODE",
+                    "این شماره فاکتور برای این کسب‌وکار قبلاً ثبت شده است",
+                    http_status=400,
+                )
             raise
-        else:
-            document = candidate
-            break
+        document = candidate_manual
 
     if not document:
-        raise ApiError(
-            "DOCUMENT_CODE_RACE",
-            "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
-            http_status=409,
-        )
+        for attempt in range(max_code_attempts):
+            doc_code = generate_document_code(db, business_id, invoice_type, document_date)
+            candidate = Document(
+                business_id=business_id,
+                fiscal_year_id=fiscal_year.id,
+                code=doc_code,
+                document_type=invoice_type,
+                document_date=document_date,
+                currency_id=int(currency_id),
+                created_by_user_id=user_id,
+                registered_at=datetime.utcnow(),
+                is_proforma=bool(data.get("is_proforma", False)),
+                description=data.get("description"),
+                extra_info=new_extra_info,
+                project_id=project_id,
+            )
+            try:
+                with db.begin_nested():
+                    db.add(candidate)
+                    db.flush()
+            except IntegrityError as exc:
+                # اگر به دلیل تکرار کد شکست خورد، دوباره تلاش کن
+                msg = str(getattr(exc.orig, "args", exc))
+                if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                    continue
+                raise
+            else:
+                document = candidate
+                break
+
+        if not document:
+            raise ApiError(
+                "DOCUMENT_CODE_RACE",
+                "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+                http_status=409,
+            )
 
     # ذخیره اقلام فاکتور در جدول مجزا (invoice_item_lines)
     for line in lines_input:

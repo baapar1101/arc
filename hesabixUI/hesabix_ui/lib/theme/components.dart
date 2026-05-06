@@ -1,12 +1,31 @@
 import 'package:flutter/material.dart';
 
-InputDecorationTheme appInputDecorationTheme(ColorScheme scheme) => InputDecorationTheme(
-      border: const OutlineInputBorder(),
-      filled: true,
-      fillColor: scheme.surfaceContainerHighest,
-      hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.8)),
-      labelStyle: TextStyle(color: scheme.onSurface),
-    );
+InputDecorationTheme appInputDecorationTheme(ColorScheme scheme) {
+  const radius = BorderRadius.all(Radius.circular(4));
+  OutlineInputBorder outline(BorderSide side) =>
+      OutlineInputBorder(borderRadius: radius, borderSide: side);
+
+  final enabled = outline(BorderSide(color: scheme.outline, width: 1));
+  final focused = outline(BorderSide(color: scheme.primary, width: 2));
+  final disabled = outline(
+    BorderSide(color: scheme.onSurface.withValues(alpha: 0.12), width: 1),
+  );
+  final error = outline(BorderSide(color: scheme.error, width: 1));
+  final focusedError = outline(BorderSide(color: scheme.error, width: 2));
+
+  return InputDecorationTheme(
+    border: enabled,
+    enabledBorder: enabled,
+    focusedBorder: focused,
+    disabledBorder: disabled,
+    errorBorder: error,
+    focusedErrorBorder: focusedError,
+    filled: true,
+    fillColor: scheme.surfaceContainerHighest,
+    hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.8)),
+    labelStyle: TextStyle(color: scheme.onSurface),
+  );
+}
 
 ElevatedButtonThemeData appElevatedButtonTheme(ColorScheme scheme) => ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

@@ -33,6 +33,7 @@ import '../../widgets/date_input_field.dart';
 import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 import 'business_shell_side_nav_scope.dart';
+import '../../widgets/barcode/mobile_barcode_scan_screen.dart';
 
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
@@ -52,6 +53,8 @@ class QuickSalesPage extends StatefulWidget {
 
 class _QuickSalesPageState extends State<QuickSalesPage> {
   static const double _mobileBreakpoint = 700.0;
+  /// نمایشگرهای خیلی باریک (مثلاً آیفون ۶ ~۳۷۵pt، SE قدیمی ~۳۲۰pt)
+  static const double _compactBreakpoint = 400.0;
   final QuickSalesService _quickSalesService = QuickSalesService();
   final InvoiceService _invoiceService = InvoiceService();
   final ProductService _productService = ProductService();
@@ -335,6 +338,26 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _loading = false;
       });
     }
+  }
+
+  bool get _supportsInlineCameraScan =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  Future<void> _scanBarcodeWithCamera() async {
+    if (!_supportsInlineCameraScan) return;
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (context) => const MobileBarcodeScanScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    final trimmed = code.trim();
+    _barcodeController.text = trimmed;
+    setState(() {});
+    await _searchByBarcode(trimmed);
   }
 
   Future<void> _searchByBarcode(String code) async {
@@ -1434,7 +1457,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   }
 
   /// تاریخ فاکتور (شمسی/میلادی طبق تنظیم کاربر) و شرح سند — چیدمان فشرده
-  Widget _buildDocumentDateAndDescription({required bool isMobile}) {
+  Widget _buildDocumentDateAndDescription({required bool isMobile, bool compact = false}) {
     final dateWidget = DateInputField(
       value: _documentDate,
       labelText: 'تاریخ فاکتور',
@@ -1470,6 +1493,29 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     );
 
     if (isMobile) {
+      if (compact) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            dateWidget,
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: Text(
+                  'شرح سند (اختیاری)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                initiallyExpanded: false,
+                children: [descWidget],
+              ),
+            ),
+          ],
+        );
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1490,11 +1536,133 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     );
   }
 
+  /// ردیف تعداد و جزئیات مالی قلم سبد؛ در حالت compact زیرهم تا از overflow جلوگیری شود.
+  Widget _buildCartItemQuantityAndTotals({
+    required InvoiceLineItem item,
+    required int index,
+    required ColorScheme cs,
+    required bool compact,
+  }) {
+    final stepper = Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outline),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            onPressed: () => _decreaseQuantity(index),
+            padding: const EdgeInsets.all(4),
+            constraints: BoxConstraints(
+              minWidth: compact ? 28 : 32,
+              minHeight: compact ? 28 : 32,
+            ),
+          ),
+          SizedBox(
+            width: compact ? 44 : 50,
+            child: Text(
+              item.quantity.toStringAsFixed(0),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            onPressed: () => _increaseQuantity(index),
+            padding: const EdgeInsets.all(4),
+            constraints: BoxConstraints(
+              minWidth: compact ? 28 : 32,
+              minHeight: compact ? 28 : 32,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final breakdown = Column(
+      crossAxisAlignment: compact ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      children: [
+        Text(
+          '${_formatNumber(item.quantity)} × ${_formatNumber(item.unitPrice)}',
+          style: TextStyle(
+            fontSize: compact ? 11 : 12,
+            color: cs.onSurface.withOpacity(0.7),
+          ),
+        ),
+        if (item.discountValue > 0)
+          Text(
+            'تخفیف: ${item.discountType == 'percent' ? '${item.discountValue}%' : _formatNumber(item.discountValue)}',
+            style: TextStyle(
+              fontSize: compact ? 10 : 11,
+              color: cs.error,
+            ),
+          ),
+        if (item.taxRate > 0)
+          Text(
+            'مالیات: ${item.taxRate}%',
+            style: TextStyle(
+              fontSize: compact ? 10 : 11,
+              color: cs.onSurface.withOpacity(0.6),
+            ),
+          ),
+      ],
+    );
+
+    final totalText = Text(
+      _formatNumber(item.total),
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: compact ? 15 : 16,
+        color: cs.primary,
+      ),
+    );
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: stepper,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: breakdown),
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: totalText,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        stepper,
+        const SizedBox(width: 16),
+        Expanded(child: breakdown),
+        const SizedBox(width: 8),
+        totalText,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < _mobileBreakpoint;
+    final isCompactHeader = screenWidth < _compactBreakpoint;
     
     if (_loading) {
       return Scaffold(
@@ -1509,7 +1677,33 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       child: Scaffold(
       appBar: AppBar(
         title: isMobile
-            ? Column(
+            ? (isCompactHeader
+                ? Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'فروش سریع',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_cartItems.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            _formatNumber(_totalAmount),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: cs.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                    ],
+                  )
+                : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1526,7 +1720,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
-              )
+              ))
             : Row(
                 children: [
                   const Text('فروش سریع'),
@@ -1580,11 +1774,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       bottomNavigationBar: isMobile ? _buildMobileBottomBar(cs) : null,
       body: LayoutBuilder(
         builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < _compactBreakpoint;
           final cartColumn = Column(
             children: [
               // جستجوی بارکد
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all((isMobile && isCompact) ? 12 : 16),
                 color: cs.surfaceContainerHighest,
                 child: isMobile
                     ? Column(
@@ -1604,10 +1799,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                   onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
-                              Expanded(child: _buildBarcodeSearchField()),
+                              Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: isCompact ? 6 : 8),
                           CustomerComboboxWidget(
                             selectedCustomer: _selectedCustomer,
                             onCustomerChanged: (customer) {
@@ -1621,8 +1816,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                             label: 'مشتری',
                             hintText: 'مشتری ناشناس',
                           ),
-                          const SizedBox(height: 8),
-                          _buildDocumentDateAndDescription(isMobile: true),
+                          SizedBox(height: isCompact ? 6 : 8),
+                          _buildDocumentDateAndDescription(isMobile: true, compact: isCompact),
                         ],
                       )
                     : Column(
@@ -1644,7 +1839,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                   onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
-                              Expanded(child: _buildBarcodeSearchField()),
+                              Expanded(child: _buildBarcodeSearchField(compact: false)),
                               const SizedBox(width: 8),
                               // جستجوی مشتری
                               SizedBox(
@@ -1673,7 +1868,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                 // تاریخچه محصولات اخیر
                 if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: 8),
                     color: cs.surfaceContainerHighest,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1790,7 +1985,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.all(8),
+                          padding: EdgeInsets.all(isCompact ? 6 : 8),
                           itemCount: _cartItems.length,
                           itemBuilder: (context, index) {
                             final item = _cartItems[index];
@@ -1804,7 +1999,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                 child: InkWell(
                                 onTap: () => _editCartItem(index),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: EdgeInsets.all(isCompact ? 6 : 8),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -1825,7 +2020,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                                 child: Text(
                                                   'موجودی کافی نیست! موجودی: ${_formatNumber(_getProductStock(item.productId) ?? 0)}، درخواست: ${_formatNumber(item.quantity)}',
                                                   style: TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: isCompact ? 11 : 12,
                                                     color: cs.onErrorContainer,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -1842,9 +2037,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                               children: [
                                                 Text(
                                                   item.productName ?? 'نامشخص',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
+                                                    fontSize: isCompact ? 14 : 16,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
@@ -1914,99 +2109,23 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                             icon: const Icon(Icons.edit, size: 20),
                                             onPressed: () => _editCartItem(index),
                                             tooltip: 'ویرایش',
+                                            visualDensity: isCompact ? VisualDensity.compact : VisualDensity.standard,
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.delete, size: 20),
                                             onPressed: () => _removeFromCart(index),
                                             tooltip: 'حذف',
+                                            visualDensity: isCompact ? VisualDensity.compact : VisualDensity.standard,
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          // دکمه‌های افزایش/کاهش تعداد
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              border: Border.all(color: cs.outline),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.remove, size: 18),
-                                                  onPressed: () => _decreaseQuantity(index),
-                                                  padding: const EdgeInsets.all(4),
-                                                  constraints: const BoxConstraints(
-                                                    minWidth: 32,
-                                                    minHeight: 32,
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  width: 50,
-                                                  child: Text(
-                                                    item.quantity.toStringAsFixed(0),
-                                                    textAlign: TextAlign.center,
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.add, size: 18),
-                                                  onPressed: () => _increaseQuantity(index),
-                                                  padding: const EdgeInsets.all(4),
-                                                  constraints: const BoxConstraints(
-                                                    minWidth: 32,
-                                                    minHeight: 32,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  '${_formatNumber(item.quantity)} × ${_formatNumber(item.unitPrice)}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: cs.onSurface.withOpacity(0.7),
-                                                  ),
-                                                ),
-                                                if (item.discountValue > 0)
-                                                  Text(
-                                                    'تخفیف: ${item.discountType == 'percent' ? '${item.discountValue}%' : _formatNumber(item.discountValue)}',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: cs.error,
-                                                    ),
-                                                  ),
-                                                if (item.taxRate > 0)
-                                                  Text(
-                                                    'مالیات: ${item.taxRate}%',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: cs.onSurface.withOpacity(0.6),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                    Text(
-                                      _formatNumber(item.total),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                        color: cs.primary,
+                                      SizedBox(height: isCompact ? 6 : 8),
+                                      _buildCartItemQuantityAndTotals(
+                                        item: item,
+                                        index: index,
+                                        cs: cs,
+                                        compact: isCompact,
                                       ),
-                                    ),
-                                        ],
-                                    ),
                                   ],
                                   ),
                                 ),
@@ -2041,78 +2160,117 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     );
   }
 
-  Widget _buildBarcodeSearchField() {
+  Widget _buildBarcodeSearchField({bool compact = false}) {
     final cs = Theme.of(context).colorScheme;
+    final filterBtn = IconButton(
+      icon: Icon(
+        _selectedCategoryId != null ? Icons.filter_alt : Icons.filter_alt_outlined,
+      ),
+      tooltip: 'فیلتر دسته‌بندی',
+      color: _selectedCategoryId != null ? cs.primary : cs.onSurface.withOpacity(0.6),
+      onPressed: () => _showCategoryFilter(context),
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+    );
+
+    Widget searchField = TextField(
+      controller: _barcodeController,
+      focusNode: _barcodeFocus,
+      decoration: InputDecoration(
+        labelText: compact ? 'جستجوی کالا' : 'بارکد / کد / نام محصول',
+        hintText: compact ? 'کد، نام یا بارکد' : 'اسکن یا وارد کردن بارکد، کد یا نام',
+        prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
+        isDense: compact,
+        border: const OutlineInputBorder(),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_supportsInlineCameraScan)
+              IconButton(
+                icon: const Icon(Icons.photo_camera_outlined),
+                tooltip: 'اسکن بارکد یا QR با دوربین',
+                onPressed: _scanBarcodeWithCamera,
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+              ),
+            if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Colors.green),
+                tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
+                onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+              ),
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => _searchByBarcode(_barcodeController.text),
+              tooltip: 'جستجو',
+              visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+            ),
+          ],
+        ),
+      ),
+      onSubmitted: _searchByBarcode,
+      onChanged: (value) {
+        if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+          setState(() {
+            _lastFailedSearchQuery = null;
+          });
+        }
+      },
+      textInputAction: TextInputAction.search,
+    );
+
+    final categoryChip = _selectedCategoryId != null
+        ? Chip(
+            label: Text(
+              _getCategoryLabel(_selectedCategoryId!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onDeleted: () {
+              setState(() {
+                _selectedCategoryId = null;
+              });
+            },
+            deleteIcon: const Icon(Icons.close, size: 18),
+            avatar: const Icon(Icons.category, size: 18),
+            materialTapTargetSize: compact ? MaterialTapTargetSize.shrinkWrap : MaterialTapTargetSize.padded,
+            visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+          )
+        : null;
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              filterBtn,
+              Expanded(child: searchField),
+            ],
+          ),
+          if (categoryChip != null) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: categoryChip,
+            ),
+          ],
+        ],
+      );
+    }
+
     return Row(
       children: [
-        // دکمه فیلتر دسته‌بندی
-        IconButton(
-          icon: Icon(
-            _selectedCategoryId != null ? Icons.filter_alt : Icons.filter_alt_outlined,
-          ),
-          tooltip: 'فیلتر دسته‌بندی',
-          color: _selectedCategoryId != null ? cs.primary : cs.onSurface.withOpacity(0.6),
-          onPressed: () => _showCategoryFilter(context),
-        ),
-        // Breadcrumb دسته‌بندی انتخاب شده
-        if (_selectedCategoryId != null)
-          Expanded(
-            flex: 0,
+        filterBtn,
+        if (categoryChip != null)
+          Flexible(
             child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Chip(
-                label: Text(_getCategoryLabel(_selectedCategoryId!)),
-                onDeleted: () {
-                  setState(() {
-                    _selectedCategoryId = null;
-                  });
-                },
-                deleteIcon: const Icon(Icons.close, size: 18),
-                avatar: const Icon(Icons.category, size: 18),
-              ),
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: categoryChip,
             ),
           ),
-        // فیلد جستجو
-        Expanded(
-          child: TextField(
-            controller: _barcodeController,
-            focusNode: _barcodeFocus,
-            decoration: InputDecoration(
-              labelText: 'بارکد / کد / نام محصول',
-              hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
-              prefixIcon: const Icon(Icons.qr_code_scanner),
-              border: const OutlineInputBorder(),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
-                  if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.add_circle, color: Colors.green),
-                      tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                      onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
-                    ),
-                  // دکمه جستجو
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: () => _searchByBarcode(_barcodeController.text),
-                    tooltip: 'جستجو',
-                  ),
-                ],
-              ),
-            ),
-            onSubmitted: _searchByBarcode,
-            onChanged: (value) {
-              // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
-              if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
-                setState(() {
-                  _lastFailedSearchQuery = null;
-                });
-              }
-            },
-            textInputAction: TextInputAction.search,
-          ),
-        ),
+        Expanded(child: searchField),
       ],
     );
   }
@@ -2253,6 +2411,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     final t = AppLocalizations.of(context);
     final g = _totalsWithGlobal;
     final lineDisc = _lineDiscountOnly;
+    final narrow = MediaQuery.sizeOf(context).width < _compactBreakpoint;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -2260,26 +2419,54 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: [
-                ButtonSegment<String>(
-                  value: 'percent',
-                  label: Text(t.invoiceGlobalDiscountTypePercent),
+            if (!narrow) ...[
+              Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+            ],
+            if (narrow)
+              DropdownButtonFormField<String>(
+                value: _globalDiscountType,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.invoiceGlobalDiscountSection,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
                 ),
-                ButtonSegment<String>(
-                  value: 'amount',
-                  label: Text(t.invoiceGlobalDiscountTypeAmount),
-                ),
-              ],
-              selected: {_globalDiscountType},
-              onSelectionChanged: (s) {
-                setState(() {
-                  _globalDiscountType = s.first;
-                });
-              },
-            ),
+                items: [
+                  DropdownMenuItem(
+                    value: 'percent',
+                    child: Text(t.invoiceGlobalDiscountTypePercent),
+                  ),
+                  DropdownMenuItem(
+                    value: 'amount',
+                    child: Text(t.invoiceGlobalDiscountTypeAmount),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() => _globalDiscountType = v);
+                  }
+                },
+              )
+            else
+              SegmentedButton<String>(
+                segments: [
+                  ButtonSegment<String>(
+                    value: 'percent',
+                    label: Text(t.invoiceGlobalDiscountTypePercent),
+                  ),
+                  ButtonSegment<String>(
+                    value: 'amount',
+                    label: Text(t.invoiceGlobalDiscountTypeAmount),
+                  ),
+                ],
+                selected: {_globalDiscountType},
+                onSelectionChanged: (s) {
+                  setState(() {
+                    _globalDiscountType = s.first;
+                  });
+                },
+              ),
             const SizedBox(height: 8),
             TextField(
               controller: _globalDiscountValueController,
@@ -2435,10 +2622,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
 
   Widget _buildMobileBottomBar(ColorScheme cs) {
     final canCheckout = _cartItems.isNotEmpty && !_saving;
+    final narrow = MediaQuery.sizeOf(context).width < _compactBreakpoint;
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: narrow ? 8 : 12, vertical: narrow ? 8 : 10),
         decoration: BoxDecoration(
           color: cs.surface,
           border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
@@ -2471,10 +2659,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: narrow ? 8 : 12),
             FilledButton(
               onPressed: canCheckout ? () => _openCheckoutSheet(cs) : null,
-              child: Text(_cartItems.isEmpty ? 'سبد خالی' : 'پرداخت / ثبت'),
+              style: narrow
+                  ? FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))
+                  : null,
+              child: Text(
+                _cartItems.isEmpty
+                    ? 'سبد خالی'
+                    : (narrow ? 'تسویه' : 'پرداخت / ثبت'),
+              ),
             ),
             const SizedBox(width: 8),
             PopupMenuButton<String>(

@@ -386,16 +386,6 @@ class SettingsCategorizationService {
             order: 1,
           ),
           SettingsItem(
-            id: 'system_logs',
-            title: 'systemLogs',
-            description: 'systemLogsDescription',
-            icon: Icons.analytics_outlined,
-            color: const Color(0xFF9C27B0),
-            route: '/user/profile/system-settings/logs',
-            categoryId: 'monitoring_logs',
-            order: 2,
-          ),
-          SettingsItem(
             id: 'service_logs',
             title: 'settingsServiceLogs',
             description: 'settingsServiceLogsDescription',
@@ -403,7 +393,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF607D8B),
             route: '/user/profile/system-settings/service-logs',
             categoryId: 'monitoring_logs',
-            order: 3,
+            order: 2,
           ),
           SettingsItem(
             id: 'database_backup',
@@ -413,7 +403,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF37474F),
             route: '/user/profile/system-settings/database-backup',
             categoryId: 'monitoring_logs',
-            order: 4,
+            order: 3,
             requiresSuperAdmin: true,
           ),
           SettingsItem(
@@ -424,7 +414,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF6A1B9A),
             route: '/user/profile/system-settings/scripts',
             categoryId: 'monitoring_logs',
-            order: 5,
+            order: 4,
             requiresSuperAdmin: true,
           ),
         ],

@@ -28,6 +28,9 @@ const _kWorkflowConditionOperators = <String>[
   'in', 'not_in', 'is_null', 'is_not_null',
 ];
 
+/// مقدار ساختگی در UI برای حالت «رویداد سفارشی» (در ذخیرهٔ نهایی استفاده نمی‌شود)
+const String _kNotificationEventCustomDropdown = '__workflow_notification_event_custom__';
+
 /// Dialog برای تنظیمات یک node
 class WorkflowNodeConfigDialog extends StatefulWidget {
   final WorkflowNodeModel node;
@@ -67,6 +70,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   Map<String, dynamic>? _smsTemplateDetail;
   Map<String, dynamic>? _smsCostEstimate;
   bool _loadingSmsCost = false;
+  List<Map<String, dynamic>> _notificationEventTypes = [];
+  bool _loadingNotificationEventTypes = false;
+  /// برای فیلدهای `notification_event_type_selector`: فرق گذاشتن بین خالیِ «هنوز انتخاب نشده» و حالت «سفارشی»
+  final Map<String, bool> _notificationEventCustomMode = {};
 
   /// همگام با انتخاب reference از نود قبلی (initialValue به‌تنهایی به‌روز نمی‌شود)
   final Map<String, TextEditingController> _workflowTextControllers = {};
@@ -192,6 +199,9 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 
     // قالب‌های SMS برای نود ارسال پیامک
     _loadSmsTemplatesIfNeeded();
+
+    // انواع رویداد (نام/کلید رویداد در نود create_notification و مشابه)
+    _loadNotificationEventTypesIfNeeded();
     
     // بارگذاری ترجمه‌ها
     _loadTranslations();
@@ -225,6 +235,37 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     } catch (e) {
       debugPrint('خطا در بارگذاری قالب‌های SMS: $e');
       if (mounted) setState(() => _loadingSmsTemplates = false);
+    }
+  }
+
+  Future<void> _loadNotificationEventTypesIfNeeded() async {
+    if (_configSchema == null) return;
+    var need = false;
+    for (final e in _configSchema!.entries) {
+      final s = e.value;
+      if (s is Map<String, dynamic> && s['ui_type'] == 'notification_event_type_selector') {
+        need = true;
+        break;
+      }
+    }
+    if (!need) return;
+
+    setState(() => _loadingNotificationEventTypes = true);
+    try {
+      final list = await _workflowService.listNotificationEventTypes();
+      if (!mounted) return;
+      list.sort((a, b) {
+        final na = '${a['name'] ?? a['code'] ?? ''}';
+        final nb = '${b['name'] ?? b['code'] ?? ''}';
+        return na.compareTo(nb);
+      });
+      setState(() {
+        _notificationEventTypes = list;
+        _loadingNotificationEventTypes = false;
+      });
+    } catch (e) {
+      debugPrint('خطا در بارگذاری انواع رویداد نوتیفیکیشن: $e');
+      if (mounted) setState(() => _loadingNotificationEventTypes = false);
     }
   }
 
@@ -1034,6 +1075,8 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
           return _buildDatePicker(key, schema, value, required, description);
         } else if (uiType == 'textarea') {
           return _buildTextarea(key, schema, value, required, description);
+        } else if (uiType == 'notification_event_type_selector') {
+          return _buildNotificationEventTypeSelector(key, schema, value, required, description);
         }
         
         // Text field برای string با پشتیبانی از Reference
@@ -1318,7 +1361,8 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         keyLower == 'invoice_type' ||
         keyLower == 'template_id' ||
         keyLower == 'person_id' ||
-        keyLower == 'recipient_mobile') {
+        keyLower == 'recipient_mobile' ||
+        keyLower == 'event_key') {
       return AppLocalizations.of(context).workflowConfigGroupMainSettings;
     }
     
@@ -2352,6 +2396,201 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             const SizedBox(height: 8),
             _buildSmsTemplateVariableChips(theme, isFa),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// انتخاب نام/کلید رویداد نوتیفیکیشن (فهرست سیستم + سفارشی + ارجاع نود)
+  Widget _buildNotificationEventTypeSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    final isFa = _workflowLangIsFa();
+    final t = AppLocalizations.of(context);
+
+    final raw = (currentValue?.toString() ?? '').trim();
+    if (raw.startsWith(r'$')) {
+      return _buildReferenceTextField(key, schema, currentValue, required, description);
+    }
+
+    if (_loadingNotificationEventTypes) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const LinearProgressIndicator(),
+            const SizedBox(height: 8),
+            Text(
+              isFa ? 'در حال بارگذاری فهرست رویدادها…' : 'Loading event types…',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final presetCodes = <String>{
+      for (final m in _notificationEventTypes)
+        if (m['code'] != null) m['code'].toString(),
+    };
+
+    String labelForCode(String code) {
+      Map<String, dynamic>? row;
+      for (final m in _notificationEventTypes) {
+        if (m['code']?.toString() == code) {
+          row = m;
+          break;
+        }
+      }
+      final name = row?['name']?.toString() ?? '';
+      if (name.isEmpty) return code;
+      return '$name ($code)';
+    }
+
+    final bool customMode = raw.isNotEmpty
+        ? !presetCodes.contains(raw)
+        : (_notificationEventCustomMode[key] == true);
+
+    final String? dropdownValue = () {
+      if (raw.isNotEmpty) {
+        return presetCodes.contains(raw) ? raw : _kNotificationEventCustomDropdown;
+      }
+      if (customMode) return _kNotificationEventCustomDropdown;
+      return null;
+    }();
+
+    final showCustomTextField = dropdownValue == _kNotificationEventCustomDropdown;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            value: dropdownValue,
+            decoration: InputDecoration(
+              labelText: _formatKey(key),
+              border: const OutlineInputBorder(),
+              helperText: description,
+              suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+            ),
+            hint: Text(isFa ? 'انتخاب رویداد' : 'Select event'),
+            isExpanded: true,
+            items: [
+              ...presetCodes.map(
+                (c) => DropdownMenuItem<String>(
+                  value: c,
+                  child: Text(
+                    labelForCode(c),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+              DropdownMenuItem<String>(
+                value: _kNotificationEventCustomDropdown,
+                child: Text(
+                  isFa ? 'سفارشی (تایپ دستی یا ارجاع از نود)' : 'Custom (type or reference from node)',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ),
+            ],
+            onChanged: (v) {
+              setState(() {
+                if (v == null) {
+                  _config.remove(key);
+                  _workflowTextControllers.remove(key);
+                  _notificationEventCustomMode.remove(key);
+                } else if (v == _kNotificationEventCustomDropdown) {
+                  _notificationEventCustomMode[key] = true;
+                  _config[key] = '';
+                  _ensureWorkflowTextController(key).text = '';
+                } else {
+                  _notificationEventCustomMode[key] = false;
+                  _config[key] = v;
+                  _ensureWorkflowTextController(key).text = v;
+                }
+              });
+            },
+            validator: required
+                ? (v) {
+                    if (v == null) return t.workflowNodeFieldRequired;
+                    if (v == _kNotificationEventCustomDropdown) {
+                      final ct = _ensureWorkflowTextController(key).text.trim();
+                      return ct.isEmpty ? t.workflowNodeFieldRequired : null;
+                    }
+                    return null;
+                  }
+                : null,
+          ),
+          if (showCustomTextField) ...[
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final c = _ensureWorkflowTextController(key);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: c,
+                      decoration: InputDecoration(
+                        labelText: isFa ? 'مقدار رویداد' : 'Event value',
+                        border: const OutlineInputBorder(),
+                        helperText: isFa
+                            ? 'نام رویداد را تایپ کنید یا با دکمه زیر از نود قبلی پر کنید'
+                            : 'Type an event key or insert a reference from a previous node',
+                        prefixIcon: c.text.contains(r'$')
+                            ? Icon(Icons.link, size: 18, color: theme.colorScheme.primary)
+                            : null,
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.select_all, size: 18),
+                                tooltip: t.workflowConfigSelectFromNodes,
+                                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
+                              ),
+                            if (required) const Icon(Icons.star, size: 12, color: Colors.red),
+                          ],
+                        ),
+                      ),
+                      onChanged: (v) {
+                        _config[key] = v;
+                        setState(() {});
+                      },
+                    ),
+                    if (c.text.contains(r'$'))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, right: 12),
+                        child: Text(
+                          t.workflowConfigValueUsesNode,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ] else if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.link, size: 16),
+                label: Text(t.workflowConfigUsePreviousNode),
+                onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
+              ),
+            ),
         ],
       ),
     );

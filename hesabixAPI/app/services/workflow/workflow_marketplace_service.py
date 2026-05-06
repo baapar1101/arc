@@ -358,6 +358,45 @@ def get_package_for_owner(db: Session, package_id: int, business_id: int, user_i
     return p
 
 
+def unpublish_package(
+    db: Session,
+    *,
+    package_id: int,
+    business_id: int,
+    user_id: int,
+) -> WorkflowMarketplacePackage:
+    p = get_package_for_owner(db, package_id, business_id, user_id)
+    if not p:
+        raise ValueError("WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND")
+    if p.status != WorkflowMarketplacePackageStatus.PUBLISHED.value:
+        raise ValueError("WORKFLOW_MARKETPLACE_NOT_PUBLISHED")
+    p.status = WorkflowMarketplacePackageStatus.HIDDEN.value
+    p.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+def republish_package(
+    db: Session,
+    *,
+    package_id: int,
+    business_id: int,
+    user_id: int,
+) -> WorkflowMarketplacePackage:
+    p = get_package_for_owner(db, package_id, business_id, user_id)
+    if not p:
+        raise ValueError("WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND")
+    if p.status != WorkflowMarketplacePackageStatus.HIDDEN.value:
+        raise ValueError("WORKFLOW_MARKETPLACE_NOT_HIDDEN")
+    p.status = WorkflowMarketplacePackageStatus.PUBLISHED.value
+    p.published_at = datetime.utcnow()
+    p.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(p)
+    return p
+
+
 def install_package_to_business(
     db: Session,
     *,

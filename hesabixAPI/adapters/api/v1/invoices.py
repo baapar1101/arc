@@ -1290,6 +1290,9 @@ async def export_single_invoice_pdf(
         "show_footer_print_time": True,
         "show_footer_preparer": True,
         "footer_note": None,
+        "show_customer_balance": True,
+        "show_seller_signature_area": True,
+        "show_buyer_signature_area": True,
     }
     invoice_footer_note: Optional[str] = None
 
@@ -1344,6 +1347,15 @@ async def export_single_invoice_pdf(
                                 getattr(r, "show_footer_preparer", True)
                             ),
                             "footer_note": getattr(r, "footer_note", None),
+                            "show_customer_balance": bool(
+                                getattr(r, "show_customer_balance", True)
+                            ),
+                            "show_seller_signature_area": bool(
+                                getattr(r, "show_seller_signature_area", True)
+                            ),
+                            "show_buyer_signature_area": bool(
+                                getattr(r, "show_buyer_signature_area", True)
+                            ),
                         }
                     elif r.document_type == doc.document_type:
                         per_type_cfg = {
@@ -1361,6 +1373,15 @@ async def export_single_invoice_pdf(
                                 getattr(r, "show_footer_preparer", True)
                             ),
                             "footer_note": getattr(r, "footer_note", None),
+                            "show_customer_balance": bool(
+                                getattr(r, "show_customer_balance", True)
+                            ),
+                            "show_seller_signature_area": bool(
+                                getattr(r, "show_seller_signature_area", True)
+                            ),
+                            "show_buyer_signature_area": bool(
+                                getattr(r, "show_buyer_signature_area", True)
+                            ),
                         }
                 if per_type_cfg is None:
                     return default_cfg
@@ -1802,6 +1823,9 @@ async def export_single_invoice_pdf(
         logger.exception("Error calculating customer balance for invoice_id=%s", invoice_id)
         customer_balance_info = {}
 
+    if not bool(print_settings.get("show_customer_balance", True)):
+        customer_balance_info = {}
+
     # تراکنش‌های پرداخت مرتبط با فاکتور (رسید/پرداخت‌ها)
     payments: list[dict[str, Any]] = []
     try:
@@ -2078,6 +2102,12 @@ async def export_single_invoice_pdf(
         "invoice_verify_qr_data_uri": invoice_verify_qr_data_uri,
         "show_footer_print_time": bool(print_settings.get("show_footer_print_time", True)),
         "show_footer_preparer": bool(print_settings.get("show_footer_preparer", True)),
+        "show_seller_signature_area": bool(
+            print_settings.get("show_seller_signature_area", True)
+        ),
+        "show_buyer_signature_area": bool(
+            print_settings.get("show_buyer_signature_area", True)
+        ),
     }
 
     # تلاش برای رندر با قالب سفارشی

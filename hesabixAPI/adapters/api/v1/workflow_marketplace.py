@@ -29,6 +29,8 @@ from app.services.workflow.workflow_marketplace_service import (
     package_detail_dict,
     package_to_public_dict,
     publish_package,
+    republish_package,
+    unpublish_package,
 )
 
 router = APIRouter(tags=["workflow-marketplace"])
@@ -193,6 +195,74 @@ async def marketplace_publish(
         data=package_to_public_dict(db, pkg, request),
         request=request,
         message="WORKFLOW_MARKETPLACE_PUBLISHED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/workflows/marketplace/my-packages/{package_id}/unpublish",
+    summary="خروج از انتشار در مخزن (مخفی برای دیگران، در فهرست من مانده)",
+)
+@require_business_access("business_id")
+async def marketplace_unpublish(
+    request: Request,
+    business_id: int,
+    package_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("workflows", "edit")),
+) -> dict:
+    try:
+        pkg = unpublish_package(
+            db,
+            package_id=package_id,
+            business_id=business_id,
+            user_id=ctx.get_user_id(),
+        )
+    except ValueError as e:
+        code = str(e.args[0]) if e.args else "UNPUBLISH_FAILED"
+        if code == "WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND":
+            raise ApiError(code, "بسته یافت نشد", http_status=404)
+        if code == "WORKFLOW_MARKETPLACE_NOT_PUBLISHED":
+            raise ApiError(code, "این بسته در حال حاضر منتشر نیست", http_status=400)
+        raise ApiError(code, "خروج از انتشار ناموفق بود", http_status=400)
+    return success_response(
+        data=package_to_public_dict(db, pkg, request),
+        request=request,
+        message="WORKFLOW_MARKETPLACE_UNPUBLISHED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/workflows/marketplace/my-packages/{package_id}/republish",
+    summary="انتشار مجدد بسته مخفی در مخزن",
+)
+@require_business_access("business_id")
+async def marketplace_republish(
+    request: Request,
+    business_id: int,
+    package_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("workflows", "edit")),
+) -> dict:
+    try:
+        pkg = republish_package(
+            db,
+            package_id=package_id,
+            business_id=business_id,
+            user_id=ctx.get_user_id(),
+        )
+    except ValueError as e:
+        code = str(e.args[0]) if e.args else "REPUBLISH_FAILED"
+        if code == "WORKFLOW_MARKETPLACE_PACKAGE_NOT_FOUND":
+            raise ApiError(code, "بسته یافت نشد", http_status=404)
+        if code == "WORKFLOW_MARKETPLACE_NOT_HIDDEN":
+            raise ApiError(code, "فقط بسته‌های مخفی‌شده قابل انتشار مجدد هستند", http_status=400)
+        raise ApiError(code, "انتشار مجدد ناموفق بود", http_status=400)
+    return success_response(
+        data=package_to_public_dict(db, pkg, request),
+        request=request,
+        message="WORKFLOW_MARKETPLACE_REPUBLISHED",
     )
 
 

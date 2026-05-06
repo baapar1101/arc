@@ -26,6 +26,8 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
   Map<String, dynamic>? _result;
   PickedFileData? _selectedFile;
   bool _isInitialized = false;
+  /// پس از ایمپورت واقعی موفق، با بستن دیالوگ جدول والد رفرش شود.
+  bool _shouldRefreshParent = false;
 
   @override
   void initState() {
@@ -146,9 +148,13 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       );
       setState(() {
         _result = res.data;
+        if (!dryRun) {
+          _shouldRefreshParent = true;
+        }
       });
-      if (!dryRun) {
-        if (mounted) Navigator.of(context).pop(true);
+      if (!dryRun && mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(context, message: t.personImportSuccess);
       }
     } catch (e) {
       if (mounted) {
@@ -252,8 +258,6 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                 if (_dryRun)
                   FilledButton.tonalIcon(
                     onPressed: _loading ? null : () async {
-                      // اجرای ایمپورت واقعی
-                      setState(() => _dryRun = false);
                       await _runImport(dryRun: false);
                     },
                     icon: const Icon(Icons.cloud_upload),
@@ -275,7 +279,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
+          onPressed: _loading ? null : () => Navigator.of(context).pop(_shouldRefreshParent),
           child: Text(t.close),
         ),
       ],
@@ -293,6 +297,10 @@ class _ResultSummary extends StatelessWidget {
     final data = result['data'] as Map<String, dynamic>?;
     final summary = (data?['summary'] as Map<String, dynamic>?) ?? {};
     final errors = (data?['errors'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final warnings =
+        (data?['warnings'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final isDry = summary['dry_run'] == true;
+    final skipApply = summary['skipped_apply'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -307,10 +315,46 @@ class _ResultSummary extends StatelessWidget {
             _chip(t.inserted, summary['inserted']),
             _chip(t.updated, summary['updated']),
             _chip(t.skipped, summary['skipped']),
-            _chip(t.dryRun, summary['dry_run'] == true ? t.yes : t.no),
+            if (skipApply != null &&
+                skipApply is num &&
+                skipApply.toInt() > 0)
+              _chip(t.importSkippedApply, skipApply),
+            _chip(t.dryRun, isDry ? t.yes : t.no),
+            if (isDry) ...[
+              _chip(t.importPreviewInsert, summary['would_insert']),
+              _chip(t.importPreviewUpdate, summary['would_update']),
+              _chip(t.importPreviewSkipConflict, summary['would_skip_conflict']),
+            ],
           ],
         ),
         const SizedBox(height: 8),
+        if (warnings.isNotEmpty) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              t.importWarningsTitle,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              itemCount: warnings.length,
+              itemBuilder: (context, i) {
+                final w = warnings[i];
+                return ListTile(
+                  dense: true,
+                  leading:
+                      Icon(Icons.warning_amber_outlined, color: Theme.of(context).colorScheme.tertiary),
+                  title: Text('${t.row} ${w['row']}'),
+                  subtitle: Text(w['message']?.toString() ?? ''),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (errors.isNotEmpty)
           SizedBox(
             height: 160,

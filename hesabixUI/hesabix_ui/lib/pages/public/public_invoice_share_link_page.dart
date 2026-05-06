@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +10,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -140,9 +141,22 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
         calendarType: _useJalaliCalendar ? 'jalali' : 'gregorian',
       );
       if (bytes.isEmpty) return;
-      await Printing.layoutPdf(
-        name: 'invoice_${widget.code}.pdf',
-        onLayout: (_) async => Uint8List.fromList(bytes),
+      final name = 'invoice_${widget.code}.pdf';
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          bytes,
+          name,
+          mimeType: 'application/pdf',
+        );
+      } else {
+        await Printing.sharePdf(
+          bytes: Uint8List.fromList(bytes),
+          filename: name,
+        );
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فایل PDF آماده شد')),
       );
     } on DioException catch (e) {
       if (!mounted) return;
@@ -165,11 +179,6 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
       appBar: AppBar(
         title: const Text('نمایش فاکتور'),
         actions: [
-          IconButton(
-            onPressed: _loading ? null : _exportPdf,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            tooltip: 'خروجی PDF',
-          ),
           IconButton(
             onPressed: _fetch,
             icon: const Icon(Icons.refresh),
@@ -287,26 +296,51 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   }
 
   Widget _buildCalendarToggle(ThemeData theme) {
-    return Align(
-      alignment: AlignmentDirectional.centerEnd,
-      child: SegmentedButton<bool>(
-        segments: const [
-          ButtonSegment<bool>(
-            value: true,
-            label: Text('شمسی'),
-            icon: Icon(Icons.calendar_month, size: 18),
-          ),
-          ButtonSegment<bool>(
-            value: false,
-            label: Text('میلادی'),
-            icon: Icon(Icons.event, size: 18),
-          ),
-        ],
-        selected: {_useJalaliCalendar},
-        onSelectionChanged: (set) {
-          setState(() => _useJalaliCalendar = set.first);
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 520;
+        final calendar = SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment<bool>(
+              value: true,
+              label: Text('شمسی'),
+              icon: Icon(Icons.calendar_month, size: 18),
+            ),
+            ButtonSegment<bool>(
+              value: false,
+              label: Text('میلادی'),
+              icon: Icon(Icons.event, size: 18),
+            ),
+          ],
+          selected: {_useJalaliCalendar},
+          onSelectionChanged: (set) {
+            setState(() => _useJalaliCalendar = set.first);
+          },
+        );
+        final invoiceBtn = FilledButton.icon(
+          onPressed: _loading ? null : _exportPdf,
+          icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+          label: const Text('دریافت فاکتور'),
+        );
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              calendar,
+              const SizedBox(height: 12),
+              invoiceBtn,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: Align(alignment: AlignmentDirectional.centerStart, child: invoiceBtn)),
+            const SizedBox(width: 12),
+            calendar,
+          ],
+        );
+      },
     );
   }
 

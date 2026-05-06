@@ -261,12 +261,25 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isEdit = widget.checkId != null;
-    final canAccountingWrite = widget.authStore.canWriteSection('accounting');
 
     if (!widget.authStore.canWriteSection('checks')) {
       return AlertDialog(
         title: Text(t.accessDenied),
-        content: const Text('شما دسترسی لازم برای ویرایش چک را ندارید'),
+        content: Text(t.checkFormNeedsChecksWritePermission),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(t.cancel),
+          ),
+        ],
+      );
+    }
+
+    // ثبت چک جدید در سرور همیشه سند حسابداری می‌سازد؛ ویرایش فقط مجوز چک را می‌خواهد.
+    if (widget.checkId == null && !widget.authStore.canCreateOrEditAccountingDocuments()) {
+      return AlertDialog(
+        title: Text(t.accessDenied),
+        content: Text(t.checkFormNeedsAccountingDocumentsPermission),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

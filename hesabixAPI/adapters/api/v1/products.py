@@ -1,7 +1,8 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from typing import Annotated, Dict, Any
-from fastapi import APIRouter, Depends, Request, Body
+from typing import Annotated, Dict, Any, Optional
+from datetime import date as date_type
+from fastapi import APIRouter, Depends, Request, Body, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -39,6 +40,7 @@ from app.services.product_service import (
     get_inventory_kardex_report,
     get_inventory_stock_report,
 )
+from app.services.product_commercial_insights_service import get_product_commercial_insights
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
     apply_bulk_price_update,
@@ -602,6 +604,39 @@ def get_product_endpoint(
     if not item:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
+
+
+@router.get(
+    "/business/{business_id}/{product_id}/commercial-insights",
+    summary="خلاصهٔ بازرگانی کالا (حواله + تسعیر به ارز پایه)",
+    description="""
+    آمار خرید/فروش و نمودار میانگین موزون قیمت واحد به **ارز پایهٔ کسب‌وکار**.
+    تنها خطوط فاکتوری که مانند Kardex کنترل می‌شوند و فاکتور مربوطه **حداقل یک حوالهٔ انبار با وضعیت posted و مبدأ invoice** دارد، لحاظ می‌شوند.
+    نرخ تبدیل مانند شخص‌حساب: اولویت با `extra_info.fx` روی سند، سپس نرخ تاریخ سند مطابق تنظیم تسعیر کسب‌وکار.
+    """,
+)
+@require_business_access("business_id")
+def get_product_commercial_insights_endpoint(
+    request: Request,
+    business_id: int,
+    product_id: int,
+    date_from: Optional[date_type] = Query(None, description="آغاز بازهٔ شمسی/میلادی یکسان با document_date اسناد"),
+    date_to: Optional[date_type] = Query(None, description="پایان بازه (شامل)"),
+    bucket: str = Query("month", description="تجمیع نمودار: day | week | month"),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "view", Product, "product_id")),
+    __: None = Depends(require_business_permission_dep("invoices", "view")),
+) -> Dict[str, Any]:
+    data = get_product_commercial_insights(
+        db,
+        business_id=int(business_id),
+        product_id=int(product_id),
+        date_from=date_from,
+        date_to=date_to,
+        bucket=str(bucket or "month"),
+    )
+    return success_response(data=format_datetime_fields(data, request), request=request)
 
 
 @router.put(

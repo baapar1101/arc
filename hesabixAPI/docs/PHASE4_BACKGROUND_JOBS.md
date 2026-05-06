@@ -77,6 +77,8 @@ sudo systemctl status hesabix-rq-worker
 sudo journalctl -u hesabix-rq-worker -f
 ```
 
+برای مشاهدهٔ همان لاگ از پنل ادمین (**تنظیمات سیستم → لاگ‌های سرویس‌ها**) و محدودیت‌های میزبان/Docker، به [SERVICE_LOGS_ADMIN_API.md](./SERVICE_LOGS_ADMIN_API.md) مراجعه کنید.
+
 ## استفاده
 
 ### Enqueue کردن Job

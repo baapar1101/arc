@@ -2293,6 +2293,26 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warehouseTransfers => 'صدور حواله';
 
   @override
+  String get permissionsWarehouseInventoryHint =>
+      'مدیریت انبارها و حواله‌های انبار مجوزهای جدا دارند. «مدیریت انبارها» برای تعریف و ویرایش انبارهاست. برای دسترسی به لیست حواله، ثبت و قطعی حواله، حواله از فاکتور، انبارگردانی و سایر عملیات موجودی مرتبط، گزینه‌های بخش «صدور حواله» را هم فعال کنید.';
+
+  @override
+  String get permissionsGroupHintChecks =>
+      'ثبت چک جدید همیشه یک سند حسابداری هم ایجاد می‌کند؛ علاوه بر مجوزهای چک، حداقل یکی از افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را فعال کنید. بعضی فرایندهای چک (مانند وصول، واگذاری، پرداخت و …) نیز ممکن است سند ثبت کنند.';
+
+  @override
+  String get permissionsGroupHintAccountingDocuments =>
+      'این مجوزها برای ثبت اسناد دستی و همچنین اسناد خودکاری که سیستم با عملیات‌هایی مانند چک، دریافت و پرداخت اشخاص یا فاکتور (در صورت کاربرد) ایجاد می‌کند، اعمال می‌شود.';
+
+  @override
+  String get checkFormNeedsChecksWritePermission =>
+      'شما مجوز افزودن یا ویرایش چک را ندارید.';
+
+  @override
+  String get checkFormNeedsAccountingDocumentsPermission =>
+      'شما مجوز ثبت سند حسابداری ندارید. ذخیرهٔ چک یک سند حسابداری ایجاد می‌کند؛ از مدیر بخواهید حداقل یکی از گزینه‌های افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را برای شما فعال کند.';
+
+  @override
   String get addBankAccount => 'افزودن حساب بانکی';
 
   @override
@@ -3132,6 +3152,24 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get skipped => 'رد شده';
+
+  @override
+  String get importSkippedApply => 'ناموفق در ذخیره';
+
+  @override
+  String get importPreviewInsert => 'ایجاد (پیش‌نمایش)';
+
+  @override
+  String get importPreviewUpdate => 'به‌روزرسانی (پیش‌نمایش)';
+
+  @override
+  String get importPreviewSkipConflict => 'رد تداخل (پیش‌نمایش)';
+
+  @override
+  String get importWarningsTitle => 'هشدارها';
+
+  @override
+  String get personImportSuccess => 'ایمپورت با موفقیت انجام شد';
 
   @override
   String get yes => 'بله';
@@ -9076,6 +9114,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get serviceLogsFollowTailChip => 'آخر خط';
 
   @override
+  String get serviceLogsEmptyAllowedList =>
+      'سرور فهرست خالی از سرویس‌های مجاز برگرداند.';
+
+  @override
+  String get serviceLogsNoFilterMatches =>
+      'هیچ خطی با فیلتر یا جستجوی فعلی هم‌خوان نیست';
+
+  @override
+  String serviceLogsAllowedServicesFetchFailed(String error) {
+    return 'به‌روزرسانی لیست سرویس از سرور نشد؛ فهرست پیش‌فرض نمایش داده می‌شود. $error';
+  }
+
+  @override
+  String serviceLogsStatusLoadFailed(String error) {
+    return 'دریافت وضعیت سرویس ممکن نشد: $error';
+  }
+
+  @override
   String get settingsDatabaseBackup => 'بکاپ دیتابیس';
 
   @override
@@ -10852,6 +10908,35 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get workflowMarketplaceError => 'خطا در مخزن ورک‌فلو';
+
+  @override
+  String get workflowMarketplaceStatusLive => 'فعال در مخزن';
+
+  @override
+  String get workflowMarketplaceStatusPrivate => 'خارج از مخزن';
+
+  @override
+  String get workflowMarketplaceMyEmpty => 'هنوز چیزی در مخزن منتشر نکرده‌اید.';
+
+  @override
+  String get workflowMarketplaceUnpublish => 'حذف از مخزن';
+
+  @override
+  String get workflowMarketplaceUnpublishConfirmTitle =>
+      'از فهرست عمومی حذف شود؟';
+
+  @override
+  String get workflowMarketplaceUnpublishConfirmBody =>
+      'دیگران این ورک‌فلو را نمی‌بینند؛ در فهرست «انتشارات من» باقی می‌ماند و می‌توانید بعداً دوباره منتشر کنید.';
+
+  @override
+  String get workflowMarketplaceRepublish => 'انتشار مجدد در مخزن';
+
+  @override
+  String get workflowMarketplaceRemovedFromRepo => 'از مخزن عمومی حذف شد.';
+
+  @override
+  String get workflowMarketplaceRepublishedToast => 'دوباره در مخزن منتشر شد.';
 
   @override
   String get distributionMenu => 'پخش مویرگی';

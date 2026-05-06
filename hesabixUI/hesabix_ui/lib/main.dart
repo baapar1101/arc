@@ -31,7 +31,6 @@ import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
 import 'pages/admin/system_configuration_page.dart';
 import 'pages/admin/user_management_page.dart';
-import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
 import 'pages/admin/redis_settings_page.dart';
 import 'pages/admin/firewall_admin_page.dart';
@@ -381,7 +380,6 @@ class _MyAppState extends State<MyApp> {
       const SystemConfigurationPage();
       const ShareLinkSettingsPage();
       const UserManagementPage();
-      const SystemLogsPage();
       const EmailSettingsPage();
       const AISettingsPage();
       const AIPlansAdminPage();
@@ -1249,20 +1247,6 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const NotificationSmsPricingPage();
-                  },
-                ),
-                GoRoute(
-                  path: 'logs',
-                  name: 'system_settings_logs',
-                  builder: (context, state) {
-                    if (_authStore == null) {
-                      return PermissionGuard.buildAccessDeniedPage();
-                    }
-                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
-                    if (!allowed) {
-                      return PermissionGuard.buildAccessDeniedPage();
-                    }
-                    return const SystemLogsPage();
                   },
                 ),
                 GoRoute(

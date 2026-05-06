@@ -147,6 +147,8 @@ class ProductService {
     List<Map<String, dynamic>>? filters,
     List<String>? searchFields,
     List<int>? categoryIds,
+    bool includeInventory = false,
+    String? inventoryAsOfDate,
   }) async {
     final data = await searchProductsRaw(
       businessId: businessId,
@@ -156,6 +158,8 @@ class ProductService {
       filters: filters,
       searchFields: searchFields,
       categoryIds: categoryIds,
+      includeInventory: includeInventory,
+      inventoryAsOfDate: inventoryAsOfDate,
     );
     final items = data['items'];
     if (items is List) {
@@ -173,6 +177,8 @@ class ProductService {
     List<Map<String, dynamic>>? filters,
     List<String>? searchFields,
     List<int>? categoryIds,
+    bool includeInventory = false,
+    String? inventoryAsOfDate,
   }) async {
     final body = <String, dynamic>{
       'take': limit,
@@ -181,6 +187,9 @@ class ProductService {
       if (filters != null && filters.isNotEmpty) 'filters': filters,
       if (searchFields != null && searchFields.isNotEmpty) 'searchFields': searchFields,
       if (categoryIds != null && categoryIds.isNotEmpty) 'category_ids': categoryIds,
+      if (includeInventory) 'include_inventory': true,
+      if (inventoryAsOfDate != null && inventoryAsOfDate.trim().isNotEmpty)
+        'inventory_as_of_date': inventoryAsOfDate.trim(),
     };
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/products/business/$businessId/search',
@@ -278,6 +287,34 @@ class ProductService {
       ),
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  /// خلاصهٔ بازرگانی کالا (حوالهٔ انبار تأییدشده + قیمت به ارز پایه با منطق تسعیر سند).
+  Future<Map<String, dynamic>> getCommercialInsights({
+    required int businessId,
+    required int productId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String bucket = 'month',
+  }) async {
+    final q = <String, dynamic>{
+      'bucket': bucket,
+      if (dateFrom != null) 'date_from': _localCalendarYmd(dateFrom),
+      if (dateTo != null) 'date_to': _localCalendarYmd(dateTo),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/$productId/commercial-insights',
+      query: q,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  /// تاریخ محلی یکسان با تقویمی که کاربر دید؛ برای جلوگیری از شیفت یک‌روزی در API.
+  String _localCalendarYmd(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
   }
 }
 

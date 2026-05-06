@@ -40,6 +40,8 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
   bool _followTail = true;
   int _lines = 100;
   String? _error;
+  String? _allowedServicesWarning;
+  String? _statusLoadError;
 
   _SeverityFilter _severityFilter = _SeverityFilter.all;
 
@@ -71,14 +73,29 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
   Future<void> _loadAllowedServices() async {
     try {
       final names = await _service.getAllowedServices();
-      if (!mounted || names.isEmpty) return;
+      if (!mounted) return;
+      if (names.isEmpty) {
+        final loc = AppLocalizations.of(context);
+        setState(() {
+          _allowedServicesWarning = loc.serviceLogsAllowedServicesFetchFailed(loc.serviceLogsEmptyAllowedList);
+        });
+        return;
+      }
       setState(() {
         _availableServices = List<String>.from(names);
+        _allowedServicesWarning = null;
         if (!_availableServices.contains(_selectedService)) {
           _selectedService = _availableServices.first;
         }
       });
     } catch (e) {
+      if (!mounted) return;
+      final loc = AppLocalizations.of(context);
+      setState(() {
+        _allowedServicesWarning = loc.serviceLogsAllowedServicesFetchFailed(
+          ErrorExtractor.forContext(e, context),
+        );
+      });
       debugPrint('getAllowedServices: $e');
     }
   }
@@ -191,10 +208,18 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
   Future<void> _loadServiceStatus() async {
     try {
       final status = await _service.getServiceStatus(serviceName: _selectedService);
-      if (mounted) {
-        setState(() => _serviceStatus = status);
-      }
+      if (!mounted) return;
+      setState(() {
+        _serviceStatus = status;
+        _statusLoadError = null;
+      });
     } catch (e) {
+      if (!mounted) return;
+      final msg = ErrorExtractor.forContext(e, context);
+      setState(() {
+        _serviceStatus = null;
+        _statusLoadError = AppLocalizations.of(context).serviceLogsStatusLoadFailed(msg);
+      });
       debugPrint('getServiceStatus: $e');
     }
   }
@@ -227,7 +252,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
     _restartConfirmController.clear();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) {
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setLocal) {
             final ok = _restartConfirmController.text.trim() == _selectedService;
@@ -251,11 +276,11 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
                   child: Text(t.cancel),
                 ),
                 ElevatedButton(
-                  onPressed: ok ? () => Navigator.of(context).pop(true) : null,
+                  onPressed: ok ? () => Navigator.of(dialogContext).pop(true) : null,
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                   child: Text(t.serviceLogsRestart),
                 ),
@@ -321,6 +346,25 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
       default:
         return Colors.grey;
     }
+  }
+
+  /// رنگ‌های ناحیهٔ لاگ: در تم روشن هم‌سو با [ColorScheme]، در تم تیره شباهت به ترمینال حفظ می‌شود.
+  ({Color panel, Color row, Color text, Color meta}) _logPanelColors(ThemeData theme) {
+    if (theme.brightness == Brightness.dark) {
+      return (
+        panel: const Color(0xFF121212),
+        row: const Color(0xFF1C1C1C),
+        text: Colors.white.withValues(alpha: 0.86),
+        meta: Colors.grey,
+      );
+    }
+    final cs = theme.colorScheme;
+    return (
+      panel: cs.surfaceContainerLowest,
+      row: cs.surfaceContainerHighest,
+      text: cs.onSurface,
+      meta: cs.onSurfaceVariant,
+    );
   }
 
   String _formatTimestamp(String timestamp) {
@@ -415,6 +459,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_allowedServicesWarning != null) _buildAllowedServicesBanner(theme, t),
           Material(
             elevation: 1,
             color: theme.colorScheme.surface,
@@ -480,6 +525,31 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                       ],
                     ),
                   ),
+                  if (_statusLoadError != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.warning_amber_rounded,
+                            size: 18,
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _statusLoadError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -607,12 +677,27 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
     }
     if (visible.isEmpty) {
       return Center(
-        child: Text(t.serviceLogsEmpty, style: theme.textTheme.titleLarge),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.manage_search_outlined, size: 56, color: theme.colorScheme.outline),
+              const SizedBox(height: 16),
+              Text(
+                t.serviceLogsNoFilterMatches,
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       );
     }
 
+    final lp = _logPanelColors(theme);
     return ColoredBox(
-      color: Colors.black87,
+      color: lp.panel,
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: ListView.builder(
@@ -629,7 +714,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: lp.row,
                 border: Border(
                   left: BorderSide(color: _getLogLevelColor(level), width: 3),
                 ),
@@ -641,8 +726,8 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                     width: 140,
                     child: Text(
                       _formatTimestamp(timestamp),
-                      style: const TextStyle(
-                        color: Colors.grey,
+                      style: TextStyle(
+                        color: lp.meta,
                         fontSize: 11,
                         fontFamily: 'monospace',
                       ),
@@ -671,8 +756,8 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                   Expanded(
                     child: SelectableText(
                       message,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: lp.text,
                         fontSize: 12,
                         fontFamily: 'monospace',
                       ),
@@ -682,6 +767,48 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAllowedServicesBanner(ThemeData theme, AppLocalizations t) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(start: 12, top: 8, bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 22,
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _allowedServicesWarning!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, size: 20, color: theme.colorScheme.onTertiaryContainer),
+                onPressed: () => setState(() => _allowedServicesWarning = null),
+                tooltip: t.cancel,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -747,7 +874,7 @@ class _LegendDot extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 10),
+      padding: const EdgeInsetsDirectional.only(start: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
