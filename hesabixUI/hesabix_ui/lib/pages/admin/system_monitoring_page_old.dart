@@ -217,7 +217,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
                 'دیسک',
                 '${disk['percent']?.toStringAsFixed(1) ?? '0'}%',
                 _getStatusColor(disk['percent'] as double? ?? 0),
-                Icons.hard_drive,
+                Icons.dns,
               ),
             ),
             const SizedBox(width: 12),

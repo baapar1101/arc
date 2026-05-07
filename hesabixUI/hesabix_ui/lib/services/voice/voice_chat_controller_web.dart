@@ -76,11 +76,8 @@ class VoiceChatController {
       onError: (e) => onError(e.toString()),
       onDone: () => onError('اتصال صوت قطع شد.'),
     );
-    
-    // Enable reconnection for web client
-    if (_ws is VoiceWsClientWeb) {
-      (_ws as dynamic).enableReconnect();
-    }
+
+    _ws.enableReconnect();
 
     // request base64 transport for web
     _ws.sendJson({

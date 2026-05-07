@@ -139,6 +139,7 @@ class VoiceWsClientIO implements VoiceWsClient {
     _connecting = false;
   }
 
+  @override
   void enableReconnect() {
     _shouldReconnect = true;
     _reconnectAttempts = 0;

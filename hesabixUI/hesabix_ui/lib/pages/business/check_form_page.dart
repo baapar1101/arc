@@ -576,7 +576,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                   ),
 
                   const SizedBox(height: 16),
-                  if (canAccountingWrite) ...[
+                  if (widget.authStore.canCreateOrEditAccountingDocuments()) ...[
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isMobile = ResponsiveHelper.isMobile(context);

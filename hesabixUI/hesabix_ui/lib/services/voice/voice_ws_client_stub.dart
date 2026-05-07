@@ -14,6 +14,9 @@ abstract class VoiceWsClient {
   void disconnect();
 
   bool get isConnected;
+
+  /// پیاده‌سازی‌های وب/موبایل پس از وصل‌شدن WS؛ روی سکوهای دیگر تهی است.
+  void enableReconnect();
 }
 
 VoiceWsClient createVoiceWsClient() => _NoopVoiceWsClient();
@@ -41,6 +44,9 @@ class _NoopVoiceWsClient implements VoiceWsClient {
 
   @override
   void sendJson(Map<String, dynamic> payload) {}
+
+  @override
+  void enableReconnect() {}
 }
 
 

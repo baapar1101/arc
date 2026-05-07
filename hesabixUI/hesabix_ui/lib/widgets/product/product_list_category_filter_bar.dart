@@ -336,19 +336,33 @@ class _HorizontalWheelScrollViewState extends State<_HorizontalWheelScrollView> 
 
   @override
   Widget build(BuildContext context) {
+    // وب و دسکتاپ: بدون mouse/trackpad در dragDevices، اسکرول افقی با درگ کار نمی‌کند.
+    final scrollBehavior = ScrollConfiguration.of(context).copyWith(
+      dragDevices: const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.unknown,
+      },
+    );
     return Listener(
+      behavior: HitTestBehavior.translucent,
       onPointerSignal: _onPointerSignal,
       child: Scrollbar(
         controller: _controller,
         thumbVisibility: false,
         thickness: 4,
         radius: const Radius.circular(4),
-        child: SingleChildScrollView(
-          controller: _controller,
-          scrollDirection: Axis.horizontal,
-          physics: const ClampingScrollPhysics(),
-          primary: false,
-          child: widget.child,
+        child: ScrollConfiguration(
+          behavior: scrollBehavior,
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            physics: const ClampingScrollPhysics(),
+            primary: false,
+            child: widget.child,
+          ),
         ),
       ),
     );

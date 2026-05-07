@@ -172,6 +172,7 @@ class VoiceWsClientWeb implements VoiceWsClient {
     _connected = false;
   }
 
+  @override
   void enableReconnect() {
     _shouldReconnect = true;
     _reconnectAttempts = 0;

@@ -4,9 +4,6 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
-// ignore_for_file: deprecated_member_use_from_same_package — dartify برای هر دو dart2js / wasm
-import 'dart:js_util' as js_util show dartify;
-
 import '../config/app_config.dart';
 import 'crm_chat_ws_client_stub.dart';
 export 'crm_chat_ws_client_stub.dart';
@@ -29,14 +26,6 @@ Map<String, dynamic>? _decodedJsonMap(String text) {
 String? _messageEventDataAsUtf16Text(web.MessageEvent e) {
   final raw = e.data;
   if (raw == null) return null;
-  try {
-    final boxed = js_util.dartify(raw as Object);
-    if (boxed is String && boxed.isNotEmpty) {
-      return boxed;
-    }
-  } catch (_) {
-    /* مسیر بعدی */
-  }
   try {
     if (raw.isA<JSString>()) {
       return (raw as JSString).toDart;
